@@ -25,7 +25,14 @@ def get_google_genai_symbol_patcher(
     return SymbolPatcher(
         lambda: importlib.import_module(base_symbol),
         attribute_name,
-        wrapper(settings.model_copy(update={"name": settings.name or display_name})),
+        wrapper(
+            settings.model_copy(
+                update={
+                    "name": settings.name or display_name,
+                    "kind": settings.kind or "llm",
+                }
+            )
+        ),
     )
 
 

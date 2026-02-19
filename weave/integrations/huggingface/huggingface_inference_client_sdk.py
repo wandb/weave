@@ -83,8 +83,9 @@ def huggingface_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Calla
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: huggingface_accumulator,
-            should_accumulate=lambda inputs: isinstance(inputs, dict)
-            and bool(inputs.get("stream")),
+            should_accumulate=lambda inputs: (
+                isinstance(inputs, dict) and bool(inputs.get("stream"))
+            ),
         )
 
     return wrapper
@@ -107,8 +108,9 @@ def huggingface_wrapper_async(settings: OpSettings) -> Callable[[Callable], Call
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: huggingface_accumulator,
-            should_accumulate=lambda inputs: isinstance(inputs, dict)
-            and bool(inputs.get("stream")),
+            should_accumulate=lambda inputs: (
+                isinstance(inputs, dict) and bool(inputs.get("stream"))
+            ),
         )
 
     return wrapper
@@ -131,7 +133,10 @@ def get_huggingface_patcher(
     patchers = []
 
     chat_completion_settings = base.model_copy(
-        update={"name": base.name or "huggingface_hub.InferenceClient.chat_completion"}
+        update={
+            "name": base.name or "huggingface_hub.InferenceClient.chat_completion",
+            "kind": base.kind or "llm",
+        }
     )
     patchers.append(
         SymbolPatcher(
@@ -143,7 +148,8 @@ def get_huggingface_patcher(
 
     chat_completion_async_settings = base.model_copy(
         update={
-            "name": base.name or "huggingface_hub.AsyncInferenceClient.chat_completion"
+            "name": base.name or "huggingface_hub.AsyncInferenceClient.chat_completion",
+            "kind": base.kind or "llm",
         }
     )
     patchers.append(

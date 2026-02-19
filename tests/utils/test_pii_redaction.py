@@ -1,6 +1,8 @@
 """Tests for PII redaction functionality."""
 
 import dataclasses
+import os
+from unittest import mock
 
 import pytest
 
@@ -235,3 +237,15 @@ def test_redact_dataclass_in_list() -> None:
 
     finally:
         sanitize._REDACT_KEYS = original_keys
+
+
+def test_redact_pii_exclude_fields() -> None:
+    """Test that redact_pii_exclude_fields excludes entities from redaction."""
+    with mock.patch.dict(
+        os.environ, {"WEAVE_REDACT_PII_EXCLUDE_FIELDS": "EMAIL_ADDRESS"}, clear=True
+    ):
+        data = {"email": "test@example.com", "name": "John Doe"}
+        redacted = redact_pii(data)
+
+        assert redacted["email"] == "test@example.com"
+        assert "John Doe" not in redacted["name"]

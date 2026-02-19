@@ -1,11 +1,19 @@
+import base64
+import datetime as dt
 import json
+import uuid
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_schema import (
+    CallEndCHInsertable,
+    CallStartCHInsertable,
+)
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -18,12 +26,16 @@ class MockObjectReadError(Exception):
 def test_clickhouse_storage_size_query_generation():
     """Test that ClickHouse storage size query generation works correctly."""
     # Mock the query builder and query stream
+    mock_ch_client = MagicMock()
     with (
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.CallsQuery",
             autospec=True,
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ),
     ):
         # Create a mock CallsQuery instance
         mock_calls_query = Mock()
@@ -60,6 +72,30 @@ def test_clickhouse_storage_size_query_generation():
         )  # First argument should be the query
         # with mocks, we don't have any params generated
         assert call_args[1] == {}  # Second argument should be project_id
+
+
+def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
+    trace_server,
+):
+    """Filter with thread_ids=[] against real ClickHouse: query runs and returns 0 rows.
+
+    When run with --trace-server=clickhouse (and ClickHouse available), uses the real
+    server. The query builder emits thread_id IN ([]) which ClickHouse accepts and
+    returns no rows. Skips when trace_server is SQLite.
+    """
+    server = trace_server._internal_trace_server
+    if not isinstance(server, chts.ClickHouseTraceServer):
+        pytest.skip("ClickHouse-only test: run with --trace-server=clickhouse")
+
+    req = tsi.CallsQueryReq(
+        project_id="test_project",
+        filter=tsi.CallsFilter(thread_ids=[]),
+        limit=100,
+    )
+    result = list(server.calls_query_stream(req))
+
+    # Empty thread_ids -> IN [] -> no rows from ClickHouse
+    assert result == []
 
 
 def test_clickhouse_storage_size_schema_conversion():
@@ -124,6 +160,50 @@ def test_clickhouse_storage_size_null_handling():
     ch_schema = chts._ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] is None
     assert ch_schema["total_storage_size_bytes"] is None
+
+
+def test_clickhouse_distributed_mode_properties():
+    """Test that ClickHouse distributed mode properties are correctly initialized."""
+    # Test with distributed mode enabled
+    with (
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_use_distributed_tables"
+        ) as mock_distributed,
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_replicated_cluster"
+        ) as mock_cluster,
+    ):
+        mock_distributed.return_value = True
+        mock_cluster.return_value = "test_cluster"
+
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        # Test distributed mode property
+        assert server.use_distributed_mode is True
+        assert server.clickhouse_cluster_name == "test_cluster"
+        from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+
+        expected_table = f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
+        assert server._get_calls_complete_table_name() == expected_table
+
+    # Test with distributed mode disabled
+    with (
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_use_distributed_tables"
+        ) as mock_distributed,
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_replicated_cluster"
+        ) as mock_cluster,
+    ):
+        mock_distributed.return_value = False
+        mock_cluster.return_value = None
+
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        # Test distributed mode property
+        assert server.use_distributed_mode is False
+        assert server.clickhouse_cluster_name is None
+        assert server._get_calls_complete_table_name() == "calls_complete"
 
 
 def test_completions_create_stream_custom_provider():
@@ -298,6 +378,9 @@ def test_completions_create_stream_custom_provider_with_tracking():
         "secrets": {"CUSTOM_API_KEY": "test-api-key-value"}
     }
 
+    # Mock ClickHouse client to prevent real connection
+    mock_ch_client = MagicMock()
+
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
@@ -305,6 +388,9 @@ def test_completions_create_stream_custom_provider_with_tracking():
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
@@ -466,12 +552,18 @@ def test_completions_create_stream_multiple_choices():
     mock_secret_fetcher = MagicMock()
     mock_secret_fetcher.fetch.return_value = {"secrets": {"OPENAI_API_KEY": "test-key"}}
 
+    # Mock ClickHouse client to prevent real connection
+    mock_ch_client = MagicMock()
+
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
@@ -512,8 +604,12 @@ def test_completions_create_stream_multiple_choices():
 
         # Get all the calls
         call_args = [call[0][0] for call in mock_insert_call.call_args_list]
-        start_calls = [call for call in call_args if hasattr(call, "started_at")]
-        end_calls = [call for call in call_args if hasattr(call, "ended_at")]
+        start_calls = [
+            call for call in call_args if isinstance(call, CallStartCHInsertable)
+        ]
+        end_calls = [
+            call for call in call_args if isinstance(call, CallEndCHInsertable)
+        ]
 
         # Should have 1 start call and 1 end call
         assert len(start_calls) == 1
@@ -595,12 +691,18 @@ def test_completions_create_stream_single_choice_unified_wrapper():
     mock_secret_fetcher = MagicMock()
     mock_secret_fetcher.fetch.return_value = {"secrets": {"OPENAI_API_KEY": "test-key"}}
 
+    # Mock ClickHouse client to prevent real connection
+    mock_ch_client = MagicMock()
+
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
@@ -637,8 +739,12 @@ def test_completions_create_stream_single_choice_unified_wrapper():
 
         # Get all the calls
         call_args = [call[0][0] for call in mock_insert_call.call_args_list]
-        start_calls = [call for call in call_args if hasattr(call, "started_at")]
-        end_calls = [call for call in call_args if hasattr(call, "ended_at")]
+        start_calls = [
+            call for call in call_args if isinstance(call, CallStartCHInsertable)
+        ]
+        end_calls = [
+            call for call in call_args if isinstance(call, CallEndCHInsertable)
+        ]
 
         # Should have 1 start call and 1 end call
         assert len(start_calls) == 1
@@ -823,3 +929,231 @@ def test_completions_create_stream_prompt_not_found_error():
         assert len(chunks) == 1
         assert "error" in chunks[0]
         assert "Failed to resolve and apply prompt" in chunks[0]["error"]
+
+
+class _MockInsertError(Exception):
+    """Simulates a ClickHouse insert error."""
+
+    pass
+
+
+def test_insert_retries_empty_query_error():
+    """Verify 'Empty query' errors are retried (generator exhaustion during HTTP retry)."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_summary = MagicMock()
+    # First call fails with empty query, second succeeds
+    mock_ch_client.insert.side_effect = [
+        DatabaseError("Empty query. (SYNTAX_ERROR)"),
+        mock_summary,
+    ]
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        result = server._insert("t", data=[[1]], column_names=["a"])
+
+        assert result == mock_summary
+        assert mock_ch_client.insert.call_count == 2  # Retried once
+
+
+@pytest.mark.disable_logging_error_check
+@pytest.mark.parametrize(
+    ("error", "expected_calls"),
+    [
+        # Other errors should NOT be retried (call_count=1)
+        (RuntimeError("unexpected"), 1),
+        (ValueError("some value error"), 1),
+        # Empty query errors retry up to INSERT_MAX_RETRIES
+        pytest.param(
+            "empty_query",
+            3,  # INSERT_MAX_RETRIES
+            id="empty_query_exhausts_retries",
+        ),
+    ],
+)
+def test_insert_error_handling(error, expected_calls):
+    """Verify only 'Empty query' errors are retried; others fail immediately."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+
+    if error == "empty_query":
+        mock_ch_client.insert.side_effect = DatabaseError("Empty query. (SYNTAX_ERROR)")
+        expected_exception = DatabaseError
+    else:
+        mock_ch_client.insert.side_effect = error
+        expected_exception = type(error)
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        with pytest.raises(expected_exception):
+            server._insert("t", data=[[1]], column_names=["a"])
+
+        assert mock_ch_client.insert.call_count == expected_calls
+
+
+@pytest.mark.disable_logging_error_check
+def test_call_batch_clears_on_insert_failure():
+    """Verify _call_batch is cleared even when insert fails."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.side_effect = _MockInsertError("Connection refused")
+    # Mock query to return empty project (no data in calls_complete or calls_merged)
+    mock_query_result = MagicMock()
+    mock_query_result.result_rows = [(None, None)]
+    mock_ch_client.query.return_value = mock_query_result
+
+    project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        for i in range(5):
+            try:
+                req = tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        op_name=f"test_op_{i}",
+                        started_at=dt.datetime.now(dt.timezone.utc),
+                        attributes={},
+                        inputs={"test_input": "value"},
+                    )
+                )
+                server.call_start(req)
+            except _MockInsertError:
+                pass
+
+        assert len(server._call_batch) == 0, (
+            f"Memory leak: _call_batch retained {len(server._call_batch)} rows "
+            f"after failed inserts. Batch should be cleared on any exception."
+        )
+
+
+@pytest.fixture
+def server_with_mock_kafka():
+    """Create a ClickHouseTraceServer with mocked Kafka producer and CH client."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+
+    # Mock query to return empty project (resolves to CALLS_MERGED write target)
+    mock_query_result = MagicMock()
+    mock_query_result.result_rows = [(None, None)]
+    mock_ch_client.query.return_value = mock_query_result
+
+    mock_producer = MagicMock()
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._kafka_producer = mock_producer
+        with patch(
+            "weave.trace_server.environment.wf_enable_online_eval",
+            return_value=True,
+        ):
+            yield server, mock_producer
+
+
+def _make_call_end_req() -> tsi.CallEndReq:
+    return tsi.CallEndReq(
+        end=tsi.EndedCallSchemaForInsert(
+            project_id=base64.b64encode(b"test_entity/test_project").decode("utf-8"),
+            id=str(uuid.uuid4()),
+            ended_at=dt.datetime.now(dt.timezone.utc),
+            output={},
+            summary={},
+            exception=None,
+        )
+    )
+
+
+def test_call_end_flushes_kafka_immediately(server_with_mock_kafka):
+    """Non-batch call_end should flush Kafka per-request."""
+    server, mock_producer = server_with_mock_kafka
+
+    server.call_end(_make_call_end_req())
+
+    mock_producer.produce_call_end.assert_called_once()
+    assert mock_producer.produce_call_end.call_args[0][1] is True
+
+
+def test_call_end_v2_flushes_kafka_immediately(server_with_mock_kafka):
+    """Non-batch call_end_v2 should flush Kafka per-request."""
+    server, mock_producer = server_with_mock_kafka
+    req = tsi.CallEndV2Req(
+        end=tsi.EndedCallSchemaForInsertWithStartedAt(
+            project_id=base64.b64encode(b"test_entity/test_project").decode("utf-8"),
+            id=str(uuid.uuid4()),
+            ended_at=dt.datetime.now(dt.timezone.utc),
+            started_at=dt.datetime.now(dt.timezone.utc),
+            output={},
+            summary={},
+            exception=None,
+        )
+    )
+
+    server.call_end_v2(req)
+
+    mock_producer.produce_call_end.assert_called_once()
+    assert mock_producer.produce_call_end.call_args[0][1] is True
+
+
+def test_call_batch_flushes_kafka_once_not_per_call_end(server_with_mock_kafka):
+    """Batched call_end should NOT flush per-call. Flush happens once at batch exit."""
+    server, mock_producer = server_with_mock_kafka
+    num_calls = 5
+
+    with server.call_batch():
+        for _ in range(num_calls):
+            server.call_end(_make_call_end_req())
+
+    # All 5 calls produced a Kafka message
+    assert mock_producer.produce_call_end.call_count == num_calls
+
+    # Every produce_call_end was called with flush_immediately=False
+    for call in mock_producer.produce_call_end.call_args_list:
+        assert call[0][1] is False, (
+            "produce_call_end should be called with flush_immediately=False inside batch"
+        )
+
+    # flush() called exactly once — by _flush_kafka_producer at batch exit
+    mock_producer.flush.assert_called_once()
+
+
+@pytest.mark.disable_logging_error_check
+def test_file_batch_clears_on_insert_failure():
+    """Verify _file_batch is cleared even when insert fails."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.side_effect = _MockInsertError("Connection refused")
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        file_chunk = MagicMock()
+        file_chunk.model_dump.return_value = {
+            "project_id": "test",
+            "digest": "digest_0",
+            "n_chunks": 1,
+            "chunk_index": 0,
+            "b64_data": "dGVzdA==",
+        }
+        server._file_batch.append(file_chunk)
+
+        try:
+            server._flush_file_chunks()
+        except _MockInsertError:
+            pass
+
+        assert len(server._file_batch) == 0, (
+            f"Memory leak: _file_batch retained {len(server._file_batch)} items "
+            f"after failed insert. Batch should be cleared on any exception."
+        )

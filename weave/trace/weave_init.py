@@ -22,6 +22,7 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 )
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -173,16 +174,25 @@ def init_weave(
         track_pii_redaction_enabled(username or "unknown", entity_name, project_name)
 
     try:
-        min_required_version = (
-            remote_server.server_info().min_required_weave_python_version
-        )
+        server_info = remote_server.server_info()
+        min_required_version = server_info.min_required_weave_python_version
+        trace_server_version = server_info.trace_server_version
     # TODO: Tighten this exception to only catch the specific exception
     # that is thrown by the server_info call.
     except Exception:
         # Set to a minimum version that will always pass the check
         # In the future, we may want to throw here.
         min_required_version = "0.0.0"
-    init_message.assert_min_weave_version(min_required_version)
+        trace_server_version = None
+    trace_server_url = env.weave_trace_server_url()
+    if not init_message.check_min_weave_version(min_required_version, trace_server_url):
+        return init_weave_disabled()
+    if not init_message.check_min_trace_server_version(
+        trace_server_version,
+        MIN_TRACE_SERVER_VERSION,
+        trace_server_url,
+    ):
+        return init_weave_disabled()
     init_message.print_init_message(
         username, entity_name, project_name, read_only=not ensure_project_exists
     )

@@ -7,6 +7,25 @@ from typing import Any, Optional
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 
+# =============================================================================
+# Error Codes - Machine-readable codes for client-side error detection
+# =============================================================================
+
+
+class ErrorCode:
+    """Machine-readable error codes for client detection.
+
+    These codes are included in error responses to allow clients to programmatically
+    identify specific error conditions without parsing human-readable messages.
+    """
+
+    CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
+
+
+# =============================================================================
+# Exception Classes
+# =============================================================================
+
 
 class Error(Exception):
     """Base class for exceptions in this module."""
@@ -24,6 +43,30 @@ class InvalidRequest(Error):
     """Raised when a request is invalid."""
 
     pass
+
+
+class CallsCompleteModeRequired(InvalidRequest):
+    """Raised when project requires calls_complete mode but SDK is using legacy mode.
+
+    This exception includes a machine-readable error_code that clients can use to
+    detect this specific error condition and automatically switch modes.
+    """
+
+    error_code: str = ErrorCode.CALLS_COMPLETE_MODE_REQUIRED
+
+    def __init__(self, project_id: str, min_sdk_version: str = "0.52.26"):
+        """Initialize the exception.
+
+        Args:
+            project_id: The project ID that requires calls_complete mode.
+            min_sdk_version: The minimum SDK version required.
+        """
+        self.project_id = project_id
+        self.min_sdk_version = min_sdk_version
+        super().__init__(
+            f"The project '{project_id}' has been created in the more performant 'complete' mode. "
+            f"Please upgrade your SDK to at least: {min_sdk_version} to write to this project."
+        )
 
 
 # Clickhouse errors
@@ -59,6 +102,12 @@ class QueryTimeoutExceededError(Error):
 
 class InsertTooLarge(Error):
     """Raised when a single insert is too large."""
+
+    pass
+
+
+class LightweightUpdateNotAllowedError(Error):
+    """Raised when ClickHouse lightweight updates are not enabled."""
 
     pass
 
@@ -115,13 +164,21 @@ class RunNotFound(Exception):
 def _format_error_to_json_with_extra(
     exc: Exception, extra_fields: dict[str, Any] | None = None
 ) -> dict[str, Any]:
-    """Helper to format exception as JSON or fallback to reason, always adding extra fields."""
+    """Helper to format exception as JSON or fallback to reason, always adding extra fields.
+
+    If the exception has an `error_code` attribute, it will be included in the response
+    to allow clients to programmatically identify the error type.
+    """
     exc_str = str(exc)
     result = {}
     try:
         result.update(json.loads(exc_str))
     except json.JSONDecodeError:
         result["reason"] = exc_str
+
+    # Include error_code if the exception has one (for machine-readable error detection)
+    if hasattr(exc, "error_code"):
+        result["error_code"] = exc.error_code
 
     if extra_fields:
         result.update(extra_fields)
@@ -211,6 +268,7 @@ class ErrorRegistry:
         # Our own error types
         # 400
         self.register(InvalidRequest, 400)
+        self.register(CallsCompleteModeRequired, 400)
         self.register(InvalidExternalRef, 400)
         self.register(QueryNoCommonTypeError, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
@@ -233,6 +291,7 @@ class ErrorRegistry:
 
         # 502
         self.register(QueryMemoryLimitExceededError, 502)
+        self.register(LightweightUpdateNotAllowedError, 502)
 
         # 504
         self.register(QueryTimeoutExceededError, 504)
@@ -341,6 +400,16 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "Example: A query like inputs.integer_value = -10000000000, when the parameter "
             "expects a UInt64, will fail: Value -10000000000 cannot be parsed as UInt64. "
             "To resolve, ensure all query parameters are of the correct type and within valid ranges."
+        ) from e
+    if "SUPPORT_IS_DISABLED" in error_str and "Lightweight updates" in error_str:
+        raise LightweightUpdateNotAllowedError(
+            "Lightweight updates are not allowed on the ClickHouse backend. "
+            "This is a backend configuration issue that needs to be resolved."
+        ) from e
+    if "UNKNOWN_TYPE_OF_QUERY" in error_str and "UpdateQuery" in error_str:
+        raise LightweightUpdateNotAllowedError(
+            "Lightweight update queries are not supported by this ClickHouse version or configuration. "
+            "This is a ClickHouse version issue that needs to be resolved."
         ) from e
 
     # Re-raise the original exception if no known pattern matches

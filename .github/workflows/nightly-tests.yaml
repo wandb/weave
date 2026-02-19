@@ -80,7 +80,7 @@ jobs:
         ports:
           - "10000:10000"
       weave_clickhouse:
-        image: clickhouse/clickhouse-server:25.4
+        image: clickhouse/clickhouse-server:25.10
         env:
           CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
           CLICKHOUSE_USER: default
@@ -112,6 +112,8 @@ jobs:
       - name: Install SQLite dev package
         if: steps.filter_shards.outputs.skip != 'true'
         run: sudo apt update && sudo apt install -y libsqlite3-dev
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         if: steps.filter_shards.outputs.skip != 'true'
         uses: actions/setup-python@v5
@@ -163,7 +165,7 @@ jobs:
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           DD_TRACE_ENABLED: false
-          OPENAI_API_KEY: dummyapikey
+          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"

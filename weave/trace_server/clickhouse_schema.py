@@ -2,99 +2,130 @@ import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server import validation
 
+# =============================================================================
+# Base Classes for ClickHouse Call Schemas
+# =============================================================================
 
-class CallStartCHInsertable(BaseModel):
+
+class CallBaseCHInsertable(BaseModel):
+    """Base class with common fields for all call insertables."""
+
     project_id: str
     id: str
+    input_refs: list[str] = Field(default_factory=list)
+    output_refs: list[str] = Field(default_factory=list)
+
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _id_v = field_validator("id")(validation.call_id_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+
+
+class CallTraceMetadataCHMixin(BaseModel):
+    """Mixin for call trace metadata fields (trace_id, parent_id, thread_id, etc)."""
+
     trace_id: str
     parent_id: str | None = None
     thread_id: str | None = None
     turn_id: str | None = None
     op_name: str
-    started_at: datetime.datetime
-    attributes_dump: str
-    inputs_dump: str
-    input_refs: list[str]
-    output_refs: list[str] = Field(default_factory=list)  # sadly, this is required
     display_name: str | None = None
-    otel_dump: str | None = None
+
+    _trace_id_v = field_validator("trace_id")(validation.trace_id_validator)
+    _parent_id_v = field_validator("parent_id")(validation.parent_id_validator)
+    _op_name_v = field_validator("op_name")(validation.op_name_validator)
+    _display_name_v = field_validator("display_name")(validation.display_name_validator)
+
+
+class CallWBMetadataCHMixin(BaseModel):
+    """Mixin for W&B metadata fields."""
 
     wb_user_id: str | None = None
     wb_run_id: str | None = None
     wb_run_step: int | None = None
 
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
-    _trace_id_v = field_validator("trace_id")(validation.trace_id_validator)
-    _parent_id_v = field_validator("parent_id")(validation.parent_id_validator)
-    _op_name_v = field_validator("op_name")(validation.op_name_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
-    _display_name_v = field_validator("display_name")(validation.display_name_validator)
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
     _wb_run_step_v = field_validator("wb_run_step")(validation.wb_run_step_validator)
 
 
-class CallEndCHInsertable(BaseModel):
-    project_id: str
-    id: str
+# =============================================================================
+# Call Insert Schemas
+# =============================================================================
+
+
+class CallStartCHInsertable(
+    CallBaseCHInsertable, CallTraceMetadataCHMixin, CallWBMetadataCHMixin
+):
+    """Schema for call start data insertion."""
+
+    started_at: datetime.datetime
+    attributes_dump: str
+    inputs_dump: str
+    otel_dump: str | None = None
+
+
+class CallEndCHInsertable(CallBaseCHInsertable):
+    """Schema for call end data insertion."""
+
+    # Optional but considerably improves UPDATE performance, strongly encouraged
+    started_at: datetime.datetime | None = None
+
     ended_at: datetime.datetime
     exception: str | None = None
     summary_dump: str
     output_dump: str
-    input_refs: list[str] = Field(default_factory=list)  # sadly, this is required
-    output_refs: list[str]
     wb_run_step_end: int | None = None
 
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
         validation.wb_run_step_validator
     )
 
 
-class CallDeleteCHInsertable(BaseModel):
-    project_id: str
-    id: str
-    wb_user_id: str
+class CallDeleteCHInsertable(CallBaseCHInsertable):
+    """Schema for call deletion."""
 
+    wb_user_id: str
     deleted_at: datetime.datetime
 
-    # required types
-    input_refs: list[str] = Field(default_factory=list)
-    output_refs: list[str] = Field(default_factory=list)
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
 
 
-class CallUpdateCHInsertable(BaseModel):
-    project_id: str
-    id: str
+class CallUpdateCHInsertable(CallBaseCHInsertable):
+    """Schema for call updates."""
+
     wb_user_id: str
-
-    # update types
     display_name: str | None = None
 
-    # required types
-    input_refs: list[str] = Field(default_factory=list)
-    output_refs: list[str] = Field(default_factory=list)
-
-    _project_id_v = field_validator("project_id")(validation.project_id_validator)
-    _id_v = field_validator("id")(validation.call_id_validator)
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _display_name_v = field_validator("display_name")(validation.display_name_validator)
-    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
-    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+
+
+class CallCompleteCHInsertable(
+    CallBaseCHInsertable, CallTraceMetadataCHMixin, CallWBMetadataCHMixin
+):
+    """Schema for inserting a complete call directly into the calls_complete table.
+
+    This represents a call that is already finished at insertion time, with both
+    start and end information provided together.
+    """
+
+    started_at: datetime.datetime
+    ended_at: datetime.datetime | None = None
+    exception: str | None = None
+    attributes_dump: str
+    inputs_dump: str
+    output_dump: str
+    summary_dump: str
+    otel_dump: str | None = None
+    wb_run_step_end: int | None = None
+
+    _wb_run_step_end_v = field_validator("wb_run_step_end")(
+        validation.wb_run_step_validator
+    )
 
 
 # Very critical that this matches the calls table schema! This should
@@ -191,6 +222,8 @@ ALL_CALL_INSERT_COLUMNS = sorted(
     | CallDeleteCHInsertable.model_fields.keys()
     | CallUpdateCHInsertable.model_fields.keys()
 )
+
+ALL_CALL_COMPLETE_INSERT_COLUMNS = sorted(CallCompleteCHInsertable.model_fields.keys())
 
 ALL_CALL_SELECT_COLUMNS = list(SelectableCHCallSchema.model_fields.keys())
 ALL_CALL_JSON_COLUMNS = ("inputs", "output", "attributes", "summary")

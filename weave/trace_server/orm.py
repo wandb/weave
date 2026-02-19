@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import TypeAlias
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.interface import query as tsi_query
 
 DatabaseType = typing.Literal["clickhouse", "sqlite"]
@@ -233,7 +234,7 @@ class Select:
     # Fields that we have constructed internally, like cost query fields
     _raw_sql_fields: list[str] | None
     _query: tsi.Query | None
-    _order_by: list[tsi.SortBy] | None
+    _order_by: list[SortBy] | None
     _limit: int | None
     _offset: int | None
     _group_by: list[str] | None
@@ -284,7 +285,7 @@ class Select:
         self._query = query
         return self
 
-    def order_by(self, order_by: list[tsi.SortBy] | None) -> "Select":
+    def order_by(self, order_by: list[SortBy] | None) -> "Select":
         if order_by:
             for o in order_by:
                 assert o.direction in (
@@ -507,6 +508,8 @@ def python_value_to_ch_type(value: typing.Any) -> str:
         return "UInt64"
     elif isinstance(value, float):
         return "Float64"
+    elif isinstance(value, datetime.datetime):
+        return "DateTime64(3)"
     elif value is None:
         return "Nullable(String)"
     else:
@@ -679,10 +682,18 @@ def _process_query_to_conditions(
             lhs_part = process_operand(operation.gt_[0])
             rhs_part = process_operand(operation.gt_[1])
             cond = f"({lhs_part} > {rhs_part})"
+        elif isinstance(operation, tsi_query.LtOperation):
+            lhs_part = process_operand(operation.lt_[0])
+            rhs_part = process_operand(operation.lt_[1])
+            cond = f"({lhs_part} < {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
             lhs_part = process_operand(operation.gte_[0])
             rhs_part = process_operand(operation.gte_[1])
             cond = f"({lhs_part} >= {rhs_part})"
+        elif isinstance(operation, tsi_query.LteOperation):
+            lhs_part = process_operand(operation.lte_[0])
+            rhs_part = process_operand(operation.lte_[1])
+            cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
             lhs_part = process_operand(operation.in_[0])
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
@@ -736,7 +747,9 @@ def _process_query_to_conditions(
                 tsi_query.NotOperation,
                 tsi_query.EqOperation,
                 tsi_query.GtOperation,
+                tsi_query.LtOperation,
                 tsi_query.GteOperation,
+                tsi_query.LteOperation,
                 tsi_query.InOperation,
                 tsi_query.ContainsOperation,
             ),

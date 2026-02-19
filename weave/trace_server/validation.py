@@ -1,7 +1,8 @@
 import re
 from typing import Any, Literal
 
-from weave.trace_server import refs_internal, validation_util
+from weave.shared import refs_internal
+from weave.trace_server import validation_util
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
 from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 

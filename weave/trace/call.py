@@ -17,6 +17,7 @@ from weave.trace.refs import CallRef, ObjectRef, OpRef
 from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
@@ -24,7 +25,6 @@ from weave.trace_server.trace_server_interface import (
     CallsFilter,
     CallsQueryReq,
     CallsQueryStatsReq,
-    SortBy,
     TraceServerInterface,
 )
 from weave.utils.attributes_dict import AttributesDict
@@ -78,6 +78,12 @@ class Call:
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
+
+    # Size of metadata storage for this call
+    storage_size_bytes: int | None = None
+
+    # Total size of metadata storage for the entire trace
+    total_storage_size_bytes: int | None = None
 
     @property
     def display_name(self) -> str | Callable[[Call], str] | None:
@@ -280,6 +286,11 @@ class Call:
             deleted_at=self.deleted_at,
             thread_id=self.thread_id,
             turn_id=self.turn_id,
+            wb_run_id=self.wb_run_id,
+            wb_run_step=self.wb_run_step,
+            wb_run_step_end=self.wb_run_step_end,
+            storage_size_bytes=self.storage_size_bytes,
+            total_storage_size_bytes=self.total_storage_size_bytes,
         )
 
 
@@ -307,6 +318,11 @@ class CallDict(TypedDict):
     deleted_at: datetime.datetime | None
     thread_id: str | None
     turn_id: str | None
+    wb_run_id: str | None
+    wb_run_step: int | None
+    wb_run_step_end: int | None
+    storage_size_bytes: int | None
+    total_storage_size_bytes: int | None
 
 
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
@@ -332,6 +348,8 @@ def _make_calls_iterator(
     query: Query | None = None,
     include_costs: bool = False,
     include_feedback: bool = False,
+    include_storage_size: bool = False,
+    include_total_storage_size: bool = False,
     columns: list[str] | None = None,
     expand_columns: list[str] | None = None,
     return_expanded_column_values: bool = True,
@@ -353,6 +371,8 @@ def _make_calls_iterator(
                     limit=limit,
                     include_costs=include_costs,
                     include_feedback=include_feedback,
+                    include_storage_size=include_storage_size,
+                    include_total_storage_size=include_total_storage_size,
                     query=query,
                     sort_by=sort_by,
                     columns=columns,
@@ -422,6 +442,8 @@ def make_client_call(
         wb_run_id=server_call.wb_run_id,
         wb_run_step=server_call.wb_run_step,
         wb_run_step_end=server_call.wb_run_step_end,
+        storage_size_bytes=server_call.storage_size_bytes,
+        total_storage_size_bytes=server_call.total_storage_size_bytes,
     )
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()

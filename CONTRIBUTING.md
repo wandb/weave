@@ -175,6 +175,22 @@ Tests are split up into shards, which include:
 2. `trace_server` -- tests for trace server backend
 3. various integrations, like `openai`, `instructor`, etc -- these envs are isolated to simplify testing
 
+Nox is the most thorough way to run the tests, as it sets important environment variables needed to run specific integrations and shards. However, it is slower. A combination of `uv` and `pytest` can be used for faster iteration when your code is agnostic to integration type, python version, etc.
+```sh
+uv sync --group test --active
+uv run pytest
+```
+
+For even faster iteration, it is possible to limit scope to a single file or test. For example:
+```sh
+uv run pytest tests/trace/test_weave_client.py
+```
+or
+```sh
+uv run pytest tests/trace/test_weave_client.py::test_table_create
+```
+
+
 ### Deprecating features
 
 `weave` is moving quickly, and sometimes features need to be deprecated.

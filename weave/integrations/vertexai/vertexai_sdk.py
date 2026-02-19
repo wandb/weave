@@ -99,8 +99,9 @@ def vertexai_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: vertexai_accumulator,
-            should_accumulate=lambda inputs: isinstance(inputs, dict)
-            and bool(inputs.get("stream")),
+            should_accumulate=lambda inputs: (
+                isinstance(inputs, dict) and bool(inputs.get("stream"))
+            ),
         )
 
     return wrapper
@@ -124,8 +125,9 @@ def vertexai_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callabl
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: vertexai_accumulator,
-            should_accumulate=lambda inputs: isinstance(inputs, dict)
-            and bool(inputs.get("stream")),
+            should_accumulate=lambda inputs: (
+                isinstance(inputs, dict) and bool(inputs.get("stream"))
+            ),
         )
 
     return wrapper
@@ -147,19 +149,34 @@ def get_vertexai_patcher(
     base = settings.op_settings
 
     generate_content_settings = base.model_copy(
-        update={"name": base.name or "vertexai.GenerativeModel.generate_content"}
+        update={
+            "name": base.name or "vertexai.GenerativeModel.generate_content",
+            "kind": base.kind or "llm",
+        }
     )
     generate_content_async_settings = base.model_copy(
-        update={"name": base.name or "vertexai.GenerativeModel.generate_content_async"}
+        update={
+            "name": base.name or "vertexai.GenerativeModel.generate_content_async",
+            "kind": base.kind or "llm",
+        }
     )
     send_message_settings = base.model_copy(
-        update={"name": base.name or "vertexai.ChatSession.send_message"}
+        update={
+            "name": base.name or "vertexai.ChatSession.send_message",
+            "kind": base.kind or "llm",
+        }
     )
     send_message_async_settings = base.model_copy(
-        update={"name": base.name or "vertexai.ChatSession.send_message_async"}
+        update={
+            "name": base.name or "vertexai.ChatSession.send_message_async",
+            "kind": base.kind or "llm",
+        }
     )
     generate_images_settings = base.model_copy(
-        update={"name": base.name or "vertexai.ImageGenerationModel.generate_images"}
+        update={
+            "name": base.name or "vertexai.ImageGenerationModel.generate_images",
+            "kind": base.kind or "llm",
+        }
     )
 
     _vertexai_patcher = MultiPatcher(

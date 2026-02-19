@@ -78,12 +78,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def _stream_ref_apply(
         self, method: Callable[[A], Iterator[B]], req: A
     ) -> Iterator[B]:
+        """Stream results while converting internal refs to external refs."""
         req_conv = universal_ext_to_int_ref_converter(
             req, self._idc.ext_to_int_project_id
         )
         res = method(req_conv)
 
-        int_to_ext_project_cache = {}
+        int_to_ext_project_cache: dict[str, str | None] = {}
 
         def cached_int_to_ext_project_id(project_id: str) -> str | None:
             if project_id not in int_to_ext_project_cache:
@@ -92,8 +93,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 )
             return int_to_ext_project_cache[project_id]
 
-        for item in res:
-            yield universal_int_to_ext_ref_converter(item, cached_int_to_ext_project_id)
+        try:
+            for item in res:
+                yield universal_int_to_ext_ref_converter(
+                    item, cached_int_to_ext_project_id
+                )
+        finally:
+            int_to_ext_project_cache.clear()
+            if hasattr(res, "close"):
+                res.close()
 
     # Standard API Below:
     def ensure_project_exists(
@@ -101,12 +109,21 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EnsureProjectExistsRes:
         return self._internal_trace_server.ensure_project_exists(entity, project)
 
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        # Convert project_id at request level
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        if req.wb_run_id is not None:
-            req.wb_run_id = self._idc.ext_to_int_run_id(req.wb_run_id)
+        # Convert run_id for each processed span, preserving the collection type
+        # We materialize to a list to allow multiple iterations (Iterable includes list)
+        for i, processed_span in enumerate(req.processed_spans):
+            if processed_span.run_id is not None:
+                processed_span.run_id = self._idc.ext_to_int_run_id(
+                    processed_span.run_id
+                )
+            req.processed_spans[i] = processed_span
+
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+
         return self._ref_apply(self._internal_trace_server.otel_export, req)
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -432,6 +449,71 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.threads_query_stream, req
         )
 
+    # Annotation Queue API
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.annotation_queue_create, req)
+
+    def annotation_queues_query_stream(
+        self, req: tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(
+            self._internal_trace_server.annotation_queues_query_stream, req
+        )
+
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.annotation_queue_read, req)
+
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.annotation_queue_update, req)
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.annotation_queue_delete, req)
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.annotation_queue_add_calls, req
+        )
+
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.annotation_queue_items_query, req
+        )
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.annotation_queues_stats, req)
+
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(
+            self._internal_trace_server.annotator_queue_items_progress_update, req
+        )
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
@@ -445,6 +527,18 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._ref_apply(self._internal_trace_server.evaluation_status, req)
 
     # === V2 APIs ===
+
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.call_stats, req)
+
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.trace_usage, req)
+
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.calls_usage, req)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
@@ -640,3 +734,26 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.score_delete, req)
+
+    # Calls V2 API
+    def calls_complete(
+        self, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        """Batch complete calls, converting project_id."""
+        for item in req.batch:
+            item.project_id = self._idc.ext_to_int_project_id(item.project_id)
+            if item.wb_user_id is not None:
+                item.wb_user_id = self._idc.ext_to_int_user_id(item.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.calls_complete, req)
+
+    def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
+        """Start a single call (v2), converting project_id."""
+        req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
+        if req.start.wb_user_id is not None:
+            req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.call_start_v2, req)
+
+    def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
+        """End a single call (v2), converting project_id."""
+        req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
+        return self._ref_apply(self._internal_trace_server.call_end_v2, req)

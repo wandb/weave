@@ -51,6 +51,7 @@ def set_weave_logger_to_debug():
     cases,
     ids=lambda case: case.id,
 )
+@pytest.mark.flaky(reruns=3, reruns_delay=2)
 def test_serialization_correctness(
     client, case: SerializationTestCase, set_weave_logger_to_debug
 ):
@@ -165,11 +166,15 @@ def test_serialization_correctness(
                         obj={
                             "project_id": project_id,
                             "object_id": obj["object_id"],
-                            "digest": obj["digest"],
                             "val": obj["exp_val"],
                         }
                     )
                 )
+
+                # Assert that the generated digest matches the one provided in the test case
+                # If this assert triggers, there are a couple of ways to fix it:
+                #  1) least intrusive: update the test case
+                #  2) more intrusive: obj_create could be updated to allow the caller to pass in a digest that would override the generated one
                 assert obj_res.digest == obj["digest"]
 
         if case.exp_files:

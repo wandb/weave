@@ -108,7 +108,7 @@ def test_pythonic_creation(client: WeaveClient):
                 "_class_name": "TestOnlyNestedBaseModel",
                 "_bases": ["BaseModel"],
             },
-            "nested_base_object": "weave:///shawn/test-project/object/TestOnlyNestedBaseObject:JyFvHfyaJ79uCKpdZ3DD3if4NYam8QgTkzUlXQXAILI",
+            "nested_base_object": "weave:///shawn/test-project/object/TestOnlyNestedBaseObject:zg8WgbAC5GBqld3Ka5XMY8YpAQkEVoJDXePQqXgrA4E",
             "_class_name": "TestOnlyExample",
             "_bases": ["BaseObject", "BaseModel"],
         }
@@ -267,7 +267,7 @@ def test_interface_creation(client):
                 "_class_name": "TestOnlyNestedBaseModel",
                 "_bases": ["BaseModel"],
             },
-            "nested_base_object": "weave:///shawn/test-project/object/TestOnlyNestedBaseObject:JyFvHfyaJ79uCKpdZ3DD3if4NYam8QgTkzUlXQXAILI",
+            "nested_base_object": "weave:///shawn/test-project/object/TestOnlyNestedBaseObject:zg8WgbAC5GBqld3Ka5XMY8YpAQkEVoJDXePQqXgrA4E",
             "_class_name": "TestOnlyExample",
             "_bases": ["BaseObject", "BaseModel"],
         }

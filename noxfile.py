@@ -61,6 +61,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "custom",
     "flow",
     "trace",
+    "trace_calls_complete_only",
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
@@ -112,6 +113,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "verifiers_test",
         "autogen_tests",
         "trace",
+        "trace_calls_complete_only",
         "trace_no_server",
         "stainless",
     ],
@@ -174,13 +176,19 @@ def tests(session: nox.Session, shard: str):
     test_dirs_dict = {
         "custom": [],
         "flow": ["tests/flow/"],
-        "trace_server": ["tests/trace_server/"],
+        "trace_server": ["tests/trace_server/", "tests/shared/"],
         "trace_server_bindings": ["tests/trace_server_bindings/"],
         "stainless": ["tests/trace_server_bindings/"],
         "scorers": ["tests/scorers/"],
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
         "trace": [
+            "tests/trace/",
+            "tests/compat/",
+            "tests/utils/",
+            "tests/wandb_interface/",
+        ],
+        "trace_calls_complete_only": [
             "tests/trace/",
             "tests/compat/",
             "tests/utils/",
@@ -197,7 +205,7 @@ def tests(session: nox.Session, shard: str):
 
     # Each worker gets its own isolated database namespace
     # Only use parallel workers for the trace shard if we have more than 1 CPU core
-    if shard == "trace":
+    if shard in ("trace", "trace_calls_complete_only"):
         cpu_count = os.cpu_count()
         if cpu_count is not None and cpu_count > 1:
             session.posargs.insert(0, f"-n{cpu_count}")
@@ -205,6 +213,8 @@ def tests(session: nox.Session, shard: str):
     # Add sharding logic for trace1, trace2, trace3
     pytest_args = [
         "pytest",
+        "-p",
+        "no:ddtrace",  # Disable ddtrace pytest plugin to prevent hangs during initialization
         "--durations=20",
         "--strict-markers",
         "--cov=weave",
@@ -213,11 +223,14 @@ def tests(session: nox.Session, shard: str):
         "--cov-branch",
     ]
 
-    if shard == "trace":
+    if shard in ("trace", "trace_calls_complete_only"):
         pytest_args.extend(["-m", "trace_server"])
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
+
+    if shard == "trace_calls_complete_only":
+        env["WEAVE_USE_CALLS_COMPLETE"] = "true"
 
     # Set trace-server flag for stainless shard
     if shard == "stainless":

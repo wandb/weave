@@ -97,6 +97,13 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_REDACT_PII_FIELDS`
     """
 
+    redact_pii_exclude_fields: list[str] = []
+    """List of PII entity types to exclude from redaction.
+
+    Only applies when `redact_pii` is True. Entities in this list are removed from the redaction set.
+    Can be overridden with the environment variable `WEAVE_REDACT_PII_EXCLUDE_FIELDS`
+    """
+
     capture_client_info: bool = True
     """Toggles capture of client information (Python version, SDK version) for ops."""
 
@@ -206,6 +213,20 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
     """
 
+    use_calls_complete: bool = False
+    """
+    Toggles use of the calls_complete write path for new calls.
+
+    If True, uses the new calls_complete endpoint which batches complete calls
+    (with both start and end information) together before sending to the server.
+    This reduces the number of write operations and improves performance.
+
+    If False (default), uses the legacy call_start/call_end endpoints which
+    send start and end events separately.
+
+    Can be overridden with the environment variable `WEAVE_USE_CALLS_COMPLETE`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -267,6 +288,10 @@ def should_redact_pii() -> bool:
 
 def redact_pii_fields() -> list[str]:
     return _list_str("redact_pii_fields")
+
+
+def redact_pii_exclude_fields() -> list[str]:
+    return _list_str("redact_pii_exclude_fields")
 
 
 def use_server_cache() -> bool:
@@ -334,6 +359,11 @@ def http_timeout() -> float:
 def should_use_stainless_server() -> bool:
     """Returns whether the stainless-generated HTTP client should be used."""
     return _should("use_stainless_server")
+
+
+def should_use_calls_complete() -> bool:
+    """Returns whether the calls_complete write path should be used."""
+    return _should("use_calls_complete")
 
 
 def parse_and_apply_settings(

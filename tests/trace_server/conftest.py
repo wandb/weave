@@ -16,6 +16,7 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
 from weave.trace_server import clickhouse_trace_server_batched
+from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -108,6 +109,13 @@ def get_remote_http_trace_server_flag(request):
     return request.config.getoption("--remote-http-trace-server")
 
 
+@pytest.fixture(autouse=True)
+def reset_project_version_cache():
+    project_version.reset_project_residence_cache()
+    yield
+    project_version.reset_project_residence_cache()
+
+
 def _get_worker_db_suffix(request) -> str:
     """Get database suffix for pytest-xdist worker isolation."""
     worker_input = getattr(request.config, "workerinput", None)
@@ -127,6 +135,10 @@ def get_ch_trace_server(
     def ch_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
         host, port = next(ensure_clickhouse_db())
         db_suffix = _get_worker_db_suffix(request)
+
+        # Always add a test-specific suffix to prevent collision with other databases
+        if not db_suffix:
+            db_suffix = "_test"
 
         # Store original environment variable
         original_db = os.environ.get("WF_CLICKHOUSE_DATABASE")
@@ -165,7 +177,7 @@ def get_ch_trace_server(
             def patched_run_migrations():
                 import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
 
-                migrator = wf_migrator.ClickHouseTraceServerMigrator(
+                migrator = wf_migrator.get_clickhouse_trace_server_migrator(
                     ch_server._mint_client(), management_db=management_db
                 )
                 migrator.apply_migrations(ch_server._database)
@@ -249,6 +261,10 @@ def get_sqlite_trace_server(
         try:
             # Drop tables to ensure clean shutdown
             sqlite_server.drop_tables()
+        except Exception:
+            pass  # Best effort cleanup
+        try:
+            sqlite_server.close()
         except Exception:
             pass  # Best effort cleanup
 

@@ -142,9 +142,7 @@ def test_processing_thread_exception_handling():
     def failing_processor_fn(batch):
         raise RuntimeError("Simulated processing error")
 
-    with patch(
-        "weave.trace_server_bindings.async_batch_processor.logger"
-    ) as mock_logger:
+    with patch("weave.telemetry.trace_sentry.logger") as mock_logger:
         processor = AsyncBatchProcessor(
             failing_processor_fn,
             max_batch_size=100,
@@ -303,12 +301,12 @@ def test_poison_pill_detection_and_immediate_drop():
             assert log_content.count("Unprocessable item detected") == 2
 
         # Test 4: Queue full - items get written to disk instead of being enqueued
-        # Keep the processor stopped to prevent any race conditions where items
-        # could be consumed during enqueue
-        # The queue is already empty from the previous stop_and_flush
+        # Stop the processor so nothing drains the queue during this test.
+        # This makes the overflow behavior deterministic.
+        processor.stop_accepting_new_work_and_flush_queue()
 
-        # Now enqueue items while processor is stopped - with maxsize=5,
-        # fill1-fill5 will fill the queue, and fill6-fill7 will overflow to disk
+        # Now enqueue items - with no processing thread running, fill1-fill5 will
+        # fill the queue, and fill6-fill7 will overflow.
         processor.enqueue(
             ["fill1", "fill2", "fill3", "fill4", "fill5", "fill6", "fill7"]
         )  # Fill the small queue (maxsize=5)
@@ -398,9 +396,7 @@ def test_log_rotation_and_disk_fallback():
             # Test 3: Error handling in disk operations
             with (
                 patch("builtins.open", side_effect=PermissionError("No write access")),
-                patch(
-                    "weave.trace_server_bindings.async_batch_processor.logger"
-                ) as mock_logger,
+                patch("weave.telemetry.trace_sentry.logger") as mock_logger,
             ):
                 processor._write_item_to_disk("test_item", "Permission test")
 
@@ -428,9 +424,7 @@ def test_log_rotation_and_disk_fallback():
             # Mock pathlib.Path.rename at the class level to simulate a rename failure
             with (
                 patch("pathlib.Path.rename", side_effect=OSError("Rename failed")),
-                patch(
-                    "weave.trace_server_bindings.async_batch_processor.logger"
-                ) as mock_logger,
+                patch("weave.telemetry.trace_sentry.logger") as mock_logger,
             ):
                 processor._rotate_log_file_if_needed()
 

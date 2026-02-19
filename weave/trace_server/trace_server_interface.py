@@ -1,22 +1,27 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from typing_extensions import TypedDict
 
-from weave.trace_server.interface.query import Query
+if TYPE_CHECKING:
+    from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+else:
+    try:
+        from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+    except ImportError:
+        ResourceSpans = Any
 
-WB_USER_ID_DESCRIPTION = (
-    "Do not set directly. Server will automatically populate this field."
+from weave.trace_server import http_service_interface as his
+from weave.trace_server.common_interface import (
+    WB_USER_ID_DESCRIPTION,
+    AnnotationState,
+    BaseModelStrict,
+    SortBy,
 )
-
-
-class BaseModelStrict(BaseModel):
-    """Base model with strict validation that forbids extra fields."""
-
-    model_config = ConfigDict(extra="forbid")
+from weave.trace_server.interface.query import Query
 
 
 class ExtraKeysTypedDict(TypedDict):
@@ -205,6 +210,61 @@ class EndedCallSchemaForInsert(BaseModel):
         return dict(v)
 
 
+class EndedCallSchemaForInsertWithStartedAt(EndedCallSchemaForInsert):
+    """Ended call schema with optional started_at for v2 end updates.
+
+    When started_at is provided, it enables more efficient ClickHouse queries
+    by utilizing the primary key (project_id, started_at, id). Without it,
+    the query falls back to using only (project_id, id).
+    """
+
+    started_at: datetime.datetime | None = None
+
+
+class CompletedCallSchemaForInsert(BaseModel):
+    """Schema for inserting a completed call directly.
+
+    This represents a call that is already finished at insertion time, with both
+    start and end information provided together. Used by the calls_complete endpoint.
+    """
+
+    # Required fields
+    project_id: str
+    id: str
+    trace_id: str
+    op_name: str
+    started_at: datetime.datetime
+    ended_at: datetime.datetime
+
+    # Optional metadata
+    display_name: str | None = None
+    parent_id: str | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
+
+    # Data fields
+    attributes: dict[str, Any]
+    inputs: dict[str, Any]
+    output: Any | None = None
+    summary: SummaryInsertMap
+
+    # OTEL span data
+    otel_dump: dict[str, Any] | None = None
+
+    # Exception if the call failed
+    exception: str | None = None
+
+    # WB Metadata
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
+    wb_run_step_end: int | None = None
+
+    @field_serializer("attributes", "summary", when_used="unless-none")
+    def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
+        return dict(v)
+
+
 class ObjSchema(BaseModel):
     project_id: str
     object_id: str
@@ -245,12 +305,17 @@ class TableSchemaForInsert(BaseModel):
     rows: list[dict[str, Any]]
 
 
-class OtelExportReq(BaseModel):
+class ProcessedResourceSpans(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    entity: str
+    project: str
+    run_id: str | None
+    resource_spans: ResourceSpans
+
+
+class OTelExportReq(BaseModel):
+    processed_spans: list[ProcessedResourceSpans]
     project_id: str
-    # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
-    traces: Any
-    wb_run_id: str | None = None
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
@@ -261,7 +326,7 @@ class ExportTracePartialSuccess(BaseModel):
 
 # Spec requires that the response be of type Export<signal>ServiceResponse
 # https://opentelemetry.io/docs/specs/otlp/
-class OtelExportRes(BaseModel):
+class OTelExportRes(BaseModel):
     partial_success: ExportTracePartialSuccess | None = Field(
         default=None,
         description="The details of a partially successful export request. When None or rejected_spans is 0, the request was fully accepted.",
@@ -301,6 +366,43 @@ class CallCreateBatchReq(BaseModelStrict):
 
 class CallCreateBatchRes(BaseModel):
     res: list[CallStartRes | CallEndRes]
+
+
+class CallsUpsertCompleteReq(BaseModel):
+    """Request for upserting a batch of completed calls."""
+
+    batch: list[CompletedCallSchemaForInsert]
+
+
+class CallsUpsertCompleteRes(BaseModel):
+    """Response for upserting a batch of completed calls."""
+
+    pass
+
+
+class CallStartV2Req(BaseModelStrict):
+    """Request for starting a single call via v2 API."""
+
+    start: StartedCallSchemaForInsert
+
+
+class CallStartV2Res(BaseModel):
+    """Response for starting a single call via v2 API."""
+
+    id: str
+    trace_id: str
+
+
+class CallEndV2Req(BaseModelStrict):
+    """Request for ending a single call via v2 API."""
+
+    end: EndedCallSchemaForInsertWithStartedAt
+
+
+class CallEndV2Res(BaseModel):
+    """Response for ending a single call via v2 API."""
+
+    pass
 
 
 class CallReadReq(BaseModelStrict):
@@ -369,6 +471,12 @@ class CompletionsCreateRequestInputs(BaseModel):
         "Variables in messages like '{variable_name}' will be replaced with the corresponding values. "
         "Applied to both prompt messages (if prompt is provided) and regular messages.",
     )
+    vertex_credentials: str | None = Field(
+        None,
+        description="JSON string of Vertex AI service account credentials. "
+        "When provided for vertex_ai models (e.g. vertex_ai/gemini-2.5-pro), used for authentication "
+        "instead of api_key. Not persisted in trace storage.",
+    )
 
 
 class CompletionsCreateReq(BaseModelStrict):
@@ -418,15 +526,6 @@ class CallsFilter(BaseModelStrict):
     trace_roots_only: bool | None = None
     wb_user_ids: list[str] | None = None
     wb_run_ids: list[str] | None = None
-
-
-class SortBy(BaseModelStrict):
-    # Field should be a key of `CallSchema`. For dictionary fields
-    # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
-    # dot-separated.
-    field: str  # Consider changing this to _FieldSelect
-    # Direction should be either 'asc' or 'desc'
-    direction: Literal["asc", "desc"]
 
 
 class CallsQueryReq(BaseModelStrict):
@@ -909,6 +1008,11 @@ class FeedbackCreateReq(BaseModelStrict):
     trigger_ref: str | None = Field(
         default=None, examples=["weave:///entity/project/object/name:digest"]
     )
+    queue_id: str | None = Field(
+        default=None,
+        description="The annotation queue ID this feedback was created from. References annotation_queues.id. NULL when feedback is created outside of queues.",
+        examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
+    )
 
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -1109,6 +1213,247 @@ class ProjectStatsRes(BaseModel):
     objects_storage_size_bytes: int
     tables_storage_size_bytes: int
     files_storage_size_bytes: int
+
+
+# Annotation Queue API
+# =====================
+# These schemas support the queue-based call annotation system.
+# See: services/weave-trace/Queue-Based Call Annotation System.md
+
+
+class AnnotationQueueSchema(BaseModel):
+    """Schema for annotation queue responses."""
+
+    id: str  # UUID
+    project_id: str
+    name: str
+    description: str
+    scorer_refs: list[str]  # Array of weave:// refs to scorers
+    created_at: datetime.datetime
+    created_by: str  # wb_user_id
+    updated_at: datetime.datetime
+    deleted_at: datetime.datetime | None = None
+
+
+class AnnotationQueueCreateReq(BaseModelStrict):
+    """Request to create a new annotation queue."""
+
+    project_id: str = Field(examples=["entity/project"])
+    name: str = Field(examples=["Error Review Queue"])
+    description: str = Field(default="", examples=["Review calls with exceptions"])
+    scorer_refs: list[str] = Field(
+        examples=[
+            [
+                "weave:///entity/project/scorer/error_severity:abc123",
+                "weave:///entity/project/scorer/resolution_quality:def456",
+            ]
+        ]
+    )
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueCreateRes(BaseModel):
+    """Response from creating an annotation queue."""
+
+    id: str  # UUID of the created queue
+
+
+class AnnotationQueuesQueryReq(BaseModelStrict):
+    """Request to query annotation queues for a project."""
+
+    project_id: str = Field(examples=["entity/project"])
+    name: str | None = Field(
+        default=None,
+        examples=["Error"],
+        description="Filter by queue name (case-insensitive partial match)",
+    )
+    sort_by: list[SortBy] | None = Field(
+        default=None,
+        description="Sort by multiple fields (e.g., created_at, updated_at, name)",
+    )
+    limit: int | None = Field(default=None, examples=[10])
+    offset: int | None = Field(default=None, examples=[0])
+
+
+class AnnotationQueuesQueryRes(BaseModel):
+    """Response from querying annotation queues."""
+
+    queues: list[AnnotationQueueSchema]
+
+
+class AnnotationQueueReadReq(BaseModelStrict):
+    """Request to read a specific annotation queue."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+
+
+class AnnotationQueueReadRes(BaseModel):
+    """Response from reading an annotation queue."""
+
+    queue: AnnotationQueueSchema
+
+
+class AnnotationQueueDeleteReq(BaseModelStrict):
+    """Request to delete (soft-delete) an annotation queue."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueDeleteRes(BaseModel):
+    """Response from deleting an annotation queue."""
+
+    queue: AnnotationQueueSchema
+
+
+class AnnotationQueueUpdateReq(BaseModelStrict):
+    """Request to update an annotation queue.
+
+    All fields except project_id and queue_id are optional - only provided fields will be updated.
+    """
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    name: str | None = Field(None, examples=["Updated Queue Name"])
+    description: str | None = Field(None, examples=["Updated description"])
+    scorer_refs: list[str] | None = Field(
+        None,
+        examples=[
+            [
+                "weave:///entity/project/scorer/error_severity:abc123",
+                "weave:///entity/project/scorer/resolution_quality:def456",
+            ]
+        ],
+    )
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueUpdateRes(BaseModel):
+    """Response from updating an annotation queue."""
+
+    queue: AnnotationQueueSchema
+
+
+class AnnotationQueueItemSchema(BaseModel):
+    """Schema for annotation queue item responses."""
+
+    id: str  # UUID
+    project_id: str
+    queue_id: str  # UUID
+    call_id: str
+    call_started_at: datetime.datetime
+    call_ended_at: datetime.datetime | None = None
+    call_op_name: str
+    call_trace_id: str
+    display_fields: list[str]  # JSON paths like ['input.prompt', 'output.text']
+    added_by: str | None = None  # wb_user_id (nullable)
+    annotation_state: AnnotationState
+    annotator_user_id: str | None = (
+        None  # wb_user_id of annotator who owns the most recent state (nullable)
+    )
+    created_at: datetime.datetime
+    created_by: str  # wb_user_id
+    updated_at: datetime.datetime
+    deleted_at: datetime.datetime | None = None
+    position_in_queue: int | None = (
+        None  # 1-based position in queue (if include_position was requested)
+    )
+
+
+class AnnotationQueueAddCallsReq(his.AnnotationQueueAddCallsBody):
+    """Request to add calls to an annotation queue in batch.
+
+    Extends AnnotationQueueAddCallsBody by adding queue_id for internal API usage.
+    """
+
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueAddCallsRes(BaseModel):
+    """Response from adding calls to a queue."""
+
+    added_count: int  # Number of calls successfully added
+    duplicates: int  # Number of calls already in queue (skipped)
+
+
+class AnnotationQueueItemsQueryReq(his.AnnotationQueueItemsQueryBody):
+    """Request to query items in an annotation queue.
+
+    Extends AnnotationQueueItemsQueryBody by adding queue_id for internal API usage.
+    """
+
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+
+
+class AnnotationQueueItemsQueryRes(BaseModel):
+    """Response from querying annotation queue items."""
+
+    items: list[AnnotationQueueItemSchema]
+
+
+class AnnotationQueueStatsSchema(BaseModel):
+    """Statistics for a single annotation queue."""
+
+    queue_id: str = Field(
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
+        description="The queue ID",
+    )
+    total_items: int = Field(
+        description="Total number of items in the queue",
+    )
+    completed_items: int = Field(
+        description="Number of items completed or skipped by at least one annotator",
+    )
+
+
+class AnnotationQueuesStatsReq(BaseModelStrict):
+    """Request to get stats for multiple annotation queues."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_ids: list[str] = Field(
+        examples=[
+            [
+                "550e8400-e29b-41d4-a716-446655440000",
+                "550e8400-e29b-41d4-a716-446655440001",
+            ]
+        ],
+        description="List of queue IDs to get stats for",
+    )
+
+
+class AnnotationQueuesStatsRes(BaseModel):
+    """Response with stats for multiple annotation queues."""
+
+    stats: list[AnnotationQueueStatsSchema]
+
+
+class AnnotatorQueueItemsProgressUpdateReq(BaseModelStrict):
+    """Request to update the annotation state of a queue item for the current annotator.
+
+    Valid state transitions:
+    - (absence) -> 'in_progress': Mark item as in progress (only when no record exists)
+    - (absence) -> 'completed' or 'skipped': Directly complete/skip item
+    - 'in_progress' or 'unstarted' -> 'completed' or 'skipped': Complete/skip started item
+    - same_state -> same_state: Idempotent no-op (returns existing item unchanged)
+    """
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    item_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440001"])
+    annotation_state: str = Field(
+        examples=["in_progress", "completed", "skipped"],
+        description="New state: 'in_progress', 'completed', or 'skipped'",
+    )
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotatorQueueItemsProgressUpdateRes(BaseModel):
+    """Response from updating annotation state."""
+
+    item: AnnotationQueueItemSchema
 
 
 # Thread API
@@ -1965,7 +2310,7 @@ class TraceServerInterface(Protocol):
         return EnsureProjectExistsRes(project_name=project)
 
     # OTEL API
-    def otel_export(self, req: OtelExportReq) -> OtelExportRes: ...
+    def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...
@@ -1975,6 +2320,9 @@ class TraceServerInterface(Protocol):
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    def call_stats(self, req: "CallStatsReq") -> "CallStatsRes": ...
+    def trace_usage(self, req: "TraceUsageReq") -> "TraceUsageRes": ...
+    def calls_usage(self, req: "CallsUsageReq") -> "CallsUsageRes": ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 
@@ -2048,6 +2396,43 @@ class TraceServerInterface(Protocol):
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...
 
+    # Annotation Queue API
+    def annotation_queue_create(
+        self, req: AnnotationQueueCreateReq
+    ) -> AnnotationQueueCreateRes: ...
+
+    def annotation_queues_query_stream(
+        self, req: AnnotationQueuesQueryReq
+    ) -> Iterator[AnnotationQueueSchema]: ...
+
+    def annotation_queue_read(
+        self, req: AnnotationQueueReadReq
+    ) -> AnnotationQueueReadRes: ...
+
+    def annotation_queue_delete(
+        self, req: AnnotationQueueDeleteReq
+    ) -> AnnotationQueueDeleteRes: ...
+
+    def annotation_queue_update(
+        self, req: AnnotationQueueUpdateReq
+    ) -> AnnotationQueueUpdateRes: ...
+
+    def annotation_queue_add_calls(
+        self, req: AnnotationQueueAddCallsReq
+    ) -> AnnotationQueueAddCallsRes: ...
+
+    def annotation_queues_stats(
+        self, req: AnnotationQueuesStatsReq
+    ) -> AnnotationQueuesStatsRes: ...
+
+    def annotation_queue_items_query(
+        self, req: AnnotationQueueItemsQueryReq
+    ) -> AnnotationQueueItemsQueryRes: ...
+
+    def annotator_queue_items_progress_update(
+        self, req: AnnotatorQueueItemsProgressUpdateReq
+    ) -> AnnotatorQueueItemsProgressUpdateRes: ...
+
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
@@ -2060,6 +2445,11 @@ class ObjectInterface(Protocol):
     provide cleaner, more RESTful interfaces. Implementations should support
     both this protocol and TraceServerInterface to maintain backward compatibility.
     """
+
+    # Calls V2 API
+    def calls_complete(self, req: CallsUpsertCompleteReq) -> CallsUpsertCompleteRes: ...
+    def call_start_v2(self, req: CallStartV2Req) -> CallStartV2Res: ...
+    def call_end_v2(self, req: CallEndV2Req) -> CallEndV2Res: ...
 
     # Ops
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
@@ -2135,3 +2525,234 @@ class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):
     """
 
     pass
+
+
+class AggregationType(str, Enum):
+    """Basic aggregation functions for metrics."""
+
+    SUM = "sum"
+    AVG = "avg"
+    MIN = "min"
+    MAX = "max"
+    COUNT = "count"
+
+
+UsageMetric = Literal[
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
+    "input_cost",
+    "output_cost",
+    "total_cost",
+]
+"""Supported usage metrics grouped by model.
+
+Token metrics are extracted from summary.usage[model]:
+- input_tokens: Sum of prompt_tokens (OpenAI) and input_tokens (Anthropic/others)
+- output_tokens: Sum of completion_tokens (OpenAI) and output_tokens (Anthropic/others)
+- total_tokens: Total tokens (input + output)
+
+Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices:
+- input_cost: input_tokens * prompt_token_cost
+- output_cost: output_tokens * completion_token_cost
+- total_cost: input_cost + output_cost
+"""
+
+
+class UsageMetricSpec(BaseModelStrict):
+    """Specification for a usage metric to aggregate (grouped by model)."""
+
+    metric: UsageMetric = Field(
+        description="Metric to aggregate. Token metrics are normalized across providers."
+    )
+    aggregations: list[AggregationType] = Field(
+        default=[AggregationType.SUM],
+        description="Basic aggregation functions to apply",
+    )
+    percentiles: list[float] = Field(
+        default=[],
+        description="Percentile values to compute (0-100). E.g., [50, 95, 99] for p50, p95, p99",
+    )
+
+
+CallMetric = Literal[
+    "latency_ms",
+    "call_count",
+    "error_count",
+]
+"""Call-level metrics computed from call data directly.
+
+- latency_ms: Call duration in milliseconds (ended_at - started_at)
+- call_count: Number of calls
+- error_count: Number of calls with errors (exception is not null)
+"""
+
+
+class CallMetricSpec(BaseModelStrict):
+    """Specification for a call-level metric to aggregate (not grouped by model)."""
+
+    metric: CallMetric = Field(description="Metric to aggregate.")
+    aggregations: list[AggregationType] = Field(
+        default=[AggregationType.SUM],
+        description="Basic aggregation functions to apply",
+    )
+    percentiles: list[float] = Field(
+        default=[],
+        description="Percentile values to compute (0-100). E.g., [50, 95, 99] for p50, p95, p99",
+    )
+
+
+MAX_CALL_STATS_RANGE_DAYS = 31
+MAX_CALL_STATS_RANGE = datetime.timedelta(days=MAX_CALL_STATS_RANGE_DAYS)
+
+
+class CallStatsReq(BaseModelStrict):
+    """Request for aggregated call statistics over a time range."""
+
+    project_id: str
+
+    start: datetime.datetime = Field(
+        description="Inclusive start time (UTC, ISO 8601).",
+    )
+    end: datetime.datetime | None = Field(
+        default=None,
+        description="Exclusive end time (UTC, ISO 8601). Defaults to now if omitted.",
+    )
+    granularity: int | None = Field(
+        default=None,
+        description="Bucket size in seconds (e.g., 3600 for 1 hour). If omitted, auto-selected based on time range. Will be adjusted if it would produce more than 10,000 buckets.",
+    )
+    usage_metrics: list[UsageMetricSpec] | None = Field(
+        default=None,
+        description="Usage metrics (tokens, cost) to compute. Grouped by timestamp and model.",
+    )
+    call_metrics: list[CallMetricSpec] | None = Field(
+        default=None,
+        description="Call-level metrics (latency, counts) to compute. Grouped by timestamp only.",
+    )
+    filter: CallsFilter | None = None
+    timezone: str = Field(
+        default="UTC",
+        description="IANA timezone for bucket alignment (e.g., 'America/New_York')",
+    )
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "CallStatsReq":
+        """Ensure call stats requests are bounded to a safe date range."""
+        end = self.end or datetime.datetime.now(datetime.timezone.utc)
+        if end < self.start:
+            raise ValueError("CallStatsReq end must be after start")
+        if end - self.start > MAX_CALL_STATS_RANGE:
+            raise ValueError(
+                f"CallStatsReq date range cannot exceed {MAX_CALL_STATS_RANGE_DAYS} days"
+            )
+        return self
+
+
+class CallStatsRes(BaseModel):
+    """Response containing time-series call statistics."""
+
+    start: datetime.datetime = Field(description="Resolved start time (UTC)")
+    end: datetime.datetime = Field(description="Resolved end time (UTC)")
+    granularity: int = Field(description="Bucket size used (in seconds)")
+    timezone: str = Field(description="Timezone used for bucket alignment")
+    usage_buckets: list[dict[str, Any]] = Field(
+        default=[],
+        description="Usage metrics by model. Each bucket contains 'timestamp', 'model', and aggregated metric values.",
+    )
+    call_buckets: list[dict[str, Any]] = Field(
+        default=[],
+        description="Call-level metrics. Each bucket contains 'timestamp' and aggregated metric values.",
+    )
+
+
+class LLMAggregatedUsage(BaseModel):
+    """Aggregated usage metrics for a specific LLM."""
+
+    requests: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    # Cost fields - only populated when include_costs=True
+    prompt_tokens_total_cost: float | None = None
+    completion_tokens_total_cost: float | None = None
+
+
+# --- /trace/usage endpoint (per-call usage with descendant rollup) ---
+
+
+class TraceUsageReq(BaseModelStrict):
+    """Request to compute per-call usage for a trace, with descendant rollup.
+
+    This endpoint returns usage metrics for each call in the trace, where each
+    call's metrics include the sum of its own usage plus all descendants' usage.
+    Use this for trace view where you want to see rolled-up metrics per call.
+
+    Note: All matching calls are loaded into memory for aggregation. For very large
+    result sets (>10k calls), consider using more specific filters or pagination
+    at the application layer.
+    """
+
+    project_id: str
+    filter: CallsFilter | None = Field(
+        default=None,
+        description="Filter to select calls. Typically use trace_ids to get all calls in a trace.",
+    )
+    query: Query | None = Field(
+        default=None,
+        description="Additional query conditions for filtering calls.",
+    )
+    include_costs: bool = Field(
+        default=False,
+        description="If true, include cost calculations in the usage.",
+    )
+    limit: int = Field(
+        default=10_000,
+        description="Maximum number of calls to process. Acts as a safety limit to prevent unbounded memory usage.",
+    )
+
+
+class TraceUsageRes(BaseModel):
+    """Response with per-call usage metrics (each includes descendant contributions)."""
+
+    # Mapping from call_id to usage metrics (own + descendants)
+    call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
+    # Unique IDs of calls in the result set that have not ended yet.
+    unfinished_call_ids: list[str] = Field(default_factory=list)
+
+
+# --- /calls/usage endpoint (root call usage across multiple traces) ---
+
+
+class CallsUsageReq(BaseModelStrict):
+    """Request to compute aggregated usage for multiple root calls.
+
+    This endpoint returns usage metrics for each requested root call, where each
+    root's metrics include the sum of its own usage plus all descendants' usage.
+
+    Note: All matching calls are loaded into memory for aggregation. For very large
+    result sets (>10k calls), consider batching root call IDs or using narrower
+    filters at the application layer.
+    """
+
+    project_id: str
+    call_ids: list[str] = Field(
+        description="Root call IDs to aggregate. Each result key corresponds to one input call ID.",
+    )
+    include_costs: bool = Field(
+        default=False,
+        description="If true, include cost calculations in the usage.",
+    )
+    limit: int = Field(
+        default=10_000,
+        description="Maximum number of calls to process across all traces. Acts as a safety limit to prevent unbounded memory usage.",
+    )
+
+
+class CallsUsageRes(BaseModel):
+    """Response with aggregated usage metrics per root call."""
+
+    # Mapping from root call_id to aggregated usage metrics (root + descendants)
+    call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
+    # Unique IDs of calls considered for rollup that have not ended yet.
+    unfinished_call_ids: list[str] = Field(default_factory=list)

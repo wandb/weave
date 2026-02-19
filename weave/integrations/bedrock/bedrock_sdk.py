@@ -289,6 +289,7 @@ def _patch_converse(bedrock_client: "BaseClient") -> None:
         bedrock_client.converse,
         name="BedrockRuntime.converse",
         postprocess_inputs=postprocess_inputs_converse,
+        kind="llm",
     )
     op._set_on_finish_handler(bedrock_on_finish_converse)
     bedrock_client.converse = op
@@ -300,6 +301,7 @@ def _patch_invoke(bedrock_client: "BaseClient") -> None:
         name="BedrockRuntime.invoke",
         postprocess_inputs=postprocess_inputs_invoke,
         postprocess_output=postprocess_output_invoke,
+        kind="llm",
     )
     op._set_on_finish_handler(bedrock_on_finish_invoke)
     bedrock_client.invoke_model = op
@@ -373,7 +375,7 @@ def create_stream_wrapper(
     name: str,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op = weave.op(postprocess_inputs=postprocess_inputs_converse)(fn)
+        op = weave.op(postprocess_inputs=postprocess_inputs_converse, kind="llm")(fn)
         op.name = name  # type: ignore
         op._set_on_finish_handler(bedrock_on_finish_converse)
 

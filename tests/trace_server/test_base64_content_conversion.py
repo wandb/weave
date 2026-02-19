@@ -8,6 +8,7 @@ import pytest
 
 from weave.trace_server.base64_content_conversion import (
     AUTO_CONVERSION_MIN_SIZE,
+    is_base64,
     is_data_uri,
     process_call_req_to_content,
     replace_base64_with_content_objects,
@@ -220,6 +221,136 @@ class TestBase64Replacement:
 
         processed_end = process_call_req_to_content(end_req, trace_server)
         assert processed_end.end.output == long_b64
+
+
+class TestStandaloneBase64Detection:
+    """Test detection and conversion of standalone base64 strings (new functionality)."""
+
+    def test_non_media_base64_strings_not_converted(self):
+        """Test that various base64 strings of different lengths (mod 4) that decode to
+        text/plain or application/octet-stream are NOT converted.
+        """
+        # Mock trace server
+        trace_server = MagicMock()
+
+        # Test strings of various lengths mod 4
+        # These should all decode to text/plain or application/octet-stream
+        test_cases = [
+            # Length % 4 == 0: "aaaa" decodes to binary data
+            "aaaa",
+            # Length % 4 == 0: "hello" in base64
+            "aGVsbG8=",
+            # Length % 4 == 0: "test message"
+            "dGVzdCBtZXNzYWdl",
+            # Length % 4 == 0: longer text
+            "VGhpcyBpcyBhIGxvbmdlciB0ZXN0IG1lc3NhZ2U=",
+            # Short strings that are valid base64 but not media
+            "YQ==",  # "a"
+            "YWI=",  # "ab"
+            "YWJj",  # "abc"
+            # Random-looking base64 that's still text-like
+            "SGVsbG8gV29ybGQh",  # "Hello World!"
+        ]
+
+        for test_str in test_cases:
+            # First verify these match the base64 pattern
+            assert is_base64(test_str), f"Expected {test_str} to match base64 pattern"
+
+            input_data = {"field": test_str}
+            result = replace_base64_with_content_objects(
+                input_data, "test_project", trace_server
+            )
+
+            # These should NOT be converted because they decode to text/plain or application/octet-stream
+            assert result["field"] == test_str, (
+                f"Expected {test_str} to NOT be converted"
+            )
+
+        # Verify trace server was never called since nothing should be converted
+        assert trace_server.file_create.call_count == 0
+
+    def test_wav_file_base64_converted(self):
+        """Test that a dict with a field containing raw base64 representing a WAV file
+        is detected and converted to Content.
+        """
+        # Mock trace server
+        trace_server = MagicMock()
+        trace_server.file_create = MagicMock(
+            side_effect=[
+                FileCreateRes(digest="content_digest"),
+                FileCreateRes(digest="metadata_digest"),
+            ]
+        )
+
+        # Create a minimal valid WAV file (larger than AUTO_CONVERSION_MIN_SIZE)
+        # WAV format: RIFF header + fmt chunk + data chunk
+        wav_data = bytearray()
+
+        # RIFF header
+        wav_data.extend(b"RIFF")
+        # Placeholder for file size (will update later)
+        file_size_pos = len(wav_data)
+        wav_data.extend(b"\x00\x00\x00\x00")
+        wav_data.extend(b"WAVE")
+
+        # fmt chunk
+        wav_data.extend(b"fmt ")
+        wav_data.extend((16).to_bytes(4, "little"))  # chunk size
+        wav_data.extend((1).to_bytes(2, "little"))  # audio format (PCM)
+        wav_data.extend((1).to_bytes(2, "little"))  # num channels
+        wav_data.extend((44100).to_bytes(4, "little"))  # sample rate
+        wav_data.extend((88200).to_bytes(4, "little"))  # byte rate
+        wav_data.extend((2).to_bytes(2, "little"))  # block align
+        wav_data.extend((16).to_bytes(2, "little"))  # bits per sample
+
+        # data chunk - make it large enough to exceed AUTO_CONVERSION_MIN_SIZE
+        audio_data_size = LARGE_TEST_DATA_SIZE
+        wav_data.extend(b"data")
+        wav_data.extend(audio_data_size.to_bytes(4, "little"))
+        # Add audio data (silence)
+        wav_data.extend(b"\x00" * audio_data_size)
+
+        # Update file size in RIFF header (total size - 8 bytes for RIFF header)
+        file_size = len(wav_data) - 8
+        wav_data[file_size_pos : file_size_pos + 4] = file_size.to_bytes(4, "little")
+
+        # Encode as base64
+        wav_base64 = base64.b64encode(bytes(wav_data)).decode("ascii")
+
+        # Verify it matches base64 pattern
+        assert is_base64(wav_base64)
+
+        # Test that it gets converted
+        input_data = {
+            "audio_field": wav_base64,
+            "other_field": "normal string",
+        }
+
+        result = replace_base64_with_content_objects(
+            input_data, "test_project", trace_server
+        )
+
+        # The WAV file should be converted to Content object
+        assert isinstance(result["audio_field"], dict)
+        assert result["audio_field"]["_type"] == "CustomWeaveType"
+        assert (
+            result["audio_field"]["weave_type"]["type"]
+            == "weave.type_wrappers.Content.content.Content"
+        )
+        assert "files" in result["audio_field"]
+        assert "content" in result["audio_field"]["files"]
+        assert "metadata.json" in result["audio_field"]["files"]
+
+        # Normal string should be unchanged
+        assert result["other_field"] == "normal string"
+
+        # Verify file_create was called twice (content + metadata)
+        assert trace_server.file_create.call_count == 2
+
+        # Verify the content mimetype is audio/wav (not text/plain or application/octet-stream)
+        metadata_call = trace_server.file_create.call_args_list[1][0][0]
+        metadata = json.loads(metadata_call.content)
+        assert metadata["mimetype"] in ["audio/wav", "audio/x-wav", "audio/wave"]
 
 
 if __name__ == "__main__":

@@ -1,12 +1,17 @@
 import asyncio
 import os
 from collections.abc import Generator
+from unittest.mock import Mock
 
 import pytest
 from google import genai
 from google.genai.types import GenerateImagesConfig
 from pydantic import BaseModel
 
+from weave.integrations.google_genai.gemini_utils import (
+    google_genai_gemini_accumulator,
+    google_genai_gemini_on_finish,
+)
 from weave.integrations.google_genai.google_genai_sdk import get_google_genai_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
 
@@ -282,6 +287,42 @@ def test_function_calling(client):
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
+def test_system_instruction_extracted_from_config(client):
+    """Test that system_instruction is extracted from config and surfaced at top level of inputs."""
+    google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
+    system_instruction = (
+        "You are a helpful assistant that always responds in haiku format."
+    )
+
+    google_client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents="What's the capital of France?",
+        config=genai.types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=0.5,
+        ),
+    )
+
+    call = next(iter(client.get_calls()))
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.genai.models.Models.generate_content"
+
+    # Verify that system_instruction is surfaced at the top level of inputs
+    assert "system_instruction" in call.inputs
+    assert call.inputs["system_instruction"] == system_instruction
+
+    # Verify that the call was successful
+    assert call.output is not None
+    assert call.output.usageMetadata.candidatesTokenCount > 0
+    assert call.output.usageMetadata.promptTokenCount > 0
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
 def test_image_generation_sync(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_images(
@@ -321,3 +362,278 @@ def test_image_generation_async(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.models.AsyncModels.generate_images"
     assert call.output is not None
+
+
+def test_thoughts_token_count_included_in_usage():
+    """Test that thoughts_token_count is included in usage data when available."""
+    from weave.trace.call import Call
+
+    # Create a mock call with model name in inputs
+    call = Mock(spec=Call)
+    call.inputs = {"model": "gemini-2.0-flash-thinking-exp"}
+    call.summary = {}
+
+    # Create a mock output with usage_metadata including thoughts_token_count
+    usage_metadata = Mock()
+    usage_metadata.prompt_token_count = 100
+    usage_metadata.candidates_token_count = 50
+    usage_metadata.total_token_count = 200
+    usage_metadata.thoughts_token_count = 50  # Thinking model token count
+
+    output = Mock()
+    output.usage_metadata = usage_metadata
+
+    # Call the on_finish handler
+    google_genai_gemini_on_finish(call, output, None)
+
+    # Verify that thoughts_tokens is included in the usage data
+    assert call.summary is not None
+    assert "usage" in call.summary
+    model_usage = call.summary["usage"]["gemini-2.0-flash-thinking-exp"]
+    assert model_usage["prompt_tokens"] == 100
+    assert model_usage["completion_tokens"] == 50
+    assert model_usage["total_tokens"] == 200
+    assert model_usage["thoughts_tokens"] == 50
+    assert model_usage["requests"] == 1
+
+
+def test_thoughts_token_count_not_included_when_missing():
+    """Test that thoughts_tokens is not included when thoughts_token_count is not available."""
+    from weave.trace.call import Call
+
+    # Create a mock call with model name in inputs
+    call = Mock(spec=Call)
+    call.inputs = {"model": "gemini-2.0-flash"}
+    call.summary = {}
+
+    # Create a mock output with usage_metadata without thoughts_token_count
+    # Use spec_set to prevent Mock from auto-creating attributes
+    usage_metadata = Mock(
+        spec=["prompt_token_count", "candidates_token_count", "total_token_count"]
+    )
+    usage_metadata.prompt_token_count = 100
+    usage_metadata.candidates_token_count = 50
+    usage_metadata.total_token_count = 150
+    # thoughts_token_count is not in spec, so getattr will return None
+
+    output = Mock()
+    output.usage_metadata = usage_metadata
+
+    # Call the on_finish handler
+    google_genai_gemini_on_finish(call, output, None)
+
+    # Verify that thoughts_tokens is NOT included in the usage data
+    assert call.summary is not None
+    assert "usage" in call.summary
+    model_usage = call.summary["usage"]["gemini-2.0-flash"]
+    assert model_usage["prompt_tokens"] == 100
+    assert model_usage["completion_tokens"] == 50
+    assert model_usage["total_tokens"] == 150
+    assert "thoughts_tokens" not in model_usage
+    assert model_usage["requests"] == 1
+
+
+def _create_mock_part(text: str, thought: bool = False) -> Mock:
+    """Helper to create a mock Part with text and optional thought attribute."""
+    part = Mock()
+    part.text = text
+    part.thought = thought
+    return part
+
+
+def _create_mock_response(
+    parts: list[Mock],
+    prompt_token_count: int | None = None,
+    candidates_token_count: int | None = None,
+    total_token_count: int | None = None,
+    cached_content_token_count: int | None = None,
+    thoughts_token_count: int | None = None,
+) -> Mock:
+    """Helper to create a mock GenerateContentResponse."""
+    content = Mock()
+    content.parts = parts
+
+    candidate = Mock()
+    candidate.content = content
+
+    usage_metadata = Mock()
+    usage_metadata.prompt_token_count = prompt_token_count
+    usage_metadata.candidates_token_count = candidates_token_count
+    usage_metadata.total_token_count = total_token_count
+    usage_metadata.cached_content_token_count = cached_content_token_count
+    # Only set thoughts_token_count if provided to test getattr fallback
+    if thoughts_token_count is not None:
+        usage_metadata.thoughts_token_count = thoughts_token_count
+    else:
+        # Delete the attribute so getattr returns None
+        del usage_metadata.thoughts_token_count
+
+    response = Mock()
+    response.candidates = [candidate]
+    response.usage_metadata = usage_metadata
+
+    return response
+
+
+def test_accumulator_returns_value_when_acc_is_none():
+    """Test that accumulator returns the value when acc is None (first chunk)."""
+    part = _create_mock_part("Hello")
+    response = _create_mock_response([part])
+
+    result = google_genai_gemini_accumulator(None, response)
+
+    assert result is response
+
+
+def test_accumulator_accumulates_regular_text_parts():
+    """Test that regular text parts are accumulated correctly."""
+    # First chunk
+    acc_part = _create_mock_part("Hello ")
+    acc = _create_mock_response([acc_part], prompt_token_count=10)
+
+    # Second chunk
+    value_part = _create_mock_part("World")
+    value = _create_mock_response([value_part], prompt_token_count=20)
+
+    result = google_genai_gemini_accumulator(acc, value)
+
+    assert result is acc
+    assert acc_part.text == "Hello World"
+
+
+def test_accumulator_separates_thought_and_regular_parts():
+    """Test that thought parts are accumulated separately from regular parts."""
+    # Accumulator has both thought and regular parts
+    acc_thought_part = _create_mock_part("Thinking: ", thought=True)
+    acc_regular_part = _create_mock_part("Answer: ")
+    acc = _create_mock_response([acc_thought_part, acc_regular_part])
+
+    # Value has a new thought chunk
+    value_thought_part = _create_mock_part("still thinking...", thought=True)
+    value = _create_mock_response([value_thought_part])
+
+    result = google_genai_gemini_accumulator(acc, value)
+
+    # Thought part should be accumulated to the thought part
+    assert acc_thought_part.text == "Thinking: still thinking..."
+    # Regular part should remain unchanged
+    assert acc_regular_part.text == "Answer: "
+    assert result is acc
+
+
+def test_accumulator_adds_new_thought_part_when_not_present():
+    """Test that a new thought part is appended when no matching part exists."""
+    # Accumulator starts with only regular part
+    acc_regular_part = _create_mock_part("Answer: ")
+    acc = _create_mock_response([acc_regular_part])
+
+    # Value has a thought part
+    value_thought_part = _create_mock_part("Let me think...", thought=True)
+    value = _create_mock_response([value_thought_part])
+
+    result = google_genai_gemini_accumulator(acc, value)
+
+    # Regular part should remain unchanged
+    assert acc_regular_part.text == "Answer: "
+    # New thought part should be appended
+    assert len(acc.candidates[0].content.parts) == 2
+    assert acc.candidates[0].content.parts[1].text == "Let me think..."
+    assert acc.candidates[0].content.parts[1].thought is True
+    assert result is acc
+
+
+def test_accumulator_adds_new_regular_part_when_only_thought_exists():
+    """Test that a new regular part is appended when only thought part exists."""
+    # Accumulator starts with only thought part
+    acc_thought_part = _create_mock_part("Thinking...", thought=True)
+    acc = _create_mock_response([acc_thought_part])
+
+    # Value has a regular (non-thought) part
+    value_regular_part = _create_mock_part("Here's my answer")
+    value = _create_mock_response([value_regular_part])
+
+    result = google_genai_gemini_accumulator(acc, value)
+
+    # Thought part should remain unchanged
+    assert acc_thought_part.text == "Thinking..."
+    # New regular part should be appended
+    assert len(acc.candidates[0].content.parts) == 2
+    assert acc.candidates[0].content.parts[1].text == "Here's my answer"
+    assert acc.candidates[0].content.parts[1].thought is False
+    assert result is acc
+
+
+def test_accumulator_handles_thoughts_token_count():
+    """Test that thoughts_token_count is accumulated correctly."""
+    acc_part = _create_mock_part("Hello")
+    acc = _create_mock_response([acc_part], thoughts_token_count=100)
+
+    value_part = _create_mock_part(" World")
+    value = _create_mock_response([value_part], thoughts_token_count=200)
+
+    result = google_genai_gemini_accumulator(acc, value)
+
+    assert result.usage_metadata.thoughts_token_count == 200
+
+
+def test_accumulator_ignores_none_thoughts_token_count():
+    """Test that thoughts_token_count is not updated when value has None."""
+    acc_part = _create_mock_part("Hello")
+    acc = _create_mock_response([acc_part], thoughts_token_count=100)
+
+    value_part = _create_mock_part(" World")
+    # Create value without thoughts_token_count
+    value = _create_mock_response([value_part])
+
+    result = google_genai_gemini_accumulator(acc, value)
+
+    # thoughts_token_count should remain at original value
+    assert result.usage_metadata.thoughts_token_count == 100
+
+
+def test_accumulator_updates_all_token_counts():
+    """Test that all token counts are updated from value when present."""
+    acc_part = _create_mock_part("Hello")
+    acc = _create_mock_response(
+        [acc_part],
+        prompt_token_count=10,
+        candidates_token_count=5,
+        total_token_count=15,
+        cached_content_token_count=2,
+        thoughts_token_count=50,
+    )
+
+    value_part = _create_mock_part(" World")
+    value = _create_mock_response(
+        [value_part],
+        prompt_token_count=20,
+        candidates_token_count=15,
+        total_token_count=35,
+        cached_content_token_count=5,
+        thoughts_token_count=100,
+    )
+
+    result = google_genai_gemini_accumulator(acc, value)
+
+    assert result.usage_metadata.prompt_token_count == 20
+    assert result.usage_metadata.candidates_token_count == 15
+    assert result.usage_metadata.total_token_count == 35
+    assert result.usage_metadata.cached_content_token_count == 5
+    assert result.usage_metadata.thoughts_token_count == 100
+
+
+def test_accumulator_skips_parts_with_none_text():
+    """Test that parts with text=None are skipped."""
+    acc_part = _create_mock_part("Hello")
+    acc = _create_mock_response([acc_part])
+
+    # Value part has None text
+    value_part = Mock()
+    value_part.text = None
+    value = _create_mock_response([value_part])
+
+    result = google_genai_gemini_accumulator(acc, value)
+
+    # Text should remain unchanged since value part had None text
+    assert acc_part.text == "Hello"
+    assert result is acc

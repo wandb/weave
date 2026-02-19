@@ -29,4 +29,5 @@ jobs:
         run: pnpm test
         working-directory: sdks/node
         env:
-          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          # Use dummy API key when secrets aren't available (e.g., Dependabot PRs)
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}

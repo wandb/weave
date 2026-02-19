@@ -269,7 +269,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         raise NotImplementedError("ensure_project_exists is not implemented")
 
     # Regular method implementations (reduced duplication)
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Export OTEL traces."""
         return self._send_request("otel_export", req)
 
@@ -431,6 +431,49 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
     ) -> Iterator[tsi.ThreadSchema]:
         """Query threads with streaming."""
         return self._send_streaming_request("threads_query_stream", req)
+
+    # Annotation Queue API
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        """Create an annotation queue."""
+        return self._send_request("annotation_queue_create", req)
+
+    def annotation_queues_query_stream(
+        self, req: tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        """Query annotation queues with streaming."""
+        return self._send_streaming_request("annotation_queues_query_stream", req)
+
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes:
+        """Read an annotation queue."""
+        return self._send_request("annotation_queue_read", req)
+
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        """Update an annotation queue."""
+        return self._send_request("annotation_queue_update", req)
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        """Delete (soft-delete) an annotation queue."""
+        return self._send_request("annotation_queue_delete", req)
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        """Add calls to an annotation queue."""
+        return self._send_request("annotation_queue_add_calls", req)
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        """Get stats for multiple annotation queues."""
+        return self._send_request("annotation_queues_stats", req)
 
 
 class CrossProcessTraceServerReceiver:

@@ -415,11 +415,13 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         op._set_on_input_handler(openai_on_input_handler)
         return _add_accumulator(
             op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc,
-                value,
-                skip_last=not _openai_stream_options_is_set(inputs),
-                stream_start_time=inputs.get(WEAVE_STREAM_START_TIME),
+            make_accumulator=lambda inputs: (
+                lambda acc, value: openai_accumulator(
+                    acc,
+                    value,
+                    skip_last=not _openai_stream_options_is_set(inputs),
+                    stream_start_time=inputs.get(WEAVE_STREAM_START_TIME),
+                )
             ),
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
@@ -459,11 +461,13 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         op._set_on_input_handler(openai_on_input_handler)
         return _add_accumulator(
             op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc,
-                value,
-                skip_last=not _openai_stream_options_is_set(inputs),
-                stream_start_time=inputs.get(WEAVE_STREAM_START_TIME),
+            make_accumulator=lambda inputs: (
+                lambda acc, value: openai_accumulator(
+                    acc,
+                    value,
+                    skip_last=not _openai_stream_options_is_set(inputs),
+                    stream_start_time=inputs.get(WEAVE_STREAM_START_TIME),
+                )
             ),
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
@@ -691,8 +695,8 @@ def create_wrapper_responses_sync(
         op._set_on_input_handler(openai_on_input_handler)
         return _add_accumulator(
             op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
-                acc, value
+            make_accumulator=lambda inputs: (
+                lambda acc, value: responses_accumulator(acc, value)
             ),
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=responses_on_finish_post_processor,
@@ -715,8 +719,8 @@ def create_wrapper_responses_async(
         op._set_on_input_handler(openai_on_input_handler)
         return _add_accumulator(
             op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
-                acc, value
+            make_accumulator=lambda inputs: (
+                lambda acc, value: responses_accumulator(acc, value)
             ),
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=responses_on_finish_post_processor,
@@ -743,18 +747,26 @@ def get_openai_patcher(
     completions_create_settings = base.model_copy(
         update={
             "name": base.name or "openai.chat.completions.create",
+            "kind": base.kind or "llm",
         }
     )
     async_completions_create_settings = base.model_copy(
         update={
             "name": base.name or "openai.chat.completions.create",
+            "kind": base.kind or "llm",
         }
     )
     completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.parse"}
+        update={
+            "name": base.name or "openai.chat.completions.parse",
+            "kind": base.kind or "llm",
+        }
     )
     async_completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.parse"}
+        update={
+            "name": base.name or "openai.chat.completions.parse",
+            "kind": base.kind or "llm",
+        }
     )
     moderation_create_settings = base.model_copy(
         update={"name": base.name or "openai.moderations.create"}
@@ -763,22 +775,40 @@ def get_openai_patcher(
         update={"name": base.name or "openai.moderations.create"}
     )
     embeddings_create_settings = base.model_copy(
-        update={"name": base.name or "openai.embeddings.create"}
+        update={
+            "name": base.name or "openai.embeddings.create",
+            "kind": base.kind or "llm",
+        }
     )
     async_embeddings_create_settings = base.model_copy(
-        update={"name": base.name or "openai.embeddings.create"}
+        update={
+            "name": base.name or "openai.embeddings.create",
+            "kind": base.kind or "llm",
+        }
     )
     responses_create_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.create"}
+        update={
+            "name": base.name or "openai.responses.create",
+            "kind": base.kind or "llm",
+        }
     )
     async_responses_create_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.create"}
+        update={
+            "name": base.name or "openai.responses.create",
+            "kind": base.kind or "llm",
+        }
     )
     responses_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.parse"}
+        update={
+            "name": base.name or "openai.responses.parse",
+            "kind": base.kind or "llm",
+        }
     )
     async_responses_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.parse"}
+        update={
+            "name": base.name or "openai.responses.parse",
+            "kind": base.kind or "llm",
+        }
     )
 
     _openai_patcher = MultiPatcher(

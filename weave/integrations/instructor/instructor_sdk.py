@@ -26,18 +26,35 @@ def get_instructor_patcher(
 
     base = settings.op_settings
 
-    create_settings = base.model_copy(update={"name": base.name or "Instructor.create"})
+    create_settings = base.model_copy(
+        update={
+            "name": base.name or "Instructor.create",
+            "kind": base.kind or "llm",
+        }
+    )
     async_create_settings = base.model_copy(
-        update={"name": base.name or "AsyncInstructor.create"}
+        update={
+            "name": base.name or "AsyncInstructor.create",
+            "kind": base.kind or "llm",
+        }
     )
     create_partial_settings = base.model_copy(
-        update={"name": base.name or "Instructor.create_partial"}
+        update={
+            "name": base.name or "Instructor.create_partial",
+            "kind": base.kind or "llm",
+        }
     )
     async_create_partial_settings = base.model_copy(
-        update={"name": base.name or "AsyncInstructor.create_partial"}
+        update={
+            "name": base.name or "AsyncInstructor.create_partial",
+            "kind": base.kind or "llm",
+        }
     )
     create_completion_settings = base.model_copy(
-        update={"name": base.name or "Instructor.create_with_completion"}
+        update={
+            "name": base.name or "Instructor.create_with_completion",
+            "kind": base.kind or "llm",
+        }
     )
 
     _instructor_patcher = MultiPatcher(
