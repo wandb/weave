@@ -12,7 +12,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.calls_query_builder.utils import param_slot
-from weave.trace_server.ch_sentinel_values import null_check_sql, sentinel_ch_literal
+from weave.trace_server.ch_sentinel_values import (
+    null_check_literal_sql,
+    null_check_sql,
+)
 from weave.trace_server.orm import ParamBuilder, combine_conditions
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.trace_server_interface import (
@@ -285,8 +288,8 @@ def build_grouped_calls_subquery(
             f"{table_alias}.{column} AS {column}" for column in select_columns
         )
         group_by_clause = ""
-        deleted_at_filter = (
-            f"{table_alias}.deleted_at = {sentinel_ch_literal('deleted_at')}"
+        deleted_at_filter = null_check_literal_sql(
+            "deleted_at", f"{table_alias}.deleted_at", read_table
         )
 
     return f"""

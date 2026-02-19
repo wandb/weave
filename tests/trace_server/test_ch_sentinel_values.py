@@ -18,6 +18,7 @@ from weave.trace_server.ch_sentinel_values import (
     from_ch_value,
     get_sentinel_value,
     is_sentinel_field,
+    null_check_literal_sql,
     null_check_sql,
     sentinel_ch_literal,
     sentinel_ch_type,
@@ -86,13 +87,20 @@ def test_sentinel_ch_type() -> None:
 
 
 def test_sentinel_ch_literal() -> None:
-    """Returns toDateTime64 SQL literals for datetime fields; raises for others."""
+    """Returns SQL literals for sentinel fields; raises for non-sentinel fields."""
+    # String sentinel fields return empty string literal.
+    assert sentinel_ch_literal("parent_id") == "''"
+    for field in SENTINEL_STRING_FIELDS:
+        assert sentinel_ch_literal(field) == "''"
+
+    # Datetime sentinel fields return toDateTime64(0, N).
     assert sentinel_ch_literal("ended_at") == "toDateTime64(0, 6)"
     assert sentinel_ch_literal("updated_at") == "toDateTime64(0, 3)"
     assert sentinel_ch_literal("deleted_at") == "toDateTime64(0, 3)"
 
-    for field in list(SENTINEL_STRING_FIELDS) + NON_SENTINEL_FIELDS:
-        with pytest.raises(ValueError, match=f"Not a sentinel datetime field: {field}"):
+    # Non-sentinel fields raise ValueError.
+    for field in NON_SENTINEL_FIELDS:
+        with pytest.raises(ValueError, match=f"Not a sentinel field: {field}"):
             sentinel_ch_literal(field)
 
 
@@ -188,5 +196,48 @@ def test_null_check_sql() -> None:
     pb = ParamBuilder("pb")
     result = null_check_sql(
         "op_name", "t.op_name", ReadTable.CALLS_COMPLETE, pb, negate=True
+    )
+    assert result == "t.op_name IS NOT NULL"
+
+
+def test_null_check_literal_sql() -> None:
+    """Generates correct SQL using inline literals (no ParamBuilder) for all paths."""
+    # calls_merged: sentinel fields use IS NULL (nullable columns).
+    result = null_check_literal_sql("parent_id", "t.parent_id", ReadTable.CALLS_MERGED)
+    assert result == "t.parent_id IS NULL"
+
+    result = null_check_literal_sql(
+        "parent_id", "t.parent_id", ReadTable.CALLS_MERGED, negate=True
+    )
+    assert result == "t.parent_id IS NOT NULL"
+
+    # calls_complete sentinel string field: uses = '' or != ''.
+    result = null_check_literal_sql(
+        "parent_id", "t.parent_id", ReadTable.CALLS_COMPLETE
+    )
+    assert result == "t.parent_id = ''"
+
+    result = null_check_literal_sql(
+        "parent_id", "t.parent_id", ReadTable.CALLS_COMPLETE, negate=True
+    )
+    assert result == "t.parent_id != ''"
+
+    # calls_complete sentinel datetime field: uses = toDateTime64(0, N) or !=.
+    result = null_check_literal_sql("ended_at", "t.ended_at", ReadTable.CALLS_COMPLETE)
+    assert result == "t.ended_at = toDateTime64(0, 6)"
+
+    result = null_check_literal_sql(
+        "ended_at", "t.ended_at", ReadTable.CALLS_COMPLETE, negate=True
+    )
+    assert result == "t.ended_at != toDateTime64(0, 6)"
+
+    # Non-sentinel field: always uses IS NULL regardless of table.
+    result = null_check_literal_sql(
+        "wb_run_step", "t.wb_run_step", ReadTable.CALLS_COMPLETE
+    )
+    assert result == "t.wb_run_step IS NULL"
+
+    result = null_check_literal_sql(
+        "op_name", "t.op_name", ReadTable.CALLS_COMPLETE, negate=True
     )
     assert result == "t.op_name IS NOT NULL"

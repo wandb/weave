@@ -99,28 +99,69 @@ def sentinel_ch_type(field: str) -> str:
 
 
 def sentinel_ch_literal(field: str) -> str:
-    """Return a raw SQL literal for the sentinel value of a datetime field.
+    """Return a raw SQL literal for a sentinel field's value.
 
     Useful in contexts where a parameterized slot is not available
     (e.g. stats_query_base, hardcoded SQL fragments).
 
     Args:
-        field: The datetime column name.
+        field: The column name (must be a sentinel field).
 
     Returns:
-        SQL expression like "toDateTime64(0, 3)".
+        SQL expression: ``toDateTime64(0, N)`` for datetime fields, ``''`` for
+        string fields.
 
     Raises:
-        ValueError: If the field is not a sentinel datetime field.
+        ValueError: If the field is not a sentinel field.
 
     Examples:
         >>> sentinel_ch_literal("deleted_at")
         'toDateTime64(0, 3)'
+        >>> sentinel_ch_literal("parent_id")
+        "''"
     """
-    if field not in SENTINEL_DATETIME_FIELDS:
-        raise ValueError(f"Not a sentinel datetime field: {field}")
-    precision = DATETIME_PRECISION[field]
-    return f"toDateTime64(0, {precision})"
+    if field in SENTINEL_STRING_FIELDS:
+        return "''"
+    if field in SENTINEL_DATETIME_FIELDS:
+        precision = DATETIME_PRECISION[field]
+        return f"toDateTime64(0, {precision})"
+    raise ValueError(f"Not a sentinel field: {field}")
+
+
+def null_check_literal_sql(
+    field_name: str,
+    field_sql: str,
+    read_table: ReadTable,
+    *,
+    negate: bool = False,
+) -> str:
+    """Like ``null_check_sql`` but uses inline literals instead of parameters.
+
+    Use this in contexts where a ``ParamBuilder`` is not available (e.g.
+    ``build_grouped_calls_subquery``).
+
+    Args:
+        field_name: The column name (e.g. "deleted_at", "parent_id").
+        field_sql: The fully-qualified SQL expression (e.g. "t.deleted_at").
+        read_table: Which table variant is being queried.
+        negate: If True, check for non-null/non-sentinel instead.
+
+    Returns:
+        A SQL fragment like ``t.deleted_at IS NULL`` or
+        ``t.deleted_at = toDateTime64(0, 3)``.
+
+    Examples:
+        >>> null_check_literal_sql("deleted_at", "cm.deleted_at", ReadTable.CALLS_COMPLETE)
+        "cm.deleted_at = toDateTime64(0, 3)"
+        >>> null_check_literal_sql("parent_id", "t.parent_id", ReadTable.CALLS_MERGED)
+        "t.parent_id IS NULL"
+    """
+    if read_table == ReadTable.CALLS_MERGED or field_name not in ALL_SENTINEL_FIELDS:
+        return f"{field_sql} IS NOT NULL" if negate else f"{field_sql} IS NULL"
+
+    literal = sentinel_ch_literal(field_name)
+    op = "!=" if negate else "="
+    return f"{field_sql} {op} {literal}"
 
 
 def get_sentinel_value(field: str) -> str | datetime.datetime | None:

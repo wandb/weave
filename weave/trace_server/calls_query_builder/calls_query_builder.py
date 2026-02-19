@@ -1058,16 +1058,26 @@ class CallsQuery(BaseModel):
             )
         )
 
-        # Important: We must always filter out calls that have not been started
-        # This can occur when there is an out of order call part insertion or worse,
-        # when such occurrence happens and the client terminates early.
-        # Additionally: This condition is also REQUIRED for proper functioning
-        # when using pre-group by (WHERE) optimizations
-        self.add_condition(
-            tsi_query.NotOperation.model_validate(
-                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+        # For calls_merged: filter out orphaned call ends (started_at IS NULL).
+        # This can occur with out-of-order call part insertion or early client
+        # termination.  Also REQUIRED for proper pre-GROUP BY (WHERE) optimizations.
+        # For calls_complete: every row has a non-nullable started_at, so this
+        # condition is always true -- skip it to avoid dead SQL.
+        if self.read_table == ReadTable.CALLS_MERGED:
+            self.add_condition(
+                tsi_query.NotOperation.model_validate(
+                    {
+                        "$not": [
+                            {
+                                "$eq": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": None},
+                                ]
+                            }
+                        ]
+                    }
+                )
             )
-        )
 
         table_alias_resolved = table_alias or get_calls_table_name(self.read_table)
 
@@ -2360,19 +2370,29 @@ def process_object_refs_filter_to_opt_sql(
     if not object_ref_fields_consumed:
         return ""
 
-    # Optimization for filtering with refs, only include calls that have non-zero
-    # input refs when we are conditioning on refs in inputs, or is a naked call end.
+    # Optimization: narrow the scan to rows that actually carry the refs we
+    # are filtering on.
+    #
+    # calls_merged has split start/end rows, so we must also include
+    # "naked call end" rows (started_at IS NULL) for input ref filters and
+    # "naked call start" rows (ended_at IS NULL) for output ref filters.
+    #
+    # calls_complete has one complete row per call -- started_at is always
+    # set (non-nullable, no sentinel) and ended_at uses a sentinel for
+    # unfinished calls.  We still include the ended_at sentinel fallback
+    # for output refs so unfinished calls aren't silently dropped.
     refs_filter_opt_sql = ""
     if "inputs_dump" in object_ref_fields_consumed:
-        started_at_field = get_field_by_name("started_at")
-        started_at_null = started_at_field.null_check_sql(
-            param_builder, table_alias, read_table, use_agg_fn=False
-        )
-        refs_filter_opt_sql += (
-            f"AND (length({table_alias}.input_refs) > 0 OR {started_at_null})"
-        )
-    # If we are conditioning on output refs, filter down calls to those with non-zero
-    # output refs, or they are a naked call start.
+        if read_table == ReadTable.CALLS_COMPLETE:
+            refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0)"
+        else:
+            started_at_field = get_field_by_name("started_at")
+            started_at_null = started_at_field.null_check_sql(
+                param_builder, table_alias, read_table, use_agg_fn=False
+            )
+            refs_filter_opt_sql += (
+                f"AND (length({table_alias}.input_refs) > 0 OR {started_at_null})"
+            )
     if "output_dump" in object_ref_fields_consumed:
         ended_at_field = get_field_by_name("ended_at")
         ended_at_null = ended_at_field.null_check_sql(
