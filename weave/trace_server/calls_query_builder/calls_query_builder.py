@@ -140,7 +140,7 @@ class CallsMergedField(QueryBuilderField):
     def _resolve_field_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
     ) -> str:
-        """Return the SQL expression for this field, honoring use_agg_fn if supported."""
+        """Return the SQL expression for this field (use_agg_fn ignored in base class)."""
         return self.as_sql(pb, table_alias)
 
     def as_select_sql(
@@ -1600,7 +1600,7 @@ class CallsQuery(BaseModel):
         if (
             not where_clause
             and filter_result.filter_sql
-            and self.read_table != ReadTable.CALLS_MERGED
+            and self.read_table == ReadTable.CALLS_COMPLETE
         ):
             where_clause = "WHERE 1"
 
@@ -2207,6 +2207,7 @@ def process_thread_id_filter_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
+    # If there's only one thread_id, use an equality condition for performance
     if len(thread_ids) == 1:
         thread_cond = f"{thread_id_field_sql} = {param_slot(param_builder.add_param(thread_ids[0]), 'String')}"
     elif len(thread_ids) > 1:
@@ -2245,6 +2246,7 @@ def process_turn_id_filter_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
+    # If there's only one turn_id, use an equality condition for performance
     if len(turn_ids) == 1:
         turn_cond = f"{turn_id_field_sql} = {param_slot(param_builder.add_param(turn_ids[0]), 'String')}"
     elif len(turn_ids) > 1:
@@ -2524,7 +2526,7 @@ def build_calls_stats_query(
     # For calls_complete, use a flat query (10x+ faster, avoids subquery materialization):
     #   Fast:  SELECT count() FROM calls_complete WHERE ...
     #   Slow:  SELECT count() FROM (SELECT id FROM calls_complete WHERE ...)
-    if read_table != ReadTable.CALLS_MERGED:
+    if read_table == ReadTable.CALLS_COMPLETE:
         query = _build_calls_complete_stats_query(
             req, param_builder, aggregated_columns
         )

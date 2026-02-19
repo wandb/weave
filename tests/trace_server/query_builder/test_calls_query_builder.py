@@ -3808,6 +3808,57 @@ def test_not_eq_none_display_name_calls_complete() -> None:
     )
 
 
+def test_hardcoded_filters_calls_complete() -> None:
+    """Verify thread_ids, turn_ids, parent_ids, wb_run_ids use sentinel null checks on calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={
+            "thread_ids": ["thread_123"],
+            "turn_ids": ["turn_456"],
+            "parent_ids": ["parent_aaa", "parent_bbb"],
+            "wb_run_ids": ["wb_run_789"],
+        }
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_13:String}
+        WHERE (calls_complete.wb_run_id IN {pb_9:Array(String)}
+               OR calls_complete.wb_run_id = {pb_10:String})
+          AND (calls_complete.parent_id IN {pb_11:Array(String)}
+               OR calls_complete.parent_id = {pb_12:String})
+          AND (calls_complete.thread_id = {pb_5:String}
+               OR calls_complete.thread_id = {pb_6:String})
+          AND (calls_complete.turn_id = {pb_7:String}
+               OR calls_complete.turn_id = {pb_8:String})
+          AND (((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+               AND ((NOT ((calls_complete.started_at IS NULL))))
+               AND (((calls_complete.parent_id IN {pb_1:Array(String)})
+                     AND (calls_complete.thread_id IN {pb_2:Array(String)})
+                     AND (calls_complete.turn_id IN {pb_3:Array(String)})
+                     AND (calls_complete.wb_run_id IN {pb_4:Array(String)}))))
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": ["parent_aaa", "parent_bbb"],
+            "pb_2": ["thread_123"],
+            "pb_3": ["turn_456"],
+            "pb_4": ["wb_run_789"],
+            "pb_5": "thread_123",
+            "pb_6": "",
+            "pb_7": "turn_456",
+            "pb_8": "",
+            "pb_9": ["wb_run_789"],
+            "pb_10": "",
+            "pb_11": ["parent_aaa", "parent_bbb"],
+            "pb_12": "",
+            "pb_13": "project",
+        },
+    )
+
+
 def test_status_sort_calls_complete_uses_sentinels() -> None:
     """Verify status computation sort uses sentinel checks on calls_complete."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
