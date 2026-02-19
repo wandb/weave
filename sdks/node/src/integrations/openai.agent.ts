@@ -14,165 +14,427 @@
  * ```
  */
 
-import {op} from '../op';
-import type {Span, Trace, TracingProcessor} from './openai.agent.types';
+import {getGlobalClient} from '../clientApi';
+import {uuidv7} from 'uuidv7';
+import type {
+  Span,
+  Trace,
+  TracingProcessor,
+  AgentSpanData,
+  FunctionSpanData,
+  ResponseSpanData,
+  HandoffSpanData,
+  GuardrailSpanData,
+  CustomSpanData,
+} from './openai.agent.types';
 
 // ============================================================================
-// Weave Tracing Operations (using op() wrapper)
+// Helper Functions
 // ============================================================================
 
 /**
- * Operation for trace start events
+ * Determine the appropriate call type for a given OpenAI Agent span
  */
-const traceStartOp = op(
-  function openai_agent_trace_start(trace: Trace) {
-    return {
-      trace_id: trace.traceId,
-      name: trace.name,
-      group_id: trace.groupId,
-      metadata: trace.metadata,
-    };
-  },
-  {
-    name: 'openai_agent_trace.start',
-  }
-);
+function getCallType(span: Span): string {
+  return span.spanData.type || 'task';
+}
 
 /**
- * Operation for trace end events
+ * Determine the name for a given OpenAI Agent span
  */
-const traceEndOp = op(
-  function openai_agent_trace_end(trace: Trace) {
-    return {
-      trace_id: trace.traceId,
-      name: trace.name,
-      group_id: trace.groupId,
-      metadata: trace.metadata,
-    };
-  },
-  {
-    name: 'openai_agent_trace.end',
+function getCallName(span: Span): string {
+  const spanData = span.spanData as any;
+  if (spanData.name) {
+    return spanData.name;
+  } else if (span.spanData.type === 'response') {
+    return 'Response';
+  } else if (span.spanData.type === 'handoff') {
+    return 'Handoff';
+  } else {
+    return 'Unknown';
   }
-);
+}
 
 /**
- * Operation for span start events
+ * Extract log data from different span types
  */
-const spanStartOp = op(
-  function openai_agent_span_start(span: Span) {
-    return {
-      span_id: span.spanId,
-      trace_id: span.traceId,
-      parent_id: span.parentId,
-      span_type: span.spanData.type,
-      started_at: span.startedAt,
-    };
-  },
-  {
-    name: 'openai_agent_span.start',
-  }
-);
+function extractSpanData(span: Span): {
+  inputs: Record<string, any>;
+  output: any;
+  metadata: Record<string, any>;
+  metrics: Record<string, any>;
+} {
+  const spanData = span.spanData;
 
-/**
- * Operation for span end events
- */
-const spanEndOp = op(
-  function openai_agent_span_end(span: Span) {
-    return {
-      span_id: span.spanId,
-      trace_id: span.traceId,
-      span_type: span.spanData.type,
-      span_data: span.spanData,
-      ended_at: span.endedAt,
-      error: span.error,
-    };
-  },
-  {
-    name: 'openai_agent_span.end',
+  switch (spanData.type) {
+    case 'agent': {
+      const data = spanData as AgentSpanData;
+      return {
+        inputs: {},
+        output: null,
+        metadata: {
+          tools: data.tools,
+          handoffs: data.handoffs,
+          output_type: data.output_type,
+        },
+        metrics: {},
+      };
+    }
+
+    case 'function': {
+      const data = spanData as FunctionSpanData;
+      return {
+        inputs: {input: data.input},
+        output: data.output,
+        metadata: {},
+        metrics: {},
+      };
+    }
+
+    case 'response': {
+      const data = spanData as ResponseSpanData;
+      return {
+        inputs: data._input ? {input: data._input} : {},
+        output: data._response || null,
+        metadata: {},
+        metrics: {},
+      };
+    }
+
+    case 'handoff': {
+      const data = spanData as HandoffSpanData;
+      return {
+        inputs: {},
+        output: null,
+        metadata: {
+          from_agent: data.from_agent,
+          to_agent: data.to_agent,
+        },
+        metrics: {},
+      };
+    }
+
+    case 'guardrail': {
+      const data = spanData as GuardrailSpanData;
+      return {
+        inputs: {},
+        output: null,
+        metadata: {
+          triggered: data.triggered,
+        },
+        metrics: {},
+      };
+    }
+
+    case 'custom': {
+      const data = spanData as CustomSpanData;
+      const customData = data.data;
+      return {
+        inputs: customData.input ? {input: customData.input} : {},
+        output: customData.output || null,
+        metadata: customData.metadata || {},
+        metrics: customData.metrics || {},
+      };
+    }
+
+    default:
+      return {
+        inputs: {},
+        output: null,
+        metadata: {},
+        metrics: {},
+      };
   }
-);
+}
 
 // ============================================================================
 // Weave Tracing Processor Implementation
 // ============================================================================
+
+interface CallData {
+  callId: string;
+  traceId: string;
+  startedAt: string;
+}
 
 /**
  * A TracingProcessor implementation that logs OpenAI Agent traces and spans to Weave.
  *
  * This processor captures different types of spans from OpenAI Agents (agent execution,
  * function calls, LLM generations, etc.) and logs them to Weave as structured trace data.
+ * Child spans are logged as separate calls with proper parent-child relationships.
  */
 export class WeaveTracingProcessor implements TracingProcessor {
+  private traceCalls: Map<string, CallData> = new Map();
+  private spanCalls: Map<string, CallData> = new Map();
+  private traceData: Map<string, {name: string; metadata: any}> = new Map();
+
   /**
    * Called when a trace starts
    */
   async onTraceStart(trace: Trace): Promise<void> {
-    try {
-      traceStartOp(trace);
-    } catch (error) {
-      // Silently fail to avoid breaking the agents SDK
-      console.error('Weave: Error logging trace start:', error);
+    const client = getGlobalClient();
+    if (!client) {
+      return;
     }
+
+    // Store trace metadata
+    this.traceData.set(trace.traceId, {
+      name: trace.name,
+      metadata: trace.metadata,
+    });
+
+    // Generate IDs for this trace call
+    const callId = uuidv7();
+    const traceId = uuidv7();
+    const startedAt = new Date().toISOString();
+
+    // Store call data
+    this.traceCalls.set(trace.traceId, {callId, traceId, startedAt});
+
+    // Create call start
+    const callStart = {
+      project_id: client.projectId,
+      id: callId,
+      op_name: 'openai_agent_trace',
+      display_name: trace.name,
+      trace_id: traceId,
+      parent_id: null,
+      started_at: startedAt,
+      inputs: {name: trace.name},
+      attributes: {
+        type: 'task',
+        agent_trace_id: trace.traceId,
+      },
+    };
+
+    // Queue the call start
+    client.saveCallStart(callStart);
   }
 
   /**
    * Called when a trace ends
    */
   async onTraceEnd(trace: Trace): Promise<void> {
-    try {
-      traceEndOp(trace);
-    } catch (error) {
-      // Silently fail to avoid breaking the agents SDK
-      console.error('Weave: Error logging trace end:', error);
+    const client = getGlobalClient();
+    if (!client) {
+      return;
     }
+
+    const callData = this.traceCalls.get(trace.traceId);
+    const traceData = this.traceData.get(trace.traceId);
+
+    if (!callData || !traceData) {
+      return;
+    }
+
+    // Create call end
+    const callEnd = {
+      project_id: client.projectId,
+      id: callData.callId,
+      ended_at: new Date().toISOString(),
+      output: {
+        status: 'completed',
+        metrics: {},
+        metadata: traceData.metadata || {},
+      },
+      summary: {},
+    };
+
+    // Queue the call end
+    client.saveCallEnd(callEnd);
+
+    // Clean up
+    this.traceCalls.delete(trace.traceId);
+    this.traceData.delete(trace.traceId);
+  }
+
+  /**
+   * Helper method to get the parent call ID for a span
+   */
+  private getParentCallId(span: Span): string | null {
+    // If span has a parent span, use that
+    if (span.parentId) {
+      const parentSpanCall = this.spanCalls.get(span.parentId);
+      if (parentSpanCall) {
+        return parentSpanCall.callId;
+      }
+    }
+
+    // Otherwise, use the trace root
+    const traceCall = this.traceCalls.get(span.traceId);
+    return traceCall ? traceCall.callId : null;
+  }
+
+  /**
+   * Helper method to get the trace ID for a span
+   */
+  private getTraceId(span: Span): string | null {
+    // Get trace ID from the trace call
+    const traceCall = this.traceCalls.get(span.traceId);
+    return traceCall ? traceCall.traceId : null;
   }
 
   /**
    * Called when a span starts
    */
   async onSpanStart(span: Span): Promise<void> {
-    try {
-      // Skip Response spans - they're handled by OpenAI SDK integration
-      if (span.spanData.type === 'response') {
-        return;
-      }
-
-      spanStartOp(span);
-    } catch (error) {
-      // Silently fail to avoid breaking the agents SDK
-      console.error('Weave: Error logging span start:', error);
+    const client = getGlobalClient();
+    if (!client) {
+      return;
     }
+
+    // Skip Response spans - they're handled by OpenAI SDK integration
+    if (span.spanData.type === 'response') {
+      return;
+    }
+
+    // Span must be part of a trace
+    if (!this.traceCalls.has(span.traceId)) {
+      return;
+    }
+
+    const spanName = getCallName(span);
+    const spanType = getCallType(span);
+    const parentCallId = this.getParentCallId(span);
+    const traceId = this.getTraceId(span);
+
+    if (!parentCallId || !traceId) {
+      return;
+    }
+
+    // Generate IDs for this span call
+    const callId = uuidv7();
+    const startedAt = new Date().toISOString();
+
+    // Store call data
+    this.spanCalls.set(span.spanId, {callId, traceId, startedAt});
+
+    // Create call start
+    const callStart = {
+      project_id: client.projectId,
+      id: callId,
+      op_name: `openai_agent_${spanType}`,
+      display_name: spanName,
+      trace_id: traceId,
+      parent_id: parentCallId,
+      started_at: startedAt,
+      inputs: {name: spanName},
+      attributes: {
+        type: spanType,
+        agent_span_id: span.spanId,
+        agent_trace_id: span.traceId,
+        parent_span_id: span.parentId,
+      },
+    };
+
+    // Queue the call start
+    client.saveCallStart(callStart);
   }
 
   /**
    * Called when a span ends
    */
   async onSpanEnd(span: Span): Promise<void> {
-    try {
-      // Skip Response spans - they're handled by OpenAI SDK integration
-      if (span.spanData.type === 'response') {
-        return;
-      }
-
-      spanEndOp(span);
-    } catch (error) {
-      // Silently fail to avoid breaking the agents SDK
-      console.error('Weave: Error logging span end:', error);
+    const client = getGlobalClient();
+    if (!client) {
+      return;
     }
+
+    // Skip Response spans - they're handled by OpenAI SDK integration
+    if (span.spanData.type === 'response') {
+      return;
+    }
+
+    const callData = this.spanCalls.get(span.spanId);
+    if (!callData) {
+      return;
+    }
+
+    const spanData = extractSpanData(span);
+
+    // Create call end
+    const callEnd = {
+      project_id: client.projectId,
+      id: callData.callId,
+      ended_at: new Date().toISOString(),
+      output: {
+        output: spanData.output,
+        metrics: spanData.metrics,
+        metadata: spanData.metadata,
+        error: span.error || null,
+      },
+      summary: {},
+    };
+
+    // Queue the call end
+    client.saveCallEnd(callEnd);
+
+    // Clean up
+    this.spanCalls.delete(span.spanId);
   }
 
   /**
    * Called when the processor should shut down
    */
   async shutdown(_timeout?: number): Promise<void> {
-    // No-op for now - weave client handles its own shutdown
+    // Finish any unfinished calls
+    this.finishUnfinishedCalls('interrupted');
+    this.cleanup();
   }
 
   /**
    * Called to force flush any pending traces
    */
   async forceFlush(): Promise<void> {
-    // No-op for now - weave client handles its own flushing
+    // Finish any unfinished calls
+    this.finishUnfinishedCalls('force_flushed');
+    this.cleanup();
+  }
+
+  /**
+   * Helper method to finish unfinished calls on shutdown or flush
+   */
+  private finishUnfinishedCalls(status: string): void {
+    const client = getGlobalClient();
+    if (!client) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    // Finish unfinished trace calls
+    for (const [traceId, callData] of this.traceCalls) {
+      const callEnd = {
+        project_id: client.projectId,
+        id: callData.callId,
+        ended_at: now,
+        output: {status},
+        summary: {},
+      };
+      client.saveCallEnd(callEnd);
+    }
+
+    // Finish unfinished span calls
+    for (const [spanId, callData] of this.spanCalls) {
+      const callEnd = {
+        project_id: client.projectId,
+        id: callData.callId,
+        ended_at: now,
+        output: {status},
+        summary: {},
+      };
+      client.saveCallEnd(callEnd);
+    }
+  }
+
+  /**
+   * Clean up all internal storage
+   */
+  private cleanup(): void {
+    this.traceCalls.clear();
+    this.spanCalls.clear();
+    this.traceData.clear();
   }
 }
 

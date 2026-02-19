@@ -637,12 +637,12 @@ export class WeaveClient {
     }
   }
 
-  private saveCallStart(callStart: CallStartParams) {
+  public saveCallStart(callStart: CallStartParams) {
     this.callQueue.push({mode: 'start', data: {start: callStart}});
     this.scheduleBatchProcessing();
   }
 
-  private saveCallEnd(callEnd: CallEndParams) {
+  public saveCallEnd(callEnd: CallEndParams) {
     this.callQueue.push({mode: 'end', data: {end: callEnd}});
     this.scheduleBatchProcessing();
   }
