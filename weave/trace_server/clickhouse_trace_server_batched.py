@@ -6369,8 +6369,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
 
     # Convert sentinel values back to None for all sentinel-tracked fields.
-    # This handles both the old Nullable path (returns None) and the new
-    # non-nullable path (returns sentinel -> converted to None).
+    # This handles both the calls_merged Nullable path (returns None) and the
+    # calls_complete non-nullable path (returns sentinel -> converted to None).
     sv: dict[str, Any] = {}
     for field in ch_sentinel_values.ALL_SENTINEL_FIELDS:
         raw = ch_call_dict.get(field)

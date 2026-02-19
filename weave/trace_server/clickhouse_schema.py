@@ -126,8 +126,6 @@ class CallCompleteCHInsertable(
     summary_dump: str
     otel_dump: str | None = None
     wb_run_step_end: int | None = None
-
-    # New columns added in migration 024
     ttl_at: datetime.datetime = datetime.datetime(2050, 1, 1)
     source: str = "direct"
 
