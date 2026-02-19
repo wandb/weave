@@ -175,10 +175,21 @@ def has_custom_repr(obj: Any) -> bool:
     return obj.__class__.__repr__ is not object.__repr__
 
 
+# Note: Max depth not picked scientifically, just trying to keep things under control.
+DEFAULT_MAX_DICTIFY_DEPTH = 20
+NO_MAX_DICTIFY_DEPTH = 0
+
+
 def dictify(
-    obj: Any, maxdepth: int = 0, depth: int = 1, seen: set[int] | None = None
+    obj: Any,
+    maxdepth: int = DEFAULT_MAX_DICTIFY_DEPTH,
+    depth: int = 1,
+    seen: set[int] | None = None,
 ) -> Any:
-    """Recursively compute a dictionary representation of an object."""
+    """Recursively compute a dictionary representation of an object.
+
+    Set ``maxdepth=NO_MAX_DICTIFY_DEPTH`` for unlimited recursion depth.
+    """
     if seen is None:
         seen = set()
 
@@ -190,7 +201,7 @@ def dictify(
         else:
             seen.add(obj_id)
 
-    if maxdepth > 0 and depth > maxdepth:
+    if maxdepth != NO_MAX_DICTIFY_DEPTH and depth > maxdepth:
         # TODO: If obj at this point is a simple type,
         #       maybe we should just return it rather than stringify
         return stringify(obj)
@@ -216,7 +227,7 @@ def dictify(
                 for k, v in as_dict.items():
                     if isinstance(k, str) and should_redact(k):
                         to_dict_result[k] = REDACTED_VALUE
-                    elif maxdepth == 0 or depth < maxdepth:
+                    elif maxdepth == NO_MAX_DICTIFY_DEPTH or depth < maxdepth:
                         to_dict_result[k] = dictify(v, maxdepth, depth + 1)
                     else:
                         to_dict_result[k] = stringify(v)
@@ -248,7 +259,7 @@ def dictify(
                 val = getattr(obj, attr)
                 if callable(val):
                     continue
-                if maxdepth == 0 or depth < maxdepth:
+                if maxdepth == NO_MAX_DICTIFY_DEPTH or depth < maxdepth:
                     result[attr] = dictify(val, maxdepth, depth + 1, seen)
                 else:
                     result[attr] = stringify(val)
@@ -259,10 +270,6 @@ def dictify(
 
 # TODO: Investigate why dictifying Logger causes problems
 ALWAYS_STRINGIFY = (logging.Logger, CoroutineType)
-
-
-# Note: Max depth not picked scientifically, just trying to keep things under control.
-DEFAULT_MAX_DICTIFY_DEPTH = 10
 
 
 def fallback_encode(obj: Any) -> Any:

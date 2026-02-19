@@ -7,6 +7,7 @@ import weave
 from weave.trace.object_record import pydantic_object_record
 from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
+    NO_MAX_DICTIFY_DEPTH,
     dictify,
     fallback_encode,
     is_pydantic_model_class,
@@ -87,7 +88,7 @@ def test_dictify_maxdepth() -> None:
             },
         },
     }
-    assert dictify(obj, maxdepth=0) == obj
+    assert dictify(obj, maxdepth=NO_MAX_DICTIFY_DEPTH) == obj
     assert dictify(obj, maxdepth=1) == {
         "a": "{'b': {'c': {'d': 1}}}",
     }
@@ -121,6 +122,21 @@ def test_dictify_maxdepth() -> None:
             },
         },
     }
+
+
+def test_dictify_default_maxdepth_20() -> None:
+    obj = {"value": 1}
+    for level in range(21, 0, -1):
+        obj = {f"level_{level}": obj}
+
+    result = dictify(obj)
+    assert result == dictify(obj, maxdepth=20)
+
+    current = result
+    for level in range(1, 20):
+        current = current[f"level_{level}"]
+
+    assert current == {"level_20": "{'level_21': {'value': 1}}"}
 
 
 def test_dictify_to_dict() -> None:
