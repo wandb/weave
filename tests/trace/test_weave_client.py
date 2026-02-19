@@ -1654,11 +1654,15 @@ def test_summary_tokens_cost(client):
             "completion_tokens": 4000000,
             "requests": 2,
             "total_tokens": 0,
+            "cached_prompt_tokens": 0,
             "prompt_tokens_total_cost": pytest.approx(60),
+            "cached_prompt_tokens_total_cost": pytest.approx(0),
             "completion_tokens_total_cost": pytest.approx(240),
             "prompt_token_cost": 3e-05,
+            "cached_prompt_token_cost": 3e-05,
             "completion_token_cost": 6e-05,
             "prompt_token_cost_unit": "USD",
+            "cached_prompt_token_cost_unit": "USD",
             "completion_token_cost_unit": "USD",
             "provider_id": "openai",
             "pricing_level": "default",
@@ -1673,11 +1677,15 @@ def test_summary_tokens_cost(client):
             "completion_tokens": 5000000,
             "requests": 1,
             "total_tokens": 0,
+            "cached_prompt_tokens": 0,
             "prompt_tokens_total_cost": pytest.approx(15),
+            "cached_prompt_tokens_total_cost": pytest.approx(0),
             "completion_tokens_total_cost": pytest.approx(75),
             "prompt_token_cost": 5e-06,
+            "cached_prompt_token_cost": 5e-06,
             "completion_token_cost": 1.5e-05,
             "prompt_token_cost_unit": "USD",
+            "cached_prompt_token_cost_unit": "USD",
             "completion_token_cost_unit": "USD",
             "provider_id": "openai",
             "pricing_level": "default",
@@ -1693,6 +1701,80 @@ def test_summary_tokens_cost(client):
         "trace_name": "models",
         "latency_ms": AnyIntMatcher(),
     }
+
+
+def test_summary_tokens_cost_uses_cached_tokens(client):
+    if client_is_sqlite(client):
+        # SQLite does not support costs
+        return
+
+    project_id = client._project_id()
+    prompt_token_cost = 5e-06
+    cached_prompt_token_cost = 2.5e-06
+    cost_res = client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=project_id,
+            costs={
+                "gpt-4o": tsi.CostCreateInput(
+                    prompt_token_cost=prompt_token_cost,
+                    completion_token_cost=1.5e-05,
+                    cached_prompt_token_cost=cached_prompt_token_cost,
+                    effective_date=datetime.datetime.now(datetime.timezone.utc)
+                    - datetime.timedelta(days=1),
+                )
+            },
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    cost_id = cost_res.ids[0][0]
+
+    @weave.op
+    def cached_prompt_op() -> dict[str, Any]:
+        return {
+            "result": "ok",
+            "model": "gpt-4o",
+            "usage": {
+                "prompt_tokens": 1000,
+                "completion_tokens": 0,
+                "total_tokens": 1000,
+                "prompt_tokens_details": {"cached_tokens": 900},
+            },
+        }
+
+    try:
+        cached_prompt_op()
+        op_call = next(iter(cached_prompt_op.calls()))
+        calls = list(
+            client.get_calls(
+                filter=tsi.CallsFilter(op_names=[op_call.op_name]),
+                include_costs=True,
+            )
+        )
+        assert len(calls) == 1
+        call_summary = calls[0].summary
+        assert call_summary is not None
+        assert call_summary.get("weave", {}).get("costs") is not None
+
+        gpt4o_cost = call_summary["weave"]["costs"]["gpt-4o"]
+        expected_prompt_cost = (1000 - 900) * prompt_token_cost + (
+            900 * cached_prompt_token_cost
+        )
+        full_prompt_cost = 1000 * prompt_token_cost
+
+        assert gpt4o_cost["prompt_tokens"] == 1000
+        assert gpt4o_cost["cached_prompt_tokens"] == 900
+        assert gpt4o_cost["cached_prompt_token_cost"] == pytest.approx(
+            cached_prompt_token_cost
+        )
+        assert gpt4o_cost["cached_prompt_tokens_total_cost"] == pytest.approx(
+            900 * cached_prompt_token_cost
+        )
+        assert gpt4o_cost["prompt_tokens_total_cost"] == pytest.approx(
+            expected_prompt_cost
+        )
+        assert gpt4o_cost["prompt_tokens_total_cost"] < full_prompt_cost
+    finally:
+        client.purge_costs(cost_id)
 
 
 @pytest.mark.skip_clickhouse_client

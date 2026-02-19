@@ -912,7 +912,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> dict[str, dict[str, float]]:
         """Query llm_token_prices for the given models and return best prices.
 
-        Returns a dict mapping model -> {prompt_token_cost, completion_token_cost}.
+        Returns a dict mapping model -> {prompt_token_cost, cached_prompt_token_cost, completion_token_cost}.
         Uses pricing level priority: project > default, newest effective_date.
         """
         if not models:
@@ -927,9 +927,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         prices: dict[str, dict[str, float]] = {}
         for row in result.result_rows:
-            llm_id, prompt_cost, completion_cost = row
+            llm_id, prompt_cost, cached_prompt_cost, completion_cost = row
+            prompt_token_cost = float(prompt_cost) if prompt_cost else 0.0
+            cached_prompt_token_cost = (
+                float(cached_prompt_cost)
+                if cached_prompt_cost is not None
+                else prompt_token_cost
+            )
             prices[llm_id] = {
-                "prompt_token_cost": float(prompt_cost) if prompt_cost else 0.0,
+                "prompt_token_cost": prompt_token_cost,
+                "cached_prompt_token_cost": cached_prompt_token_cost,
                 "completion_token_cost": float(completion_cost)
                 if completion_cost
                 else 0.0,
@@ -958,24 +965,38 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Query prices for those models
         prices = self._get_prices_for_models(models, project_id)
 
+        include_cached_tokens = bool(
+            {"input_cost", "total_cost"} & requested_cost_metrics
+        )
+
         # Compute costs for each bucket
         for bucket in usage_buckets:
             model = bucket.get("model", "")
             model_prices = prices.get(model, {})
             prompt_cost = model_prices.get("prompt_token_cost", 0.0)
+            cached_prompt_cost = model_prices.get("cached_prompt_token_cost", prompt_cost)
             completion_cost = model_prices.get("completion_token_cost", 0.0)
 
             input_tokens = bucket.get("sum_input_tokens", 0) or 0
             output_tokens = bucket.get("sum_output_tokens", 0) or 0
+            cached_tokens = (
+                (bucket.get("sum_cached_tokens", 0) or 0) if include_cached_tokens else 0
+            )
+            cached_input_tokens = min(max(cached_tokens, 0), max(input_tokens, 0))
+            uncached_input_tokens = max(input_tokens - cached_input_tokens, 0)
+            input_cost = (
+                uncached_input_tokens * prompt_cost
+                + cached_input_tokens * cached_prompt_cost
+            )
 
             if "input_cost" in requested_cost_metrics:
-                bucket["sum_input_cost"] = input_tokens * prompt_cost
+                bucket["sum_input_cost"] = input_cost
 
             if "output_cost" in requested_cost_metrics:
                 bucket["sum_output_cost"] = output_tokens * completion_cost
 
             if "total_cost" in requested_cost_metrics:
-                input_cost = bucket.get("sum_input_cost", input_tokens * prompt_cost)
+                input_cost = bucket.get("sum_input_cost", input_cost)
                 output_cost = bucket.get(
                     "sum_output_cost", output_tokens * completion_cost
                 )
@@ -987,7 +1008,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Usage metrics (tokens, cost) are grouped by model.
         Call metrics (latency, counts) are not grouped by model.
 
-        Cost metrics are computed post-query by multiplying token counts by prices.
+        Cost metrics are computed post-query by multiplying billable token counts by prices.
         """
         usage_buckets: list[dict[str, Any]] = []
         call_buckets: list[dict[str, Any]] = []
@@ -1006,7 +1027,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Process token metrics (grouped by model)
         if token_metrics:
             pb = ParamBuilder()
-            usage_query = build_usage_query(req, token_metrics, pb, read_table)
+            usage_query = build_usage_query(
+                req,
+                token_metrics,
+                pb,
+                read_table,
+                include_cached_tokens_for_cost=bool(
+                    {"input_cost", "total_cost"} & requested_cost_metrics
+                ),
+            )
             granularity = usage_query.granularity_seconds
             start = usage_query.start
             end = usage_query.end
@@ -1020,6 +1049,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._compute_costs_for_buckets(
                 usage_buckets, req.project_id, requested_cost_metrics
             )
+            for bucket in usage_buckets:
+                bucket.pop("sum_cached_tokens", None)
 
         # Process call metrics (not grouped by model)
         if req.call_metrics:
@@ -5169,8 +5200,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     cost.effective_date if cost.effective_date else created_at
                 ),
                 "prompt_token_cost": cost.prompt_token_cost,
+                "cached_prompt_token_cost": (
+                    cost.cached_prompt_token_cost
+                    if cost.cached_prompt_token_cost is not None
+                    else cost.prompt_token_cost
+                ),
                 "completion_token_cost": cost.completion_token_cost,
                 "prompt_token_cost_unit": cost.prompt_token_cost_unit,
+                "cached_prompt_token_cost_unit": (
+                    cost.cached_prompt_token_cost_unit
+                    if cost.cached_prompt_token_cost_unit is not None
+                    else cost.prompt_token_cost_unit
+                ),
                 "completion_token_cost_unit": cost.completion_token_cost_unit,
             }
 

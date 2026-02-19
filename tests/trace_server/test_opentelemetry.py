@@ -1216,11 +1216,15 @@ class TestSemanticConventionParsing:
                 "completion_tokens": 2000000,
                 "requests": 0,  # OTEL doesn't track requests separately
                 "total_tokens": 3000000,  # Now properly calculated from prompt + completion tokens
+                "cached_prompt_tokens": 0,
                 "prompt_tokens_total_cost": pytest.approx(30),
+                "cached_prompt_tokens_total_cost": pytest.approx(0),
                 "completion_tokens_total_cost": pytest.approx(120),
                 "prompt_token_cost": 3e-05,
+                "cached_prompt_token_cost": 3e-05,
                 "completion_token_cost": 6e-05,
                 "prompt_token_cost_unit": "USD",
+                "cached_prompt_token_cost_unit": "USD",
                 "completion_token_cost_unit": "USD",
                 "provider_id": "openai",
                 "pricing_level": "default",

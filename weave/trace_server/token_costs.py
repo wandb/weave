@@ -52,8 +52,10 @@ LLM_TOKEN_PRICES_COLUMNS = [
     Column(name="llm_id", type="string"),
     Column(name="effective_date", type="datetime"),
     Column(name="prompt_token_cost", type="float"),
+    Column(name="cached_prompt_token_cost", type="float"),
     Column(name="completion_token_cost", type="float"),
     Column(name="prompt_token_cost_unit", type="string"),
+    Column(name="cached_prompt_token_cost_unit", type="string"),
     Column(name="completion_token_cost_unit", type="string"),
     Column(name="created_by", type="string"),
     Column(name="created_at", type="datetime"),
@@ -80,11 +82,12 @@ def build_model_prices_query(
         SQL string and parameters dict.
     """
     sql = f"""
-    SELECT llm_id, prompt_token_cost, completion_token_cost
+    SELECT llm_id, prompt_token_cost, cached_prompt_token_cost, completion_token_cost
     FROM (
         SELECT
             llm_id,
             prompt_token_cost,
+            cached_prompt_token_cost,
             completion_token_cost,
             ROW_NUMBER() OVER (
                 PARTITION BY llm_id
@@ -381,6 +384,7 @@ def _build_cost_summary_dump_snippet() -> str:
     # These two objects are used to construct the costs object
     cost_string_fields = [
         "prompt_token_cost_unit",
+        "cached_prompt_token_cost_unit",
         "completion_token_cost_unit",
         "effective_date",
         "provider_id",
@@ -397,6 +401,20 @@ def _build_cost_summary_dump_snippet() -> str:
         "total_tokens",
     ]
 
+    cached_prompt_tokens_sql = _cached_prompt_tokens_sql_from_usage_json("kv.2")
+    bounded_cached_prompt_tokens_sql = (
+        f"least(greatest({cached_prompt_tokens_sql}, 0), prompt_tokens)"
+    )
+    uncached_prompt_tokens_sql = (
+        f"greatest(prompt_tokens - {bounded_cached_prompt_tokens_sql}, 0)"
+    )
+    cached_prompt_tokens_total_cost_sql = (
+        f"{bounded_cached_prompt_tokens_sql} * cached_prompt_token_cost"
+    )
+    prompt_tokens_total_cost_sql = (
+        f"({uncached_prompt_tokens_sql} * prompt_token_cost) + ({cached_prompt_tokens_total_cost_sql})"
+    )
+
     numeric_fields_str = " ".join(
         [
             *[
@@ -404,10 +422,13 @@ def _build_cost_summary_dump_snippet() -> str:
                 for field in cost_numeric_fields
             ],
             # These numeric fields are derived or mapped to another name
-            """
+            f"""
+            '"cached_prompt_tokens":', toString({bounded_cached_prompt_tokens_sql}), ',',
             '"prompt_token_cost":', toString(prompt_token_cost), ',',
+            '"cached_prompt_token_cost":', toString(cached_prompt_token_cost), ',',
             '"completion_token_cost":', toString(completion_token_cost), ',',
-            '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',',
+            '"prompt_tokens_total_cost":', toString({prompt_tokens_total_cost_sql}), ',',
+            '"cached_prompt_tokens_total_cost":', toString({cached_prompt_tokens_total_cost_sql}), ',',
             '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
         """,
         ]
@@ -445,6 +466,26 @@ def _build_cost_summary_dump_snippet() -> str:
         '}}' )
     ) AS summary_dump
     """
+
+
+def _cached_prompt_tokens_sql_from_usage_json(usage_json_col: str) -> str:
+    """Build SQL that extracts cached prompt/input tokens from provider usage details.
+
+    OpenAI-style usage may report cached tokens in either:
+    - prompt_tokens_details.cached_tokens (chat/completions)
+    - input_tokens_details.cached_tokens (responses API)
+    """
+
+    return f"""(
+        if(JSONHas({usage_json_col}, 'prompt_tokens_details'),
+           JSONExtractInt(JSONExtractRaw({usage_json_col}, 'prompt_tokens_details'), 'cached_tokens'),
+           0
+        ) +
+        if(JSONHas({usage_json_col}, 'input_tokens_details'),
+           JSONExtractInt(JSONExtractRaw({usage_json_col}, 'input_tokens_details'), 'cached_tokens'),
+           0
+        )
+    )"""
 
 
 def _prepare_final_select_fields(

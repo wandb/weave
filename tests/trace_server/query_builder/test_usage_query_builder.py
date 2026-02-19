@@ -1,6 +1,8 @@
 import datetime
 
 from tests.trace_server.query_builder.utils import assert_usage_sql
+from weave.trace_server.calls_query_builder.usage_query_builder import build_usage_query
+from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.trace_server_interface import (
     AggregationType,
@@ -1163,6 +1165,31 @@ def test_wb_user_ids_filter():
 # NOTE: Cost metrics (input_cost, output_cost, total_cost) are computed post-query
 # by multiplying token counts by prices from llm_token_prices table.
 # There is no SQL test for cost metrics since they are not extracted via SQL.
+
+
+def test_usage_query_includes_cached_tokens_for_cost_flag() -> None:
+    """Internal cached-token aggregate should be present when requested."""
+    start_dt = datetime.datetime(2024, 12, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    end_dt = datetime.datetime(2024, 12, 2, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    req = CallStatsReq(
+        project_id="entity/project",
+        start=start_dt,
+        end=end_dt,
+        granularity=3600,
+    )
+    metrics = [UsageMetricSpec(metric="input_tokens")]
+
+    pb = ParamBuilder("pb")
+    query_result = build_usage_query(
+        req,
+        metrics,
+        pb,
+        include_cached_tokens_for_cost=True,
+    )
+
+    assert "sum_cached_tokens" in query_result.columns
+    assert "prompt_tokens_details" in query_result.sql
+    assert "input_tokens_details" in query_result.sql
 
 
 # =============================================================================

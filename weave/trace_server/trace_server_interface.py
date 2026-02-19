@@ -42,11 +42,15 @@ class LLMUsageSchema(TypedDict, total=False):
 
 
 class LLMCostSchema(LLMUsageSchema):
+    cached_prompt_tokens: int | None
     prompt_tokens_total_cost: float | None
+    cached_prompt_tokens_total_cost: float | None
     completion_tokens_total_cost: float | None
     prompt_token_cost: float | None
+    cached_prompt_token_cost: float | None
     completion_token_cost: float | None
     prompt_token_cost_unit: str | None
+    cached_prompt_token_cost_unit: str | None
     completion_token_cost_unit: str | None
     effective_date: str | None
     provider_id: str | None
@@ -1110,8 +1114,16 @@ class EnsureProjectExistsRes(BaseModel):
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
+    cached_prompt_token_cost: float | None = Field(
+        None,
+        description="The cost of a cached prompt/input token. Defaults to prompt_token_cost when omitted.",
+    )
     prompt_token_cost_unit: str | None = Field(
         "USD", description="The unit of the cost for the prompt tokens"
+    )
+    cached_prompt_token_cost_unit: str | None = Field(
+        None,
+        description="The unit of the cost for cached prompt/input tokens. Defaults to prompt_token_cost_unit when omitted.",
     )
     completion_token_cost_unit: str | None = Field(
         "USD", description="The unit of the cost for the completion tokens"
@@ -1146,8 +1158,10 @@ class CostQueryReq(BaseModelStrict):
                 "id",
                 "llm_id",
                 "prompt_token_cost",
+                "cached_prompt_token_cost",
                 "completion_token_cost",
                 "prompt_token_cost_unit",
+                "cached_prompt_token_cost_unit",
                 "completion_token_cost_unit",
                 "effective_date",
                 "provider_id",
@@ -1167,8 +1181,10 @@ class CostQueryOutput(BaseModel):
     id: str | None = Field(default=None, examples=["2341-asdf-asdf"])
     llm_id: str | None = Field(default=None, examples=["gpt4"])
     prompt_token_cost: float | None = Field(default=None, examples=[1.0])
+    cached_prompt_token_cost: float | None = Field(default=None, examples=[0.5])
     completion_token_cost: float | None = Field(default=None, examples=[1.0])
     prompt_token_cost_unit: str | None = Field(default=None, examples=["USD"])
+    cached_prompt_token_cost_unit: str | None = Field(default=None, examples=["USD"])
     completion_token_cost_unit: str | None = Field(default=None, examples=["USD"])
     effective_date: datetime.datetime | None = Field(
         default=None, examples=["2024-01-01T00:00:00Z"]
@@ -2553,7 +2569,7 @@ Token metrics are extracted from summary.usage[model]:
 - total_tokens: Total tokens (input + output)
 
 Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices:
-- input_cost: input_tokens * prompt_token_cost
+- input_cost: uncached_input_tokens * prompt_token_cost + cached_input_tokens * cached_prompt_token_cost (fallback to prompt_token_cost when cached rate is unset)
 - output_cost: output_tokens * completion_token_cost
 - total_cost: input_cost + output_cost
 """
