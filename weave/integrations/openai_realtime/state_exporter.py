@@ -305,12 +305,11 @@ class StateExporter(BaseModel):
                 self.session_span.get_root_call() if self.session_span else None
             )
             client = require_weave_client()
-            with set_thread_id(conv_id):
-                conv_call = client.create_call(
-                    op="realtime.conversation",
-                    inputs={"id": conv_id},
-                    parent=session_call,
-                )
+            conv_call = client.create_call(
+                op="realtime.conversation",
+                inputs={"id": conv_id},
+                parent=session_call,
+            )
             self.conversation_calls[conv_id] = conv_call
 
     def handle_input_audio_append(self, msg: dict) -> None:
@@ -576,8 +575,6 @@ class StateExporter(BaseModel):
                 self.conversation_responses[conv_id].append(response_id)
         elif conv_id and response_id:
             self.conversation_responses[conv_id] = [response_id]
-
-        with set_thread_id(conv_id):
             if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
                 response_parent = conv_call
             elif conv_id:
@@ -595,9 +592,15 @@ class StateExporter(BaseModel):
                 # Will not happen in GA but potentially possible in Beta
                 response_parent = None
 
-            call = client.create_call(
-                "realtime.response", inputs=inputs, parent=response_parent
-            )
+            if conv_id:
+                with set_thread_id(conv_id):
+                    call = client.create_call(
+                        "realtime.response", inputs=inputs, parent=response_parent
+                    )
+            else:
+                call = client.create_call(
+                    "realtime.response", inputs=inputs, parent=response_parent
+                )
 
             output_dict = dict(response)
             output_list = response.get("output", [])
