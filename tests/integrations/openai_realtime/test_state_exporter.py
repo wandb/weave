@@ -8,11 +8,14 @@ class DummyWeaveClient:
     def __init__(self):
         self.created: list[str] = []
         self.finished: list[str] = []
+        self.thread_ids: list[str | None] = []
 
     def create_call(self, op, inputs=None, parent=None):
         from weave.trace.call import Call
+        from weave.trace.context.call_context import get_thread_id
 
         self.created.append(op)
+        self.thread_ids.append(get_thread_id())
         return Call(
             _op_name=op,
             trace_id="trace",
@@ -37,11 +40,11 @@ def install_require_weave_client(monkeypatch, client: DummyWeaveClient):
     monkeypatch.setattr(wcc, "require_weave_client", lambda: client)
 
 
-def make_session_text():
+def make_session(modalities=None):
     return {
         "id": "sess_1",
         "model": "m",
-        "modalities": ["text"],
+        "modalities": modalities or ["text"],
         "instructions": "",
         "voice": "alloy",
         "input_audio_format": "pcm16",
@@ -75,15 +78,23 @@ def make_assistant_output(item_id, content=None):
     }
 
 
-def make_response(resp_id, output):
+def make_response(resp_id, output, conversation_id=None):
     return {
         "id": resp_id,
         "status": "completed",
         "status_details": None,
         "output": [output],
         "usage": None,
-        "conversation_id": None,
+        "conversation_id": conversation_id,
     }
+
+
+def assert_calls_with_thread_id(client, op, expected_thread_id, expected_count=1):
+    """Assert that calls for a given op have the expected thread_id."""
+    indices = [i for i, o in enumerate(client.created) if o == op]
+    assert len(indices) == expected_count
+    for idx in indices:
+        assert client.thread_ids[idx] == expected_thread_id
 
 
 def test_response_audio_delta_and_done():
@@ -151,7 +162,7 @@ def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
         {
             "type": "session.updated",
             "event_id": "event_0",
-            "session": make_session_text(),
+            "session": make_session(),
         }
     )
 
@@ -216,6 +227,74 @@ def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
     assert client.finished == ["resp_1", "resp_2"]
 
 
+def test_response_calls_have_thread_id_set_to_conversation_id(monkeypatch):
+    """Each realtime.response call should be created with thread_id = conversation_id."""
+    client = DummyWeaveClient()
+    install_require_weave_client(monkeypatch, client)
+    import weave.integrations.openai_realtime.state_exporter as se
+
+    monkeypatch.setattr(
+        se.Content, "from_bytes", staticmethod(lambda b, extension: {"ok": True})
+    )
+
+    exp = StateExporter()
+    exp.handle_session_updated(
+        {
+            "type": "session.updated",
+            "event_id": "event_0",
+            "session": make_session(modalities=["audio"]),
+        }
+    )
+
+    conv_id = "conv_abc123"
+    out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])
+    resp = make_response("resp_1", out, conversation_id=conv_id)
+    exp.handle_response_created(
+        {"type": "response.created", "event_id": "event_1", "response": resp}
+    )
+    exp.handle_response_done(
+        {"type": "response.done", "event_id": "event_2", "response": resp}
+    )
+
+    time.sleep(0.08)
+
+    assert_calls_with_thread_id(client, "realtime.response", conv_id)
+    assert_calls_with_thread_id(client, "realtime.conversation", conv_id)
+
+
+def test_response_without_conversation_id_has_no_thread_id(monkeypatch):
+    """When conversation_id is None (Beta API), no thread_id should be set."""
+    client = DummyWeaveClient()
+    install_require_weave_client(monkeypatch, client)
+    import weave.integrations.openai_realtime.state_exporter as se
+
+    monkeypatch.setattr(
+        se.Content, "from_bytes", staticmethod(lambda b, extension: {"ok": True})
+    )
+
+    exp = StateExporter()
+    exp.handle_session_updated(
+        {
+            "type": "session.updated",
+            "event_id": "event_0",
+            "session": make_session(modalities=["audio"]),
+        }
+    )
+
+    out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])
+    resp = make_response("resp_1", out, conversation_id=None)
+    exp.handle_response_created(
+        {"type": "response.created", "event_id": "event_1", "response": resp}
+    )
+    exp.handle_response_done(
+        {"type": "response.done", "event_id": "event_2", "response": resp}
+    )
+
+    time.sleep(0.08)
+
+    assert_calls_with_thread_id(client, "realtime.response", None)
+
+
 def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
     client = DummyWeaveClient()
     install_require_weave_client(monkeypatch, client)
@@ -227,23 +306,12 @@ def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
 
     exp = StateExporter()
     # Session without text modality -> no gating
-    session = {
-        "id": "sess_2",
-        "model": "m",
-        "modalities": ["audio"],
-        "instructions": "",
-        "voice": "alloy",
-        "input_audio_format": "pcm16",
-        "output_audio_format": "pcm16",
-        "input_audio_transcription": None,
-        "turn_detection": {"type": "none"},
-        "tools": [],
-        "tool_choice": "auto",
-        "temperature": 0.6,
-        "max_response_output_tokens": None,
-    }
     exp.handle_session_updated(
-        {"type": "session.updated", "event_id": "event_0", "session": session}
+        {
+            "type": "session.updated",
+            "event_id": "event_0",
+            "session": make_session(modalities=["audio"]),
+        }
     )
 
     out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])

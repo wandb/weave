@@ -32,6 +32,12 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
 from weave import Thread, ThreadPoolExecutor
+from weave.shared.refs_internal import extra_value_quoter
+from weave.shared.trace_server_interface_util import (
+    TRACE_REF_SCHEME,
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    extract_refs_from_values,
+)
 from weave.trace import weave_client
 from weave.trace.context.call_context import require_current_call
 from weave.trace.context.weave_client_context import (
@@ -46,13 +52,7 @@ from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
-from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
-from weave.trace_server.trace_server_interface_util import (
-    TRACE_REF_SCHEME,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-    extract_refs_from_values,
-)
 from weave.trace_server.validation_util import CHValidationError
 from weave.utils.project_id import from_project_id, to_project_id
 
@@ -6447,3 +6447,37 @@ def test_calls_query_ordering_with_costs_comprehensive(client):
     assert calls[0].id == call6.id
     assert calls[1].id == call5.id
     assert calls[2].id == call4.id
+
+
+def test_sentinel_round_trip_none_values(client):
+    """Verify that None values survive the full write→read pipeline without leaking sentinels.
+
+    The calls_complete table uses non-nullable columns with sentinel values (empty string
+    for strings, epoch 1970-01-01 for datetimes) instead of NULL. The app layer converts
+    between Python None and sentinels at the ClickHouse boundary. This test validates
+    that nullable fields remain None when read back, not "".
+    """
+
+    @weave.op
+    def returns_none() -> None:
+        return None
+
+    returns_none()
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    c = calls[0]
+
+    # Nullable fields that should be None must not leak sentinels (e.g. "")
+    assert c.parent_id is None
+    assert c.exception is None
+    assert c.wb_run_id is None
+    assert c.display_name is None
+    assert c.output is None
+
+    # Non-null fields must be present
+    assert c.id is not None
+    assert c.trace_id is not None
+    assert c.started_at is not None
+    assert c.ended_at is not None
+    assert c.op_name is not None

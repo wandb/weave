@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import threading
+from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -12,6 +13,7 @@ from typing_extensions import Self
 
 from weave.integrations.openai_realtime.audio_buffer import AudioBufferManager
 from weave.integrations.openai_realtime.encoding import pcm_to_wav
+from weave.trace.context.call_context import set_thread_id
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 from weave.type_wrappers.Content import Content
@@ -27,6 +29,15 @@ INPUT_AUDIO_TYPE = "input_audio"
 def _get_from_dict(obj: Any, key: str, default: Any = None) -> Any:
     """Safely get a value from obj if it's a dict, otherwise return default."""
     return obj.get(key, default) if isinstance(obj, dict) else default
+
+
+def _get_nested(obj: Any, *keys: str) -> Any:
+    """Walk a chain of dict keys, returning None if any step is missing or not a dict."""
+    for key in keys:
+        if not isinstance(obj, dict):
+            return None
+        obj = obj.get(key)
+    return obj
 
 
 class SessionSpan(BaseModel):
@@ -59,7 +70,7 @@ class SessionSpan(BaseModel):
             self.root_call = wc.create_call("realtime.session", inputs=self.session)
 
     def on_updated(self, msg: dict) -> None:
-        """This function runs when we recieve a session.updated message
+        """This function runs when we receive a session.updated message
         In Beta:
             session.updated message can come from the server before send/recv session.create(d)
         In GA:
@@ -149,6 +160,7 @@ class StateExporter(BaseModel):
     committed_item_ids: set[str] = Field(default_factory=set)
 
     transcript_completed: set[str] = Field(default_factory=set)
+    transcription_usage: dict[str, dict] = Field(default_factory=dict)
     items: dict[str, dict] = Field(default_factory=dict)
     last_input_item_id: str | None = None
 
@@ -293,9 +305,12 @@ class StateExporter(BaseModel):
                 self.session_span.get_root_call() if self.session_span else None
             )
             client = require_weave_client()
-            conv_call = client.create_call(
-                op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
-            )
+            with set_thread_id(conv_id):
+                conv_call = client.create_call(
+                    op="realtime.conversation",
+                    inputs={"id": conv_id},
+                    parent=session_call,
+                )
             self.conversation_calls[conv_id] = conv_call
 
     def handle_input_audio_append(self, msg: dict) -> None:
@@ -382,14 +397,29 @@ class StateExporter(BaseModel):
 
     def handle_item_input_audio_transcription_completed(self, msg: dict) -> None:
         item_id = msg.get("item_id")
+
         if not item_id:
             return
+
         item = self.items.get(item_id)
+
         if not item:
             return
+
         self._apply_transcript(item, msg.get("content_index"), msg.get("transcript"))
         self.items[item_id] = item
         self.transcript_completed.add(item_id)
+        usage = msg.get("usage")
+
+        if self.session_span and self.session_span.session:
+            transcription_model = _get_nested(
+                self.session_span.session, "audio", "input", "transcription", "model"
+            )
+        else:
+            transcription_model = "unknown-transcription-model"
+
+        if usage and isinstance(usage, dict):
+            self.transcription_usage[item_id] = {transcription_model: usage}
         # A transcript becoming available may unblock the head of the FIFO
         self._schedule_fifo_check()
 
@@ -420,6 +450,72 @@ class StateExporter(BaseModel):
             msg_dict["content"] = content_list
 
         return msg_dict
+
+    def _extract_audio_content(
+        self, output_list: list[dict], output_dict: dict
+    ) -> None:
+        """Replace raw audio references in response outputs with encoded Content objects."""
+        for output_idx, output in enumerate(output_list):
+            if output.get("type") == "message":
+                item_id = output.get("id")
+                content_list = output.get("content", [])
+                for content_idx, content in enumerate(content_list):
+                    content_dict = dict(content)
+                    content_type = content.get("type")
+                    if content_type in OUTPUT_AUDIO_TYPES:
+                        audio_bytes = (
+                            self.response_audio.get(item_id) if item_id else None
+                        )
+
+                        if not audio_bytes:
+                            logger.error("failed to fetch audio bytes")
+                            continue
+
+                        content_dict["audio"] = Content.from_bytes(
+                            pcm_to_wav(bytes(audio_bytes)), extension=".wav"
+                        )
+                    output_dict["output"][output_idx]["content"][content_idx] = (
+                        content_dict
+                    )
+
+    def _update_usage_summary_for_speech(
+        self, summary_usage: dict, response: dict, model: str
+    ) -> None:
+        """Add speech model usage from the response to the summary."""
+        usage = response.get("usage")
+        if usage and isinstance(usage, dict):
+            summary_usage[model] = {**usage, "requests": 1}
+
+    def _update_usage_summary_for_transcription(
+        self,
+        summary_usage: dict,
+        messages: list[dict] | None,
+    ) -> None:
+        """Add transcription model usage from input messages to the summary."""
+        if not messages:
+            return
+
+        # We don't have multiple turns since there was only one response.
+        # Need to sum across messages and calculate usage per model
+        usages = defaultdict(list)
+        for message in messages:
+            if msg_id := message.get("id"):
+                model_usage = self.transcription_usage.get(msg_id, None)
+                if not model_usage or len(model_usage.keys()) == 0:
+                    continue
+                for key, value in model_usage.items():
+                    usages[key].append(value)
+
+        for model, usage_list in usages.items():
+            summed: dict[str, int | float] = {}
+            for usage in usage_list:
+                for key, value in usage.items():
+                    if isinstance(value, (int, float)):
+                        summed[key] = summed.get(key, 0) + value
+            summary_usage[model] = {
+                "requests": len(usage_list),
+                **summed,
+            }
 
     def _handle_response_done_inner(
         self,
@@ -468,11 +564,9 @@ class StateExporter(BaseModel):
 
         client = require_weave_client()
 
-        session_call = None
+        session_call: Call | None = None
         if self.session_span:
             session_call = self.session_span.get_root_call()
-
-        response_parent = None
 
         response = msg.get("response", {})
         conv_id = response.get("conversation_id")
@@ -483,47 +577,41 @@ class StateExporter(BaseModel):
         elif conv_id and response_id:
             self.conversation_responses[conv_id] = [response_id]
 
-        if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
-            response_parent = conv_call
+        with set_thread_id(conv_id):
+            if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
+                response_parent = conv_call
+            elif conv_id:
+                conv_call = client.create_call(
+                    op="realtime.conversation",
+                    inputs={"id": conv_id},
+                    parent=session_call,
+                )
+                self.conversation_calls[conv_id] = conv_call
+                response_parent = conv_call
+            elif session_call:
+                response_parent = session_call
+            else:
+                logger.warning(f"Could not find session for response - {response_id}")
+                # Will not happen in GA but potentially possible in Beta
+                response_parent = None
 
-        elif conv_id:
-            conv_call = client.create_call(
-                op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
+            call = client.create_call(
+                "realtime.response", inputs=inputs, parent=response_parent
             )
-            self.conversation_calls[conv_id] = conv_call
-            response_parent = conv_call
-        else:
-            response_parent = session_call
 
-        call = client.create_call(
-            "realtime.response", inputs=inputs, parent=response_parent
-        )
+            output_dict = dict(response)
+            output_list = response.get("output", [])
+            self._extract_audio_content(output_list, output_dict)
 
-        output_dict = dict(response)
-        output_list = response.get("output", [])
-        for output_idx, output in enumerate(output_list):
-            if output.get("type") == "message":
-                item_id = output.get("id")
-                content_list = output.get("content", [])
-                for content_idx, content in enumerate(content_list):
-                    content_dict = dict(content)
-                    content_type = content.get("type")
-                    if content_type in OUTPUT_AUDIO_TYPES:
-                        audio_bytes = (
-                            self.response_audio.get(item_id) if item_id else None
-                        )
+            summary_usage: dict[str, dict] = {}
+            model = session.get("model", "unknown") if session else "unknown"
+            self._update_usage_summary_for_speech(summary_usage, response, model)
+            self._update_usage_summary_for_transcription(summary_usage, messages)
 
-                        if not audio_bytes:
-                            logger.error("failed to fetch audio bytes")
-                            continue
+            if summary_usage:
+                call.summary = {"usage": summary_usage}
 
-                        content_dict["audio"] = Content.from_bytes(
-                            pcm_to_wav(bytes(audio_bytes)), extension=".wav"
-                        )
-                    output_dict["output"][output_idx]["content"][content_idx] = (
-                        content_dict
-                    )
-        client.finish_call(call, output=output_dict)
+            client.finish_call(call, output=output_dict)
 
     def handle_response_done(self, msg: dict) -> None:
         # Update state to the completed version and enqueue for FIFO completion.
@@ -568,8 +656,11 @@ class StateExporter(BaseModel):
     def _transcripts_ready_for_ctx(self, ctx: dict[str, Any]) -> bool:
         session = ctx.get("session")
         messages = ctx.get("messages", [])
-        modalities = _get_from_dict(session, "modalities", [])
-        if session and "text" in modalities:
+        modalities = _get_from_dict(session, "modalities", [])  # Beta
+        transcription_model = _get_nested(
+            session, "audio", "input", "transcription", "model"
+        )  # GA
+        if session and ("text" in modalities or transcription_model):
             for message in messages:
                 if (
                     _get_from_dict(message, "type") == "message"
