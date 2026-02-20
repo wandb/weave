@@ -100,7 +100,6 @@ config_cases = [
                 }
             },
             scorer_debounce_config={
-                "enabled": True,
                 "aggregation_field": "trace_id",
                 "timeout_seconds": 60.1,
             },
@@ -140,7 +139,6 @@ config_cases = [
             },
             "active": False,
             "scorer_debounce_config": {
-                "enabled": True,
                 "aggregation_field": "trace_id",
                 "timeout_seconds": 60.1,
             },

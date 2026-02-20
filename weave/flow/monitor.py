@@ -17,9 +17,6 @@ class ScorerDebounceConfig(TypedDict):
     When present on a Monitor, all fields are required.
     """
 
-    # Enables debouncing
-    enabled: bool
-
     # Specifies which field is used to find candidates for debouncing
     aggregation_field: Literal["trace_id", "thread_id"]
     
@@ -68,6 +65,8 @@ class Monitor(Object):
     op_names: list[str]
     query: Query | None = None
     active: bool = False
+
+    # Debounced scoring is enabled when this is present, and disabled when it is not.
     scorer_debounce_config: ScorerDebounceConfig | None = None
 
     def activate(self) -> ObjectRef:
