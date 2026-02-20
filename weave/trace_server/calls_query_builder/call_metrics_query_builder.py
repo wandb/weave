@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import logging
 
+from weave.trace_server import ch_sentinel_values
 from weave.trace_server.calls_query_builder.stats_query_base import (
     StatsQueryBuildResult,
     aggregation_selects_for_metric,
@@ -42,11 +43,17 @@ def _normalize_call_metrics(metrics: list[CallMetricSpec]) -> list[CallMetricSpe
     return normalized
 
 
-def _get_call_metric_extraction_sql(metric: str) -> str:
+def _get_call_metric_extraction_sql(
+    metric: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
+    pb: ParamBuilder | None = None,
+) -> str:
     """Generate SQL to extract a call-level metric.
 
     Args:
         metric: The metric name (latency_ms, call_count, error_count)
+        read_table: Which table to query; affects NULL vs sentinel checks.
+        pb: Parameter builder (required for error_count with sentinel checks).
 
     Returns:
         SQL expression that extracts the metric value.
@@ -56,7 +63,12 @@ def _get_call_metric_extraction_sql(metric: str) -> str:
     elif metric == "call_count":
         return "1"
     elif metric == "error_count":
-        return "if(exception IS NOT NULL, 1, 0)"
+        if pb is None:
+            raise ValueError("ParamBuilder required for error_count metric")
+        exception_check = ch_sentinel_values.null_check_sql(
+            "exception", "exception", read_table, pb, negate=True
+        )
+        return f"if({exception_check}, 1, 0)"
     else:
         raise ValueError(f"Unknown call metric: {metric}")
 
@@ -89,14 +101,14 @@ def build_call_metrics_query(
     tz_param = pb.add_param(req.timezone or "UTC")
     bucket_interval_param = pb.add_param(granularity_seconds)
 
-    where_filter_sql = build_calls_filter_sql(req.filter, pb)
+    where_filter_sql = build_calls_filter_sql(req.filter, pb, read_table)
 
     normalized_metrics = _normalize_call_metrics(metrics)
 
     inner_metric_exprs: list[str] = []
     for metric_spec in normalized_metrics:
         metric = metric_spec.metric
-        extraction_sql = _get_call_metric_extraction_sql(metric)
+        extraction_sql = _get_call_metric_extraction_sql(metric, read_table, pb)
         inner_metric_exprs.append(f"{extraction_sql} AS m_{metric}")
 
     inner_metric_sql = ",\n        ".join(inner_metric_exprs)

@@ -40,9 +40,14 @@ from weave.shared.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     extract_refs_from_values,
 )
+from weave.trace_server import (
+    ch_sentinel_values,
+    constants,
+    object_creation_utils,
+    usage_utils,
+)
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
-from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
@@ -196,7 +201,6 @@ from weave.trace_server.trace_server_common import (
     DynamicBatchProcessor,
     LRUCache,
     determine_call_status,
-    empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
     make_derived_summary_fields,
@@ -834,11 +838,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_id_param = pb.add_param(end_call.project_id)
         id_param = pb.add_param(end_call.id)
         ended_at_param = pb.add_param(ended_at_us)
-        exception_param = pb.add_param(end_call.exception)
+        exception_param = pb.add_param(end_call.exception or "")
         output_dump_param = pb.add_param(output_dump)
         summary_dump_param = pb.add_param(summary_dump)
         output_refs_param = pb.add_param(output_refs)
-        wb_run_step_end_param = pb.add_param(end_call.wb_run_step_end)
+        wb_run_step_end_param = pb.add_param(
+            ch_sentinel_values.to_ch_value("wb_run_step_end", end_call.wb_run_step_end)
+        )
 
         # Add started_at param if provided for more efficient primary key usage
         started_at_param: str | None = None
@@ -6129,7 +6135,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         parameters = ch_call.model_dump()
         row = []
         for key in ALL_CALL_COMPLETE_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
+            val = parameters.get(key, None)
+            row.append(ch_sentinel_values.to_ch_value(key, val))
         self._calls_complete_batch.append(row)
         if self._flush_immediately:
             self._flush_calls_complete()
@@ -6358,8 +6365,22 @@ def _nullable_any_dump_to_any(
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
-    ended_at = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at"))
-    display_name = empty_str_to_none(ch_call_dict.get("display_name"))
+
+    # Convert sentinel values back to None for all sentinel-tracked fields.
+    # This handles both the calls_merged Nullable path (returns None) and the
+    # calls_complete non-nullable path (returns sentinel -> converted to None).
+    sv: dict[str, Any] = {}
+    for field in ch_sentinel_values.ALL_SENTINEL_FIELDS:
+        raw = ch_call_dict.get(field)
+        val = ch_sentinel_values.from_ch_value(field, raw)
+        if field in ch_sentinel_values.SENTINEL_DATETIME_FIELDS:
+            val = _ensure_datetimes_have_tz(val)
+        sv[field] = val
+
+    ended_at = sv["ended_at"]
+    display_name = sv["display_name"]
+    exception = sv["exception"]
+    otel_dump = sv["otel_dump"]
 
     # Load attributes from attributes_dump
     attributes = _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}"))
@@ -6367,16 +6388,16 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     # For backwards/future compatibility: inject otel_dump into attributes if present
     # Legacy trace servers stored all otel info in attributes, clients expect it
     # TODO(gst): consider returning the raw otel column and reconstructing client side
-    if otel_dump := ch_call_dict.get("otel_dump"):
+    if otel_dump:
         attributes["otel_span"] = _dict_dump_to_dict(otel_dump)
 
     return {
         "project_id": ch_call_dict.get("project_id"),
         "id": ch_call_dict.get("id"),
         "trace_id": ch_call_dict.get("trace_id"),
-        "parent_id": ch_call_dict.get("parent_id"),
-        "thread_id": ch_call_dict.get("thread_id"),
-        "turn_id": ch_call_dict.get("turn_id"),
+        "parent_id": sv["parent_id"],
+        "thread_id": sv["thread_id"],
+        "turn_id": sv["turn_id"],
         "op_name": ch_call_dict.get("op_name"),
         "started_at": started_at,
         "ended_at": ended_at,
@@ -6388,14 +6409,14 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
             op_name=ch_call_dict.get("op_name", ""),
             started_at=started_at,
             ended_at=ended_at,
-            exception=ch_call_dict.get("exception"),
+            exception=exception,
             display_name=display_name,
         ),
-        "exception": ch_call_dict.get("exception"),
-        "wb_run_id": ch_call_dict.get("wb_run_id"),
+        "exception": exception,
+        "wb_run_id": sv["wb_run_id"],
         "wb_run_step": ch_call_dict.get("wb_run_step"),
         "wb_run_step_end": ch_call_dict.get("wb_run_step_end"),
-        "wb_user_id": ch_call_dict.get("wb_user_id"),
+        "wb_user_id": sv["wb_user_id"],
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
         "total_storage_size_bytes": ch_call_dict.get("total_storage_size_bytes"),
@@ -6607,7 +6628,10 @@ def _start_end_calls_to_ch_complete_insertable(
 def _ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
     """Convert a CallCompleteCHInsertable to a row for batch insertion."""
     call_dict = ch_call.model_dump()
-    return [call_dict.get(col) for col in ALL_CALL_COMPLETE_INSERT_COLUMNS]
+    return [
+        ch_sentinel_values.to_ch_value(col, call_dict.get(col))
+        for col in ALL_CALL_COMPLETE_INSERT_COLUMNS
+    ]
 
 
 def _maybe_enqueue_minimal_call_end(
