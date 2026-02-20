@@ -221,6 +221,16 @@ logger.setLevel(logging.INFO)
 # num_pools: Number of distinct connection pools (for different hosts/configs)
 _CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
 
+# Precomputed list of (column_index, field_name) for every sentinel field that appears
+# in ALL_CALL_COMPLETE_INSERT_COLUMNS.  Used by _insert_call_complete_batch to enforce
+# sentinel conversion as a last line of defense — preventing "Invalid None value in
+# non-Nullable column" errors if any call-site forgets to apply to_ch_value().
+_CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
+    (idx, col)
+    for idx, col in enumerate(ALL_CALL_COMPLETE_INSERT_COLUMNS)
+    if ch_sentinel_values.is_sentinel_field(col)
+]
+
 
 class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def __init__(
@@ -838,7 +848,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_id_param = pb.add_param(end_call.project_id)
         id_param = pb.add_param(end_call.id)
         ended_at_param = pb.add_param(ended_at_us)
-        exception_param = pb.add_param(end_call.exception or "")
+        exception_param = pb.add_param(
+            ch_sentinel_values.to_ch_value("exception", end_call.exception)
+        )
         output_dump_param = pb.add_param(output_dump)
         summary_dump_param = pb.add_param(summary_dump)
         output_refs_param = pb.add_param(output_refs)
@@ -6184,6 +6196,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         if not batch:
             return
+
+        # Safety net: enforce sentinel conversion on every row before hitting ClickHouse.
+        # Callers (e.g. _insert_call_complete, _ch_complete_call_to_row) should have
+        # already applied to_ch_value(), but a single missed call-site produces the
+        # cryptic "Invalid None value in non-Nullable column" error.  Applying here as
+        # well is cheap (idempotent for non-None values) and makes new code paths safe
+        # by default.
+        for row in batch:
+            for idx, field in _CALLS_COMPLETE_SENTINEL_COLUMNS:
+                row[idx] = ch_sentinel_values.to_ch_value(field, row[idx])
 
         self._insert(
             "calls_complete",
