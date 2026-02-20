@@ -19,7 +19,7 @@ class ScorerDebounceConfig(TypedDict):
 
     # Specifies which field is used to find candidates for debouncing
     aggregation_field: Literal["trace_id", "thread_id"]
-    
+
     # Timeframe for the debouncing. Messages received within this timeframe will be debounced.
     timeout_seconds: float
 
