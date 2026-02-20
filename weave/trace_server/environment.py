@@ -165,27 +165,43 @@ def wf_clickhouse_max_execution_time() -> int | None:
         return None
 
 
-def wf_clickhouse_async_insert_busy_timeout_ms() -> int | None:
-    """The async insert busy timeout in milliseconds for ClickHouse.
+def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
+    """The minimum async insert busy timeout in milliseconds for ClickHouse.
 
-    Controls how long ClickHouse waits before flushing the async insert buffer.
-
-    - Not set: returns the hardcoded default (1000 ms)
-    - Set to an integer: returns that integer
-    - Set to "none" (case-insensitive): returns None, which causes the setting
-      to be omitted from the ClickHouse settings dict (server default applies)
+    When async_insert_use_adaptive_busy_timeout is enabled, this sets the lower
+    bound and initial value for the adaptive flush interval. Lower values flush
+    sooner under low load.
     """
-    env_key = "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MS"
-    if env_key not in os.environ:
-        return 1000
-    val = os.environ[env_key]
-    if val.lower() == "none":
-        return None
+    env_key = "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS"
+    val = os.environ.get(env_key)
+    if val is None:
+        return 100
     try:
         return int(val)
     except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MS value '{val}' is not valid"
+            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '{val}' is not valid"
+        )
+        return 100
+
+
+def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
+    """The maximum async insert busy timeout in milliseconds for ClickHouse.
+
+    When async_insert_use_adaptive_busy_timeout is enabled, this sets the upper
+    bound for how long ClickHouse will wait before flushing the async insert
+    buffer. The adaptive algorithm starts at async_insert_busy_timeout_min_ms
+    and adjusts up to this value based on load.
+    """
+    env_key = "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS"
+    val = os.environ.get(env_key)
+    if val is None:
+        return 1000
+    try:
+        return int(val)
+    except ValueError:
+        logger.exception(
+            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '{val}' is not valid"
         )
         return 1000
 
