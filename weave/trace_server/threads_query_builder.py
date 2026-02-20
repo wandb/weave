@@ -1,5 +1,6 @@
 import datetime
 
+from weave.trace_server import ch_sentinel_values
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable, TableConfig
@@ -102,9 +103,11 @@ def make_threads_query(
 
         thread_ids_in_clause = f"({', '.join(thread_id_params)})"
 
-        # WHERE: Include NULL (incomplete rows) OR matching thread_ids (optimization)
+        thread_null = ch_sentinel_values.null_check_sql(
+            "thread_id", "thread_id", read_table, pb
+        )
         where_thread_filter_clause = (
-            f"AND (thread_id IS NULL OR thread_id IN {thread_ids_in_clause})"
+            f"AND ({thread_null} OR thread_id IN {thread_ids_in_clause})"
         )
 
         # HAVING: Filter final aggregated thread_id to specified thread_ids only
