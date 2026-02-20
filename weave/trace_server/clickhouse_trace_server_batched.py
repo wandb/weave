@@ -260,6 +260,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def __del__(self) -> None:
         """Flush the Kafka producer on cleanup to avoid dropping in-flight messages."""
+        if (
+            not self._call_batch
+            and not self._calls_complete_batch
+            and not self._file_batch
+        ):
+            return
         try:
             self._flush_all_batches_in_order()
         except Exception:
