@@ -43,7 +43,7 @@ There are two ways to authenticate with Azure Blob Storage:
 import logging
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Generic, ParamSpec, TypeGuard, TypeVar, cast
+from typing import Generic, ParamSpec, TypeVar
 
 import boto3
 from azure.core.exceptions import HttpResponseError
@@ -61,6 +61,7 @@ from tenacity import (
     wait_exponential,
     wait_random_exponential,
 )
+from typing_extensions import TypeIs
 
 from weave.trace_server.environment import wf_file_storage_uri
 from weave.trace_server.file_storage_credentials import (
@@ -95,16 +96,16 @@ RETRY_MAX_WAIT = 10  # seconds
 
 def _is_azure_connection_credentials(
     credentials: AzureConnectionCredentials | AzureAccountCredentials,
-) -> TypeGuard[AzureConnectionCredentials]:
-    """Narrow Azure credential union to the connection-string variant."""
+) -> TypeIs[AzureConnectionCredentials]:
+    """Check whether Azure credentials use the connection-string variant."""
     return "connection_string" in credentials
 
 
 def _is_azure_account_credentials(
     credentials: AzureConnectionCredentials | AzureAccountCredentials,
-) -> TypeGuard[AzureAccountCredentials]:
-    """Narrow Azure credential union to the account-based variant."""
-    return "connection_string" not in credentials
+) -> TypeIs[AzureAccountCredentials]:
+    """Check whether Azure credentials use the account-key variant."""
+    return "access_key" in credentials
 
 
 class FileStorageWriteError(Exception):
@@ -358,22 +359,21 @@ class AzureStorageClient(FileStorageClient[AzureFileStorageURI]):
 
     def _get_client(self, account: str) -> BlobServiceClient:
         """Create Azure client based on available credentials (connection string or account)."""
-        if _is_azure_connection_credentials(self.credentials):
-            creds = cast(AzureConnectionCredentials, self.credentials)
+        credentials = self.credentials
+        if _is_azure_connection_credentials(credentials):
             return BlobServiceClient.from_connection_string(
-                creds["connection_string"],
+                credentials["connection_string"],
                 connection_timeout=DEFAULT_CONNECT_TIMEOUT,
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )
-        if _is_azure_account_credentials(self.credentials):
-            account_creds = cast(AzureAccountCredentials, self.credentials)
-            if "account_url" in account_creds and account_creds["account_url"]:
-                account_url = account_creds["account_url"]
+        if _is_azure_account_credentials(credentials):
+            if "account_url" in credentials and credentials["account_url"]:
+                account_url = credentials["account_url"]
             else:
                 account_url = f"https://{account}.blob.core.windows.net/"
             return BlobServiceClient(
                 account_url=account_url,
-                credential=account_creds["access_key"],
+                credential=credentials["access_key"],
                 connection_timeout=DEFAULT_CONNECT_TIMEOUT,
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )
