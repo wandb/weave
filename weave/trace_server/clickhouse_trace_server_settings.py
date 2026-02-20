@@ -58,7 +58,8 @@ CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
 # ClickHouse async insert settings
 # These settings are used when async_insert is enabled for high-throughput scenarios
 # Reference: https://clickhouse.com/docs/en/optimize/asynchronous-inserts
-CLICKHOUSE_ASYNC_INSERT_SETTINGS = {
+_async_insert_busy_timeout_ms = wf_env.wf_clickhouse_async_insert_busy_timeout_ms()
+CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, Any] = {
     "async_insert": 1,
     # Wait for async insert to complete to ensure errors are caught
     "wait_for_async_insert": 1,
@@ -68,9 +69,13 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS = {
     "async_insert_max_data_size": 10_485_760,
     # Max number of queries to batch together, this is the default
     "async_insert_max_query_number": 450,
-    # Max time between buffer flushes
-    "async_insert_busy_timeout_ms": 1000,
 }
+# Max time between buffer flushes — omitted when None to let the server default apply.
+# Controlled via WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MS env var.
+if _async_insert_busy_timeout_ms is not None:
+    CLICKHOUSE_ASYNC_INSERT_SETTINGS["async_insert_busy_timeout_ms"] = (
+        _async_insert_busy_timeout_ms
+    )
 
 
 def update_settings_for_async_insert(

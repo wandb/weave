@@ -165,6 +165,31 @@ def wf_clickhouse_max_execution_time() -> int | None:
         return None
 
 
+def wf_clickhouse_async_insert_busy_timeout_ms() -> int | None:
+    """The async insert busy timeout in milliseconds for ClickHouse.
+
+    Controls how long ClickHouse waits before flushing the async insert buffer.
+
+    - Not set: returns the hardcoded default (1000 ms)
+    - Set to an integer: returns that integer
+    - Set to "none" (case-insensitive): returns None, which causes the setting
+      to be omitted from the ClickHouse settings dict (server default applies)
+    """
+    env_key = "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MS"
+    if env_key not in os.environ:
+        return 1000
+    val = os.environ[env_key]
+    if val.lower() == "none":
+        return None
+    try:
+        return int(val)
+    except ValueError:
+        logger.exception(
+            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MS value '{val}' is not valid"
+        )
+        return 1000
+
+
 # BYOB Settings
 
 
