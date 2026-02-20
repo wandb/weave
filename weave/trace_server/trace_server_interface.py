@@ -1,4 +1,5 @@
 import datetime
+import re
 from collections.abc import Iterator
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Protocol
@@ -280,6 +281,8 @@ class ObjSchema(BaseModel):
 
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
     size_bytes: int | None = None
+    tags: list[str] | None = None
+    aliases: list[str] | None = None
 
 
 class ObjSchemaForInsert(BaseModel):
@@ -648,6 +651,10 @@ class ObjReadReq(BaseModelStrict):
         description="If true, the `val` column is not read from the database and is empty."
         "All other fields are returned.",
     )
+    include_tags_and_aliases: bool | None = Field(
+        default=False,
+        description="If true, tags and aliases are fetched and included in the response.",
+    )
 
 
 class ObjReadRes(BaseModel):
@@ -685,6 +692,14 @@ class ObjectVersionFilter(BaseModelStrict):
         description="If True, return only the latest version of each object. `False` and `None` will return all versions",
         examples=[True, False],
     )
+    tags: list[str] | None = Field(
+        default=None,
+        description="Filter object versions that have any of the specified tags",
+    )
+    aliases: list[str] | None = Field(
+        default=None,
+        description="Filter objects that have any of the specified aliases",
+    )
 
 
 class ObjQueryReq(BaseModelStrict):
@@ -720,6 +735,10 @@ class ObjQueryReq(BaseModelStrict):
         default=False,
         description="If true, the `size_bytes` column is returned.",
     )
+    include_tags_and_aliases: bool | None = Field(
+        default=False,
+        description="If true, tags and aliases are fetched and included in the response.",
+    )
 
 
 class ObjDeleteReq(BaseModelStrict):
@@ -733,6 +752,97 @@ class ObjDeleteReq(BaseModelStrict):
 
 class ObjDeleteRes(BaseModel):
     num_deleted: int
+
+
+# --- Tag and Alias types ---
+
+MAX_TAG_OR_ALIAS_LENGTH = 128
+TAG_OR_ALIAS_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+VERSION_LIKE_PATTERN = re.compile(r"^v\d+$")
+RESERVED_ALIAS_NAMES = {"latest"}
+
+
+def _validate_tag_or_alias_name(name: str, kind: str = "tag or alias") -> None:
+    """Validate a tag or alias name."""
+    if not name:
+        raise ValueError(f"{kind} name must not be empty")
+    if len(name) > MAX_TAG_OR_ALIAS_LENGTH:
+        raise ValueError(
+            f"{kind} name must be at most {MAX_TAG_OR_ALIAS_LENGTH} characters"
+        )
+    if not TAG_OR_ALIAS_PATTERN.match(name):
+        raise ValueError(
+            f"{kind} name must start with alphanumeric and contain only alphanumeric, '.', '_', or '-'"
+        )
+    if VERSION_LIKE_PATTERN.match(name):
+        raise ValueError(
+            f"{kind} name '{name}' is reserved (matches version pattern v<number>)"
+        )
+
+
+def _validate_alias_name(name: str) -> None:
+    """Validate an alias name (additional constraints beyond tag/alias)."""
+    _validate_tag_or_alias_name(name, "alias")
+    if name in RESERVED_ALIAS_NAMES:
+        raise ValueError(f"alias name '{name}' is reserved")
+
+
+class ObjAddTagsReq(BaseModelStrict):
+    project_id: str
+    object_id: str
+    digest: str
+    tags: list[str]
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    @model_validator(mode="after")
+    def validate_tags(self) -> "ObjAddTagsReq":
+        for tag in self.tags:
+            _validate_tag_or_alias_name(tag, "tag")
+        return self
+
+
+class ObjAddTagsRes(BaseModel):
+    pass
+
+
+class ObjRemoveTagsReq(BaseModelStrict):
+    project_id: str
+    object_id: str
+    digest: str
+    tags: list[str]
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ObjRemoveTagsRes(BaseModel):
+    pass
+
+
+class ObjSetAliasReq(BaseModelStrict):
+    project_id: str
+    object_id: str
+    digest: str
+    alias: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    @model_validator(mode="after")
+    def validate_alias(self) -> "ObjSetAliasReq":
+        _validate_alias_name(self.alias)
+        return self
+
+
+class ObjSetAliasRes(BaseModel):
+    pass
+
+
+class ObjRemoveAliasReq(BaseModelStrict):
+    project_id: str
+    object_id: str
+    alias: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ObjRemoveAliasRes(BaseModel):
+    pass
 
 
 class ObjQueryRes(BaseModel):
@@ -2336,6 +2446,12 @@ class TraceServerInterface(Protocol):
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
     def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes: ...
+
+    # Tag and Alias API
+    def obj_add_tags(self, req: ObjAddTagsReq) -> ObjAddTagsRes: ...
+    def obj_remove_tags(self, req: ObjRemoveTagsReq) -> ObjRemoveTagsRes: ...
+    def obj_set_alias(self, req: ObjSetAliasReq) -> ObjSetAliasRes: ...
+    def obj_remove_alias(self, req: ObjRemoveAliasReq) -> ObjRemoveAliasRes: ...
 
     # Table API
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
