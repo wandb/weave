@@ -1,7 +1,7 @@
 from typing import Literal
 
 from pydantic import Field
-from typing_extensions import Self
+from typing_extensions import Self, TypedDict
 
 from weave.flow.casting import Scorer
 from weave.object.obj import Object
@@ -9,6 +9,17 @@ from weave.trace.api import ObjectRef, publish
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
+
+
+class ScorerDebounceConfig(TypedDict):
+    """Configuration for debounced scoring on a monitor.
+
+    When present on a Monitor, all fields are required.
+    """
+
+    enabled: bool
+    aggregation_field: Literal["trace_id", "thread_id"]
+    timeout_seconds: float
 
 
 @register_object
@@ -52,9 +63,7 @@ class Monitor(Object):
     op_names: list[str]
     query: Query | None = None
     active: bool = False
-    debounced_scoring_enabled: bool = False
-    debounced_scoring_aggregation_field: Literal["trace_id", "thread_id"] | None = None
-    debounced_scoring_timeout_seconds: float | None = None
+    scorer_debounce_config: ScorerDebounceConfig | None = None
 
     def activate(self) -> ObjectRef:
         """Activates the monitor.

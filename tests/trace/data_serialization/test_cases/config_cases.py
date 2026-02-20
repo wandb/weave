@@ -99,9 +99,11 @@ config_cases = [
                     ]
                 }
             },
-            debounced_scoring_enabled=True,
-            debounced_scoring_aggregation_field="trace_id",
-            debounced_scoring_timeout_seconds=60.1,
+            scorer_debounce_config={
+                "enabled": True,
+                "aggregation_field": "trace_id",
+                "timeout_seconds": 60.1,
+            },
         ),
         inline_call_param=False,
         is_legacy=False,
@@ -137,9 +139,11 @@ config_cases = [
                 "_bases": ["BaseModel"],
             },
             "active": False,
-            "debounced_scoring_enabled": True,
-            "debounced_scoring_aggregation_field": "trace_id",
-            "debounced_scoring_timeout_seconds": 60.1,
+            "scorer_debounce_config": {
+                "enabled": True,
+                "aggregation_field": "trace_id",
+                "timeout_seconds": 60.1,
+            },
             "_class_name": "Monitor",
             "_bases": ["Object", "BaseModel"],
         },
