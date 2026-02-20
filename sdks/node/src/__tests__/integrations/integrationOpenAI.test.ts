@@ -364,7 +364,8 @@ describe('OpenAI Integration', () => {
     const calls = await getCalls(inMemoryTraceServer, testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('create');
-    expect(calls[0].inputs).toEqual(options);
+    expect(calls[0].inputs).toMatchObject(options);
+    expect(calls[0].inputs.self).toBeDefined(); // self parameter should be captured
     expect(calls[0].output.responses[0].output[0].content[0].text).toBe('Arrr');
   });
 });

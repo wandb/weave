@@ -521,9 +521,9 @@ export class WeaveClient {
    * (currently only Dataset/DatasetRow in the js client) has refs
    * available immediately.
    */
-  private saveWeaveValues(val: any): void {
+  private saveWeaveValues(val: any, visited = new WeakSet()): void {
     if (Array.isArray(val)) {
-      val.map(item => this.saveWeaveValues(item));
+      val.map(item => this.saveWeaveValues(item, visited));
     } else if (val != null && val.__savedRef) {
       return;
     } else if (val instanceof WeaveObject) {
@@ -535,8 +535,14 @@ export class WeaveClient {
     } else if (isOp(val)) {
       this.saveOp(val);
     } else if (typeof val === 'object' && val !== null) {
+      // Detect circular references
+      if (visited.has(val)) {
+        return;
+      }
+      visited.add(val);
+
       for (const [key, value] of Object.entries(val)) {
-        this.saveWeaveValues(value);
+        this.saveWeaveValues(value, visited);
       }
     }
   }
@@ -597,9 +603,11 @@ export class WeaveClient {
    * This function is asynchronous, and must be called after saveWeaveValues
    * has been called on the value.
    */
-  private async serializedVal(val: any): Promise<any> {
+  private async serializedVal(val: any, visited = new WeakSet()): Promise<any> {
     if (Array.isArray(val)) {
-      return Promise.all(val.map(async item => this.serializedVal(item)));
+      return Promise.all(
+        val.map(async item => this.serializedVal(item, visited))
+      );
     } else if (val != null && val.__savedRef) {
       return (await val.__savedRef).uri();
     } else if (isWeaveImage(val)) {
@@ -613,9 +621,15 @@ export class WeaveClient {
     } else if (isOp(val)) {
       throw new Error('Programming error: Op not saved');
     } else if (typeof val === 'object' && val !== null) {
+      // Detect circular references
+      if (visited.has(val)) {
+        return '[Circular]';
+      }
+      visited.add(val);
+
       const result: {[key: string]: any} = {};
       for (const [key, value] of Object.entries(val)) {
-        result[key] = await this.serializedVal(value);
+        result[key] = await this.serializedVal(value, visited);
       }
       return result;
     } else {
@@ -664,8 +678,13 @@ export class WeaveClient {
   ) {
     let inputs: Record<string, any> = {};
 
-    // Add 'self' first if thisArg is a WeaveObject
-    if (thisArg instanceof WeaveObject) {
+    // Add 'self' if thisArg is an object (WeaveObject, SDK client, or any other object instance)
+    // We exclude primitives, null, undefined, and functions
+    if (
+      thisArg != null &&
+      typeof thisArg === 'object' &&
+      !Array.isArray(thisArg)
+    ) {
       inputs['self'] = thisArg;
     }
     if (parameterNames === 'useParam0Object') {
