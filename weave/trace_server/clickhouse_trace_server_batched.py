@@ -1503,7 +1503,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         pb = ParamBuilder()
         project_id_param = pb.add_param(project_id)
         call_id_param = pb.add_param(call_id)
-        display_name_param = pb.add_param(display_name)
+        display_name_param = pb.add_param(
+            ch_sentinel_values.to_ch_value("display_name", display_name)
+        )
         update_query = build_calls_complete_update_query(
             "calls_complete",
             project_id_param,
