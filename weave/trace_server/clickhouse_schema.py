@@ -66,6 +66,7 @@ class CallStartCHInsertable(
     attributes_dump: str
     inputs_dump: str
     otel_dump: str | None = None
+    ttl_at: datetime.datetime = datetime.datetime(2100, 1, 1)
 
 
 class CallEndCHInsertable(CallBaseCHInsertable):
@@ -79,6 +80,7 @@ class CallEndCHInsertable(CallBaseCHInsertable):
     summary_dump: str
     output_dump: str
     wb_run_step_end: int | None = None
+    ttl_at: datetime.datetime = datetime.datetime(2100, 1, 1)
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
         validation.wb_run_step_validator
@@ -90,6 +92,7 @@ class CallDeleteCHInsertable(CallBaseCHInsertable):
 
     wb_user_id: str
     deleted_at: datetime.datetime
+    ttl_at: datetime.datetime = datetime.datetime(2100, 1, 1)
 
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
 
@@ -99,6 +102,7 @@ class CallUpdateCHInsertable(CallBaseCHInsertable):
 
     wb_user_id: str
     display_name: str | None = None
+    ttl_at: datetime.datetime = datetime.datetime(2100, 1, 1)
 
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _display_name_v = field_validator("display_name")(validation.display_name_validator)
