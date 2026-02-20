@@ -892,6 +892,26 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
         )
 
+    def project_ttl_settings_read(
+        self, req: tsi.ProjectTTLSettingsReq
+    ) -> tsi.ProjectTTLSettingsRes:
+        return self._generic_request(
+            "/project/ttl_settings",
+            req,
+            tsi.ProjectTTLSettingsReq,
+            tsi.ProjectTTLSettingsRes,
+        )
+
+    def project_ttl_settings_set(
+        self, req: tsi.SetProjectTTLSettingsReq
+    ) -> tsi.SetProjectTTLSettingsRes:
+        return self._generic_request(
+            "/project/ttl_settings/set",
+            req,
+            tsi.SetProjectTTLSettingsReq,
+            tsi.SetProjectTTLSettingsRes,
+        )
+
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
