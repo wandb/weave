@@ -439,12 +439,15 @@ def query_to_filters(query: tsi.Query | None) -> Filters | None:
             return None
         return [operand_to_filter(o) for o in operands]
 
-    if (
-        isinstance(query.expr_, tsi_query.EqOperation)
-        or isinstance(query.expr_, tsi_query.GtOperation)
-        or isinstance(query.expr_, tsi_query.GteOperation)
-        or isinstance(query.expr_, tsi_query.NotOperation)
-        or isinstance(query.expr_, tsi_query.ContainsOperation)
+    if isinstance(
+        query.expr_,
+        (
+            tsi_query.EqOperation,
+            tsi_query.GtOperation,
+            tsi_query.GteOperation,
+            tsi_query.NotOperation,
+            tsi_query.ContainsOperation,
+        ),
     ):
         return [operand_to_filter(query.expr_)]
 

@@ -310,11 +310,12 @@ def test_poison_pill_detection_and_immediate_drop():
         processor.enqueue(
             ["fill1", "fill2", "fill3", "fill4", "fill5", "fill6", "fill7"]
         )  # Fill the small queue (maxsize=5)
+
         # Confirm extras got written to disk
         with open(log_path) as f:
             log_content = f.read().splitlines()
-            # Should have at least 4 log entries (2 poison pills + 2 queue full items)
-            assert len(log_content) >= 4
+            # Should have 4 log entries: 2 poison pills + 2 queue full items (fill6, fill7)
+            assert len(log_content) == 4
             # Check that queue full items were logged
             queue_full_entries = [
                 line for line in log_content if "Queue is full" in line
