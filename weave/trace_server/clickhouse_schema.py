@@ -2,7 +2,7 @@ import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server import validation
 
 # =============================================================================
@@ -111,6 +111,10 @@ class CallCompleteCHInsertable(
 
     This represents a call that is already finished at insertion time, with both
     start and end information provided together.
+
+    Note: The pydantic model uses None for "not set" values. Conversion to
+    ClickHouse sentinel values (empty string, epoch zero) happens at insert time
+    via ch_sentinel_values.to_ch_value().
     """
 
     started_at: datetime.datetime
@@ -122,6 +126,8 @@ class CallCompleteCHInsertable(
     summary_dump: str
     otel_dump: str | None = None
     wb_run_step_end: int | None = None
+    ttl_at: datetime.datetime = datetime.datetime(2100, 1, 1)
+    source: str = "direct"
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
         validation.wb_run_step_validator

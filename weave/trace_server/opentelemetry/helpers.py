@@ -328,9 +328,7 @@ def flatten_attributes(
                     new_key == attr for attr in json_attributes
                 )
 
-                if (
-                    isinstance(value, dict) or isinstance(value, list)
-                ) and not should_stringify_as_json:
+                if isinstance(value, (dict, list)) and not should_stringify_as_json:
                     # Recursively flatten nested dictionaries or lists
                     _flatten(value, f"{new_key}.")
                 else:
@@ -348,9 +346,7 @@ def flatten_attributes(
                     new_key == attr for attr in json_attributes
                 )
 
-                if (
-                    isinstance(item, dict) or isinstance(item, list)
-                ) and not should_stringify_as_json:
+                if isinstance(item, (dict, list)) and not should_stringify_as_json:
                     # Recursively flatten nested dictionaries or lists
                     _flatten(item, f"{new_key}.")
                 else:

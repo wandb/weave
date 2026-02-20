@@ -7,6 +7,14 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "MiniMaxAI/MiniMax-M2.5": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "zai-org/GLM-5-FP8": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "zai-org/GLM-4.5": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -32,6 +40,10 @@
     "api_key_name": "WANDB_API_KEY"
   },
   "Qwen/Qwen2.5-14B-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "moonshotai/Kimi-K2.5": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
@@ -2038,6 +2050,10 @@
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
+  "us/claude-sonnet-4-6": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
   "claude-sonnet-4-5-20250929-v1:0": {
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
@@ -2446,7 +2462,7 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY",
     "deprecated": true,
-    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-live-2.5-flash-preview-native-audio-09-2025 is not found for API version v1beta, or is not suppor",
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-live-2.5-flash-preview-native-audio-09-2025 is not found for API version v1beta, or is not support",
     "deprecated_date": "2026-01-29T21:44:57.320603"
   },
   "gemini-2.5-flash-lite-preview-06-17": {
@@ -2469,11 +2485,27 @@
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
+  "gemini-3.1-pro-preview": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "gemini-3.1-pro-preview-customtools": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
   "vertex_ai/gemini-3-pro-preview": {
     "litellm_provider": "vertex_ai",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
   "vertex_ai/gemini-3-flash-preview": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.1-pro-preview": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.1-pro-preview-customtools": {
     "litellm_provider": "vertex_ai",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
@@ -2560,14 +2592,14 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY",
     "deprecated": true,
-    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-8b-exp-0827 is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-8b-exp-0827 is not found for API version v1beta, or is not supported for generateContent",
     "deprecated_date": "2026-01-29T21:44:57.321904"
   },
   "gemini/gemini-1.5-flash-8b-exp-0924": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY",
     "deprecated": true,
-    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-8b-exp-0924 is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-8b-exp-0924 is not found for API version v1beta, or is not supported for generateContent",
     "deprecated_date": "2026-01-29T21:44:57.322163"
   },
   "gemini/gemini-1.5-flash-exp-0827": {
@@ -2649,7 +2681,7 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY",
     "deprecated": true,
-    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.0-flash-lite-preview-02-05 is not found for API version v1beta, or is not supported for generat",
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.0-flash-lite-preview-02-05 is not found for API version v1beta, or is not supported for generate",
     "deprecated_date": "2026-01-29T21:44:57.323626"
   },
   "gemini/gemini-2.0-flash-live-001": {
@@ -2674,7 +2706,7 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY",
     "deprecated": true,
-    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.0-flash-thinking-exp-01-21 is not found for API version v1beta, or is not supported for generat",
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.0-flash-thinking-exp-01-21 is not found for API version v1beta, or is not supported for generate",
     "deprecated_date": "2026-01-29T21:44:57.323831"
   },
   "gemini/gemini-2.0-pro-exp-02-05": {
@@ -2737,7 +2769,7 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY",
     "deprecated": true,
-    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-flash-lite-preview-06-17 is not found for API version v1beta, or is not supported for generat",
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-flash-lite-preview-06-17 is not found for API version v1beta, or is not supported for generate",
     "deprecated_date": "2026-01-29T21:44:57.324184"
   },
   "gemini/gemini-2.5-flash-preview-04-17": {
@@ -2780,6 +2812,14 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
+  "gemini/gemini-3.1-pro-preview": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-3.1-pro-preview-customtools": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
   "gemini-3-flash-preview": {
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
@@ -2795,21 +2835,21 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY",
     "deprecated": true,
-    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-pro-preview-03-25 is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-pro-preview-03-25 is not found for API version v1beta, or is not supported for generateContent",
     "deprecated_date": "2026-01-29T21:44:57.324568"
   },
   "gemini/gemini-2.5-pro-preview-05-06": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY",
     "deprecated": true,
-    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-pro-preview-05-06 is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-pro-preview-05-06 is not found for API version v1beta, or is not supported for generateContent",
     "deprecated_date": "2026-01-29T21:44:57.324629"
   },
   "gemini/gemini-2.5-pro-preview-06-05": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY",
     "deprecated": true,
-    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-pro-preview-06-05 is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-pro-preview-06-05 is not found for API version v1beta, or is not supported for generateContent",
     "deprecated_date": "2026-01-29T21:44:57.324691"
   },
   "gemini/gemini-2.5-pro-preview-tts": {
@@ -2890,7 +2930,7 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY",
     "deprecated": true,
-    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/learnlm-1.5-pro-experimental is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/learnlm-1.5-pro-experimental is not found for API version v1beta, or is not supported for generateContent",
     "deprecated_date": "2026-01-29T21:44:57.325120"
   },
   "gemini/veo-2.0-generate-001": {
@@ -3775,7 +3815,19 @@
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
+  "mistral/devstral-small-latest": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
   "mistral/labs-devstral-small-2512": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/devstral-latest": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/devstral-medium-latest": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },

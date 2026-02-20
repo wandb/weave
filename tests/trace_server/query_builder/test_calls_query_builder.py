@@ -13,6 +13,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
 )
+from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
@@ -52,21 +53,18 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
         expected_query = f"""
             SELECT {expected_table}.id AS id
             FROM {expected_table}
-            PREWHERE {expected_table}.project_id = {{pb_0:String}}
+            PREWHERE {expected_table}.project_id = {{pb_1:String}}
             WHERE 1
-              AND (
-                ((
-                    {expected_table}.deleted_at IS NULL
-                ))
-                AND
-                ((
-                   NOT ((
-                      {expected_table}.started_at IS NULL
-                   ))
-                ))
-            )
+              AND ({expected_table}.deleted_at = {{pb_0:DateTime64(3)}})
         """
-    assert_sql(cq, expected_query, {"pb_0": "project"})
+    if read_table == ReadTable.CALLS_MERGED:
+        assert_sql(cq, expected_query, {"pb_0": "project"})
+    else:
+        assert_sql(
+            cq,
+            expected_query,
+            {"pb_0": SENTINEL_DATETIME, "pb_1": "project"},
+        )
 
 
 def test_query_light_column() -> None:
@@ -641,27 +639,27 @@ def test_query_with_simple_feedback_filter_calls_complete() -> None:
         FROM
             calls_complete
                     LEFT JOIN (
-                SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
             ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///',
-            {pb_3:String},
+            {pb_4:String},
             '/call/',
             calls_complete.id))
         PREWHERE
-            calls_complete.project_id = {pb_3:String}
+            calls_complete.project_id = {pb_4:String}
         WHERE 1
         AND
             (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
             {pb_2:String}), 'null'), '')))
-                AND ((calls_complete.deleted_at IS NULL))
-                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+       AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)})))
         """,
         {
             "pb_0": "wandb.runnable.my_op",
             "pb_1": '$."output"."expected"',
             "pb_2": '$."output"."found"',
-            "pb_3": "project",
+            "pb_3": SENTINEL_DATETIME,
+            "pb_4": "project",
         },
     )
 
@@ -1245,18 +1243,18 @@ def test_calls_query_with_like_optimization_calls_complete() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_3:String}
-        WHERE (calls_complete.inputs_dump LIKE {pb_2:String})
+        PREWHERE calls_complete.project_id = {pb_4:String}
+        WHERE (calls_complete.inputs_dump LIKE {pb_3:String})
         AND
             (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') = {pb_1:String}))
-                AND ((calls_complete.deleted_at IS NULL))
-                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+                 AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
         """,
         {
-            "pb_3": "project",
-            "pb_2": '%"hello"%',
-            "pb_1": "hello",
             "pb_0": '$."param"',
+            "pb_1": "hello",
+            "pb_2": SENTINEL_DATETIME,
+            "pb_3": '%"hello"%',
+            "pb_4": "project",
         },
     )
 
@@ -1283,18 +1281,18 @@ def test_calls_query_with_like_optimization_contains_calls_complete() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_3:String}
-        WHERE (lower(calls_complete.inputs_dump) LIKE {pb_2:String})
+        PREWHERE calls_complete.project_id = {pb_4:String}
+        WHERE (lower(calls_complete.inputs_dump) LIKE {pb_3:String})
         AND
             ((positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
-                AND ((calls_complete.deleted_at IS NULL))
-                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+                 AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
         """,
         {
             "pb_0": '$."param"',
-            "pb_3": "project",
-            "pb_2": '%"%hello%"%',
             "pb_1": "hello",
+            "pb_2": SENTINEL_DATETIME,
+            "pb_3": '%"%hello%"%',
+            "pb_4": "project",
         },
     )
 
@@ -1320,20 +1318,20 @@ def test_calls_query_with_like_optimization_in_calls_complete() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_5:String}
-        WHERE ((calls_complete.inputs_dump LIKE {pb_3:String} OR calls_complete.inputs_dump LIKE {pb_4:String}))
+        PREWHERE calls_complete.project_id = {pb_6:String}
+        WHERE ((calls_complete.inputs_dump LIKE {pb_4:String} OR calls_complete.inputs_dump LIKE {pb_5:String}))
         AND
             (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
-                AND ((calls_complete.deleted_at IS NULL))
-                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+                 AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)})))
         """,
         {
             "pb_0": '$."param"',
             "pb_1": "hello",
             "pb_2": "world",
-            "pb_5": "project",
-            "pb_3": '%"hello"%',
-            "pb_4": '%"world"%',
+            "pb_3": SENTINEL_DATETIME,
+            "pb_4": '%"hello"%',
+            "pb_5": '%"world"%',
+            "pb_6": "project",
         },
     )
 
@@ -1692,11 +1690,11 @@ def test_build_calls_complete_update_end_query() -> None:
         UPDATE calls_complete
         SET
             ended_at = fromUnixTimestamp64Micro({ended_at:Int64}, 'UTC'),
-            exception = {exception:Nullable(String)},
+            exception = {exception:String},
             output_dump = {output_dump:String},
             summary_dump = {summary_dump:String},
             output_refs = {output_refs:Array(String)},
-            wb_run_step_end = {wb_run_step_end:Nullable(UInt64)},
+            wb_run_step_end = {wb_run_step_end:UInt64},
             updated_at = now64(3)
         WHERE project_id = {project_id:String}
             AND started_at = fromUnixTimestamp64Micro({started_at:Int64}, 'UTC')
@@ -2895,13 +2893,12 @@ def test_calls_complete_with_light_filter_and_order() -> None:
             calls_complete.started_at AS started_at,
             calls_complete.op_name AS op_name
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_2:String}
+        PREWHERE calls_complete.project_id = {pb_3:String}
         WHERE 1
           AND (
             ((calls_complete.started_at > {pb_0:String}))
             AND ((calls_complete.wb_user_id = {pb_1:String}))
-            AND ((calls_complete.deleted_at IS NULL))
-            AND ((NOT ((calls_complete.started_at IS NULL))))
+            AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
         )
         ORDER BY calls_complete.started_at DESC
         LIMIT 50
@@ -2909,7 +2906,8 @@ def test_calls_complete_with_light_filter_and_order() -> None:
         {
             "pb_0": "2024-03-01 00:00:00.000000",
             "pb_1": "user_123",
-            "pb_2": "project",
+            "pb_2": SENTINEL_DATETIME,
+            "pb_3": "project",
         },
     )
 
@@ -2957,26 +2955,25 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
         WITH filtered_calls AS (
             SELECT calls_complete.id AS id
             FROM calls_complete
-            PREWHERE calls_complete.project_id = {pb_9:String}
-            WHERE ((calls_complete.op_name IN {pb_2:Array(String)})
+            PREWHERE calls_complete.project_id = {pb_12:String}
+            WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
                     OR (calls_complete.op_name IS NULL))
-                AND (calls_complete.trace_id = {pb_3:String}
+                AND (calls_complete.trace_id = {pb_4:String}
                     OR calls_complete.trace_id IS NULL)
             AND (
                 ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:UInt64}))
-                AND ((calls_complete.deleted_at IS NULL))
-                AND ((NOT ((calls_complete.started_at IS NULL))))
+                AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
             )
             ORDER BY CASE
-                WHEN calls_complete.exception IS NOT NULL THEN {pb_5:String}
+                WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
                 WHEN IFNULL(
                     toInt64OrNull(
-                        coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_4:String}), 'null'), '')
+                        coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
                     ),
                     0
-                ) > 0 THEN {pb_8:String}
-                WHEN calls_complete.ended_at IS NULL THEN {pb_6:String}
-                ELSE {pb_7:String}
+                ) > 0 THEN {pb_9:String}
+                WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
+                ELSE {pb_8:String}
                 END ASC
             LIMIT 100
         )
@@ -2986,31 +2983,36 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             calls_complete.exception AS exception,
             calls_complete.ended_at AS ended_at
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_9:String}
+        PREWHERE calls_complete.project_id = {pb_12:String}
         WHERE (calls_complete.id IN filtered_calls)
         ORDER BY CASE
-            WHEN calls_complete.exception IS NOT NULL THEN {pb_5:String}
+            WHEN calls_complete.exception != {pb_13:String} THEN {pb_6:String}
             WHEN IFNULL(
                 toInt64OrNull(
-                    coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_4:String}), 'null'), '')
+                    coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
                 ),
                 0
-            ) > 0 THEN {pb_8:String}
-            WHEN calls_complete.ended_at IS NULL THEN {pb_6:String}
-            ELSE {pb_7:String}
+            ) > 0 THEN {pb_9:String}
+            WHEN calls_complete.ended_at = {pb_14:DateTime64(6)} THEN {pb_7:String}
+            ELSE {pb_8:String}
             END ASC
         """,
         {
             "pb_0": '$."latency"',
             "pb_1": 1000,
-            "pb_2": ["my_op"],
-            "pb_3": "trace_abc",
-            "pb_4": '$."status_counts"."error"',
-            "pb_5": "error",
-            "pb_6": "running",
-            "pb_7": "success",
-            "pb_8": "descendant_error",
-            "pb_9": "project",
+            "pb_2": SENTINEL_DATETIME,
+            "pb_3": ["my_op"],
+            "pb_4": "trace_abc",
+            "pb_5": '$."status_counts"."error"',
+            "pb_6": "error",
+            "pb_7": "running",
+            "pb_8": "success",
+            "pb_9": "descendant_error",
+            "pb_10": "",
+            "pb_11": SENTINEL_DATETIME,
+            "pb_12": "project",
+            "pb_13": "",
+            "pb_14": SENTINEL_DATETIME,
         },
     )
 
@@ -3028,40 +3030,39 @@ def test_query_with_simple_feedback_sort_calls_complete() -> None:
             FROM
                 calls_complete
             LEFT JOIN (
-                SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_5:String}
             ) AS feedback ON (
                 feedback.weave_ref = concat('weave-trace-internal:///',
-                {pb_4:String},
+                {pb_5:String},
                 '/call/',
                 calls_complete.id))
             PREWHERE
-                calls_complete.project_id = {pb_4:String}
+                calls_complete.project_id = {pb_5:String}
             WHERE 1
-              AND (
-                ((calls_complete.deleted_at IS NULL))
-                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+              AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
             ORDER BY
-                (NOT (JSONType(CASE WHEN feedback.feedback_type = {pb_0:String}
+                (NOT (JSONType(CASE WHEN feedback.feedback_type = {pb_1:String}
                 THEN feedback.payload_dump END,
-                {pb_1:String},
-                {pb_2:String}) = 'Null'
-                    OR JSONType(CASE WHEN feedback.feedback_type = {pb_0:String}
+                {pb_2:String},
+                {pb_3:String}) = 'Null'
+                    OR JSONType(CASE WHEN feedback.feedback_type = {pb_1:String}
                     THEN feedback.payload_dump END,
-                    {pb_1:String},
-                    {pb_2:String}) IS NULL)) desc,
-                toFloat64OrNull(coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
+                    {pb_2:String},
+                    {pb_3:String}) IS NULL)) desc,
+                toFloat64OrNull(coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_1:String}
                 THEN feedback.payload_dump END,
-                {pb_3:String}), 'null'), '')) DESC,
-                toString(coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
+                {pb_4:String}), 'null'), '')) DESC,
+                toString(coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_1:String}
                 THEN feedback.payload_dump END,
-                {pb_3:String}), 'null'), '')) DESC
+                {pb_4:String}), 'null'), '')) DESC
             """,
         {
-            "pb_0": "wandb.runnable.my_op",
-            "pb_1": "output",
-            "pb_2": "expected",
-            "pb_3": '$."output"."expected"',
-            "pb_4": "project",
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": "wandb.runnable.my_op",
+            "pb_2": "output",
+            "pb_3": "expected",
+            "pb_4": '$."output"."expected"',
+            "pb_5": "project",
         },
     )
 
@@ -3089,24 +3090,24 @@ def test_calls_complete_with_refs_filter() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_4:String}
-        WHERE (((hasAny(calls_complete.input_refs, {pb_2:Array(String)})
+        PREWHERE calls_complete.project_id = {pb_5:String}
+        WHERE (((hasAny(calls_complete.input_refs, {pb_3:Array(String)})
                 OR length(calls_complete.input_refs) = 0)
-            AND (hasAny(calls_complete.output_refs, {pb_3:Array(String)})
+            AND (hasAny(calls_complete.output_refs, {pb_4:Array(String)})
                 OR length(calls_complete.output_refs) = 0)))
         AND (
-            ((calls_complete.deleted_at IS NULL))
-            AND ((NOT ((calls_complete.started_at IS NULL))))
-            AND (((hasAny(calls_complete.input_refs, {pb_0:Array(String)}))
-                AND (hasAny(calls_complete.output_refs, {pb_1:Array(String)}))))
+            ((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+            AND (((hasAny(calls_complete.input_refs, {pb_1:Array(String)}))
+                AND (hasAny(calls_complete.output_refs, {pb_2:Array(String)}))))
         )
         """,
         {
-            "pb_0": ["weave-trace-internal:///project/object/my_input:abc"],
-            "pb_1": ["weave-trace-internal:///project/object/my_output:xyz"],
-            "pb_2": ["weave-trace-internal:///project/object/my_input:abc"],
-            "pb_3": ["weave-trace-internal:///project/object/my_output:xyz"],
-            "pb_4": "project",
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": ["weave-trace-internal:///project/object/my_input:abc"],
+            "pb_2": ["weave-trace-internal:///project/object/my_output:xyz"],
+            "pb_3": ["weave-trace-internal:///project/object/my_input:abc"],
+            "pb_4": ["weave-trace-internal:///project/object/my_output:xyz"],
+            "pb_5": "project",
         },
     )
 
@@ -3141,27 +3142,26 @@ def test_calls_complete_with_feedback_filter() -> None:
         FROM
             calls_complete
         LEFT JOIN (
-            SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+            SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
         ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///',
-            {pb_3:String},
+            {pb_4:String},
             '/call/',
             calls_complete.id))
         PREWHERE
-            calls_complete.project_id = {pb_3:String}
+            calls_complete.project_id = {pb_4:String}
         WHERE 1
-          AND (
-            ((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
+          AND (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
             THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '') > {pb_2:Float64}))
-            AND ((calls_complete.deleted_at IS NULL))
-            AND ((NOT ((calls_complete.started_at IS NULL)))))
+       AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)})))
         """,
         {
             "pb_0": "wandb.runnable.my_op",
             "pb_1": '$."output"."score"',
             "pb_2": 0.5,
-            "pb_3": "project",
+            "pb_3": SENTINEL_DATETIME,
+            "pb_4": "project",
         },
     )
 
@@ -3202,24 +3202,23 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
         """
         SELECT
             calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_5:String}
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_10:String}
         WHERE 1
           AND (
             (((CASE
-                WHEN calls_complete.exception IS NOT NULL THEN {pb_1:String}
+                WHEN calls_complete.exception != {pb_5:String} THEN {pb_1:String}
                 WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-                WHEN calls_complete.ended_at IS NULL THEN {pb_2:String}
+                WHEN calls_complete.ended_at = {pb_6:DateTime64(6)} THEN {pb_2:String}
                 ELSE {pb_3:String}
             END = {pb_3:String})
             OR
             (CASE
-                WHEN calls_complete.exception IS NOT NULL THEN {pb_1:String}
+                WHEN calls_complete.exception != {pb_7:String} THEN {pb_1:String}
                 WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-                WHEN calls_complete.ended_at IS NULL THEN {pb_2:String}
+                WHEN calls_complete.ended_at = {pb_8:DateTime64(6)} THEN {pb_2:String}
                 ELSE {pb_3:String}
             END = {pb_1:String})))
-            AND ((calls_complete.deleted_at IS NULL))
-            AND ((NOT ((calls_complete.started_at IS NULL)))))
+       AND ((calls_complete.deleted_at = {pb_9:DateTime64(3)})))
         """,
         {
             "pb_0": '$."status_counts"."error"',
@@ -3227,7 +3226,12 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
             "pb_2": "running",
             "pb_3": "success",
             "pb_4": "descendant_error",
-            "pb_5": "project",
+            "pb_5": "",
+            "pb_6": SENTINEL_DATETIME,
+            "pb_7": "",
+            "pb_8": SENTINEL_DATETIME,
+            "pb_9": SENTINEL_DATETIME,
+            "pb_10": "project",
         },
     )
 
@@ -3389,23 +3393,22 @@ def test_query_with_queue_filter_calls_complete() -> None:
             calls_complete
         INNER JOIN (
             SELECT * FROM annotation_queue_items
-            WHERE annotation_queue_items.project_id = {pb_1:String}
+            WHERE annotation_queue_items.project_id = {pb_2:String}
               AND annotation_queue_items.deleted_at IS NULL
               AND annotation_queue_items.queue_id = {pb_0:String}
         ) AS annotation_queue_items ON (
             annotation_queue_items.project_id = calls_complete.project_id
             AND annotation_queue_items.call_id = calls_complete.id)
         PREWHERE
-            calls_complete.project_id = {pb_1:String}
+            calls_complete.project_id = {pb_2:String}
         WHERE 1
-          AND (
-            ((annotation_queue_items.queue_id = {pb_0:String}))
-            AND ((calls_complete.deleted_at IS NULL))
-            AND ((NOT ((calls_complete.started_at IS NULL)))))
+          AND (((annotation_queue_items.queue_id = {pb_0:String}))
+       AND ((calls_complete.deleted_at = {pb_1:DateTime64(3)})))
         """,
         {
             "pb_0": "test_queue_id",
-            "pb_1": "project",
+            "pb_1": SENTINEL_DATETIME,
+            "pb_2": "project",
         },
     )
 
@@ -3501,11 +3504,14 @@ def test_stats_query_calls_complete_flat_count() -> None:
         """
         SELECT count() AS count
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_0:String}
+        PREWHERE calls_complete.project_id = {pb_1:String}
         WHERE 1
-          AND (calls_complete.deleted_at IS NULL)
+          AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
-        {"pb_0": "project"},
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": "project",
+        },
         read_table=ReadTable.CALLS_COMPLETE,
     )
 
@@ -3521,12 +3527,16 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
         """
         SELECT count() AS count
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_1:String}
-        WHERE ((calls_complete.op_name IN {pb_0:Array(String)})
+        PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
                OR (calls_complete.op_name IS NULL))
-          AND (calls_complete.deleted_at IS NULL)
+          AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
-        {"pb_0": ["my_op"], "pb_1": "project"},
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": ["my_op"],
+            "pb_2": "project",
+        },
         read_table=ReadTable.CALLS_COMPLETE,
     )
 
@@ -3542,7 +3552,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
         """
         SELECT count() AS count,
                sum(coalesce(CASE
-                   WHEN calls_complete.parent_id IS NULL
+                   WHEN calls_complete.parent_id = {pb_2:String}
                         THEN rolled_up_cms.total_storage_size_bytes
                    ELSE NULL
                END, 0)) AS total_storage_size_bytes
@@ -3551,14 +3561,18 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
             SELECT trace_id,
                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
             FROM calls_complete_stats
-            WHERE project_id = {pb_0:String}
+            WHERE project_id = {pb_1:String}
             GROUP BY trace_id
         ) AS rolled_up_cms ON calls_complete.trace_id = rolled_up_cms.trace_id
-        PREWHERE calls_complete.project_id = {pb_0:String}
+        PREWHERE calls_complete.project_id = {pb_1:String}
         WHERE 1
-          AND (calls_complete.deleted_at IS NULL)
+          AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
-        {"pb_0": "project"},
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": "project",
+            "pb_2": "",
+        },
         read_table=ReadTable.CALLS_COMPLETE,
     )
 
@@ -3584,4 +3598,263 @@ def test_stats_query_calls_merged_uses_subquery() -> None:
         """,
         {"pb_0": "project"},
         read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bug-fix tests: sentinel-aware ended_at checks for calls_complete
+# ---------------------------------------------------------------------------
+
+
+def test_latency_ms_sort_calls_complete_uses_sentinel_for_ended_at() -> None:
+    """For calls_complete, latency_ms must check ended_at against the sentinel, not IS NULL.
+
+    Bug: _handle_latency_ms_summary_field used `ended_at IS NULL` which never matches in
+    calls_complete (ended_at is non-nullable with epoch-zero sentinel). This caused
+    unfinished calls to compute garbage latency instead of NULL.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_field("ended_at")
+    cq.add_order("summary.weave.latency_ms", "desc")
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id,
+            calls_complete.started_at AS started_at,
+            calls_complete.ended_at AS ended_at
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE 1
+          AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+        ORDER BY CASE
+            WHEN calls_complete.ended_at = {pb_1:DateTime64(6)} THEN NULL
+            ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
+        END DESC
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": SENTINEL_DATETIME,
+            "pb_2": "project",
+        },
+    )
+
+
+def test_latency_ms_filter_calls_complete_uses_sentinel_for_ended_at() -> None:
+    """For calls_complete, latency_ms filter must use sentinel check for ended_at."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_field("ended_at")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {"$gt": [{"$getField": "summary.weave.latency_ms"}, {"$literal": 1000}]}
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id,
+            calls_complete.started_at AS started_at,
+            calls_complete.ended_at AS ended_at
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_3:String}
+        WHERE 1
+          AND (((CASE
+              WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN NULL
+              ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
+          END > {pb_1:UInt64}))
+       AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": 1000,
+            "pb_2": SENTINEL_DATETIME,
+            "pb_3": "project",
+        },
+    )
+
+
+def test_trace_roots_only_filter_calls_complete() -> None:
+    """Verify trace_roots_only uses parent_id = '' sentinel on calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"trace_roots_only": True})
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_2:String}
+            WHERE (calls_complete.parent_id = {pb_1:String})
+              AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": "",
+            "pb_2": "project",
+        },
+    )
+
+
+def test_trace_name_filter_calls_complete_uses_sentinel() -> None:
+    """Verify display_name sentinel check in trace_name CASE on calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("display_name")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "summary.weave.trace_name"},
+                    {"$literal": "my_model"},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id,
+               calls_complete.display_name AS display_name
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_3:String}
+        WHERE 1
+          AND (((CASE
+                     WHEN calls_complete.display_name != {pb_0:String} THEN calls_complete.display_name
+                     WHEN calls_complete.op_name IS NOT NULL
+                          AND calls_complete.op_name LIKE 'weave-trace-internal:///%' THEN regexpExtract(toString(calls_complete.op_name), '/([^/:]*):', 1)
+                     ELSE calls_complete.op_name
+                     END = {pb_1:String}))
+               AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
+        """,
+        {
+            "pb_0": "",
+            "pb_1": "my_model",
+            "pb_2": SENTINEL_DATETIME,
+            "pb_3": "project",
+        },
+    )
+
+
+def test_not_eq_none_display_name_calls_complete() -> None:
+    """Verify $not: [$eq: [display_name, None]] uses sentinel on calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("display_name")
+    cq.add_condition(
+        tsi_query.NotOperation.model_validate(
+            {
+                "$not": [
+                    {
+                        "$eq": [
+                            {"$getField": "display_name"},
+                            {"$literal": None},
+                        ]
+                    }
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id,
+               calls_complete.display_name AS display_name
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE 1
+          AND (((NOT ((calls_complete.display_name = {pb_0:String}))))
+               AND ((calls_complete.deleted_at = {pb_1:DateTime64(3)})))
+        """,
+        {
+            "pb_0": "",
+            "pb_1": SENTINEL_DATETIME,
+            "pb_2": "project",
+        },
+    )
+
+
+def test_hardcoded_filters_calls_complete() -> None:
+    """Verify thread_ids, turn_ids, parent_ids, wb_run_ids use sentinel null checks on calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={
+            "thread_ids": ["thread_123"],
+            "turn_ids": ["turn_456"],
+            "parent_ids": ["parent_aaa", "parent_bbb"],
+            "wb_run_ids": ["wb_run_789"],
+        }
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_13:String}
+        WHERE (calls_complete.wb_run_id IN {pb_9:Array(String)}
+               OR calls_complete.wb_run_id = {pb_10:String})
+          AND (calls_complete.parent_id IN {pb_11:Array(String)}
+               OR calls_complete.parent_id = {pb_12:String})
+          AND (calls_complete.thread_id = {pb_5:String}
+               OR calls_complete.thread_id = {pb_6:String})
+          AND (calls_complete.turn_id = {pb_7:String}
+               OR calls_complete.turn_id = {pb_8:String})
+          AND (((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+               AND (((calls_complete.parent_id IN {pb_1:Array(String)})
+                     AND (calls_complete.thread_id IN {pb_2:Array(String)})
+                     AND (calls_complete.turn_id IN {pb_3:Array(String)})
+                     AND (calls_complete.wb_run_id IN {pb_4:Array(String)}))))
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": ["parent_aaa", "parent_bbb"],
+            "pb_2": ["thread_123"],
+            "pb_3": ["turn_456"],
+            "pb_4": ["wb_run_789"],
+            "pb_5": "thread_123",
+            "pb_6": "",
+            "pb_7": "turn_456",
+            "pb_8": "",
+            "pb_9": ["wb_run_789"],
+            "pb_10": "",
+            "pb_11": ["parent_aaa", "parent_bbb"],
+            "pb_12": "",
+            "pb_13": "project",
+        },
+    )
+
+
+def test_status_sort_calls_complete_uses_sentinels() -> None:
+    """Verify status computation sort uses sentinel checks on calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_order("summary.weave.status", "asc")
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_8:String}
+        WHERE 1
+          AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+        ORDER BY CASE
+                     WHEN calls_complete.exception != {pb_6:String} THEN {pb_2:String}
+                     WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_1:String}), 'null'), '')), 0) > 0 THEN {pb_5:String}
+                     WHEN calls_complete.ended_at = {pb_7:DateTime64(6)} THEN {pb_3:String}
+                     ELSE {pb_4:String}
+                 END ASC
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": '$."status_counts"."error"',
+            "pb_2": "error",
+            "pb_3": "running",
+            "pb_4": "success",
+            "pb_5": "descendant_error",
+            "pb_6": "",
+            "pb_7": SENTINEL_DATETIME,
+            "pb_8": "project",
+        },
     )
