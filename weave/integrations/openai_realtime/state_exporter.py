@@ -574,6 +574,7 @@ class StateExporter(BaseModel):
         if conv_id and self.conversation_responses.get(conv_id) is not None:
             if response_id:
                 self.conversation_responses[conv_id].append(response_id)
+
         elif conv_id and response_id:
             self.conversation_responses[conv_id] = [response_id]
 
