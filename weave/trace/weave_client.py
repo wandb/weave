@@ -2160,17 +2160,11 @@ class WeaveClient:
             self.future_executor.flush()
         if self.future_executor_fastlane:
             self.future_executor_fastlane.flush()
-        if (
-            self._server_call_processor
-            and self._server_call_processor.num_outstanding_jobs > 0
-        ):
+        if self._server_call_processor:
             self._server_call_processor.stop_accepting_new_work_and_flush_queue()
             # Restart call processor processing thread after flushing
             self._server_call_processor.accept_new_work()
-        if (
-            self._server_feedback_processor
-            and self._server_feedback_processor.num_outstanding_jobs > 0
-        ):
+        if self._server_feedback_processor:
             self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
             # Restart feedback processor processing thread after flushing
             self._server_feedback_processor.accept_new_work()
