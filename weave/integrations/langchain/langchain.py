@@ -35,6 +35,9 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
+from pydantic import BaseModel
+from pydantic.v1.json import pydantic_encoder
+
 from weave.flow.util import warn_once
 from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
@@ -67,6 +70,29 @@ logger = logging.getLogger(__name__)
 
 if not import_failed:
 
+    def _safe_json_encoder(obj: Any) -> Any:
+        """JSON encoder that extends pydantic's default with fallback handling.
+
+        Handles objects that pydantic v1's default encoder can't serialize,
+        such as Pydantic model classes (ModelMetaclass) passed via LangChain's
+        with_structured_output(), and other arbitrary non-serializable objects.
+        """
+        try:
+            return pydantic_encoder(obj)
+        except TypeError:
+            pass
+
+        if isinstance(obj, type) and issubclass(obj, BaseModel):
+            return obj.model_json_schema()
+
+        if isinstance(obj, (set, frozenset)):
+            return list(obj)
+
+        try:
+            return repr(obj)
+        except Exception:
+            return f"<{type(obj).__name__}>"
+
     def _run_to_dict(run: Run, as_input: bool = False) -> dict:
         run_dict = run.json(
             exclude={
@@ -82,6 +108,7 @@ if not import_failed:
             exclude_unset=True,
             exclude_none=True,
             exclude_defaults=True,
+            encoder=_safe_json_encoder,
         )
 
         run_dict = json.loads(run_dict)
