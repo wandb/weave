@@ -125,6 +125,7 @@ class ObjectMetadataQueryBuilder:
         self._sort_by: list[SortBy] = []
         self._include_deleted: bool = include_deleted
         self.include_storage_size: bool = False
+        self._main_table_alias: str = "main"
 
     @property
     def conditions_part(self) -> str:
@@ -242,6 +243,32 @@ class ObjectMetadataQueryBuilder:
         )
         self.parameters.update({"leaf_object_classes": leaf_object_classes})
 
+    def add_tags_condition(self, tags: list[str]) -> None:
+        self._conditions.append(
+            f"({self._main_table_alias}.project_id, {self._main_table_alias}.object_id, {self._main_table_alias}.digest) IN ("
+            "SELECT project_id, object_id, digest "
+            "FROM tags "
+            "PREWHERE project_id = {project_id: String} "
+            "WHERE tag IN {filter_tags: Array(String)} "
+            "GROUP BY project_id, object_id, digest, tag "
+            "HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)"
+            ")"
+        )
+        self.parameters.update({"filter_tags": tags})
+
+    def add_aliases_condition(self, aliases: list[str]) -> None:
+        self._conditions.append(
+            f"({self._main_table_alias}.project_id, {self._main_table_alias}.object_id) IN ("
+            "SELECT project_id, object_id "
+            "FROM aliases "
+            "PREWHERE project_id = {project_id: String} "
+            "WHERE alias IN {filter_aliases: Array(String)} "
+            "GROUP BY project_id, object_id, alias "
+            "HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)"
+            ")"
+        )
+        self.parameters.update({"filter_aliases": aliases})
+
     def add_order(self, field: str, direction: str) -> None:
         direction = direction.lower()
         if direction not in ("asc", "desc"):
@@ -268,7 +295,7 @@ class ObjectMetadataQueryBuilder:
     def make_metadata_query(self) -> str:
         columns = list(OBJECT_METADATA_COLUMNS)
 
-        main_table_alias = "main"
+        main_table_alias = self._main_table_alias
 
         if self.include_storage_size:
             columns += ["size_bytes"]

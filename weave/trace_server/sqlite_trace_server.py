@@ -1112,6 +1112,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
 
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        raise NotImplementedError("Tags not supported in SQLite trace server")
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        raise NotImplementedError("Tags not supported in SQLite trace server")
+
+    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+        raise NotImplementedError("Aliases not supported in SQLite trace server")
+
+    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+        raise NotImplementedError("Aliases not supported in SQLite trace server")
+
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         insert_rows = []
