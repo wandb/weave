@@ -3,7 +3,7 @@ import inspect
 import logging
 import operator
 import typing
-from collections.abc import Generator, Iterator, Sequence
+from collections.abc import Generator, Iterable, Iterator, Sequence
 from copy import deepcopy
 from typing import Any, Literal, Optional, SupportsIndex
 
@@ -616,29 +616,103 @@ class WeaveList(Traceable, list):
         index = operator.index(i)
         new_ref = self.ref.with_index(index) if self.ref else None
         index_val = super().__getitem__(index)
-        return make_trace_obj(index_val, new_ref, self.server, self.root)
+        wrapped = make_trace_obj(
+            index_val, new_ref, self.server, self.root, parent=self
+        )
+        if isinstance(wrapped, Traceable) and wrapped is not index_val:
+            # Cache wrapped mutables into the list so nested in-place edits
+            # mutate this list's value rather than a detached copy.
+            super().__setitem__(index, wrapped)
+        return wrapped
+
+    def _adopt_child(self, value: Any) -> None:
+        if isinstance(value, Traceable):
+            value.parent = self
 
     def __setitem__(self, i: SupportsIndex | slice, value: Any) -> None:
         if isinstance(i, slice):
             raise TypeError("Slices not yet supported")
-        if (index := operator.index(i)) >= len(self):
+        if (index := operator.index(i)) >= len(self) or index < (-len(self)):
             raise IndexError("list assignment index out of range")
 
         # Though this ostensibly only marks the parent (list) as dirty, siblings
         # will also get new refs because their old refs are relative to the parent
         # (the element refs will be extras of the new parent ref)
-        self._mark_dirty()
-        if isinstance(value, Traceable):
-            value.parent = self
-
+        self._adopt_child(value)
         super().__setitem__(index, value)
+        self._mark_dirty()
 
     def append(self, item: Any) -> None:
-        self._mark_dirty()
-        if isinstance(item, Traceable):
-            item.parent = self
-
+        self._adopt_child(item)
         super().append(item)
+        self._mark_dirty()
+
+    def extend(self, iterable: Iterable[Any]) -> None:
+        items = list(iterable)
+        if not items:
+            return
+        for item in items:
+            self._adopt_child(item)
+        super().extend(items)
+        self._mark_dirty()
+
+    def __add__(self, value: list[Any]) -> list[Any]:
+        # Mirror built-in list `+` behavior (including returned type).
+        return super().__add__(value)
+
+    def __iadd__(self, iterable: Iterable[Any]) -> "WeaveList":
+        items = list(iterable)
+        if not items:
+            return self
+        for item in items:
+            self._adopt_child(item)
+        super().__iadd__(items)
+        self._mark_dirty()
+        return self
+
+    def __imul__(self, n: SupportsIndex) -> "WeaveList":
+        multiplier = operator.index(n)
+        had_values = len(self) > 0
+        super().__imul__(multiplier)
+        if had_values and multiplier != 1:
+            self._mark_dirty()
+        return self
+
+    def insert(self, index: SupportsIndex, item: Any) -> None:
+        self._adopt_child(item)
+        super().insert(operator.index(index), item)
+        self._mark_dirty()
+
+    def pop(self, index: SupportsIndex = -1) -> Any:
+        value = super().pop(operator.index(index))
+        self._mark_dirty()
+        return value
+
+    def remove(self, value: Any) -> None:
+        super().remove(value)
+        self._mark_dirty()
+
+    def clear(self) -> None:
+        if not self:
+            return
+        super().clear()
+        self._mark_dirty()
+
+    def __delitem__(self, i: SupportsIndex | slice) -> None:
+        old_len = len(self)
+        super().__delitem__(i)
+        if len(self) != old_len:
+            self._mark_dirty()
+
+    def reverse(self) -> None:
+        super().reverse()
+        if len(self) > 1:
+            self._mark_dirty()
+
+    def sort(self, *, key: Any = None, reverse: bool = False) -> None:
+        super().sort(key=key, reverse=reverse)
+        if len(self) > 1:
+            self._mark_dirty()
 
     def __iter__(self) -> Iterator[Any]:
         for i in range(len(self)):
@@ -662,6 +736,8 @@ class WeaveList(Traceable, list):
 
 
 class WeaveDict(Traceable, dict):
+    _pop_default = object()
+
     def __init__(
         self,
         *args: Any,
@@ -693,22 +769,80 @@ class WeaveDict(Traceable, dict):
     def __getitem__(self, key: str) -> Any:
         new_ref = self.ref.with_key(key) if self.ref else None
         v = super().__getitem__(key)
-        return make_trace_obj(v, new_ref, self.server, self.root)
+        wrapped = make_trace_obj(v, new_ref, self.server, self.root, parent=self)
+        if isinstance(wrapped, Traceable) and wrapped is not v:
+            # Cache wrapped mutables into the dict so nested in-place edits
+            # mutate this dict's value rather than a detached copy.
+            super().__setitem__(key, wrapped)
+        return wrapped
+
+    def _adopt_child(self, value: Any) -> None:
+        if isinstance(value, Traceable):
+            value.parent = self
 
     def get(self, key: str, default: Any = None) -> Any:
+        if key in self:
+            return self[key]
         new_ref = self.ref.with_key(key) if self.ref else None
         v = super().get(key, default)
-        return make_trace_obj(v, new_ref, self.server, self.root)
+        return make_trace_obj(v, new_ref, self.server, self.root, parent=self)
 
     def __setitem__(self, key: str, value: Any) -> None:
         # Though this ostensibly only marks the parent (dict) as dirty, siblings
         # will also get new refs because their old refs are relative to the parent
         # (the element refs will be extras of the new parent ref)
-        self._mark_dirty()
-        if isinstance(value, Traceable):
-            value.parent = self
-
+        self._adopt_child(value)
         super().__setitem__(key, value)
+        self._mark_dirty()
+
+    def __delitem__(self, key: str) -> None:
+        super().__delitem__(key)
+        self._mark_dirty()
+
+    def update(self, *args: Any, **kwargs: Any) -> None:
+        updates = dict(*args, **kwargs)
+        if not updates:
+            return
+        for value in updates.values():
+            self._adopt_child(value)
+        super().update(updates)
+        self._mark_dirty()
+
+    def __or__(self, other: Any) -> dict[Any, Any]:
+        # Mirror built-in dict `|` behavior (including returned type).
+        return super().__or__(other)
+
+    def __ior__(self, other: Any) -> "WeaveDict":
+        self.update(other)
+        return self
+
+    def pop(self, key: str, default: Any = _pop_default) -> Any:
+        if key in self:
+            value = super().pop(key)
+            self._mark_dirty()
+            return value
+        if default is self._pop_default:
+            raise KeyError(key)
+        return default
+
+    def popitem(self) -> tuple[Any, Any]:
+        item = super().popitem()
+        self._mark_dirty()
+        return item
+
+    def clear(self) -> None:
+        if not self:
+            return
+        super().clear()
+        self._mark_dirty()
+
+    def setdefault(self, key: str, default: Any = None) -> Any:
+        if key in self:
+            return self[key]
+        self._adopt_child(default)
+        super().__setitem__(key, default)
+        self._mark_dirty()
+        return self[key]
 
     def keys(self) -> Generator[Any, Any, Any]:  # type: ignore
         yield from super().keys()
@@ -754,6 +888,8 @@ def make_trace_obj(
     parent: Any = None,
 ) -> Any:
     if isinstance(val, Traceable):
+        if parent is not None:
+            val.parent = parent
         # If val is a WeaveTable, we want to refer to it via the outer object
         # that it is within, rather than via the TableRef. For example we
         # want Dataset row refs to be Dataset.rows[id] rather than table[id]
@@ -862,7 +998,7 @@ def make_trace_obj(
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
-            return WeaveDict(val, ref=new_ref, server=server, root=root)
+            return WeaveDict(val, ref=new_ref, server=server, root=root, parent=parent)
     if is_op(val) and inspect.signature(val.resolve_fn).parameters.get("self"):
         # This condition attempts to bind the current `self` to the attribute if
         # it happens to be both an `Op` and have a `self` argument. This is a
