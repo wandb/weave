@@ -1706,3 +1706,498 @@ def test_otel_span_wandb_attributes_and_data_routing(
     client.server.calls_delete(
         tsi.CallsDeleteReq(project_id=project_id, call_ids=[call.id], wb_user_id=None)
     )
+
+
+class TestToolCallExtraction:
+    """Tests for extracting tool calls from OTel span data."""
+
+    def test_extract_tool_calls_from_attributes_openai_style(self):
+        """Span with gen_ai.output.messages containing tool_calls."""
+        from weave.trace_server.opentelemetry.tool_calls import (
+            extract_tool_calls_from_attributes,
+        )
+
+        attributes = {
+            "gen_ai.output.messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_abc123",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": '{"city": "SF"}',
+                            },
+                        },
+                        {
+                            "id": "call_def456",
+                            "function": {
+                                "name": "get_time",
+                                "arguments": '{"tz": "PST"}',
+                            },
+                        },
+                    ],
+                }
+            ]
+        }
+
+        tool_calls = extract_tool_calls_from_attributes(attributes)
+        assert len(tool_calls) == 2
+        assert tool_calls[0].tool_call_id == "call_abc123"
+        assert tool_calls[0].tool_name == "get_weather"
+        assert tool_calls[0].arguments == {"city": "SF"}
+        assert tool_calls[1].tool_call_id == "call_def456"
+        assert tool_calls[1].tool_name == "get_time"
+        assert tool_calls[1].arguments == {"tz": "PST"}
+
+    def test_extract_tool_calls_from_attributes_gen_ai_completion(self):
+        """Span with gen_ai.completion containing tool_calls."""
+        from weave.trace_server.opentelemetry.tool_calls import (
+            extract_tool_calls_from_attributes,
+        )
+
+        attributes = {
+            "gen_ai.completion": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_xyz",
+                            "function": {
+                                "name": "search",
+                                "arguments": '{"query": "weather"}',
+                            },
+                        },
+                    ],
+                }
+            ]
+        }
+
+        tool_calls = extract_tool_calls_from_attributes(attributes)
+        assert len(tool_calls) == 1
+        assert tool_calls[0].tool_name == "search"
+        assert tool_calls[0].arguments == {"query": "weather"}
+
+    def test_extract_tool_calls_from_attributes_json_string(self):
+        """Attributes where messages are JSON strings instead of dicts."""
+        from weave.trace_server.opentelemetry.tool_calls import (
+            extract_tool_calls_from_attributes,
+        )
+
+        attributes = {
+            "gen_ai.output.messages": json.dumps(
+                [
+                    {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "call_str1",
+                                "function": {
+                                    "name": "calculator",
+                                    "arguments": '{"expr": "2+2"}',
+                                },
+                            }
+                        ],
+                    }
+                ]
+            )
+        }
+
+        tool_calls = extract_tool_calls_from_attributes(attributes)
+        assert len(tool_calls) == 1
+        assert tool_calls[0].tool_name == "calculator"
+
+    def test_extract_tool_calls_from_events(self):
+        """Extract tool calls from span events with gen_ai.tool.call.* attributes."""
+        from weave.trace_server.opentelemetry.tool_calls import (
+            extract_tool_calls_from_events,
+        )
+
+        events = [
+            {
+                "name": "gen_ai.tool.call",
+                "attributes": {
+                    "gen_ai.tool.call.id": "call_evt1",
+                    "gen_ai.tool.call.name": "get_weather",
+                    "gen_ai.tool.call.arguments": '{"city": "NYC"}',
+                },
+            },
+            {
+                "name": "gen_ai.tool.call",
+                "attributes": {
+                    "gen_ai.tool.call.id": "call_evt2",
+                    "gen_ai.tool.call.name": "get_time",
+                    "gen_ai.tool.call.arguments": '{"tz": "EST"}',
+                },
+            },
+        ]
+
+        tool_calls = extract_tool_calls_from_events(events)
+        assert len(tool_calls) == 2
+        assert tool_calls[0].tool_call_id == "call_evt1"
+        assert tool_calls[0].tool_name == "get_weather"
+        assert tool_calls[0].arguments == {"city": "NYC"}
+        assert tool_calls[1].tool_call_id == "call_evt2"
+        assert tool_calls[1].tool_name == "get_time"
+
+    def test_extract_tool_results_from_span(self):
+        """Extract tool results from input messages with role=tool."""
+        from weave.trace_server.opentelemetry.tool_calls import (
+            extract_tool_results_from_span,
+        )
+
+        attributes = {
+            "gen_ai.input.messages": [
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_abc123",
+                    "content": '{"temperature": "72F"}',
+                },
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_def456",
+                    "content": "3:00 PM",
+                },
+            ]
+        }
+
+        results = extract_tool_results_from_span([], attributes)
+        assert len(results) == 2
+        assert results["call_abc123"] == {"temperature": "72F"}
+        assert results["call_def456"] == "3:00 PM"
+
+    def test_extract_tool_calls_with_result_matching(self):
+        """Tool calls paired with results in the same span."""
+        from weave.trace_server.opentelemetry.tool_calls import extract_tool_calls
+
+        attributes = {
+            "gen_ai.output.messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_abc123",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": '{"city": "SF"}',
+                            },
+                        },
+                    ],
+                }
+            ],
+            "gen_ai.input.messages": [
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_abc123",
+                    "content": '{"temperature": "72F"}',
+                },
+            ],
+        }
+
+        tool_calls = extract_tool_calls([], attributes)
+        assert len(tool_calls) == 1
+        assert tool_calls[0].tool_name == "get_weather"
+        assert tool_calls[0].result == {"temperature": "72F"}
+
+    def test_extract_tool_calls_without_results(self):
+        """Tool calls with no results available (start-only)."""
+        from weave.trace_server.opentelemetry.tool_calls import extract_tool_calls
+
+        attributes = {
+            "gen_ai.output.messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_noresult",
+                            "function": {
+                                "name": "slow_tool",
+                                "arguments": "{}",
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+
+        tool_calls = extract_tool_calls([], attributes)
+        assert len(tool_calls) == 1
+        assert tool_calls[0].tool_name == "slow_tool"
+        assert tool_calls[0].result is None
+
+    def test_extract_no_tool_calls(self):
+        """Span with no tool calls returns empty list."""
+        from weave.trace_server.opentelemetry.tool_calls import extract_tool_calls
+
+        attributes = {
+            "gen_ai.output.messages": [
+                {
+                    "role": "assistant",
+                    "content": "Hello, how can I help you?",
+                }
+            ],
+        }
+
+        tool_calls = extract_tool_calls([], attributes)
+        assert len(tool_calls) == 0
+
+    def test_id_generation_determinism(self):
+        """Same trace_id + tool_call_id always produces the same child ID."""
+        from weave.trace_server.opentelemetry.tool_calls import (
+            generate_tool_call_child_id,
+        )
+
+        id1 = generate_tool_call_child_id("trace_abc", "call_123")
+        id2 = generate_tool_call_child_id("trace_abc", "call_123")
+        id3 = generate_tool_call_child_id("trace_abc", "call_456")
+
+        assert id1 == id2
+        assert id1 != id3
+        assert len(id1) == 16
+
+    def test_id_generation_by_index_determinism(self):
+        """Same span_id + index always produces the same child ID."""
+        from weave.trace_server.opentelemetry.tool_calls import (
+            generate_tool_call_child_id_by_index,
+        )
+
+        id1 = generate_tool_call_child_id_by_index("span_abc", 0)
+        id2 = generate_tool_call_child_id_by_index("span_abc", 0)
+        id3 = generate_tool_call_child_id_by_index("span_abc", 1)
+
+        assert id1 == id2
+        assert id1 != id3
+        assert len(id1) == 16
+
+    def test_to_calls_no_tool_calls(self):
+        """to_calls() with no tool calls returns single parent call."""
+        from weave.trace_server.opentelemetry.python_spans import (
+            Resource as PyResource,
+        )
+        from weave.trace_server.opentelemetry.python_spans import (
+            Status,
+        )
+
+        span = PySpan(
+            resource=PyResource(attributes={}),
+            name="test_op",
+            trace_id="abc123",
+            span_id="def456",
+            start_time_unix_nano=1000000000000000000,
+            end_time_unix_nano=1001000000000000000,
+            attributes={"gen_ai.system": "openai"},
+            kind=SpanKind.CLIENT,
+            parent_id=None,
+            trace_state="",
+            flags=0,
+            dropped_attributes_count=0,
+            events=[],
+            dropped_events_count=0,
+            links=[],
+            dropped_links_count=0,
+            status=Status(code=StatusCode.OK, message=""),
+        )
+
+        calls = span.to_calls("test_project")
+        assert len(calls) == 1
+        start, end = calls[0]
+        assert start.op_name == "test_op"
+        assert end is not None
+
+    def test_to_calls_with_tool_calls(self):
+        """to_calls() extracts tool calls as child calls."""
+        from weave.trace_server.opentelemetry.python_spans import (
+            Resource as PyResource,
+        )
+        from weave.trace_server.opentelemetry.python_spans import (
+            Status,
+        )
+
+        span = PySpan(
+            resource=PyResource(attributes={}),
+            name="chat_completion",
+            trace_id="trace_001",
+            span_id="span_001",
+            start_time_unix_nano=1000000000000000000,
+            end_time_unix_nano=1001000000000000000,
+            attributes={
+                "gen_ai.system": "openai",
+                "gen_ai.output.messages": [
+                    {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "call_abc",
+                                "function": {
+                                    "name": "get_weather",
+                                    "arguments": '{"city": "SF"}',
+                                },
+                            },
+                            {
+                                "id": "call_def",
+                                "function": {
+                                    "name": "get_time",
+                                    "arguments": '{"tz": "PST"}',
+                                },
+                            },
+                        ],
+                    }
+                ],
+                "gen_ai.input.messages": [
+                    {
+                        "role": "tool",
+                        "tool_call_id": "call_abc",
+                        "content": '{"temp": "72F"}',
+                    },
+                ],
+            },
+            kind=SpanKind.CLIENT,
+            parent_id=None,
+            trace_state="",
+            flags=0,
+            dropped_attributes_count=0,
+            events=[],
+            dropped_events_count=0,
+            links=[],
+            dropped_links_count=0,
+            status=Status(code=StatusCode.OK, message=""),
+        )
+
+        calls = span.to_calls("test_project")
+
+        # Parent call + 2 child calls
+        assert len(calls) == 3
+
+        # First is parent
+        parent_start, parent_end = calls[0]
+        assert parent_start.op_name == "chat_completion"
+        assert parent_end is not None
+
+        # Second is get_weather (with result)
+        weather_start, weather_end = calls[1]
+        assert weather_start.op_name == "get_weather"
+        assert weather_start.parent_id == "span_001"
+        assert weather_start.trace_id == "trace_001"
+        assert weather_start.inputs == {"city": "SF"}
+        assert weather_end is not None
+        assert weather_end.output == {"temp": "72F"}
+
+        # Third is get_time (no result)
+        time_start, time_end = calls[2]
+        assert time_start.op_name == "get_time"
+        assert time_start.parent_id == "span_001"
+        assert time_start.inputs == {"tz": "PST"}
+        assert time_end is None
+
+    def test_cross_span_result_matching(self):
+        """Tool results in span B complete start-only child calls from span A."""
+        from weave.trace_server.opentelemetry.tool_calls import (
+            extract_tool_calls,
+            extract_tool_results_from_span,
+            generate_tool_call_child_id,
+        )
+
+        # Span A: LLM response with tool call invocations (no results)
+        span_a_attributes = {
+            "gen_ai.output.messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_cross1",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": '{"city": "NYC"}',
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+
+        tool_calls = extract_tool_calls([], span_a_attributes)
+        assert len(tool_calls) == 1
+        assert tool_calls[0].tool_name == "get_weather"
+        assert tool_calls[0].result is None  # No result in span A
+
+        # Span B: Next LLM call that has tool results in its input
+        span_b_attributes = {
+            "gen_ai.input.messages": [
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_cross1",
+                    "content": '{"temperature": "55F"}',
+                },
+            ],
+            "gen_ai.output.messages": [
+                {
+                    "role": "assistant",
+                    "content": "The weather in NYC is 55F.",
+                }
+            ],
+        }
+
+        # Cross-span matching: extract results from span B
+        results = extract_tool_results_from_span([], span_b_attributes)
+        assert "call_cross1" in results
+        assert results["call_cross1"] == {"temperature": "55F"}
+
+        # The child IDs match across spans because they use trace_id
+        trace_id = "shared_trace_123"
+        child_id_from_span_a = generate_tool_call_child_id(
+            trace_id, "call_cross1"
+        )
+        child_id_from_span_b = generate_tool_call_child_id(
+            trace_id, "call_cross1"
+        )
+        assert child_id_from_span_a == child_id_from_span_b
+
+    def test_cross_span_no_duplicate_results(self):
+        """Results already paired within a span are not duplicated by cross-span matching."""
+        from weave.trace_server.opentelemetry.tool_calls import (
+            extract_tool_calls,
+            extract_tool_results_from_span,
+            generate_tool_call_child_id,
+        )
+
+        # Span has both invocation and result
+        attributes = {
+            "gen_ai.output.messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_dup1",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": "{}",
+                            },
+                        },
+                    ],
+                }
+            ],
+            "gen_ai.input.messages": [
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_dup1",
+                    "content": "sunny",
+                },
+            ],
+        }
+
+        # Within-span matching pairs the result
+        tool_calls = extract_tool_calls([], attributes)
+        assert len(tool_calls) == 1
+        assert tool_calls[0].result == "sunny"  # Already paired
+
+        # Cross-span scan also finds the result
+        results = extract_tool_results_from_span([], attributes)
+        assert "call_dup1" in results
+
+        # But in otel_export, the completed_child_ids set prevents duplicates
+        trace_id = "trace_dup"
+        child_id = generate_tool_call_child_id(trace_id, "call_dup1")
+        completed_child_ids = {child_id}  # Already completed from within-span
+
+        # Cross-span would skip this because child_id is in completed set
+        assert child_id in completed_child_ids

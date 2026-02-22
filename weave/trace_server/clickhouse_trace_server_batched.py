@@ -157,6 +157,10 @@ from weave.trace_server.model_providers.model_providers import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
+from weave.trace_server.opentelemetry.tool_calls import (
+    extract_tool_results_from_span,
+    generate_tool_call_child_id,
+)
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
@@ -425,8 +429,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
         calls: list[
-            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert | None]
         ] = []
+        # Collect parsed span metadata for cross-span tool result matching
+        parsed_spans: list[Span] = []
         rejected_spans = 0
         error_messages: list[str] = []
         for processed_span in req.processed_spans:
@@ -462,13 +468,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
-                        )
-                    )
+                    parsed_spans.append(span)
+                    for call_tuple in span.to_calls(
+                        req.project_id,
+                        wb_user_id=req.wb_user_id,
+                        wb_run_id=wb_run_id,
+                    ):
+                        calls.append(call_tuple)
 
             obj_id_idx_map = defaultdict(list)
             for idx, (start_call, _) in enumerate(calls):
@@ -535,7 +541,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self.ch_client,
         )
 
-        # Build event callbacks (same for both write targets)
+        # Split calls into complete (has end) and start-only (no end yet)
+        complete_calls = [(s, e) for s, e in calls if e is not None]
+        start_only_calls = [s for s, e in calls if e is None]
+
+        # Build event callbacks for complete calls only
         event_callbacks = [
             partial(
                 _maybe_enqueue_minimal_call_end,
@@ -545,30 +555,75 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 end_call.ended_at,
                 False,
             )
-            for _, end_call in calls
+            for _, end_call in complete_calls
         ]
 
-        # Convert and insert based on write target
-        if write_target == WriteTarget.CALLS_COMPLETE:
-            rows = [
-                _ch_complete_call_to_row(
-                    _start_end_calls_to_ch_complete_insertable(start, end)
+        # Convert and insert complete calls based on write target
+        if complete_calls:
+            if write_target == WriteTarget.CALLS_COMPLETE:
+                rows = [
+                    _ch_complete_call_to_row(
+                        _start_end_calls_to_ch_complete_insertable(start, end)
+                    )
+                    for start, end in complete_calls
+                ]
+                self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
+            else:
+                rows = []
+                for start, end in complete_calls:
+                    rows.append(
+                        _ch_call_to_row(
+                            _start_call_for_insert_to_ch_insertable_start_call(start)
+                        )
+                    )
+                    rows.append(
+                        _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
+                    )
+                self._insert_call_batch(rows, settings=None, do_sync_insert=True)
+
+        # Route start-only calls to CALLS_MERGED (always, regardless of project target)
+        if start_only_calls:
+            start_rows = [
+                _ch_call_to_row(
+                    _start_call_for_insert_to_ch_insertable_start_call(start)
                 )
-                for start, end in calls
+                for start in start_only_calls
             ]
-            self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
-        else:
-            rows = []
-            for start, end in calls:
-                rows.append(
+            self._insert_call_batch(start_rows, settings=None, do_sync_insert=True)
+
+        # Cross-span tool result matching: scan all spans for tool results
+        # that complete start-only child calls from other spans.
+        completed_child_ids = {e.id for _, e in complete_calls}
+        tool_result_end_rows = []
+        for span in parsed_spans:
+            events = [e.as_dict() for e in span.events]
+            results = extract_tool_results_from_span(events, span.attributes)
+            for tool_call_id, result in results.items():
+                child_id = generate_tool_call_child_id(span.trace_id, tool_call_id)
+                if child_id in completed_child_ids:
+                    continue
+                completed_child_ids.add(child_id)
+                end_call = tsi.EndedCallSchemaForInsert(
+                    project_id=req.project_id,
+                    id=child_id,
+                    ended_at=span.end_time,
+                    output=result if isinstance(result, dict) else {"result": result},
+                    summary=tsi.SummaryMap(
+                        weave=tsi.WeaveSummarySchema(
+                            status="success",
+                            latency_ms=0,
+                        )
+                    ),
+                )
+                tool_result_end_rows.append(
                     _ch_call_to_row(
-                        _start_call_for_insert_to_ch_insertable_start_call(start)
+                        _end_call_for_insert_to_ch_insertable_end_call(end_call)
                     )
                 )
-                rows.append(
-                    _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
-                )
-            self._insert_call_batch(rows, settings=None, do_sync_insert=True)
+        if tool_result_end_rows:
+            self._insert_call_batch(
+                tool_result_end_rows, settings=None, do_sync_insert=True
+            )
 
         # Run callbacks and flush
         for cb in event_callbacks:
