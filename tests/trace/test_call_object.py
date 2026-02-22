@@ -25,6 +25,8 @@ def test_call_to_dict(client):
         "thread_id": call.thread_id,
         "turn_id": call.turn_id,
         "project_id": call.project_id,
+        "wb_user_id": call.wb_user_id,
+        "username": call.username,
         "wb_run_id": call.wb_run_id,
         "wb_run_step": call.wb_run_step,
         "wb_run_step_end": call.wb_run_step_end,

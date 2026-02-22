@@ -216,6 +216,13 @@ npm run test
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
 
+### Calls User Identity Pattern
+
+- `Call` objects include `wb_user_id` (stable user identifier) and optional `username` (resolved display identifier).
+- `WeaveClient.get_calls(resolve_usernames=True)` opt-in resolves usernames from `wb_user_id`.
+- Username resolution may add extra lookup calls, so default behavior should remain `resolve_usernames=False`.
+- When using projected columns with `resolve_usernames=True`, ensure `wb_user_id` is included (the client now appends it automatically if missing).
+
 ### Documentation
 
 - Update relevant docstrings for Python code

@@ -539,6 +539,7 @@ class WeaveClient:
         columns: list[str] | None = None,
         expand_columns: list[str] | None = None,
         return_expanded_column_values: bool = True,
+        resolve_usernames: bool = False,
         scored_by: str | list[str] | None = None,
         page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
@@ -562,6 +563,8 @@ class WeaveClient:
             `include_total_storage_size`: If True, includes the total storage size for a trace.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
+            `resolve_usernames`: If True, resolves `wb_user_id` values to usernames for each returned call.
+                    This may add an additional lookup query per page.
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
@@ -583,6 +586,13 @@ class WeaveClient:
             filter = CallsFilter()
 
         query = _add_scored_by_to_calls_query(scored_by, query)
+        effective_columns = columns
+        if (
+            resolve_usernames
+            and effective_columns is not None
+            and "wb_user_id" not in effective_columns
+        ):
+            effective_columns = [*effective_columns, "wb_user_id"]
 
         return _make_calls_iterator(
             self.server,
@@ -596,9 +606,10 @@ class WeaveClient:
             include_feedback=include_feedback,
             include_storage_size=include_storage_size,
             include_total_storage_size=include_total_storage_size,
-            columns=columns,
+            columns=effective_columns,
             expand_columns=expand_columns,
             return_expanded_column_values=return_expanded_column_values,
+            resolve_usernames=resolve_usernames,
             page_size=page_size,
         )
 

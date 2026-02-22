@@ -16,6 +16,7 @@ from pydantic import ValidationError
 import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
+from weave.compat import wandb
 from tests.conftest import TestOnlyFlushingWeaveClient
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
@@ -4233,6 +4234,81 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
 
     assert len(calls) == 1
     assert calls[0].wb_run_id == mock_run_id
+
+
+def test_get_calls_columns_wb_user_id(client):
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 3
+
+    _, call = test_op.call(2)
+    client.flush()
+
+    calls = list(
+        client.get_calls(
+            columns=["wb_user_id"],
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+        )
+    )
+    server_calls = list(
+        client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(call_ids=[call.id]),
+                columns=["wb_user_id"],
+            )
+        ).calls
+    )
+
+    assert len(calls) == 1
+    assert len(server_calls) == 1
+    assert calls[0].wb_user_id == server_calls[0].wb_user_id
+
+
+def test_get_calls_resolve_usernames(client, monkeypatch):
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 3
+
+    _, call = test_op.call(2)
+    client.flush()
+
+    server_call = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+            columns=["wb_user_id"],
+        )
+    ).calls[0]
+    wb_user_id = server_call.wb_user_id
+    assert wb_user_id is not None
+
+    query_user_ids: list[list[str]] = []
+
+    def mock_usernames_by_ids(self, user_ids: list[str]) -> dict[str, str | None]:
+        query_user_ids.append(user_ids)
+        return {wb_user_id: "mock-user"}
+
+    monkeypatch.setattr(wandb.Api, "usernames_by_ids", mock_usernames_by_ids)
+
+    unresolved_calls = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+            columns=["id"],
+        )
+    )
+    resolved_calls = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+            columns=["id"],
+            resolve_usernames=True,
+        )
+    )
+
+    assert unresolved_calls[0].username is None
+    assert resolved_calls[0].wb_user_id == wb_user_id
+    assert resolved_calls[0].username == "mock-user"
+    assert query_user_ids == [[wb_user_id]]
 
 
 def test_calls_query_with_dotted_field_keys(client):

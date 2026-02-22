@@ -7,6 +7,7 @@ from collections.abc import Callable
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, TypedDict
 
+from weave.compat import wandb
 from weave.trace import urls
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
@@ -71,6 +72,8 @@ class Call:
     deleted_at: datetime.datetime | None = None
     thread_id: str | None = None
     turn_id: str | None = None
+    wb_user_id: str | None = None
+    username: str | None = None
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
@@ -286,6 +289,8 @@ class Call:
             deleted_at=self.deleted_at,
             thread_id=self.thread_id,
             turn_id=self.turn_id,
+            wb_user_id=self.wb_user_id,
+            username=self.username,
             wb_run_id=self.wb_run_id,
             wb_run_step=self.wb_run_step,
             wb_run_step_end=self.wb_run_step_end,
@@ -318,6 +323,8 @@ class CallDict(TypedDict):
     deleted_at: datetime.datetime | None
     thread_id: str | None
     turn_id: str | None
+    wb_user_id: str | None
+    username: str | None
     wb_run_id: str | None
     wb_run_step: int | None
     wb_run_step_end: int | None
@@ -353,8 +360,22 @@ def _make_calls_iterator(
     columns: list[str] | None = None,
     expand_columns: list[str] | None = None,
     return_expanded_column_values: bool = True,
+    resolve_usernames: bool = False,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
+    call_id_to_username: dict[str, str | None] = {}
+    wb_user_id_to_username_cache: dict[str, str | None] = {}
+
+    def resolve_usernames_for_user_ids(user_ids: list[str]) -> dict[str, str | None]:
+        try:
+            return wandb.Api().usernames_by_ids(user_ids)
+        except Exception:
+            log_once(
+                logger.exception,
+                "Failed to resolve usernames for wb_user_id values in get_calls.",
+            )
+            return {}
+
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
         # Add the global offset to the page offset
         # This ensures the offset is applied only once
@@ -362,7 +383,7 @@ def _make_calls_iterator(
         if offset_override is not None:
             effective_offset += offset_override
 
-        return list(
+        calls = list(
             server.calls_query_stream(
                 CallsQueryReq(
                     project_id=project_id,
@@ -381,11 +402,41 @@ def _make_calls_iterator(
                 )
             )
         )
+        if resolve_usernames:
+            user_ids_on_page = sorted(
+                {
+                    call.wb_user_id
+                    for call in calls
+                    if call.wb_user_id is not None and call.wb_user_id != ""
+                }
+            )
+            unresolved_user_ids = [
+                user_id
+                for user_id in user_ids_on_page
+                if user_id not in wb_user_id_to_username_cache
+            ]
+            if unresolved_user_ids:
+                resolved = resolve_usernames_for_user_ids(unresolved_user_ids)
+                for unresolved_user_id in unresolved_user_ids:
+                    wb_user_id_to_username_cache[unresolved_user_id] = resolved.get(
+                        unresolved_user_id
+                    )
+            for call in calls:
+                if call.id is not None and call.wb_user_id is not None:
+                    call_id_to_username[call.id] = wb_user_id_to_username_cache.get(
+                        call.wb_user_id
+                    )
+        return calls
 
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
         entity, project = from_project_id(project_id)
-        return make_client_call(entity, project, call, server)
+        resolved_username = (
+            call_id_to_username.get(call.id) if call.id is not None else None
+        )
+        return make_client_call(
+            entity, project, call, server, resolved_username=resolved_username
+        )
 
     def size_func() -> int:
         response = server.calls_query_stats(
@@ -417,7 +468,11 @@ def _make_calls_iterator(
 
 
 def make_client_call(
-    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
+    entity: str,
+    project: str,
+    server_call: CallSchema,
+    server: TraceServerInterface,
+    resolved_username: str | None = None,
 ) -> WeaveObject:
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
@@ -439,6 +494,8 @@ def make_client_call(
         deleted_at=server_call.deleted_at,
         thread_id=server_call.thread_id,
         turn_id=server_call.turn_id,
+        wb_user_id=server_call.wb_user_id,
+        username=resolved_username,
         wb_run_id=server_call.wb_run_id,
         wb_run_step=server_call.wb_run_step,
         wb_run_step_end=server_call.wb_run_step_end,

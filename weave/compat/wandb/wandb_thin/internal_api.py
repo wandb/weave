@@ -172,6 +172,46 @@ class Api:
 
         return result.get("viewer", {}).get("username", None)
 
+    USERS_BY_IDS_QUERY = gql.gql(
+        """
+        query UsersByIds($ids: [ID!]) {
+            users(ids: $ids, first: 1000) {
+                edges {
+                    node {
+                        id
+                        username
+                    }
+                }
+            }
+        }
+        """
+    )
+
+    def usernames_by_ids(self, user_ids: list[str]) -> dict[str, str | None]:
+        if len(user_ids) == 0:
+            return {}
+
+        try:
+            result = self.query(self.USERS_BY_IDS_QUERY, ids=user_ids)
+        except gql.transport.exceptions.TransportQueryError:
+            return {}
+
+        users = result.get("users", {})
+        edges = users.get("edges", []) if isinstance(users, dict) else []
+        usernames_by_id: dict[str, str | None] = {}
+        for edge in edges:
+            if not isinstance(edge, dict):
+                continue
+            node = edge.get("node")
+            if not isinstance(node, dict):
+                continue
+            user_id = node.get("id")
+            if not isinstance(user_id, str):
+                continue
+            username = node.get("username")
+            usernames_by_id[user_id] = username if isinstance(username, str) else None
+        return usernames_by_id
+
     UPSERT_PROJECT_MUTATION = gql.gql(
         """
     mutation UpsertModel($name: String!, $id: String, $entity: String!, $description: String, $repo: String)  {
