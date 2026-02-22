@@ -158,3 +158,26 @@ SPAN_OVERRIDES = {
     "start_time": [("langfuse.startTime", try_parse_timestamp)],
     "end_time": [("langfuse.endTime", try_parse_timestamp)],
 }
+
+# Tool call attribute keys found in span events
+TOOL_CALL_EVENT_KEYS: dict[str, list[str]] = {
+    "tool_call_id": ["gen_ai.tool.call.id"],
+    "tool_name": ["gen_ai.tool.call.name", "gen_ai.tool.name"],
+    "arguments": ["gen_ai.tool.call.arguments"],
+    "result": ["gen_ai.tool.call.result"],
+}
+
+# Attribute keys where tool calls may be embedded in message structures
+TOOL_CALL_MESSAGE_KEYS = [
+    "gen_ai.output.messages",
+    "gen_ai.completion",
+    "ai.response",
+    "pydantic_ai.all_messages",
+]
+
+# Attribute keys where tool results may be found
+TOOL_RESULT_MESSAGE_KEYS = [
+    "gen_ai.input.messages",
+    "gen_ai.prompt",
+    "pydantic_ai.all_messages",
+]

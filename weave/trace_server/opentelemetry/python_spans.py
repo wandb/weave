@@ -47,6 +47,11 @@ from weave.trace_server.opentelemetry.helpers import (
     to_json_serializable,
     unflatten_key_values,
 )
+from weave.trace_server.opentelemetry.tool_calls import (
+    extract_tool_calls,
+    generate_tool_call_child_id,
+    generate_tool_call_child_id_by_index,
+)
 
 
 class SpanKind(Enum):
@@ -427,6 +432,71 @@ class Span:
             wb_run_step_end=wb_run_step_end,
         )
         return (start_call, end_call)
+
+    def to_calls(
+        self,
+        project_id: str,
+        wb_user_id: str | None = None,
+        wb_run_id: str | None = None,
+    ) -> list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert | None]]:
+        """Convert span to one or more Weave calls.
+
+        Returns:
+            List of (start, end_or_none) tuples.
+            First tuple is always the original span call.
+            Additional tuples are child calls for extracted tool calls.
+            end_or_none is None when only tool call args are available (no result yet).
+        """
+        start_call, end_call = self.to_call(project_id, wb_user_id, wb_run_id)
+        result: list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert | None]] = [
+            (start_call, end_call)
+        ]
+
+        events = [e.as_dict() for e in self.events]
+        tool_calls = extract_tool_calls(events, self.attributes)
+
+        if not tool_calls:
+            return result
+
+        for i, tc in enumerate(tool_calls):
+            if tc.tool_call_id:
+                child_id = generate_tool_call_child_id(self.trace_id, tc.tool_call_id)
+            else:
+                child_id = generate_tool_call_child_id_by_index(self.span_id, i)
+
+            child_start = tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=child_id,
+                op_name=tc.tool_name,
+                display_name=tc.tool_name,
+                trace_id=self.trace_id,
+                parent_id=self.span_id,
+                started_at=tc.timestamp or self.start_time,
+                attributes={"tool_call_id": tc.tool_call_id} if tc.tool_call_id else {},
+                inputs=tc.arguments if isinstance(tc.arguments, dict) else {"args": tc.arguments},
+                wb_user_id=wb_user_id,
+                wb_run_id=wb_run_id,
+            )
+
+            child_end = None
+            if tc.result is not None:
+                child_end = tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=child_id,
+                    ended_at=self.end_time,
+                    output=tc.result if isinstance(tc.result, dict) else {"result": tc.result},
+                    summary=tsi.SummaryMap(
+                        weave=tsi.WeaveSummarySchema(
+                            status="success",
+                            latency_ms=0,
+                            trace_name=tc.tool_name,
+                        )
+                    ),
+                )
+
+            result.append((child_start, child_end))
+
+        return result
 
 
 @dataclass
