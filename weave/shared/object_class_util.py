@@ -2,12 +2,7 @@ from typing import Any, TypedDict
 
 from pydantic import BaseModel
 
-from weave.trace_server.client_server_common.pydantic_util import (
-    pydantic_asdict_one_level,
-)
-from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
-    BUILTIN_OBJECT_REGISTRY,
-)
+from weave.shared.pydantic_util import pydantic_asdict_one_level
 
 """
 There are two standard base object classes: BaseObject and Object
@@ -49,6 +44,14 @@ class ProcessIncomingObjectResult(TypedDict):
     val: Any
     base_object_class: str | None
     leaf_object_class: str | None
+
+
+def _get_builtin_object_registry() -> dict[str, type[BaseModel]]:
+    # Circular import avoidance: importing this eagerly during `import weave`
+    # can recurse through builtin object class modules before weave is initialized.
+    from weave.trace.base_objects import BUILTIN_OBJECT_REGISTRY
+
+    return BUILTIN_OBJECT_REGISTRY
 
 
 def process_incoming_object_val(
@@ -101,7 +104,7 @@ def process_incoming_object_val(
     # and set the correct bases information. This is an important case: the user is asking us to ensure that they payload is valid and
     # stored correctly. We need to validate the payload and write the correct bases information.
     if req_builtin_object_class is not None:
-        if builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(
+        if builtin_object_class := _get_builtin_object_registry().get(
             req_builtin_object_class
         ):
             # TODO: in the next iteration of this code path, this is where we need to actually publish the object
