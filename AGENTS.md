@@ -19,6 +19,7 @@
 - Note: Imports inside functions are not caught by linting. **Agents must self-enforce this rule.**
 
 ❌ **Never do this:**
+
 ```python
 def my_function():
     import re  # BAD: import inside function
@@ -26,6 +27,7 @@ def my_function():
 ```
 
 ✅ **Always do this:**
+
 ```python
 import re  # GOOD: import at top of file
 
