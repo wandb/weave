@@ -470,65 +470,65 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         )
                     )
 
-            obj_id_idx_map = defaultdict(list)
-            for idx, (start_call, _) in enumerate(calls):
-                op_name = object_creation_utils.make_safe_name(start_call.op_name)
-                obj_id_idx_map[op_name].append(idx)
+        obj_id_idx_map = defaultdict(list)
+        for idx, (start_call, _) in enumerate(calls):
+            op_name = object_creation_utils.make_safe_name(start_call.op_name)
+            obj_id_idx_map[op_name].append(idx)
 
-            existing_objects = self._get_existing_ops_from_spans(
-                seen_ids=set(obj_id_idx_map.keys()),
-                project_id=req.project_id,
-                limit=len(calls),
+        existing_objects = self._get_existing_ops_from_spans(
+            seen_ids=set(obj_id_idx_map.keys()),
+            project_id=req.project_id,
+            limit=len(calls),
+        )
+        # We know that OTel will always use the placeholder source.
+        # We can instead just reuse the existing file if we know it is present
+        # and create it just once if we are not sure.
+        if len(existing_objects) == 0:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=True
             )
-            # We know that OTel will always use the placeholder source.
-            # We can instead just reuse the existing file if we know it is present
-            # and create it just once if we are not sure.
-            if len(existing_objects) == 0:
-                digest = self._create_or_get_placeholder_ops_digest(
-                    project_id=req.project_id, create=True
-                )
-            else:
-                digest = self._create_or_get_placeholder_ops_digest(
-                    project_id=req.project_id, create=False
-                )
+        else:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=False
+            )
 
-            for obj in existing_objects:
-                op_ref_uri = ri.InternalOpRef(
+        for obj in existing_objects:
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=obj.object_id,
+                version=obj.digest,
+            ).uri()
+
+            # Modify each of the matched start calls in place
+            for idx in obj_id_idx_map[obj.object_id]:
+                calls[idx][0].op_name = op_ref_uri
+            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
+            obj_id_idx_map.pop(obj.object_id)
+
+        obj_creation_batch = []
+        for op_obj_id in obj_id_idx_map.keys():
+            op_val = object_creation_utils.build_op_val(digest)
+            obj_creation_batch.append(
+                tsi.ObjSchemaForInsert(
                     project_id=req.project_id,
-                    name=obj.object_id,
-                    version=obj.digest,
-                ).uri()
-
-                # Modify each of the matched start calls in place
-                for idx in obj_id_idx_map[obj.object_id]:
-                    calls[idx][0].op_name = op_ref_uri
-                # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
-                obj_id_idx_map.pop(obj.object_id)
-
-            obj_creation_batch = []
-            for op_obj_id in obj_id_idx_map.keys():
-                op_val = object_creation_utils.build_op_val(digest)
-                obj_creation_batch.append(
-                    tsi.ObjSchemaForInsert(
-                        project_id=req.project_id,
-                        object_id=op_obj_id,
-                        val=op_val,
-                        wb_user_id=req.wb_user_id,
-                    )
+                    object_id=op_obj_id,
+                    val=op_val,
+                    wb_user_id=req.wb_user_id,
                 )
-            res = self.obj_create_batch(obj_creation_batch)
+            )
+        res = self.obj_create_batch(obj_creation_batch)
 
-            for result in res:
-                if result.object_id is None:
-                    raise RuntimeError("Otel Export - Expected object_id but got None")
+        for result in res:
+            if result.object_id is None:
+                raise RuntimeError("Otel Export - Expected object_id but got None")
 
-                op_ref_uri = ri.InternalOpRef(
-                    project_id=req.project_id,
-                    name=result.object_id,
-                    version=result.digest,
-                ).uri()
-                for idx in obj_id_idx_map[result.object_id]:
-                    calls[idx][0].op_name = op_ref_uri
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=result.object_id,
+                version=result.digest,
+            ).uri()
+            for idx in obj_id_idx_map[result.object_id]:
+                calls[idx][0].op_name = op_ref_uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
