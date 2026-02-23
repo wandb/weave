@@ -253,7 +253,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._database = database
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
+        self._init_lock = threading.Lock()
         self._file_storage_client: FileStorageClient | None = None
+        self._file_storage_client_initialized = False
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
@@ -332,10 +334,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @property
     def file_storage_client(self) -> FileStorageClient | None:
-        if self._file_storage_client is not None:
+        if self._file_storage_client_initialized:
             return self._file_storage_client
-        self._file_storage_client = maybe_get_storage_client_from_env()
-        return self._file_storage_client
+        with self._init_lock:
+            if self._file_storage_client_initialized:
+                return self._file_storage_client
+            self._file_storage_client = maybe_get_storage_client_from_env()
+            self._file_storage_client_initialized = True
+            return self._file_storage_client
 
     @property
     def kafka_producer(self) -> KafkaProducer | None:
@@ -344,15 +350,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return None
         if self._kafka_producer is not None:
             return self._kafka_producer
-        self._kafka_producer = KafkaProducer.from_env()
-        return self._kafka_producer
+        with self._init_lock:
+            if self._kafka_producer is not None:
+                return self._kafka_producer
+            self._kafka_producer = KafkaProducer.from_env()
+            return self._kafka_producer
 
     @property
     def table_routing_resolver(self) -> TableRoutingResolver:
         if self._table_routing_resolver is not None:
             return self._table_routing_resolver
-        self._table_routing_resolver = TableRoutingResolver()
-        return self._table_routing_resolver
+        with self._init_lock:
+            if self._table_routing_resolver is not None:
+                return self._table_routing_resolver
+            self._table_routing_resolver = TableRoutingResolver()
+            return self._table_routing_resolver
 
     @property
     def use_distributed_mode(self) -> bool:
