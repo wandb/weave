@@ -97,7 +97,7 @@ crewai = [
 ]
 dspy = ["dspy>=3.0.0; python_version >= '3.10'"]
 google_genai = [
-  "google-genai>=1.0.0,<=1.23.0; python_version >= '3.10'",
+  "google-genai>=1.0.0,<=1.64.0; python_version >= '3.10'",
   "pillow>=11.1.0",
 ]
 groq = ["groq>=0.13.0"]
