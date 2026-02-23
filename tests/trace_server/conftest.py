@@ -204,18 +204,6 @@ def get_ch_trace_server(
         if not ch_client:
             continue
 
-        # Drop test databases (best effort)
-        try:
-            ch_client.command(f"DROP DATABASE IF EXISTS {server_config.management_db}")
-        except Exception:
-            pass
-
-        try:
-            ch_client.command(f"DROP DATABASE IF EXISTS {server_config.unique_db}")
-        except Exception:
-            pass
-
-        # Close client connection (best effort)
         try:
             ch_client.close()
         except Exception:

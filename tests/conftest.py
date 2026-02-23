@@ -379,16 +379,6 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
     try:
         yield client
     finally:
-        # Flush all in-flight futures before teardown to prevent races between
-        # background executor threads and database cleanup (DROP DATABASE).
-        # Without this, the flush() vs then() chain race can leave futures
-        # still executing when get_ch_trace_server tears down the database,
-        # causing ClickHouse lock contention that blocks fixture teardown
-        # long enough to hit CI timeouts.
-        try:
-            client._flush()
-        except Exception:
-            pass
         weave_client_context.set_weave_client_global(None)
         try:
             client.server.close()
@@ -415,10 +405,6 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
         try:
             yield client
         finally:
-            try:
-                client._flush()
-            except Exception:
-                pass
             weave_client_context.set_weave_client_global(None)
             weave.trace.api._global_attributes = {}
             weave.trace.settings.parse_and_apply_settings(
