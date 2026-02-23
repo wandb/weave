@@ -265,11 +265,14 @@ def test_otel_export_multiple_processed_spans(client: weave_client.WeaveClient):
     for sid in expected_span_ids:
         assert sid in ingested_ids
 
-    # Every call's op_name must be a valid ref URI, not a mangled/re-sanitized name
-    for call in res.calls:
-        assert call.op_name.startswith("weave:///"), (
-            f"op_name should be a ref URI, got: {call.op_name}"
-        )
+    # In clickhouse, every call's op_name must be a valid ref URI, not a
+    # mangled/re-sanitized name.  The sqlite server doesn't do op object
+    # resolution, so we skip this assertion there.
+    if not client_is_sqlite(client):
+        for call in res.calls:
+            assert call.op_name.startswith("weave:///"), (
+                f"op_name should be a ref URI, got: {call.op_name}"
+            )
 
 
 def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
