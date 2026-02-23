@@ -424,168 +424,63 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
-        calls: list[
-            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
-        ] = []
-        rejected_spans = 0
-        error_messages: list[str] = []
-        for processed_span in req.processed_spans:
-            # Extract wb_run_id from the processed span
-            wb_run_id = processed_span.run_id
 
-            if not isinstance(processed_span.resource_spans, ResourceSpans):
-                raise TypeError(
-                    f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
-                )
+        calls, rejected_spans, error_messages = _convert_processed_spans_to_calls(
+            req.processed_spans, req.project_id, req.wb_user_id
+        )
 
-            proto_resource_spans = processed_span.resource_spans
-            resource = Resource.from_proto(proto_resource_spans.resource)
-            for proto_scope_spans in proto_resource_spans.scope_spans:
-                for proto_span in proto_scope_spans.spans:
-                    try:
-                        span = Span.from_proto(proto_span, resource)
-                    except AttributePathConflictError as e:
-                        # Record and skip malformed spans so we can partially accept the batch
-                        rejected_spans += 1
-                        # Use data available on the proto span for context
-                        try:
-                            trace_id = proto_span.trace_id.hex()
-                            span_id = proto_span.span_id.hex()
-                            name = getattr(proto_span, "name", "")
-                        except Exception:
-                            trace_id = ""
-                            span_id = ""
-                            name = ""
-                        span_ident = (
-                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
-                        )
-                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
-                        continue
-
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
-                        )
-                    )
-
-        obj_id_idx_map = defaultdict(list)
-        for idx, (start_call, _) in enumerate(calls):
-            op_name = object_creation_utils.make_safe_name(start_call.op_name)
-            obj_id_idx_map[op_name].append(idx)
+        obj_id_idx_map = _build_op_name_to_call_index(calls)
 
         existing_objects = self._get_existing_ops_from_spans(
             seen_ids=set(obj_id_idx_map.keys()),
             project_id=req.project_id,
             limit=len(calls),
         )
-        # We know that OTel will always use the placeholder source.
-        # We can instead just reuse the existing file if we know it is present
-        # and create it just once if we are not sure.
-        if len(existing_objects) == 0:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=True
-            )
-        else:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=False
-            )
 
-        for obj in existing_objects:
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=obj.object_id,
-                version=obj.digest,
-            ).uri()
+        # OTel spans never carry real source code, so all ops share a single
+        # placeholder source file.  We only create it when no ops exist yet
+        # (meaning the project has never seen an OTel export) to avoid
+        # redundant file writes on every request.
+        digest = self._create_or_get_placeholder_ops_digest(
+            project_id=req.project_id,
+            create=len(existing_objects) == 0,
+        )
 
-            # Modify each of the matched start calls in place
-            for idx in obj_id_idx_map[obj.object_id]:
-                calls[idx][0].op_name = op_ref_uri
-            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
-            obj_id_idx_map.pop(obj.object_id)
+        _rewrite_existing_op_refs(
+            calls, obj_id_idx_map, existing_objects, req.project_id
+        )
 
-        obj_creation_batch = []
-        for op_obj_id in obj_id_idx_map.keys():
-            op_val = object_creation_utils.build_op_val(digest)
-            obj_creation_batch.append(
-                tsi.ObjSchemaForInsert(
-                    project_id=req.project_id,
-                    object_id=op_obj_id,
-                    val=op_val,
-                    wb_user_id=req.wb_user_id,
-                )
-            )
-        res = self.obj_create_batch(obj_creation_batch)
-
-        for result in res:
-            if result.object_id is None:
-                raise RuntimeError("Otel Export - Expected object_id but got None")
-
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=result.object_id,
-                version=result.digest,
-            ).uri()
-            for idx in obj_id_idx_map[result.object_id]:
-                calls[idx][0].op_name = op_ref_uri
+        obj_creation_batch = _build_new_op_creation_batch(
+            obj_id_idx_map, digest, req.project_id, req.wb_user_id
+        )
+        creation_results = self.obj_create_batch(obj_creation_batch)
+        _rewrite_created_op_refs(
+            calls, obj_id_idx_map, creation_results, req.project_id
+        )
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
             self.ch_client,
         )
 
-        # Build event callbacks (same for both write targets)
-        event_callbacks = [
-            partial(
-                _maybe_enqueue_minimal_call_end,
-                self.kafka_producer,
-                end_call.project_id,
-                end_call.id,
-                end_call.ended_at,
-                False,
-            )
-            for _, end_call in calls
-        ]
+        event_callbacks = _build_call_end_event_callbacks(calls, self.kafka_producer)
 
-        # Convert and insert based on write target
-        if write_target == WriteTarget.CALLS_COMPLETE:
-            rows = [
-                _ch_complete_call_to_row(
-                    _start_end_calls_to_ch_complete_insertable(start, end)
-                )
-                for start, end in calls
-            ]
-            self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
-        else:
-            rows = []
-            for start, end in calls:
-                rows.append(
-                    _ch_call_to_row(
-                        _start_call_for_insert_to_ch_insertable_start_call(start)
-                    )
-                )
-                rows.append(
-                    _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
-                )
-            self._insert_call_batch(rows, settings=None, do_sync_insert=True)
+        _insert_otel_calls(
+            calls,
+            write_target,
+            self._insert_call_complete_batch,
+            self._insert_call_batch,
+        )
 
-        # Run callbacks and flush
         for cb in event_callbacks:
             cb()
         self._flush_kafka_producer()
 
-        if rejected_spans > 0:
-            # Join the first 20 errors and return them delimited by ';'
-            joined_errors = "; ".join(error_messages[:20]) + (
-                "; ..." if len(error_messages) > 20 else ""
-            )
-            return tsi.OTelExportRes(
-                partial_success=tsi.ExportTracePartialSuccess(
-                    rejected_spans=rejected_spans,
-                    error_message=joined_errors,
-                )
-            )
+        partial_response = _build_otel_partial_success_response(
+            rejected_spans, error_messages
+        )
+        if partial_response is not None:
+            return partial_response
         return tsi.OTelExportRes()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
@@ -6482,6 +6377,215 @@ def _ch_table_stats_to_table_stats_schema(
         count=count,
         digest=digest,
         storage_size_bytes=storage_size_bytes,
+    )
+
+
+# ---------------------------------------------------------------------------
+# OTel export helpers
+# ---------------------------------------------------------------------------
+
+CallPair = tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+
+
+def _convert_processed_spans_to_calls(
+    processed_spans: list[tsi.ProcessedResourceSpans],
+    project_id: str,
+    wb_user_id: str | None,
+) -> tuple[list[CallPair], int, list[str]]:
+    """OTel proto spans must be deserialized individually because each can fail
+    independently.  Partial acceptance prevents a single malformed span from
+    rejecting the entire batch, which is required by the OTel export protocol."""
+    calls: list[CallPair] = []
+    rejected_spans = 0
+    error_messages: list[str] = []
+
+    for processed_span in processed_spans:
+        wb_run_id = processed_span.run_id
+
+        if not isinstance(processed_span.resource_spans, ResourceSpans):
+            raise TypeError(
+                f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
+            )
+
+        proto_resource_spans = processed_span.resource_spans
+        resource = Resource.from_proto(proto_resource_spans.resource)
+        for proto_scope_spans in proto_resource_spans.scope_spans:
+            for proto_span in proto_scope_spans.spans:
+                try:
+                    span = Span.from_proto(proto_span, resource)
+                except AttributePathConflictError as e:
+                    rejected_spans += 1
+                    try:
+                        trace_id = proto_span.trace_id.hex()
+                        span_id = proto_span.span_id.hex()
+                        name = getattr(proto_span, "name", "")
+                    except Exception:
+                        trace_id = ""
+                        span_id = ""
+                        name = ""
+                    span_ident = (
+                        f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                    )
+                    error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                    continue
+
+                calls.append(
+                    span.to_call(
+                        project_id,
+                        wb_user_id=wb_user_id,
+                        wb_run_id=wb_run_id,
+                    )
+                )
+
+    return calls, rejected_spans, error_messages
+
+
+def _build_op_name_to_call_index(
+    calls: list[CallPair],
+) -> defaultdict[str, list[int]]:
+    """Multiple calls may reference the same op, so we group by sanitized op name
+    to batch-resolve op references and avoid per-call DB lookups."""
+    obj_id_idx_map: defaultdict[str, list[int]] = defaultdict(list)
+    for idx, (start_call, _) in enumerate(calls):
+        op_name = object_creation_utils.make_safe_name(start_call.op_name)
+        obj_id_idx_map[op_name].append(idx)
+    return obj_id_idx_map
+
+
+def _rewrite_existing_op_refs(
+    calls: list[CallPair],
+    obj_id_idx_map: defaultdict[str, list[int]],
+    existing_objects: list[tsi.ObjSchema],
+    project_id: str,
+) -> None:
+    """Ops already in the DB have known digests, so we can resolve their versioned
+    ref URIs immediately without creating new objects.  Removing matched entries
+    from the index leaves only truly-new ops for the creation step."""
+    for obj in existing_objects:
+        op_ref_uri = ri.InternalOpRef(
+            project_id=project_id,
+            name=obj.object_id,
+            version=obj.digest,
+        ).uri()
+
+        for idx in obj_id_idx_map[obj.object_id]:
+            calls[idx][0].op_name = op_ref_uri
+        obj_id_idx_map.pop(obj.object_id)
+
+
+def _build_new_op_creation_batch(
+    obj_id_idx_map: defaultdict[str, list[int]],
+    digest: str,
+    project_id: str,
+    wb_user_id: str | None,
+) -> list[tsi.ObjSchemaForInsert]:
+    """New ops need to be registered as objects before calls can reference them.
+    Batching minimises DB round-trips compared to creating each op individually."""
+    batch: list[tsi.ObjSchemaForInsert] = []
+    for op_obj_id in obj_id_idx_map.keys():
+        op_val = object_creation_utils.build_op_val(digest)
+        batch.append(
+            tsi.ObjSchemaForInsert(
+                project_id=project_id,
+                object_id=op_obj_id,
+                val=op_val,
+                wb_user_id=wb_user_id,
+            )
+        )
+    return batch
+
+
+def _rewrite_created_op_refs(
+    calls: list[CallPair],
+    obj_id_idx_map: defaultdict[str, list[int]],
+    creation_results: list[tsi.ObjCreateRes],
+    project_id: str,
+) -> None:
+    """Newly created ops now have server-assigned digests.  We use the pre-built
+    index to match creation results back to their calls regardless of the order
+    the server returns them."""
+    for result in creation_results:
+        if result.object_id is None:
+            raise RuntimeError("Otel Export - Expected object_id but got None")
+
+        op_ref_uri = ri.InternalOpRef(
+            project_id=project_id,
+            name=result.object_id,
+            version=result.digest,
+        ).uri()
+        for idx in obj_id_idx_map[result.object_id]:
+            calls[idx][0].op_name = op_ref_uri
+
+
+def _build_call_end_event_callbacks(
+    calls: list[CallPair],
+    kafka_producer: KafkaProducer | None,
+) -> list[Callable[[], None]]:
+    """Downstream consumers (actions, online eval) rely on Kafka events to trigger
+    post-call processing.  Callbacks are built eagerly so they can be fired only
+    after the DB insert succeeds, avoiding events for data that was never persisted."""
+    return [
+        partial(
+            _maybe_enqueue_minimal_call_end,
+            kafka_producer,
+            end_call.project_id,
+            end_call.id,
+            end_call.ended_at,
+            False,
+        )
+        for _, end_call in calls
+    ]
+
+
+def _insert_otel_calls(
+    calls: list[CallPair],
+    write_target: WriteTarget,
+    insert_complete_batch_fn: Callable[..., Any],
+    insert_batch_fn: Callable[..., Any],
+) -> None:
+    """Projects may use either the unified calls_complete table or separate
+    start/end tables depending on their migration state.  The write target
+    determines which schema and insertion path to use."""
+    if write_target == WriteTarget.CALLS_COMPLETE:
+        rows = [
+            _ch_complete_call_to_row(
+                _start_end_calls_to_ch_complete_insertable(start, end)
+            )
+            for start, end in calls
+        ]
+        insert_complete_batch_fn(rows, settings=None, do_sync_insert=True)
+    else:
+        rows = []
+        for start, end in calls:
+            rows.append(
+                _ch_call_to_row(
+                    _start_call_for_insert_to_ch_insertable_start_call(start)
+                )
+            )
+            rows.append(
+                _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
+            )
+        insert_batch_fn(rows, settings=None, do_sync_insert=True)
+
+
+def _build_otel_partial_success_response(
+    rejected_spans: int,
+    error_messages: list[str],
+) -> tsi.OTelExportRes | None:
+    """The OTel export protocol expects a partial-success response when some spans
+    are rejected, rather than failing the entire request.  We cap the error detail
+    to avoid oversized responses."""
+    if rejected_spans == 0:
+        return None
+
+    joined_errors = "; ".join(error_messages[:20]) + (
+        "; ..." if len(error_messages) > 20 else ""
+    )
+    return tsi.OTelExportRes(
+        partial_success=tsi.ExportTracePartialSuccess(
+            rejected_spans=rejected_spans,
+            error_message=joined_errors,
+        )
     )
 
 
