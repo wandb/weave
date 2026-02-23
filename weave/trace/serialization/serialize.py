@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
+from enum import Enum
 from types import CoroutineType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
@@ -74,6 +75,9 @@ def to_json(
 
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
+
+    if isinstance(obj, Enum):
+        return obj.value
 
     # Add explicit handling for WeaveScorerResult models
     from weave.flow.scorer import WeaveScorerResult

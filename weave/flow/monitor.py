@@ -1,7 +1,7 @@
 from typing import Literal
 
 from pydantic import Field
-from typing_extensions import Self, TypedDict
+from typing_extensions import NotRequired, Self, TypedDict
 
 from weave.flow.casting import Scorer
 from weave.object.obj import Object
@@ -13,12 +13,14 @@ from weave.trace_server.interface.query import Query
 
 class ScorerDebounceConfig(TypedDict):
     """Configuration for debounced scoring on a monitor.
-
-    When present on a Monitor, all fields are required.
     """
 
     # Specifies which field is used to find candidates for debouncing
     aggregation_field: Literal["trace_id", "thread_id"]
+
+    # How to aggregate messages for scoring: last message only or all messages in the window.
+    # Defaults to last_message when not present.
+    aggregation_method: NotRequired[Literal["last_message", "all_messages"]]
 
     # Timeframe for the debouncing. Messages received within this timeframe will be debounced.
     timeout_seconds: float
