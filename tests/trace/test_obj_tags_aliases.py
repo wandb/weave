@@ -258,7 +258,7 @@ def test_alias_reserved_names():
 
 
 def test_tag_validation():
-    """Empty, too-long, and special-char names rejected."""
+    """Empty and too-long tag names rejected. Tags are permissive otherwise."""
     # Empty tag
     with pytest.raises(ValidationError):
         tsi.ObjAddTagsReq(
@@ -268,23 +268,22 @@ def test_tag_validation():
             tags=[""],
         )
 
-    # Too long (>128 chars)
+    # Too long (>256 chars)
     with pytest.raises(ValidationError):
         tsi.ObjAddTagsReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            tags=["a" * 129],
+            tags=["a" * 257],
         )
 
-    # Special characters
-    with pytest.raises(ValidationError):
-        tsi.ObjAddTagsReq(
-            project_id="test/proj",
-            object_id="obj",
-            digest="abc123",
-            tags=["invalid tag!"],
-        )
+    # Special characters ARE allowed for tags (permissive like W&B Models)
+    tsi.ObjAddTagsReq(
+        project_id="test/proj",
+        object_id="obj",
+        digest="abc123",
+        tags=["has spaces", "special!chars", "emoji-ok"],
+    )
 
 
 # --- Virtual "latest" alias ---
@@ -589,14 +588,16 @@ def test_obj_read_with_real_digest(client: WeaveClient):
 
 
 def test_valid_tag_and_alias_names():
-    """Names with dots, dashes, underscores, and mixed case should be accepted."""
-    # These should all succeed (no ValidationError)
+    """Tags are very permissive; aliases disallow only '/' and ':'."""
+    # Tags: permissive — spaces, special chars, up to 256 chars
     tsi.ObjAddTagsReq(
         project_id="test/proj",
         object_id="obj",
         digest="abc123",
-        tags=["reviewed", "my-tag", "my_tag", "my.tag", "Tag123", "a" * 128],
+        tags=["reviewed", "my-tag", "my_tag", "my.tag", "Tag123", "a" * 256,
+              "has spaces", "under review", "special!chars"],
     )
+    # Aliases: broad charset, only '/' and ':' disallowed
     tsi.ObjSetAliasReq(
         project_id="test/proj",
         object_id="obj",
@@ -609,24 +610,46 @@ def test_valid_tag_and_alias_names():
         digest="abc123",
         alias="my-deploy.v2",
     )
+    tsi.ObjSetAliasReq(
+        project_id="test/proj",
+        object_id="obj",
+        digest="abc123",
+        alias="has spaces",
+    )
 
 
-def test_tag_version_like_rejected():
-    """Version-like names (v0, v1, ...) should be rejected for tags too."""
+def test_alias_invalid_characters():
+    """Aliases cannot contain '/' or ':'."""
     with pytest.raises(ValidationError):
-        tsi.ObjAddTagsReq(
+        tsi.ObjSetAliasReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            tags=["v0"],
+            alias="path/slash",
         )
     with pytest.raises(ValidationError):
-        tsi.ObjAddTagsReq(
+        tsi.ObjSetAliasReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            tags=["v999"],
+            alias="has:colon",
         )
+
+
+def test_tag_version_like_accepted():
+    """Version-like names (v0, v1, ...) are accepted for tags (only reserved for aliases)."""
+    tsi.ObjAddTagsReq(
+        project_id="test/proj",
+        object_id="obj",
+        digest="abc123",
+        tags=["v0"],
+    )
+    tsi.ObjAddTagsReq(
+        project_id="test/proj",
+        object_id="obj",
+        digest="abc123",
+        tags=["v999"],
+    )
 
 
 # --- digest_is_content_hash ---
