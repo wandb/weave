@@ -35,6 +35,15 @@ def make_base_64_content(content: str) -> str:
 string_suffix = "a" * AUTO_CONVERSION_MIN_SIZE
 
 
+def create_file_sized_content(content: str) -> str:
+    """Create base64 content padded to exceed AUTO_CONVERSION_MIN_SIZE.
+
+    This ensures the content is large enough to trigger file-based storage
+    in ClickHouse rather than inline storage.
+    """
+    return make_base_64_content(content + string_suffix)
+
+
 def _make_batch_req_with_contents(project_id: str, contents: list[str]):
     """Helper to build a CallCreateBatchReq where each call has one base64 input."""
     return tsi.CallCreateBatchReq(
@@ -47,7 +56,7 @@ def _make_batch_req_with_contents(project_id: str, contents: list[str]):
                         op_name=f"test_op_{i}",
                         started_at=datetime.datetime.now(datetime.timezone.utc),
                         attributes={},
-                        inputs={"input": make_base_64_content(c + string_suffix)},
+                        inputs={"input": create_file_sized_content(c)},
                     )
                 ),
             )
@@ -95,8 +104,8 @@ def test_clickhouse_batching():
                             started_at=datetime.datetime.now(datetime.timezone.utc),
                             attributes={},
                             inputs={
-                                "input": make_base_64_content(
-                                    "SOME BASE64 CONTENT - 1" + string_suffix
+                                "input": create_file_sized_content(
+                                    "SOME BASE64 CONTENT - 1"
                                 )
                             },
                         )
@@ -111,8 +120,8 @@ def test_clickhouse_batching():
                             started_at=datetime.datetime.now(datetime.timezone.utc),
                             attributes={},
                             inputs={
-                                "input": make_base_64_content(
-                                    "SOME BASE64 CONTENT - 2" + string_suffix
+                                "input": create_file_sized_content(
+                                    "SOME BASE64 CONTENT - 2"
                                 )
                             },
                         )
@@ -127,8 +136,8 @@ def test_clickhouse_batching():
                             started_at=datetime.datetime.now(datetime.timezone.utc),
                             attributes={},
                             inputs={
-                                "input": make_base_64_content(
-                                    "SOME BASE64 CONTENT - 3" + string_suffix
+                                "input": create_file_sized_content(
+                                    "SOME BASE64 CONTENT - 3"
                                 )
                             },
                         )
