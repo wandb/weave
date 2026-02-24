@@ -755,34 +755,45 @@ class ObjDeleteRes(BaseModel):
 
 
 # --- Tag and Alias types ---
+# Validation follows W&B Models conventions:
+#   - Aliases: broad charset, disallow "/" and ":", length 1-128,
+#     reserve "latest" and version patterns (v\d+)
+#   - Tags: more permissive than aliases, length 1-256
 
-MAX_TAG_OR_ALIAS_LENGTH = 128
-TAG_OR_ALIAS_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+MAX_ALIAS_LENGTH = 128
+MAX_TAG_LENGTH = 256
+INVALID_ALIAS_CHARACTERS = "/:"
 VERSION_LIKE_PATTERN = re.compile(r"^v\d+$")
 RESERVED_ALIAS_NAMES = {"latest"}
 
 
-def _validate_tag_or_alias_name(name: str, kind: str = "tag or alias") -> None:
-    """Validate a tag or alias name."""
+def _validate_tag_name(name: str) -> None:
+    """Validate a tag name. Tags are permissive — only length is enforced."""
     if not name:
-        raise ValueError(f"{kind} name must not be empty")
-    if len(name) > MAX_TAG_OR_ALIAS_LENGTH:
+        raise ValueError("tag name must not be empty")
+    if len(name) > MAX_TAG_LENGTH:
         raise ValueError(
-            f"{kind} name must be at most {MAX_TAG_OR_ALIAS_LENGTH} characters"
-        )
-    if not TAG_OR_ALIAS_PATTERN.match(name):
-        raise ValueError(
-            f"{kind} name must start with alphanumeric and contain only alphanumeric, '.', '_', or '-'"
-        )
-    if VERSION_LIKE_PATTERN.match(name):
-        raise ValueError(
-            f"{kind} name '{name}' is reserved (matches version pattern v<number>)"
+            f"tag name must be at most {MAX_TAG_LENGTH} characters"
         )
 
 
 def _validate_alias_name(name: str) -> None:
-    """Validate an alias name (additional constraints beyond tag/alias)."""
-    _validate_tag_or_alias_name(name, "alias")
+    """Validate an alias name. Disallows '/' and ':', reserves 'latest' and version indices."""
+    if not name:
+        raise ValueError("alias name must not be empty")
+    if len(name) > MAX_ALIAS_LENGTH:
+        raise ValueError(
+            f"alias name must be at most {MAX_ALIAS_LENGTH} characters"
+        )
+    for ch in name:
+        if ch in INVALID_ALIAS_CHARACTERS:
+            raise ValueError(
+                f"alias name cannot contain character '{ch}'"
+            )
+    if VERSION_LIKE_PATTERN.match(name):
+        raise ValueError(
+            f"alias name '{name}' is reserved (matches version pattern v<number>)"
+        )
     if name in RESERVED_ALIAS_NAMES:
         raise ValueError(f"alias name '{name}' is reserved")
 
@@ -797,7 +808,7 @@ class ObjAddTagsReq(BaseModelStrict):
     @model_validator(mode="after")
     def validate_tags(self) -> "ObjAddTagsReq":
         for tag in self.tags:
-            _validate_tag_or_alias_name(tag, "tag")
+            _validate_tag_name(tag)
         return self
 
 
