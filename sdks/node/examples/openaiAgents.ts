@@ -64,7 +64,7 @@ async function main() {
   await weave.init('wandb/csbx');
 
   // OpenAI Agents is automatically instrumented via module loader hooks when you import Weave.
-  // The below function need to be called only for edge cases where automatic instrumentation
+  // The below function needs to be called only for edge cases where automatic instrumentation
   // doesn't work (e.g., dynamic imports, bundlers that bypass hooks).
 
   // await weave.instrumentOpenAIAgents();
