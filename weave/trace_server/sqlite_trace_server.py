@@ -50,6 +50,7 @@ from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
     determine_call_status,
+    digest_is_content_hash,
     digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
@@ -154,6 +155,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         cursor.execute("DROP TABLE IF EXISTS objects")
         cursor.execute("DROP TABLE IF EXISTS tables")
         cursor.execute("DROP TABLE IF EXISTS table_rows")
+        cursor.execute("DROP TABLE IF EXISTS tags")
+        cursor.execute("DROP TABLE IF EXISTS aliases")
 
     def setup_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -231,6 +234,30 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 digest TEXT,
                 val BLOB,
                 primary key (project_id, digest)
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tags (
+                project_id TEXT NOT NULL,
+                object_id TEXT NOT NULL,
+                digest TEXT NOT NULL,
+                tag TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (project_id, object_id, digest, tag)
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS aliases (
+                project_id TEXT NOT NULL,
+                object_id TEXT NOT NULL,
+                alias TEXT NOT NULL,
+                digest TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (project_id, object_id, alias)
             )
             """
         )
@@ -996,8 +1023,15 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 return f"digest = '{digest}'"
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        digest = req.digest
+        resolved_digest = self._maybe_resolve_alias(
+            req.project_id, req.object_id, digest
+        )
+        if resolved_digest is not None:
+            digest = resolved_digest
+
         conds = [f"object_id = '{req.object_id}'"]
-        digest_condition = self._make_digest_condition(req.digest)
+        digest_condition = self._make_digest_condition(digest)
         conds.append(digest_condition)
         objs = self._select_objs_query(
             req.project_id,
@@ -1012,6 +1046,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 f"{req.object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}",
                 deleted_at=objs[0].deleted_at,
             )
+        if req.include_tags_and_aliases:
+            self._enrich_objs_with_tags_and_aliases(req.project_id, objs)
         return tsi.ObjReadRes(obj=objs[0])
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
@@ -1045,6 +1081,24 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 placeholders = ",".join(["?" for _ in req.filter.leaf_object_classes])
                 conds.append(f"leaf_object_class IN ({placeholders})")
                 parameters["leaf_object_classes"] = req.filter.leaf_object_classes
+            if req.filter.tags:
+                tag_placeholders = ",".join(["?" for _ in req.filter.tags])
+                conds.append(
+                    f"(project_id, object_id, digest) IN "
+                    f"(SELECT project_id, object_id, digest FROM tags "
+                    f"WHERE project_id = ? AND tag IN ({tag_placeholders}))"
+                )
+                parameters["filter_tags"] = [req.project_id] + list(req.filter.tags)
+            if req.filter.aliases:
+                alias_placeholders = ",".join(["?" for _ in req.filter.aliases])
+                conds.append(
+                    f"(project_id, object_id) IN "
+                    f"(SELECT project_id, object_id FROM aliases "
+                    f"WHERE project_id = ? AND alias IN ({alias_placeholders}))"
+                )
+                parameters["filter_aliases"] = [req.project_id] + list(
+                    req.filter.aliases
+                )
 
         objs = self._select_objs_query(
             req.project_id,
@@ -1055,6 +1109,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             offset=req.offset,
             sort_by=req.sort_by,
         )
+
+        if req.include_tags_and_aliases:
+            self._enrich_objs_with_tags_and_aliases(req.project_id, objs)
 
         return tsi.ObjQueryRes(objs=objs)
 
@@ -1112,17 +1169,71 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
 
+    def _assert_obj_version_exists(
+        self,
+        cursor: sqlite3.Cursor,
+        project_id: str,
+        object_id: str,
+        digest: str,
+    ) -> None:
+        cursor.execute(
+            "SELECT 1 FROM objects WHERE project_id = ? AND object_id = ? AND digest = ? LIMIT 1",
+            (project_id, object_id, digest),
+        )
+        if cursor.fetchone() is None:
+            raise NotFoundError(
+                f"Object version {object_id}:{digest} not found"
+            )
+
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
-        raise NotImplementedError("Tags not supported in SQLite trace server")
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute("BEGIN TRANSACTION")
+            self._assert_obj_version_exists(
+                cursor, req.project_id, req.object_id, req.digest
+            )
+            for tag in req.tags:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO tags (project_id, object_id, digest, tag) VALUES (?, ?, ?, ?)",
+                    (req.project_id, req.object_id, req.digest, tag),
+                )
+            conn.commit()
+        return tsi.ObjAddTagsRes()
 
     def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
-        raise NotImplementedError("Tags not supported in SQLite trace server")
+        conn, cursor = get_conn_cursor(self.db_path)
+        placeholders = ",".join(["?" for _ in req.tags])
+        with self.lock:
+            cursor.execute(
+                f"DELETE FROM tags WHERE project_id = ? AND object_id = ? AND digest = ? AND tag IN ({placeholders})",
+                [req.project_id, req.object_id, req.digest] + list(req.tags),
+            )
+            conn.commit()
+        return tsi.ObjRemoveTagsRes()
 
     def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
-        raise NotImplementedError("Aliases not supported in SQLite trace server")
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute("BEGIN TRANSACTION")
+            self._assert_obj_version_exists(
+                cursor, req.project_id, req.object_id, req.digest
+            )
+            cursor.execute(
+                "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
+                (req.project_id, req.object_id, req.alias, req.digest),
+            )
+            conn.commit()
+        return tsi.ObjSetAliasRes()
 
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
-        raise NotImplementedError("Aliases not supported in SQLite trace server")
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute(
+                "DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias = ?",
+                (req.project_id, req.object_id, req.alias),
+            )
+            conn.commit()
+        return tsi.ObjRemoveAliasRes()
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -3629,6 +3740,101 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.TableRowSchema(
             digest=query_result[0], val=json.loads(query_result[1])
         )
+
+    def _get_tags_for_objects(
+        self,
+        project_id: str,
+        object_digests: list[tuple[str, str]],
+    ) -> dict[tuple[str, str], list[str]]:
+        """Fetch tags for a list of (object_id, digest) pairs."""
+        if not object_digests:
+            return {}
+        conn, cursor = get_conn_cursor(self.db_path)
+        conditions = " OR ".join(
+            ["(object_id = ? AND digest = ?)"] * len(object_digests)
+        )
+        params: list[str] = [project_id]
+        for oid, dig in object_digests:
+            params.extend([oid, dig])
+        cursor.execute(
+            f"SELECT object_id, digest, tag FROM tags WHERE project_id = ? AND ({conditions})",
+            params,
+        )
+        result: dict[tuple[str, str], list[str]] = {}
+        for row in cursor.fetchall():
+            key = (row[0], row[1])
+            result.setdefault(key, []).append(row[2])
+        return result
+
+    def _get_aliases_for_objects(
+        self,
+        project_id: str,
+        object_ids: list[str],
+    ) -> dict[tuple[str, str], list[str]]:
+        """Fetch aliases for a list of object_ids.
+        Returns a dict mapping (object_id, digest) -> list of alias strings.
+        """
+        if not object_ids:
+            return {}
+        conn, cursor = get_conn_cursor(self.db_path)
+        placeholders = ",".join(["?"] * len(object_ids))
+        cursor.execute(
+            f"SELECT object_id, digest, alias FROM aliases WHERE project_id = ? AND object_id IN ({placeholders})",
+            [project_id] + list(object_ids),
+        )
+        result: dict[tuple[str, str], list[str]] = {}
+        for row in cursor.fetchall():
+            key = (row[0], row[1])
+            result.setdefault(key, []).append(row[2])
+        return result
+
+    def _enrich_objs_with_tags_and_aliases(
+        self,
+        project_id: str,
+        objs: list[tsi.ObjSchema],
+    ) -> None:
+        """In-place enrichment of ObjSchema list with tags and aliases."""
+        if not objs:
+            return
+        object_digests = [(obj.object_id, obj.digest) for obj in objs]
+        object_ids = list({obj.object_id for obj in objs})
+
+        tags_map = self._get_tags_for_objects(project_id, object_digests)
+        aliases_map = self._get_aliases_for_objects(project_id, object_ids)
+
+        for obj in objs:
+            key = (obj.object_id, obj.digest)
+            obj.tags = tags_map.get(key, [])
+            aliases = aliases_map.get(key, [])
+            if obj.is_latest == 1 and "latest" not in aliases:
+                aliases = ["latest"] + aliases
+            obj.aliases = aliases
+
+    def _maybe_resolve_alias(
+        self,
+        project_id: str,
+        object_id: str,
+        digest: str,
+    ) -> str | None:
+        """If digest looks like an alias name, resolve it to the actual digest.
+        Returns None if not an alias.
+        """
+        if digest == "latest":
+            return None
+        (is_version, _) = digest_is_version_like(digest)
+        if is_version:
+            return None
+        if digest_is_content_hash(digest):
+            return None
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
+            "SELECT digest FROM aliases WHERE project_id = ? AND object_id = ? AND alias = ? LIMIT 1",
+            (project_id, object_id, digest),
+        )
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        return None
 
     def _select_objs_query(
         self,

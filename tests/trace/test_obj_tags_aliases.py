@@ -5,6 +5,7 @@ import weave
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError
+from weave.trace_server.trace_server_common import digest_is_content_hash
 
 
 def _publish_obj(client: WeaveClient, name: str, val: dict | None = None):
@@ -14,9 +15,10 @@ def _publish_obj(client: WeaveClient, name: str, val: dict | None = None):
         tsi.ObjQueryReq(
             project_id=client._project_id(),
             filter=tsi.ObjectVersionFilter(object_ids=[name]),
+            sort_by=[tsi.SortBy(field="created_at", direction="asc")],
         )
     )
-    obj = res.objs[-1]  # latest version
+    obj = res.objs[-1]  # latest version (sorted by created_at asc)
     return obj.object_id, obj.digest
 
 
@@ -395,3 +397,265 @@ def test_tags_on_nonexistent_object(client: WeaveClient):
                 tags=["tag"],
             )
         )
+
+
+def test_alias_on_nonexistent_object(client: WeaveClient):
+    with pytest.raises(NotFoundError):
+        client.server.obj_set_alias(
+            tsi.ObjSetAliasReq(
+                project_id=client._project_id(),
+                object_id="nonexistent_object",
+                digest="0000000000000000000000000000000000000000000000000000000000000000",
+                alias="prod",
+            )
+        )
+
+
+# --- Enrichment behavior ---
+
+
+def test_include_tags_and_aliases_false_returns_none(client: WeaveClient):
+    """When include_tags_and_aliases is not set, tags/aliases should be None."""
+    object_id, digest = _publish_obj(client, "no_enrich_obj")
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            tags=["some-tag"],
+        )
+    )
+
+    # Query without include_tags_and_aliases
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
+        )
+    )
+    assert res.objs[0].tags is None
+    assert res.objs[0].aliases is None
+
+    # obj_read without include_tags_and_aliases
+    read_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+        )
+    )
+    assert read_res.obj.tags is None
+    assert read_res.obj.aliases is None
+
+
+def test_obj_read_enrichment(client: WeaveClient):
+    """obj_read with include_tags_and_aliases returns tags and aliases."""
+    object_id, digest = _publish_obj(client, "read_enrich_obj")
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            tags=["reviewed"],
+        )
+    )
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            alias="prod",
+        )
+    )
+
+    res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert res.obj.tags == ["reviewed"]
+    assert "prod" in res.obj.aliases
+    assert "latest" in res.obj.aliases
+
+
+# --- Tag version scoping ---
+
+
+def test_tags_scoped_to_version(client: WeaveClient):
+    """Tags on v0 should not appear on v1."""
+    weave.publish({"v": 0}, name="tag_scope_obj")
+    weave.publish({"v": 1}, name="tag_scope_obj")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=["tag_scope_obj"]),
+            sort_by=[tsi.SortBy(field="created_at", direction="asc")],
+        )
+    )
+    v0, v1 = res.objs[0], res.objs[1]
+
+    # Tag only v0
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=v0.object_id,
+            digest=v0.digest,
+            tags=["v0-only"],
+        )
+    )
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=["tag_scope_obj"]),
+            include_tags_and_aliases=True,
+            sort_by=[tsi.SortBy(field="created_at", direction="asc")],
+        )
+    )
+    assert "v0-only" in res.objs[0].tags
+    assert res.objs[1].tags == []
+
+
+def test_multiple_aliases_on_object(client: WeaveClient):
+    """Different aliases can point to different versions of the same object."""
+    weave.publish({"v": 0}, name="multi_alias_obj")
+    weave.publish({"v": 1}, name="multi_alias_obj")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=["multi_alias_obj"]),
+            sort_by=[tsi.SortBy(field="created_at", direction="asc")],
+        )
+    )
+    v0, v1 = res.objs[0], res.objs[1]
+
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=v0.object_id,
+            digest=v0.digest,
+            alias="stable",
+        )
+    )
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=v1.object_id,
+            digest=v1.digest,
+            alias="canary",
+        )
+    )
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=["multi_alias_obj"]),
+            include_tags_and_aliases=True,
+            sort_by=[tsi.SortBy(field="created_at", direction="asc")],
+        )
+    )
+    assert "stable" in res.objs[0].aliases
+    assert "canary" not in (res.objs[0].aliases or [])
+    assert "canary" in res.objs[1].aliases
+    assert "stable" not in (res.objs[1].aliases or [])
+
+
+# --- obj_read with real digest (not alias) ---
+
+
+def test_obj_read_with_real_digest(client: WeaveClient):
+    """obj_read with a content-addressed digest should not attempt alias resolution."""
+    object_id, digest = _publish_obj(client, "real_digest_obj")
+
+    res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+        )
+    )
+    assert res.obj.digest == digest
+    assert res.obj.object_id == object_id
+
+
+# --- Validation: accepted names ---
+
+
+def test_valid_tag_and_alias_names():
+    """Names with dots, dashes, underscores, and mixed case should be accepted."""
+    # These should all succeed (no ValidationError)
+    tsi.ObjAddTagsReq(
+        project_id="test/proj",
+        object_id="obj",
+        digest="abc123",
+        tags=["reviewed", "my-tag", "my_tag", "my.tag", "Tag123", "a" * 128],
+    )
+    tsi.ObjSetAliasReq(
+        project_id="test/proj",
+        object_id="obj",
+        digest="abc123",
+        alias="production",
+    )
+    tsi.ObjSetAliasReq(
+        project_id="test/proj",
+        object_id="obj",
+        digest="abc123",
+        alias="my-deploy.v2",
+    )
+
+
+def test_tag_version_like_rejected():
+    """Version-like names (v0, v1, ...) should be rejected for tags too."""
+    with pytest.raises(ValidationError):
+        tsi.ObjAddTagsReq(
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            tags=["v0"],
+        )
+    with pytest.raises(ValidationError):
+        tsi.ObjAddTagsReq(
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            tags=["v999"],
+        )
+
+
+# --- digest_is_content_hash ---
+
+
+@pytest.mark.parametrize(
+    ("digest", "expected"),
+    [
+        # Weave base64url digest (43 alphanumeric chars)
+        ("oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8", True),
+        # Hex SHA-256 (64 hex chars)
+        ("a" * 64, True),
+        ("abcdef1234567890" * 4, True),
+        # Alias names — not content hashes
+        ("production", False),
+        ("staging", False),
+        ("my-alias", False),
+        # Version-like — not content hashes (shorter than 43)
+        ("v0", False),
+        ("v123", False),
+        # Edge cases
+        ("", False),
+        ("a" * 42, False),
+        ("a" * 44, False),
+        ("a" * 63, False),
+        ("a" * 65, False),
+        # 64 chars but not hex
+        ("g" * 64, False),
+    ],
+)
+def test_digest_is_content_hash(digest: str, expected: bool):
+    assert digest_is_content_hash(digest) == expected
