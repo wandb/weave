@@ -39,7 +39,8 @@ def _run_tracer_lifecycle(
     kwargs: dict,
 ) -> list:
     """Drive a WeaveTracer through a full on_chat_model_start → _finish_run cycle
-    and return the recorded calls."""
+    and return the recorded calls.
+    """
     tracer = WeaveTracer()
     run_id = uuid4()
     messages = [[HumanMessage(content="test")]]
@@ -77,8 +78,7 @@ def _run_tracer_lifecycle(
 def test_tracer_traces_call_when_kwargs_contain_pydantic_model_class(
     client: WeaveClient,
 ) -> None:
-    """
-    Requirement: WeaveTracer must successfully trace LLM calls that use
+    """Requirement: WeaveTracer must successfully trace LLM calls that use
                  with_structured_output(PydanticModel), without errors.
     Interface: WeaveTracer callback lifecycle (on_chat_model_start → finish)
     Given: kwargs containing a Pydantic model class (simulating with_structured_output)
@@ -87,7 +87,9 @@ def test_tracer_traces_call_when_kwargs_contain_pydantic_model_class(
     """
     calls = _run_tracer_lifecycle(
         client,
-        kwargs={"invocation_params": {"model": "gpt-4o-mini", "response_format": Process}},
+        kwargs={
+            "invocation_params": {"model": "gpt-4o-mini", "response_format": Process}
+        },
     )
 
     assert len(calls) >= 1, "Expected at least one traced call"
@@ -109,8 +111,7 @@ def test_tracer_traces_call_when_kwargs_contain_pydantic_model_class(
 def test_tracer_traces_call_when_kwargs_contain_arbitrary_non_serializable_objects(
     client: WeaveClient,
 ) -> None:
-    """
-    Requirement: WeaveTracer must be robust against ANY non-JSON-serializable
+    """Requirement: WeaveTracer must be robust against ANY non-JSON-serializable
                  object in kwargs, not just Pydantic model classes.
     Interface: WeaveTracer callback lifecycle (on_chat_model_start → finish)
     Given: kwargs containing a custom class instance, a set, and a lambda

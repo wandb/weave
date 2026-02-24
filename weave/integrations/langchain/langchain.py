@@ -62,7 +62,7 @@ except ImportError:
     import_failed = True
 
 from collections.abc import Generator
-from typing import Any
+from typing import Any, cast
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
@@ -83,7 +83,7 @@ if not import_failed:
             pass
 
         if isinstance(obj, type) and issubclass(obj, BaseModel):
-            return obj.model_json_schema()
+            return cast(type[BaseModel], obj).model_json_schema()
 
         if isinstance(obj, (set, frozenset)):
             return list(obj)
