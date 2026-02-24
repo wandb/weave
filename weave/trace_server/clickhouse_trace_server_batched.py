@@ -253,7 +253,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._database = database
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
+        self._init_lock = threading.Lock()
         self._file_storage_client: FileStorageClient | None = None
+        self._file_storage_client_initialized = False
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
@@ -332,10 +334,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @property
     def file_storage_client(self) -> FileStorageClient | None:
-        if self._file_storage_client is not None:
+        if self._file_storage_client_initialized:
             return self._file_storage_client
-        self._file_storage_client = maybe_get_storage_client_from_env()
-        return self._file_storage_client
+        with self._init_lock:
+            if self._file_storage_client_initialized:
+                return self._file_storage_client
+            self._file_storage_client = maybe_get_storage_client_from_env()
+            self._file_storage_client_initialized = True
+            return self._file_storage_client
 
     @property
     def kafka_producer(self) -> KafkaProducer | None:
@@ -344,15 +350,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return None
         if self._kafka_producer is not None:
             return self._kafka_producer
-        self._kafka_producer = KafkaProducer.from_env()
-        return self._kafka_producer
+        with self._init_lock:
+            if self._kafka_producer is not None:
+                return self._kafka_producer
+            self._kafka_producer = KafkaProducer.from_env()
+            return self._kafka_producer
 
     @property
     def table_routing_resolver(self) -> TableRoutingResolver:
         if self._table_routing_resolver is not None:
             return self._table_routing_resolver
-        self._table_routing_resolver = TableRoutingResolver()
-        return self._table_routing_resolver
+        with self._init_lock:
+            if self._table_routing_resolver is not None:
+                return self._table_routing_resolver
+            self._table_routing_resolver = TableRoutingResolver()
+            return self._table_routing_resolver
 
     @property
     def use_distributed_mode(self) -> bool:
@@ -470,65 +482,65 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         )
                     )
 
-            obj_id_idx_map = defaultdict(list)
-            for idx, (start_call, _) in enumerate(calls):
-                op_name = object_creation_utils.make_safe_name(start_call.op_name)
-                obj_id_idx_map[op_name].append(idx)
+        obj_id_idx_map = defaultdict(list)
+        for idx, (start_call, _) in enumerate(calls):
+            op_name = object_creation_utils.make_safe_name(start_call.op_name)
+            obj_id_idx_map[op_name].append(idx)
 
-            existing_objects = self._get_existing_ops_from_spans(
-                seen_ids=set(obj_id_idx_map.keys()),
-                project_id=req.project_id,
-                limit=len(calls),
+        existing_objects = self._get_existing_ops_from_spans(
+            seen_ids=set(obj_id_idx_map.keys()),
+            project_id=req.project_id,
+            limit=len(calls),
+        )
+        # We know that OTel will always use the placeholder source.
+        # We can instead just reuse the existing file if we know it is present
+        # and create it just once if we are not sure.
+        if len(existing_objects) == 0:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=True
             )
-            # We know that OTel will always use the placeholder source.
-            # We can instead just reuse the existing file if we know it is present
-            # and create it just once if we are not sure.
-            if len(existing_objects) == 0:
-                digest = self._create_or_get_placeholder_ops_digest(
-                    project_id=req.project_id, create=True
-                )
-            else:
-                digest = self._create_or_get_placeholder_ops_digest(
-                    project_id=req.project_id, create=False
-                )
+        else:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=False
+            )
 
-            for obj in existing_objects:
-                op_ref_uri = ri.InternalOpRef(
+        for obj in existing_objects:
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=obj.object_id,
+                version=obj.digest,
+            ).uri()
+
+            # Modify each of the matched start calls in place
+            for idx in obj_id_idx_map[obj.object_id]:
+                calls[idx][0].op_name = op_ref_uri
+            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
+            obj_id_idx_map.pop(obj.object_id)
+
+        obj_creation_batch = []
+        for op_obj_id in obj_id_idx_map.keys():
+            op_val = object_creation_utils.build_op_val(digest)
+            obj_creation_batch.append(
+                tsi.ObjSchemaForInsert(
                     project_id=req.project_id,
-                    name=obj.object_id,
-                    version=obj.digest,
-                ).uri()
-
-                # Modify each of the matched start calls in place
-                for idx in obj_id_idx_map[obj.object_id]:
-                    calls[idx][0].op_name = op_ref_uri
-                # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
-                obj_id_idx_map.pop(obj.object_id)
-
-            obj_creation_batch = []
-            for op_obj_id in obj_id_idx_map.keys():
-                op_val = object_creation_utils.build_op_val(digest)
-                obj_creation_batch.append(
-                    tsi.ObjSchemaForInsert(
-                        project_id=req.project_id,
-                        object_id=op_obj_id,
-                        val=op_val,
-                        wb_user_id=req.wb_user_id,
-                    )
+                    object_id=op_obj_id,
+                    val=op_val,
+                    wb_user_id=req.wb_user_id,
                 )
-            res = self.obj_create_batch(obj_creation_batch)
+            )
+        res = self.obj_create_batch(obj_creation_batch)
 
-            for result in res:
-                if result.object_id is None:
-                    raise RuntimeError("Otel Export - Expected object_id but got None")
+        for result in res:
+            if result.object_id is None:
+                raise RuntimeError("Otel Export - Expected object_id but got None")
 
-                op_ref_uri = ri.InternalOpRef(
-                    project_id=req.project_id,
-                    name=result.object_id,
-                    version=result.digest,
-                ).uri()
-                for idx in obj_id_idx_map[result.object_id]:
-                    calls[idx][0].op_name = op_ref_uri
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=result.object_id,
+                version=result.digest,
+            ).uri()
+            for idx in obj_id_idx_map[result.object_id]:
+                calls[idx][0].op_name = op_ref_uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
