@@ -11,6 +11,9 @@ import {Agent, run, tool} from '@openai/agents';
 import type {AgentInputItem} from '@openai/agents';
 import {z} from 'zod';
 
+// Set your own entity/project name here
+const WANDB_PROJECT = process.env.WANDB_PROJECT || 'example';
+
 // --- Tools ---
 
 const getWeatherTool = tool({
@@ -45,7 +48,8 @@ const calculateTool = tool({
     expression: z.string().describe('A math expression, e.g. "3 * (4 + 2)"'),
   }),
   execute({expression}) {
-    // Restrict to safe arithmetic characters only
+    // NOTE: Using Function() to evaluate expressions is unsafe in production.
+    // In a real application, use a proper math library (e.g. mathjs) instead.
     if (!/^[\d\s+\-*/().]+$/.test(expression)) {
       return 'Error: invalid expression';
     }
@@ -61,7 +65,7 @@ const calculateTool = tool({
 // --- Agent ---
 
 async function main() {
-  await weave.init('wandb/csbx');
+  await weave.init(WANDB_PROJECT);
 
   // OpenAI Agents is automatically instrumented via module loader hooks when you import Weave.
   // The below function needs to be called only for edge cases where automatic instrumentation
