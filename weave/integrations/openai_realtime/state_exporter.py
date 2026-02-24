@@ -305,12 +305,11 @@ class StateExporter(BaseModel):
                 self.session_span.get_root_call() if self.session_span else None
             )
             client = require_weave_client()
-            with set_thread_id(conv_id):
-                conv_call = client.create_call(
-                    op="realtime.conversation",
-                    inputs={"id": conv_id},
-                    parent=session_call,
-                )
+            conv_call = client.create_call(
+                op="realtime.conversation",
+                inputs={"id": conv_id},
+                parent=session_call,
+            )
             self.conversation_calls[conv_id] = conv_call
 
     def handle_input_audio_append(self, msg: dict) -> None:
@@ -571,47 +570,57 @@ class StateExporter(BaseModel):
         response = msg.get("response", {})
         conv_id = response.get("conversation_id")
         response_id = response.get("id")
+
         if conv_id and self.conversation_responses.get(conv_id) is not None:
             if response_id:
                 self.conversation_responses[conv_id].append(response_id)
+
         elif conv_id and response_id:
             self.conversation_responses[conv_id] = [response_id]
 
-        with set_thread_id(conv_id):
-            if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
-                response_parent = conv_call
-            elif conv_id:
-                conv_call = client.create_call(
-                    op="realtime.conversation",
-                    inputs={"id": conv_id},
-                    parent=session_call,
-                )
-                self.conversation_calls[conv_id] = conv_call
-                response_parent = conv_call
-            elif session_call:
-                response_parent = session_call
-            else:
-                logger.warning(f"Could not find session for response - {response_id}")
-                # Will not happen in GA but potentially possible in Beta
-                response_parent = None
+        if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
+            response_parent = conv_call
 
+        elif conv_id:
+            conv_call = client.create_call(
+                op="realtime.conversation",
+                inputs={"id": conv_id},
+                parent=session_call,
+            )
+            self.conversation_calls[conv_id] = conv_call
+            response_parent = conv_call
+
+        elif session_call:
+            response_parent = session_call
+
+        else:
+            logger.warning(f"Could not find session for response - {response_id}")
+            # Will not happen in GA but potentially possible in Beta
+            response_parent = None
+
+        if conv_id:
+            with set_thread_id(conv_id):
+                call = client.create_call(
+                    "realtime.response", inputs=inputs, parent=response_parent
+                )
+        else:
             call = client.create_call(
                 "realtime.response", inputs=inputs, parent=response_parent
             )
 
-            output_dict = dict(response)
-            output_list = response.get("output", [])
-            self._extract_audio_content(output_list, output_dict)
+        output_dict = dict(response)
+        output_list = response.get("output", [])
+        self._extract_audio_content(output_list, output_dict)
 
-            summary_usage: dict[str, dict] = {}
-            model = session.get("model", "unknown") if session else "unknown"
-            self._update_usage_summary_for_speech(summary_usage, response, model)
-            self._update_usage_summary_for_transcription(summary_usage, messages)
+        summary_usage: dict[str, dict] = {}
+        model = session.get("model", "unknown") if session else "unknown"
+        self._update_usage_summary_for_speech(summary_usage, response, model)
+        self._update_usage_summary_for_transcription(summary_usage, messages)
 
-            if summary_usage:
-                call.summary = {"usage": summary_usage}
+        if summary_usage:
+            call.summary = {"usage": summary_usage}
 
-            client.finish_call(call, output=output_dict)
+        client.finish_call(call, output=output_dict)
 
     def handle_response_done(self, msg: dict) -> None:
         # Update state to the completed version and enqueue for FIFO completion.
