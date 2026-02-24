@@ -200,6 +200,9 @@ class StateExporter(BaseModel):
     # Per-item timing: item_id -> {event_name: datetime}
     item_timestamps: dict[str, dict[str, datetime.datetime]] = Field(default_factory=dict)
 
+    # Cached output metrics per item_id so they can be carried forward as input metrics
+    item_output_metrics: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -645,18 +648,27 @@ class StateExporter(BaseModel):
             else None
         )
 
-        # Inject metrics into input items
-        for input_msg in inputs.get("messages", []):
-            item_id = input_msg.get("id")
-            if item_id and item_id in self.item_timestamps:
-                ts = self.item_timestamps[item_id]
+        # Inject metrics into inputs.metadata.metrics array (indexed by message)
+        input_messages = inputs.get("messages", [])
+        if input_messages:
+            input_metrics_array: list[dict[str, Any]] = []
+            for input_msg in input_messages:
+                item_id = input_msg.get("id")
                 metrics: dict[str, Any] = {}
-                if "speech_started" in ts:
-                    metrics["speech_started"] = ts["speech_started"].isoformat()
-                if "speech_stopped" in ts:
-                    metrics["speech_stopped"] = ts["speech_stopped"].isoformat()
-                if metrics:
-                    input_msg["metrics"] = metrics
+                if item_id and item_id in self.item_timestamps:
+                    ts = self.item_timestamps[item_id]
+                    if "speech_started" in ts:
+                        metrics["speech_started"] = ts["speech_started"].isoformat()
+                    if "speech_stopped" in ts:
+                        metrics["speech_stopped"] = ts["speech_stopped"].isoformat()
+                # Carry forward output metrics from a previous response
+                if item_id and item_id in self.item_output_metrics:
+                    metrics.update(self.item_output_metrics[item_id])
+                input_metrics_array.append(metrics)
+            if any(input_metrics_array):
+                if not isinstance(inputs.get("metadata"), dict):
+                    inputs["metadata"] = {}
+                inputs["metadata"]["metrics"] = input_metrics_array
 
         # Latency = TTFT: started_at=response.created, ended_at=first content
         if conv_id:
@@ -679,9 +691,11 @@ class StateExporter(BaseModel):
         output_list = response.get("output", [])
         self._extract_audio_content(output_list, output_dict)
 
-        # Inject metrics into output items
+        # Inject metrics into output_dict.metadata.metrics array (indexed by output item)
         first_content_at: datetime.datetime | None = None
-        for output_item in output_dict.get("output", []):
+        output_items = output_dict.get("output", [])
+        output_metrics_array: list[dict[str, Any]] = []
+        for output_item in output_items:
             item_id = output_item.get("id")
             item_type = output_item.get("type")
             ts = self.item_timestamps.get(item_id, {}) if item_id else {}
@@ -711,8 +725,14 @@ class StateExporter(BaseModel):
                 if ft and (first_content_at is None or ft < first_content_at):
                     first_content_at = ft
 
-            if metrics:
-                output_item["metrics"] = metrics
+            output_metrics_array.append(metrics)
+            # Cache output metrics by item_id for reuse when this item appears as input
+            if metrics and item_id:
+                self.item_output_metrics[item_id] = metrics
+        if any(output_metrics_array):
+            if not isinstance(output_dict.get("metadata"), dict):
+                output_dict["metadata"] = {}
+            output_dict["metadata"]["metrics"] = output_metrics_array
 
         summary: dict[str, Any] = {}
 
