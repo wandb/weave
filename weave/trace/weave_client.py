@@ -867,6 +867,7 @@ class WeaveClient:
         exception: BaseException | None = None,
         *,
         op: Op | None = None,
+        ended_at: datetime.datetime | None = None,
     ) -> None:
         """Finalize a call and persist its results.
 
@@ -883,7 +884,8 @@ class WeaveClient:
 
         from weave.trace.api import _global_postprocess_output
 
-        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        if ended_at is None:
+            ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
 
