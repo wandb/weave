@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import copy
+import datetime
 import logging
 import threading
+import time
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -192,6 +194,11 @@ class StateExporter(BaseModel):
     pending_response: dict | None = None
     pending_create_params: dict | None = None
 
+    # Timing: response_id -> timestamp
+    response_created_at: dict[str, datetime.datetime] = Field(default_factory=dict)
+    response_created_mono: dict[str, float] = Field(default_factory=dict)
+    response_first_content_mono: dict[str, float] = Field(default_factory=dict)
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -297,6 +304,14 @@ class StateExporter(BaseModel):
     def handle_response_created(self, msg: dict) -> None:
         self.pending_response = msg.get("response")
         response = self.pending_response or {}
+        response_id = response.get("id")
+
+        if response_id:
+            self.response_created_at[response_id] = datetime.datetime.now(
+                tz=datetime.timezone.utc
+            )
+            self.response_created_mono[response_id] = time.monotonic()
+
         conv_id = response.get("conversation_id")
         if conv_id and conv_id not in self.conversation_calls:
             from weave.trace.context.weave_client_context import require_weave_client
@@ -318,6 +333,10 @@ class StateExporter(BaseModel):
             self.audio_input_buffer.extend_base64(audio)
 
     def handle_response_audio_delta(self, msg: dict) -> None:
+        response_id = msg.get("response_id")
+        if response_id and response_id not in self.response_first_content_mono:
+            self.response_first_content_mono[response_id] = time.monotonic()
+
         delta = msg.get("delta")
         if delta:
             self.audio_output_buffer.extend_base64(delta)
@@ -327,6 +346,11 @@ class StateExporter(BaseModel):
         if item_id:
             self.response_audio[item_id] = bytes(self.audio_output_buffer.buffer)
         self.audio_output_buffer.clear()
+
+    def handle_response_text_delta(self, msg: dict) -> None:
+        response_id = msg.get("response_id")
+        if response_id and response_id not in self.response_first_content_mono:
+            self.response_first_content_mono[response_id] = time.monotonic()
 
     def _response_with_audio(self, resp: dict) -> dict[str, Any]:
         """This function takes in the final response message.
@@ -598,19 +622,45 @@ class StateExporter(BaseModel):
             # Will not happen in GA but potentially possible in Beta
             response_parent = None
 
+        # Use the recorded response.created time as started_at so the server
+        # computes latency correctly (response.created -> finish_call).
+        response_started_at = (
+            self.response_created_at.pop(response_id, None) if response_id else None
+        )
+
         if conv_id:
             with set_thread_id(conv_id):
                 call = client.create_call(
-                    "realtime.response", inputs=inputs, parent=response_parent
+                    "realtime.response",
+                    inputs=inputs,
+                    parent=response_parent,
+                    started_at=response_started_at,
                 )
         else:
             call = client.create_call(
-                "realtime.response", inputs=inputs, parent=response_parent
+                "realtime.response",
+                inputs=inputs,
+                parent=response_parent,
+                started_at=response_started_at,
             )
 
         output_dict = dict(response)
         output_list = response.get("output", [])
         self._extract_audio_content(output_list, output_dict)
+
+        summary: dict[str, Any] = {}
+
+        # Compute time to first token from monotonic timestamps
+        if response_id:
+            created_mono = self.response_created_mono.pop(response_id, None)
+            first_content_mono = self.response_first_content_mono.pop(
+                response_id, None
+            )
+
+            if created_mono is not None and first_content_mono is not None:
+                summary["time_to_first_token_s"] = round(
+                    first_content_mono - created_mono, 4
+                )
 
         summary_usage: dict[str, dict] = {}
         model = session.get("model", "unknown") if session else "unknown"
@@ -618,7 +668,10 @@ class StateExporter(BaseModel):
         self._update_usage_summary_for_transcription(summary_usage, messages)
 
         if summary_usage:
-            call.summary = {"usage": summary_usage}
+            summary["usage"] = summary_usage
+
+        if summary:
+            call.summary = summary
 
         client.finish_call(call, output=output_dict)
 
