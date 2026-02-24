@@ -650,6 +650,7 @@ class WeaveClient:
         *,
         use_stack: bool = True,
         _call_id_override: str | None = None,
+        started_at: datetime.datetime | None = None,
     ) -> Call:
         """Create, log, and push a call onto the runtime stack.
 
@@ -660,6 +661,7 @@ class WeaveClient:
             display_name: The display name for the call. Defaults to None.
             attributes: The attributes for the call. Defaults to None.
             use_stack: Whether to push the call onto the runtime stack. Defaults to True.
+            started_at: Override the call start time. If None, uses current time.
 
         Returns:
             The created Call object.
@@ -770,7 +772,8 @@ class WeaveClient:
             current_wb_run_id = None
             current_wb_run_step = None
 
-        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        if started_at is None:
+            started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.started_at = started_at
         project_id = self._project_id()
 
