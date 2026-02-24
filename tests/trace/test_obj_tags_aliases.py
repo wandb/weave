@@ -594,8 +594,17 @@ def test_valid_tag_and_alias_names():
         project_id="test/proj",
         object_id="obj",
         digest="abc123",
-        tags=["reviewed", "my-tag", "my_tag", "my.tag", "Tag123", "a" * 256,
-              "has spaces", "under review", "special!chars"],
+        tags=[
+            "reviewed",
+            "my-tag",
+            "my_tag",
+            "my.tag",
+            "Tag123",
+            "a" * 256,
+            "has spaces",
+            "under review",
+            "special!chars",
+        ],
     )
     # Aliases: broad charset, only '/' and ':' disallowed
     tsi.ObjSetAliasReq(
