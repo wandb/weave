@@ -71,6 +71,8 @@ class ConversationManager:
             "response.audio.delta": self.state.handle_response_audio_delta,
             "response.audio.done": self.state.handle_response_audio_done,
             "response.text.delta": self.state.handle_response_text_delta,
+            # Function call streaming
+            "response.function_call_arguments.delta": self.state.handle_function_call_arguments_delta,
         }
 
         self._registry.update(handlers)
