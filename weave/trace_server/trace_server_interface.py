@@ -772,9 +772,7 @@ def _validate_tag_name(name: str) -> None:
     if not name:
         raise ValueError("tag name must not be empty")
     if len(name) > MAX_TAG_LENGTH:
-        raise ValueError(
-            f"tag name must be at most {MAX_TAG_LENGTH} characters"
-        )
+        raise ValueError(f"tag name must be at most {MAX_TAG_LENGTH} characters")
 
 
 def _validate_alias_name(name: str) -> None:
@@ -782,14 +780,10 @@ def _validate_alias_name(name: str) -> None:
     if not name:
         raise ValueError("alias name must not be empty")
     if len(name) > MAX_ALIAS_LENGTH:
-        raise ValueError(
-            f"alias name must be at most {MAX_ALIAS_LENGTH} characters"
-        )
+        raise ValueError(f"alias name must be at most {MAX_ALIAS_LENGTH} characters")
     for ch in name:
         if ch in INVALID_ALIAS_CHARACTERS:
-            raise ValueError(
-                f"alias name cannot contain character '{ch}'"
-            )
+            raise ValueError(f"alias name cannot contain character '{ch}'")
     if VERSION_LIKE_PATTERN.match(name):
         raise ValueError(
             f"alias name '{name}' is reserved (matches version pattern v<number>)"

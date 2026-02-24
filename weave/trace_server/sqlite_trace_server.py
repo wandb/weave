@@ -1181,9 +1181,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             (project_id, object_id, digest),
         )
         if cursor.fetchone() is None:
-            raise NotFoundError(
-                f"Object version {object_id}:{digest} not found"
-            )
+            raise NotFoundError(f"Object version {object_id}:{digest} not found")
 
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
         conn, cursor = get_conn_cursor(self.db_path)
