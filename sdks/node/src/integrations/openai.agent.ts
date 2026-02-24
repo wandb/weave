@@ -15,6 +15,7 @@
  */
 
 import {getGlobalClient} from '../clientApi';
+import {CallStack} from '../weaveClient';
 import {uuidv7} from 'uuidv7';
 import {topologicalSortChildrenFirst} from '../utils/topologicalSort';
 import type {
@@ -38,6 +39,31 @@ import type {
  */
 function getCallType(span: Span): string {
   return span.spanData.type || 'task';
+}
+
+/**
+ * Map OpenAI Agent span types to Weave kind categories for UI display.
+ * These kinds correspond to the KIND_CONFIG in the frontend.
+ */
+function getCallKind(span: Span): string {
+  const spanType = span.spanData.type;
+  switch (spanType) {
+    case 'agent':
+      return 'agent';
+    case 'function':
+      return 'tool';
+    case 'response':
+      return 'llm';
+    case 'handoff':
+      return 'agent';
+    case 'guardrail':
+      return 'guardrail';
+    case 'custom':
+      // For custom spans, check if there's a kind in the custom data
+      return (span.spanData as CustomSpanData).data?.kind || 'agent';
+    default:
+      return 'agent'; // Default to agent for task and unknown types
+  }
 }
 
 /**
@@ -159,6 +185,85 @@ interface CallData {
   parentSpanId?: string; // OpenAI agent span's parentId, used for topological ordering on cleanup
 }
 
+// Global map to store Weave call data for OpenAI Agent spans/traces
+// This allows the OpenAI SDK integration to look up parent call information
+const globalWeaveCallDataMap = new Map<
+  string,
+  {weaveCallId: string; weaveTraceId: string}
+>();
+
+/**
+ * Get Weave call data for an OpenAI Agent span or trace by its ID
+ */
+export function getWeaveCallDataForAgent(
+  spanOrTraceId: string
+): {weaveCallId: string; weaveTraceId: string} | undefined {
+  return globalWeaveCallDataMap.get(spanOrTraceId);
+}
+
+/**
+ * Attempts to recover the Weave call stack from the current OpenAI Agents trace/span context.
+ * Returns a CallStack with the current agent call as parent, or null if not in an agent context.
+ *
+ * This handles the AsyncLocalStorage isolation issue where OpenAI Agents' ALSO.run() creates
+ * a new context that doesn't share Weave's stack. We work around this by looking up the
+ * parent call from a global registry keyed by the OpenAI Agents trace/span ID.
+ *
+ * @returns CallStack with parent set to the current agent call, or null if not available
+ */
+export function getCallStackFromOpenAIAgents(): any | null {
+  try {
+    // Try to dynamically require @openai/agents - it may not be installed
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const agents = require('@openai/agents');
+
+    const currentTrace = agents.getCurrentTrace?.();
+    const currentSpan = agents.getCurrentSpan?.();
+
+    // Try span first (more specific), then trace
+    // Support both camelCase (class getters) and snake_case (JSON serialized)
+    // Also check 'id' which is used in toJSON() output
+    const spanId =
+      currentSpan?.spanId || currentSpan?.id || currentSpan?.span_id;
+    const spanParentId = currentSpan?.parentId || currentSpan?.parent_id;
+    const traceId =
+      currentTrace?.traceId ||
+      currentTrace?.trace_id ||
+      currentSpan?.traceId ||
+      currentSpan?.trace_id;
+
+    // Skip NoopSpan instances
+    if (spanId === 'no-op' || traceId === 'no-op') {
+      return null;
+    }
+
+    // Look up Weave call data with fallback chain:
+    // 1. Try current span ID first (most specific)
+    // 2. Fall back to parent span ID (if current span not tracked not tracking is delayed)
+    // 3. Fall back to trace ID (trace root)
+    const callData =
+      (spanId && globalWeaveCallDataMap.get(spanId)) ||
+      (spanParentId && globalWeaveCallDataMap.get(spanParentId)) ||
+      (traceId && globalWeaveCallDataMap.get(traceId));
+
+    if (callData) {
+      // Create a CallStack with the agent call as parent
+      let stack = new CallStack();
+      stack = stack.pushCall({
+        callId: callData.weaveCallId,
+        traceId: callData.weaveTraceId,
+        childSummary: {},
+      });
+      return stack;
+    }
+
+    return null;
+  } catch (e) {
+    // @openai/agents not installed or error - silently return null
+    return null;
+  }
+}
+
 /**
  * A TracingProcessor implementation that logs OpenAI Agent traces and spans to Weave.
  *
@@ -191,9 +296,6 @@ export class WeaveTracingProcessor implements TracingProcessor {
     const traceId = uuidv7();
     const startedAt = new Date().toISOString();
 
-    // Store call data
-    this.traceCalls.set(trace.traceId, {callId, traceId, startedAt});
-
     // Create call start
     const callStart = {
       project_id: client.projectId,
@@ -205,13 +307,27 @@ export class WeaveTracingProcessor implements TracingProcessor {
       started_at: startedAt,
       inputs: {name: trace.name},
       attributes: {
-        type: 'task',
+        kind: 'agent',
         agent_trace_id: trace.traceId,
       },
     };
 
     // Queue the call start
     client.saveCallStart(callStart);
+
+    // Store Weave call data in global map keyed by OpenAI Agent trace ID
+    // This allows OpenAI SDK integration to look up parent call information
+    globalWeaveCallDataMap.set(trace.traceId, {
+      weaveCallId: callId,
+      weaveTraceId: traceId,
+    });
+
+    // Store call data for later cleanup
+    this.traceCalls.set(trace.traceId, {
+      callId,
+      traceId,
+      startedAt,
+    });
   }
 
   /**
@@ -247,6 +363,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
     client.saveCallEnd(callEnd);
 
     // Clean up
+    globalWeaveCallDataMap.delete(trace.traceId);
     this.traceCalls.delete(trace.traceId);
     this.traceData.delete(trace.traceId);
   }
@@ -298,6 +415,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
 
     const spanName = getCallName(span);
     const spanType = getCallType(span);
+    const spanKind = getCallKind(span);
     const parentCallId = this.getParentCallId(span);
     const traceId = this.getTraceId(span);
 
@@ -308,14 +426,6 @@ export class WeaveTracingProcessor implements TracingProcessor {
     // Generate IDs for this span call
     const callId = uuidv7();
     const startedAt = new Date().toISOString();
-
-    // Store call data
-    this.spanCalls.set(span.spanId, {
-      callId,
-      traceId,
-      startedAt,
-      parentSpanId: span.parentId ?? undefined,
-    });
 
     // Create call start
     const callStart = {
@@ -328,7 +438,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
       started_at: startedAt,
       inputs: {name: spanName},
       attributes: {
-        type: spanType,
+        kind: spanKind,
         agent_span_id: span.spanId,
         agent_trace_id: span.traceId,
         parent_span_id: span.parentId,
@@ -337,6 +447,21 @@ export class WeaveTracingProcessor implements TracingProcessor {
 
     // Queue the call start
     client.saveCallStart(callStart);
+
+    // Store Weave call data in global map keyed by OpenAI Agent span ID
+    // This allows OpenAI SDK integration to look up parent call information
+    globalWeaveCallDataMap.set(span.spanId, {
+      weaveCallId: callId,
+      weaveTraceId: traceId,
+    });
+
+    // Store call data for later cleanup
+    this.spanCalls.set(span.spanId, {
+      callId,
+      traceId,
+      startedAt,
+      parentSpanId: span.parentId ?? undefined,
+    });
   }
 
   /**
@@ -378,6 +503,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
     client.saveCallEnd(callEnd);
 
     // Clean up
+    globalWeaveCallDataMap.delete(span.spanId);
     this.spanCalls.delete(span.spanId);
   }
 

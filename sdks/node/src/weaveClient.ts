@@ -51,7 +51,7 @@ function generateCallId(): string {
   return uuidv7();
 }
 
-class CallStack {
+export class CallStack {
   constructor(private stack: CallStackEntry[] = []) {}
 
   peek(): CallStackEntry | null {
@@ -70,6 +70,13 @@ class CallStack {
     const newCall: CallStackEntry = {callId, traceId, childSummary: {}};
     const newStack = new CallStack([...this.stack, newCall]);
     return {currentCall: newCall, parentCall, newStack};
+  }
+
+  /**
+   * Push a specific call entry onto the stack
+   */
+  pushCall(entry: CallStackEntry): CallStack {
+    return new CallStack([...this.stack, entry]);
   }
 }
 
