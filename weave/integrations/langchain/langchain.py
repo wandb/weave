@@ -94,24 +94,34 @@ if not import_failed:
             return f"<{type(obj).__name__}>"
 
     def _run_to_dict(run: Run, as_input: bool = False) -> dict:
-        run_dict = run.json(
-            exclude={
-                "child_runs",
-                "inputs",
-                "outputs",
-                "serialized",
-                "events",
-                "reference_example_id",
-                "trace_id",
-                "dotted_order",
-            },
+        exclude_fields = {
+            "child_runs",
+            "inputs",
+            "outputs",
+            "serialized",
+            "events",
+            "reference_example_id",
+            "trace_id",
+            "dotted_order",
+        }
+        common_kwargs = dict(
+            exclude=exclude_fields,
             exclude_unset=True,
             exclude_none=True,
             exclude_defaults=True,
-            encoder=_safe_json_encoder,
         )
 
-        run_dict = json.loads(run_dict)
+        try:
+            # Pydantic v2 API (langchain-core >=1.0)
+            run_json = json.dumps(
+                run.model_dump(**common_kwargs),
+                default=_safe_json_encoder,
+            )
+        except AttributeError:
+            # Pydantic v1 API (langchain-core <1.0): no model_dump
+            run_json = run.json(encoder=_safe_json_encoder, **common_kwargs)
+
+        run_dict = json.loads(run_json)
         if as_input:
             run_dict["inputs"] = run.inputs.copy() if run.inputs is not None else None
         else:
