@@ -16,6 +16,7 @@
 
 import {getGlobalClient} from '../clientApi';
 import {uuidv7} from 'uuidv7';
+import {topologicalSortChildrenFirst} from '../utils/topologicalSort';
 import type {
   Span,
   Trace,
@@ -155,6 +156,7 @@ interface CallData {
   callId: string;
   traceId: string;
   startedAt: string;
+  parentSpanId?: string; // OpenAI agent span's parentId, used for topological ordering on cleanup
 }
 
 /**
@@ -308,7 +310,12 @@ export class WeaveTracingProcessor implements TracingProcessor {
     const startedAt = new Date().toISOString();
 
     // Store call data
-    this.spanCalls.set(span.spanId, {callId, traceId, startedAt});
+    this.spanCalls.set(span.spanId, {
+      callId,
+      traceId,
+      startedAt,
+      parentSpanId: span.parentId ?? undefined,
+    });
 
     // Create call start
     const callStart = {
@@ -393,7 +400,11 @@ export class WeaveTracingProcessor implements TracingProcessor {
   }
 
   /**
-   * Helper method to finish unfinished calls on shutdown or flush
+   * Helper method to finish unfinished calls on shutdown or flush.
+   *
+   * Calls are ended in topological order — children before parents — so the
+   * server receives ends in a valid order:
+   *   deepest child spans → ancestor spans → trace root
    */
   private finishUnfinishedCalls(status: string): void {
     const client = getGlobalClient();
@@ -403,8 +414,17 @@ export class WeaveTracingProcessor implements TracingProcessor {
 
     const now = new Date().toISOString();
 
-    // Finish unfinished trace calls
-    for (const [traceId, callData] of this.traceCalls) {
+    // Topologically sort spans: children before parents.
+    // Any parentSpanId not present in spanCalls (e.g. trace IDs, skipped
+    // response spans) is treated as external, so that span sorts as a root.
+    const parentOf = new Map<string, string | undefined>(
+      [...this.spanCalls.entries()].map(([id, data]) => [id, data.parentSpanId])
+    );
+    const sortedSpanIds = topologicalSortChildrenFirst(parentOf);
+
+    // Finish unfinished span calls (deepest children first)
+    for (const spanId of sortedSpanIds) {
+      const callData = this.spanCalls.get(spanId)!;
       const callEnd = {
         project_id: client.projectId,
         id: callData.callId,
@@ -415,8 +435,8 @@ export class WeaveTracingProcessor implements TracingProcessor {
       client.saveCallEnd(callEnd);
     }
 
-    // Finish unfinished span calls
-    for (const [spanId, callData] of this.spanCalls) {
+    // Finish unfinished trace calls last (they are roots)
+    for (const [, callData] of this.traceCalls) {
       const callEnd = {
         project_id: client.projectId,
         id: callData.callId,
