@@ -809,7 +809,7 @@ def test_sdk_add_tags(client: WeaveClient):
             include_tags_and_aliases=True,
         )
     )
-    assert sorted(res.objs[0].tags) == ["alpha", "beta"]
+    assert res.objs[0].tags == ["alpha", "beta"]
 
 
 def test_sdk_remove_tags(client: WeaveClient):
