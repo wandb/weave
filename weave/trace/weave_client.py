@@ -19,6 +19,11 @@ import pydantic
 from httpx import HTTPStatusError as HTTPError
 
 from weave import version
+from weave.shared.digest import (
+    compute_object_digest_result,
+    compute_row_digest,
+    compute_table_digest,
+)
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.telemetry import trace_sentry
@@ -115,7 +120,6 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     FileCreateRes,
     ObjCreateReq,
-    ObjCreateRes,
     ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
@@ -1685,29 +1689,27 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
-        def send_obj_create() -> ObjCreateRes:
-            # `to_json` is mostly fast, except for CustomWeaveTypes
-            # which incur network costs to serialize the payload
-            json_val = to_json(val, self._project_id(), self)
-            req = ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
-                )
+        # Serialize and derive digest inline so refs are materialized immediately.
+        # We still upload asynchronously to keep network I/O off the caller thread.
+        json_val = to_json(val, self._project_id(), self)
+        req = ObjCreateReq(
+            obj=ObjSchemaForInsert(
+                project_id=self.entity + "/" + self.project,
+                object_id=name,
+                val=json_val,
             )
-            return self.server.obj_create(req)
-
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
         )
+        digest = compute_object_digest_result(
+            req.obj.val,
+            req.obj.builtin_object_class,
+        ).digest
+        self.future_executor.defer(lambda req=req: self.server.obj_create(req))
 
         ref: Ref
         if is_op(orig_val):
-            ref = OpRef(self.entity, self.project, name, digest_future)
+            ref = OpRef(self.entity, self.project, name, digest)
         else:
-            ref = ObjectRef(self.entity, self.project, name, digest_future)
+            ref = ObjectRef(self.entity, self.project, name, digest)
 
         # Attach the ref to the object
         try:
@@ -1736,6 +1738,23 @@ class WeaveClient:
         )
         return self.server.table_create(req)
 
+    def _compute_table_digest_data(
+        self, rows: list[Any]
+    ) -> tuple[list[dict[str, Any]], str, list[str]]:
+        json_rows = to_json(rows, self._project_id(), self)
+        if not isinstance(json_rows, list):
+            raise TypeError("Table rows must serialize to a list")
+
+        row_digests: list[str] = []
+        serialized_rows: list[dict[str, Any]] = []
+        for row in json_rows:
+            if not isinstance(row, dict):
+                raise TypeError("All table rows must serialize to dictionaries")
+            serialized_rows.append(row)
+            row_digests.append(compute_row_digest(row))
+
+        return serialized_rows, compute_table_digest(row_digests), row_digests
+
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
@@ -1748,28 +1767,30 @@ class WeaveClient:
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
+        # Serialize and derive digest data inline so refs are materialized immediately.
+        serialized_rows, local_table_digest, local_row_digests = (
+            self._compute_table_digest_data(list(table.rows))
+        )
+
         chunking_config = self._should_use_chunking(table)
         if not chunking_config.use_chunking:
-            # Simple case: defer the entire serialization and upload
-            res_future: Future[TableCreateRes] = self.future_executor.defer(
-                lambda: self._send_table_create(list(table.rows))
+            # Simple case: request is built inline, upload is deferred.
+            req = TableCreateReq(
+                table=TableSchemaForInsert(
+                    project_id=self._project_id(),
+                    rows=serialized_rows,
+                )
             )
+            self.future_executor.defer(lambda req=req: self.server.table_create(req))
         elif chunking_config.use_parallel_chunks:
             # Need to chunk up, use parallelism
-            res_future = self._create_table_with_parallel_chunks(table)
+            self._create_table_with_parallel_chunks(table)
         else:
             # Legacy method for large tables and old servers
-            res_future = self._create_table_with_incremental_updates(table)
-
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
-        row_digests_future: Future[list[str]] = self.future_executor.then(
-            [res_future], lambda res: res[0].row_digests
-        )
+            self._create_table_with_incremental_updates(table)
 
         table_ref = TableRef(
-            self.entity, self.project, digest_future, row_digests_future
+            self.entity, self.project, local_table_digest, local_row_digests
         )
 
         table.ref = table_ref

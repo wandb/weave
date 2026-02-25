@@ -27,6 +27,11 @@ from tests.trace.util import (
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
+from weave.shared.digest import (
+    compute_object_digest_result,
+    compute_row_digest,
+    compute_table_digest,
+)
 from weave.trace import refs, settings, table_upload_chunking, weave_client
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
@@ -135,16 +140,72 @@ def test_table_update(client):
     for i, row in enumerate(table_query_2_res.rows):
         assert row.val["val"] == final_data[i]["val"]
 
-    # Verify digests are equal to if we added directly
-    check_res = client.server.table_create(
-        TableCreateReq(
-            table=TableSchemaForInsert(
-                project_id=client._project_id(),
-                rows=final_data,
-            )
-        )
+
+def test_object_ref_digest_ignores_server_returned_digest(client, monkeypatch):
+    underlying_server = client.server.server._next_trace_server
+    original_obj_create = underlying_server.obj_create
+    observed_reqs: list[tsi.ObjCreateReq] = []
+    bogus_server_digest = "server-returned-digest"
+
+    def obj_create_with_bogus_digest(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        observed_reqs.append(req)
+        original_obj_create(req)
+        return tsi.ObjCreateRes(digest=bogus_server_digest)
+
+    monkeypatch.setattr(underlying_server, "obj_create", obj_create_with_bogus_digest)
+
+    ref = client._save_object_basic(
+        {"value": 1}, name=f"client-digest-obj-{uuid.uuid4().hex}"
     )
-    assert check_res.digest == table_create_res.digest
+    digest = ref.digest
+    client.flush()
+
+    assert observed_reqs, "Expected obj_create to be invoked"
+    expected_digest = compute_object_digest_result(
+        observed_reqs[0].obj.val,
+        observed_reqs[0].obj.builtin_object_class,
+    ).digest
+    assert digest == expected_digest
+    assert digest != bogus_server_digest
+
+
+def test_table_ref_digest_ignores_server_returned_digests(client, monkeypatch):
+    underlying_server = client.server.server._next_trace_server
+    original_table_create = underlying_server.table_create
+    observed_reqs: list[tsi.TableCreateReq] = []
+    bogus_server_digest = "server-table-digest"
+    bogus_server_row_digests = ["server-row-digest-1", "server-row-digest-2"]
+
+    def table_create_with_bogus_digests(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        observed_reqs.append(req)
+        original_table_create(req)
+        return tsi.TableCreateRes(
+            digest=bogus_server_digest,
+            row_digests=bogus_server_row_digests,
+        )
+
+    monkeypatch.setattr(
+        underlying_server, "table_create", table_create_with_bogus_digests
+    )
+
+    table_ref = client._save_table(weave_client.Table([{"a": 1}, {"a": 2}]))
+    digest = table_ref.digest
+    row_digests = table_ref.row_digests
+    client.flush()
+
+    assert observed_reqs, "Expected table_create to be invoked"
+    req_rows = observed_reqs[0].table.rows
+    assert isinstance(req_rows, list)
+    expected_row_digests: list[str] = []
+    for row in req_rows:
+        assert isinstance(row, dict)
+        expected_row_digests.append(compute_row_digest(row))
+    expected_digest = compute_table_digest(expected_row_digests)
+
+    assert digest == expected_digest
+    assert row_digests == expected_row_digests
+    assert digest != bogus_server_digest
+    assert row_digests != bogus_server_row_digests
 
 
 @pytest.mark.skip
