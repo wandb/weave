@@ -794,6 +794,74 @@ def test_multiple_aliases_on_object(client: WeaveClient):
 # --- obj_read with real digest (not alias) ---
 
 
+# --- SDK client methods (WeaveClient.add_tags, remove_tags, set_alias, remove_alias) ---
+
+
+def test_sdk_add_tags(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_add_tags_obj")
+
+    client.add_tags(ref, ["alpha", "beta"])
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert sorted(res.objs[0].tags) == ["alpha", "beta"]
+
+
+def test_sdk_remove_tags(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_rm_tags_obj")
+
+    client.add_tags(ref, ["x", "y"])
+    client.remove_tags(ref, ["x"])
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert res.objs[0].tags == ["y"]
+
+
+def test_sdk_set_alias(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_set_alias_obj")
+
+    client.set_alias(ref, "production")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "production" in res.objs[0].aliases
+
+
+def test_sdk_remove_alias(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_rm_alias_obj")
+
+    client.set_alias(ref, "staging")
+    client.remove_alias(ref.name, "staging")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "staging" not in (res.objs[0].aliases or [])
+
+
+# --- obj_read with real digest (not alias) ---
+
+
 def test_obj_read_with_real_digest(client: WeaveClient):
     """obj_read with a content-addressed digest should not attempt alias resolution."""
     object_id, digest = _publish_obj(client, "real_digest_obj")
