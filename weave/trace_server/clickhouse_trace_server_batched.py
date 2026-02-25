@@ -2018,7 +2018,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         for obj in objs:
             key = (obj.object_id, obj.digest)
-            obj.tags = tags_map.get(key, [])
+            obj.tags = sorted(tags_map.get(key, []))
             aliases = aliases_map.get(key, [])
             # "latest" is virtual — synthesized from the is_latest window function
             if obj.is_latest == 1 and "latest" not in aliases:

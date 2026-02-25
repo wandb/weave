@@ -44,7 +44,7 @@ def test_add_tags(client: WeaveClient):
             include_tags_and_aliases=True,
         )
     )
-    assert sorted(res.objs[0].tags) == ["reviewed", "staging"]
+    assert res.objs[0].tags == ["reviewed", "staging"]
 
 
 def test_remove_tags(client: WeaveClient):
@@ -258,7 +258,7 @@ def test_alias_reserved_names():
 
 
 def test_tag_validation():
-    """Empty and too-long tag names rejected. Tags are permissive otherwise."""
+    """Tags must match TAG_REGEX: alphanumeric, hyphens, underscores, single spaces between words."""
     # Empty tag
     with pytest.raises(ValidationError):
         tsi.ObjAddTagsReq(
@@ -277,12 +277,56 @@ def test_tag_validation():
             tags=["a" * 257],
         )
 
-    # Special characters ARE allowed for tags (permissive like W&B Models)
+    # Whitespace-only rejected
+    with pytest.raises(ValidationError):
+        tsi.ObjAddTagsReq(
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            tags=["   "],
+        )
+
+    # Special characters rejected (dots, bangs, etc.)
+    for bad_tag in ["special!chars", "my.tag", "hello@world", "a+b"]:
+        with pytest.raises(ValidationError):
+            tsi.ObjAddTagsReq(
+                project_id="test/proj",
+                object_id="obj",
+                digest="abc123",
+                tags=[bad_tag],
+            )
+
+    # Leading/trailing spaces rejected
+    with pytest.raises(ValidationError):
+        tsi.ObjAddTagsReq(
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            tags=[" leading"],
+        )
+    with pytest.raises(ValidationError):
+        tsi.ObjAddTagsReq(
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            tags=["trailing "],
+        )
+
+    # Consecutive spaces rejected
+    with pytest.raises(ValidationError):
+        tsi.ObjAddTagsReq(
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            tags=["two  spaces"],
+        )
+
+    # Valid tags with single spaces between words
     tsi.ObjAddTagsReq(
         project_id="test/proj",
         object_id="obj",
         digest="abc123",
-        tags=["has spaces", "special!chars", "emoji-ok"],
+        tags=["has spaces", "under review"],
     )
 
 
@@ -588,8 +632,8 @@ def test_obj_read_with_real_digest(client: WeaveClient):
 
 
 def test_valid_tag_and_alias_names():
-    """Tags are very permissive; aliases disallow only '/' and ':'."""
-    # Tags: permissive — spaces, special chars, up to 256 chars
+    """Tags match TAG_REGEX; aliases disallow only '/' and ':'."""
+    # Tags: alphanumeric, hyphens, underscores, single spaces between words
     tsi.ObjAddTagsReq(
         project_id="test/proj",
         object_id="obj",
@@ -598,12 +642,10 @@ def test_valid_tag_and_alias_names():
             "reviewed",
             "my-tag",
             "my_tag",
-            "my.tag",
             "Tag123",
             "a" * 256,
             "has spaces",
             "under review",
-            "special!chars",
         ],
     )
     # Aliases: broad charset, only '/' and ':' disallowed
@@ -643,6 +685,35 @@ def test_alias_invalid_characters():
             digest="abc123",
             alias="has:colon",
         )
+
+
+def test_alias_whitespace_only():
+    """Whitespace-only alias names should be rejected."""
+    with pytest.raises(ValidationError):
+        tsi.ObjSetAliasReq(
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            alias="   ",
+        )
+    with pytest.raises(ValidationError):
+        tsi.ObjSetAliasReq(
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            alias="\t",
+        )
+
+
+def test_tag_deduplication():
+    """Duplicate tags in a single request should be deduplicated."""
+    req = tsi.ObjAddTagsReq(
+        project_id="test/proj",
+        object_id="obj",
+        digest="abc123",
+        tags=["a", "b", "a"],
+    )
+    assert req.tags == ["a", "b"]
 
 
 def test_tag_version_like_accepted():
