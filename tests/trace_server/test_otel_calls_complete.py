@@ -395,6 +395,44 @@ def test_v1_api_raises_error_for_otel_established_project(
         )
 
 
+def test_otel_export_null_sentinel_fields_to_calls_complete(
+    trace_server, clickhouse_trace_server
+):
+    """OTel spans with no optional attributes must not produce a CH 'None in non-Nullable column' error.
+
+    Regression test for: clickhouse_connect.driver.exceptions.DataError:
+        "Invalid None value in non-Nullable column, column name: `display_name`"
+
+    The calls_complete table uses non-nullable String columns with an empty-string
+    sentinel instead of Nullable(String).  Every OTel span that omits optional fields
+    (display_name, exception, wb_run_id, parent_id, …) will have Python None for those
+    fields.  The insert path must convert None → "" before hitting ClickHouse, and the
+    read path must convert "" → None so callers see clean Python values.
+    """
+    project_id = f"{TEST_ENTITY}/otel_null_sentinels"
+
+    # A plain span with no wandb.* attributes — display_name, exception, wb_run_id,
+    # parent_id, thread_id, and turn_id will all be None.
+    span = _create_otel_span("sentinel_test_span")
+    req = _create_otel_export_req(project_id, [span])
+
+    # Must not raise DataError / "Invalid None value in non-Nullable column"
+    res = trace_server.otel_export(req)
+    assert res.partial_success is None  # no rejected spans
+
+    # Read the call back and verify sentinel fields are exposed as None, not ""
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    call = calls[0]
+
+    assert call.display_name is None, (
+        f"display_name sentinel leaked: {call.display_name!r}"
+    )
+    assert call.exception is None, f"exception sentinel leaked: {call.exception!r}"
+    assert call.wb_run_id is None, f"wb_run_id sentinel leaked: {call.wb_run_id!r}"
+    assert call.parent_id is None, f"parent_id sentinel leaked: {call.parent_id!r}"
+
+
 def test_otel_and_calls_complete_api_interoperability(
     trace_server, clickhouse_trace_server
 ):

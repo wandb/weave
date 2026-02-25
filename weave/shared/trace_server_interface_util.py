@@ -1,31 +1,10 @@
-import base64
-import hashlib
 from typing import Any
 
-from weave.trace_server import refs_internal
+from weave.shared import refs_internal
 
 TRACE_REF_SCHEME = "weave"
 ARTIFACT_REF_SCHEME = "wandb-artifact"
 WILDCARD_ARTIFACT_VERSION_AND_PATH = ":*"
-
-
-def bytes_digest(json_val: bytes) -> str:
-    hasher = hashlib.sha256()
-    hasher.update(json_val)
-    hash_bytes = hasher.digest()
-    base64_encoded_hash = base64.urlsafe_b64encode(hash_bytes).decode("utf-8")
-    return base64_encoded_hash.replace("-", "X").replace("_", "Y").rstrip("=")
-
-
-def str_digest(json_val: str) -> str:
-    return bytes_digest(json_val.encode())
-
-
-def _order_dict(dictionary: dict) -> dict:
-    return {
-        k: _order_dict(v) if isinstance(v, dict) else v
-        for k, v in sorted(dictionary.items())
-    }
 
 
 valid_internal_schemes = [

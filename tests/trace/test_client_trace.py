@@ -32,6 +32,12 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
 from weave import Thread, ThreadPoolExecutor
+from weave.shared.refs_internal import extra_value_quoter
+from weave.shared.trace_server_interface_util import (
+    TRACE_REF_SCHEME,
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    extract_refs_from_values,
+)
 from weave.trace import weave_client
 from weave.trace.context.call_context import require_current_call
 from weave.trace.context.weave_client_context import (
@@ -46,13 +52,7 @@ from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
-from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
-from weave.trace_server.trace_server_interface_util import (
-    TRACE_REF_SCHEME,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-    extract_refs_from_values,
-)
 from weave.trace_server.validation_util import CHValidationError
 from weave.type_wrappers.Content.content import Content
 from weave.utils.project_id import from_project_id, to_project_id
@@ -110,7 +110,7 @@ def test_simple_op(client):
     calls = list(client.get_calls())
     assert len(calls) == 1
     fetched_call = calls[0]
-    digest = "nFk3Jq6jb72HLfeGaxwcsHyckk0gRWNFn17M2AR8Oxo"
+    digest = "VAjc7UcWtXC9OiUr6jrzM6CURhBaMiBr0gqOddcCxY4"
     expected_name = (
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
@@ -1799,7 +1799,7 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:FkWFKCRcl9wsGp3yclN7v1IIAICTPenpZYrWo0otI4Y/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -3420,7 +3420,7 @@ def test_objects_and_keys_with_special_characters(client):
         exp_key
         == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
     )
-    exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
+    exp_digest = "k8nuYiUMP6VgAP6wMjeY8dRYnMz2lCqlCyzu2F7iFMw"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
     assert obj.ref.uri() == exp_obj_ref
@@ -3441,7 +3441,7 @@ def test_objects_and_keys_with_special_characters(client):
     gotten_res = weave.ref(found_ref).get()
     assert gotten_res == "hello world"
 
-    exp_op_digest = "qlezedpwj0O4lZYB3vcgSYj0eQvQDdStowLaGBCEmaI"
+    exp_op_digest = "UsyKRnrEyBIieYPDU6eGrbGJgtXjFVFoR6PEemZma68"
     exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
 
     found_ref = test.ref.uri()
@@ -6451,3 +6451,37 @@ def test_calls_query_ordering_with_costs_comprehensive(client):
     assert calls[0].id == call6.id
     assert calls[1].id == call5.id
     assert calls[2].id == call4.id
+
+
+def test_sentinel_round_trip_none_values(client):
+    """Verify that None values survive the full write→read pipeline without leaking sentinels.
+
+    The calls_complete table uses non-nullable columns with sentinel values (empty string
+    for strings, epoch 1970-01-01 for datetimes) instead of NULL. The app layer converts
+    between Python None and sentinels at the ClickHouse boundary. This test validates
+    that nullable fields remain None when read back, not "".
+    """
+
+    @weave.op
+    def returns_none() -> None:
+        return None
+
+    returns_none()
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    c = calls[0]
+
+    # Nullable fields that should be None must not leak sentinels (e.g. "")
+    assert c.parent_id is None
+    assert c.exception is None
+    assert c.wb_run_id is None
+    assert c.display_name is None
+    assert c.output is None
+
+    # Non-null fields must be present
+    assert c.id is not None
+    assert c.trace_id is not None
+    assert c.started_at is not None
+    assert c.ended_at is not None
+    assert c.op_name is not None

@@ -246,6 +246,7 @@ select = [
   "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
+  "SIM101",  # https://docs.astral.sh/ruff/rules/duplicate-isinstance-call/
   "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
   "N801",    # https://docs.astral.sh/ruff/rules/invalid-class-name/
   "N802",    # https://docs.astral.sh/ruff/rules/invalid-function-name/
@@ -277,6 +278,7 @@ select = [
   "E711",    # https://docs.astral.sh/ruff/rules/none-comparison/
   "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
   "PYI019",  # https://docs.astral.sh/ruff/rules/custom-type-var-for-self/
+  "FA",      # https://docs.astral.sh/ruff/rules/#flake8-future-annotations-fa
 ]
 ignore = [
   # Fix these when possible.  They are formatting changes related to the docs!
@@ -307,6 +309,7 @@ exclude = ["rules"]
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
 "!/tests/**/*.py" = ["RUF059"]
+"weave/trace/serialization/op_type.py" = ["RUF100", "N802"]
 
 [tool.pyright]
 include = ["weave"]
@@ -429,7 +432,7 @@ test = [
   "pytest-xdist>=3.1.0",
   "pytest-rerunfailures>=14.0",
   "pytest-shard==0.1.2",
-  "clickhouse_connect==0.7.0",
+  "clickhouse_connect==0.11.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
   "freezegun",
@@ -449,6 +452,10 @@ test = [
   # Media Generation
   "opencv-python", # Video generation
   "reportlab",     # PDF generation
+
+  # MIME type detection (requires libmagic system library on Linux/macOS)
+  "python-magic; sys_platform != 'win32'",
+  "python-magic-bin; sys_platform == 'win32'",
 
   "confluent-kafka",
 
