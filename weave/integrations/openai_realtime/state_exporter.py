@@ -189,6 +189,7 @@ class StateExporter(BaseModel):
     pending_completions: dict[str, dict[str, Any]] = Field(default_factory=dict)
     fifo_timer: threading.Timer | None = None
     fifo_lock: threading.Lock = Field(default_factory=threading.Lock)
+    _fifo_advancing: bool = False
 
     pending_response: dict | None = None
     pending_create_params: dict | None = None
@@ -835,47 +836,58 @@ class StateExporter(BaseModel):
 
     def _advance_fifo(self) -> None:
         """Attempt to finish the head response if ready; maintain order."""
-        while True:
-            with self.fifo_lock:
-                if not self.completion_queue:
-                    # Nothing pending
-                    self.fifo_timer = None
-                    return
-                head = self.completion_queue[0]
-                ctx = self.pending_completions.get(head)
-                if ctx is None:
-                    # Corrupt entry; drop and continue
-                    self.completion_queue.pop(0)
-                    continue
-
-                ready = self._transcripts_ready_for_ctx(ctx)
-
-            if not ready:
-                # Head not ready; reschedule a check and exit to preserve order
-                self._schedule_fifo_check()
+        with self.fifo_lock:
+            if self._fifo_advancing:
+                # Another thread is already advancing; it will loop and
+                # pick up any newly-ready items, so we can safely return.
                 return
+            self._fifo_advancing = True
 
-            # Finish the head outside the lock to avoid blocking
-            msg = ctx["msg"]
-            self._handle_response_done_inner(
-                msg,
-                ctx.get("session"),
-                ctx.get("pending_create_params"),
-                ctx.get("messages", []),
-            )
+        try:
+            while True:
+                with self.fifo_lock:
+                    if not self.completion_queue:
+                        # Nothing pending
+                        self.fifo_timer = None
+                        return
+                    head = self.completion_queue[0]
+                    ctx = self.pending_completions.get(head)
+                    if ctx is None:
+                        # Corrupt entry; drop and continue
+                        self.completion_queue.pop(0)
+                        continue
 
-            # Remove the head and continue to next (if it's immediately ready)
+                    ready = self._transcripts_ready_for_ctx(ctx)
+
+                if not ready:
+                    # Head not ready; reschedule a check and exit to preserve order
+                    self._schedule_fifo_check()
+                    return
+
+                # Finish the head outside the lock to avoid blocking
+                msg = ctx["msg"]
+                self._handle_response_done_inner(
+                    msg,
+                    ctx.get("session"),
+                    ctx.get("pending_create_params"),
+                    ctx.get("messages", []),
+                )
+
+                # Remove the head and continue to next (if it's immediately ready)
+                with self.fifo_lock:
+                    rid = _get_from_dict(_get_from_dict(msg, "response", {}), "id")
+                    if rid and self.completion_queue and self.completion_queue[0] == rid:
+                        self.completion_queue.pop(0)
+                    if rid:
+                        self.pending_completions.pop(rid, None)
+
+                # Loop to see if the next head is already ready; otherwise schedule check
+                # for later and return.
+                # The loop continues only if the immediate next is also ready now.
+                continue
+        finally:
             with self.fifo_lock:
-                rid = _get_from_dict(_get_from_dict(msg, "response", {}), "id")
-                if rid and self.completion_queue and self.completion_queue[0] == rid:
-                    self.completion_queue.pop(0)
-                if rid:
-                    self.pending_completions.pop(rid, None)
-
-            # Loop to see if the next head is already ready; otherwise schedule check
-            # for later and return.
-            # The loop continues only if the immediate next is also ready now.
-            continue
+                self._fifo_advancing = False
 
     def build_conversation_forward(self, item_id: str | None) -> list[dict]:
         if not item_id:
