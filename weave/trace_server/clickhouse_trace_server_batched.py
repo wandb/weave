@@ -4978,6 +4978,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = compute_file_digest(req.content)
+
+        # During a batch, _file_batch accumulates chunks. If we already have
+        # chunks for this (project_id, digest), the content is identical and
+        # we can skip the redundant storage I/O (bucket upload or CH insert).
+        if any(
+            c.project_id == req.project_id and c.digest == digest
+            for c in self._file_batch
+        ):
+            return tsi.FileCreateRes(digest=digest)
+
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 
