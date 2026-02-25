@@ -12,8 +12,7 @@ from weave.trace_server.interface.query import Query
 
 
 class ScorerDebounceConfig(TypedDict):
-    """Configuration for debounced scoring on a monitor.
-    """
+    """Configuration for debounced scoring on a monitor."""
 
     # Specifies which field is used to find candidates for debouncing
     aggregation_field: Literal["trace_id", "thread_id"]
