@@ -114,14 +114,18 @@ from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
+    ObjAddTagsReq,
     ObjCreateReq,
     ObjCreateRes,
     ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
+    ObjRemoveAliasReq,
+    ObjRemoveTagsReq,
     ObjSchema,
     ObjSchemaForInsert,
+    ObjSetAliasReq,
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
@@ -1172,6 +1176,69 @@ class WeaveClient:
             )
         )
         return result.num_deleted
+
+    def add_tags(self, obj_ref: ObjectRef, tags: list[str]) -> None:
+        """Add tags to an object version.
+
+        Args:
+            obj_ref: Reference to the object version.
+            tags: List of tag strings to add.
+        """
+        self.server.obj_add_tags(
+            ObjAddTagsReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                tags=tags,
+            )
+        )
+
+    def remove_tags(self, obj_ref: ObjectRef, tags: list[str]) -> None:
+        """Remove tags from an object version.
+
+        Args:
+            obj_ref: Reference to the object version.
+            tags: List of tag strings to remove.
+        """
+        self.server.obj_remove_tags(
+            ObjRemoveTagsReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                tags=tags,
+            )
+        )
+
+    def set_alias(self, obj_ref: ObjectRef, alias: str) -> None:
+        """Set an alias for an object version.
+
+        Args:
+            obj_ref: Reference to the object version.
+            alias: The alias name to set (e.g., "production", "staging").
+        """
+        self.server.obj_set_alias(
+            ObjSetAliasReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                alias=alias,
+            )
+        )
+
+    def remove_alias(self, object_id: str, alias: str) -> None:
+        """Remove an alias from an object.
+
+        Args:
+            object_id: The object name.
+            alias: The alias name to remove.
+        """
+        self.server.obj_remove_alias(
+            ObjRemoveAliasReq(
+                project_id=self._project_id(),
+                object_id=object_id,
+                alias=alias,
+            )
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
