@@ -90,7 +90,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
             )
-        self._auth: tuple[str, str] | None = auth
+        self._auth: tuple[str, str] | None = None
+        self._bearer_token: str | None = None
+        if auth is not None:
+            self._set_auth_internal(auth)
         self._extra_headers: dict[str, str] | None = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
@@ -108,13 +111,25 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         return cls(weave_trace_server_url(), should_batch)
 
     def set_auth(self, auth: tuple[str, str]) -> None:
-        self._auth = auth
+        self._set_auth_internal(auth)
+
+    def _set_auth_internal(self, auth: tuple[str, str]) -> None:
+        """Route auth to Basic or Bearer based on the key prefix."""
+        _, key = auth
+        if key.startswith("wb_at_"):
+            self._auth = None
+            self._bearer_token = key
+        else:
+            self._auth = auth
+            self._bearer_token = None
 
     def _build_dynamic_request_headers(self) -> dict[str, str]:
         """Build headers for HTTP requests, including extra headers and retry ID."""
         headers = dict(self._extra_headers) if self._extra_headers else {}
         if retry_id := get_current_retry_id():
             headers["X-Weave-Retry-Id"] = retry_id
+        if self._bearer_token is not None:
+            headers["Authorization"] = f"Bearer {self._bearer_token}"
         return headers
 
     def get(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:

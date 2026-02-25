@@ -110,20 +110,36 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         Args:
             auth: Tuple of (username, password) for authentication.
+                  If the password starts with ``wb_at_``, Bearer auth is used
+                  instead of Basic auth.
         """
-        self._username, self._password = auth
-        # Recreate stainless client with new credentials
+        username, password = auth
         default_headers = self._extra_headers.copy()
         if retry_id := get_current_retry_id():
             default_headers["X-Weave-Retry-Id"] = retry_id
 
-        self._stainless_client = StainlessClient(
-            base_url=self.trace_server_url,
-            username=self._username,
-            password=self._password,
-            default_headers=default_headers,
-            batch_requests=False,  # We handle batching ourselves
-        )
+        if password.startswith("wb_at_"):
+            # Use Bearer auth for wb_at_ tokens
+            self._username = ""
+            self._password = ""
+            default_headers["Authorization"] = f"Bearer {password}"
+            self._stainless_client = StainlessClient(
+                base_url=self.trace_server_url,
+                username="",
+                password="",
+                default_headers=default_headers,
+                batch_requests=False,
+            )
+        else:
+            self._username = username
+            self._password = password
+            self._stainless_client = StainlessClient(
+                base_url=self.trace_server_url,
+                username=self._username,
+                password=self._password,
+                default_headers=default_headers,
+                batch_requests=False,
+            )
 
     def _update_client_headers(self) -> None:
         """Update client headers with current retry ID and extra headers."""
