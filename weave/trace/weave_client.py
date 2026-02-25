@@ -102,6 +102,9 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
+from weave.trace_server.trace_server_converter import (
+    universal_ext_to_int_ref_converter,
+)
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallsDeleteReq,
@@ -1700,7 +1703,7 @@ class WeaveClient:
             )
         )
         digest = compute_object_digest_result(
-            req.obj.val,
+            self._normalize_payload_for_digest(req.obj.val),
             req.obj.builtin_object_class,
         ).digest
         self.future_executor.defer(lambda req=req: self.server.obj_create(req))
@@ -1744,14 +1747,21 @@ class WeaveClient:
         json_rows = to_json(rows, self._project_id(), self)
         if not isinstance(json_rows, list):
             raise TypeError("Table rows must serialize to a list")
+        digest_rows = self._normalize_payload_for_digest(json_rows)
+        if not isinstance(digest_rows, list):
+            raise TypeError("Digest rows must be a list")
+        if len(digest_rows) != len(json_rows):
+            raise TypeError("Digest rows must preserve row count")
 
         row_digests: list[str] = []
         serialized_rows: list[dict[str, Any]] = []
-        for row in json_rows:
+        for row, digest_row in zip(json_rows, digest_rows):
             if not isinstance(row, dict):
                 raise TypeError("All table rows must serialize to dictionaries")
+            if not isinstance(digest_row, dict):
+                raise TypeError("All digest rows must be dictionaries")
             serialized_rows.append(row)
-            row_digests.append(compute_row_digest(row))
+            row_digests.append(compute_row_digest(digest_row))
 
         return serialized_rows, compute_table_digest(row_digests), row_digests
 
@@ -1952,6 +1962,39 @@ class WeaveClient:
 
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
+
+    def _normalize_payload_for_digest(self, payload: Any) -> Any:
+        project_id_converter = self._find_ext_to_int_project_id_converter()
+        if project_id_converter is None:
+            return payload
+        try:
+            return universal_ext_to_int_ref_converter(payload, project_id_converter)
+        except Exception:
+            return payload
+
+    def _find_ext_to_int_project_id_converter(
+        self,
+    ) -> Callable[[str], str] | None:
+        server: Any = self.server
+        seen_server_ids: set[int] = set()
+        while server is not None:
+            server_id = id(server)
+            if server_id in seen_server_ids:
+                break
+            seen_server_ids.add(server_id)
+
+            id_converter = getattr(server, "_idc", None)
+            project_id_converter = getattr(id_converter, "ext_to_int_project_id", None)
+            if callable(project_id_converter):
+                return cast(Callable[[str], str], project_id_converter)
+
+            next_server = getattr(server, "_next_trace_server", None)
+            if next_server is None:
+                next_server = getattr(server, "_delegated_server", None)
+            if next_server is None:
+                next_server = getattr(server, "server", None)
+            server = next_server
+        return None
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
