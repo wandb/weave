@@ -6,9 +6,8 @@ crashing. This is a regression test for https://github.com/wandb/weave/issues/46
 """
 
 import datetime
-import json
 from collections.abc import Generator
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -157,17 +156,17 @@ class PydanticV2Run(BaseModel):
     name: str
     run_type: str
     start_time: datetime.datetime
-    end_time: Optional[datetime.datetime] = None
+    end_time: datetime.datetime | None = None
     extra: dict[str, Any] = {}
-    inputs: Optional[dict[str, Any]] = None
-    outputs: Optional[dict[str, Any]] = None
+    inputs: dict[str, Any] | None = None
+    outputs: dict[str, Any] | None = None
     serialized: dict[str, Any] = {}
     events: list[dict[str, Any]] = []
     child_runs: list[Any] = []
-    parent_run_id: Optional[UUID] = None
-    reference_example_id: Optional[UUID] = None
-    trace_id: Optional[UUID] = None
-    dotted_order: Optional[str] = None
+    parent_run_id: UUID | None = None
+    reference_example_id: UUID | None = None
+    trace_id: UUID | None = None
+    dotted_order: str | None = None
 
 
 def test_run_to_dict_with_pydantic_v2_run_and_model_class_in_extra() -> None:
@@ -187,7 +186,9 @@ def test_run_to_dict_with_pydantic_v2_run_and_model_class_in_extra() -> None:
         run_type="llm",
         start_time=now,
         end_time=now,
-        extra={"invocation_params": {"model": "gpt-4o-mini", "response_format": Process}},
+        extra={
+            "invocation_params": {"model": "gpt-4o-mini", "response_format": Process}
+        },
         inputs={"messages": ["test"]},
         outputs={"generations": [{"text": "response"}]},
     )

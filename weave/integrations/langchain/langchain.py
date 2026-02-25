@@ -104,12 +104,12 @@ if not import_failed:
             "trace_id",
             "dotted_order",
         }
-        common_kwargs = dict(
-            exclude=exclude_fields,
-            exclude_unset=True,
-            exclude_none=True,
-            exclude_defaults=True,
-        )
+        common_kwargs = {
+            "exclude": exclude_fields,
+            "exclude_unset": True,
+            "exclude_none": True,
+            "exclude_defaults": True,
+        }
 
         try:
             # Pydantic v2 API (langchain-core >=1.0)
