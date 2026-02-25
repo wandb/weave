@@ -110,7 +110,7 @@ from weave.trace_server.trace_server_interface import (
     CostPurgeReq,
     CostQueryOutput,
     CostQueryReq,
-    EndedCallSchemaForInsert,
+    EndedCallSchemaForInsertWithStartedAt,
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
@@ -135,11 +135,14 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     ROW_COUNT_CHUNKING_THRESHOLD,
     check_endpoint_exists,
 )
+from weave.trace_server_bindings.models import StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
@@ -335,8 +338,10 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
-        self._server_call_processor = None
-        self._server_feedback_processor = None
+        self._server_call_processor: AsyncBatchProcessor | CallBatchProcessor | None = (
+            None
+        )
+        self._server_feedback_processor: AsyncBatchProcessor | None = None
         # This is a short-term hack to get around the fact that we are reaching into
         # the underlying implementation of the specific server to get the call processor.
         # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
@@ -766,10 +771,18 @@ class WeaveClient:
             current_wb_run_step = None
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        call.started_at = started_at
         project_id = self._project_id()
 
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
+
+        # Check if using CallBatchProcessor with non-eager mode (calls_complete path)
+        # In this case, we delay printing the call link until finish_call
+        uses_calls_complete_path = (
+            isinstance(self._server_call_processor, CallBatchProcessor)
+            and not op.eager_call_start
+        )
 
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
@@ -806,13 +819,31 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
-            self.server.call_start(call_start_req)
+            # eager_call_start is a client-side hint that tells the batch processor
+            # to send this call's start immediately (for long-running ops like evals)
+            # Ugly that we have to reach down to the processor level here, but otherwise
+            # we need to change the interface itself.
+            call_processor = _get_call_processor(self.server)
+            if call_processor is not None:
+                eager = op.eager_call_start
+                call_processor.enqueue_start(
+                    StartBatchItem(req=call_start_req), eager_call_start=eager
+                )
+            else:
+                self.server.call_start(call_start_req)
+
             return True
 
         def on_complete(f: Future) -> None:
             try:
                 root_call_did_not_error = f.result() and not current_call
-                if root_call_did_not_error and should_print_call_link_:
+                # For calls_complete path (non-eager CallBatchProcessor), the link is
+                # printed in finish_call after the complete call is queued to ensure
+                if (
+                    root_call_did_not_error
+                    and should_print_call_link_
+                    and not uses_calls_complete_path
+                ):
                     print_call_link(call)
             except Exception:
                 pass
@@ -951,9 +982,10 @@ class WeaveClient:
             )
 
             call_end_req = CallEndReq(
-                end=EndedCallSchemaForInsert(
+                end=EndedCallSchemaForInsertWithStartedAt(
                     project_id=project_id,
                     id=call.id,
+                    started_at=call.started_at,
                     ended_at=ended_at,
                     output=output_json,
                     summary=merged_summary,
@@ -969,7 +1001,27 @@ class WeaveClient:
                 )
             self.server.call_end(call_end_req)
 
-        self.future_executor.defer(send_end_call)
+        # For calls_complete path (non-eager CallBatchProcessor), print the call link
+        # after finish_call, when the complete call is queued to the batch processor.
+        is_root_call = call.parent_id is None
+        uses_calls_complete_path = isinstance(
+            self._server_call_processor, CallBatchProcessor
+        ) and not (op is not None and op.eager_call_start)
+
+        def on_end_complete(f: Future) -> None:
+            try:
+                f.result()  # Check for errors
+                if (
+                    is_root_call
+                    and uses_calls_complete_path
+                    and should_print_call_link()
+                ):
+                    print_call_link(call)
+            except Exception:
+                pass
+
+        fut = self.future_executor.defer(send_end_call)
+        fut.add_done_callback(on_end_complete)
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:
@@ -2273,3 +2325,19 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > MAX_OBJECT_NAME_LENGTH:
         res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
+
+
+def _get_call_processor(server: Any) -> Any:
+    """Get the call processor from a server, traversing through middleware wrappers.
+
+    Most production clients (RemoteHTTPTraceServer, StainlessRemoteHTTPTraceServer)
+    use batching and have a call_processor. This traverses through middleware like
+    CachingMiddlewareTraceServer to find it.
+
+    Returns None for direct backend servers (used in tests).
+    """
+    if hasattr(server, "call_processor"):
+        return server.call_processor
+    if hasattr(server, "_next_trace_server"):
+        return _get_call_processor(server._next_trace_server)
+    return None

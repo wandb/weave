@@ -12,7 +12,6 @@ Optimization SQL is applied before GROUP BY, reducing memory usage and
 improving performance for complex conditions.
 """
 
-import datetime
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -21,6 +20,7 @@ from pydantic import BaseModel
 from weave.trace_server.calls_query_builder.utils import (
     NotContext,
     param_slot,
+    timestamp_to_datetime_str,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import clickhouse_cast
@@ -179,6 +179,16 @@ class QueryOptimizationProcessor(ABC):
         """Process greater than or equal operation."""
         pass
 
+    @abstractmethod
+    def process_lt(self, operation: tsi_query.LtOperation) -> str | None:
+        """Process less than operation."""
+        pass
+
+    @abstractmethod
+    def process_lte(self, operation: tsi_query.LteOperation) -> str | None:
+        """Process less than or equal operation."""
+        pass
+
     def finalize_sql(self, result: str | None) -> str | None:
         """Final step to make valid SQL for the calls query.
 
@@ -202,14 +212,26 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
     This processor creates LIKE-based SQL conditions to optimize queries
     on heavy fields (inputs, outputs, attributes) before aggregation, reducing memory pressure.
     Handles both string and numeric values in JSON fields.
+
+    For calls_merged (use_null_check=True), null checks are added to avoid filtering
+    out unmerged call parts. For calls_complete (use_null_check=False), null checks
+    are skipped since every row is a complete call.
     """
+
+    def __init__(
+        self, pb: "ParamBuilder", table_alias: str, use_null_check: bool = True
+    ) -> None:
+        super().__init__(pb, table_alias)
+        self.use_null_check = use_null_check
 
     def process_eq(self, operation: tsi_query.EqOperation) -> str | None:
         """Process equality operation on heavy fields.
 
         Creates SQL condition using LIKE patterns for values in JSON fields.
         """
-        return _create_like_optimized_eq_condition(operation, self.pb, self.table_alias)
+        return _create_like_optimized_eq_condition(
+            operation, self.pb, self.table_alias, self.use_null_check
+        )
 
     def process_contains(self, operation: tsi_query.ContainsOperation) -> str | None:
         """Process contains operation on heavy fields.
@@ -217,7 +239,7 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
         Creates SQL condition using LIKE patterns for substrings in JSON fields.
         """
         return _create_like_optimized_contains_condition(
-            operation, self.pb, self.table_alias
+            operation, self.pb, self.table_alias, self.use_null_check
         )
 
     def process_in(self, operation: tsi_query.InOperation) -> str | None:
@@ -225,13 +247,23 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
 
         Creates SQL conditions using LIKE patterns for multiple values.
         """
-        return _create_like_optimized_in_condition(operation, self.pb, self.table_alias)
+        return _create_like_optimized_in_condition(
+            operation, self.pb, self.table_alias, self.use_null_check
+        )
 
     def process_gt(self, operation: tsi_query.GtOperation) -> str | None:
         """Not implemented for heavy field optimization."""
         return None
 
     def process_gte(self, operation: tsi_query.GteOperation) -> str | None:
+        """Not implemented for heavy field optimization."""
+        return None
+
+    def process_lt(self, operation: tsi_query.LtOperation) -> str | None:
+        """Not implemented for heavy field optimization."""
+        return None
+
+    def process_lte(self, operation: tsi_query.LteOperation) -> str | None:
         """Not implemented for heavy field optimization."""
         return None
 
@@ -277,6 +309,24 @@ class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
             operation, self.pb, self.table_alias, ">="
         )
 
+    def process_lt(self, operation: tsi_query.LtOperation) -> str | None:
+        """Process LT operation on sortable_datetime fields using sortable_datetime optimization.
+
+        Creates SQL condition that filters started_at with the sortable_datetime column.
+        """
+        return _create_datetime_optimization_sql(
+            operation, self.pb, self.table_alias, "<"
+        )
+
+    def process_lte(self, operation: tsi_query.LteOperation) -> str | None:
+        """Process LTE operation on sortable_datetime fields using sortable_datetime optimization.
+
+        Creates SQL condition that filters started_at with the sortable_datetime column.
+        """
+        return _create_datetime_optimization_sql(
+            operation, self.pb, self.table_alias, "<="
+        )
+
 
 def apply_processor(
     processor: QueryOptimizationProcessor, operation: tsi_query.Operation
@@ -297,6 +347,10 @@ def apply_processor(
         return processor.process_gt(operation)
     elif isinstance(operation, tsi_query.GteOperation):
         return processor.process_gte(operation)
+    elif isinstance(operation, tsi_query.LtOperation):
+        return processor.process_lt(operation)
+    elif isinstance(operation, tsi_query.LteOperation):
+        return processor.process_lte(operation)
     return None
 
 
@@ -332,12 +386,18 @@ def process_query_to_optimization_sql(
     and_operation = tsi_query.AndOperation(**{"$and": [c.operand for c in conditions]})
 
     # Apply heavy field optimization
-    heavy_field_processor = HeavyFieldOptimizationProcessor(param_builder, table_alias)
+    # For calls_merged (use_aggregation=True), null checks are needed because unmerged
+    # call parts may have NULL fields. For calls_complete (use_aggregation=False),
+    # null checks are skipped since every row is a complete call.
+    config = TableConfig.from_read_table(read_table)
+    use_null_check = config.use_aggregation
+    heavy_field_processor = HeavyFieldOptimizationProcessor(
+        param_builder, table_alias, use_null_check=use_null_check
+    )
     heavy_field_result = apply_processor(heavy_field_processor, and_operation)
     heavy_field_result_sql = heavy_field_processor.finalize_sql(heavy_field_result)
 
     sortable_datetime_result_sql = None
-    config = TableConfig.from_read_table(read_table)
     if config.use_aggregation:
         # Apply sortable_datetime optimization only for aggregated tables (calls_merged)
         # The sortable_datetime column is specific to calls_merged's materialized view
@@ -400,17 +460,26 @@ def _create_like_condition(
 
 
 def _extract_field_and_literal(
-    operation: tsi_query.EqOperation | tsi_query.GtOperation | tsi_query.GteOperation,
+    operation: tsi_query.EqOperation
+    | tsi_query.GtOperation
+    | tsi_query.GteOperation
+    | tsi_query.LtOperation
+    | tsi_query.LteOperation,
 ) -> tuple[tsi_query.GetFieldOperator | None, tsi_query.LiteralOperation | None]:
     """Extract field and literal operands from a binary operation.
 
     Returns a tuple of (field_operand, literal_operand) or (None, None) if invalid.
     """
-    ops = (
-        operation.eq_
-        if hasattr(operation, "eq_")
-        else (operation.gt_ if hasattr(operation, "gt_") else operation.gte_)
-    )
+    if hasattr(operation, "eq_"):
+        ops = operation.eq_
+    elif hasattr(operation, "gt_"):
+        ops = operation.gt_
+    elif hasattr(operation, "gte_"):
+        ops = operation.gte_
+    elif hasattr(operation, "lt_"):
+        ops = operation.lt_
+    else:
+        ops = operation.lte_
 
     if len(ops) != 2:
         return None, None
@@ -435,8 +504,18 @@ def _create_like_optimized_eq_condition(
     operation: tsi_query.EqOperation,
     pb: "ParamBuilder",
     table_alias: str,
+    use_null_check: bool = True,
 ) -> str | None:
-    """Creates a LIKE-optimized condition for equality operations."""
+    """Creates a LIKE-optimized condition for equality operations.
+
+    Args:
+        operation: The equality operation to optimize.
+        pb: Parameter builder for query parameterization.
+        table_alias: The table alias to use in SQL.
+        use_null_check: Whether to add OR IS NULL for start/end fields.
+            True for calls_merged (unmerged parts may have NULL fields).
+            False for calls_complete (every row is a complete call).
+    """
     field_operand, literal_operand = _extract_field_and_literal(operation)
     if field_operand is None or literal_operand is None:
         return None
@@ -462,7 +541,7 @@ def _create_like_optimized_eq_condition(
     like_pattern = _create_like_pattern_for_value(literal_value)
 
     like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
-    if _field_requires_null_check(field):
+    if use_null_check and _field_requires_null_check(field):
         return f"({like_condition} OR {table_alias}.{field} IS NULL)"
     return like_condition
 
@@ -471,8 +550,18 @@ def _create_like_optimized_contains_condition(
     operation: tsi_query.ContainsOperation,
     pb: "ParamBuilder",
     table_alias: str,
+    use_null_check: bool = True,
 ) -> str | None:
-    """Creates a LIKE-optimized condition for contains operations."""
+    """Creates a LIKE-optimized condition for contains operations.
+
+    Args:
+        operation: The contains operation to optimize.
+        pb: Parameter builder for query parameterization.
+        table_alias: The table alias to use in SQL.
+        use_null_check: Whether to add OR IS NULL for start/end fields.
+            True for calls_merged (unmerged parts may have NULL fields).
+            False for calls_complete (every row is a complete call).
+    """
     # Check if the input is a GetField operation on a JSON field
     if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
         return None
@@ -501,7 +590,7 @@ def _create_like_optimized_contains_condition(
     like_condition = _create_like_condition(
         field, like_pattern, pb, table_alias, case_insensitive
     )
-    if _field_requires_null_check(field):
+    if use_null_check and _field_requires_null_check(field):
         return f"({like_condition} OR {table_alias}.{field} IS NULL)"
     return like_condition
 
@@ -510,8 +599,18 @@ def _create_like_optimized_in_condition(
     operation: tsi_query.InOperation,
     pb: "ParamBuilder",
     table_alias: str,
+    use_null_check: bool = True,
 ) -> str | None:
-    """Creates a LIKE-optimized condition for in operations."""
+    """Creates a LIKE-optimized condition for in operations.
+
+    Args:
+        operation: The IN operation to optimize.
+        pb: Parameter builder for query parameterization.
+        table_alias: The table alias to use in SQL.
+        use_null_check: Whether to add OR IS NULL for start/end fields.
+            True for calls_merged (unmerged parts may have NULL fields).
+            False for calls_complete (every row is a complete call).
+    """
     # Check if the left side is a GetField operation on a JSON field
     if not isinstance(operation.in_[0], tsi_query.GetFieldOperator):
         return None
@@ -550,20 +649,16 @@ def _create_like_optimized_in_condition(
         like_conditions.append(like_condition)
 
     or_sql = "(" + " OR ".join(like_conditions) + ")"
-    if _field_requires_null_check(field):
+    if use_null_check and _field_requires_null_check(field):
         return f"({or_sql} OR {table_alias}.{field} IS NULL)"
     return or_sql
 
 
-def _timestamp_to_datetime_str(timestamp: int) -> str:
-    """Converts a timestamp to a datetime string."""
-    return datetime.datetime.fromtimestamp(
-        timestamp, tz=datetime.timezone.utc
-    ).strftime("%Y-%m-%d %H:%M:%S.%f")
-
-
 def _create_datetime_optimization_sql(
-    operation: tsi_query.GtOperation | tsi_query.GteOperation,
+    operation: tsi_query.GtOperation
+    | tsi_query.GteOperation
+    | tsi_query.LtOperation
+    | tsi_query.LteOperation,
     pb: "ParamBuilder",
     table_alias: str,
     op_str: str,
@@ -590,16 +685,21 @@ def _create_datetime_optimization_sql(
     # convert timestamp to datetime_str
     timestamp = int(literal_value)
 
-    # Apply buffer in appropriate direction based on context
+    # Apply buffer in appropriate direction based on context and operator.
+    # For normal context:
+    # - ">" / ">=": subtract buffer to be more permissive
+    # - "<" / "<=": add buffer to be more permissive
+    # For NOT context, invert the buffer direction to keep the filter permissive.
     buffer_seconds = int(DATETIME_BUFFER_TIME_SECONDS)
-    if NotContext.is_in_not_context():
-        # For NOT context, add buffer to make filter more permissive
-        timestamp += buffer_seconds
+    if op_str in ("<", "<="):
+        buffer_sign = 1
     else:
-        # For normal context, subtract buffer to make filter more permissive
-        timestamp -= buffer_seconds
+        buffer_sign = -1
+    if NotContext.is_in_not_context():
+        buffer_sign *= -1
+    timestamp += buffer_sign * buffer_seconds
 
-    datetime_str = _timestamp_to_datetime_str(timestamp)
+    datetime_str = timestamp_to_datetime_str(timestamp)
 
     param_name = pb.add_param(datetime_str)
     return (

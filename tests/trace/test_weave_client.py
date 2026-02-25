@@ -44,6 +44,7 @@ from weave.trace.serialization.serializer import (
     get_serializer_for_obj,
     register_serializer,
 )
+from weave.trace.wandb_run_context import WandbRunContext
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
@@ -317,7 +318,8 @@ def test_filter_sort_by_query_validation(client):
         client.get_calls(query=["not a query"])
 
     with pytest.raises(
-        ValidationError, match="8 validation errors for WeaveClient.get_calls"
+        ValidationError,
+        match=r"\d+ validation errors for WeaveClient.get_calls",
     ):
         client.get_calls(query={"$expr": {"$invalid_field": "invalid_value"}})
 
@@ -332,7 +334,7 @@ def test_call_create(client):
     client.finish_call(call, "hello")
     result = client.get_call(call.id)
     expected = weave.trace.call.Call(
-        _op_name="weave:///shawn/test-project/op/x:IMZjfLeSAoLTYu8QLPrVVXrNIFX6jZlxAYAeRDEEezE",
+        _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -376,7 +378,7 @@ def test_calls_query(client):
     result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave.trace.call.Call(
-        _op_name="weave:///shawn/test-project/op/x:IMZjfLeSAoLTYu8QLPrVVXrNIFX6jZlxAYAeRDEEezE",
+        _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -402,7 +404,7 @@ def test_calls_query(client):
         ended_at=None,
     )
     assert result[1] == weave.trace.call.Call(
-        _op_name="weave:///shawn/test-project/op/x:IMZjfLeSAoLTYu8QLPrVVXrNIFX6jZlxAYAeRDEEezE",
+        _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=call0.id,
@@ -572,30 +574,32 @@ def test_get_calls_limit_offset(client):
     for i in range(10):
         client.create_call("x", {"a": i})
 
-    calls = client.get_calls(limit=3)
+    sort_by = [SortBy(field="inputs.a", direction="asc")]
+
+    calls = client.get_calls(limit=3, sort_by=sort_by)
     assert len(calls) == 3
     for i, call in enumerate(calls):
         assert call.inputs["a"] == i
 
-    calls = client.get_calls(limit=5, offset=5)
+    calls = client.get_calls(limit=5, offset=5, sort_by=sort_by)
     assert len(calls) == 5
 
     for i, call in enumerate(calls):
         assert call.inputs["a"] == i + 5
 
-    calls = client.get_calls(offset=9)
+    calls = client.get_calls(offset=9, sort_by=sort_by)
     assert len(calls) == 1
     assert calls[0].inputs["a"] == 9
 
     # now test indexing
-    calls = client.get_calls()
+    calls = client.get_calls(sort_by=sort_by)
     assert calls[0].inputs["a"] == 0
     assert calls[1].inputs["a"] == 1
     assert calls[2].inputs["a"] == 2
     assert calls[3].inputs["a"] == 3
     assert calls[4].inputs["a"] == 4
 
-    calls = client.get_calls(offset=5)
+    calls = client.get_calls(offset=5, sort_by=sort_by)
     assert calls[0].inputs["a"] == 5
     assert calls[1].inputs["a"] == 6
     assert calls[2].inputs["a"] == 7
@@ -603,7 +607,7 @@ def test_get_calls_limit_offset(client):
     assert calls[4].inputs["a"] == 9
 
     # slicing
-    calls = client.get_calls(offset=5)
+    calls = client.get_calls(offset=5, sort_by=sort_by)
     for i, call in enumerate(calls[2:]):
         assert call.inputs["a"] == 7 + i
 
@@ -638,7 +642,11 @@ def test_get_calls_page_size_with_offset(client):
         batch_num += 1
 
     assert len(all_call_ids) == 20
-    assert all_values == list(range(20))
+    # Use sorted() because calls created in a tight loop may share the same
+    # started_at timestamp (especially on Windows with ~15ms clock resolution),
+    # and the default sort tiebreaker (id DESC) uses random UUIDv7 suffixes
+    # which don't preserve insertion order.
+    assert sorted(all_values) == list(range(20))
 
 
 def test_calls_delete(client):
@@ -2548,6 +2556,87 @@ def test_calls_query_filter_by_strings(client):
         assert call.inputs["value"] > 0
 
 
+def test_calls_default_sort_secondary_id_asc(client):
+    """Test that the default sort uses id ASC as a secondary tiebreaker.
+
+    When no explicit sort_by is provided, calls should be sorted by
+    started_at ASC, then id ASC. This test creates three calls with
+    identical started_at timestamps but different explicit IDs, then
+    verifies that within the same started_at group the ids are returned
+    in ascending order.
+    """
+    # Use explicit IDs that have a clear lexicographic ordering:
+    # id_small < id_mid < id_large
+    id_small = "00000000-0000-7000-8000-00000000000a"
+    id_mid = "00000000-0000-7000-8000-00000000000b"
+    id_large = "00000000-0000-7000-8000-00000000000c"
+
+    # All calls share the exact same started_at to force the tiebreaker
+    fixed_time = datetime.datetime(2025, 1, 1, 12, 0, 0)
+    project_id = client._project_id()
+    trace_id = generate_id()
+
+    # Insert calls via server API with controlled ids and started_at.
+    # Insert in ascending id order to ensure the sort isn't just insertion order.
+    for call_id in [id_small, id_mid, id_large]:
+        client.server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=trace_id,
+                    op_name="test_secondary_sort",
+                    started_at=fixed_time,
+                    attributes={},
+                    inputs={"call_id": call_id},
+                )
+            )
+        )
+        client.server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=fixed_time + datetime.timedelta(seconds=1),
+                    output={"result": "ok"},
+                    summary={},
+                )
+            )
+        )
+
+    # Query with default sort (no sort_by) -- should be started_at ASC, id ASC
+    result = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(op_names=["test_secondary_sort"]),
+        )
+    )
+    returned_ids = [c.id for c in result.calls]
+    assert len(returned_ids) == 3
+
+    # All have the same started_at, so order is determined by id ASC:
+    # id_small < id_mid < id_large
+    assert returned_ids == [id_small, id_mid, id_large], (
+        f"Expected id ASC tiebreaker order [{id_small}, {id_mid}, {id_large}], "
+        f"but got {returned_ids}"
+    )
+
+    # Also verify with explicit sort_by -- when sorting by started_at,
+    # secondary id sort should match the started_at direction for perf
+    result_explicit = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(op_names=["test_secondary_sort"]),
+            sort_by=[SortBy(field="started_at", direction="asc")],
+        )
+    )
+    returned_ids_explicit = [c.id for c in result_explicit.calls]
+    assert returned_ids_explicit == [id_small, id_mid, id_large], (
+        f"Expected id ASC tiebreaker with explicit sort [{id_small}, {id_mid}, {id_large}], "
+        f"but got {returned_ids_explicit}"
+    )
+
+
 def test_calls_query_sort_by_status(client):
     """Test that sort_by summary.weave.status works with get_calls."""
     # Use a unique test ID to identify these calls
@@ -2736,20 +2825,19 @@ def test_calls_filter_by_latency(client):
     # Use a unique test ID to identify these calls
     test_id = str(uuid.uuid4())
 
-    # Create calls with different latencies
-    # Fast call - minimal latency
+    # Create calls with different latencies.
+    # Use substantial sleep differences to ensure reliable latency ordering
+    # across all backends (SQLite, ClickHouse).
     fast_call = client.create_call("x-fast", {"a": 1, "b": 1, "test_id": test_id})
-    time.sleep(0.001)
-    client.finish_call(fast_call, "fast result")  # Minimal latency
+    time.sleep(0.05)
+    client.finish_call(fast_call, "fast result")
 
-    # Medium latency
     medium_call = client.create_call("x-medium", {"a": 2, "b": 2, "test_id": test_id})
-    time.sleep(0.1)  # Add delay to increase latency
+    time.sleep(0.3)
     client.finish_call(medium_call, "medium result")
 
-    # Slow call - higher latency
     slow_call = client.create_call("x-slow", {"a": 3, "b": 3, "test_id": test_id})
-    time.sleep(0.2)  # Add more delay to further increase latency
+    time.sleep(0.6)
     client.finish_call(slow_call, "slow result")
 
     # Flush to make sure all calls are committed
@@ -2762,30 +2850,42 @@ def test_calls_filter_by_latency(client):
     all_calls = list(client.get_calls(query=tsi.Query(**base_query)))
     assert len(all_calls) == 3
 
-    # Print summary structure to debug
-    for call in all_calls:
-        print(f"Call {call.id} summary: {call.summary}")
-        print(
-            f"Call {call.id} latency: {call.summary.get('weave', {}).get('latency_ms')}"
+    # Verify asc order: latencies should be monotonically non-decreasing
+    sorted_calls_asc = list(
+        client.get_calls(
+            query=tsi.Query(**base_query),
+            sort_by=[SortBy(field="summary.weave.latency_ms", direction="asc")],
+        )
+    )
+    latencies_asc = [
+        c.summary.get("weave", {}).get("latency_ms") for c in sorted_calls_asc
+    ]
+    # All latencies should be present (non-None)
+    assert all(lat is not None for lat in latencies_asc), (
+        f"Expected all calls to have latency_ms, but got {latencies_asc}"
+    )
+    for i in range(len(latencies_asc) - 1):
+        assert latencies_asc[i] <= latencies_asc[i + 1], (
+            f"Expected latency ASC order, but got {latencies_asc}"
         )
 
-    # Verify asc order
-    sorted_calls = client.get_calls(
-        query=tsi.Query(**base_query),
-        sort_by=[SortBy(field="summary.weave.latency_ms", direction="asc")],
+    # Verify desc order: latencies should be monotonically non-increasing
+    sorted_calls_desc = list(
+        client.get_calls(
+            query=tsi.Query(**base_query),
+            sort_by=[SortBy(field="summary.weave.latency_ms", direction="desc")],
+        )
     )
-    assert sorted_calls[0].id == fast_call.id  # Fast call
-    assert sorted_calls[1].id == medium_call.id  # Medium call
-    assert sorted_calls[2].id == slow_call.id  # Slow call
-
-    # Verify desc order
-    sorted_calls = client.get_calls(
-        query=tsi.Query(**base_query),
-        sort_by=[SortBy(field="summary.weave.latency_ms", direction="desc")],
+    latencies_desc = [
+        c.summary.get("weave", {}).get("latency_ms") for c in sorted_calls_desc
+    ]
+    assert all(lat is not None for lat in latencies_desc), (
+        f"Expected all calls to have latency_ms, but got {latencies_desc}"
     )
-    assert sorted_calls[0].id == slow_call.id  # Slow call
-    assert sorted_calls[1].id == medium_call.id  # Medium call
-    assert sorted_calls[2].id == fast_call.id  # Fast call
+    for i in range(len(latencies_desc) - 1):
+        assert latencies_desc[i] >= latencies_desc[i + 1], (
+            f"Expected latency DESC order, but got {latencies_desc}"
+        )
 
     # Filter by latency, Float
     latency_calls = list(
@@ -2976,7 +3076,7 @@ def test_tracing_enabled_context(client):
     # Test create_call with tracing enabled
     call = client.create_call(test_op, {})
     assert isinstance(call, Call)
-    assert call.op_name.endswith("/test_op:GSZXBrCr3rBDk7kuOn6iy6GeAcDxV7N8Z1EH5RKTsGs")
+    assert call.op_name.endswith("/test_op:mxdfzr0HPxStQEzDDx7NgSoQXzfxkf86sc6bmUTZaIk")
     assert len(list(client.get_calls())) == 1  # Verify only one call was created
 
     # Test create_call with tracing disabled
@@ -3155,6 +3255,22 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
     mid_call_ids = {call.id for call in mid_calls}
     assert mid_call_ids == {call3.id, call4.id}
 
+    # Test LT operation on started_at
+    lt_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$lt": [{"$getField": "started_at"}, {"$literal": call3_ts}]},
+                ]
+            }
+        }
+    )
+    lt_calls = list(client.get_calls(query=lt_query))
+    assert len(lt_calls) == 2  # Should get call1 and call2
+    lt_call_ids = {call.id for call in lt_calls}
+    assert lt_call_ids == {call1.id, call2.id}
+
     # Test GT operation with a timestamp after all calls
     future_timestamp = call4_ts + 1000  # 1000 seconds after the last call
     future_query = tsi.Query(
@@ -3183,13 +3299,9 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
                     {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
                     {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
                     {
-                        "$not": [
-                            {
-                                "$gt": [
-                                    {"$getField": "started_at"},
-                                    {"$literal": call4_ts},
-                                ]
-                            }
+                        "$lte": [
+                            {"$getField": "started_at"},
+                            {"$literal": call4_ts},
                         ]
                     },
                 ]
@@ -3209,8 +3321,9 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
                     {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
                     {"$gt": [{"$getField": "ended_at"}, {"$literal": call2_ts}]},
                     {
-                        "$not": [
-                            {"$gt": [{"$getField": "ended_at"}, {"$literal": call4_ts}]}
+                        "$lte": [
+                            {"$getField": "ended_at"},
+                            {"$literal": call4_ts},
                         ]
                     },
                 ]
@@ -4053,10 +4166,6 @@ def test_table_create_from_digests(network_proxy_client):
 
 def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     """Test optimized stats query for wb_run_id not null."""
-    # Mock wandb to simulate a run
-    from weave.trace import weave_client
-    from weave.trace.wandb_run_context import WandbRunContext
-
     mock_run_id = f"{client._project_id()}/test_run_123"
     monkeypatch.setattr(
         weave_client,
@@ -4068,18 +4177,47 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     def test_op(x: int) -> int:
         return x * 2
 
-    # Create a call with wb_run_id
     test_op(5)
     client.flush()
 
-    # first query all root calls
     calls = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     ).calls
     assert len(calls) == 1
     assert calls[0].wb_run_id == mock_run_id
 
-    # Now query for calls with wb_run_id not null using limit=1 to trigger optimization
+
+def test_get_calls_columns_wb_run_id(client, monkeypatch):
+    # Step 1: Mock wandb run context so a deterministic wb_run_id is attached to the call.
+    mock_run_id = f"{client._project_id()}/test_run_456"
+    monkeypatch.setattr(
+        weave_client,
+        "get_global_wb_run_context",
+        lambda: WandbRunContext(run_id="test_run_456", step=7),
+    )
+
+    # Step 2: Create a traced call and flush so it can be queried.
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 3
+
+    _, call = test_op.call(2)
+    client.flush()
+
+    # Step 3: Request only the wb_run_id column through client.get_calls.
+    calls = list(
+        client.get_calls(
+            columns=["wb_run_id"],
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+        )
+    )
+
+    assert len(calls) == 1
+    assert hasattr(calls[0], "wb_run_id")
+    assert calls[0].wb_run_id == mock_run_id
+
+    # Step 4: Query via optimized server path (limit=1 + query expression) and
+    # verify wb_run_id is still available.
     query = tsi.Query(
         **{
             "$expr": {

@@ -1,6 +1,7 @@
 import base64
 import datetime as dt
 import json
+import uuid
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
 
@@ -71,6 +72,30 @@ def test_clickhouse_storage_size_query_generation():
         )  # First argument should be the query
         # with mocks, we don't have any params generated
         assert call_args[1] == {}  # Second argument should be project_id
+
+
+def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
+    trace_server,
+):
+    """Filter with thread_ids=[] against real ClickHouse: query runs and returns 0 rows.
+
+    When run with --trace-server=clickhouse (and ClickHouse available), uses the real
+    server. The query builder emits thread_id IN ([]) which ClickHouse accepts and
+    returns no rows. Skips when trace_server is SQLite.
+    """
+    server = trace_server._internal_trace_server
+    if not isinstance(server, chts.ClickHouseTraceServer):
+        pytest.skip("ClickHouse-only test: run with --trace-server=clickhouse")
+
+    req = tsi.CallsQueryReq(
+        project_id="test_project",
+        filter=tsi.CallsFilter(thread_ids=[]),
+        limit=100,
+    )
+    result = list(server.calls_query_stream(req))
+
+    # Empty thread_ids -> IN [] -> no rows from ClickHouse
+    assert result == []
 
 
 def test_clickhouse_storage_size_schema_conversion():
@@ -1007,6 +1032,98 @@ def test_call_batch_clears_on_insert_failure():
             f"Memory leak: _call_batch retained {len(server._call_batch)} rows "
             f"after failed inserts. Batch should be cleared on any exception."
         )
+
+
+@pytest.fixture
+def server_with_mock_kafka():
+    """Create a ClickHouseTraceServer with mocked Kafka producer and CH client."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+
+    # Mock query to return empty project (resolves to CALLS_MERGED write target)
+    mock_query_result = MagicMock()
+    mock_query_result.result_rows = [(None, None)]
+    mock_ch_client.query.return_value = mock_query_result
+
+    mock_producer = MagicMock()
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._kafka_producer = mock_producer
+        with patch(
+            "weave.trace_server.environment.wf_enable_online_eval",
+            return_value=True,
+        ):
+            yield server, mock_producer
+
+
+def _make_call_end_req() -> tsi.CallEndReq:
+    return tsi.CallEndReq(
+        end=tsi.EndedCallSchemaForInsert(
+            project_id=base64.b64encode(b"test_entity/test_project").decode("utf-8"),
+            id=str(uuid.uuid4()),
+            ended_at=dt.datetime.now(dt.timezone.utc),
+            output={},
+            summary={},
+            exception=None,
+        )
+    )
+
+
+def test_call_end_flushes_kafka_immediately(server_with_mock_kafka):
+    """Non-batch call_end should flush Kafka per-request."""
+    server, mock_producer = server_with_mock_kafka
+
+    server.call_end(_make_call_end_req())
+
+    mock_producer.produce_call_end.assert_called_once()
+    assert mock_producer.produce_call_end.call_args[0][1] is True
+
+
+def test_call_end_v2_flushes_kafka_immediately(server_with_mock_kafka):
+    """Non-batch call_end_v2 should flush Kafka per-request."""
+    server, mock_producer = server_with_mock_kafka
+    req = tsi.CallEndV2Req(
+        end=tsi.EndedCallSchemaForInsertWithStartedAt(
+            project_id=base64.b64encode(b"test_entity/test_project").decode("utf-8"),
+            id=str(uuid.uuid4()),
+            ended_at=dt.datetime.now(dt.timezone.utc),
+            started_at=dt.datetime.now(dt.timezone.utc),
+            output={},
+            summary={},
+            exception=None,
+        )
+    )
+
+    server.call_end_v2(req)
+
+    mock_producer.produce_call_end.assert_called_once()
+    assert mock_producer.produce_call_end.call_args[0][1] is True
+
+
+def test_call_batch_flushes_kafka_once_not_per_call_end(server_with_mock_kafka):
+    """Batched call_end should NOT flush per-call. Flush happens once at batch exit."""
+    server, mock_producer = server_with_mock_kafka
+    num_calls = 5
+
+    with server.call_batch():
+        for _ in range(num_calls):
+            server.call_end(_make_call_end_req())
+
+    # All 5 calls produced a Kafka message
+    assert mock_producer.produce_call_end.call_count == num_calls
+
+    # Every produce_call_end was called with flush_immediately=False
+    for call in mock_producer.produce_call_end.call_args_list:
+        assert call[0][1] is False, (
+            "produce_call_end should be called with flush_immediately=False inside batch"
+        )
+
+    # flush() called exactly once — by _flush_kafka_producer at batch exit
+    mock_producer.flush.assert_called_once()
 
 
 @pytest.mark.disable_logging_error_check

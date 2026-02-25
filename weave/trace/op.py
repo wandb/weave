@@ -43,6 +43,12 @@ from weave.trace.context.call_context import (
     tracing_disabled,
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
+from weave.trace.op_accumulator import (
+    _add_accumulator as _add_accumulator_impl,
+)
+from weave.trace.op_accumulator import (
+    _build_iterator_from_accumulator_for_op as _build_iterator_from_accumulator_for_op_impl,
+)
 from weave.trace.op_protocol import (
     CallDisplayNameFunc,
     FinishCallbackType,
@@ -197,6 +203,7 @@ class OpKwargs(TypedDict, total=False):
     accumulator: Callable[[Any | None, Any], Any] | None
     kind: OpKind | None
     color: OpColor | None
+    eager_call_start: bool
 
 
 def setup_dunder_weave_dict(op: Op, d: WeaveKwargs | None = None) -> WeaveKwargs:
@@ -510,28 +517,12 @@ def _call_sync_func(
             and isinstance(output, (Iterator, Generator, AsyncIterator))
             and not isinstance(output, (str, bytes))
         ):
-            # If an accumulator is set on the op directly (e.g., via @weave.op(accumulator=...))
-            # and the function returns a standard iterator/generator, or an async iterator, apply the accumulator.
-
-            # Create an _Accumulator helper instance
-            # op._accumulator is Callable[[State | None, Value], State]
-            acc_logic: _Accumulator = _Accumulator(op._accumulator)
-
-            # Define callbacks for the _IteratorWrapper
-            def acc_on_yield(value: Any) -> None:
-                acc_logic.next(value)
-
-            def acc_on_error(e: Exception) -> None:
-                # Call the original finish function with accumulated state and exception
-                finish(acc_logic.get_state(), e)
-
-            def acc_on_close() -> None:
-                # Call the original finish function with accumulated state
-                finish(acc_logic.get_state(), None)
-
-            # Wrap the output iterator with the accumulation logic
-            # _IteratorWrapper can handle sync and async iterators through its __next__ and __anext__.
-            return _IteratorWrapper(output, acc_on_yield, acc_on_error, acc_on_close)
+            return _build_iterator_from_accumulator_for_op(
+                output,
+                op._accumulator,
+                finish,
+                _IteratorWrapper,
+            )
 
         # Original behavior: if no handler and no accumulator for an iterator,
         # or if output is not an iterator type we should accumulate.
@@ -653,18 +644,12 @@ async def _call_async_func(
             and isinstance(output, AsyncIterator)
             and not isinstance(output, (str, bytes))
         ):
-            acc_logic: _Accumulator = _Accumulator(op._accumulator)
-
-            def acc_on_yield(value: Any) -> None:
-                acc_logic.next(value)
-
-            def acc_on_error(e: Exception) -> None:
-                finish(acc_logic.get_state(), e)
-
-            def acc_on_close() -> None:
-                finish(acc_logic.get_state(), None)
-
-            return _IteratorWrapper(output, acc_on_yield, acc_on_error, acc_on_close)
+            return _build_iterator_from_accumulator_for_op(
+                output,
+                op._accumulator,
+                finish,
+                _IteratorWrapper,
+            )
         else:
             finish(output)
             return output
@@ -717,10 +702,17 @@ def _call_sync_gen(
         return gen, call
 
     if _should_sample_traces(op):
-        with tracing_disabled():
-            gen = func(*args, **kwargs)
-            call.output = gen
-            return gen, call
+        # Generator bodies run at iteration time, so tracing must remain disabled
+        # while consuming the iterator (not only while constructing it).
+        gen = func(*args, **kwargs)
+
+        def untraced_gen() -> Generator[Any]:
+            with tracing_disabled():
+                yield from gen
+
+        wrapped_gen = untraced_gen()
+        call.output = wrapped_gen
+        return wrapped_gen, call
 
     __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "generator")
@@ -929,10 +921,18 @@ async def _call_async_gen(
         return gen, call
 
     if _should_sample_traces(op):
-        with tracing_disabled():
-            gen = func(*args, **kwargs)
-            call.output = gen
-            return gen, call
+        # Async generator bodies run at iteration time, so tracing must remain
+        # disabled while consuming the async iterator.
+        gen = func(*args, **kwargs)
+
+        async def untraced_gen() -> AsyncIterator[Any]:
+            with tracing_disabled():
+                async for item in gen:
+                    yield item
+
+        wrapped_gen = untraced_gen()
+        call.output = wrapped_gen
+        return wrapped_gen, call
 
     __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "async_generator")
@@ -1211,9 +1211,23 @@ def op(
     accumulator: Callable[[Any | None, Any], Any] | None = None,
     kind: OpKind | None = None,
     color: OpColor | None = None,
+    eager_call_start: bool = False,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
     """A decorator to weave op-ify a function or method. Works for both sync and async.
     Automatically detects iterator functions and applies appropriate behavior.
+
+    Args:
+        func: The function to decorate.
+        name: Custom name for the op. Defaults to the function name.
+        call_display_name: Display name for calls, can be a string or callable.
+        postprocess_inputs: Function to transform inputs before logging.
+        postprocess_output: Function to transform output before logging.
+        tracing_sample_rate: Fraction of calls to trace (0.0 to 1.0).
+        enable_code_capture: Whether to capture source code for this op.
+        accumulator: Function to accumulate results for streaming ops.
+        eager_call_start: If True, call starts are sent immediately rather than batched.
+            Useful for long-running operations like evaluations that should
+            be visible in the UI immediately.
     """
     if not isinstance(tracing_sample_rate, (int, float)):
         raise TypeError("tracing_sample_rate must be a float")
@@ -1304,6 +1318,7 @@ def op(
 
             wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
             wrapper._code_capture_enabled = enable_code_capture  # type: ignore
+            wrapper.eager_call_start = eager_call_start  # type: ignore
 
             if callable(call_display_name):
                 params = inspect.signature(call_display_name).parameters
@@ -1608,49 +1623,18 @@ class _IteratorWrapper(Generic[V]):
         self._call_on_close_once()
 
 
-class _Accumulator(Generic[S, V]):
-    state: S | None
-
-    def __init__(
-        self,
-        accumulator: Callable[[S | None, V], S],
-        initial_state: S | None = None,
-    ):
-        self._accumulator = accumulator
-        self._state = initial_state
-
-    def next(self, value: V) -> None:
-        # the try-except hack to catch `StopIteration` inside `<integration>_accumulator`
-        # this `StopIteration` is raised when some condition is met, for example, when
-        # we don't want to surface last chunk (with usage info) from openai integration.
-        try:
-            self._state = self._accumulator(self._state, value)
-        except StopIteration as e:
-            self._state = e.value
-            raise
-
-    def get_state(self) -> S | None:
-        return self._state
-
-
 def _build_iterator_from_accumulator_for_op(
     value: Iterator[V] | AsyncIterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
     iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
 ) -> _IteratorWrapper:
-    acc: _Accumulator = _Accumulator(accumulator)
-
-    def on_yield(value: V) -> None:
-        acc.next(value)
-
-    def on_error(e: Exception) -> None:
-        on_finish(acc.get_state(), e)
-
-    def on_close() -> None:
-        on_finish(acc.get_state(), None)
-
-    return iterator_wrapper(value, on_yield, on_error, on_close)
+    return _build_iterator_from_accumulator_for_op_impl(
+        value,
+        accumulator,
+        on_finish,
+        iterator_wrapper,
+    )
 
 
 def _add_accumulator(
@@ -1686,25 +1670,10 @@ def _add_accumulator(
         return acc
     add_accumulator(fn, simple_list_accumulator) # returns the op with `list(range(9, -1, -1))` as output
     """
-
-    def on_output(
-        value: Iterator[V] | AsyncIterator[V],
-        on_finish: FinishCallbackType,
-        inputs: dict,
-    ) -> Iterator | AsyncIterator:
-        if should_accumulate is None or should_accumulate(inputs):
-            # we build the accumulator here dependent on the inputs (optional)
-            accumulator = make_accumulator(inputs)
-            return _build_iterator_from_accumulator_for_op(
-                value,
-                accumulator,
-                on_finish,
-                iterator_wrapper,
-            )
-        else:
-            on_finish(value, None)
-            return value
-
-    op._set_on_output_handler(on_output)
-    op._on_finish_post_processor = on_finish_post_processor
-    return op
+    return _add_accumulator_impl(
+        op,
+        make_accumulator,
+        should_accumulate=should_accumulate,
+        on_finish_post_processor=on_finish_post_processor,
+        iterator_wrapper=iterator_wrapper,
+    )

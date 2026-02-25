@@ -5,6 +5,7 @@ import platform
 import random
 import sys
 import time
+import uuid
 from collections import defaultdict, namedtuple
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -31,6 +32,12 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
 from weave import Thread, ThreadPoolExecutor
+from weave.shared.refs_internal import extra_value_quoter
+from weave.shared.trace_server_interface_util import (
+    TRACE_REF_SCHEME,
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    extract_refs_from_values,
+)
 from weave.trace import weave_client
 from weave.trace.context.call_context import require_current_call
 from weave.trace.context.weave_client_context import (
@@ -45,13 +52,7 @@ from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
-from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
-from weave.trace_server.trace_server_interface_util import (
-    TRACE_REF_SCHEME,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-    extract_refs_from_values,
-)
 from weave.trace_server.validation_util import CHValidationError
 from weave.utils.project_id import from_project_id, to_project_id
 
@@ -108,7 +109,7 @@ def test_simple_op(client):
     calls = list(client.get_calls())
     assert len(calls) == 1
     fetched_call = calls[0]
-    digest = "nFk3Jq6jb72HLfeGaxwcsHyckk0gRWNFn17M2AR8Oxo"
+    digest = "VAjc7UcWtXC9OiUr6jrzM6CURhBaMiBr0gqOddcCxY4"
     expected_name = (
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
@@ -602,6 +603,15 @@ def test_trace_call_wb_run_step_query(client):
         tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
     )
     assert len(res.calls) == count
+
+    lt_query = tsi.Query(
+        **{"$expr": {"$lt": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]}}
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=lt_query)
+    )
+    exp_lt_count = len([step for step in exp_start_steps if step < compare_step])
+    assert len(res.calls) == exp_lt_count
 
     count = 4
     compare_step = exp_end_steps[-count]
@@ -1788,7 +1798,7 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:FkWFKCRcl9wsGp3yclN7v1IIAICTPenpZYrWo0otI4Y/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -3144,9 +3154,13 @@ def test_calls_iter_different_value_same_page_cached(client):
     elapsed_time3 = end_time3 - start_time3
 
     # cached lookup should be way faster!
-    # Use 3x threshold instead of 10x to reduce flakiness while still verifying caching
-    assert elapsed_time1 > elapsed_time2 * 3
-    assert elapsed_time1 > elapsed_time3 * 3
+    if sys.platform == "win32":  # Test on windows is slower...
+        assert elapsed_time1 > elapsed_time2
+        assert elapsed_time1 > elapsed_time3
+    else:
+        # Use 3x threshold instead of 10x to reduce flakiness while still verifying caching
+        assert elapsed_time1 > elapsed_time2 * 3
+        assert elapsed_time1 > elapsed_time3 * 3
 
 
 class BasicModel(weave.Model):
@@ -3405,7 +3419,7 @@ def test_objects_and_keys_with_special_characters(client):
         exp_key
         == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
     )
-    exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
+    exp_digest = "k8nuYiUMP6VgAP6wMjeY8dRYnMz2lCqlCyzu2F7iFMw"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
     assert obj.ref.uri() == exp_obj_ref
@@ -3426,7 +3440,7 @@ def test_objects_and_keys_with_special_characters(client):
     gotten_res = weave.ref(found_ref).get()
     assert gotten_res == "hello world"
 
-    exp_op_digest = "qlezedpwj0O4lZYB3vcgSYj0eQvQDdStowLaGBCEmaI"
+    exp_op_digest = "UsyKRnrEyBIieYPDU6eGrbGJgtXjFVFoR6PEemZma68"
     exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
 
     found_ref = test.ref.uri()
@@ -3736,7 +3750,7 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     assert large_calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
 
 
-def test_weave_finish_unsets_client(client):
+def test_weave_finish_unsets_client(client, monkeypatch):
     @weave.op
     def foo():
         return 1
@@ -3745,10 +3759,21 @@ def test_weave_finish_unsets_client(client):
     weave_client = get_weave_client()
     assert get_weave_client() is not None
 
+    finish_called = False
+    original_finish = weave_client.finish
+
+    def tracked_finish(*args, **kwargs):
+        nonlocal finish_called
+        finish_called = True
+        return original_finish(*args, **kwargs)
+
+    monkeypatch.setattr(weave_client, "finish", tracked_finish)
+
     foo()
     assert len(list(weave_client.get_calls())) == 1
 
     weave.finish()
+    assert finish_called
 
     foo()
     assert len(list(weave_client.get_calls())) == 1
@@ -3928,6 +3953,57 @@ def test_op_sampling_inheritance_async(client):
     assert child_calls == 10  # Child function executed
     assert len(list(child_op.calls())) == 10  # And was traced
     assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
+
+
+def test_op_sampling_inheritance_generator(client):
+    parent_calls = 0
+    child_calls = 0
+
+    @weave.op
+    def child_op(x: int) -> int:
+        nonlocal child_calls
+        child_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=0.0)
+    def parent_op(x: int):
+        nonlocal parent_calls
+        parent_calls += 1
+        yield child_op(x)
+
+    # When parent is sampled out, child should execute but also remain untraced.
+    for i in range(10):
+        assert list(parent_op(i)) == [i + 1]
+
+    assert parent_calls == 10
+    assert child_calls == 10
+    assert len(client.get_calls()) == 0
+
+
+@pytest.mark.asyncio
+async def test_op_sampling_inheritance_async_generator(client):
+    parent_calls = 0
+    child_calls = 0
+
+    @weave.op
+    async def child_op(x: int) -> int:
+        nonlocal child_calls
+        child_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=0.0)
+    async def parent_op(x: int):
+        nonlocal parent_calls
+        parent_calls += 1
+        yield await child_op(x)
+
+    # When parent is sampled out, child should execute but also remain untraced.
+    for i in range(10):
+        assert [item async for item in parent_op(i)] == [i + 1]
+
+    assert parent_calls == 10
+    assert child_calls == 10
+    assert len(client.get_calls()) == 0
 
 
 def test_op_sampling_invalid_rates(client):
@@ -4690,6 +4766,99 @@ def test_calls_query_stats_with_limit(client):
     assert result.total_storage_size_bytes is not None
 
 
+@pytest.mark.parametrize(
+    "thread_ids",
+    [
+        ["thread_does_not_exist"],  # single thread id that does not match
+        ["thread_exists_no_calls"],  # thread exists but has zero calls
+        [],  # empty list -> no threads -> 0 calls
+    ],
+)
+def test_calls_query_stats_thread_ids_filter_not_minimal(client, thread_ids):
+    """Ensure that we do not optimize away the thread_ids filter when it is present."""
+    client.set_wandb_run_context(run_id="stats-thread-run", step=0)
+
+    @weave.op
+    def stats_thread_op() -> int:
+        return 1
+
+    # Create calls in one thread (so project has calls with wb_run_id; optimized path would return 1)
+    with weave.thread("thread_with_calls"):
+        stats_thread_op()
+        stats_thread_op()
+
+    # Thread that exists but has zero calls (ensures we test this distinct case)
+    with weave.thread("thread_exists_no_calls"):
+        pass
+
+    # A query is required to exercise the "Pattern 2" check in _try_optimized_stats_query.
+    # Use a query that matches the created calls (wb_run_id not null).
+    wb_run_id_not_null_query = tsi.Query(
+        **{
+            "$expr": {
+                "$not": [{"$eq": [{"$getField": "wb_run_id"}, {"$literal": None}]}]
+            }
+        }
+    )
+    # Confirm that this query returns results, so we can test filtering with the second query below.
+    res_with_matching_thread = client.server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=get_client_project_id(client),
+            limit=1,
+            query=wb_run_id_not_null_query,
+            filter=tsi.CallsFilter(thread_ids=["thread_with_calls"]),
+        )
+    )
+    assert res_with_matching_thread.count == 1
+
+    # Query with thread_ids that match zero calls. Full path -> 0. Incorrectly choosing the optimized path -> 1.
+    res = client.server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=get_client_project_id(client),
+            limit=1,
+            query=wb_run_id_not_null_query,
+            filter=tsi.CallsFilter(thread_ids=thread_ids),
+        )
+    )
+    assert res.count == 0
+
+
+def test_calls_query_thread_ids_filter_returns_matching_thread(client):
+    """Create 3 threads, request the second one, assert the returned call has the correct thread_id."""
+    client.set_wandb_run_context(run_id="thread-filter-run", step=0)
+
+    @weave.op
+    def thread_op() -> int:
+        return 1
+
+    thread_1, thread_2, thread_3 = "thread_first", "thread_second", "thread_third"
+    with weave.thread(thread_1):
+        thread_op()
+    with weave.thread(thread_2):
+        thread_op()
+    with weave.thread(thread_3):
+        thread_op()
+
+    # Use a query that matches the created calls (wb_run_id not null).
+    wb_run_id_not_null_query = tsi.Query(
+        **{
+            "$expr": {
+                "$not": [{"$eq": [{"$getField": "wb_run_id"}, {"$literal": None}]}]
+            }
+        }
+    )
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            limit=1,
+            query=wb_run_id_not_null_query,
+            filter=tsi.CallsFilter(thread_ids=[thread_2]),
+        )
+    )
+    assert len(res.calls) == 1
+    assert res.calls[0].thread_id == thread_2
+
+
 def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with total storage size."""
     if client_is_sqlite(client):
@@ -4746,6 +4915,17 @@ def test_project_stats_clickhouse(client, clickhouse_client):
     object_size = 5678
     file_size = 4321
     table_size = 1234  # New test data for table storage size
+
+    # Insert a row into calls_merged to establish project data residence
+    # This ensures the table routing resolver routes to calls_merged_stats
+    clickhouse_client.command(
+        f"""
+        INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id,
+                                  parent_id, attributes_dump, inputs_dump, output_dump, summary_dump)
+        VALUES ('{internal_project_id}', '{uuid.uuid4()}', 'test_op', now(), '{uuid.uuid4()}',
+                '', '{{}}', '{{}}', 'null', '{{}}')
+        """
+    )
 
     # directly insert into stats tables to avoid materialized views's consistency issue
     # Insert into calls_merged_stats
@@ -5115,6 +5295,36 @@ def test_thread_id_query_filtering(client):
         assert None in thread_ids_found, (
             f"Should find None thread_id, got: {thread_ids_found}"
         )
+
+
+def test_get_calls_filter_by_thread_ids_only(client):
+    """Test that get_calls with only CallsFilter(thread_ids=[...]) returns just that thread's calls.
+
+    This exercises the path where thread_ids is the sole filter (HardCodedFilter.is_useful()
+    """
+    unique = uuid.uuid4().hex
+
+    @weave.op
+    def thread_filter_op(value: str) -> str:
+        return f"out_{value}"
+
+    with weave.thread(f"thread_a_{unique}"):
+        thread_filter_op("a1")
+        thread_filter_op("a2")
+
+    with weave.thread(f"thread_b_{unique}"):
+        thread_filter_op("b1")
+
+    # Filter using only thread_ids (no op_names, trace_ids, etc.)
+    calls_thread_a = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(thread_ids=[f"thread_a_{unique}"]),
+            limit=100,
+        )
+    )
+
+    assert len(calls_thread_a) == 2
+    assert all(call.thread_id == f"thread_a_{unique}" for call in calls_thread_a)
 
 
 def test_thread_context_error_handling(client):
@@ -6237,3 +6447,37 @@ def test_calls_query_ordering_with_costs_comprehensive(client):
     assert calls[0].id == call6.id
     assert calls[1].id == call5.id
     assert calls[2].id == call4.id
+
+
+def test_sentinel_round_trip_none_values(client):
+    """Verify that None values survive the full write→read pipeline without leaking sentinels.
+
+    The calls_complete table uses non-nullable columns with sentinel values (empty string
+    for strings, epoch 1970-01-01 for datetimes) instead of NULL. The app layer converts
+    between Python None and sentinels at the ClickHouse boundary. This test validates
+    that nullable fields remain None when read back, not "".
+    """
+
+    @weave.op
+    def returns_none() -> None:
+        return None
+
+    returns_none()
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    c = calls[0]
+
+    # Nullable fields that should be None must not leak sentinels (e.g. "")
+    assert c.parent_id is None
+    assert c.exception is None
+    assert c.wb_run_id is None
+    assert c.display_name is None
+    assert c.output is None
+
+    # Non-null fields must be present
+    assert c.id is not None
+    assert c.trace_id is not None
+    assert c.started_at is not None
+    assert c.ended_at is not None
+    assert c.op_name is not None

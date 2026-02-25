@@ -142,9 +142,7 @@ def test_processing_thread_exception_handling():
     def failing_processor_fn(batch):
         raise RuntimeError("Simulated processing error")
 
-    with patch(
-        "weave.trace_server_bindings.async_batch_processor.logger"
-    ) as mock_logger:
+    with patch("weave.telemetry.trace_sentry.logger") as mock_logger:
         processor = AsyncBatchProcessor(
             failing_processor_fn,
             max_batch_size=100,
@@ -312,11 +310,12 @@ def test_poison_pill_detection_and_immediate_drop():
         processor.enqueue(
             ["fill1", "fill2", "fill3", "fill4", "fill5", "fill6", "fill7"]
         )  # Fill the small queue (maxsize=5)
+
         # Confirm extras got written to disk
         with open(log_path) as f:
             log_content = f.read().splitlines()
-            # Should have at least 4 log entries (2 poison pills + 2 queue full items)
-            assert len(log_content) >= 4
+            # Should have 4 log entries: 2 poison pills + 2 queue full items (fill6, fill7)
+            assert len(log_content) == 4
             # Check that queue full items were logged
             queue_full_entries = [
                 line for line in log_content if "Queue is full" in line
@@ -397,9 +396,7 @@ def test_log_rotation_and_disk_fallback():
             # Test 3: Error handling in disk operations
             with (
                 patch("builtins.open", side_effect=PermissionError("No write access")),
-                patch(
-                    "weave.trace_server_bindings.async_batch_processor.logger"
-                ) as mock_logger,
+                patch("weave.telemetry.trace_sentry.logger") as mock_logger,
             ):
                 processor._write_item_to_disk("test_item", "Permission test")
 
@@ -427,9 +424,7 @@ def test_log_rotation_and_disk_fallback():
             # Mock pathlib.Path.rename at the class level to simulate a rename failure
             with (
                 patch("pathlib.Path.rename", side_effect=OSError("Rename failed")),
-                patch(
-                    "weave.trace_server_bindings.async_batch_processor.logger"
-                ) as mock_logger,
+                patch("weave.telemetry.trace_sentry.logger") as mock_logger,
             ):
                 processor._rotate_log_file_if_needed()
 

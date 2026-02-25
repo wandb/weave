@@ -3,6 +3,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
 )
+from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
@@ -42,6 +43,77 @@ def test_object_ref_filter_simple() -> None:
            FROM table_rows
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+           GROUP BY project_id,
+                    digest),
+             filtered_calls AS
+          (SELECT calls_merged.id AS id
+           FROM calls_merged
+           PREWHERE calls_merged.project_id = {pb_0:String}
+           WHERE (length(calls_merged.output_refs) > 0
+                  OR calls_merged.ended_at IS NULL)
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), '') IN
+                      (SELECT ref
+                       FROM obj_filter_0)
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                      (SELECT ref
+                       FROM obj_filter_0)))
+                   AND ((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+           ORDER BY any(calls_merged.started_at) DESC)
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_0:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id,
+                  calls_merged.id)
+        ORDER BY any(calls_merged.started_at) DESC
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": '$."temperature"',
+            "pb_2": 1,
+            "pb_3": '$."model"',
+        },
+    )
+
+
+def test_object_ref_filter_lt() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.LtOperation.model_validate(
+            {
+                "$lt": [
+                    {"$getField": "output.model.temperature"},
+                    {"$literal": 1},
+                ]
+            }
+        )
+    )
+    cq.add_order("started_at", "desc")
+    cq.set_expand_columns(["output.model"])
+    assert_sql(
+        cq,
+        """
+        WITH obj_filter_0 AS
+          (SELECT digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_1:String}) < {pb_2:UInt64}
+           GROUP BY project_id,
+                    object_id,
+                    digest
+
+           UNION ALL
+
+           SELECT digest,
+                  digest as ref
+           FROM table_rows
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_1:String}) < {pb_2:UInt64}
            GROUP BY project_id,
                     digest),
              filtered_calls AS
@@ -946,15 +1018,14 @@ def test_object_ref_filter_calls_complete() -> None:
           (SELECT calls_complete.id AS id
            FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
            WHERE (length(calls_complete.output_refs) > 0
-                  OR calls_complete.ended_at IS NULL)
+                  OR calls_complete.ended_at = {pb_5:DateTime64(6)})
            AND (((coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), '') IN
                       (SELECT ref
                        FROM obj_filter_0)
                    OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
                       (SELECT ref
                        FROM obj_filter_0)))
-                   AND ((calls_complete.deleted_at IS NULL))
-                   AND ((NOT ((calls_complete.started_at IS NULL)))))
+                   AND ((calls_complete.deleted_at = {pb_4:DateTime64(3)})))
            ORDER BY calls_complete.started_at DESC)
         SELECT calls_complete.id AS id
         FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
@@ -966,6 +1037,8 @@ def test_object_ref_filter_calls_complete() -> None:
             "pb_1": '$."temperature"',
             "pb_2": 1,
             "pb_3": '$."model"',
+            "pb_4": SENTINEL_DATETIME,
+            "pb_5": SENTINEL_DATETIME,
         },
     )
 
@@ -1028,23 +1101,21 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
            GROUP BY project_id,
                     digest),
-             filtered_calls AS (
-        SELECT calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
-        WHERE (calls_complete.parent_id IS NULL)
-          AND (length(calls_complete.input_refs) > 0
-               OR calls_complete.started_at IS NULL)
-        AND (((((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), '') IN
-                       (SELECT ref
-                        FROM obj_filter_0)
-                     OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
-                       (SELECT ref
-                        FROM obj_filter_0)))
-                  OR ((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_4:String}), 'null'), '') = {pb_5:String}))))
-                AND ((calls_complete.deleted_at IS NULL))
-                AND ((NOT ((calls_complete.started_at IS NULL)))))
-                ORDER BY calls_complete.started_at DESC
-                LIMIT 10)
+             filtered_calls AS
+          (SELECT calls_complete.id AS id
+           FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
+           WHERE (calls_complete.parent_id = {pb_7:String})
+             AND (length(calls_complete.input_refs) > 0)
+             AND (((((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), '') IN
+                        (SELECT ref
+                         FROM obj_filter_0)
+                      OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                        (SELECT ref
+                         FROM obj_filter_0)))
+                   OR ((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_4:String}), 'null'), '') = {pb_5:String}))))
+             AND ((calls_complete.deleted_at = {pb_6:DateTime64(3)})))
+           ORDER BY calls_complete.started_at DESC
+           LIMIT 10)
         SELECT calls_complete.id AS id,
                calls_complete.inputs_dump AS inputs_dump
         FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
@@ -1058,5 +1129,7 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
             "pb_3": '$."model"',
             "pb_4": '$."prompt"',
             "pb_5": "test prompt",
+            "pb_6": SENTINEL_DATETIME,
+            "pb_7": "",
         },
     )

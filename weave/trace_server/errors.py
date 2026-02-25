@@ -54,7 +54,7 @@ class CallsCompleteModeRequired(InvalidRequest):
 
     error_code: str = ErrorCode.CALLS_COMPLETE_MODE_REQUIRED
 
-    def __init__(self, project_id: str, min_sdk_version: str = "0.52.24"):
+    def __init__(self, project_id: str, min_sdk_version: str = "0.52.26"):
         """Initialize the exception.
 
         Args:
@@ -102,6 +102,12 @@ class QueryTimeoutExceededError(Error):
 
 class InsertTooLarge(Error):
     """Raised when a single insert is too large."""
+
+    pass
+
+
+class LightweightUpdateNotAllowedError(Error):
+    """Raised when ClickHouse lightweight updates are not enabled."""
 
     pass
 
@@ -285,6 +291,7 @@ class ErrorRegistry:
 
         # 502
         self.register(QueryMemoryLimitExceededError, 502)
+        self.register(LightweightUpdateNotAllowedError, 502)
 
         # 504
         self.register(QueryTimeoutExceededError, 504)
@@ -393,6 +400,16 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "Example: A query like inputs.integer_value = -10000000000, when the parameter "
             "expects a UInt64, will fail: Value -10000000000 cannot be parsed as UInt64. "
             "To resolve, ensure all query parameters are of the correct type and within valid ranges."
+        ) from e
+    if "SUPPORT_IS_DISABLED" in error_str and "Lightweight updates" in error_str:
+        raise LightweightUpdateNotAllowedError(
+            "Lightweight updates are not allowed on the ClickHouse backend. "
+            "This is a backend configuration issue that needs to be resolved."
+        ) from e
+    if "UNKNOWN_TYPE_OF_QUERY" in error_str and "UpdateQuery" in error_str:
+        raise LightweightUpdateNotAllowedError(
+            "Lightweight update queries are not supported by this ClickHouse version or configuration. "
+            "This is a ClickHouse version issue that needs to be resolved."
         ) from e
 
     # Re-raise the original exception if no known pattern matches

@@ -275,6 +275,25 @@ def test_wandb_login_try_save_api_key(mock_netrc, mock_default_host):
     )
 
 
+def test_wandb_login_try_save_api_key_with_url_host(mock_netrc):
+    """URL hosts should be normalized before netrc write."""
+    wlogin = _WandbLogin(host="https://custom.wandb.ai/")
+    wlogin.try_save_api_key("test_key")
+
+    mock_netrc.add_or_update_entry.assert_called_once_with(
+        "custom.wandb.ai", "user", "test_key"
+    )
+
+
+def test_wandb_login_is_apikey_configured_with_url_host(mock_netrc):
+    """URL hosts should be normalized before netrc lookup."""
+    mock_netrc.get_credentials.return_value = {"password": "test_api_key"}
+
+    wlogin = _WandbLogin(host="https://custom.wandb.ai/")
+    assert wlogin.is_apikey_configured() is True
+    mock_netrc.get_credentials.assert_called_once_with("custom.wandb.ai")
+
+
 def test_login_internal_with_preconfigured_key(mock_netrc, mock_default_host):
     """Test internal login function with pre-configured key."""
     mock_netrc.get_credentials.return_value = {"password": "existing_key"}
@@ -291,6 +310,16 @@ def test_login_internal_with_provided_key(mock_netrc, mock_default_host):
     assert result is True
     mock_netrc.add_or_update_entry.assert_called_once_with(
         "api.wandb.ai", "user", "a" * 40
+    )
+
+
+def test_login_internal_with_provided_key_and_url_host(mock_netrc):
+    """URL hosts should be normalized before key persistence."""
+    result = _login(key="a" * 40, host="https://custom.wandb.ai/")
+
+    assert result is True
+    mock_netrc.add_or_update_entry.assert_called_once_with(
+        "custom.wandb.ai", "user", "a" * 40
     )
 
 

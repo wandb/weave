@@ -430,7 +430,7 @@ export function makeOpenAIResponsesCreateProxy(originalCreate: any) {
         return originalCreate.apply(thisArg, args);
       }, weaveOpOptions);
 
-      return weaveOp(...args);
+      return weaveOp.apply(thisArg, args);
     },
   });
 }
@@ -582,10 +582,22 @@ function commonProxy(exports: any) {
 function cjsPatchOpenAI(exports: any) {
   const OpenAIProxy = commonProxy(exports);
 
-  Object.defineProperty(exports, 'OpenAI', OpenAIProxy);
+  // Patch named export (must use defineProperty to override read-only getter)
+  Object.defineProperty(exports, 'OpenAI', {
+    value: OpenAIProxy,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
 
+  // Patch default export (must use defineProperty to override read-only getter)
   if (exports.default) {
-    Object.defineProperty(exports.default, 'OpenAI', OpenAIProxy);
+    Object.defineProperty(exports, 'default', {
+      value: OpenAIProxy,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
   }
 
   return exports;
@@ -594,8 +606,21 @@ function cjsPatchOpenAI(exports: any) {
 function esmPatchOpenAI(exports: any) {
   const OpenAIProxy = commonProxy(exports);
 
-  exports.OpenAI = OpenAIProxy;
-  exports.default.OpenAI = OpenAIProxy;
+  // Patch named export (must use defineProperty to override read-only getter)
+  Object.defineProperty(exports, 'OpenAI', {
+    value: OpenAIProxy,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+
+  // Patch default export (must use defineProperty to override read-only getter)
+  Object.defineProperty(exports, 'default', {
+    value: OpenAIProxy,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
 
   return exports;
 }

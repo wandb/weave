@@ -1,4 +1,5 @@
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 
 def make_project_stats_query(
@@ -8,7 +9,25 @@ def make_project_stats_query(
     include_objects_storage_size: bool,
     include_tables_storage_size: bool,
     include_files_storage_size: bool,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> tuple[str, list[str]]:
+    """Build a SQL query for computing project storage statistics.
+
+    Args:
+        project_id: The project ID to query stats for.
+        pb: ParamBuilder instance for parameterized query construction.
+        include_trace_storage_size: Include trace storage size in results.
+        include_objects_storage_size: Include objects storage size in results.
+        include_tables_storage_size: Include tables storage size in results.
+        include_files_storage_size: Include files storage size in results.
+        read_table: Which calls table to use for trace storage stats.
+
+    Returns:
+        A tuple of (sql_query, column_names).
+
+    Raises:
+        ValueError: If all include_* parameters are False.
+    """
     if (
         not include_trace_storage_size
         and not include_objects_storage_size
@@ -18,7 +37,10 @@ def make_project_stats_query(
         raise ValueError(
             "At least one of include_trace_storage_size, include_objects_storage_size, include_table_storage_size, or include_files_storage_size must be True"
         )
-    project_id = pb.add_param(project_id)
+    project_id_param = pb.add_param(project_id)
+
+    table_config = TableConfig.from_read_table(read_table)
+    calls_stats_table = table_config.stats_table_name
 
     columns = []
     sub_sqls = []
@@ -32,8 +54,8 @@ def make_project_stats_query(
                 COALESCE(output_size_bytes, 0) +
                 COALESCE(summary_size_bytes, 0)
                 )
-                FROM calls_merged_stats
-                WHERE project_id = {{{project_id}: String}}
+                FROM {calls_stats_table}
+                WHERE project_id = {{{project_id_param}: String}}
             ) AS {columns[-1]}
             """
         )
@@ -43,7 +65,7 @@ def make_project_stats_query(
             f"""
             (SELECT sum(size_bytes)
                 FROM object_versions_stats
-                WHERE project_id = {{{project_id}: String}}
+                WHERE project_id = {{{project_id_param}: String}}
             ) AS {columns[-1]}
         """
         )
@@ -53,7 +75,7 @@ def make_project_stats_query(
             f"""
             (SELECT sum(size_bytes)
                 FROM table_rows_stats
-                WHERE project_id = {{{project_id}: String}}
+                WHERE project_id = {{{project_id_param}: String}}
             ) AS {columns[-1]}
         """
         )
@@ -63,13 +85,13 @@ def make_project_stats_query(
             f"""
             (SELECT sum(size_bytes)
                 FROM files_stats
-                WHERE project_id = {{{project_id}: String}}
+                WHERE project_id = {{{project_id_param}: String}}
             ) AS {columns[-1]}
         """
         )
 
     sql = f"""
-        SELECT {", ".join(sub_sqls)}
+        SELECT {", ".join(s.strip() for s in sub_sqls)}
     """
 
     return sql, columns
