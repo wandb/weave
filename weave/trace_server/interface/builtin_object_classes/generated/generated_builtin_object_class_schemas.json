@@ -51,6 +51,64 @@
       "title": "ActionSpec",
       "type": "object"
     },
+    "AlertSpec": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "op_scope": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If provided, this alert only applies to calls from the given op refs",
+          "examples": [
+            [
+              "weave:///entity/project/op/name:digest"
+            ],
+            [
+              "weave:///entity/project/op/name:*"
+            ]
+          ],
+          "title": "Op Scope"
+        },
+        "spec": {
+          "$ref": "#/$defs/WeaveMetricThresholdSpec",
+          "description": "Alert specification (threshold config, window config, etc.)"
+        }
+      },
+      "title": "AlertSpec",
+      "type": "object"
+    },
     "AndOperation": {
       "description": "Logical AND. All conditions must evaluate to true.\n\nExample:\n    ```\n    {\n        \"$and\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]},\n            {\"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 1000}]}\n        ]\n    }\n    ```",
       "properties": {
@@ -67,7 +125,7 @@
                 "$ref": "#/$defs/ConvertOperation"
               },
               {
-                "$ref": "#/$defs/AndOperation"
+                "title": "AndOperation"
               },
               {
                 "$ref": "#/$defs/OrOperation"
@@ -82,7 +140,13 @@
                 "$ref": "#/$defs/GtOperation"
               },
               {
+                "$ref": "#/$defs/LtOperation"
+              },
+              {
                 "$ref": "#/$defs/GteOperation"
+              },
+              {
+                "$ref": "#/$defs/LteOperation"
               },
               {
                 "$ref": "#/$defs/InOperation"
@@ -598,7 +662,7 @@
               "$ref": "#/$defs/ConvertOperation"
             },
             {
-              "$ref": "#/$defs/AndOperation"
+              "title": "AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -613,13 +677,19 @@
               "$ref": "#/$defs/GtOperation"
             },
             {
+              "$ref": "#/$defs/LtOperation"
+            },
+            {
               "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/LteOperation"
             },
             {
               "$ref": "#/$defs/InOperation"
             },
             {
-              "$ref": "#/$defs/ContainsOperation"
+              "title": "ContainsOperation"
             }
           ],
           "title": "Input"
@@ -636,7 +706,7 @@
               "$ref": "#/$defs/ConvertOperation"
             },
             {
-              "$ref": "#/$defs/AndOperation"
+              "title": "AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -651,13 +721,19 @@
               "$ref": "#/$defs/GtOperation"
             },
             {
+              "$ref": "#/$defs/LtOperation"
+            },
+            {
               "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/LteOperation"
             },
             {
               "$ref": "#/$defs/InOperation"
             },
             {
-              "$ref": "#/$defs/ContainsOperation"
+              "title": "ContainsOperation"
             }
           ],
           "title": "Substr"
@@ -729,10 +805,10 @@
               "$ref": "#/$defs/GetFieldOperator"
             },
             {
-              "$ref": "#/$defs/ConvertOperation"
+              "title": "ConvertOperation"
             },
             {
-              "$ref": "#/$defs/AndOperation"
+              "title": "AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -747,13 +823,19 @@
               "$ref": "#/$defs/GtOperation"
             },
             {
+              "$ref": "#/$defs/LtOperation"
+            },
+            {
               "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/LteOperation"
             },
             {
               "$ref": "#/$defs/InOperation"
             },
             {
-              "$ref": "#/$defs/ContainsOperation"
+              "title": "ContainsOperation"
             }
           ],
           "title": "Input"
@@ -925,10 +1007,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -937,19 +1019,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
                   "$ref": "#/$defs/GtOperation"
                 },
                 {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
                   "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             },
@@ -962,10 +1050,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -974,19 +1062,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
                   "$ref": "#/$defs/GtOperation"
                 },
                 {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
                   "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             }
@@ -1031,10 +1125,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1043,19 +1137,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LtOperation"
                 },
                 {
                   "$ref": "#/$defs/GteOperation"
                 },
                 {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             },
@@ -1068,10 +1168,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1080,19 +1180,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LtOperation"
                 },
                 {
                   "$ref": "#/$defs/GteOperation"
                 },
                 {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             }
@@ -1123,10 +1229,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1135,19 +1241,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "title": "GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             },
@@ -1160,10 +1272,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1172,19 +1284,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "title": "GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             }
@@ -1215,10 +1333,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1227,19 +1345,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "$ref": "#/$defs/LtOperation"
                 },
                 {
-                  "$ref": "#/$defs/InOperation"
+                  "title": "GteOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
+                  "title": "InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
                 }
               ]
             },
@@ -1253,10 +1377,10 @@
                     "$ref": "#/$defs/GetFieldOperator"
                   },
                   {
-                    "$ref": "#/$defs/ConvertOperation"
+                    "title": "ConvertOperation"
                   },
                   {
-                    "$ref": "#/$defs/AndOperation"
+                    "title": "AndOperation"
                   },
                   {
                     "$ref": "#/$defs/OrOperation"
@@ -1265,19 +1389,25 @@
                     "$ref": "#/$defs/NotOperation"
                   },
                   {
-                    "$ref": "#/$defs/EqOperation"
+                    "title": "EqOperation"
                   },
                   {
-                    "$ref": "#/$defs/GtOperation"
+                    "title": "GtOperation"
                   },
                   {
-                    "$ref": "#/$defs/GteOperation"
+                    "$ref": "#/$defs/LtOperation"
                   },
                   {
-                    "$ref": "#/$defs/InOperation"
+                    "title": "GteOperation"
                   },
                   {
-                    "$ref": "#/$defs/ContainsOperation"
+                    "$ref": "#/$defs/LteOperation"
+                  },
+                  {
+                    "title": "InOperation"
+                  },
+                  {
+                    "title": "ContainsOperation"
                   }
                 ]
               },
@@ -1594,13 +1724,13 @@
             },
             {
               "additionalProperties": {
-                "$ref": "#/$defs/LiteralOperation"
+                "title": "LiteralOperation"
               },
               "type": "object"
             },
             {
               "items": {
-                "$ref": "#/$defs/LiteralOperation"
+                "title": "LiteralOperation"
               },
               "type": "array"
             },
@@ -1649,6 +1779,214 @@
         "response_schema"
       ],
       "title": "LlmJudgeActionConfig",
+      "type": "object"
+    },
+    "LtOperation": {
+      "description": "Less than comparison.\n\nExample:\n    ```\n    {\n        \"$lt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```",
+      "properties": {
+        "$lt": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "title": "GtOperation"
+                },
+                {
+                  "title": "LtOperation"
+                },
+                {
+                  "title": "GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
+                  "title": "InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "title": "GtOperation"
+                },
+                {
+                  "title": "LtOperation"
+                },
+                {
+                  "title": "GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
+                  "title": "InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            }
+          ],
+          "title": "$Lt",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$lt"
+      ],
+      "title": "LtOperation",
+      "type": "object"
+    },
+    "LteOperation": {
+      "description": "Less than or equal comparison.\n\nExample:\n    ```\n    {\n        \"$lte\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```",
+      "properties": {
+        "$lte": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "title": "GtOperation"
+                },
+                {
+                  "title": "LtOperation"
+                },
+                {
+                  "title": "GteOperation"
+                },
+                {
+                  "title": "LteOperation"
+                },
+                {
+                  "title": "InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "title": "GtOperation"
+                },
+                {
+                  "title": "LtOperation"
+                },
+                {
+                  "title": "GteOperation"
+                },
+                {
+                  "title": "LteOperation"
+                },
+                {
+                  "title": "InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            }
+          ],
+          "title": "$Lte",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$lte"
+      ],
+      "title": "LteOperation",
       "type": "object"
     },
     "Message": {
@@ -1737,31 +2075,37 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
                 },
                 {
-                  "$ref": "#/$defs/NotOperation"
+                  "title": "NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "title": "LtOperation"
                 },
                 {
-                  "$ref": "#/$defs/InOperation"
+                  "title": "GteOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "LteOperation"
+                },
+                {
+                  "title": "InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
                 }
               ]
             }
@@ -1915,31 +2259,37 @@
                 "$ref": "#/$defs/GetFieldOperator"
               },
               {
-                "$ref": "#/$defs/ConvertOperation"
+                "title": "ConvertOperation"
               },
               {
-                "$ref": "#/$defs/AndOperation"
+                "title": "AndOperation"
               },
               {
-                "$ref": "#/$defs/OrOperation"
+                "title": "OrOperation"
               },
               {
-                "$ref": "#/$defs/NotOperation"
+                "title": "NotOperation"
               },
               {
-                "$ref": "#/$defs/EqOperation"
+                "title": "EqOperation"
               },
               {
-                "$ref": "#/$defs/GtOperation"
+                "title": "GtOperation"
               },
               {
-                "$ref": "#/$defs/GteOperation"
+                "title": "LtOperation"
               },
               {
-                "$ref": "#/$defs/InOperation"
+                "title": "GteOperation"
               },
               {
-                "$ref": "#/$defs/ContainsOperation"
+                "title": "LteOperation"
+              },
+              {
+                "title": "InOperation"
+              },
+              {
+                "title": "ContainsOperation"
               }
             ]
           },
@@ -2100,7 +2450,13 @@
               "$ref": "#/$defs/GtOperation"
             },
             {
+              "$ref": "#/$defs/LtOperation"
+            },
+            {
               "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/LteOperation"
             },
             {
               "$ref": "#/$defs/InOperation"
@@ -2520,6 +2876,101 @@
       ],
       "title": "TestOnlyNestedBaseObject",
       "type": "object"
+    },
+    "WeaveMetricThresholdSpec": {
+      "additionalProperties": true,
+      "description": "Alert specification for weave metric threshold alerts.\n\nFields align with gorilla's WeaveMetricThresholdFilter and the\nalert_worker's WeaveMetricFilter.  Extra keys are permitted so that\nthe schema can evolve without breaking existing stored objects.",
+      "properties": {
+        "alert_condition": {
+          "default": "THRESHOLD",
+          "description": "Trigger condition type (e.g. 'THRESHOLD')",
+          "title": "Alert Condition",
+          "type": "string"
+        },
+        "comparison_operator": {
+          "default": "GREATER_THAN",
+          "description": "Direction of the threshold comparison",
+          "enum": [
+            "GREATER_THAN",
+            "LESS_THAN",
+            "EQUAL"
+          ],
+          "title": "Comparison Operator",
+          "type": "string"
+        },
+        "metric_path": {
+          "default": "",
+          "description": "Dot-notation path to the metric value in the call (e.g. 'output.score')",
+          "title": "Metric Path",
+          "type": "string"
+        },
+        "op_str": {
+          "default": "",
+          "description": "Op or scorer ref to scope this alert to; empty means all ops",
+          "title": "Op Str",
+          "type": "string"
+        },
+        "threshold": {
+          "default": 0.0,
+          "description": "Threshold value that triggers the alert",
+          "title": "Threshold",
+          "type": "number"
+        },
+        "window_size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Max number of recent calls to include in the window",
+          "title": "Window Size"
+        },
+        "window_duration": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Time window in seconds for historical calls",
+          "title": "Window Duration"
+        },
+        "monitor_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Monitor ref; presence indicates alert was created from a monitor",
+          "title": "Monitor Ref"
+        },
+        "scorer_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Scorer object ref identifying which scorer instance within a monitor to alert on. Disambiguates scorers that share the same op class (e.g. multiple LLMAsAJudgeScorer instances). Filterable via inputs.self on scorer calls or input_refs on CallsFilter.",
+          "title": "Scorer Ref"
+        }
+      },
+      "title": "WeaveMetricThresholdSpec",
+      "type": "object"
     }
   },
   "properties": {
@@ -2537,6 +2988,9 @@
     },
     "ActionSpec": {
       "$ref": "#/$defs/ActionSpec"
+    },
+    "AlertSpec": {
+      "$ref": "#/$defs/AlertSpec"
     },
     "AnnotationSpec": {
       "$ref": "#/$defs/AnnotationSpec"
@@ -2566,6 +3020,7 @@
     "TestOnlyInheritedBaseObject",
     "Leaderboard",
     "ActionSpec",
+    "AlertSpec",
     "AnnotationSpec",
     "Provider",
     "ProviderModel",
