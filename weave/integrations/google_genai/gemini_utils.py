@@ -5,18 +5,50 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any
 
 import weave
+from weave import Content
 from weave.trace.autopatch import OpSettings
 from weave.trace.call import Call
 from weave.trace.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
 
 if TYPE_CHECKING:
-    from google.genai.types import GenerateContentResponse
+    from google.genai.types import GenerateContentResponse, Blob
 
 SKIP_TRACING_FUNCTIONS = [
     "google.genai.models.Models.count_tokens",
     "google.genai.models.AsyncModels.count_tokens",
 ]
+
+
+def _traverse_and_replace_blobs(obj: Any) -> Any:
+    obj_type = type(obj)
+    if obj_type.__module__ == "google.genai.types" and obj_type.__name__ == "Blob":
+        return Content.from_bytes(obj.data, getattr(obj, "mime_type", ""))
+
+    if isinstance(obj, dict):
+        return {k: _traverse_and_replace_blobs(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_traverse_and_replace_blobs(v) for v in obj]
+    elif isinstance(obj, tuple):
+        return tuple(_traverse_and_replace_blobs(v) for v in obj)
+    elif hasattr(obj, "__dict__"):
+        try:
+            import copy
+            new_obj = copy.copy(obj)
+            for k, v in vars(new_obj).items():
+                setattr(new_obj, k, _traverse_and_replace_blobs(v))
+            return new_obj
+        except Exception:
+            pass
+
+    return obj
+
+
+def google_genai_gemini_postprocess_outputs(outputs: Any) -> Any:
+    """Postprocess outputs of the trace for the Google GenAI Gemini API to be used in
+    the trace visualization in the Weave UI.
+    """
+    return _traverse_and_replace_blobs(outputs)
 
 
 def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -42,11 +74,9 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     # be displayed in the Weave UI
     if "self" in inputs:
         inputs["self"] = dictify(inputs["self"])
-    if "contents" in inputs:
-        for i, content in enumerate(inputs["contents"]):
-            if "inlineData" in content and "data" in content["inlineData"] and isinstance(content["inlineData"]["data"], bytes):
-                from weave import Content
-                inputs["contents"][i]["inlineData"]["data"] = Content.from_bytes(content["inlineData"]["data"], mimetype=content["inlineData"]["mimeType"])
+
+    inputs = _traverse_and_replace_blobs(inputs)
+
     return inputs
 
 
@@ -149,6 +179,9 @@ def google_genai_gemini_wrapper_sync(
         if not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
 
+        if not op_kwargs.get("postprocess_output"):
+            op_kwargs["postprocess_output"] = google_genai_gemini_postprocess_outputs
+
         op = weave.op(fn, **op_kwargs)
         if op.name not in SKIP_TRACING_FUNCTIONS:
             op._set_on_finish_handler(google_genai_gemini_on_finish)
@@ -175,6 +208,9 @@ def google_genai_gemini_wrapper_async(
         op_kwargs = settings.model_dump()
         if not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
+
+        if not op_kwargs.get("postprocess_output"):
+            op_kwargs["postprocess_output"] = google_genai_gemini_postprocess_outputs
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
         if op.name not in SKIP_TRACING_FUNCTIONS:
