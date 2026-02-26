@@ -35,6 +35,24 @@ def my_function():
 
 ## Development Setup
 
+### Local Development (uv)
+
+This project uses `uv` for dependency management. Dependencies are organized into **dependency-groups** (not extras) in `pyproject.toml`.
+
+**Quick reference:**
+
+- **Run tests**: `uv run --group test python -m pytest <path> -v`
+- **Run linting**: `uvx ruff check <path>`
+- **Run lint with auto-fix**: `uvx ruff check --fix <path>`
+
+**Common pitfalls:**
+
+- Do NOT use bare `python -m pytest` — the `python` on PATH may be from a uv cache, not the project `.venv`. Always use `uv run`.
+- Do NOT use `--extra test` — `test` is a dependency-group, not an optional-dependency. Use `--group test`.
+- `ruff` is not installed in any project dependency group. Use `uvx ruff` to run it.
+
+### Codex Development (nox)
+
 - Your machine should be setup for you automatically via `bin/codex_setup.sh`
 - If you encounter any setup issues:
   1. Check the setup script for potential problems
