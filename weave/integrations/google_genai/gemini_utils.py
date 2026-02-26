@@ -26,9 +26,9 @@ def _traverse_and_replace_blobs(obj: Any) -> Any:
     if isinstance(obj, BaseModel):
         return _traverse_and_replace_blobs(obj.model_dump())
     elif isinstance(obj, dict):
-        if obj.get('data') is not None and obj.get('mime_type') is not None:
-            data = bytes(obj.get('data', ''))
-            mimetype = obj.get('mime_type', '')
+        if obj.get("data") is not None and obj.get("mime_type") is not None:
+            data = bytes(obj.get("data", ""))
+            mimetype = obj.get("mime_type", "")
             if len(data) > 0 and len(mimetype) > 0:
                 return Content.from_bytes(data, mimetype=mimetype)
         return {k: _traverse_and_replace_blobs(v) for k, v in obj.items()}
@@ -36,7 +36,6 @@ def _traverse_and_replace_blobs(obj: Any) -> Any:
         return [_traverse_and_replace_blobs(v) for v in obj]
     elif isinstance(obj, tuple):
         return tuple(_traverse_and_replace_blobs(v) for v in obj)
-
 
     return obj
 

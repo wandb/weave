@@ -658,8 +658,9 @@ def test_traverse_and_replace_blobs_converts_blob_dict_to_content():
 
 def test_traverse_and_replace_blobs_converts_part_with_inline_data():
     """types.Part.from_bytes (Pydantic BaseModel) has inline_data converted to Content."""
-    from weave import Content
     from google.genai import types
+
+    from weave import Content
 
     part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/jpeg")
     result = _traverse_and_replace_blobs(part)
@@ -671,8 +672,9 @@ def test_traverse_and_replace_blobs_converts_part_with_inline_data():
 
 def test_traverse_and_replace_blobs_traverses_list_of_parts():
     """List of Parts with blobs are recursively traversed; text parts unchanged."""
-    from weave import Content
     from google.genai import types
+
+    from weave import Content
 
     parts = [
         types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/jpeg"),
@@ -688,8 +690,9 @@ def test_traverse_and_replace_blobs_traverses_list_of_parts():
 
 def test_traverse_and_replace_blobs_traverses_tuple():
     """Tuples with blobs are traversed and returned as tuples."""
-    from weave import Content
     from google.genai import types
+
+    from weave import Content
 
     part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/jpeg")
     result = _traverse_and_replace_blobs((part,))
@@ -738,9 +741,7 @@ def test_traverse_and_replace_blobs_traverses_nested_dict():
     from weave import Content
 
     nested = {
-        "outer": {
-            "inner": {"data": b"fake_image_bytes", "mime_type": "image/png"}
-        }
+        "outer": {"inner": {"data": b"fake_image_bytes", "mime_type": "image/png"}}
     }
     result = _traverse_and_replace_blobs(nested)
 
@@ -753,8 +754,9 @@ def test_traverse_and_replace_blobs_traverses_nested_dict():
 
 def test_postprocess_inputs_converts_image_bytes_to_content():
     """Image bytes in 'contents' inputs are converted to Content for Weave UI display."""
-    from weave import Content
     from google.genai import types
+
+    from weave import Content
 
     mock_self = Mock()
     mock_self._model = "gemini-2.0-flash"
@@ -779,8 +781,6 @@ def test_postprocess_inputs_converts_image_bytes_to_content():
 
 def test_postprocess_inputs_leaves_text_only_contents_unchanged():
     """Text-only 'contents' are not affected by postprocess_inputs."""
-    from weave import Content
-
     mock_self = Mock()
     mock_self._model = "gemini-2.0-flash"
 
@@ -814,9 +814,7 @@ def test_postprocess_outputs_converts_blob_to_content():
 def test_postprocess_outputs_leaves_text_responses_unchanged():
     """Text responses in outputs are not affected by postprocess_outputs."""
     text_output = {
-        "candidates": [
-            {"content": {"parts": [{"text": "Paris"}], "role": "model"}}
-        ]
+        "candidates": [{"content": {"parts": [{"text": "Paris"}], "role": "model"}}]
     }
 
     result = google_genai_gemini_postprocess_outputs(text_output)
@@ -834,8 +832,9 @@ def test_postprocess_outputs_leaves_text_responses_unchanged():
 @pytest.mark.skip_clickhouse_client
 def test_content_generation_with_image_bytes(client):
     """Image bytes passed to generate_content are stored as Content in the Weave trace."""
-    from weave import Content
     from google.genai import types
+
+    from weave import Content
 
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     image_bytes = b"\xff\xd8\xff\xe0"  # minimal JPEG header bytes
@@ -856,9 +855,7 @@ def test_content_generation_with_image_bytes(client):
     # The image bytes in inputs must be converted to Content for Weave UI display
     contents = call.inputs.get("contents", [])
     image_part = contents[0]
-    assert isinstance(image_part, dict), (
-        "Part should be dict after postprocessing"
-    )
+    assert isinstance(image_part, dict), "Part should be dict after postprocessing"
     assert isinstance(image_part["inline_data"], Content), (
         "Image bytes must be converted to Content so they display in the Weave UI"
     )
