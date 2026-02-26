@@ -49,6 +49,10 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.methods.evaluation_status import evaluation_status
+from weave.trace_server.methods.sqlite_feedback_stats import (
+    sqlite_feedback_payload_schema,
+    sqlite_feedback_stats,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import quote_json_path
@@ -2052,6 +2056,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=create_result.wb_user_id,
             payload=create_result.payload,
         )
+
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        """Compute feedback stats using SQLite + Python aggregation."""
+        return sqlite_feedback_stats(self, req)
+
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        """Discover feedback payload schema from SQLite samples."""
+        return sqlite_feedback_payload_schema(self, req)
 
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
