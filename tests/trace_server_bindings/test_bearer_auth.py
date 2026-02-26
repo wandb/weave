@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-import httpx
 import pytest
 
 from weave.trace_server_bindings.remote_http_trace_server import (
