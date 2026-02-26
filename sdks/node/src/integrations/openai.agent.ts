@@ -689,10 +689,16 @@ export async function instrumentOpenAIAgents(): Promise<boolean> {
   }
 }
 
+let _agentsInstrumented = false;
+
 export function instrumentOpenAIAgentsCommon(exports: any): boolean {
+  if (_agentsInstrumented) {
+    return true;
+  }
   if (typeof exports.addTraceProcessor === 'function') {
     const processor = createOpenAIAgentsTracingProcessor();
     exports.addTraceProcessor(processor);
+    _agentsInstrumented = true;
     return true;
   } else {
     console.warn(
