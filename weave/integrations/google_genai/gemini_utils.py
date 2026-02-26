@@ -42,6 +42,11 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     # be displayed in the Weave UI
     if "self" in inputs:
         inputs["self"] = dictify(inputs["self"])
+    if "contents" in inputs:
+        for i, content in enumerate(inputs["contents"]):
+            if "inlineData" in content and "data" in content["inlineData"] and isinstance(content["inlineData"]["data"], bytes):
+                from weave import Content
+                inputs["contents"][i]["inlineData"]["data"] = Content.from_bytes(content["inlineData"]["data"], mimetype=content["inlineData"]["mimeType"])
     return inputs
 
 
