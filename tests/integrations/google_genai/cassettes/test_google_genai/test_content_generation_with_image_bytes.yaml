@@ -1,0 +1,53 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-type:
+      - application/json
+      host:
+      - generativelanguage.googleapis.com
+    method: POST
+    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
+  response:
+    body:
+      string: !!binary |
+        H4sIAHPFoGkC/1WPTWsCQQyG/8qQs4pY+kGPFbwVxUovxUPYza7B2URmsqAs+9+bHQvF2+RJ
+        8uaZASqUmms0yvAefgaoVIzEvBjggsn+sNF1YvCFEjYJpeJcadhQSrfw0XOsWdpZWGPkRpMw
+        LmA8zgIkjTStdVpThNFJw8L5tCfMKiXwsN2Bc5aarg6W/s7YkN32aB5a7h9LWJ+xpU8ydF28
+        CybtLnbQM8la+2K9enn20f9fPTTfvGVqGB9XXp8ms+L4TSnz3aylzl3nq8Vy3kTMJxh/AauX
+        djguAQAA
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 20 Mar 2025 04:33:53 GMT
+      Server:
+      - scaffolding on HTTPServer2
+      Server-Timing:
+      - gfet4t7; dur=1924
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin
+      - X-Origin
+      - Referer
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1
