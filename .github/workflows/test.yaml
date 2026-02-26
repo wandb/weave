@@ -96,90 +96,16 @@ jobs:
 
   # ==== Windows Jobs ====
   windows_trace_tests:
-    name: Trace nox tests (windows) (py${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}, ${{ matrix.nox-shard }})
-    timeout-minutes: 15
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        python-version-major: ["3"]
-        python-version-minor: [
-            "10",
-            "11",
-            "13",
-            #
-          ]
-        nox-shard: [
-            "trace_no_server",
-            "trace",
-            "flow",
-            "trace_server",
-            "trace_server_bindings",
-            "anthropic",
-            "bedrock",
-            "cerebras",
-            "cohere",
-            "crewai",
-            "dspy",
-            "groq",
-            "google_genai",
-            "instructor",
-            "langchain",
-            "litellm",
-            "llamaindex",
-            "mistral",
-            "notdiamond",
-            "openai",
-            "verifiers_test",
-            "vertexai",
-            "pandas_test",
-            "mcp",
-            "smolagents",
-            # "stainless",
-            "autogen_tests",
-          ]
-      fail-fast: false
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install nox uv
-      - name: Run nox (Non Trace Server)
-        if: matrix.nox-shard == 'trace_no_server'
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "not trace_server"
-      - name: Run nox (Sqlite Trace Server)
-        if: matrix.nox-shard != 'trace_no_server'
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://localhost
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          # Use format-valid dummy API keys when secrets aren't available (e.g., Dependabot PRs)
-          # Tests use VCR recordings so real keys aren't needed
-          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
-          DD_TRACE_ENABLED: false
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "trace_server" --trace-server=sqlite
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./tests/coverage.xml
-          flags: ${{ matrix.nox-shard == 'trace_no_server' && 'windows-trace-no-server' || 'windows-trace-tests' }}
-          name: ${{ matrix.nox-shard == 'trace_no_server' && format('windows-trace-no-server-{0}.{1}', matrix.python-version-major, matrix.python-version-minor) || format('windows-trace-tests-{0}.{1}-{2}', matrix.python-version-major, matrix.python-version-minor, matrix.nox-shard) }}
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
+    name: Trace nox tests (windows)
+    uses: ./.github/workflows/reusable-trace-tests-windows.yaml
+    with:
+      job_name: Trace nox tests (windows)
+      timeout_minutes: 15
+      python_version_minors_json: '["10", "11", "13"]'
+      shards_json: '["trace_no_server", "trace", "flow", "trace_server", "trace_server_bindings", "anthropic", "bedrock", "cerebras", "cohere", "crewai", "dspy", "groq", "google_genai", "instructor", "langchain", "litellm", "llamaindex", "mistral", "notdiamond", "openai", "verifiers_test", "vertexai", "pandas_test", "mcp", "smolagents", "autogen_tests"]'
+      non_trace_server_shards_json: '["trace_no_server"]'
+      upload_coverage: true
+    secrets: inherit
 
   windows-trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()

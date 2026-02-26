@@ -1,0 +1,97 @@
+name: reusable-trace-tests-windows
+
+on:
+  workflow_call:
+    inputs:
+      job_name:
+        description: Display name for the matrix job
+        required: false
+        type: string
+        default: Trace nox tests (windows)
+      timeout_minutes:
+        description: Job timeout in minutes
+        required: false
+        type: number
+        default: 15
+      python_version_minors_json:
+        description: JSON array of Python minor versions (for Python 3.x)
+        required: true
+        type: string
+      shards_json:
+        description: JSON array of nox shard names
+        required: true
+        type: string
+      non_trace_server_shards_json:
+        description: JSON array of shards that should run with -m "not trace_server"
+        required: false
+        type: string
+        default: "[]"
+      upload_coverage:
+        description: Upload coverage artifacts to Codecov
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  trace-tests-windows:
+    name: ${{ inputs.job_name }} (py${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}, ${{ matrix.shard }})
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: ${{ fromJSON(inputs.python_version_minors_json) }}
+        shard: ${{ fromJSON(inputs.shards_json) }}
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Determine shard execution mode
+        id: shard_mode
+        run: |
+          NON_TRACE_SERVER_SHARDS="${{ join(fromJSON(inputs.non_trace_server_shards_json), ',') }}"
+          if [[ -n "$NON_TRACE_SERVER_SHARDS" ]] && [[ ",$NON_TRACE_SERVER_SHARDS," == *",${{ matrix.shard }},"* ]]; then
+            echo "mode=non_trace_server" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=trace_markers" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Run nox (Non Trace Server)
+        if: steps.shard_mode.outputs.mode == 'non_trace_server'
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- -m "not trace_server"
+      - name: Run nox (Sqlite Trace Server)
+        if: steps.shard_mode.outputs.mode == 'trace_markers'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://localhost
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          # Use format-valid dummy API keys when secrets aren't available (e.g., Dependabot PRs)
+          # Tests use VCR recordings so real keys aren't needed
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- -m "trace_server" --trace-server=sqlite
+      - name: Upload coverage reports to Codecov
+        if: inputs.upload_coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: ${{ matrix.shard == 'trace_no_server' && 'windows-trace-no-server' || 'windows-trace-tests' }}
+          name: ${{ matrix.shard == 'trace_no_server' && format('windows-trace-no-server-{0}.{1}', matrix.python-version-major, matrix.python-version-minor) || format('windows-trace-tests-{0}.{1}-{2}', matrix.python-version-major, matrix.python-version-minor, matrix.shard) }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
