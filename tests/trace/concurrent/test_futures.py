@@ -1,3 +1,4 @@
+import threading
 import time
 from concurrent.futures import Future
 from typing import Any
@@ -268,3 +269,50 @@ def test_nested_futures_with_0_max_workers_direct() -> None:
     res = executor.defer(inner_2).result()
     assert executor._executor is None
     assert res == [0, 1, 2]
+
+
+def test_flush_waits_for_then_continuations() -> None:
+    executor: FutureExecutor = FutureExecutor(max_workers=2)
+    allow_base = threading.Event()
+    allow_then = threading.Event()
+    then_started = threading.Event()
+    flush_done = threading.Event()
+
+    def base_task() -> int:
+        assert allow_base.wait(timeout=5)
+        return 1
+
+    def continuation(results: list[int]) -> int:
+        then_started.set()
+        assert allow_then.wait(timeout=5)
+        return results[0] + 1
+
+    base_future: Future[int] = executor.defer(base_task)
+    chained_future: Future[int] = executor.then([base_future], continuation)
+
+    flush_error: list[BaseException] = []
+
+    def flush_worker() -> None:
+        try:
+            executor.flush(timeout=5)
+        except BaseException as exc:  # noqa: BLE001
+            flush_error.append(exc)
+        finally:
+            flush_done.set()
+
+    flush_thread = threading.Thread(target=flush_worker)
+    flush_thread.start()
+    assert not flush_done.wait(timeout=0.1)
+
+    allow_base.set()
+    assert then_started.wait(timeout=5)
+
+    # Flush should still be waiting because the continuation has not been released.
+    assert not flush_done.wait(timeout=0.2)
+
+    allow_then.set()
+    assert flush_done.wait(timeout=5)
+    flush_thread.join(timeout=5)
+
+    assert flush_error == []
+    assert chained_future.result(timeout=1) == 2
