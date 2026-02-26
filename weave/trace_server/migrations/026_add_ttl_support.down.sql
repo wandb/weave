@@ -1,4 +1,4 @@
--- Rollback Migration 025: Remove TTL support
+-- Rollback Migration 026: Remove TTL support
 
 -- Step 1: Remove TTL clauses
 ALTER TABLE calls_merged REMOVE TTL;
