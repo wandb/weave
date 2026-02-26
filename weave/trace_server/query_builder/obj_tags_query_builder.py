@@ -4,8 +4,6 @@ Provides functions that return (query, parameters) tuples for ClickHouse
 tag/alias operations.  SQLite uses simpler queries built inline.
 """
 
-import datetime
-
 
 def make_assert_obj_version_exists_query(
     project_id: str,
@@ -33,24 +31,20 @@ def make_assert_obj_version_exists_query(
 
 def make_get_tags_query(
     project_id: str,
-    object_digests: list[tuple[str, str]],
+    object_ids: list[str],
 ) -> tuple[str, dict]:
-    """Build a query to fetch tags for a list of (object_id, digest) pairs."""
-    object_ids = list({od[0] for od in object_digests})
-    digests = list({od[1] for od in object_digests})
+    """Build a query to fetch tags for a list of object_ids."""
     query = """
         SELECT object_id, digest, tag
         FROM tags
         PREWHERE project_id = {project_id: String}
             AND object_id IN {object_ids: Array(String)}
-        WHERE digest IN {digests: Array(String)}
         GROUP BY project_id, object_id, digest, tag
         HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
     """
     parameters = {
         "project_id": project_id,
         "object_ids": object_ids,
-        "digests": digests,
     }
     return query, parameters
 

@@ -20,14 +20,12 @@ def test_make_assert_obj_version_exists_query():
 
 
 def test_make_get_tags_query():
-    digests = [("obj1", "d1"), ("obj2", "d2"), ("obj1", "d3")]
-    query, params = make_get_tags_query("proj", digests)
+    query, params = make_get_tags_query("proj", ["obj1", "obj2"])
     assert "FROM tags" in query
     assert "tag" in query
     assert params["project_id"] == "proj"
-    # object_ids and digests are deduplicated sets (order may vary)
     assert set(params["object_ids"]) == {"obj1", "obj2"}
-    assert set(params["digests"]) == {"d1", "d2", "d3"}
+    assert "digests" not in params
 
 
 def test_make_get_aliases_query():
