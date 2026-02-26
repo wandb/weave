@@ -11,14 +11,17 @@ from __future__ import annotations
 import datetime
 import threading
 
-from cachetools import LRUCache
+from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 
 PROJECT_TTL_CACHE_SIZE = 10_000
+PROJECT_TTL_CACHE_TTL_SECS = 300  # 5 minutes; bounds staleness in multi-instance deploys
 
 # Global cache shared across all threads. Keyed by project_id.
 # Value is retention_days (int). 0 means no TTL (sentinel 2100-01-01).
-_project_ttl_cache: LRUCache[str, int] = LRUCache(maxsize=PROJECT_TTL_CACHE_SIZE)
+_project_ttl_cache: TTLCache[str, int] = TTLCache(
+    maxsize=PROJECT_TTL_CACHE_SIZE, ttl=PROJECT_TTL_CACHE_TTL_SECS
+)
 _project_ttl_cache_lock = threading.Lock()
 
 _TTL_SENTINEL = datetime.datetime(2100, 1, 1)
