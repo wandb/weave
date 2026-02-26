@@ -526,6 +526,147 @@ def test_obj_read_enrichment(client: WeaveClient):
     assert "latest" in res.obj.aliases
 
 
+def test_obj_read_enrichment_multi_version(client: WeaveClient):
+    """obj_read on latest version returns 'latest' alias; older version does not."""
+    weave.publish({"v": 0}, name="read_enrich_multi")
+    weave.publish({"v": 1}, name="read_enrich_multi")
+
+    # Get both versions
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=["read_enrich_multi"]),
+            sort_by=[tsi.SortBy(field="created_at", direction="asc")],
+        )
+    )
+    v0, v1 = res.objs[0], res.objs[1]
+
+    # Add a real alias to v0
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=v0.object_id,
+            digest=v0.digest,
+            alias="stable",
+        )
+    )
+
+    # obj_read on older version: has real alias, but NOT "latest"
+    read_v0 = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=v0.object_id,
+            digest=v0.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "stable" in read_v0.obj.aliases
+    assert "latest" not in read_v0.obj.aliases
+
+    # obj_read on latest version: has "latest"
+    read_v1 = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=v1.object_id,
+            digest=v1.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "latest" in read_v1.obj.aliases
+
+
+def test_obj_read_enrichment_no_tags_or_aliases(client: WeaveClient):
+    """obj_read with enrichment on an object with no tags/aliases returns empty lists."""
+    object_id, digest = _publish_obj(client, "read_enrich_empty")
+
+    res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert res.obj.tags == []
+    assert "latest" in res.obj.aliases  # still the latest version
+    # No other aliases besides "latest"
+    assert res.obj.aliases == ["latest"]
+
+
+def test_obj_read_by_latest_digest_with_enrichment(client: WeaveClient):
+    """obj_read with digest='latest' returns enriched tags/aliases."""
+    weave.publish({"v": 0}, name="read_latest_digest")
+    weave.publish({"v": 1}, name="read_latest_digest")
+
+    # Tag v1 (the latest)
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(
+                object_ids=["read_latest_digest"],
+                latest_only=True,
+            ),
+        )
+    )
+    v1 = res.objs[0]
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=v1.object_id,
+            digest=v1.digest,
+            tags=["deployed"],
+        )
+    )
+
+    # Read using digest="latest"
+    read_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id="read_latest_digest",
+            digest="latest",
+            include_tags_and_aliases=True,
+        )
+    )
+    assert read_res.obj.version_index == 1
+    assert read_res.obj.tags == ["deployed"]
+    assert "latest" in read_res.obj.aliases
+
+
+def test_obj_read_by_alias_enrichment(client: WeaveClient):
+    """obj_read via alias resolution includes all aliases and the virtual 'latest'."""
+    object_id, digest = _publish_obj(client, "read_alias_enrich")
+
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            alias="production",
+        )
+    )
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            alias="stable",
+        )
+    )
+
+    # Read by alias name
+    res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest="production",
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "production" in res.obj.aliases
+    assert "stable" in res.obj.aliases
+    assert "latest" in res.obj.aliases
+
+
 # --- Tag version scoping ---
 
 

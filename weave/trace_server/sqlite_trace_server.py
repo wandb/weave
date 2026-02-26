@@ -1090,15 +1090,26 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 )
                 parameters["filter_tags"] = [req.project_id] + list(req.filter.tags)
             if req.filter.aliases:
-                alias_placeholders = ",".join(["?" for _ in req.filter.aliases])
-                conds.append(
-                    f"(project_id, object_id) IN "
-                    f"(SELECT project_id, object_id FROM aliases "
-                    f"WHERE project_id = ? AND alias IN ({alias_placeholders}))"
-                )
-                parameters["filter_aliases"] = [req.project_id] + list(
-                    req.filter.aliases
-                )
+                non_latest = [a for a in req.filter.aliases if a != "latest"]
+                has_latest = "latest" in req.filter.aliases
+                if non_latest and has_latest:
+                    alias_placeholders = ",".join(["?" for _ in non_latest])
+                    conds.append(
+                        f"(is_latest = 1 OR (project_id, object_id) IN "
+                        f"(SELECT project_id, object_id FROM aliases "
+                        f"WHERE project_id = ? AND alias IN ({alias_placeholders})))"
+                    )
+                    parameters["filter_aliases"] = [req.project_id] + non_latest
+                elif has_latest:
+                    conds.append("is_latest = 1")
+                else:
+                    alias_placeholders = ",".join(["?" for _ in non_latest])
+                    conds.append(
+                        f"(project_id, object_id) IN "
+                        f"(SELECT project_id, object_id FROM aliases "
+                        f"WHERE project_id = ? AND alias IN ({alias_placeholders}))"
+                    )
+                    parameters["filter_aliases"] = [req.project_id] + non_latest
 
         objs = self._select_objs_query(
             req.project_id,
