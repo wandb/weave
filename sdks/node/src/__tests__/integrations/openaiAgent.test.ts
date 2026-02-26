@@ -2,18 +2,6 @@ import {InMemoryTraceServer} from '../../inMemoryTraceServer';
 import {createOpenAIAgentsTracingProcessor} from '../../integrations/openai.agent';
 import {initWithCustomTraceServer} from '../clientMock';
 
-async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
-  const calls = await traceServer.calls
-    .callsStreamQueryPost({
-      project_id: projectId,
-      limit: 100,
-    })
-    .then(result => result.calls);
-  return calls;
-}
-
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 describe('OpenAI Agents Integration', () => {
   let inMemoryTraceServer: InMemoryTraceServer;
   const testProjectName = 'test-project';
@@ -34,11 +22,9 @@ describe('OpenAI Agents Integration', () => {
     };
 
     await processor.onTraceStart(trace);
-    await wait(100);
     await processor.onTraceEnd(trace);
-    await wait(300);
 
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await inMemoryTraceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toBe('openai_agent_trace');
     expect(calls[0].display_name).toBe('Agent Workflow');
@@ -58,7 +44,6 @@ describe('OpenAI Agents Integration', () => {
       name: 'Test',
       groupId: null,
     });
-    await wait(100);
 
     // Test key span types
     const spans = [
@@ -79,9 +64,8 @@ describe('OpenAI Agents Integration', () => {
         error: null,
       });
     }
-    await wait(300);
 
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await inMemoryTraceServer.getCalls(testProjectName);
 
     for (const {id, expectedKind} of spans) {
       const call = calls.find(c => c.attributes?.agent_span_id === id);
@@ -98,7 +82,6 @@ describe('OpenAI Agents Integration', () => {
       name: 'Workflow',
       groupId: null,
     });
-    await wait(100);
 
     await processor.onSpanStart({
       type: 'trace.span',
@@ -110,9 +93,8 @@ describe('OpenAI Agents Integration', () => {
       endedAt: null,
       error: null,
     });
-    await wait(300);
 
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await inMemoryTraceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(2);
 
     const traceCall = calls.find(c => c.op_name === 'openai_agent_trace');

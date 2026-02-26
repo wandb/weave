@@ -212,56 +212,56 @@ export function getWeaveCallDataForAgent(
  * @returns CallStack with parent set to the current agent call, or null if not available
  */
 export function getCallStackFromOpenAIAgents(): any | null {
+  let agents: any;
   try {
     // Try to dynamically require @openai/agents - it may not be installed
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const agents = require('@openai/agents');
-
-    const currentTrace = agents.getCurrentTrace?.();
-    const currentSpan = agents.getCurrentSpan?.();
-
-    // Try span first (more specific), then trace
-    // Support both camelCase (class getters) and snake_case (JSON serialized)
-    // Also check 'id' which is used in toJSON() output
-    const spanId =
-      currentSpan?.spanId || currentSpan?.id || currentSpan?.span_id;
-    const spanParentId = currentSpan?.parentId || currentSpan?.parent_id;
-    const traceId =
-      currentTrace?.traceId ||
-      currentTrace?.trace_id ||
-      currentSpan?.traceId ||
-      currentSpan?.trace_id;
-
-    // Skip NoopSpan instances
-    if (spanId === 'no-op' || traceId === 'no-op') {
-      return null;
-    }
-
-    // Look up Weave call data with fallback chain:
-    // 1. Try current span ID first (most specific)
-    // 2. Fall back to parent span ID (if current span not tracked not tracking is delayed)
-    // 3. Fall back to trace ID (trace root)
-    const callData =
-      (spanId && globalWeaveCallDataMap.get(spanId)) ||
-      (spanParentId && globalWeaveCallDataMap.get(spanParentId)) ||
-      (traceId && globalWeaveCallDataMap.get(traceId));
-
-    if (callData) {
-      // Create a CallStack with the agent call as parent
-      let stack = new CallStack();
-      stack = stack.pushCall({
-        callId: callData.weaveCallId,
-        traceId: callData.weaveTraceId,
-        childSummary: {},
-      });
-      return stack;
-    }
-
-    return null;
+    agents = require('@openai/agents');
   } catch (e) {
-    // @openai/agents not installed or error - silently return null
+    // @openai/agents not installed - silently return null
     return null;
   }
+
+  const currentTrace = agents.getCurrentTrace?.();
+  const currentSpan = agents.getCurrentSpan?.();
+
+  // Try span first (more specific), then trace
+  // Support both camelCase (class getters) and snake_case (JSON serialized)
+  // Also check 'id' which is used in toJSON() output
+  const spanId = currentSpan?.spanId || currentSpan?.id || currentSpan?.span_id;
+  const spanParentId = currentSpan?.parentId || currentSpan?.parent_id;
+  const traceId =
+    currentTrace?.traceId ||
+    currentTrace?.trace_id ||
+    currentSpan?.traceId ||
+    currentSpan?.trace_id;
+
+  // Skip NoopSpan instances
+  if (spanId === 'no-op' || traceId === 'no-op') {
+    return null;
+  }
+
+  // Look up Weave call data with fallback chain:
+  // 1. Try current span ID first (most specific)
+  // 2. Fall back to parent span ID (if current span not tracked not tracking is delayed)
+  // 3. Fall back to trace ID (trace root)
+  const callData =
+    (spanId && globalWeaveCallDataMap.get(spanId)) ||
+    (spanParentId && globalWeaveCallDataMap.get(spanParentId)) ||
+    (traceId && globalWeaveCallDataMap.get(traceId));
+
+  if (callData) {
+    // Create a CallStack with the agent call as parent
+    let stack = new CallStack();
+    stack = stack.pushCall({
+      callId: callData.weaveCallId,
+      traceId: callData.weaveTraceId,
+      childSummary: {},
+    });
+    return stack;
+  }
+
+  return null;
 }
 
 /**
@@ -578,6 +578,12 @@ export class WeaveTracingProcessor implements TracingProcessor {
    * Clean up all internal storage
    */
   private cleanup(): void {
+    for (const traceId of this.traceCalls.keys()) {
+      globalWeaveCallDataMap.delete(traceId);
+    }
+    for (const spanId of this.spanCalls.keys()) {
+      globalWeaveCallDataMap.delete(spanId);
+    }
     this.traceCalls.clear();
     this.spanCalls.clear();
     this.traceData.clear();

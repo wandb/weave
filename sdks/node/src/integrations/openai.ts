@@ -10,10 +10,13 @@ import {getCallStackFromOpenAIAgents} from './openai.agent';
  * This ensures that OpenAI SDK calls are properly linked as children of OpenAI Agent calls.
  */
 function runWithOpenAIAgentsContext<T>(fn: () => T): T {
-  const agentStack = getCallStackFromOpenAIAgents();
-  if (agentStack) {
-    const client = getGlobalClient();
-    if (client) {
+  const client = getGlobalClient();
+  // Only apply the agent stack as a fallback when Weave's own stack is empty.
+  // If there's already an active Weave call (e.g. a user's op wrapping this
+  // OpenAI call), preserve it so parent-child linking is correct.
+  if (client && !client.getCallStack().peek()) {
+    const agentStack = getCallStackFromOpenAIAgents();
+    if (agentStack) {
       return client.runWithCallStack(agentStack, fn);
     }
   }
