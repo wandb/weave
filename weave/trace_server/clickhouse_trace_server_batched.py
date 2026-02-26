@@ -1912,7 +1912,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             result.setdefault(key, []).append(row[2])
         return result
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._get_aliases_for_objects")
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._get_aliases_for_objects"
+    )
     def _get_aliases_for_objects(
         self,
         project_id: str,

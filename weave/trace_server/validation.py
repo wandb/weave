@@ -6,7 +6,6 @@ from weave.trace_server import validation_util
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
 from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 
-
 # --- Tag and Alias validation ---
 # Follows W&B Models conventions:
 #   - Tags: alphanumeric, hyphens, underscores, single spaces between words,
