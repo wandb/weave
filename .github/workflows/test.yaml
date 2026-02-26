@@ -136,7 +136,7 @@ jobs:
 
   # ==== Windows Jobs ====
   windows_trace_no_server:
-    name: Windows Trace non-trace server tests
+    name: Windows Trace tests (py${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}, trace_no_server)
     timeout-minutes: 10
     runs-on: windows-latest
     strategy:
@@ -174,7 +174,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
   windows_trace_tests:
-    name: Windows Trace nox tests
+    name: Windows Trace tests (py${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}, ${{ matrix.nox-shard }})
     timeout-minutes: 15
     runs-on: windows-latest
     strategy:

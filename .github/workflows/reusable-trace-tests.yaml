@@ -31,6 +31,11 @@ on:
         required: false
         type: boolean
         default: false
+      non_trace_server_shards_json:
+        description: JSON array of shards that should run with -m "not trace_server"
+        required: false
+        type: string
+        default: "[]"
       use_heavy_runner:
         description: Use 8-core runner for heavy trace shards
         required: false
@@ -147,24 +152,38 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install nox uv
-      - name: Check if shard needs trace_server markers
-        id: check_trace_markers
+      - name: Determine shard execution mode
+        id: shard_mode
         if: steps.filter_shards.outputs.skip != 'true'
         run: |
+          NON_TRACE_SERVER_SHARDS="${{ join(fromJSON(inputs.non_trace_server_shards_json), ',') }}"
+          if [[ -n "$NON_TRACE_SERVER_SHARDS" ]] && [[ ",$NON_TRACE_SERVER_SHARDS," == *",${{ matrix.shard }},"* ]]; then
+            echo "mode=non_trace_server" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if [[ "${{ inputs.marker_filter_enabled }}" != "true" ]]; then
-            echo "needs_markers=true" >> "$GITHUB_OUTPUT"
+            echo "mode=trace_markers" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           # Shards from the test matrix that require trace_server marker filtering.
-          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents mcp autogen_tests trace trace_no_server"
+          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents mcp autogen_tests trace"
           if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
-            echo "needs_markers=true" >> "$GITHUB_OUTPUT"
+            echo "mode=trace_markers" >> "$GITHUB_OUTPUT"
           else
-            echo "needs_markers=false" >> "$GITHUB_OUTPUT"
+            echo "mode=no_markers" >> "$GITHUB_OUTPUT"
           fi
+      - name: Run nox (Non Trace Server)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'non_trace_server'
+        run: |
+          if [[ "${{ inputs.set_weave_use_memray }}" == "true" ]]; then
+            export WEAVE_USE_MEMRAY=1
+          fi
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+            -m "not trace_server"
       - name: Run nox (Sqlite Trace Server)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true' && (inputs.marker_filter_enabled || matrix.shard != 'trace_calls_complete_only') && !inputs.use_dummy_api_key_fallback
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'trace_markers' && (inputs.marker_filter_enabled || matrix.shard != 'trace_calls_complete_only') && !inputs.use_dummy_api_key_fallback
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -186,7 +205,7 @@ jobs:
             -m "trace_server" \
             --trace-server=sqlite
       - name: Run nox (Sqlite Trace Server) with fallback API keys
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true' && (inputs.marker_filter_enabled || matrix.shard != 'trace_calls_complete_only') && inputs.use_dummy_api_key_fallback
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'trace_markers' && (inputs.marker_filter_enabled || matrix.shard != 'trace_calls_complete_only') && inputs.use_dummy_api_key_fallback
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -210,7 +229,7 @@ jobs:
             -m "trace_server" \
             --trace-server=sqlite
       - name: Run nox (Clickhouse Trace Server)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'trace_markers'
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -226,7 +245,7 @@ jobs:
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
       - name: Run nox (No marker filters for integration-only shards)
-        if: steps.filter_shards.outputs.skip != 'true' && inputs.marker_filter_enabled && steps.check_trace_markers.outputs.needs_markers == 'false' && !inputs.use_dummy_api_key_fallback
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'no_markers' && !inputs.use_dummy_api_key_fallback
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -246,7 +265,7 @@ jobs:
           fi
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
       - name: Run nox (No marker filters for integration-only shards) with fallback API keys
-        if: steps.filter_shards.outputs.skip != 'true' && inputs.marker_filter_enabled && steps.check_trace_markers.outputs.needs_markers == 'false' && inputs.use_dummy_api_key_fallback
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'no_markers' && inputs.use_dummy_api_key_fallback
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1

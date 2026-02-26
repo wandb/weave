@@ -20,9 +20,10 @@ jobs:
       job_name: Nightly Tests
       timeout_minutes: 30
       python_version_minors_json: '["10", "11", "12", "13"]'
-      shards_json: '["trace", "flow", "trace_server", "trace_server_bindings", "anthropic", "bedrock", "cerebras", "cohere", "crewai", "dspy", "groq", "google_genai", "instructor", "langchain", "litellm", "llamaindex", "mistral", "notdiamond", "openai", "verifiers_test", "vertexai", "pandas_test", "mcp", "smolagents", "autogen_tests"]'
+      shards_json: '["trace_no_server", "trace", "flow", "trace_server", "trace_server_bindings", "anthropic", "bedrock", "cerebras", "cohere", "crewai", "dspy", "groq", "google_genai", "instructor", "langchain", "litellm", "llamaindex", "mistral", "notdiamond", "openai", "verifiers_test", "vertexai", "pandas_test", "mcp", "smolagents", "autogen_tests"]'
       shard_filter: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.shards || '' }}
       marker_filter_enabled: true
+      non_trace_server_shards_json: '["trace_no_server"]'
       use_heavy_runner: false
       clickhouse_image: clickhouse/clickhouse-server:25.10
       set_weave_use_memray: true
