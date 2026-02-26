@@ -105,6 +105,8 @@ def google_genai_gemini_on_finish(
     if call.summary is not None:
         call.summary.update(summary_update)
 
+    call.output = google_genai_gemini_postprocess_outputs(call.output)
+
 
 def google_genai_gemini_accumulator(
     acc: GenerateContentResponse | None, value: GenerateContentResponse
@@ -174,9 +176,6 @@ def google_genai_gemini_wrapper_sync(
         op_kwargs = settings.model_dump()
         if not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
-
-        if not op_kwargs.get("postprocess_output"):
-            op_kwargs["postprocess_output"] = google_genai_gemini_postprocess_outputs
 
         op = weave.op(fn, **op_kwargs)
         if op.name not in SKIP_TRACING_FUNCTIONS:
