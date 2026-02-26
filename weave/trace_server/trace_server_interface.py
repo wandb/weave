@@ -1230,6 +1230,7 @@ class ProjectTTLSettingsRes(BaseModel):
 class SetProjectTTLSettingsReq(BaseModelStrict):
     project_id: str
     retention_days: int  # 0 = disable TTL; must be 0 or >= 1
+    wb_user_id: str | None = None
 
 
 class SetProjectTTLSettingsRes(BaseModel):
