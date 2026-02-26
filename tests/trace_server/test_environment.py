@@ -3,7 +3,9 @@ import os
 import pytest
 
 from weave.trace_server.environment import (
+    VALID_CALLS_SHARD_KEYS,
     kafka_producer_max_buffer_size,
+    wf_clickhouse_calls_shard_key,
     wf_scoring_worker_check_cancellation,
     wf_scoring_worker_kafka_consumer_group_id_override,
 )
@@ -51,3 +53,28 @@ def test_wf_scoring_worker_kafka_consumer_group_id_override():
     os.environ["SCORING_WORKER_KAFKA_CONSUMER_GROUP_ID"] = "another-group"
     assert wf_scoring_worker_kafka_consumer_group_id_override() == "another-group"
     del os.environ["SCORING_WORKER_KAFKA_CONSUMER_GROUP_ID"]
+
+
+@pytest.mark.parametrize(
+    ("env_value", "expected", "raises"),
+    [
+        (None, "trace_id", None),
+        *[(key, key, None) for key in sorted(VALID_CALLS_SHARD_KEYS)],
+        *[
+            (bad_key, None, ValueError)
+            for bad_key in ["random_col", "", "TRACE_ID", "proj_id"]
+        ],
+    ],
+)
+def test_wf_clickhouse_calls_shard_key(env_value, expected, raises, monkeypatch):
+    """Valid shard keys are accepted; invalid values raise; unset defaults to trace_id."""
+    if env_value is None:
+        monkeypatch.delenv("WF_CLICKHOUSE_CALLS_SHARD_KEY", raising=False)
+    else:
+        monkeypatch.setenv("WF_CLICKHOUSE_CALLS_SHARD_KEY", env_value)
+
+    if raises is None:
+        assert wf_clickhouse_calls_shard_key() == expected
+    else:
+        with pytest.raises(raises, match="Invalid WF_CLICKHOUSE_CALLS_SHARD_KEY"):
+            wf_clickhouse_calls_shard_key()
