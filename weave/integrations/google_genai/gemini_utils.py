@@ -4,6 +4,8 @@ from collections.abc import Callable
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel
+
 import weave
 from weave import Content
 from weave.trace.autopatch import OpSettings
@@ -12,7 +14,7 @@ from weave.trace.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
 
 if TYPE_CHECKING:
-    from google.genai.types import GenerateContentResponse, Blob
+    from google.genai.types import GenerateContentResponse
 
 SKIP_TRACING_FUNCTIONS = [
     "google.genai.models.Models.count_tokens",
@@ -21,25 +23,20 @@ SKIP_TRACING_FUNCTIONS = [
 
 
 def _traverse_and_replace_blobs(obj: Any) -> Any:
-    obj_type = type(obj)
-    if obj_type.__module__ == "google.genai.types" and obj_type.__name__ == "Blob":
-        return Content.from_bytes(obj.data, getattr(obj, "mime_type", ""))
-
-    if isinstance(obj, dict):
+    if isinstance(obj, BaseModel):
+        return _traverse_and_replace_blobs(obj.model_dump())
+    elif isinstance(obj, dict):
+        if obj.get('data') is not None and obj.get('mime_type') is not None:
+            data = bytes(obj.get('data', ''))
+            mimetype = obj.get('mime_type', '')
+            if len(data) > 0 and len(mimetype) > 0:
+                return Content.from_bytes(data, mimetype=mimetype)
         return {k: _traverse_and_replace_blobs(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [_traverse_and_replace_blobs(v) for v in obj]
     elif isinstance(obj, tuple):
         return tuple(_traverse_and_replace_blobs(v) for v in obj)
-    elif hasattr(obj, "__dict__"):
-        try:
-            import copy
-            new_obj = copy.copy(obj)
-            for k, v in vars(new_obj).items():
-                setattr(new_obj, k, _traverse_and_replace_blobs(v))
-            return new_obj
-        except Exception:
-            pass
+
 
     return obj
 
