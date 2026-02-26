@@ -13,7 +13,6 @@ from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_accumulator,
     google_genai_gemini_on_finish,
     google_genai_gemini_postprocess_inputs,
-    google_genai_gemini_postprocess_outputs,
 )
 from weave.integrations.google_genai.google_genai_sdk import get_google_genai_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
@@ -792,37 +791,6 @@ def test_postprocess_inputs_leaves_text_only_contents_unchanged():
     result = google_genai_gemini_postprocess_inputs(inputs)
 
     assert result["contents"][0] == "What's the capital of France?"
-
-
-def test_postprocess_outputs_converts_blob_to_content():
-    """Blob data in outputs is converted to Content objects for Weave UI display."""
-    from weave import Content
-
-    output_with_blob = {
-        "image": {
-            "data": b"fake_image_bytes",
-            "mime_type": "image/jpeg",
-        }
-    }
-
-    result = google_genai_gemini_postprocess_outputs(output_with_blob)
-
-    assert isinstance(result["image"], Content)
-    assert result["image"].mimetype == "image/jpeg"
-
-
-def test_postprocess_outputs_leaves_text_responses_unchanged():
-    """Text responses in outputs are not affected by postprocess_outputs."""
-    text_output = {
-        "candidates": [{"content": {"parts": [{"text": "Paris"}], "role": "model"}}]
-    }
-
-    result = google_genai_gemini_postprocess_outputs(text_output)
-
-    assert result["candidates"][0]["content"]["parts"][0]["text"] == "Paris"
-
-
-# ── Integration test: generate_content with image bytes ──────────────────────
 
 
 @pytest.mark.vcr(

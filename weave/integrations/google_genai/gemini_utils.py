@@ -40,13 +40,6 @@ def _traverse_and_replace_blobs(obj: Any) -> Any:
     return obj
 
 
-def google_genai_gemini_postprocess_outputs(outputs: Any) -> Any:
-    """Postprocess outputs of the trace for the Google GenAI Gemini API to be used in
-    the trace visualization in the Weave UI.
-    """
-    return _traverse_and_replace_blobs(outputs)
-
-
 def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     """Postprocess inputs of the trace for the Google GenAI Gemini API to be used in
     the trace visualization in the Weave UI. If the parameter `self` is present
@@ -87,7 +80,7 @@ def google_genai_gemini_on_finish(
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if output:
-        call.output = dictify(output)
+        call.output = _traverse_and_replace_blobs(dictify(output))
         if hasattr(output, "usage_metadata"):
             usage_data = {
                 "prompt_tokens": output.usage_metadata.prompt_token_count,
@@ -104,8 +97,6 @@ def google_genai_gemini_on_finish(
 
     if call.summary is not None:
         call.summary.update(summary_update)
-
-    call.output = google_genai_gemini_postprocess_outputs(call.output)
 
 
 def google_genai_gemini_accumulator(
@@ -203,9 +194,6 @@ def google_genai_gemini_wrapper_async(
         op_kwargs = settings.model_dump()
         if not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
-
-        if not op_kwargs.get("postprocess_output"):
-            op_kwargs["postprocess_output"] = google_genai_gemini_postprocess_outputs
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
         if op.name not in SKIP_TRACING_FUNCTIONS:
