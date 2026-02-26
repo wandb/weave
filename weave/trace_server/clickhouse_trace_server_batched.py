@@ -6159,11 +6159,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         retention_days = get_project_retention_days(ch_call.project_id, self.ch_client)
-        ref_time = (
+        started_at = (
             ch_call.started_at
-            if hasattr(ch_call, "started_at") and ch_call.started_at is not None
-            else datetime.datetime.utcnow()
+            if isinstance(ch_call, (CallStartCHInsertable, CallEndCHInsertable))
+            else None
         )
+        ref_time = started_at or datetime.datetime.now(datetime.UTC)
         ch_call.ttl_at = compute_ttl_at(retention_days, ref_time)
         parameters = ch_call.model_dump()
         row = []
