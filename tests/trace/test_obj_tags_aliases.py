@@ -335,13 +335,13 @@ def test_tag_validation():
 
 def test_latest_virtual_alias(client: WeaveClient):
     """The latest version should have 'latest' in its aliases; earlier versions should not."""
-    weave.publish({"v": 0}, name="latest_test")
-    weave.publish({"v": 1}, name="latest_test")
+    weave.publish({"v": 0}, name="virtual_latest_obj")
+    weave.publish({"v": 1}, name="virtual_latest_obj")
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
-            filter=tsi.ObjectVersionFilter(object_ids=["latest_test"]),
+            filter=tsi.ObjectVersionFilter(object_ids=["virtual_latest_obj"]),
             include_tags_and_aliases=True,
         )
     )
@@ -737,14 +737,14 @@ def test_tag_version_like_accepted():
 
 def test_filter_by_latest_alias(client: WeaveClient):
     """Filtering by alias=['latest'] should return only the latest version of each object."""
-    weave.publish({"v": 0}, name="filter_latest_obj")
-    weave.publish({"v": 1}, name="filter_latest_obj")
+    weave.publish({"v": 0}, name="filter_by_latest_alias_obj")
+    weave.publish({"v": 1}, name="filter_by_latest_alias_obj")
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
             filter=tsi.ObjectVersionFilter(
-                object_ids=["filter_latest_obj"],
+                object_ids=["filter_by_latest_alias_obj"],
                 aliases=["latest"],
             ),
             include_tags_and_aliases=True,
