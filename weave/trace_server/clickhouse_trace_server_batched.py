@@ -49,6 +49,7 @@ from weave.trace_server import (
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
+from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
@@ -4666,6 +4667,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         res = self.calls_delete(calls_delete_req)
         return tsi.ScoreDeleteRes(num_deleted=res.num_deleted)
+
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Return grouped prediction/trial/score data for evaluation results."""
+        return eval_helpers.eval_results_query(self, req)
 
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05

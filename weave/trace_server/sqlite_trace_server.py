@@ -2,6 +2,7 @@
 
 import datetime
 import json
+import logging
 import sqlite3
 import threading
 from collections.abc import Iterator
@@ -24,6 +25,7 @@ from weave.shared.trace_server_interface_util import (
     extract_refs_from_values,
 )
 from weave.trace_server import constants, object_creation_utils
+from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
@@ -132,6 +134,9 @@ def close_conn_cursor(db_path: str | None = None) -> None:
             pass
     if not conn_map:
         _conn_cursor.set(None)
+
+
+logger = logging.getLogger(__name__)
 
 
 class SqliteTraceServer(tsi.FullTraceServerInterface):
@@ -3600,6 +3605,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         self.calls_delete(calls_delete_req)
         return tsi.ScoreDeleteRes(num_deleted=len(req.score_ids))
+
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Return grouped prediction/trial/score data for evaluation results."""
+        return eval_helpers.eval_results_query(self, req)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
