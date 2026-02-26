@@ -69,7 +69,7 @@ on:
 
 jobs:
   trace-tests:
-    name: ${{ inputs.job_name }}
+    name: ${{ inputs.job_name }} (py${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}, ${{ matrix.shard }})
     timeout-minutes: ${{ inputs.timeout_minutes }}
     runs-on: ${{ inputs.use_heavy_runner && (matrix.shard == 'trace' || matrix.shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
