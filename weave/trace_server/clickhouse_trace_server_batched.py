@@ -1667,6 +1667,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         obj_schema = _ch_obj_to_obj_schema(obj)
         if req.include_tags_and_aliases:
+            set_root_span_dd_tags({"include_tags_and_aliases": True})
             self._enrich_objs_with_tags_and_aliases(req.project_id, [obj_schema])
         return tsi.ObjReadRes(obj=obj_schema)
 
@@ -1713,6 +1714,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         objs = self._select_objs_query(object_query_builder, metadata_only)
         obj_schemas = [_ch_obj_to_obj_schema(obj) for obj in objs]
         if req.include_tags_and_aliases:
+            set_root_span_dd_tags({"include_tags_and_aliases": True})
             self._enrich_objs_with_tags_and_aliases(req.project_id, obj_schemas)
         return tsi.ObjQueryRes(objs=obj_schemas)
 
