@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 # Global cache for endpoint availability to avoid repeated checks
 _ENDPOINT_CACHE: set[str] = set()
 
+# Prefix for W&B agent tokens that use Bearer auth instead of Basic auth
+WB_AGENT_TOKEN_PREFIX = "wb_at_"
+
 # Default remote request bytes limit (32 MiB real limit - 1 MiB buffer)
 REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
 ROW_COUNT_CHUNKING_THRESHOLD = 1000

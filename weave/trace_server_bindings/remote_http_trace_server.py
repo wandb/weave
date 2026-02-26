@@ -24,6 +24,7 @@ from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
+    WB_AGENT_TOKEN_PREFIX,
     CallsCompleteModeRequired,
     handle_response_error,
     log_dropped_call_batch,
@@ -116,7 +117,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def _set_auth_internal(self, auth: tuple[str, str]) -> None:
         """Route auth to Basic or Bearer based on the key prefix."""
         _, key = auth
-        if key.startswith("wb_at_"):
+        if key.startswith(WB_AGENT_TOKEN_PREFIX):
             self._auth = None
             self._bearer_token = key
         else:

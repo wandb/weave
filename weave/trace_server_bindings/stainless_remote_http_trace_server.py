@@ -19,6 +19,7 @@ from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcesso
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
+    WB_AGENT_TOKEN_PREFIX,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
     process_batch_with_retry,
@@ -118,7 +119,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if retry_id := get_current_retry_id():
             default_headers["X-Weave-Retry-Id"] = retry_id
 
-        if password.startswith("wb_at_"):
+        if password.startswith(WB_AGENT_TOKEN_PREFIX):
             # Use Bearer auth for wb_at_ tokens
             self._username = ""
             self._password = ""
