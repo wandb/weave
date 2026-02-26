@@ -64,6 +64,10 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   // If true, the op will adopt the `this` value of the original function
   shouldAdoptThis?: boolean;
   parameterNames?: ParameterNamesOption;
+  /** The kind of operation (e.g., 'llm', 'agent', 'tool', 'search') for UI categorization */
+  opKind?: string;
+  /** Custom color for the operation in the UI */
+  opColor?: string;
 }
 
 type AsyncResult<F extends (...args: any[]) => any> = Promise<

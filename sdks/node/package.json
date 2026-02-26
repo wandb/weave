@@ -27,7 +27,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
     "run": "tsx",
     "prettier-check": "prettier --check \"src/**/*.ts\" \"examples/**/*.ts\"",
-    "generate-api": "swagger-typescript-api -p ./weave.openapi.json -o ./src/generated -n traceServerApi.ts",
+    "generate-api": "swagger-typescript-api generate -o ./src/generated -n traceServerApi.ts --p ./weave.openapi.json ",
     "dev": "nodemon"
   },
   "files": [
