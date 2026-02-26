@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 OP_SOURCE_FILE_NAME = "obj.py"
@@ -78,23 +79,25 @@ def make_safe_name(name: str | None) -> str:
         name: The name to sanitize
 
     Returns:
-        A safe identifier with spaces and slashes replaced by underscores, lowercased
+        A safe identifier with spaces and slashes replaced by underscores,
+        all other invalid characters removed, and lowercased.
+        Valid characters are: alphanumeric, underscore, dot, and dash.
 
     Examples:
         >>> make_safe_name("My Dataset")
         'my_dataset'
         >>> make_safe_name("user/model")
         'user_model'
+        >>> make_safe_name("name:with=invalid<chars>")
+        'namewithinvalidchars'
     """
     if name is None:
         name = "unknown"
-    return (
-        name.replace(" ", "_")
-        .replace("/", "_")
-        .replace("<", "")
-        .replace(">", "")
-        .lower()
-    )
+    # First replace common separators with underscores
+    name = name.replace(" ", "_").replace("/", "_")
+    # Remove all characters that aren't valid in object names (alphanumeric, _, ., -)
+    name = re.sub(r"[^\w._-]", "", name)
+    return name.lower()
 
 
 def make_object_id(name: str | None, default: str) -> str:

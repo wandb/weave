@@ -8,9 +8,14 @@ This module contains common utilities used by both usage_query_builder.py
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.ch_sentinel_values import (
+    null_check_literal_sql,
+    null_check_sql,
+)
 from weave.trace_server.orm import ParamBuilder, combine_conditions
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.trace_server_interface import (
@@ -23,6 +28,24 @@ if TYPE_CHECKING:
 
 # Maximum number of buckets to prevent excessive query results
 MAX_BUCKETS = 10_000
+
+
+@dataclass(frozen=True)
+class StatsQueryTimeBounds:
+    granularity_seconds: int
+    start: datetime.datetime
+    end: datetime.datetime
+    bucket_expr: str
+
+
+@dataclass(frozen=True)
+class StatsQueryBuildResult:
+    sql: str
+    columns: list[str]
+    parameters: dict[str, Any]
+    granularity_seconds: int
+    start: datetime.datetime
+    end: datetime.datetime
 
 
 def auto_select_granularity_seconds(delta: datetime.timedelta) -> int:
@@ -55,7 +78,7 @@ def ensure_max_buckets(granularity_seconds: int, time_range_seconds: float) -> i
 def determine_bounds_and_bucket(
     req: CallStatsReq,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
-) -> tuple[int, datetime.datetime, datetime.datetime, str]:
+) -> StatsQueryTimeBounds:
     """Resolve request parameters to concrete time bounds and bucket configuration.
 
     Args:
@@ -63,10 +86,7 @@ def determine_bounds_and_bucket(
         read_table: Which table to query (calls_merged or calls_complete).
 
     Returns:
-        - granularity_seconds: bucket size in seconds
-        - start: start datetime (UTC)
-        - end: end datetime (UTC)
-        - bucket_sql_expr: ClickHouse expression for bucketing
+        StatsQueryTimeBounds containing bucket size, UTC range bounds, and bucket SQL.
     """
     now_utc = datetime.datetime.now(datetime.timezone.utc)
 
@@ -90,7 +110,12 @@ def determine_bounds_and_bucket(
     datetime_field = table_config.datetime_filter_field
     bucket_expr = f"toStartOfInterval({datetime_field}, INTERVAL {granularity_seconds} SECOND, {{tz}})"
 
-    return granularity_seconds, start, end, bucket_expr
+    return StatsQueryTimeBounds(
+        granularity_seconds=granularity_seconds,
+        start=start,
+        end=end,
+        bucket_expr=bucket_expr,
+    )
 
 
 def aggregation_selects_for_metric(
@@ -135,11 +160,20 @@ def aggregation_selects_for_metric(
 def build_calls_filter_sql(
     calls_filter: CallsFilter | None,
     pb: ParamBuilder,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Build WHERE clause SQL for CallsFilter.
 
     Generates filter conditions without table alias since this is used
-    in an inner subquery that directly queries calls_merged.
+    in an inner subquery that directly queries calls_merged or calls_complete.
+
+    Args:
+        calls_filter: The filter to convert to SQL.
+        pb: Parameter builder for parameterized queries.
+        read_table: Which table is being queried; affects NULL vs sentinel checks.
+
+    Returns:
+        SQL fragment with leading `` AND `` if any filters apply, or empty string.
     """
     if calls_filter is None:
         return ""
@@ -155,7 +189,7 @@ def build_calls_filter_sql(
 
     # Handle trace_roots_only
     if calls_filter.trace_roots_only:
-        where_clauses.append("parent_id IS NULL")
+        where_clauses.append(null_check_sql("parent_id", "parent_id", read_table, pb))
 
     # Handle trace_ids
     if calls_filter.trace_ids:
@@ -247,12 +281,16 @@ def build_grouped_calls_subquery(
             for column in select_columns
         )
         group_by_clause = "\n        GROUP BY project_id, id"
+        deleted_at_filter = f"{table_alias}.deleted_at IS NULL"
     else:
         # calls_complete: single row per call, no aggregation needed
         select_sql = ",\n              ".join(
             f"{table_alias}.{column} AS {column}" for column in select_columns
         )
         group_by_clause = ""
+        deleted_at_filter = null_check_literal_sql(
+            "deleted_at", f"{table_alias}.deleted_at", read_table
+        )
 
     return f"""
         SELECT
@@ -262,5 +300,5 @@ def build_grouped_calls_subquery(
               {table_alias}.project_id = {param_slot(project_param, "String")}
               AND {table_alias}.{datetime_field} >= toDateTime({param_slot(start_param, "Float64")}, {param_slot(tz_param, "String")})
               AND {table_alias}.{datetime_field} < toDateTime({param_slot(end_param, "Float64")}, {param_slot(tz_param, "String")})
-              AND {table_alias}.deleted_at IS NULL{where_filter_sql}{group_by_clause}
+              AND {deleted_at_filter}{where_filter_sql}{group_by_clause}
         """

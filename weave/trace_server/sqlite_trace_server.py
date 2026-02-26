@@ -1,8 +1,8 @@
 # Sqlite Trace Server
 
 import datetime
-import hashlib
 import json
+import logging
 import sqlite3
 import threading
 from collections.abc import Iterator
@@ -12,8 +12,20 @@ from typing import Any, cast
 
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
+from weave.shared import refs_internal as ri
+from weave.shared.digest import (
+    compute_file_digest,
+    compute_object_digest_result,
+    compute_row_digest,
+    compute_table_digest,
+)
+from weave.shared.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    assert_non_null_wb_user_id,
+    extract_refs_from_values,
+)
 from weave.trace_server import constants, object_creation_utils
-from weave.trace_server import refs_internal as ri
+from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
@@ -33,7 +45,6 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.methods.evaluation_status import evaluation_status
-from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import quote_json_path
@@ -49,13 +60,6 @@ from weave.trace_server.trace_server_common import (
     make_feedback_query_req,
     op_name_matches,
     set_nested_key,
-)
-from weave.trace_server.trace_server_interface_util import (
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-    assert_non_null_wb_user_id,
-    bytes_digest,
-    extract_refs_from_values,
-    str_digest,
 )
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
@@ -130,6 +134,9 @@ def close_conn_cursor(db_path: str | None = None) -> None:
             pass
     if not conn_map:
         _conn_cursor.set(None)
+
+
+logger = logging.getLogger(__name__)
 
 
 class SqliteTraceServer(tsi.FullTraceServerInterface):
@@ -592,11 +599,28 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         # Match the batch server:
         if req.sort_by is None:
-            order_by = [("started_at", "asc")]
+            order_by = [("started_at", "asc"), ("id", "asc")]
+            order_by = [("started_at", "asc"), ("id", "asc")]
         elif len(req.sort_by) == 0:
             order_by = None
         else:
             order_by = [(s.field, s.direction) for s in req.sort_by]
+            # Add id as secondary sort for consistency if not already present
+            if not any(field == "id" for field, _ in order_by):
+                last_sort = req.sort_by[-1]
+                # When sorting by started_at, match the id direction for perf
+                if last_sort.field == "started_at":
+                    order_by.append(("id", last_sort.direction))
+                else:
+                    order_by.append(("id", "desc"))
+            # Add id as secondary sort for consistency if not already present
+            if not any(field == "id" for field, _ in order_by):
+                last_sort = req.sort_by[-1]
+                # When sorting by started_at, match the id direction for perf
+                if last_sort.field == "started_at":
+                    order_by.append(("id", last_sort.direction))
+                else:
+                    order_by.append(("id", "desc"))
 
         if order_by is not None:
             order_parts = []
@@ -858,12 +882,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
 
-        processed_result = process_incoming_object_val(
-            req.obj.val, req.obj.builtin_object_class
+        digest_result = compute_object_digest_result(
+            req.obj.val,
+            req.obj.builtin_object_class,
         )
-        processed_val = processed_result["val"]
-        json_val = json.dumps(processed_val)
-        digest = str_digest(json_val)
+        processed_val = digest_result.processed_val
+        json_val = digest_result.json_val
+        digest = digest_result.digest
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
             req.obj.object_id,
@@ -914,8 +939,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     object_id,
                     datetime.datetime.now().isoformat(),
                     get_kind(processed_val),
-                    processed_result["base_object_class"],
-                    processed_result["leaf_object_class"],
+                    digest_result.base_object_class,
+                    digest_result.leaf_object_class,
                     json.dumps([]),
                     json_val,
                     digest,
@@ -1099,7 +1124,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if not isinstance(r, dict):
                 raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(r)
-            row_digest = str_digest(row_json)
+            row_digest = compute_row_digest(r)
             insert_rows.append((req.table.project_id, row_digest, row_json))
         with self.lock:
             cursor.executemany(
@@ -1109,10 +1134,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
             row_digests = [r[1] for r in insert_rows]
 
-            table_hasher = hashlib.sha256()
-            for row_digest in row_digests:
-                table_hasher.update(row_digest.encode())
-            digest = table_hasher.hexdigest()
+            digest = compute_table_digest(row_digests)
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
@@ -1129,10 +1151,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
 
         # Calculate table digest from row digests
-        table_hasher = hashlib.sha256()
-        for row_digest in req.row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = compute_table_digest(req.row_digests)
 
         with self.lock:
             cursor.execute(
@@ -1168,7 +1187,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if not isinstance(row_data, dict):
                 raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
-            row_digest = str_digest(row_json)
+            row_digest = compute_row_digest(row_data)
             if row_digest not in known_digests:
                 new_rows_needed_to_insert.append((req.project_id, row_digest, row_json))
                 known_digests.add(row_digest)
@@ -1204,10 +1223,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 new_rows_needed_to_insert,
             )
 
-            table_hasher = hashlib.sha256()
-            for row_digest in final_row_digests:
-                table_hasher.update(row_digest.encode())
-            digest = table_hasher.hexdigest()
+            digest = compute_table_digest(final_row_digests)
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
@@ -1526,7 +1542,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
-        digest = bytes_digest(req.content)
+        digest = compute_file_digest(req.content)
         with self.lock:
             cursor.execute(
                 "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)",
@@ -1742,6 +1758,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def annotation_queue_read(
         self, req: tsi.AnnotationQueueReadReq
     ) -> tsi.AnnotationQueueReadRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
         """Annotation queues not supported in SQLite."""
         raise NotImplementedError("Annotation queues are not supported in SQLite")
 
@@ -3577,6 +3605,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         self.calls_delete(calls_delete_req)
         return tsi.ScoreDeleteRes(num_deleted=len(req.score_ids))
+
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Return grouped prediction/trial/score data for evaluation results."""
+        return eval_helpers.eval_results_query(self, req)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)

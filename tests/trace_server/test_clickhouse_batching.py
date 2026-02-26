@@ -13,11 +13,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tests.trace.util import client_is_sqlite
+from weave.shared.digest import str_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import InvalidRequest, ObjectDeletedError
-from weave.trace_server.trace_server_interface_util import str_digest
 
 
 def make_base_64_content(content: str) -> str:
@@ -33,6 +33,36 @@ def make_base_64_content(content: str) -> str:
 
 
 string_suffix = "a" * AUTO_CONVERSION_MIN_SIZE
+
+
+def create_file_sized_content(content: str) -> str:
+    """Create base64 content padded to exceed AUTO_CONVERSION_MIN_SIZE.
+
+    This ensures the content is large enough to trigger file-based storage
+    in ClickHouse rather than inline storage.
+    """
+    return make_base_64_content(content + string_suffix)
+
+
+def _make_batch_req_with_contents(project_id: str, contents: list[str]):
+    """Helper to build a CallCreateBatchReq where each call has one base64 input."""
+    return tsi.CallCreateBatchReq(
+        batch=[
+            tsi.CallBatchStartMode(
+                mode="start",
+                req=tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        op_name=f"test_op_{i}",
+                        started_at=datetime.datetime.now(datetime.timezone.utc),
+                        attributes={},
+                        inputs={"input": create_file_sized_content(c)},
+                    )
+                ),
+            )
+            for i, c in enumerate(contents)
+        ]
+    )
 
 
 def test_clickhouse_batching():
@@ -74,8 +104,8 @@ def test_clickhouse_batching():
                             started_at=datetime.datetime.now(datetime.timezone.utc),
                             attributes={},
                             inputs={
-                                "input": make_base_64_content(
-                                    "SOME BASE64 CONTENT - 1" + string_suffix
+                                "input": create_file_sized_content(
+                                    "SOME BASE64 CONTENT - 1"
                                 )
                             },
                         )
@@ -90,8 +120,8 @@ def test_clickhouse_batching():
                             started_at=datetime.datetime.now(datetime.timezone.utc),
                             attributes={},
                             inputs={
-                                "input": make_base_64_content(
-                                    "SOME BASE64 CONTENT - 2" + string_suffix
+                                "input": create_file_sized_content(
+                                    "SOME BASE64 CONTENT - 2"
                                 )
                             },
                         )
@@ -106,8 +136,8 @@ def test_clickhouse_batching():
                             started_at=datetime.datetime.now(datetime.timezone.utc),
                             attributes={},
                             inputs={
-                                "input": make_base_64_content(
-                                    "SOME BASE64 CONTENT - 3" + string_suffix
+                                "input": create_file_sized_content(
+                                    "SOME BASE64 CONTENT - 3"
                                 )
                             },
                         )
@@ -137,6 +167,49 @@ def test_clickhouse_batching():
         assert set(insert_tables) == {"files", "call_parts"}, (
             f"Expected inserts to files and call_parts tables, "
             f"but got inserts to: {insert_tables}"
+        )
+
+
+def test_clickhouse_batching_deduplicates_identical_files():
+    """Duplicate content in the same batch should only produce one file insert."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+    mock_ch_client.query.return_value.result_rows = []
+
+    with patch.object(
+        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        trace_server = ClickHouseTraceServer(host="test_host")
+        project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
+
+        mock_query_result = MagicMock()
+        mock_query_result.result_rows = [[0, 1]]
+        mock_ch_client.query.return_value = mock_query_result
+
+        # 3 calls with the SAME content
+        same_content = "IDENTICAL CONTENT"
+        batch_req = _make_batch_req_with_contents(
+            project_id, [same_content, same_content, same_content]
+        )
+        trace_server.call_start_batch(batch_req)
+
+        insert_tables = [call[0][0] for call in mock_ch_client.insert.call_args_list]
+        assert set(insert_tables) == {"files", "call_parts"}
+
+        # The files insert should contain chunks for only 1 unique file
+        # (content + metadata), not 3 copies.
+        files_insert = next(
+            call
+            for call in mock_ch_client.insert.call_args_list
+            if call[0][0] == "files"
+        )
+        file_rows = files_insert[1]["data"]
+        # Each Content object produces 2 files (content + metadata.json).
+        # With dedup, 3 identical calls should still yield only 2 file rows.
+        assert len(file_rows) == 2, (
+            f"Expected 2 file rows (1 content + 1 metadata) for deduplicated batch, "
+            f"got {len(file_rows)}"
         )
 
 
@@ -322,6 +395,70 @@ def test_obj_batch_delete_version_preserves_indices(trace_server, client):
     )
     assert len(res.objs) == 2
     assert {obj.digest for obj in res.objs} == {pre_del_digests[0], pre_del_digests[2]}
+
+
+def test_str_digest_is_key_order_independent():
+    """str_digest must return the same value regardless of dict key insertion order."""
+    val_a = {"b": 1, "a": 2, "c": [{"z": 9, "y": 8}]}
+    val_b = {"a": 2, "c": [{"y": 8, "z": 9}], "b": 1}
+
+    digest_a = str_digest(json.dumps(val_a, sort_keys=True))
+    digest_b = str_digest(json.dumps(val_b, sort_keys=True))
+    assert digest_a == digest_b
+
+    # Without sort_keys the digests would differ
+    assert str_digest(json.dumps(val_a)) != str_digest(json.dumps(val_b))
+
+
+def test_obj_batch_different_key_order_deduplicates(trace_server, client):
+    """Objects with identical values but different key ordering share the same digest."""
+    if client_is_sqlite(client):
+        pytest.skip("SQLite does not support batch object creation")
+    server = trace_server._internal_trace_server
+    pid = _internal_pid()
+    wb_user_id = _internal_wb_user_id()
+    obj_id = "key_order_obj"
+
+    val_a = {"b": 1, "a": 2}
+    val_b = {"a": 2, "b": 1}
+
+    server.obj_create_batch(
+        batch=[
+            _mk_obj(pid, obj_id, wb_user_id, val_a),
+            _mk_obj(pid, obj_id, wb_user_id, val_b),
+        ]
+    )
+
+    res = server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=pid,
+            filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=False),
+        )
+    )
+    # Both values are logically identical, so only one version should exist
+    assert len(res.objs) == 1
+
+
+def test_table_create_different_key_order_same_digest(trace_server):
+    """Rows with different key ordering produce the same digest in table_create."""
+    server = trace_server._internal_trace_server
+    pid = _internal_pid()
+
+    row_a = {"b": 1, "a": 2}
+    row_b = {"a": 2, "b": 1}
+
+    res = server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=pid,
+                rows=[row_a, row_b],
+            )
+        )
+    )
+
+    # Both rows are logically identical so their digests must match
+    assert len(res.row_digests) == 2
+    assert res.row_digests[0] == res.row_digests[1]
 
 
 def test_obj_batch_mixed_projects_errors(trace_server, client):

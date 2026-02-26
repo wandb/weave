@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Any
 
+from weave.trace_server import ch_sentinel_values
 from weave.trace_server.calls_query_builder.stats_query_base import (
+    StatsQueryBuildResult,
     aggregation_selects_for_metric,
     build_calls_filter_sql,
     build_grouped_calls_subquery,
@@ -42,11 +43,17 @@ def _normalize_call_metrics(metrics: list[CallMetricSpec]) -> list[CallMetricSpe
     return normalized
 
 
-def _get_call_metric_extraction_sql(metric: str) -> str:
+def _get_call_metric_extraction_sql(
+    metric: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
+    pb: ParamBuilder | None = None,
+) -> str:
     """Generate SQL to extract a call-level metric.
 
     Args:
         metric: The metric name (latency_ms, call_count, error_count)
+        read_table: Which table to query; affects NULL vs sentinel checks.
+        pb: Parameter builder (required for error_count with sentinel checks).
 
     Returns:
         SQL expression that extracts the metric value.
@@ -56,7 +63,12 @@ def _get_call_metric_extraction_sql(metric: str) -> str:
     elif metric == "call_count":
         return "1"
     elif metric == "error_count":
-        return "if(exception IS NOT NULL, 1, 0)"
+        if pb is None:
+            raise ValueError("ParamBuilder required for error_count metric")
+        exception_check = ch_sentinel_values.null_check_sql(
+            "exception", "exception", read_table, pb, negate=True
+        )
+        return f"if({exception_check}, 1, 0)"
     else:
         raise ValueError(f"Unknown call metric: {metric}")
 
@@ -66,14 +78,7 @@ def build_call_metrics_query(
     metrics: list[CallMetricSpec],
     pb: ParamBuilder,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
-) -> tuple[
-    str,
-    list[str],
-    dict[str, Any],
-    int,
-    datetime.datetime,
-    datetime.datetime,
-]:
+) -> StatsQueryBuildResult:
     """Generate parameterized ClickHouse SQL for call-level metrics (not grouped by model).
 
     Args:
@@ -83,28 +88,27 @@ def build_call_metrics_query(
         read_table: Which table to query (calls_merged or calls_complete).
 
     Returns:
-        (sql, output_columns, parameters, granularity_seconds, start, end).
+        Named query build result with SQL, output columns, params, and time bounds.
     """
-    granularity_seconds, start, end, bucket_expr = determine_bounds_and_bucket(
-        req, read_table
-    )
+    time_bounds = determine_bounds_and_bucket(req, read_table)
+    granularity_seconds = time_bounds.granularity_seconds
 
     project_param = pb.add_param(req.project_id)
-    start_epoch = start.replace(tzinfo=datetime.timezone.utc).timestamp()
-    end_epoch = end.replace(tzinfo=datetime.timezone.utc).timestamp()
+    start_epoch = time_bounds.start.replace(tzinfo=datetime.timezone.utc).timestamp()
+    end_epoch = time_bounds.end.replace(tzinfo=datetime.timezone.utc).timestamp()
     start_param = pb.add_param(start_epoch)
     end_param = pb.add_param(end_epoch)
     tz_param = pb.add_param(req.timezone or "UTC")
     bucket_interval_param = pb.add_param(granularity_seconds)
 
-    where_filter_sql = build_calls_filter_sql(req.filter, pb)
+    where_filter_sql = build_calls_filter_sql(req.filter, pb, read_table)
 
     normalized_metrics = _normalize_call_metrics(metrics)
 
     inner_metric_exprs: list[str] = []
     for metric_spec in normalized_metrics:
         metric = metric_spec.metric
-        extraction_sql = _get_call_metric_extraction_sql(metric)
+        extraction_sql = _get_call_metric_extraction_sql(metric, read_table, pb)
         inner_metric_exprs.append(f"{extraction_sql} AS m_{metric}")
 
     inner_metric_sql = ",\n        ".join(inner_metric_exprs)
@@ -177,7 +181,7 @@ def build_call_metrics_query(
         FROM
         (
           SELECT
-            {bucket_expr.format(tz=param_slot(tz_param, "String"))} AS bucket,
+            {time_bounds.bucket_expr.format(tz=param_slot(tz_param, "String"))} AS bucket,
             {inner_metric_sql}
           FROM (
             {grouped_calls_sql}
@@ -193,11 +197,11 @@ def build_call_metrics_query(
     ORDER BY all_buckets.bucket
     """
 
-    return (
-        safely_format_sql(raw_sql, logger),
-        columns,
-        pb.get_params(),
-        granularity_seconds,
-        start,
-        end,
+    return StatsQueryBuildResult(
+        sql=safely_format_sql(raw_sql, logger),
+        columns=columns,
+        parameters=pb.get_params(),
+        granularity_seconds=granularity_seconds,
+        start=time_bounds.start,
+        end=time_bounds.end,
     )

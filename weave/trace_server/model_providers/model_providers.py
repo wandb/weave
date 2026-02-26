@@ -26,7 +26,13 @@ PROVIDER_TO_API_KEY_NAME_MAP = {
     "openai": "OPENAI_API_KEY",
     "mistral": "MISTRAL_API_KEY",
     "xai": "XAI_API_KEY",
+    "vertex_ai": "VERTEXAI_JSON_CREDENTIALS",
+    "vertex_ai-language-models": "VERTEXAI_JSON_CREDENTIALS",
 }
+
+# Provider names that use Vertex credentials (same as keys in PROVIDER_TO_API_KEY_NAME_MAP).
+# Used for credential handling in completion paths.
+VERTEX_PROVIDER_NAMES: tuple[str, ...] = ("vertex_ai", "vertex_ai-language-models")
 
 
 class LLMModelProviderInfo(TypedDict, total=False):

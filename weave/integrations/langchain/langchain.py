@@ -35,6 +35,9 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
+from pydantic import BaseModel
+from pydantic.v1.json import pydantic_encoder
+
 from weave.flow.util import warn_once
 from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
@@ -59,7 +62,7 @@ except ImportError:
     import_failed = True
 
 from collections.abc import Generator
-from typing import Any
+from typing import Any, cast
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
@@ -67,24 +70,58 @@ logger = logging.getLogger(__name__)
 
 if not import_failed:
 
-    def _run_to_dict(run: Run, as_input: bool = False) -> dict:
-        run_dict = run.json(
-            exclude={
-                "child_runs",
-                "inputs",
-                "outputs",
-                "serialized",
-                "events",
-                "reference_example_id",
-                "trace_id",
-                "dotted_order",
-            },
-            exclude_unset=True,
-            exclude_none=True,
-            exclude_defaults=True,
-        )
+    def _safe_json_encoder(obj: Any) -> Any:
+        """JSON encoder that extends pydantic's default with fallback handling.
 
-        run_dict = json.loads(run_dict)
+        Handles objects that pydantic v1's default encoder can't serialize,
+        such as Pydantic model classes (ModelMetaclass) passed via LangChain's
+        with_structured_output(), and other arbitrary non-serializable objects.
+        """
+        try:
+            return pydantic_encoder(obj)
+        except TypeError:
+            pass
+
+        if isinstance(obj, type) and issubclass(obj, BaseModel):
+            return cast(type[BaseModel], obj).model_json_schema()
+
+        if isinstance(obj, (set, frozenset)):
+            return list(obj)
+
+        try:
+            return repr(obj)
+        except Exception:
+            return f"<{type(obj).__name__}>"
+
+    def _run_to_dict(run: Run, as_input: bool = False) -> dict:
+        exclude_fields = {
+            "child_runs",
+            "inputs",
+            "outputs",
+            "serialized",
+            "events",
+            "reference_example_id",
+            "trace_id",
+            "dotted_order",
+        }
+        common_kwargs = {
+            "exclude": exclude_fields,
+            "exclude_unset": True,
+            "exclude_none": True,
+            "exclude_defaults": True,
+        }
+
+        try:
+            # Pydantic v2 API (langchain-core >=1.0)
+            run_json = json.dumps(
+                run.model_dump(**common_kwargs),
+                default=_safe_json_encoder,
+            )
+        except AttributeError:
+            # Pydantic v1 API (langchain-core <1.0): no model_dump
+            run_json = run.json(encoder=_safe_json_encoder, **common_kwargs)
+
+        run_dict = json.loads(run_json)
         if as_input:
             run_dict["inputs"] = run.inputs.copy() if run.inputs is not None else None
         else:
