@@ -2121,6 +2121,33 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             **dict(zip(columns, query_result.result_rows[0], strict=False))
         )
 
+    def project_ttl_settings_read(
+        self, req: tsi.ProjectTTLSettingsReq
+    ) -> tsi.ProjectTTLSettingsRes:
+        retention_days = get_project_retention_days(req.project_id, self.ch_client)
+        return tsi.ProjectTTLSettingsRes(retention_days=retention_days)
+
+    def project_ttl_settings_set(
+        self, req: tsi.SetProjectTTLSettingsReq
+    ) -> tsi.SetProjectTTLSettingsRes:
+        if req.retention_days < 0:
+            raise InvalidRequest("retention_days must be 0 (no TTL) or >= 1")
+
+        self.ch_client.insert(
+            "project_ttl_settings",
+            data=[
+                [
+                    req.project_id,
+                    req.retention_days,
+                    datetime.datetime.now(datetime.UTC),
+                    req.wb_user_id or "",
+                ]
+            ],
+            column_names=["project_id", "retention_days", "updated_at", "updated_by"],
+        )
+        invalidate_ttl_cache(req.project_id)
+        return tsi.SetProjectTTLSettingsRes(retention_days=req.retention_days)
+
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:

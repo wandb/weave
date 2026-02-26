@@ -1215,6 +1215,28 @@ class ProjectStatsRes(BaseModel):
     files_storage_size_bytes: int
 
 
+# TTL Settings API
+# ================
+
+
+class ProjectTTLSettingsReq(BaseModelStrict):
+    project_id: str
+
+
+class ProjectTTLSettingsRes(BaseModel):
+    retention_days: int  # 0 = no TTL (infinite retention)
+
+
+class SetProjectTTLSettingsReq(BaseModelStrict):
+    project_id: str
+    retention_days: int  # 0 = disable TTL; must be 0 or >= 1
+    wb_user_id: str | None = None
+
+
+class SetProjectTTLSettingsRes(BaseModel):
+    retention_days: int
+
+
 # Annotation Queue API
 # =====================
 # These schemas support the queue-based call annotation system.
@@ -2537,6 +2559,15 @@ class TraceServerInterface(Protocol):
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
+
+    # TTL settings API
+    def project_ttl_settings_read(
+        self, req: ProjectTTLSettingsReq
+    ) -> ProjectTTLSettingsRes: ...
+
+    def project_ttl_settings_set(
+        self, req: SetProjectTTLSettingsReq
+    ) -> SetProjectTTLSettingsRes: ...
 
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...

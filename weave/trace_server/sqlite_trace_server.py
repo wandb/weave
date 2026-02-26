@@ -1672,6 +1672,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             "project_stats is not implemented for SQLite trace server"
         )
 
+    def project_ttl_settings_read(
+        self, req: tsi.ProjectTTLSettingsReq
+    ) -> tsi.ProjectTTLSettingsRes:
+        raise NotImplementedError(
+            "project_ttl_settings_read is not implemented for SQLite trace server"
+        )
+
+    def project_ttl_settings_set(
+        self, req: tsi.SetProjectTTLSettingsReq
+    ) -> tsi.SetProjectTTLSettingsRes:
+        raise NotImplementedError(
+            "project_ttl_settings_set is not implemented for SQLite trace server"
+        )
+
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
