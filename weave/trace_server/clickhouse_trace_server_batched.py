@@ -208,6 +208,11 @@ from weave.trace_server.trace_server_common import (
     make_feedback_query_req,
     set_nested_key,
 )
+from weave.trace_server.ttl_settings import (
+    compute_ttl_at,
+    get_project_retention_days,
+    invalidate_ttl_cache,
+)
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
     EvaluateModelDispatcher,
@@ -6153,6 +6158,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
+        retention_days = get_project_retention_days(ch_call.project_id, self.ch_client)
+        started_at = (
+            ch_call.started_at
+            if isinstance(ch_call, (CallStartCHInsertable, CallEndCHInsertable))
+            else None
+        )
+        ref_time = started_at or datetime.datetime.now(datetime.UTC)
+        ch_call.ttl_at = compute_ttl_at(retention_days, ref_time)
         parameters = ch_call.model_dump()
         row = []
         for key in ALL_CALL_INSERT_COLUMNS:
@@ -6181,6 +6194,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Args:
             ch_call: The complete call to insert.
         """
+        retention_days = get_project_retention_days(ch_call.project_id, self.ch_client)
+        ch_call.ttl_at = compute_ttl_at(retention_days, ch_call.started_at)
         parameters = ch_call.model_dump()
         row = []
         for key in ALL_CALL_COMPLETE_INSERT_COLUMNS:
@@ -6200,6 +6215,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Args:
             ch_call: The complete call to insert.
         """
+        retention_days = get_project_retention_days(ch_call.project_id, self.ch_client)
+        ch_call.ttl_at = compute_ttl_at(retention_days, ch_call.started_at)
         parameters = ch_call.model_dump()
         row = []
         for key in ALL_CALL_INSERT_COLUMNS:
