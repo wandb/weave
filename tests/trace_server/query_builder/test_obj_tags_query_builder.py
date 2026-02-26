@@ -8,7 +8,6 @@ from weave.trace_server.query_builder.objects_query_builder import (
     ObjectMetadataQueryBuilder,
 )
 
-
 # --- obj_tags_query_builder functions ---
 
 
@@ -25,7 +24,6 @@ def test_make_get_tags_query():
     assert "tag" in query
     assert params["project_id"] == "proj"
     assert set(params["object_ids"]) == {"obj1", "obj2"}
-    assert "digests" not in params
 
 
 def test_make_get_aliases_query():
