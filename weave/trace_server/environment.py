@@ -139,6 +139,14 @@ def wf_clickhouse_use_distributed_tables() -> bool:
     )
 
 
+def wf_clickhouse_calls_shard_key() -> str:
+    """The column used as shard key for calls_complete in distributed mode.
+
+    Valid values: "trace_id" (default), "id", "project_id".
+    """
+    return os.environ.get("WF_CLICKHOUSE_CALLS_SHARD_KEY", "trace_id")
+
+
 def wf_clickhouse_max_memory_usage() -> int | None:
     """The maximum memory usage for the clickhouse server."""
     mem = os.environ.get("WF_CLICKHOUSE_MAX_MEMORY_USAGE")

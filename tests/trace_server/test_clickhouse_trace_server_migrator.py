@@ -388,7 +388,7 @@ def test_create_distributed_table_sql():
 
 
 def test_create_distributed_table_sql_id_sharded():
-    """Test distributed table creation SQL for ID-sharded tables."""
+    """Test distributed table creation SQL for ID-sharded tables (default: trace_id)."""
     distributed_migrator = DistributedClickHouseTraceServerMigrator(
         Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
@@ -396,9 +396,32 @@ def test_create_distributed_table_sql_id_sharded():
     expected = """
         CREATE TABLE IF NOT EXISTS calls_complete ON CLUSTER test_cluster
         AS calls_complete_local
-        ENGINE = Distributed(test_cluster, currentDatabase(), calls_complete_local, sipHash64(id))
+        ENGINE = Distributed(test_cluster, currentDatabase(), calls_complete_local, sipHash64(trace_id))
     """
     assert sql.strip() == expected.strip()
+
+
+@pytest.mark.parametrize(
+    ("shard_key", "expected_expr"),
+    [
+        ("trace_id", "sipHash64(trace_id)"),
+        ("id", "sipHash64(id)"),
+        ("project_id", "sipHash64(project_id)"),
+    ],
+)
+def test_calls_complete_shard_key_env_var(shard_key, expected_expr):
+    """Test that WF_CLICKHOUSE_CALLS_SHARD_KEY env var configures the sharding key."""
+    with patch.dict(
+        "weave.trace_server.clickhouse_trace_server_migrator.ID_SHARDED_TABLES",
+        {"calls_complete": shard_key},
+    ):
+        distributed_migrator = DistributedClickHouseTraceServerMigrator(
+            Mock(),
+            replicated_cluster="test_cluster",
+            migration_dir=DEFAULT_MIGRATION_DIR,
+        )
+        sql = distributed_migrator._create_distributed_table_sql("calls_complete")
+        assert expected_expr in sql
 
 
 def test_format_distributed_sql():
