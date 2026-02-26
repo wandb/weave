@@ -925,6 +925,23 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        return self._generic_request(
+            "/feedback/stats", req, tsi.FeedbackStatsReq, tsi.FeedbackStatsRes
+        )
+
+    @validate_call
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        return self._generic_request(
+            "/feedback/payload_schema",
+            req,
+            tsi.FeedbackPayloadSchemaReq,
+            tsi.FeedbackPayloadSchemaRes,
+        )
+
+    @validate_call
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
