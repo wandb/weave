@@ -2,6 +2,26 @@ import {weaveImage} from '../media';
 import {op} from '../op';
 import {OpOptions} from '../opType';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {getGlobalClient} from '../clientApi';
+import {getCallStackFromOpenAIAgents} from './openai.agent';
+
+/**
+ * Wraps a function to run with OpenAI Agents call stack if available.
+ * This ensures that OpenAI SDK calls are properly linked as children of OpenAI Agent calls.
+ */
+function runWithOpenAIAgentsContext<T>(fn: () => T): T {
+  const client = getGlobalClient();
+  // Only apply the agent stack as a fallback when Weave's own stack is empty.
+  // If there's already an active Weave call (e.g. a user's op wrapping this
+  // OpenAI call), preserve it so parent-child linking is correct.
+  if (client && !client.getCallStack().peek()) {
+    const agentStack = getCallStackFromOpenAIAgents();
+    if (agentStack) {
+      return client.runWithCallStack(agentStack, fn);
+    }
+  }
+  return fn();
+}
 
 // exported just for testing
 export const openAIStreamReducer = {
@@ -86,6 +106,7 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
 
   const options: OpOptions<typeof wrapped> = {
     name: name,
+    opKind: 'llm',
     parameterNames: 'useParam0Object',
     summarize: result => ({
       usage: {
@@ -95,7 +116,12 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
     streamReducer: openAIStreamReducer,
   };
 
-  return op(wrapped, options);
+  const weaveOp = op(wrapped, options);
+
+  // Wrap with OpenAI Agents context if available
+  return function wrappedWithAgents(...args: Parameters<typeof wrapped>) {
+    return runWithOpenAIAgentsContext(() => weaveOp(...args));
+  };
 }
 
 export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
@@ -120,6 +146,7 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
 
   const options: OpOptions<typeof wrapped> = {
     name: 'openai.images.generate',
+    opKind: 'llm',
     summarize: result => ({
       usage: {
         'dall-e': {
@@ -129,7 +156,12 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
     }),
   };
 
-  return op(wrapped, options);
+  const weaveOp = op(wrapped, options);
+
+  // Wrap with OpenAI Agents context if available
+  return function wrappedWithAgents(...args: Parameters<typeof wrapped>) {
+    return runWithOpenAIAgentsContext(() => weaveOp(...args));
+  };
 }
 
 import {StreamReducer} from '../opType';
@@ -419,6 +451,7 @@ export function makeOpenAIResponsesCreateProxy(originalCreate: any) {
       const isStream = inputOptions.stream;
       const weaveOpOptions: OpOptions<typeof originalCreate> = {
         name: 'create',
+        opKind: 'llm',
         shouldAdoptThis: true,
         originalFunction: originalCreate,
         summarize: summarizer,
@@ -426,11 +459,14 @@ export function makeOpenAIResponsesCreateProxy(originalCreate: any) {
         parameterNames: 'useParam0Object',
       };
 
-      let weaveOp = op(() => {
+      const weaveOp = op(() => {
         return originalCreate.apply(thisArg, args);
       }, weaveOpOptions);
 
-      return weaveOp.apply(thisArg, args);
+      // Run with OpenAI Agents context if available
+      return runWithOpenAIAgentsContext(() => {
+        return weaveOp.apply(thisArg, args);
+      });
     },
   });
 }

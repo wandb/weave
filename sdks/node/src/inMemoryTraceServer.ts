@@ -329,5 +329,19 @@ export class InMemoryTraceServer {
     );
   }
 
+  async getCalls(
+    projectId: string,
+    limit?: number,
+    filters?: Partial<Call>
+  ): Promise<Call[]> {
+    await this.waitForPendingOperations();
+    const result = await this.calls.callsStreamQueryPost({
+      project_id: projectId,
+      limit,
+      filters,
+    });
+    return result.calls;
+  }
+
   // ... other existing methods ...
 }
