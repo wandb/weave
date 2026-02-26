@@ -378,6 +378,16 @@ def _create_call(
     )
 
 
+def _cleanup_failed_create_call_context(parent_call: Call | None) -> None:
+    """Pop leaked call context when create_call fails after pushing a call."""
+    current_call = call_context.get_current_call()
+    if current_call is None:
+        return
+    if parent_call is not None and current_call.id == parent_call.id:
+        return
+    call_context.pop_call(current_call.id)
+
+
 def is_tracing_setting_disabled() -> bool:
     if settings.should_disable_weave():
         return True
@@ -459,11 +469,13 @@ def _call_sync_func(
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
     # If the parent was traced (sampled in), the child will be too.
+    parent_call_before_create = call_context.get_current_call()
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
         raise e
     except Exception as e:
+        _cleanup_failed_create_call_context(parent_call_before_create)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -586,11 +598,13 @@ async def _call_async_func(
     _set_python_function_type_on_weave_dict(__weave, "async_function")
 
     # Proceed with tracing
+    parent_call_before_create = call_context.get_current_call()
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
         raise e
     except Exception as e:
+        _cleanup_failed_create_call_context(parent_call_before_create)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -718,6 +732,7 @@ def _call_sync_gen(
     _set_python_function_type_on_weave_dict(__weave, "generator")
 
     # Proceed with tracing
+    parent_call_before_create = call_context.get_current_call()
     try:
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
@@ -725,6 +740,7 @@ def _call_sync_gen(
     except OpCallError:
         raise
     except Exception:
+        _cleanup_failed_create_call_context(parent_call_before_create)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -938,6 +954,7 @@ async def _call_async_gen(
     _set_python_function_type_on_weave_dict(__weave, "async_generator")
 
     # Proceed with tracing
+    parent_call_before_create = call_context.get_current_call()
     try:
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
@@ -945,6 +962,7 @@ async def _call_async_gen(
     except OpCallError:
         raise
     except Exception:
+        _cleanup_failed_create_call_context(parent_call_before_create)
         if get_raise_on_captured_errors():
             raise
         log_once(

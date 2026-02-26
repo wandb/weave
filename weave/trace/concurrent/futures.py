@@ -77,6 +77,7 @@ class FutureExecutor:
             )
         self._active_futures: set[Future] = set()
         self._active_futures_lock = Lock()
+        self._pending_raise_exception: BaseException | None = None
         self._in_thread_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
 
@@ -163,20 +164,37 @@ class FutureExecutor:
             RuntimeError: If called from within a thread context.
             TimeoutError: If the timeout is reached.
         """
+        should_raise = get_raise_on_captured_errors()
+        if not should_raise:
+            # Avoid leaking stale pending exceptions between test contexts.
+            self._pop_pending_raise_exception()
+
         with self._active_futures_lock:
             if not self._active_futures:
+                if should_raise:
+                    pending_exception = self._pending_raise_exception
+                    self._pending_raise_exception = None
+                    if pending_exception is not None:
+                        raise pending_exception
                 return True
             futures_to_wait = list(self._active_futures)
 
         if self._in_thread_context.get():
             raise RuntimeError("Cannot flush from within a thread")
 
+        first_exception: BaseException | None = None
         for future in concurrent.futures.as_completed(futures_to_wait, timeout=timeout):
             try:
                 future.result()
             except Exception as e:
-                if get_raise_on_captured_errors():
-                    raise
+                if should_raise and first_exception is None:
+                    first_exception = e
+        if should_raise:
+            pending_exception = self._pop_pending_raise_exception()
+            if pending_exception is None and first_exception is not None:
+                raise first_exception
+            if pending_exception is not None:
+                raise pending_exception
         return True
 
     def _future_done_callback(self, future: Future) -> None:
@@ -186,6 +204,14 @@ class FutureExecutor:
 
             if exception := future.exception():
                 logger.error(f"Task failed: {_format_exception(exception)}")
+                if get_raise_on_captured_errors():
+                    self._pending_raise_exception = exception
+
+    def _pop_pending_raise_exception(self) -> BaseException | None:
+        with self._active_futures_lock:
+            pending_exception = self._pending_raise_exception
+            self._pending_raise_exception = None
+        return pending_exception
 
     def _shutdown(self) -> None:
         """Shutdown the thread pool executor. Should only be called when the program is exiting."""

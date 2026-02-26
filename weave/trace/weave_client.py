@@ -247,9 +247,17 @@ def map_to_refs(obj: Any) -> Any:
         return ref
 
     if isinstance(obj, ObjectRecord):
-        # Here, we expect ref to be empty since it would have short circuited
-        # above with `_get_direct_ref`
-        return _remove_empty_ref(obj.map_values(map_to_refs))
+        # Keep class metadata scalar: `_class_name` / `_bases` should never become refs.
+        mapped_attrs: dict[str, Any] = {}
+        for key, value in obj.__dict__.items():
+            if key == "_class_name":
+                mapped_attrs[key] = str(value)
+                continue
+            if key == "_bases" and isinstance(value, list):
+                mapped_attrs[key] = [str(base) for base in value]
+                continue
+            mapped_attrs[key] = map_to_refs(value)
+        return _remove_empty_ref(ObjectRecord(mapped_attrs))
     elif isinstance(obj, pydantic.BaseModel):
         # Check if this object has a custom serializer registered
         from weave.trace.serialization.serializer import get_serializer_for_obj
@@ -792,54 +800,57 @@ class WeaveClient:
         )
 
         def send_start_call() -> bool:
-            maybe_redacted_inputs_with_refs = inputs_with_refs
-            if should_redact_pii():
-                from weave.utils.pii_redaction import redact_pii
+            try:
+                maybe_redacted_inputs_with_refs = inputs_with_refs
+                if should_redact_pii():
+                    from weave.utils.pii_redaction import redact_pii
 
-                maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
+                    maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
-            inputs_json = to_json(
-                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
-            )
-            call_start_req = CallStartReq(
-                start=StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=call_id,
-                    op_name=op_def_ref.uri(),
-                    display_name=call.display_name,
-                    trace_id=trace_id,
-                    started_at=started_at,
-                    parent_id=parent_id,
-                    inputs=inputs_json,
-                    attributes=attributes_dict.unwrap(),
-                    wb_run_id=current_wb_run_id,
-                    wb_run_step=current_wb_run_step,
-                    thread_id=thread_id,
-                    turn_id=turn_id,
+                inputs_json = to_json(
+                    maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
                 )
-            )
-
-            bytes_size = len(call_start_req.model_dump_json())
-            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                logger.warning(
-                    f"Trace input size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes."
-                    "Inputs may be dropped."
+                call_start_req = CallStartReq(
+                    start=StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call_id,
+                        op_name=op_def_ref.uri(),
+                        display_name=call.display_name,
+                        trace_id=trace_id,
+                        started_at=started_at,
+                        parent_id=parent_id,
+                        inputs=inputs_json,
+                        attributes=attributes_dict.unwrap(),
+                        wb_run_id=current_wb_run_id,
+                        wb_run_step=current_wb_run_step,
+                        thread_id=thread_id,
+                        turn_id=turn_id,
+                    )
                 )
 
-            # eager_call_start is a client-side hint that tells the batch processor
-            # to send this call's start immediately (for long-running ops like evals)
-            # Ugly that we have to reach down to the processor level here, but otherwise
-            # we need to change the interface itself.
-            call_processor = _get_call_processor(self.server)
-            if call_processor is not None:
-                eager = op.eager_call_start
-                call_processor.enqueue_start(
-                    StartBatchItem(req=call_start_req), eager_call_start=eager
-                )
-            else:
-                self.server.call_start(call_start_req)
+                bytes_size = len(call_start_req.model_dump_json())
+                if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                    logger.warning(
+                        f"Trace input size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes."
+                        "Inputs may be dropped."
+                    )
 
-            return True
+                # eager_call_start is a client-side hint that tells the batch processor
+                # to send this call's start immediately (for long-running ops like evals)
+                # Ugly that we have to reach down to the processor level here, but otherwise
+                # we need to change the interface itself.
+                call_processor = _get_call_processor(self.server)
+                if call_processor is not None:
+                    eager = op.eager_call_start
+                    call_processor.enqueue_start(
+                        StartBatchItem(req=call_start_req), eager_call_start=eager
+                    )
+                else:
+                    self.server.call_start(call_start_req)
+
+                return True
+            except Exception:
+                return False
 
         def on_complete(f: Future) -> None:
             try:
@@ -1451,30 +1462,33 @@ class WeaveClient:
         """
 
         def send_score_call() -> str:
-            call_ref = get_ref(predict_call)
-            if call_ref is None:
-                raise ValueError("Predict call must have a ref")
-            weave_ref_uri = call_ref.uri()
-            scorer_call_ref = get_ref(score_call)
-            if scorer_call_ref is None:
-                raise ValueError("Score call must have a ref")
-            scorer_call_ref_uri = scorer_call_ref.uri()
+            try:
+                call_ref = get_ref(predict_call)
+                if call_ref is None:
+                    raise ValueError("Predict call must have a ref")
+                weave_ref_uri = call_ref.uri()
+                scorer_call_ref = get_ref(score_call)
+                if scorer_call_ref is None:
+                    raise ValueError("Score call must have a ref")
+                scorer_call_ref_uri = scorer_call_ref.uri()
 
-            # If scorer_object_ref is provided, it is used as the runnable_ref_uri
-            # Otherwise, we use the op_name from the score_call. This should happen
-            # when there is a Scorer subclass that is the source of the score call.
-            scorer_object_ref_uri = (
-                scorer_object_ref.uri() if scorer_object_ref else None
-            )
-            runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
-            score_results = score_call.output
+                # If scorer_object_ref is provided, it is used as the runnable_ref_uri
+                # Otherwise, we use the op_name from the score_call. This should happen
+                # when there is a Scorer subclass that is the source of the score call.
+                scorer_object_ref_uri = (
+                    scorer_object_ref.uri() if scorer_object_ref else None
+                )
+                runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
+                score_results = score_call.output
 
-            return self._add_runnable_feedback(
-                weave_ref_uri=weave_ref_uri,
-                output=score_results,
-                call_ref_uri=scorer_call_ref_uri,
-                runnable_ref_uri=runnable_ref_uri,
-            )
+                return self._add_runnable_feedback(
+                    weave_ref_uri=weave_ref_uri,
+                    output=score_results,
+                    call_ref_uri=scorer_call_ref_uri,
+                    runnable_ref_uri=runnable_ref_uri,
+                )
+            except Exception:
+                return ""
 
         return self.future_executor.defer(send_score_call)
 
@@ -1702,11 +1716,40 @@ class WeaveClient:
                 val=json_val,
             )
         )
-        digest = compute_object_digest_result(
-            self._normalize_payload_for_digest(req.obj.val),
-            req.obj.builtin_object_class,
-        ).digest
-        self.future_executor.defer(lambda req=req: self.server.obj_create(req))
+        project_id_converter = self._find_ext_to_int_project_id_converter()
+        normalized_digest_payload = req.obj.val
+        if project_id_converter is not None:
+            try:
+                normalized_digest_payload = universal_ext_to_int_ref_converter(
+                    req.obj.val, project_id_converter
+                )
+            except Exception:
+                normalized_digest_payload = req.obj.val
+        requires_server_digest = (
+            project_id_converter is None
+            and self._payload_contains_external_weave_ref(req.obj.val)
+        )
+        if requires_server_digest:
+            local_digest = compute_object_digest_result(
+                normalized_digest_payload,
+                req.obj.builtin_object_class,
+            ).digest
+            create_future = self.future_executor.defer(
+                lambda req=req: self.server.obj_create(req)
+            )
+            digest: str | Future[str] = self.future_executor.defer(
+                lambda create_future=create_future, local_digest=local_digest: (
+                    create_future.result().digest
+                    if not create_future.exception()
+                    else local_digest
+                )
+            )
+        else:
+            digest = compute_object_digest_result(
+                normalized_digest_payload,
+                req.obj.builtin_object_class,
+            ).digest
+            self.future_executor.defer(lambda req=req: self.server.obj_create(req))
 
         ref: Ref
         if is_op(orig_val):
@@ -1971,6 +2014,20 @@ class WeaveClient:
             return universal_ext_to_int_ref_converter(payload, project_id_converter)
         except Exception:
             return payload
+
+    def _payload_contains_external_weave_ref(self, payload: Any) -> bool:
+        if isinstance(payload, str):
+            return payload.startswith("weave:///")
+        if isinstance(payload, dict):
+            return any(
+                self._payload_contains_external_weave_ref(value)
+                for value in payload.values()
+            )
+        if isinstance(payload, (list, tuple, set)):
+            return any(
+                self._payload_contains_external_weave_ref(value) for value in payload
+            )
+        return False
 
     def _find_ext_to_int_project_id_converter(
         self,
