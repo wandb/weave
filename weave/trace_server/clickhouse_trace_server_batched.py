@@ -176,6 +176,12 @@ from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_queues_query,
     make_queues_stats_query,
 )
+from weave.trace_server.query_builder.obj_tags_query_builder import (
+    make_assert_obj_version_exists_query,
+    make_get_aliases_query,
+    make_get_tags_query,
+    make_resolve_alias_query,
+)
 from weave.trace_server.query_builder.objects_query_builder import (
     ObjectMetadataQueryBuilder,
     format_metadata_objects_from_query_result,
@@ -1782,27 +1788,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _assert_obj_version_exists(
         self, project_id: str, object_id: str, digest: str
     ) -> None:
-        """Raise NotFoundError if the object version doesn't exist or is deleted.
-
-        Uses argMax to handle ReplacingMergeTree pre-merge state: multiple rows
-        may exist for the same version, so we pick the latest deleted_at by
-        created_at and check it's NULL (not soft-deleted).
-        """
-        query = """
-            SELECT 1
-            FROM object_versions
-            PREWHERE project_id = {project_id: String}
-                AND object_id = {object_id: String}
-            WHERE digest = {digest: String}
-            GROUP BY project_id, object_id, digest
-            HAVING argMax(deleted_at, created_at) IS NULL
-            LIMIT 1
-        """
-        parameters = {
-            "project_id": project_id,
-            "object_id": object_id,
-            "digest": digest,
-        }
+        """Raise NotFoundError if the object version doesn't exist or is deleted."""
+        query, parameters = make_assert_obj_version_exists_query(
+            project_id, object_id, digest
+        )
         found = False
         for _ in self._query_stream(query, parameters):
             found = True
@@ -1913,22 +1902,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         if not object_digests:
             return {}
-        object_ids = list({od[0] for od in object_digests})
-        digests = list({od[1] for od in object_digests})
-        query = """
-            SELECT object_id, digest, tag
-            FROM tags
-            PREWHERE project_id = {project_id: String}
-                AND object_id IN {object_ids: Array(String)}
-            WHERE digest IN {digests: Array(String)}
-            GROUP BY project_id, object_id, digest, tag
-            HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
-        """
-        parameters = {
-            "project_id": project_id,
-            "object_ids": object_ids,
-            "digests": digests,
-        }
+        query, parameters = make_get_tags_query(project_id, object_digests)
         result: dict[tuple[str, str], list[str]] = {}
         for row in self._query_stream(query, parameters):
             key = (row[0], row[1])
@@ -1945,18 +1919,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         if not object_ids:
             return {}
-        query = """
-            SELECT object_id, argMax(digest, created_at) AS digest, alias
-            FROM aliases
-            PREWHERE project_id = {project_id: String}
-                AND object_id IN {object_ids: Array(String)}
-            GROUP BY project_id, object_id, alias
-            HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
-        """
-        parameters = {
-            "project_id": project_id,
-            "object_ids": object_ids,
-        }
+        query, parameters = make_get_aliases_query(project_id, object_ids)
         result: dict[tuple[str, str], list[str]] = {}
         for row in self._query_stream(query, parameters):
             key = (row[0], row[1])
@@ -1972,6 +1935,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """If digest looks like an alias name (not a hash, not version-like, not 'latest'),
         resolve it to the actual digest via the aliases table. Returns None if not an alias.
         """
+        # Return None for digests that are not alias names, so the caller
+        # falls through to normal digest-based lookup.  "latest" and version
+        # patterns (v0, v1, …) are handled by the existing obj_read logic;
+        # content hashes are real digests that don't need resolution.
         if digest == "latest":
             return None
         (is_version, _) = tsc.digest_is_version_like(digest)
@@ -1979,22 +1946,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return None
         if tsc.digest_is_content_hash(digest):
             return None
-        # Try to resolve as alias
-        query = """
-            SELECT argMax(digest, created_at) AS digest
-            FROM aliases
-            PREWHERE project_id = {project_id: String}
-                AND object_id = {object_id: String}
-            WHERE alias = {alias: String}
-            GROUP BY project_id, object_id, alias
-            HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
-            LIMIT 1
-        """
-        parameters = {
-            "project_id": project_id,
-            "object_id": object_id,
-            "alias": digest,
-        }
+        query, parameters = make_resolve_alias_query(project_id, object_id, digest)
         for row in self._query_stream(query, parameters):
             return row[0]
         return None

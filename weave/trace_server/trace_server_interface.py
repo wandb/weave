@@ -1,5 +1,4 @@
 import datetime
-import re
 from collections.abc import Iterator
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Protocol
@@ -755,54 +754,8 @@ class ObjDeleteRes(BaseModel):
 
 
 # --- Tag and Alias types ---
-# Validation follows W&B Models conventions:
-#   - Tags: alphanumeric, hyphens, underscores, single spaces between words,
-#     max 256 chars.  Matches W&B Models TAG_REGEX: ^[-\w]+( +[-\w]+)*$
-#   - Aliases: broad charset, disallow "/" and ":", length 1-128,
-#     reserve "latest" and version patterns (v\d+), reject whitespace-only
-
-MAX_ALIAS_LENGTH = 128
-MAX_TAG_LENGTH = 256
-TAG_REGEX = re.compile(r"^[-\w]+( [-\w]+)*$")
-INVALID_ALIAS_CHARACTERS = "/:"
-VERSION_LIKE_PATTERN = re.compile(r"^v\d+$")
-RESERVED_ALIAS_NAMES = {"latest"}
-
-
-def _validate_tag_name(name: str) -> None:
-    """Validate a tag name against W&B Models TAG_REGEX.
-
-    Allowed: alphanumeric, hyphens, underscores, single spaces between words.
-    Max length: 256 characters.
-    """
-    if not name:
-        raise ValueError("tag name must not be empty")
-    if len(name) > MAX_TAG_LENGTH:
-        raise ValueError(f"tag name must be at most {MAX_TAG_LENGTH} characters")
-    if not TAG_REGEX.match(name):
-        raise ValueError(
-            f"tag name {name!r} is invalid: only alphanumeric characters, "
-            "hyphens, underscores, and single spaces between words are allowed"
-        )
-
-
-def _validate_alias_name(name: str) -> None:
-    """Validate an alias name. Disallows '/' and ':', reserves 'latest' and version indices."""
-    if not name:
-        raise ValueError("alias name must not be empty")
-    if not name.strip():
-        raise ValueError("alias name must not be whitespace-only")
-    if len(name) > MAX_ALIAS_LENGTH:
-        raise ValueError(f"alias name must be at most {MAX_ALIAS_LENGTH} characters")
-    for ch in name:
-        if ch in INVALID_ALIAS_CHARACTERS:
-            raise ValueError(f"alias name cannot contain character '{ch}'")
-    if VERSION_LIKE_PATTERN.match(name):
-        raise ValueError(
-            f"alias name '{name}' is reserved (matches version pattern v<number>)"
-        )
-    if name in RESERVED_ALIAS_NAMES:
-        raise ValueError(f"alias name '{name}' is reserved")
+# Validation logic lives in weave.trace_server.validation
+from weave.trace_server.validation import validate_alias_name, validate_tag_name
 
 
 class ObjAddTagsReq(BaseModelStrict):
@@ -817,7 +770,7 @@ class ObjAddTagsReq(BaseModelStrict):
         # Deduplicate while preserving order
         self.tags = list(dict.fromkeys(self.tags))
         for tag in self.tags:
-            _validate_tag_name(tag)
+            validate_tag_name(tag)
         return self
 
 
@@ -846,7 +799,7 @@ class ObjSetAliasReq(BaseModelStrict):
 
     @model_validator(mode="after")
     def validate_alias(self) -> "ObjSetAliasReq":
-        _validate_alias_name(self.alias)
+        validate_alias_name(self.alias)
         return self
 
 

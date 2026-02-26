@@ -1177,7 +1177,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         digest: str,
     ) -> None:
         cursor.execute(
-            "SELECT 1 FROM objects WHERE project_id = ? AND object_id = ? AND digest = ? LIMIT 1",
+            "SELECT 1 FROM objects WHERE project_id = ? AND object_id = ? AND digest = ? AND deleted_at IS NULL LIMIT 1",
             (project_id, object_id, digest),
         )
         if cursor.fetchone() is None:
@@ -3817,6 +3817,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """If digest looks like an alias name, resolve it to the actual digest.
         Returns None if not an alias.
         """
+        # Return None for digests that are not alias names, so the caller
+        # falls through to normal digest-based lookup.  "latest" and version
+        # patterns (v0, v1, …) are handled by the existing obj_read logic;
+        # content hashes are real digests that don't need resolution.
         if digest == "latest":
             return None
         (is_version, _) = digest_is_version_like(digest)

@@ -732,6 +732,192 @@ def test_tag_version_like_accepted():
     )
 
 
+# --- Additional query filtering tests ---
+
+
+def test_filter_by_latest_alias(client: WeaveClient):
+    """Filtering by alias=['latest'] should return only the latest version of each object."""
+    weave.publish({"v": 0}, name="filter_latest_obj")
+    weave.publish({"v": 1}, name="filter_latest_obj")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(
+                object_ids=["filter_latest_obj"],
+                aliases=["latest"],
+            ),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert len(res.objs) == 1
+    assert "latest" in res.objs[0].aliases
+
+
+def test_filter_by_nonexistent_alias(client: WeaveClient):
+    """Filtering by a non-existent alias should return an empty result, not an error."""
+    _publish_obj(client, "filter_noalias_obj")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(aliases=["does-not-exist"]),
+        )
+    )
+    assert len(res.objs) == 0
+
+
+def test_filter_by_nonexistent_tag(client: WeaveClient):
+    """Filtering by a non-existent tag should return an empty result, not an error."""
+    _publish_obj(client, "filter_notag_obj")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(tags=["does-not-exist"]),
+        )
+    )
+    assert len(res.objs) == 0
+
+
+def test_filter_by_multiple_tags(client: WeaveClient):
+    """Filtering by multiple tags should return objects matching any of the tags."""
+    oid1, d1 = _publish_obj(client, "multi_tag_a")
+    oid2, d2 = _publish_obj(client, "multi_tag_b")
+    _publish_obj(client, "multi_tag_c")  # no tags
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=oid1,
+            digest=d1,
+            tags=["alpha"],
+        )
+    )
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=oid2,
+            digest=d2,
+            tags=["beta"],
+        )
+    )
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(tags=["alpha", "beta"]),
+        )
+    )
+    returned_ids = {o.object_id for o in res.objs}
+    assert returned_ids == {"multi_tag_a", "multi_tag_b"}
+
+
+def test_filter_by_empty_tags_list(client: WeaveClient):
+    """Filtering with an empty tags list should not filter (return all objects)."""
+    _publish_obj(client, "empty_tags_obj")
+
+    # Empty tags list — should behave as no filter
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(
+                object_ids=["empty_tags_obj"],
+                tags=[],
+            ),
+        )
+    )
+    assert len(res.objs) >= 1
+
+
+def test_tags_on_deleted_object(client: WeaveClient):
+    """Adding tags to a deleted object should fail with NotFoundError."""
+    object_id, digest = _publish_obj(client, "deleted_tag_obj")
+
+    # Delete the object
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digests=[digest],
+        )
+    )
+
+    # Attempting to add tags to the deleted object should fail
+    with pytest.raises(NotFoundError):
+        client.server.obj_add_tags(
+            tsi.ObjAddTagsReq(
+                project_id=client._project_id(),
+                object_id=object_id,
+                digest=digest,
+                tags=["should-fail"],
+            )
+        )
+
+
+def test_alias_on_deleted_object(client: WeaveClient):
+    """Setting an alias on a deleted object should fail with NotFoundError."""
+    object_id, digest = _publish_obj(client, "deleted_alias_obj")
+
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digests=[digest],
+        )
+    )
+
+    with pytest.raises(NotFoundError):
+        client.server.obj_set_alias(
+            tsi.ObjSetAliasReq(
+                project_id=client._project_id(),
+                object_id=object_id,
+                digest=digest,
+                alias="should-fail",
+            )
+        )
+
+
+def test_cross_object_digest_isolation(client: WeaveClient):
+    """Tags/aliases on object A should not leak to object B even if digests overlap."""
+    oid_a, digest_a = _publish_obj(client, "cross_obj_a")
+    oid_b, digest_b = _publish_obj(client, "cross_obj_b")
+
+    # Tag only object A
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=oid_a,
+            digest=digest_a,
+            tags=["only-on-a"],
+        )
+    )
+    # Alias only object B
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=oid_b,
+            digest=digest_b,
+            alias="only-on-b",
+        )
+    )
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[oid_a, oid_b]),
+            include_tags_and_aliases=True,
+        )
+    )
+    objs_by_id = {o.object_id: o for o in res.objs}
+
+    assert "only-on-a" in objs_by_id[oid_a].tags
+    assert "only-on-a" not in objs_by_id[oid_b].tags
+
+    assert "only-on-b" in objs_by_id[oid_b].aliases
+    assert "only-on-b" not in (objs_by_id[oid_a].aliases or [])
+
+
 # --- digest_is_content_hash ---
 
 
