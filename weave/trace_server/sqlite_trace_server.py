@@ -3742,21 +3742,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def _get_tags_for_objects(
         self,
         project_id: str,
-        object_digests: list[tuple[str, str]],
+        object_ids: list[str],
     ) -> dict[tuple[str, str], list[str]]:
-        """Fetch tags for a list of (object_id, digest) pairs."""
-        if not object_digests:
+        """Fetch tags for a list of object_ids."""
+        if not object_ids:
             return {}
         conn, cursor = get_conn_cursor(self.db_path)
-        conditions = " OR ".join(
-            ["(object_id = ? AND digest = ?)"] * len(object_digests)
-        )
-        params: list[str] = [project_id]
-        for oid, dig in object_digests:
-            params.extend([oid, dig])
+        placeholders = ",".join("?" * len(object_ids))
         cursor.execute(
-            f"SELECT object_id, digest, tag FROM tags WHERE project_id = ? AND ({conditions})",
-            params,
+            f"SELECT object_id, digest, tag FROM tags WHERE project_id = ? AND object_id IN ({placeholders})",
+            [project_id] + list(object_ids),
         )
         result: dict[tuple[str, str], list[str]] = {}
         for row in cursor.fetchall():
@@ -3794,10 +3789,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """In-place enrichment of ObjSchema list with tags and aliases."""
         if not objs:
             return
-        object_digests = [(obj.object_id, obj.digest) for obj in objs]
         object_ids = list({obj.object_id for obj in objs})
 
-        tags_map = self._get_tags_for_objects(project_id, object_digests)
+        tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
 
         for obj in objs:

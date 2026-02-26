@@ -1895,14 +1895,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _get_tags_for_objects(
         self,
         project_id: str,
-        object_digests: list[tuple[str, str]],
+        object_ids: list[str],
     ) -> dict[tuple[str, str], list[str]]:
-        """Fetch tags for a list of (object_id, digest) pairs.
+        """Fetch tags for a list of object_ids.
         Returns a dict mapping (object_id, digest) -> list of tag strings.
         """
-        if not object_digests:
+        if not object_ids:
             return {}
-        query, parameters = make_get_tags_query(project_id, object_digests)
+        query, parameters = make_get_tags_query(project_id, object_ids)
         result: dict[tuple[str, str], list[str]] = {}
         for row in self._query_stream(query, parameters):
             key = (row[0], row[1])
@@ -1959,10 +1959,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """In-place enrichment of ObjSchema list with tags and aliases."""
         if not objs:
             return
-        object_digests = [(obj.object_id, obj.digest) for obj in objs]
         object_ids = list({obj.object_id for obj in objs})
 
-        tags_map = self._get_tags_for_objects(project_id, object_digests)
+        tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
 
         for obj in objs:
