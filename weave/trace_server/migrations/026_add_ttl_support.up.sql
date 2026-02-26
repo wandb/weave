@@ -1,4 +1,4 @@
--- Migration 025: Add TTL support for per-project call data retention
+-- Migration 026: Add TTL support for per-project call data retention
 --
 -- Safe to deploy alone — all rows get the 2100-01-01 sentinel, nothing expires
 -- until a user explicitly configures TTL via the API.
