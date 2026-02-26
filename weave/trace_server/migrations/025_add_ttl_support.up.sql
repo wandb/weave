@@ -24,7 +24,7 @@ ALTER TABLE call_parts
 
 -- Step 3: Add ttl_at to calls_merged (v1 aggregated table)
 ALTER TABLE calls_merged
-    ADD COLUMN ttl_at SimpleAggregateFunction(any, DateTime)
+    ADD COLUMN ttl_at SimpleAggregateFunction(min, DateTime)
     DEFAULT '2100-01-01 00:00:00';
 
 -- Step 4: Update calls_merged_view to propagate ttl_at from call_parts
@@ -53,7 +53,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         argMaxState(display_name, call_parts.created_at) as display_name,
         anySimpleState(coalesce(call_parts.started_at, call_parts.ended_at, call_parts.created_at)) as sortable_datetime,
         anySimpleState(otel_dump) as otel_dump,
-        anySimpleState(ttl_at) as ttl_at
+        minSimpleState(ttl_at) as ttl_at
     FROM call_parts
     GROUP BY project_id,
         id;
