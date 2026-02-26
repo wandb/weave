@@ -69,10 +69,10 @@ def _try_import_stainless():
         from weave.trace_server_bindings.stainless_remote_http_trace_server import (
             StainlessRemoteHTTPTraceServer,
         )
-
-        return StainlessRemoteHTTPTraceServer
     except ImportError:
         return None
+    else:
+        return StainlessRemoteHTTPTraceServer
 
 
 _StainlessServer = _try_import_stainless()
