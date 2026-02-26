@@ -1699,6 +1699,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             payload=create_result.payload,
         )
 
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        """Not implemented for SQLite; use ClickHouse for feedback stats."""
+        raise NotImplementedError(
+            "feedback_stats is not supported on the SQLite trace server."
+        )
+
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        """Schema discovery not implemented for SQLite; returns empty paths."""
+        return tsi.FeedbackPayloadSchemaRes(paths=[])
+
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:

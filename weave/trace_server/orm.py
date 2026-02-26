@@ -500,6 +500,23 @@ def combine_conditions(conditions: list[str], operator: str) -> str:
     return f"({combined})"
 
 
+def _parse_iso_datetime_string(value: str) -> datetime.datetime | None:
+    """Parse ISO 8601 datetime strings for use in DateTime64 comparisons.
+
+    Returns None if the string does not look like a datetime.
+    """
+    if not value or not isinstance(value, str):
+        return None
+    # Match ISO 8601 patterns: 2026-02-25T01:09:39.509Z or 2026-02-25T01:09:39+00:00
+    if "T" not in value or len(value) < 19:
+        return None
+    try:
+        normalized = value.replace("Z", "+00:00")
+        return datetime.datetime.fromisoformat(normalized)
+    except (ValueError, TypeError):
+        return None
+
+
 def python_value_to_ch_type(value: typing.Any) -> str:
     """Helper function to convert python types to clickhouse types."""
     if isinstance(value, str):
@@ -725,9 +742,14 @@ def _process_query_to_conditions(
 
     def process_operand(operand: tsi_query.Operand) -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
-            return pb.add(
-                operand.literal_, None, python_value_to_ch_type(operand.literal_)
-            )
+            literal_val = operand.literal_
+            # Parse ISO datetime strings so ClickHouse receives DateTime64, not String
+            effective_val: typing.Any = literal_val
+            if isinstance(literal_val, str):
+                parsed = _parse_iso_datetime_string(literal_val)
+                if parsed is not None:
+                    effective_val = parsed
+            return pb.add(effective_val, None, python_value_to_ch_type(effective_val))
         elif isinstance(operand, tsi_query.GetFieldOperator):
             (
                 field,
