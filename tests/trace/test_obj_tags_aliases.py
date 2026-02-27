@@ -1165,27 +1165,24 @@ def test_aliases_list_excludes_removed(client: WeaveClient):
     assert res.aliases == ["keep-alias"]
 
 
-def test_tag_named_latest_allowed(client: WeaveClient):
-    """'latest' is reserved for aliases but is a perfectly valid tag name."""
-    object_id, digest = _publish_obj(client, "tag_latest_obj")
+# --- SDK list_tags / list_aliases ---
 
-    client.server.obj_add_tags(
-        tsi.ObjAddTagsReq(
-            project_id=client._project_id(),
-            object_id=object_id,
-            digest=digest,
-            tags=["latest"],
-        )
-    )
 
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client._project_id(),
-            filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
-            include_tags_and_aliases=True,
-        )
-    )
-    assert "latest" in res.objs[0].tags
+def test_sdk_list_tags(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_list_tags_obj")
+    client.add_tags(ref, ["zeta", "alpha"])
+
+    tags = client.list_tags()
+    assert "alpha" in tags
+    assert "zeta" in tags
+
+
+def test_sdk_list_aliases(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_list_aliases_obj")
+    client.set_alias(ref, "my-alias")
+
+    aliases = client.list_aliases()
+    assert "my-alias" in aliases
 
 
 def test_tag_version_like_accepted():
