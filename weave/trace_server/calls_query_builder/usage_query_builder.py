@@ -75,11 +75,32 @@ def _get_usage_metric_extraction_sql(metric: str, json_col: str) -> str:
         return f"toFloat64OrNull(JSONExtractRaw({json_col}, '{metric}'))"
 
 
+def _get_cached_tokens_extraction_sql(json_col: str) -> str:
+    """Extract cached prompt/input tokens from provider usage details.
+
+    OpenAI-style responses can report this in either:
+    - prompt_tokens_details.cached_tokens
+    - input_tokens_details.cached_tokens
+    """
+
+    return f"""(
+        if(JSONHas({json_col}, 'prompt_tokens_details'),
+           JSONExtractInt(JSONExtractRaw({json_col}, 'prompt_tokens_details'), 'cached_tokens'),
+           0
+        ) +
+        if(JSONHas({json_col}, 'input_tokens_details'),
+           JSONExtractInt(JSONExtractRaw({json_col}, 'input_tokens_details'), 'cached_tokens'),
+           0
+        )
+    )"""
+
+
 def build_usage_query(
     req: CallStatsReq,
     metrics: list[UsageMetricSpec],
     pb: ParamBuilder,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
+    include_cached_tokens_for_cost: bool = False,
 ) -> StatsQueryBuildResult:
     """Generate parameterized ClickHouse SQL for usage metrics (grouped by model).
 
@@ -88,6 +109,8 @@ def build_usage_query(
         metrics: Usage metrics to compute (tokens, etc.).
         pb: ParamBuilder for parameterized queries.
         read_table: Which table to query (calls_merged or calls_complete).
+        include_cached_tokens_for_cost: Include internal cached-token aggregates
+            so callers can compute cached-token-aware costs.
 
     Returns:
         Named query build result with SQL, output columns, params, and time bounds.
@@ -114,6 +137,10 @@ def build_usage_query(
         extraction_sql = _get_usage_metric_extraction_sql(metric, "kv.2")
         inner_metric_exprs.append(f"{extraction_sql} AS m_{metric}")
 
+    if include_cached_tokens_for_cost:
+        cached_tokens_sql = _get_cached_tokens_extraction_sql("kv.2")
+        inner_metric_exprs.append(f"{cached_tokens_sql} AS m_cached_tokens")
+
     inner_metric_sql = ""
     if inner_metric_exprs:
         inner_metric_sql = ",\n        " + ",\n        ".join(inner_metric_exprs)
@@ -136,6 +163,13 @@ def build_usage_query(
             else:
                 agg_selects_outer.append(f"aggregated_data.{alias} AS {alias}")
             columns.append(alias)
+
+    if include_cached_tokens_for_cost:
+        agg_selects.append("sumOrNull(m_cached_tokens) AS sum_cached_tokens")
+        agg_selects_outer.append(
+            "COALESCE(aggregated_data.sum_cached_tokens, 0) AS sum_cached_tokens"
+        )
+        columns.append("sum_cached_tokens")
 
     agg_sql_for_cte = ",\n          ".join(agg_selects)
 

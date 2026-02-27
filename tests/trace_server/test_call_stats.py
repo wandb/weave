@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from tests.trace.util import client_is_sqlite
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.trace_server_interface import (
     AggregationType,
     CallMetricSpec,
@@ -168,6 +169,54 @@ def test_call_stats_usage_sum_aggregation(client: weave_client.WeaveClient):
     assert total_total_tokens == expected_total_tokens, (
         f"Expected sum_total_tokens={expected_total_tokens}, got {total_total_tokens}"
     )
+
+
+def test_compute_costs_for_buckets_uses_cached_tokens() -> None:
+    """Input cost should apply cached tokens at cached token rate."""
+
+    class StubServer:
+        def _get_prices_for_models(  # noqa: N802 (match production method name)
+            self, models: set[str], project_id: str
+        ) -> dict[str, dict[str, float]]:
+            return {
+                model: {
+                    "prompt_token_cost": 2.0,
+                    "cached_prompt_token_cost": 0.5,
+                    "completion_token_cost": 1.0,
+                }
+                for model in models
+            }
+
+    usage_buckets: list[dict[str, object]] = [
+        {
+            "model": "test-model",
+            "sum_input_tokens": 100,
+            "sum_output_tokens": 10,
+            "sum_cached_tokens": 90,
+        },
+        {
+            "model": "test-model",
+            "sum_input_tokens": 100,
+            "sum_output_tokens": 0,
+            "sum_cached_tokens": 0,
+        },
+    ]
+
+    ClickHouseTraceServer._compute_costs_for_buckets(  # type: ignore[misc]
+        StubServer(),
+        usage_buckets,
+        "entity/project",
+        {"input_cost", "output_cost", "total_cost"},
+    )
+
+    # Bucket 0: 10 uncached at 2.0 + 90 cached at 0.5 = 65.
+    assert usage_buckets[0]["sum_input_cost"] == pytest.approx(65.0)
+    # Bucket 1: 100 uncached at 2.0.
+    assert usage_buckets[1]["sum_input_cost"] == pytest.approx(200.0)
+
+    # Output cost remains unchanged and contributes to total cost.
+    assert usage_buckets[0]["sum_output_cost"] == pytest.approx(10.0)
+    assert usage_buckets[0]["sum_total_cost"] == pytest.approx(75.0)
 
 
 def test_call_stats_date_range_limit_validation():
