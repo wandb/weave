@@ -35,6 +35,7 @@ from weave.shared.digest import (
 from weave.trace import refs, settings, table_upload_chunking, weave_client
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
+from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -139,6 +140,24 @@ def test_table_update(client):
     assert len(table_query_2_res.rows) == len(final_data)
     for i, row in enumerate(table_query_2_res.rows):
         assert row.val["val"] == final_data[i]["val"]
+
+
+@pytest.mark.disable_logging_error_check
+def test_publish_raises_when_obj_create_fails(client, monkeypatch):
+    underlying_server = client.server.server._next_trace_server
+
+    def obj_create_fail(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        raise RuntimeError("obj_create boom")
+
+    monkeypatch.setattr(underlying_server, "obj_create", obj_create_fail)
+
+    client.set_autoflush(False)
+    try:
+        with raise_on_captured_errors(False):
+            with pytest.raises(RuntimeError, match="obj_create boom"):
+                weave.publish({"a": 1}, name=f"publish-failure-{uuid.uuid4().hex}")
+    finally:
+        client.set_autoflush(True)
 
 
 def test_object_ref_digest_ignores_server_returned_digest(client, monkeypatch):

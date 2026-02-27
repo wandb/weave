@@ -160,7 +160,9 @@ class FutureExecutor:
 
         return result_future
 
-    def flush(self, timeout: float | None = None) -> bool:
+    def flush(
+        self, timeout: float | None = None, *, force_raise: bool = False
+    ) -> bool:
         """Block until all currently submitted items are complete or timeout is reached.
 
         This method allows new submissions while waiting, ensuring that
@@ -168,6 +170,8 @@ class FutureExecutor:
 
         Args:
             timeout (Optional[float]): Maximum time to wait in seconds. If None, wait indefinitely.
+            force_raise: If True, raise captured background task exceptions even when
+                `raise_on_captured_errors` is disabled.
 
         Returns:
             bool: True if all tasks completed
@@ -176,7 +180,7 @@ class FutureExecutor:
             RuntimeError: If called from within a thread context.
             TimeoutError: If the timeout is reached.
         """
-        should_raise = get_raise_on_captured_errors()
+        should_raise = force_raise or get_raise_on_captured_errors()
         if not should_raise:
             # Avoid leaking stale pending exceptions between test contexts.
             self._pop_pending_raise_exception()

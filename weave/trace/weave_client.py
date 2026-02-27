@@ -2178,9 +2178,9 @@ class WeaveClient:
         else:
             self._flush()
 
-    def flush(self) -> None:
+    def flush(self, *, raise_on_errors: bool = False) -> None:
         """Flushes background asynchronous tasks, safe to call multiple times."""
-        self._flush()
+        self._flush(raise_on_errors=raise_on_errors)
 
     def _flush_with_callback(
         self,
@@ -2273,12 +2273,12 @@ class WeaveClient:
         )
         callback(final_status)
 
-    def _flush(self) -> None:
+    def _flush(self, *, raise_on_errors: bool = False) -> None:
         """Used to wait until all currently enqueued jobs are processed."""
         if not self.future_executor._in_thread_context.get():
-            self.future_executor.flush()
+            self.future_executor.flush(force_raise=raise_on_errors)
         if self.future_executor_fastlane:
-            self.future_executor_fastlane.flush()
+            self.future_executor_fastlane.flush(force_raise=raise_on_errors)
         if self._server_call_processor:
             self._server_call_processor.stop_accepting_new_work_and_flush_queue()
             # Restart call processor processing thread after flushing

@@ -150,7 +150,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     ref = client._save_object(obj, save_name, "latest")
     # `publish` should preserve read-after-write semantics for immediate ref reads.
     # Object/table creates may be queued for background send, so block until flushed.
-    client.flush()
+    client.flush(raise_on_errors=True)
 
     if isinstance(ref, ObjectRef):
         if isinstance(ref, weave_client.OpRef):
