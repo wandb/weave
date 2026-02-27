@@ -439,13 +439,22 @@ def test_get_calls_complete(client):
     ref = client.save(obj, "my-dataset")
 
     call0 = client.create_call(
-        "x", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call0"
+        "x",
+        {"a": 5, "b": 10, "dataset": ref, "s": "str"},
+        display_name="call0",
+        use_stack=False,
     )
     call1 = client.create_call(
-        "x", {"a": 6, "b": 11, "dataset": ref, "s": "str"}, display_name="call1"
+        "x",
+        {"a": 6, "b": 11, "dataset": ref, "s": "str"},
+        display_name="call1",
+        use_stack=False,
     )
     call2 = client.create_call(
-        "y", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call2"
+        "y",
+        {"a": 5, "b": 10, "dataset": ref, "s": "str"},
+        display_name="call2",
+        use_stack=False,
     )
 
     query = tsi.Query(
@@ -542,7 +551,7 @@ def test_get_calls_complete(client):
 
 def test_get_calls_len(client):
     for i in range(10):
-        client.create_call("x", {"a": i})
+        client.create_call("x", {"a": i}, use_stack=False)
 
     # test len first
     calls = client.get_calls()
@@ -572,7 +581,7 @@ def test_get_calls_len(client):
 
 def test_get_calls_limit_offset(client):
     for i in range(10):
-        client.create_call("x", {"a": i})
+        client.create_call("x", {"a": i}, use_stack=False)
 
     sort_by = [SortBy(field="inputs.a", direction="asc")]
 
@@ -614,7 +623,7 @@ def test_get_calls_limit_offset(client):
 
 def test_get_calls_page_size_with_offset(client):
     for i in range(20):
-        client.create_call("x", {"a": i})
+        client.create_call("x", {"a": i}, use_stack=False)
 
     batch_size = 5
     batch_num = 0
@@ -650,10 +659,12 @@ def test_get_calls_page_size_with_offset(client):
 
 
 def test_calls_delete(client):
-    call0 = client.create_call("x", {"a": 5, "b": 10})
-    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
-    _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
-    call1 = client.create_call("y", {"a": 6, "b": 11})
+    call0 = client.create_call("x", {"a": 5, "b": 10}, use_stack=False)
+    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0, use_stack=False)
+    _call0_child2 = client.create_call(
+        "x", {"a": 5, "b": 12}, call0_child1, use_stack=False
+    )
+    call1 = client.create_call("y", {"a": 6, "b": 11}, _call0_child2, use_stack=False)
 
     assert len(list(client.get_calls())) == 4
 
@@ -753,7 +764,7 @@ def test_delete_calls(client):
 
 
 def test_call_display_name(client):
-    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call0 = client.create_call("x", {"a": 5, "b": 10}, use_stack=False)
 
     # Rename using the client method
     client._set_call_display_name(call0, "updated_name")
@@ -1704,10 +1715,12 @@ def test_summary_tokens_cost_sqlite(client):
         return
 
     # ensure that include_costs is a no-op for sqlite
-    call0 = client.create_call("x", {"a": 5, "b": 10})
-    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
-    _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
-    call1 = client.create_call("y", {"a": 6, "b": 11})
+    call0 = client.create_call("x", {"a": 5, "b": 10}, use_stack=False)
+    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0, use_stack=False)
+    _call0_child2 = client.create_call(
+        "x", {"a": 5, "b": 12}, call0_child1, use_stack=False
+    )
+    call1 = client.create_call("y", {"a": 6, "b": 11}, use_stack=False)
 
     calls_with_cost = list(client.get_calls(include_costs=True))
     calls_no_cost = list(client.get_calls(include_costs=False))
@@ -1735,9 +1748,9 @@ def _setup_calls_for_storage_size_test(client):
     Returns:
         List of created Call objects.
     """
-    call0 = client.create_call("x", {"a": 5, "b": 10})
-    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
-    call1 = client.create_call("y", {"a": 6, "b": 11})
+    call0 = client.create_call("x", {"a": 5, "b": 10}, use_stack=False)
+    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0, use_stack=False)
+    call1 = client.create_call("y", {"a": 6, "b": 11}, use_stack=False)
     return [call0, call0_child1, call1]
 
 
@@ -2655,7 +2668,9 @@ def test_calls_query_sort_by_status(client):
 
     # Create a call with running status (no finish_call)
     running_call = client.create_call(
-        "x", {"a": 3, "b": 3, "test_id": test_id}
+        "x",
+        {"a": 3, "b": 3, "test_id": test_id},
+        use_stack=False,
     )  # This will have status "running"
 
     # Flush to make sure all calls are committed
@@ -2774,7 +2789,9 @@ def test_calls_filter_by_status(client):
     client.finish_call(error_call, None, exception=e)  # Status: error
 
     running_call = client.create_call(
-        "x", {"a": 3, "b": 3, "test_id": test_id}
+        "x",
+        {"a": 3, "b": 3, "test_id": test_id},
+        use_stack=False,
     )  # Status: running
 
     # Flush to make sure all calls are committed
@@ -3074,7 +3091,7 @@ def test_tracing_enabled_context(client):
         return "test"
 
     # Test create_call with tracing enabled
-    call = client.create_call(test_op, {})
+    call = client.create_call(test_op, {}, use_stack=False)
     assert isinstance(call, Call)
     assert call.op_name.endswith("/test_op:mxdfzr0HPxStQEzDDx7NgSoQXzfxkf86sc6bmUTZaIk")
     assert len(list(client.get_calls())) == 1  # Verify only one call was created
