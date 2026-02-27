@@ -294,7 +294,7 @@ def test_poison_pill_detection_and_immediate_drop():
 
         # Test 3: Check poison pills were written to disk immediately
         assert log_path.exists()
-        with open(log_path) as f:
+        with open(log_path, encoding="utf-8") as f:
             log_content = f.read()
             assert "Unprocessable item detected" in log_content
             # Should have two poison pills logged (poison_const and batch_killer_const)
@@ -312,7 +312,7 @@ def test_poison_pill_detection_and_immediate_drop():
         )  # Fill the small queue (maxsize=5)
 
         # Confirm extras got written to disk
-        with open(log_path) as f:
+        with open(log_path, encoding="utf-8") as f:
             log_content = f.read().splitlines()
             # Should have 4 log entries: 2 poison pills + 2 queue full items (fill6, fill7)
             assert len(log_content) == 4

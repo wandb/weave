@@ -625,27 +625,28 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if order_by is not None:
             order_parts = []
             for field, direction in order_by:
+                sort_field = field
                 json_path: str | None = None
-                if field.startswith("inputs"):
-                    field = "inputs" + field[len("inputs") :]
-                    if field.startswith("inputs."):
-                        json_path = field[len("inputs.") :]
-                        field = "inputs"
-                elif field.startswith("output"):
-                    field = "output" + field[len("output") :]
-                    if field.startswith("output."):
-                        json_path = field[len("output.") :]
-                        field = "output"
-                elif field.startswith("attributes"):
-                    field = "attributes" + field[len("attributes") :]
-                    if field.startswith("attributes."):
-                        json_path = field[len("attributes.") :]
-                        field = "attributes"
-                elif field.startswith("summary"):
+                if sort_field.startswith("inputs"):
+                    sort_field = "inputs" + sort_field[len("inputs") :]
+                    if sort_field.startswith("inputs."):
+                        json_path = sort_field[len("inputs.") :]
+                        sort_field = "inputs"
+                elif sort_field.startswith("output"):
+                    sort_field = "output" + sort_field[len("output") :]
+                    if sort_field.startswith("output."):
+                        json_path = sort_field[len("output.") :]
+                        sort_field = "output"
+                elif sort_field.startswith("attributes"):
+                    sort_field = "attributes" + sort_field[len("attributes") :]
+                    if sort_field.startswith("attributes."):
+                        json_path = sort_field[len("attributes.") :]
+                        sort_field = "attributes"
+                elif sort_field.startswith("summary"):
                     # Handle special summary fields that are calculated rather than stored directly
-                    if field == "summary.weave.status":
+                    if sort_field == "summary.weave.status":
                         # Create a CASE expression to properly determine the status
-                        field = """
+                        sort_field = """
                             CASE
                                 WHEN exception IS NOT NULL THEN 'error'
                                 WHEN ended_at IS NULL THEN 'running'
@@ -654,9 +655,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                             END
                         """
                         json_path = None
-                    elif field == "summary.weave.latency_ms":
+                    elif sort_field == "summary.weave.latency_ms":
                         # Calculate latency directly using julianday for millisecond precision
-                        field = """
+                        sort_field = """
                             CASE
                                 WHEN ended_at IS NOT NULL THEN
                                     CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS FLOAT)
@@ -664,12 +665,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                             END
                         """
                         json_path = None
-                    elif field == "summary.weave.trace_name":
+                    elif sort_field == "summary.weave.trace_name":
                         # Handle trace_name field similar to the ClickHouse implementation
                         # If display_name is present, use that
                         # Otherwise, check if op_name is an object reference and extract the name
                         # If not, just use op_name directly
-                        field = """
+                        sort_field = """
                             CASE
                                 WHEN display_name IS NOT NULL AND display_name != '' THEN display_name
                                 WHEN op_name IS NOT NULL AND op_name LIKE 'weave-trace-internal:///%' THEN
@@ -683,10 +684,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         """
                         json_path = None
                     else:
-                        field = "summary" + field[len("summary") :]
-                        if field.startswith("summary."):
-                            json_path = field[len("summary.") :]
-                            field = "summary"
+                        sort_field = "summary" + sort_field[len("summary") :]
+                        if sort_field.startswith("summary."):
+                            json_path = sort_field[len("summary.") :]
+                            sort_field = "summary"
 
                 assert direction in [
                     "ASC",
@@ -695,8 +696,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     "desc",
                 ], f"Invalid order_by direction: {direction}"
                 if json_path:
-                    field = f"json_extract({field}, '{quote_json_path(json_path)}')"
-                order_parts.append(f"{field} {direction}")
+                    sort_field = (
+                        f"json_extract({sort_field}, '{quote_json_path(json_path)}')"
+                    )
+                order_parts.append(f"{sort_field} {direction}")
 
             order_by_part = ", ".join(order_parts)
             query += f" ORDER BY {order_by_part}"

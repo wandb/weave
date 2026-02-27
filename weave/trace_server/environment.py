@@ -13,7 +13,7 @@ def kafka_broker_host() -> str:
 
 def kafka_broker_port() -> int:
     """The port of the kafka broker."""
-    return int(os.environ.get("KAFKA_BROKER_PORT", 9092))
+    return int(os.environ.get("KAFKA_BROKER_PORT", "9092"))
 
 
 def kafka_client_user() -> str | None:
@@ -59,12 +59,12 @@ def wf_enable_online_eval() -> bool:
 
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", 100))
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", "100"))
 
 
 def wf_scoring_worker_batch_timeout() -> int:
     """The timeout for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", 5))
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", "5"))
 
 
 def wf_scoring_worker_check_cancellation() -> bool:
@@ -98,7 +98,7 @@ def wf_clickhouse_host() -> str:
 
 def wf_clickhouse_port() -> int:
     """The port of the clickhouse server."""
-    return int(os.environ.get("WF_CLICKHOUSE_PORT", 8123))
+    return int(os.environ.get("WF_CLICKHOUSE_PORT", "8123"))
 
 
 def wf_clickhouse_user() -> str:

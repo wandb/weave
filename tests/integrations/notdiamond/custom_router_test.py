@@ -56,7 +56,7 @@ def preference_id():
         cassette_path = (
             test_dir / "cassettes" / "custom_router_test" / "test_train_router.yaml"
         )
-        with open(cassette_path) as file:
+        with open(cassette_path, encoding="utf-8") as file:
             cassette = yaml.safe_load(file)
 
         response_body = cassette["interactions"][0]["response"]["body"]

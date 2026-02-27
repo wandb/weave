@@ -122,7 +122,7 @@ def test_get_default_host_settings_file(tmp_path, host_and_base_url):
     config.add_section("default")
     config.set("default", "base_url", "https://custom.wandb.server")
 
-    with open(settings_path, "w") as f:
+    with open(settings_path, "w", encoding="utf-8") as f:
         config.write(f)
 
     with patch.dict(os.environ, {"WANDB_CONFIG_DIR": str(tmp_path)}, clear=True):
@@ -170,7 +170,7 @@ def test_clear_setting(tmp_path):
     config.add_section("default")
     config.set("default", "base_url", "https://test.wandb.ai")
 
-    with open(settings_path, "w") as f:
+    with open(settings_path, "w", encoding="utf-8") as f:
         config.write(f)
 
     with patch.dict(os.environ, {"WANDB_CONFIG_DIR": str(tmp_path)}, clear=True):

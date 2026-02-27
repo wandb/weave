@@ -43,7 +43,7 @@ def update_logger_level() -> None:
 
 def configure_logger() -> None:
     """Configure the root logger for Weave with custom formatting and log level."""
-    global configured
+    global configured  # noqa: PLW0603
     if configured:
         # Even if already configured, update the log level in case settings changed
         update_logger_level()

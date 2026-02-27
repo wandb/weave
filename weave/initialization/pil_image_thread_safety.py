@@ -40,7 +40,7 @@ def apply_threadsafe_patch_to_pil_image() -> None:
     This function is idempotent - calling it multiple times has no additional effect.
     If PIL is not installed or if patching fails, the function will handle the error gracefully.
     """
-    global _patched
+    global _patched  # noqa: PLW0603
 
     if _patched:
         return
@@ -64,7 +64,7 @@ def _apply_threadsafe_patch() -> None:
     """
     from PIL.ImageFile import ImageFile
 
-    global _original_methods
+    global _original_methods  # noqa: PLW0602
 
     # Store original methods
     _original_methods["load"] = ImageFile.load
@@ -113,7 +113,7 @@ def undo_threadsafe_patch_to_pil_image() -> None:
     This function is idempotent - if the patch hasn't been applied, this function does nothing.
     If the patch has been applied but can't be reverted, an error message is printed.
     """
-    global _patched
+    global _patched  # noqa: PLW0603
 
     if not _patched:
         return
@@ -139,7 +139,7 @@ def _undo_threadsafe_patch() -> None:
     """
     from PIL.ImageFile import ImageFile
 
-    global _original_methods
+    global _original_methods  # noqa: PLW0603
 
     if _original_methods["load"] is not None:
         ImageFile.load = _original_methods["load"]  # type: ignore

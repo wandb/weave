@@ -45,7 +45,7 @@ class AbstractRichContainer(ABC, Generic[T]):
     def _cycle_repr(self) -> str:
         return f"AbstractContainer[{self.item_type}](...)"
 
-    def _repr_pretty_(self, p: Any, cycle: bool) -> None:
+    def _repr_pretty_(self, p: Any, cycle: bool) -> None:  # noqa: PLW3201
         """Show a nicely formatted table in ipython."""
         if cycle:
             p.text(self._cycle_repr())

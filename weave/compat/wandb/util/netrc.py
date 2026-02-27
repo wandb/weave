@@ -113,7 +113,7 @@ class Netrc:
             self.path.parent.mkdir(parents=True, exist_ok=True)
 
             # Write the netrc file
-            with open(self.path, "w") as f:
+            with open(self.path, "w", encoding="utf-8") as f:
                 for machine, creds in credentials.items():
                     f.write(f"machine {machine}\n")
                     f.write(f"  login {creds['login']}\n")

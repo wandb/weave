@@ -68,7 +68,7 @@ def _set_setting(key: str, value: str) -> None:
 
         settings.set("default", key, value)
 
-        with open(settings_path, "w") as f:
+        with open(settings_path, "w", encoding="utf-8") as f:
             settings.write(f)
     except Exception as e:
         logger.warning(f"Failed to write setting {key}: {e}")
@@ -89,7 +89,7 @@ def _clear_setting(key: str) -> None:
 
         if settings.has_section("default") and settings.has_option("default", key):
             settings.remove_option("default", key)
-            with open(settings_path, "w") as f:
+            with open(settings_path, "w", encoding="utf-8") as f:
                 settings.write(f)
     except Exception as e:
         logger.warning(f"Failed to clear setting {key}: {e}")

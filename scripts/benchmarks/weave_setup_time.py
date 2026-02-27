@@ -45,12 +45,16 @@ def _run_timing_script(
     # Write to a temporary file
     temp_file = f"temp_{test_name}_{uuid.uuid4().hex[:8]}.py"
     try:
-        with open(temp_file, "w") as f:
+        with open(temp_file, "w", encoding="utf-8") as f:
             f.write(script_content)
 
         # Run in a fresh Python process
         result = subprocess.run(
-            [sys.executable, temp_file], capture_output=True, text=True, timeout=30
+            [sys.executable, temp_file],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
 
         if result.returncode == 0:
