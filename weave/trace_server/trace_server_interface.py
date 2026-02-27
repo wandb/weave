@@ -818,6 +818,24 @@ class ObjRemoveAliasRes(BaseModel):
     pass
 
 
+class TagsListReq(BaseModelStrict):
+    project_id: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class TagsListRes(BaseModel):
+    tags: list[str]
+
+
+class AliasesListReq(BaseModelStrict):
+    project_id: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AliasesListRes(BaseModel):
+    aliases: list[str]
+
+
 class ObjQueryRes(BaseModel):
     objs: list[ObjSchema]
 
@@ -2425,6 +2443,8 @@ class TraceServerInterface(Protocol):
     def obj_remove_tags(self, req: ObjRemoveTagsReq) -> ObjRemoveTagsRes: ...
     def obj_set_alias(self, req: ObjSetAliasReq) -> ObjSetAliasRes: ...
     def obj_remove_alias(self, req: ObjRemoveAliasReq) -> ObjRemoveAliasRes: ...
+    def tags_list(self, req: TagsListReq) -> TagsListRes: ...
+    def aliases_list(self, req: AliasesListReq) -> AliasesListRes: ...
 
     # Table API
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...

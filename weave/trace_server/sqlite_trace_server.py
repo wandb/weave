@@ -1241,6 +1241,24 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conn.commit()
         return tsi.ObjRemoveAliasRes()
 
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
+            "SELECT DISTINCT tag FROM tags WHERE project_id = ? ORDER BY tag",
+            (req.project_id,),
+        )
+        tags = [row[0] for row in cursor.fetchall()]
+        return tsi.TagsListRes(tags=tags)
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
+            "SELECT DISTINCT alias FROM aliases WHERE project_id = ? ORDER BY alias",
+            (req.project_id,),
+        )
+        aliases = [row[0] for row in cursor.fetchall()]
+        return tsi.AliasesListRes(aliases=aliases)
+
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         insert_rows = []

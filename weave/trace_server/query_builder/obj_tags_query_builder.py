@@ -101,6 +101,56 @@ def make_get_aliases_query(
     return query, parameters
 
 
+def make_list_tags_query(
+    project_id: str,
+) -> tuple[str, dict[str, Any]]:
+    """Build a query to list all distinct active tags in a project.
+
+    Args:
+        project_id: The project ID to filter by.
+
+    Returns:
+        A tuple of (sql_query, parameters).
+    """
+    query = """
+        SELECT tag
+        FROM tags
+        PREWHERE project_id = {project_id: String}
+        GROUP BY project_id, tag
+        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+        ORDER BY tag
+    """
+    parameters = {
+        "project_id": project_id,
+    }
+    return query, parameters
+
+
+def make_list_aliases_query(
+    project_id: str,
+) -> tuple[str, dict[str, Any]]:
+    """Build a query to list all distinct active aliases in a project.
+
+    Args:
+        project_id: The project ID to filter by.
+
+    Returns:
+        A tuple of (sql_query, parameters).
+    """
+    query = """
+        SELECT alias
+        FROM aliases
+        PREWHERE project_id = {project_id: String}
+        GROUP BY project_id, alias
+        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+        ORDER BY alias
+    """
+    parameters = {
+        "project_id": project_id,
+    }
+    return query, parameters
+
+
 def make_resolve_alias_query(
     project_id: str,
     object_id: str,

@@ -180,6 +180,8 @@ from weave.trace_server.query_builder.obj_tags_query_builder import (
     make_assert_obj_version_exists_query,
     make_get_aliases_query,
     make_get_tags_query,
+    make_list_aliases_query,
+    make_list_tags_query,
     make_resolve_alias_query,
 )
 from weave.trace_server.query_builder.objects_query_builder import (
@@ -1893,6 +1895,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             deleted_at=datetime.datetime.now(datetime.timezone.utc),
         )
         return tsi.ObjRemoveAliasRes()
+
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        query, parameters = make_list_tags_query(req.project_id)
+        query_result = self.ch_client.query(query, parameters)
+        tags = [row[0] for row in query_result.result_rows]
+        return tsi.TagsListRes(tags=tags)
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        query, parameters = make_list_aliases_query(req.project_id)
+        query_result = self.ch_client.query(query, parameters)
+        aliases = [row[0] for row in query_result.result_rows]
+        return tsi.AliasesListRes(aliases=aliases)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._get_tags_for_objects")
     def _get_tags_for_objects(
