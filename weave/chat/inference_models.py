@@ -8,6 +8,7 @@ from weave.chat.types.models import (
     ModelsResponseError,
     ModelsResponseSuccess,
 )
+from weave.trace.settings import http_timeout
 from weave.trace_server.constants import INFERENCE_HOST
 from weave.wandb_interface.context import get_wandb_api_context
 
@@ -36,7 +37,7 @@ class InferenceModels:
             "Content-Type": "application/json",
         }
         url = f"https://{INFERENCE_HOST}/v1/models"
-        with httpx.Client() as client:
+        with httpx.Client(timeout=http_timeout()) as client:
             response = client.post(url, headers=headers)
         if response.status_code == 401:
             raise httpx.HTTPStatusError(
