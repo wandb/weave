@@ -15,178 +15,21 @@ on:
 jobs:
   nightly-tests:
     name: Nightly Tests
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version-major: ["3"]
-        python-version-minor: [
-            "10",
-            "11",
-            "12",
-            "13",
-            #
-          ]
-        shard:
-          [
-            "trace",
-            "flow",
-            "trace_server",
-            "trace_server_bindings",
-            "anthropic",
-            "bedrock",
-            "cerebras",
-            "cohere",
-            "crewai",
-            "dspy",
-            "groq",
-            "google_genai",
-            "instructor",
-            "langchain",
-            "litellm",
-            "llamaindex",
-            "mistral",
-            "notdiamond",
-            "openai",
-            "verifiers_test",
-            "vertexai",
-            "pandas_test",
-            "mcp",
-            "smolagents",
-            "autogen_tests",
-          ]
-      fail-fast: false
-    services:
-      wandbservice:
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
-        credentials:
-          username: _json_key
-          password: ${{ secrets.gcp_wb_sa_key }}
-        env:
-          CI: 1
-          WANDB_ENABLE_TEST_CONTAINER: true
-          LOGGING_ENABLED: true
-        ports:
-          - "8080:8080"
-          - "8083:8083"
-          - "9015:9015"
-        options: >-
-          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
-          --health-interval=5s
-          --health-timeout=3s
-          --health-start-period=10s
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite
-        ports:
-          - "10000:10000"
-      weave_clickhouse:
-        image: clickhouse/clickhouse-server:25.10
-        env:
-          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-          CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ""
-          CLICKHOUSE_DB: default
-        ports:
-          - "8123:8123"
-        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Filter shards if specified
-        id: filter_shards
-        run: |
-          INPUT_SHARDS="${{ github.event.inputs.shards }}"
-          if [ -n "$INPUT_SHARDS" ]; then
-            echo "Running specific shards: $INPUT_SHARDS"
-            if [[ ! ",$INPUT_SHARDS," == *",${{ matrix.shard }},"* ]]; then
-              echo "Skipping ${{ matrix.shard }} as it's not in the specified list"
-              echo "skip=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-          fi
-          echo "Running shard: ${{ matrix.shard }}"
-          echo "skip=false" >> $GITHUB_OUTPUT
-      - name: Enable debug logging
-        if: steps.filter_shards.outputs.skip != 'true'
-        run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
-      - name: Install SQLite dev package
-        if: steps.filter_shards.outputs.skip != 'true'
-        run: sudo apt update && sudo apt install -y libsqlite3-dev
-      - name: Install Libmagic dependency package
-        run: sudo apt update && sudo apt install -y libmagic1
-      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-        if: steps.filter_shards.outputs.skip != 'true'
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-      - name: Install dependencies
-        if: steps.filter_shards.outputs.skip != 'true'
-        run: |
-          python -m pip install --upgrade pip
-          pip install nox uv
-      - name: Check if shard needs trace_server markers
-        id: check_trace_markers
-        if: steps.filter_shards.outputs.skip != 'true'
-        run: |
-          # Shards that are in the regular test matrix and need trace_server markers
-          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents mcp autogen_tests trace trace_no_server"
-          if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
-            echo "needs_markers=true" >> $GITHUB_OUTPUT
-          else
-            echo "needs_markers=false" >> $GITHUB_OUTPUT
-          fi
-      - name: Run nox (Sqlite Trace Server)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WEAVE_USE_MEMRAY: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: weave_clickhouse
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          DD_TRACE_ENABLED: false
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
-            -m "trace_server" \
-            --trace-server=sqlite
-      - name: Run nox (Clickhouse Trace Server)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WEAVE_USE_MEMRAY: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          DD_TRACE_ENABLED: false
-          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client"
-      - name: Run nox (No marker filters for integration-only shards)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WEAVE_USE_MEMRAY: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          DD_TRACE_ENABLED: false
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
+    uses: ./.github/workflows/reusable-trace-tests.yaml
+    with:
+      job_name: Nightly Tests
+      timeout_minutes: 30
+      python_version_minors_json: '["10", "11", "12", "13"]'
+      shards_json: '["trace_no_server", "trace", "flow", "trace_server", "trace_server_bindings", "anthropic", "bedrock", "cerebras", "cohere", "crewai", "dspy", "groq", "google_genai", "instructor", "langchain", "litellm", "llamaindex", "mistral", "notdiamond", "openai", "verifiers_test", "vertexai", "pandas_test", "mcp", "smolagents", "autogen_tests"]'
+      shard_filter: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.shards || '' }}
+      marker_filter_enabled: true
+      non_trace_server_shards_json: '["trace_no_server"]'
+      use_heavy_runner: false
+      clickhouse_image: clickhouse/clickhouse-server:25.10
+      set_weave_use_memray: true
+      use_dummy_api_key_fallback: false
+      upload_coverage: false
+    secrets: inherit
 
   slack-notification:
     name: Slack Notification

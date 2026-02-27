@@ -1,0 +1,297 @@
+name: reusable-trace-tests
+
+on:
+  workflow_call:
+    inputs:
+      job_name:
+        description: Display name for the matrix job
+        required: false
+        type: string
+        default: Trace nox tests
+      timeout_minutes:
+        description: Job timeout in minutes
+        required: false
+        type: number
+        default: 15
+      python_version_minors_json:
+        description: JSON array of Python minor versions (for Python 3.x)
+        required: true
+        type: string
+      shards_json:
+        description: JSON array of nox shard names
+        required: true
+        type: string
+      shard_filter:
+        description: Optional comma-separated shard filter
+        required: false
+        type: string
+        default: ""
+      marker_filter_enabled:
+        description: Whether to switch between trace_server marker modes per shard
+        required: false
+        type: boolean
+        default: false
+      non_trace_server_shards_json:
+        description: JSON array of shards that should run with -m "not trace_server"
+        required: false
+        type: string
+        default: "[]"
+      use_heavy_runner:
+        description: Use 8-core runner for heavy trace shards
+        required: false
+        type: boolean
+        default: false
+      clickhouse_image:
+        description: ClickHouse image for the service container
+        required: false
+        type: string
+        default: clickhouse/clickhouse-server:25.11.2.24
+      set_weave_use_memray:
+        description: Export WEAVE_USE_MEMRAY=1 before running nox
+        required: false
+        type: boolean
+        default: false
+      use_dummy_api_key_fallback:
+        description: Use dummy fallback API keys when secrets are unavailable
+        required: false
+        type: boolean
+        default: false
+      upload_coverage:
+        description: Upload coverage artifacts to Codecov
+        required: false
+        type: boolean
+        default: false
+      coverage_flag:
+        description: Codecov flag name
+        required: false
+        type: string
+        default: trace-tests
+      coverage_name_prefix:
+        description: Prefix for Codecov upload name
+        required: false
+        type: string
+        default: trace-tests
+
+jobs:
+  trace-tests:
+    name: ${{ inputs.job_name }} (py${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}, ${{ matrix.shard }})
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    runs-on: ${{ inputs.use_heavy_runner && (matrix.shard == 'trace' || matrix.shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: ${{ fromJSON(inputs.python_version_minors_json) }}
+        shard: ${{ fromJSON(inputs.shards_json) }}
+      fail-fast: false
+    services:
+      wandbservice:
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+        credentials:
+          username: _json_key
+          password: ${{ secrets.gcp_wb_sa_key }}
+        env:
+          CI: 1
+          WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
+        ports:
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - "10000:10000"
+      weave_clickhouse:
+        image: ${{ inputs.clickhouse_image }}
+        env:
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_DB: default
+        ports:
+          - "8123:8123"
+        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Filter shards if specified
+        id: filter_shards
+        run: |
+          INPUT_SHARDS="${{ inputs.shard_filter }}"
+          if [ -n "$INPUT_SHARDS" ]; then
+            echo "Running specific shards: $INPUT_SHARDS"
+            if [[ ! ",$INPUT_SHARDS," == *",${{ matrix.shard }},"* ]]; then
+              echo "Skipping ${{ matrix.shard }} as it's not in the specified list"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          echo "Running shard: ${{ matrix.shard }}"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+      - name: Enable debug logging
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: echo "ACTIONS_STEP_DEBUG=true" >> "$GITHUB_ENV"
+      - name: Install SQLite dev package
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: sudo apt update && sudo apt install -y libsqlite3-dev
+      - name: Install Libmagic dependency package
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: sudo apt update && sudo apt install -y libmagic1
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        if: steps.filter_shards.outputs.skip != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Determine shard execution mode
+        id: shard_mode
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: |
+          NON_TRACE_SERVER_SHARDS="${{ join(fromJSON(inputs.non_trace_server_shards_json), ',') }}"
+          if [[ -n "$NON_TRACE_SERVER_SHARDS" ]] && [[ ",$NON_TRACE_SERVER_SHARDS," == *",${{ matrix.shard }},"* ]]; then
+            echo "mode=non_trace_server" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "${{ inputs.marker_filter_enabled }}" != "true" ]]; then
+            echo "mode=trace_markers" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Shards from the test matrix that require trace_server marker filtering.
+          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents mcp autogen_tests trace"
+          if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
+            echo "mode=trace_markers" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=no_markers" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Run nox (Non Trace Server)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'non_trace_server'
+        run: |
+          if [[ "${{ inputs.set_weave_use_memray }}" == "true" ]]; then
+            export WEAVE_USE_MEMRAY=1
+          fi
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+            -m "not trace_server"
+      - name: Run nox (Sqlite Trace Server)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'trace_markers' && (inputs.marker_filter_enabled || matrix.shard != 'trace_calls_complete_only') && !inputs.use_dummy_api_key_fallback
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: weave_clickhouse
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DD_TRACE_ENABLED: false
+        run: |
+          if [[ "${{ inputs.set_weave_use_memray }}" == "true" ]]; then
+            export WEAVE_USE_MEMRAY=1
+          fi
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+            -m "trace_server" \
+            --trace-server=sqlite
+      - name: Run nox (Sqlite Trace Server) with fallback API keys
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'trace_markers' && (inputs.marker_filter_enabled || matrix.shard != 'trace_calls_complete_only') && inputs.use_dummy_api_key_fallback
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: weave_clickhouse
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          # Use format-valid dummy API keys when secrets aren't available (e.g., Dependabot PRs)
+          # Tests use VCR recordings so real keys aren't needed
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
+          DD_TRACE_ENABLED: false
+        run: |
+          if [[ "${{ inputs.set_weave_use_memray }}" == "true" ]]; then
+            export WEAVE_USE_MEMRAY=1
+          fi
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+            -m "trace_server" \
+            --trace-server=sqlite
+      - name: Run nox (Clickhouse Trace Server)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'trace_markers'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
+        run: |
+          if [[ "${{ inputs.set_weave_use_memray }}" == "true" ]]; then
+            export WEAVE_USE_MEMRAY=1
+          fi
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+            -m "trace_server and not skip_clickhouse_client"
+      - name: Run nox (No marker filters for integration-only shards)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'no_markers' && !inputs.use_dummy_api_key_fallback
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DD_TRACE_ENABLED: false
+        run: |
+          if [[ "${{ inputs.set_weave_use_memray }}" == "true" ]]; then
+            export WEAVE_USE_MEMRAY=1
+          fi
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
+      - name: Run nox (No marker filters for integration-only shards) with fallback API keys
+        if: steps.filter_shards.outputs.skip != 'true' && steps.shard_mode.outputs.mode == 'no_markers' && inputs.use_dummy_api_key_fallback
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          # Use format-valid dummy API keys when secrets aren't available (e.g., Dependabot PRs)
+          # Tests use VCR recordings so real keys aren't needed
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
+          DD_TRACE_ENABLED: false
+        run: |
+          if [[ "${{ inputs.set_weave_use_memray }}" == "true" ]]; then
+            export WEAVE_USE_MEMRAY=1
+          fi
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
+      - name: Upload coverage reports to Codecov
+        if: steps.filter_shards.outputs.skip != 'true' && inputs.upload_coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: ${{ inputs.coverage_flag }}
+          name: ${{ inputs.coverage_name_prefix }}-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.shard }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
