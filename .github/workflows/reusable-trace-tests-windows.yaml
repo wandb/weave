@@ -56,13 +56,19 @@ jobs:
           pip install nox uv
       - name: Determine shard execution mode
         id: shard_mode
+        shell: pwsh
         run: |
-          NON_TRACE_SERVER_SHARDS="${{ join(fromJSON(inputs.non_trace_server_shards_json), ',') }}"
-          if [[ -n "$NON_TRACE_SERVER_SHARDS" ]] && [[ ",$NON_TRACE_SERVER_SHARDS," == *",${{ matrix.shard }},"* ]]; then
-            echo "mode=non_trace_server" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=trace_markers" >> "$GITHUB_OUTPUT"
-          fi
+          $nonTraceServerShardsCsv = '${{ join(fromJSON(inputs.non_trace_server_shards_json), ',') }}'
+          $nonTraceServerShards = @()
+          if ($nonTraceServerShardsCsv) {
+            $nonTraceServerShards = $nonTraceServerShardsCsv.Split(',')
+          }
+
+          if ($nonTraceServerShards -contains '${{ matrix.shard }}') {
+            "mode=non_trace_server" >> $env:GITHUB_OUTPUT
+          } else {
+            "mode=trace_markers" >> $env:GITHUB_OUTPUT
+          }
       - name: Run nox (Non Trace Server)
         if: steps.shard_mode.outputs.mode == 'non_trace_server'
         run: |
