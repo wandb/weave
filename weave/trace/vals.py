@@ -457,9 +457,14 @@ class WeaveTable(Traceable):
                 return
 
         for i, _ in enumerate(self._prefetched_rows):
-            next_id_future = wc.future_executor.defer(
-                lambda closure=i: cached_table_ref.row_digests[closure]
-            )
+
+            def make_get_row_digest(idx: int) -> typing.Callable[[], str]:
+                def get_row_digest() -> str:
+                    return cached_table_ref.row_digests[idx]
+
+                return get_row_digest
+
+            next_id_future = wc.future_executor.defer(make_get_row_digest(i))
             new_ref = self.ref.with_item(next_id_future)
             val = self._prefetched_rows[i]
             res = from_json(val, self.table_ref.project_id, self.server)
@@ -523,7 +528,7 @@ class WeaveTable(Traceable):
                     else self._prefetched_rows[page_index * page_size + i]
                 )
 
-                def process_row(val: Any, new_ref: RefWithExtra) -> Any:
+                def process_row(val: Any, new_ref: RefWithExtra | None) -> Any:
                     if not self.table_ref:
                         # Should never happen, we need table_ref to remote_iter
                         return None
@@ -534,9 +539,15 @@ class WeaveTable(Traceable):
                         self.root,
                     )
 
-                future = wc.future_executor.defer(
-                    lambda v=val, r=new_ref: process_row(v, r)
-                )
+                def make_row_task(
+                    v: Any, r: RefWithExtra | None
+                ) -> typing.Callable[[], Any]:
+                    def row_task() -> Any:
+                        return process_row(v, r)
+
+                    return row_task
+
+                future = wc.future_executor.defer(make_row_task(val, new_ref))
                 futures.append(future)
 
             # Yield results as they complete
