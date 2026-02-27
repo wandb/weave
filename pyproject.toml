@@ -437,22 +437,28 @@ test = [
   "sqlparse==0.5.0",
   "freezegun",
   "rich",
+
   # Integration Tests
   "pytest-recording>=0.13.2",
   "vcrpy>=7.0.0; platform_python_implementation != 'PyPy'",
+
   # serving tests
   "flask",
   "uvicorn>=0.27.0",
   "pillow",
   "moviepy<=1.0.3",
   "filelock",
+
   # Media Generation
   "opencv-python", # Video generation
-  "reportlab", # PDF generation
+  "reportlab",     # PDF generation
+
   # MIME type detection (requires libmagic system library on Linux/macOS)
   "python-magic; sys_platform != 'win32'",
   "python-magic-bin; sys_platform == 'win32'",
+
   "confluent-kafka",
+
   "weave[trace_server]",
   "moto[s3]>=5.0.0",
   "respx",
