@@ -33,11 +33,12 @@ class ChatCompletionChunkStream:
         self.response = response
 
     def __iter__(self) -> Iterator[ChatCompletionChunk]:
-        for line in self.response.iter_lines():
-            if line:  # skip keep-alive lines
-                if line.startswith("data: "):
+        for raw_line in self.response.iter_lines():
+            if raw_line:  # skip keep-alive lines
+                line = raw_line
+                if raw_line.startswith("data: "):
                     # This is how OpenAI streams things back
-                    line = line[6:]
+                    line = raw_line[6:]
                 if line == "[DONE]":
                     continue
                 try:

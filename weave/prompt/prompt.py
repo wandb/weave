@@ -516,7 +516,7 @@ class EasyPrompt(UserList, Prompt):
     @classmethod
     def load_file(cls, filepath: str | Path) -> Self:
         expanded_path = os.path.expanduser(str(filepath))
-        with open(expanded_path) as f:
+        with open(expanded_path, encoding="utf-8") as f:
             return EasyPrompt.load(f)
 
     def dump(self, fp: IO) -> None:
@@ -524,7 +524,7 @@ class EasyPrompt(UserList, Prompt):
 
     def dump_file(self, filepath: str | Path) -> None:
         expanded_path = os.path.expanduser(str(filepath))
-        with open(expanded_path, "w") as f:
+        with open(expanded_path, "w", encoding="utf-8") as f:
             self.dump(f)
 
     # TODO: We would like to be able to make this an Op.

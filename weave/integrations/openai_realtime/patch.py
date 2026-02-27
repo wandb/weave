@@ -42,7 +42,7 @@ def get_openai_realtime_patcher(
     websocket_app_patcher = SymbolPatcher(
         lambda: importlib.import_module("websocket"),
         "WebSocketApp",
-        lambda original: websocket_wrapper(original),
+        websocket_wrapper,
     )
 
     _openai_realtime_patcher = MultiPatcher([base, websocket_app_patcher])

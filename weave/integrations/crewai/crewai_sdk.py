@@ -151,8 +151,8 @@ def get_crewai_patcher(
             update={
                 "name": base.name or f"crewai.Flow.{method_name}",
                 "call_display_name": base.call_display_name,
-                "postprocess_inputs": lambda inputs: dictify(inputs),
-                "postprocess_output": lambda output: dictify(output),
+                "postprocess_inputs": dictify,
+                "postprocess_output": dictify,
                 "kind": base.kind or "agent",
             }
         )

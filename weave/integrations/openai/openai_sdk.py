@@ -695,9 +695,7 @@ def create_wrapper_responses_sync(
         op._set_on_input_handler(openai_on_input_handler)
         return _add_accumulator(
             op,  # type: ignore
-            make_accumulator=lambda inputs: (
-                lambda acc, value: responses_accumulator(acc, value)
-            ),
+            make_accumulator=lambda inputs: responses_accumulator,
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=responses_on_finish_post_processor,
         )
@@ -719,9 +717,7 @@ def create_wrapper_responses_async(
         op._set_on_input_handler(openai_on_input_handler)
         return _add_accumulator(
             op,  # type: ignore
-            make_accumulator=lambda inputs: (
-                lambda acc, value: responses_accumulator(acc, value)
-            ),
+            make_accumulator=lambda inputs: responses_accumulator,
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=responses_on_finish_post_processor,
         )

@@ -258,9 +258,9 @@ class CachingMiddlewareTraceServer(
             func,
             req,
             func.__name__,
-            lambda req: pydantic_bytes_safe_dump(req),
+            pydantic_bytes_safe_dump,
             lambda res: res.model_dump_json(),
-            lambda json_value: res_type.model_validate_json(json_value),
+            res_type.model_validate_json,
         )
 
     def reset_cache_recorder(self) -> None:

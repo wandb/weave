@@ -222,7 +222,7 @@ def save(
     with artifact.writeable_file_path(METADATA_FILE_NAME) as metadata_path:
         obj_module = obj.__module__
         obj_class = obj.__class__.__name__
-        with open(metadata_path, "w") as f:
+        with open(metadata_path, "w", encoding="utf-8") as f:
             metadata = {"_type": f"{obj_module}.{obj_class}"}
             json.dump(metadata, f)
 
@@ -251,7 +251,7 @@ def load(
     """
     pytype = None
     if artifact.path_contents.get(METADATA_FILE_NAME):
-        with open(artifact.path(METADATA_FILE_NAME)) as f:
+        with open(artifact.path(METADATA_FILE_NAME), encoding="utf-8") as f:
             pytype = json.load(f).get("_type")
 
     for filename in artifact.path_contents:

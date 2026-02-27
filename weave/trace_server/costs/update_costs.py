@@ -39,7 +39,7 @@ def get_current_costs(file_name: str = COST_FILE) -> dict[str, list[CostDetails]
         return {}
 
     try:
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError as e:
         print("Failed to parse existing costs file:", e)
@@ -106,7 +106,7 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
         sys.exit(1)
 
     try:
-        with open(models_begin_path) as f:
+        with open(models_begin_path, encoding="utf-8") as f:
             models_data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         print(f"Failed to read modelsBegin.json: {e}")
@@ -221,7 +221,7 @@ def main(file_name: str = COST_FILE) -> None:
 
     # output costs to costs.json
     try:
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             json.dump(costs, f, indent=2)
     except Exception as e:
         print("Failed to write updated costs to file:", e)

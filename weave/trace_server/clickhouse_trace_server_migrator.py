@@ -340,7 +340,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_file_path = os.path.join(self.migration_dir, migration_file)
 
-        with open(migration_file_path) as f:
+        with open(migration_file_path, encoding="utf-8") as f:
             migration_sql = f.read()
 
         # Mark migration as partially applied

@@ -187,13 +187,15 @@ class Table:
     def tuple_to_row(self, tup: tuple, fields: list[str]) -> Row:
         d = {}
         for i, field in enumerate(fields):
-            if field.endswith("_dump"):
-                field = field[:-5]
+            normalized_field = field[:-5] if field.endswith("_dump") else field
             value = tup[i]
-            if field in self.col_types and self.col_types[field] == "json":
-                d[field] = json.loads(value)
+            if (
+                normalized_field in self.col_types
+                and self.col_types[normalized_field] == "json"
+            ):
+                d[normalized_field] = json.loads(value)
             else:
-                d[field] = value
+                d[normalized_field] = value
         return d
 
     def tuples_to_rows(self, tuples: list[tuple], fields: list[str]) -> Rows:

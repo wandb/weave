@@ -102,7 +102,7 @@ def save(obj: File, artifact: MemTraceFilesArtifact, name: str) -> None:
 
 def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> File:
     metadata_path = artifact.path("metadata.json")
-    with open(metadata_path) as f:
+    with open(metadata_path, encoding="utf-8") as f:
         metadata = json.load(f)
     path = artifact.path("file", metadata.get("original_path"))
     return File(path, metadata["mimetype"])

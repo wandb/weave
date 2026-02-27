@@ -53,7 +53,7 @@ def load_costs_from_json(file_name: str = COST_FILE) -> dict[str, list[CostDetai
 
     data = {}
     try:
-        with open(file_path) as file:
+        with open(file_path, encoding="utf-8") as file:
             data = json.load(file)
     except json.JSONDecodeError as e:
         logger.exception("JSON decode error")
