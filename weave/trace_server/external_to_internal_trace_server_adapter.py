@@ -267,6 +267,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.obj_delete, req)
 
+    # Tag/alias requests contain only plain identifiers (no refs to convert)
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.obj_add_tags(req)
