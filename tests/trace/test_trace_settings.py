@@ -107,12 +107,18 @@ def test_print_call_link_setting(client_creator):
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
+            client.flush()
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
     with client_creator(settings=UserSettings(print_call_link=True)) as client:
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
+            for _ in range(50):
+                client.flush()
+                if TRACE_CALL_EMOJI in captured.getvalue():
+                    break
+                time.sleep(0.01)
     assert TRACE_CALL_EMOJI in captured.getvalue()
 
 
@@ -121,6 +127,7 @@ def test_print_call_link_env(client):
     callbacks = [flushing_callback(client)]
     with capture_output(callbacks) as captured:
         func()
+        client.flush()
 
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
@@ -128,6 +135,11 @@ def test_print_call_link_env(client):
     callbacks = [flushing_callback(client)]
     with capture_output(callbacks) as captured:
         func()
+        for _ in range(50):
+            client.flush()
+            if TRACE_CALL_EMOJI in captured.getvalue():
+                break
+            time.sleep(0.01)
 
     assert TRACE_CALL_EMOJI in captured.getvalue()
 

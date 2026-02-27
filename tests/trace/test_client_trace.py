@@ -1051,7 +1051,7 @@ def test_trace_call_query_timings(client):
 
         for i in range(num_calls):
             call_index = i
-            client.create_call("y", {"a": i})
+            client.create_call("y", {"a": i}, use_stack=False)
 
     def query_server():
         result = get_client_trace_server(client).calls_query_stream(
