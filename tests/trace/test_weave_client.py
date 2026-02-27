@@ -317,7 +317,9 @@ def test_table_ref_digest_matches_server_digest_with_ref_uri_rewrite(
 
     req_rows = observed_reqs[0].table.rows
     assert isinstance(req_rows, list)
-    raw_row_digests = [compute_row_digest(row) for row in req_rows if isinstance(row, dict)]
+    raw_row_digests = [
+        compute_row_digest(row) for row in req_rows if isinstance(row, dict)
+    ]
     normalized_rows = client._normalize_payload_for_digest(req_rows)
     assert isinstance(normalized_rows, list)
     normalized_row_digests = [
@@ -343,10 +345,12 @@ def test_table_ref_digest_matches_server_digest_non_chunked(client, monkeypatch)
     table_ref = client._save_table(
         weave_client.Table([{"a": 1, "b": "x"}, {"a": 2, "b": "y"}])
     )
-    assert isinstance(table_ref._digest, str), "Table digest should be materialized inline"
-    assert isinstance(
-        table_ref._row_digests, list
-    ), "Table row digests should be materialized inline"
+    assert isinstance(table_ref._digest, str), (
+        "Table digest should be materialized inline"
+    )
+    assert isinstance(table_ref._row_digests, list), (
+        "Table row digests should be materialized inline"
+    )
     local_digest = table_ref.digest
     local_row_digests = table_ref.row_digests
     client.flush()
@@ -403,10 +407,12 @@ def test_table_ref_digest_matches_server_digest_chunked_parallel(client, monkeyp
     local_row_digests = table_ref.row_digests
     client.flush()
 
-    assert table_create_req_count[0] == 2, "Expected chunked parallel table_create calls"
-    assert merged_table_digests == [
-        local_digest
-    ], "Merged server digest should match local digest"
+    assert table_create_req_count[0] == 2, (
+        "Expected chunked parallel table_create calls"
+    )
+    assert merged_table_digests == [local_digest], (
+        "Merged server digest should match local digest"
+    )
 
     queried = client.server.table_query(
         tsi.TableQueryReq(project_id=client._project_id(), digest=local_digest)

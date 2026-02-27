@@ -19,13 +19,13 @@ import pydantic
 from httpx import HTTPStatusError as HTTPError
 
 from weave import version
+from weave.chat.chat import Chat
+from weave.chat.inference_models import InferenceModels
 from weave.shared.digest import (
     compute_object_digest_result,
     compute_row_digest,
     compute_table_digest,
 )
-from weave.chat.chat import Chat
-from weave.chat.inference_models import InferenceModels
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -399,6 +399,9 @@ class WeaveClient:
         ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
             raise TypeError(f"Expected ObjectRef, got {ref}")
+        # Preserve save() read-after-write semantics now that object/table writes
+        # are deferred and digests are computed inline.
+        self._flush()
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1716,24 +1719,13 @@ class WeaveClient:
                 val=json_val,
             )
         )
-        project_id_converter = self._find_ext_to_int_project_id_converter()
-        normalized_digest_payload = req.obj.val
-        if project_id_converter is not None:
-            try:
-                normalized_digest_payload = universal_ext_to_int_ref_converter(
-                    req.obj.val, project_id_converter
-                )
-            except Exception:
-                normalized_digest_payload = req.obj.val
-        requires_server_digest = (
-            project_id_converter is None
-            and self._payload_contains_external_weave_ref(req.obj.val)
-        )
+        normalized_digest_payload = self._normalize_payload_for_digest(req.obj.val)
+        requires_server_digest = self._payload_contains_external_weave_ref(req.obj.val)
+        local_digest = compute_object_digest_result(
+            normalized_digest_payload,
+            req.obj.builtin_object_class,
+        ).digest
         if requires_server_digest:
-            local_digest = compute_object_digest_result(
-                normalized_digest_payload,
-                req.obj.builtin_object_class,
-            ).digest
             create_future = self.future_executor.defer(
                 lambda req=req: self.server.obj_create(req)
             )
@@ -1745,10 +1737,7 @@ class WeaveClient:
                 )
             )
         else:
-            digest = compute_object_digest_result(
-                normalized_digest_payload,
-                req.obj.builtin_object_class,
-            ).digest
+            digest = local_digest
             self.future_executor.defer(lambda req=req: self.server.obj_create(req))
 
         ref: Ref
@@ -1756,6 +1745,10 @@ class WeaveClient:
             ref = OpRef(self.entity, self.project, name, digest)
         else:
             ref = ObjectRef(self.entity, self.project, name, digest)
+        if requires_server_digest:
+            # Allow serialization of nested refs to proceed without blocking on
+            # deferred server digest futures.
+            ref.__dict__["_local_digest"] = local_digest
 
         # Attach the ref to the object
         try:
@@ -1798,7 +1791,7 @@ class WeaveClient:
 
         row_digests: list[str] = []
         serialized_rows: list[dict[str, Any]] = []
-        for row, digest_row in zip(json_rows, digest_rows):
+        for row, digest_row in zip(json_rows, digest_rows, strict=False):
             if not isinstance(row, dict):
                 raise TypeError("All table rows must serialize to dictionaries")
             if not isinstance(digest_row, dict):

@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
+from concurrent.futures import Future
 from types import CoroutineType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from pydantic import BaseModel
 
 from weave.shared.digest import bytes_digest
+from weave.shared import refs_internal
 from weave.trace.object_record import ObjectRecord
-from weave.trace.refs import ObjectRef, Ref, TableRef
+from weave.trace.refs import ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
 from weave.trace_server.trace_server_interface import (
@@ -36,13 +38,63 @@ def is_pydantic_model_class(obj: Any) -> bool:
         return False
 
 
+def _ref_uri_for_serialization(ref: ObjectRef | TableRef) -> str:
+    digest = ref.__dict__.get("_digest")
+    if isinstance(digest, Future):
+        if digest.done():
+            try:
+                resolved_digest = digest.result()
+            except Exception:
+                resolved_digest = None
+            else:
+                ref.__dict__["_digest"] = resolved_digest
+                digest = resolved_digest
+        else:
+            local_digest = ref.__dict__.get("_local_digest")
+            if isinstance(local_digest, str):
+                digest = local_digest
+
+    if not isinstance(digest, str):
+        return ref.uri()
+
+    if isinstance(ref, TableRef):
+        return f"weave:///{ref.entity}/{ref.project}/table/{digest}"
+
+    kind = "op" if isinstance(ref, OpRef) else "object"
+    uri = f"weave:///{ref.entity}/{ref.project}/{kind}/{ref.name}:{digest}"
+    extra = ref.__dict__.get("_extra", ())
+    if isinstance(extra, tuple):
+        resolved_extra: list[str] = []
+        for e in extra:
+            if isinstance(e, str):
+                resolved_extra.append(e)
+            elif isinstance(e, Future):
+                if not e.done():
+                    return ref.uri()
+                try:
+                    resolved = e.result()
+                except Exception:
+                    return ref.uri()
+                if not isinstance(resolved, str):
+                    return ref.uri()
+                resolved_extra.append(resolved)
+            else:
+                return ref.uri()
+        if resolved_extra:
+            uri += "/" + "/".join(
+                refs_internal.extra_value_quoter(e) for e in resolved_extra
+            )
+        return uri
+    return ref.uri()
+
+
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
     if isinstance(obj, TableRef):
-        return obj.uri()
+        return _ref_uri_for_serialization(obj)
     elif isinstance(obj, ObjectRef):
-        return obj.uri()
+        return _ref_uri_for_serialization(obj)
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():

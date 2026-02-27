@@ -295,7 +295,7 @@ def test_flush_waits_for_then_continuations() -> None:
     def flush_worker() -> None:
         try:
             executor.flush(timeout=5)
-        except BaseException as exc:  # noqa: BLE001
+        except BaseException as exc:
             flush_error.append(exc)
         finally:
             flush_done.set()
