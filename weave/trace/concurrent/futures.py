@@ -32,6 +32,7 @@ from __future__ import annotations
 import atexit
 import concurrent.futures
 import logging
+import time
 from collections.abc import Callable
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
@@ -77,6 +78,7 @@ class FutureExecutor:
             )
         self._active_futures: set[Future] = set()
         self._active_futures_lock = Lock()
+        self._pending_raise_exception: BaseException | None = None
         self._in_thread_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
 
@@ -114,6 +116,17 @@ class FutureExecutor:
         """
         result_future: Future[U] = Future()
 
+        # Track the chained result so flush() blocks until continuation work is done.
+        def on_result_done(fut: Future[U]) -> None:
+            with self._active_futures_lock:
+                self._active_futures.discard(fut)
+                if exception := fut.exception():
+                    self._pending_raise_exception = exception
+
+        with self._active_futures_lock:
+            self._active_futures.add(result_future)
+        self._safe_add_done_callback(result_future, on_result_done)
+
         def callback() -> None:
             try:
                 _, _ = wait(futures)
@@ -147,7 +160,9 @@ class FutureExecutor:
 
         return result_future
 
-    def flush(self, timeout: float | None = None) -> bool:
+    def flush(
+        self, timeout: float | None = None, *, force_raise: bool = False
+    ) -> bool:
         """Block until all currently submitted items are complete or timeout is reached.
 
         This method allows new submissions while waiting, ensuring that
@@ -155,6 +170,8 @@ class FutureExecutor:
 
         Args:
             timeout (Optional[float]): Maximum time to wait in seconds. If None, wait indefinitely.
+            force_raise: If True, raise captured background task exceptions even when
+                `raise_on_captured_errors` is disabled.
 
         Returns:
             bool: True if all tasks completed
@@ -163,20 +180,47 @@ class FutureExecutor:
             RuntimeError: If called from within a thread context.
             TimeoutError: If the timeout is reached.
         """
-        with self._active_futures_lock:
-            if not self._active_futures:
-                return True
-            futures_to_wait = list(self._active_futures)
+        should_raise = force_raise or get_raise_on_captured_errors()
+        if not should_raise:
+            # Avoid leaking stale pending exceptions between test contexts.
+            self._pop_pending_raise_exception()
 
         if self._in_thread_context.get():
             raise RuntimeError("Cannot flush from within a thread")
 
-        for future in concurrent.futures.as_completed(futures_to_wait, timeout=timeout):
-            try:
-                future.result()
-            except Exception as e:
-                if get_raise_on_captured_errors():
-                    raise
+        deadline = None if timeout is None else time.monotonic() + timeout
+        first_exception: BaseException | None = None
+
+        # Drain until there are no pending futures. Futures can enqueue more
+        # work (for example via `then` callbacks), so a single snapshot is not enough.
+        while True:
+            with self._active_futures_lock:
+                futures_to_wait = list(self._active_futures)
+
+            if not futures_to_wait:
+                break
+
+            remaining_timeout = None
+            if deadline is not None:
+                remaining_timeout = deadline - time.monotonic()
+                if remaining_timeout <= 0:
+                    raise TimeoutError("FutureExecutor.flush timed out")
+
+            for future in concurrent.futures.as_completed(
+                futures_to_wait, timeout=remaining_timeout
+            ):
+                try:
+                    future.result()
+                except Exception as e:
+                    if should_raise and first_exception is None:
+                        first_exception = e
+
+        if should_raise:
+            pending_exception = self._pop_pending_raise_exception()
+            if pending_exception is None and first_exception is not None:
+                raise first_exception
+            if pending_exception is not None:
+                raise pending_exception
         return True
 
     def _future_done_callback(self, future: Future) -> None:
@@ -186,6 +230,13 @@ class FutureExecutor:
 
             if exception := future.exception():
                 logger.error(f"Task failed: {_format_exception(exception)}")
+                self._pending_raise_exception = exception
+
+    def _pop_pending_raise_exception(self) -> BaseException | None:
+        with self._active_futures_lock:
+            pending_exception = self._pending_raise_exception
+            self._pending_raise_exception = None
+        return pending_exception
 
     def _shutdown(self) -> None:
         """Shutdown the thread pool executor. Should only be called when the program is exiting."""

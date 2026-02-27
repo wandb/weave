@@ -21,6 +21,11 @@ from httpx import HTTPStatusError as HTTPError
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
+from weave.shared.digest import (
+    compute_object_digest_result,
+    compute_row_digest,
+    compute_table_digest,
+)
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -35,6 +40,7 @@ from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
+from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.feedback import FeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -97,6 +103,9 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
+from weave.trace_server.trace_server_converter import (
+    universal_ext_to_int_ref_converter,
+)
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallsDeleteReq,
@@ -115,7 +124,6 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     FileCreateRes,
     ObjCreateReq,
-    ObjCreateRes,
     ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
@@ -240,9 +248,17 @@ def map_to_refs(obj: Any) -> Any:
         return ref
 
     if isinstance(obj, ObjectRecord):
-        # Here, we expect ref to be empty since it would have short circuited
-        # above with `_get_direct_ref`
-        return _remove_empty_ref(obj.map_values(map_to_refs))
+        # Keep class metadata scalar: `_class_name` / `_bases` should never become refs.
+        mapped_attrs: dict[str, Any] = {}
+        for key, value in obj.__dict__.items():
+            if key == "_class_name":
+                mapped_attrs[key] = str(value)
+                continue
+            if key == "_bases" and isinstance(value, list):
+                mapped_attrs[key] = [str(base) for base in value]
+                continue
+            mapped_attrs[key] = map_to_refs(value)
+        return _remove_empty_ref(ObjectRecord(mapped_attrs))
     elif isinstance(obj, pydantic.BaseModel):
         # Check if this object has a custom serializer registered
         from weave.trace.serialization.serializer import get_serializer_for_obj
@@ -384,6 +400,9 @@ class WeaveClient:
         ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
             raise TypeError(f"Expected ObjectRef, got {ref}")
+        # Preserve save() read-after-write semantics now that object/table writes
+        # are deferred and digests are computed inline.
+        self._flush()
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -785,54 +804,59 @@ class WeaveClient:
         )
 
         def send_start_call() -> bool:
-            maybe_redacted_inputs_with_refs = inputs_with_refs
-            if should_redact_pii():
-                from weave.utils.pii_redaction import redact_pii
+            try:
+                maybe_redacted_inputs_with_refs = inputs_with_refs
+                if should_redact_pii():
+                    from weave.utils.pii_redaction import redact_pii
 
-                maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
+                    maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
-            inputs_json = to_json(
-                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
-            )
-            call_start_req = CallStartReq(
-                start=StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=call_id,
-                    op_name=op_def_ref.uri(),
-                    display_name=call.display_name,
-                    trace_id=trace_id,
-                    started_at=started_at,
-                    parent_id=parent_id,
-                    inputs=inputs_json,
-                    attributes=attributes_dict.unwrap(),
-                    wb_run_id=current_wb_run_id,
-                    wb_run_step=current_wb_run_step,
-                    thread_id=thread_id,
-                    turn_id=turn_id,
+                inputs_json = to_json(
+                    maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
                 )
-            )
-
-            bytes_size = len(call_start_req.model_dump_json())
-            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                logger.warning(
-                    f"Trace input size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes."
-                    "Inputs may be dropped."
+                call_start_req = CallStartReq(
+                    start=StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call_id,
+                        op_name=op_def_ref.uri(),
+                        display_name=call.display_name,
+                        trace_id=trace_id,
+                        started_at=started_at,
+                        parent_id=parent_id,
+                        inputs=inputs_json,
+                        attributes=attributes_dict.unwrap(),
+                        wb_run_id=current_wb_run_id,
+                        wb_run_step=current_wb_run_step,
+                        thread_id=thread_id,
+                        turn_id=turn_id,
+                    )
                 )
 
-            # eager_call_start is a client-side hint that tells the batch processor
-            # to send this call's start immediately (for long-running ops like evals)
-            # Ugly that we have to reach down to the processor level here, but otherwise
-            # we need to change the interface itself.
-            call_processor = _get_call_processor(self.server)
-            if call_processor is not None:
-                eager = op.eager_call_start
-                call_processor.enqueue_start(
-                    StartBatchItem(req=call_start_req), eager_call_start=eager
-                )
-            else:
-                self.server.call_start(call_start_req)
+                bytes_size = len(call_start_req.model_dump_json())
+                if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                    logger.warning(
+                        f"Trace input size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes."
+                        "Inputs may be dropped."
+                    )
 
-            return True
+                # eager_call_start is a client-side hint that tells the batch processor
+                # to send this call's start immediately (for long-running ops like evals)
+                # Ugly that we have to reach down to the processor level here, but otherwise
+                # we need to change the interface itself.
+                call_processor = _get_call_processor(self.server)
+                if call_processor is not None:
+                    eager = op.eager_call_start
+                    call_processor.enqueue_start(
+                        StartBatchItem(req=call_start_req), eager_call_start=eager
+                    )
+                else:
+                    self.server.call_start(call_start_req)
+
+                return True
+            except Exception:
+                if get_raise_on_captured_errors():
+                    raise
+                return False
 
         def on_complete(f: Future) -> None:
             try:
@@ -1444,30 +1468,35 @@ class WeaveClient:
         """
 
         def send_score_call() -> str:
-            call_ref = get_ref(predict_call)
-            if call_ref is None:
-                raise ValueError("Predict call must have a ref")
-            weave_ref_uri = call_ref.uri()
-            scorer_call_ref = get_ref(score_call)
-            if scorer_call_ref is None:
-                raise ValueError("Score call must have a ref")
-            scorer_call_ref_uri = scorer_call_ref.uri()
+            try:
+                call_ref = get_ref(predict_call)
+                if call_ref is None:
+                    raise ValueError("Predict call must have a ref")
+                weave_ref_uri = call_ref.uri()
+                scorer_call_ref = get_ref(score_call)
+                if scorer_call_ref is None:
+                    raise ValueError("Score call must have a ref")
+                scorer_call_ref_uri = scorer_call_ref.uri()
 
-            # If scorer_object_ref is provided, it is used as the runnable_ref_uri
-            # Otherwise, we use the op_name from the score_call. This should happen
-            # when there is a Scorer subclass that is the source of the score call.
-            scorer_object_ref_uri = (
-                scorer_object_ref.uri() if scorer_object_ref else None
-            )
-            runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
-            score_results = score_call.output
+                # If scorer_object_ref is provided, it is used as the runnable_ref_uri
+                # Otherwise, we use the op_name from the score_call. This should happen
+                # when there is a Scorer subclass that is the source of the score call.
+                scorer_object_ref_uri = (
+                    scorer_object_ref.uri() if scorer_object_ref else None
+                )
+                runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
+                score_results = score_call.output
 
-            return self._add_runnable_feedback(
-                weave_ref_uri=weave_ref_uri,
-                output=score_results,
-                call_ref_uri=scorer_call_ref_uri,
-                runnable_ref_uri=runnable_ref_uri,
-            )
+                return self._add_runnable_feedback(
+                    weave_ref_uri=weave_ref_uri,
+                    output=score_results,
+                    call_ref_uri=scorer_call_ref_uri,
+                    runnable_ref_uri=runnable_ref_uri,
+                )
+            except Exception:
+                if get_raise_on_captured_errors():
+                    raise
+                return ""
 
         return self.future_executor.defer(send_score_call)
 
@@ -1685,29 +1714,46 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
-        def send_obj_create() -> ObjCreateRes:
-            # `to_json` is mostly fast, except for CustomWeaveTypes
-            # which incur network costs to serialize the payload
-            json_val = to_json(val, self._project_id(), self)
-            req = ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
+        # Serialize and derive digest inline so refs are materialized immediately.
+        # We still upload asynchronously to keep network I/O off the caller thread.
+        json_val = to_json(val, self._project_id(), self)
+        req = ObjCreateReq(
+            obj=ObjSchemaForInsert(
+                project_id=self.entity + "/" + self.project,
+                object_id=name,
+                val=json_val,
+            )
+        )
+        normalized_digest_payload = self._normalize_payload_for_digest(req.obj.val)
+        requires_server_digest = self._payload_contains_external_weave_ref(req.obj.val)
+        local_digest = compute_object_digest_result(
+            normalized_digest_payload,
+            req.obj.builtin_object_class,
+        ).digest
+        if requires_server_digest:
+            create_future = self.future_executor.defer(
+                lambda req=req: self.server.obj_create(req)
+            )
+            digest: str | Future[str] = self.future_executor.defer(
+                lambda create_future=create_future, local_digest=local_digest: (
+                    create_future.result().digest
+                    if not create_future.exception()
+                    else local_digest
                 )
             )
-            return self.server.obj_create(req)
-
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
+        else:
+            digest = local_digest
+            self.future_executor.defer(lambda req=req: self.server.obj_create(req))
 
         ref: Ref
         if is_op(orig_val):
-            ref = OpRef(self.entity, self.project, name, digest_future)
+            ref = OpRef(self.entity, self.project, name, digest)
         else:
-            ref = ObjectRef(self.entity, self.project, name, digest_future)
+            ref = ObjectRef(self.entity, self.project, name, digest)
+        if requires_server_digest:
+            # Allow serialization of nested refs to proceed without blocking on
+            # deferred server digest futures.
+            ref.__dict__["_local_digest"] = local_digest
 
         # Attach the ref to the object
         try:
@@ -1736,6 +1782,30 @@ class WeaveClient:
         )
         return self.server.table_create(req)
 
+    def _compute_table_digest_data(
+        self, rows: list[Any]
+    ) -> tuple[list[dict[str, Any]], str, list[str]]:
+        json_rows = to_json(rows, self._project_id(), self)
+        if not isinstance(json_rows, list):
+            raise TypeError("Table rows must serialize to a list")
+        digest_rows = self._normalize_payload_for_digest(json_rows)
+        if not isinstance(digest_rows, list):
+            raise TypeError("Digest rows must be a list")
+        if len(digest_rows) != len(json_rows):
+            raise TypeError("Digest rows must preserve row count")
+
+        row_digests: list[str] = []
+        serialized_rows: list[dict[str, Any]] = []
+        for row, digest_row in zip(json_rows, digest_rows, strict=False):
+            if not isinstance(row, dict):
+                raise TypeError("All table rows must serialize to dictionaries")
+            if not isinstance(digest_row, dict):
+                raise TypeError("All digest rows must be dictionaries")
+            serialized_rows.append(row)
+            row_digests.append(compute_row_digest(digest_row))
+
+        return serialized_rows, compute_table_digest(row_digests), row_digests
+
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
@@ -1748,28 +1818,30 @@ class WeaveClient:
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
+        # Serialize and derive digest data inline so refs are materialized immediately.
+        serialized_rows, local_table_digest, local_row_digests = (
+            self._compute_table_digest_data(list(table.rows))
+        )
+
         chunking_config = self._should_use_chunking(table)
         if not chunking_config.use_chunking:
-            # Simple case: defer the entire serialization and upload
-            res_future: Future[TableCreateRes] = self.future_executor.defer(
-                lambda: self._send_table_create(list(table.rows))
+            # Simple case: request is built inline, upload is deferred.
+            req = TableCreateReq(
+                table=TableSchemaForInsert(
+                    project_id=self._project_id(),
+                    rows=serialized_rows,
+                )
             )
+            self.future_executor.defer(lambda req=req: self.server.table_create(req))
         elif chunking_config.use_parallel_chunks:
             # Need to chunk up, use parallelism
-            res_future = self._create_table_with_parallel_chunks(table)
+            self._create_table_with_parallel_chunks(table)
         else:
             # Legacy method for large tables and old servers
-            res_future = self._create_table_with_incremental_updates(table)
-
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
-        row_digests_future: Future[list[str]] = self.future_executor.then(
-            [res_future], lambda res: res[0].row_digests
-        )
+            self._create_table_with_incremental_updates(table)
 
         table_ref = TableRef(
-            self.entity, self.project, digest_future, row_digests_future
+            self.entity, self.project, local_table_digest, local_row_digests
         )
 
         table.ref = table_ref
@@ -1932,6 +2004,53 @@ class WeaveClient:
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
 
+    def _normalize_payload_for_digest(self, payload: Any) -> Any:
+        project_id_converter = self._find_ext_to_int_project_id_converter()
+        if project_id_converter is None:
+            return payload
+        try:
+            return universal_ext_to_int_ref_converter(payload, project_id_converter)
+        except Exception:
+            return payload
+
+    def _payload_contains_external_weave_ref(self, payload: Any) -> bool:
+        if isinstance(payload, str):
+            return payload.startswith("weave:///")
+        if isinstance(payload, dict):
+            return any(
+                self._payload_contains_external_weave_ref(value)
+                for value in payload.values()
+            )
+        if isinstance(payload, (list, tuple, set)):
+            return any(
+                self._payload_contains_external_weave_ref(value) for value in payload
+            )
+        return False
+
+    def _find_ext_to_int_project_id_converter(
+        self,
+    ) -> Callable[[str], str] | None:
+        server: Any = self.server
+        seen_server_ids: set[int] = set()
+        while server is not None:
+            server_id = id(server)
+            if server_id in seen_server_ids:
+                break
+            seen_server_ids.add(server_id)
+
+            id_converter = getattr(server, "_idc", None)
+            project_id_converter = getattr(id_converter, "ext_to_int_project_id", None)
+            if callable(project_id_converter):
+                return cast(Callable[[str], str], project_id_converter)
+
+            next_server = getattr(server, "_next_trace_server", None)
+            if next_server is None:
+                next_server = getattr(server, "_delegated_server", None)
+            if next_server is None:
+                next_server = getattr(server, "server", None)
+            server = next_server
+        return None
+
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
         op_ref = get_ref(op)
@@ -2059,9 +2178,9 @@ class WeaveClient:
         else:
             self._flush()
 
-    def flush(self) -> None:
+    def flush(self, *, raise_on_errors: bool = False) -> None:
         """Flushes background asynchronous tasks, safe to call multiple times."""
-        self._flush()
+        self._flush(raise_on_errors=raise_on_errors)
 
     def _flush_with_callback(
         self,
@@ -2154,12 +2273,12 @@ class WeaveClient:
         )
         callback(final_status)
 
-    def _flush(self) -> None:
+    def _flush(self, *, raise_on_errors: bool = False) -> None:
         """Used to wait until all currently enqueued jobs are processed."""
         if not self.future_executor._in_thread_context.get():
-            self.future_executor.flush()
+            self.future_executor.flush(force_raise=raise_on_errors)
         if self.future_executor_fastlane:
-            self.future_executor_fastlane.flush()
+            self.future_executor_fastlane.flush(force_raise=raise_on_errors)
         if self._server_call_processor:
             self._server_call_processor.stop_accepting_new_work_and_flush_queue()
             # Restart call processor processing thread after flushing

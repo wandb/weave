@@ -27,9 +27,15 @@ from tests.trace.util import (
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
+from weave.shared.digest import (
+    compute_object_digest_result,
+    compute_row_digest,
+    compute_table_digest,
+)
 from weave.trace import refs, settings, table_upload_chunking, weave_client
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
+from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -135,16 +141,354 @@ def test_table_update(client):
     for i, row in enumerate(table_query_2_res.rows):
         assert row.val["val"] == final_data[i]["val"]
 
-    # Verify digests are equal to if we added directly
-    check_res = client.server.table_create(
-        TableCreateReq(
-            table=TableSchemaForInsert(
-                project_id=client._project_id(),
-                rows=final_data,
-            )
-        )
+
+@pytest.mark.disable_logging_error_check
+def test_publish_raises_when_obj_create_fails(client, monkeypatch):
+    underlying_server = client.server.server._next_trace_server
+
+    def obj_create_fail(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        raise RuntimeError("obj_create boom")
+
+    monkeypatch.setattr(underlying_server, "obj_create", obj_create_fail)
+
+    client.set_autoflush(False)
+    try:
+        with raise_on_captured_errors(False):
+            with pytest.raises(RuntimeError, match="obj_create boom"):
+                weave.publish({"a": 1}, name=f"publish-failure-{uuid.uuid4().hex}")
+    finally:
+        client.set_autoflush(True)
+
+
+def test_object_ref_digest_ignores_server_returned_digest(client, monkeypatch):
+    underlying_server = client.server.server._next_trace_server
+    original_obj_create = underlying_server.obj_create
+    observed_reqs: list[tsi.ObjCreateReq] = []
+    bogus_server_digest = "server-returned-digest"
+
+    def obj_create_with_bogus_digest(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        observed_reqs.append(req)
+        original_obj_create(req)
+        return tsi.ObjCreateRes(digest=bogus_server_digest)
+
+    monkeypatch.setattr(underlying_server, "obj_create", obj_create_with_bogus_digest)
+
+    ref = client._save_object_basic(
+        {"value": 1}, name=f"client-digest-obj-{uuid.uuid4().hex}"
     )
-    assert check_res.digest == table_create_res.digest
+    digest = ref.digest
+    client.flush()
+
+    assert observed_reqs, "Expected obj_create to be invoked"
+    expected_digest = compute_object_digest_result(
+        client._normalize_payload_for_digest(observed_reqs[0].obj.val),
+        observed_reqs[0].obj.builtin_object_class,
+    ).digest
+    assert digest == expected_digest
+    assert digest != bogus_server_digest
+
+
+def test_object_ref_digest_matches_server_digest(client, monkeypatch):
+    underlying_server = client.server.server._next_trace_server
+    original_obj_create = underlying_server.obj_create
+    observed_reqs: list[tsi.ObjCreateReq] = []
+    server_digests: list[str] = []
+
+    def obj_create_capture_digest(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        observed_reqs.append(req)
+        res = original_obj_create(req)
+        server_digests.append(res.digest)
+        return res
+
+    monkeypatch.setattr(underlying_server, "obj_create", obj_create_capture_digest)
+
+    ref = client._save_object_basic(
+        {"value": 1, "nested": {"x": "y"}},
+        name=f"client-server-digest-match-obj-{uuid.uuid4().hex}",
+    )
+    assert isinstance(ref._digest, str), "Object digest should be materialized inline"
+    local_digest = ref.digest
+    client.flush()
+
+    assert len(observed_reqs) == 1, "Expected exactly one obj_create request"
+    assert len(server_digests) == 1, "Expected exactly one obj_create response digest"
+
+    expected_local_digest = compute_object_digest_result(
+        client._normalize_payload_for_digest(observed_reqs[0].obj.val),
+        observed_reqs[0].obj.builtin_object_class,
+    ).digest
+    assert local_digest == expected_local_digest
+    assert local_digest == server_digests[0]
+
+
+def test_object_ref_digest_matches_server_digest_with_ref_uri_rewrite(
+    client, monkeypatch
+):
+    underlying_server = client.server.server._next_trace_server
+    original_obj_create = underlying_server.obj_create
+    observed_reqs: list[tsi.ObjCreateReq] = []
+    server_digests: list[str] = []
+
+    def obj_create_capture(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        observed_reqs.append(req)
+        res = original_obj_create(req)
+        server_digests.append(res.digest)
+        return res
+
+    monkeypatch.setattr(underlying_server, "obj_create", obj_create_capture)
+
+    ref_like_uri = "weave:///shawn/test-project/object/obj-for-digest:abc123"
+    ref = client._save_object_basic(
+        {"uri": ref_like_uri},
+        name=f"client-server-digest-ref-uri-obj-{uuid.uuid4().hex}",
+    )
+    local_digest = ref.digest
+    client.flush()
+
+    assert len(observed_reqs) == 1
+    assert len(server_digests) == 1
+
+    raw_digest = compute_object_digest_result(
+        observed_reqs[0].obj.val,
+        observed_reqs[0].obj.builtin_object_class,
+    ).digest
+    normalized_digest = compute_object_digest_result(
+        client._normalize_payload_for_digest(observed_reqs[0].obj.val),
+        observed_reqs[0].obj.builtin_object_class,
+    ).digest
+
+    assert local_digest == normalized_digest
+    assert local_digest == server_digests[0]
+    if client._find_ext_to_int_project_id_converter() is not None:
+        assert normalized_digest != raw_digest
+
+
+def test_table_ref_digest_ignores_server_returned_digests(client, monkeypatch):
+    underlying_server = client.server.server._next_trace_server
+    original_table_create = underlying_server.table_create
+    observed_reqs: list[tsi.TableCreateReq] = []
+    bogus_server_digest = "server-table-digest"
+    bogus_server_row_digests = ["server-row-digest-1", "server-row-digest-2"]
+
+    def table_create_with_bogus_digests(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        observed_reqs.append(req)
+        original_table_create(req)
+        return tsi.TableCreateRes(
+            digest=bogus_server_digest,
+            row_digests=bogus_server_row_digests,
+        )
+
+    monkeypatch.setattr(
+        underlying_server, "table_create", table_create_with_bogus_digests
+    )
+
+    table_ref = client._save_table(weave_client.Table([{"a": 1}, {"a": 2}]))
+    digest = table_ref.digest
+    row_digests = table_ref.row_digests
+    client.flush()
+
+    assert observed_reqs, "Expected table_create to be invoked"
+    req_rows = observed_reqs[0].table.rows
+    assert isinstance(req_rows, list)
+    digest_rows = client._normalize_payload_for_digest(req_rows)
+    assert isinstance(digest_rows, list)
+    expected_row_digests: list[str] = []
+    for row in digest_rows:
+        assert isinstance(row, dict)
+        expected_row_digests.append(compute_row_digest(row))
+    expected_digest = compute_table_digest(expected_row_digests)
+
+    assert digest == expected_digest
+    assert row_digests == expected_row_digests
+    assert digest != bogus_server_digest
+    assert row_digests != bogus_server_row_digests
+
+
+def test_table_ref_digest_matches_server_digest_with_ref_uri_rewrite(
+    client, monkeypatch
+):
+    underlying_server = client.server.server._next_trace_server
+    original_table_create = underlying_server.table_create
+    observed_reqs: list[tsi.TableCreateReq] = []
+    server_responses: list[tsi.TableCreateRes] = []
+
+    def table_create_capture(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        observed_reqs.append(req)
+        res = original_table_create(req)
+        server_responses.append(res)
+        return res
+
+    monkeypatch.setattr(underlying_server, "table_create", table_create_capture)
+
+    rows = [
+        {"uri": "weave:///shawn/test-project/object/table-row-ref:abc123"},
+        {"uri": "weave:///shawn/test-project/object/table-row-ref:def456"},
+    ]
+    table_ref = client._save_table(weave_client.Table(rows))
+    local_digest = table_ref.digest
+    local_row_digests = table_ref.row_digests
+    client.flush()
+
+    assert len(observed_reqs) == 1
+    assert len(server_responses) == 1
+    assert local_digest == server_responses[0].digest
+    assert local_row_digests == server_responses[0].row_digests
+
+    req_rows = observed_reqs[0].table.rows
+    assert isinstance(req_rows, list)
+    raw_row_digests = [
+        compute_row_digest(row) for row in req_rows if isinstance(row, dict)
+    ]
+    normalized_rows = client._normalize_payload_for_digest(req_rows)
+    assert isinstance(normalized_rows, list)
+    normalized_row_digests = [
+        compute_row_digest(row) for row in normalized_rows if isinstance(row, dict)
+    ]
+    assert local_row_digests == normalized_row_digests
+    if client._find_ext_to_int_project_id_converter() is not None:
+        assert normalized_row_digests != raw_row_digests
+
+
+def test_table_ref_digest_matches_server_digest_non_chunked(client, monkeypatch):
+    underlying_server = client.server.server._next_trace_server
+    original_table_create = underlying_server.table_create
+    server_responses: list[tsi.TableCreateRes] = []
+
+    def table_create_capture(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        res = original_table_create(req)
+        server_responses.append(res)
+        return res
+
+    monkeypatch.setattr(underlying_server, "table_create", table_create_capture)
+
+    table_ref = client._save_table(
+        weave_client.Table([{"a": 1, "b": "x"}, {"a": 2, "b": "y"}])
+    )
+    assert isinstance(table_ref._digest, str), (
+        "Table digest should be materialized inline"
+    )
+    assert isinstance(table_ref._row_digests, list), (
+        "Table row digests should be materialized inline"
+    )
+    local_digest = table_ref.digest
+    local_row_digests = table_ref.row_digests
+    client.flush()
+
+    assert len(server_responses) == 1, "Expected one non-chunked table_create response"
+    assert local_digest == server_responses[0].digest
+    assert local_row_digests == server_responses[0].row_digests
+
+
+def test_table_ref_digest_matches_server_digest_chunked_parallel(client, monkeypatch):
+    underlying_server = client.server.server._next_trace_server
+    original_table_create = underlying_server.table_create
+    original_table_create_from_digests = underlying_server.table_create_from_digests
+    table_create_req_count = [0]
+    merged_table_digests: list[str] = []
+
+    def table_create_capture(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        table_create_req_count[0] += 1
+        return original_table_create(req)
+
+    def table_create_from_digests_capture(
+        req: tsi.TableCreateFromDigestsReq,
+    ) -> tsi.TableCreateFromDigestsRes:
+        res = original_table_create_from_digests(req)
+        merged_table_digests.append(res.digest)
+        return res
+
+    monkeypatch.setattr(underlying_server, "table_create", table_create_capture)
+    monkeypatch.setattr(
+        underlying_server,
+        "table_create_from_digests",
+        table_create_from_digests_capture,
+    )
+    monkeypatch.setattr(
+        weave_client.WeaveClient,
+        "_should_use_chunking",
+        lambda self, table: weave_client.ChunkingConfig(
+            use_chunking=True, use_parallel_chunks=True
+        ),
+    )
+    monkeypatch.setattr(
+        weave_client.TableChunkManager,
+        "create_chunks",
+        lambda self, rows: [list(rows[:1]), list(rows[1:])],
+    )
+
+    rows = [
+        {"idx": 0, "payload": "alpha"},
+        {"idx": 1, "payload": "beta"},
+        {"idx": 2, "payload": "gamma"},
+    ]
+    table_ref = client._save_table(weave_client.Table(rows))
+    local_digest = table_ref.digest
+    local_row_digests = table_ref.row_digests
+    client.flush()
+
+    assert table_create_req_count[0] == 2, (
+        "Expected chunked parallel table_create calls"
+    )
+    assert merged_table_digests == [local_digest], (
+        "Merged server digest should match local digest"
+    )
+
+    queried = client.server.table_query(
+        tsi.TableQueryReq(project_id=client._project_id(), digest=local_digest)
+    )
+    assert [row.digest for row in queried.rows] == local_row_digests
+
+
+def test_table_ref_digest_matches_server_digest_chunked_incremental(
+    client, monkeypatch
+):
+    underlying_server = client.server.server._next_trace_server
+    original_table_create = underlying_server.table_create
+    original_table_update = underlying_server.table_update
+    mutation_digests: list[str] = []
+
+    def table_create_capture(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        res = original_table_create(req)
+        mutation_digests.append(res.digest)
+        return res
+
+    def table_update_capture(req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        res = original_table_update(req)
+        mutation_digests.append(res.digest)
+        return res
+
+    monkeypatch.setattr(underlying_server, "table_create", table_create_capture)
+    monkeypatch.setattr(underlying_server, "table_update", table_update_capture)
+    monkeypatch.setattr(
+        weave_client.WeaveClient,
+        "_should_use_chunking",
+        lambda self, table: weave_client.ChunkingConfig(
+            use_chunking=True, use_parallel_chunks=False
+        ),
+    )
+    monkeypatch.setattr(
+        weave_client.TableChunkManager,
+        "create_chunks",
+        lambda self, rows: [list(rows[:1]), list(rows[1:])],
+    )
+
+    rows = [
+        {"idx": 0, "payload": "alpha"},
+        {"idx": 1, "payload": "beta"},
+        {"idx": 2, "payload": "gamma"},
+    ]
+    table_ref = client._save_table(weave_client.Table(rows))
+    local_digest = table_ref.digest
+    local_row_digests = table_ref.row_digests
+    client.flush()
+
+    assert len(mutation_digests) >= 2, "Expected base create plus at least one update"
+    assert mutation_digests[-1] == local_digest
+
+    queried = client.server.table_query(
+        tsi.TableQueryReq(project_id=client._project_id(), digest=local_digest)
+    )
+    assert [row.digest for row in queried.rows] == local_row_digests
 
 
 @pytest.mark.skip
