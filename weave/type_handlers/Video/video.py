@@ -203,7 +203,7 @@ def is_video_clip_instance(obj: Any) -> TypeIs[VideoClip]:
 
 def _ensure_registered() -> None:
     """Ensure the video type handler is registered if MoviePy is available."""
-    global _registered
+    global _registered  # noqa: PLW0603
     if not _registered and _dependencies_met():
         from moviepy.editor import VideoClip
 

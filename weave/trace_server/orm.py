@@ -43,7 +43,7 @@ class ParamBuilder:
         prefix: str | None = None,
         database_type: DatabaseType = "clickhouse",
     ):
-        global param_builder_count
+        global param_builder_count  # noqa: PLW0603
         param_builder_count += 1
         self._params: dict[str, typing.Any] = {}
         self._prefix = (prefix or f"pb_{param_builder_count}") + "_"

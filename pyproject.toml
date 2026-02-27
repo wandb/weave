@@ -290,13 +290,6 @@ ignore = [
   "D417",
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
-  # Existing singleton patchers and module initialization patterns rely on globals.
-  "PLW0602", # https://docs.astral.sh/ruff/rules/global-variable-not-assigned/
-  "PLW0603", # https://docs.astral.sh/ruff/rules/global-statement/
-  # We intentionally implement non-hashable equality matchers in tests/utilities.
-  "PLW1641", # https://docs.astral.sh/ruff/rules/eq-without-hash/
-  # We intentionally expose IPython/SDK integration hooks with these method names.
-  "PLW3201", # https://docs.astral.sh/ruff/rules/bad-dunder-method-name/
 ]
 
 [tool.ruff.lint.isort]

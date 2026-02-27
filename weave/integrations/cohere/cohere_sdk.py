@@ -203,7 +203,7 @@ def get_cohere_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _cohere_patcher
+    global _cohere_patcher  # noqa: PLW0603
     if _cohere_patcher is not None:
         return _cohere_patcher
 

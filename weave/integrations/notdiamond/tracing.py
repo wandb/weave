@@ -51,7 +51,7 @@ def get_notdiamond_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _notdiamond_patcher
+    global _notdiamond_patcher  # noqa: PLW0603
     if _notdiamond_patcher is not None:
         return _notdiamond_patcher
 

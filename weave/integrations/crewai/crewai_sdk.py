@@ -82,7 +82,7 @@ def get_crewai_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _crewai_patcher
+    global _crewai_patcher  # noqa: PLW0603
     if _crewai_patcher is not None:
         return _crewai_patcher
 

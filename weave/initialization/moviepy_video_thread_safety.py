@@ -44,7 +44,7 @@ def apply_threadsafe_patch_to_moviepy_video() -> None:
     Note: This function now defers patching until MoviePy is actually imported to avoid
     forcing the import of MoviePy at module initialization time.
     """
-    global _patched
+    global _patched  # noqa: PLW0603
 
     if _patched:
         return
@@ -75,7 +75,7 @@ def _apply_threadsafe_patch() -> None:
     """
     from moviepy.editor import VideoFileClip
 
-    global _original_methods
+    global _original_methods  # noqa: PLW0602
 
     # Store original methods
     _original_methods["__init__"] = VideoFileClip.__init__
@@ -119,7 +119,7 @@ def undo_threadsafe_patch_to_moviepy_video() -> None:
     This function is idempotent - if the patch hasn't been applied, this function does nothing.
     If the patch has been applied but can't be reverted, an error message is printed.
     """
-    global _patched
+    global _patched  # noqa: PLW0603
 
     if not _patched:
         return
@@ -145,7 +145,7 @@ def _undo_threadsafe_patch() -> None:
     """
     from moviepy.editor import VideoFileClip
 
-    global _original_methods
+    global _original_methods  # noqa: PLW0603
 
     if _original_methods["__init__"] is not None:
         VideoFileClip.__init__ = _original_methods["__init__"]  # type: ignore
@@ -173,7 +173,7 @@ class MoviePyPatchHook(MetaPathFinder):
             sys.meta_path.remove(self)
 
         # Apply the thread-safety patch
-        global _patched
+        global _patched  # noqa: PLW0603
         if _patched:
             return None
         try:

@@ -52,6 +52,8 @@ This project uses `uv` for dependency management. Dependencies are organized int
 - Do NOT use bare `python -m pytest` — the `python` on PATH may be from a uv cache, not the project `.venv`. Always use `uv run`.
 - Do NOT use `--extra test` — `test` is a dependency-group, not an optional-dependency. Use `--group test`.
 - `ruff` is not installed in any project dependency group. Use `uvx ruff` to run it.
+- Ruff now enforces `PLW` rules. `PLW0602`, `PLW0603`, `PLW1641`, and `PLW3201` are handled with spot-level inline `# noqa` on specific lines (not global/per-file ignore). Prefer fixing code first; if intentional, suppress only the exact line.
+- Be careful with `PLW1514` autofixes on serialization-sensitive code (`weave/type_handlers/Content/content.py`, `weave/type_handlers/Audio/audio.py`) and mocked file I/O (`weave/trace_server/costs/update_costs.py`): adding `encoding=` changed behavior/tests, so these files are explicitly ignored for that rule.
 
 ### Codex Development (nox)
 
@@ -156,6 +158,16 @@ If you encounter an error like `Can not specify both --no-color and --force-colo
 
 ```bash
 unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=sqlite
+```
+
+**Pre-commit stashing behavior:**
+`nox --no-install -e lint` runs `pre-commit`, and pre-commit stashes unstaged changes before running hooks. If you need to validate a fix to one file (for example with `--mypy-only`), stage that file first or run the checker directly, otherwise hooks may run against older content.
+
+**Markdown serialization and MTSAAS env:**
+`weave/type_handlers/Markdown/markdown.py` only stores large markdown payloads in `markup.md` when `is_mtsaas()` is true. If local `WANDB_BASE_URL`/`WF_TRACE_SERVER_URL` differs from CI defaults, `test_serialization_correctness[markdown]` may fail locally with inline markup differences. For CI-like behavior, set:
+
+```bash
+WF_TRACE_SERVER_URL=https://trace.wandb.ai nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/data_serialization/test_serialization_correctness.py::test_serialization_correctness[markdown] --trace-server=sqlite
 ```
 
 #### Reinstalling Dependencies

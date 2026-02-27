@@ -25,7 +25,7 @@ def websocket_wrapper(original_class: Any) -> Callable:
 def get_openai_realtime_patcher(
     settings: autopatch.IntegrationSettings | None = None,
 ) -> MultiPatcher:
-    global _openai_realtime_patcher
+    global _openai_realtime_patcher  # noqa: PLW0603
 
     if _openai_realtime_patcher is not None:
         return _openai_realtime_patcher

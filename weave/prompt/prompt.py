@@ -471,7 +471,7 @@ class EasyPrompt(UserList, Prompt):
         """Return a single prompt string when str() is called on the object."""
         return self.as_str
 
-    def _repr_pretty_(self, p: Any, cycle: bool) -> None:
+    def _repr_pretty_(self, p: Any, cycle: bool) -> None:  # noqa: PLW3201
         """Show a nicely formatted table in ipython."""
         if cycle:
             p.text("Prompt(...)")

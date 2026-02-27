@@ -180,7 +180,7 @@ def get_nvidia_ai_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _lc_nvidia_patcher
+    global _lc_nvidia_patcher  # noqa: PLW0603
     if _lc_nvidia_patcher is not None:
         return _lc_nvidia_patcher
 

@@ -12,7 +12,7 @@ from weave.shared.pydantic_util import pydantic_asdict_one_level
 from weave.trace.op import is_op
 
 
-class ObjectRecord:
+class ObjectRecord:  # noqa: PLW1641
     _class_name: str
     _bases: list[str]
 

@@ -16,7 +16,7 @@ class WeaveInitError(Exception): ...
 
 
 def set_weave_client_global(client: WeaveClient | None) -> None:
-    global _global_weave_client
+    global _global_weave_client  # noqa: PLW0603
 
     # These outer guards are to avoid expensive lock acquisition
     if client is not None and _global_weave_client is None:

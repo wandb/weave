@@ -734,7 +734,7 @@ def get_openai_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _openai_patcher
+    global _openai_patcher  # noqa: PLW0603
     if _openai_patcher is not None:
         return _openai_patcher
 

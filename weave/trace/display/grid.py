@@ -192,7 +192,7 @@ class Row:
         else:
             raise TypeError("Key must be string or integer")
 
-    def _repr_pretty_(self, p: Any, cycle: bool) -> None:
+    def _repr_pretty_(self, p: Any, cycle: bool) -> None:  # noqa: PLW3201
         """Pretty representation for IPython."""
         if cycle:
             p.text("Row(...)")
@@ -304,7 +304,7 @@ class Column:
         table = self.to_rich_table()
         return pydantic_util.table_to_str(table)
 
-    def _repr_pretty_(self, p: Any, cycle: bool) -> None:
+    def _repr_pretty_(self, p: Any, cycle: bool) -> None:  # noqa: PLW3201
         """Show a nicely formatted table in ipython."""
         if cycle:
             p.text("Column(...)")
@@ -540,7 +540,7 @@ class Grid:
 
         return table
 
-    def _repr_pretty_(self, p: Any, cycle: bool) -> None:
+    def _repr_pretty_(self, p: Any, cycle: bool) -> None:  # noqa: PLW3201
         """Show a nicely formatted table in ipython."""
         if cycle:
             p.text("Grid(...)")

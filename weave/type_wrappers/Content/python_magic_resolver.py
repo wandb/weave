@@ -26,7 +26,7 @@ _thread_local = threading.local()
 
 def _check_availability() -> tuple[bool, bool]:
     """One-time check for python-magic availability."""
-    global _magic_available, _magic_has_extension
+    global _magic_available, _magic_has_extension  # noqa: PLW0603
     if _magic_available is not None:
         return _magic_available, _magic_has_extension
     try:

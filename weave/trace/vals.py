@@ -220,7 +220,7 @@ def attribute_access_result(
     )
 
 
-class WeaveObject(Traceable):
+class WeaveObject(Traceable):  # noqa: PLW1641
     def __init__(
         self,
         val: Any,
@@ -294,7 +294,7 @@ class WeaveObject(Traceable):
         return unwrap(self._val)
 
 
-class WeaveTable(Traceable):
+class WeaveTable(Traceable):  # noqa: PLW1641
     filter: TableRowFilter | None = None
     _known_length: int | None = None
     _rows: Sequence[dict] | None = None
@@ -582,7 +582,7 @@ class WeaveTable(Traceable):
         return unwrap(list(self.rows))
 
 
-class WeaveList(Traceable, list):
+class WeaveList(Traceable, list):  # noqa: PLW1641
     def __init__(
         self,
         *args: Any,
@@ -661,7 +661,7 @@ class WeaveList(Traceable, list):
         return unwrap(list(self))
 
 
-class WeaveDict(Traceable, dict):
+class WeaveDict(Traceable, dict):  # noqa: PLW1641
     def __init__(
         self,
         *args: Any,

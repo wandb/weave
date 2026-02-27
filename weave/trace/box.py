@@ -29,7 +29,7 @@ class BoxedStr(str):
     ref: Ref | None = None
 
 
-class BoxedDatetime(datetime.datetime):
+class BoxedDatetime(datetime.datetime):  # noqa: PLW1641
     ref: Ref | None = None
 
     def __eq__(self, other: Any) -> bool:
@@ -39,7 +39,7 @@ class BoxedDatetime(datetime.datetime):
         )
 
 
-class BoxedTimedelta(datetime.timedelta):
+class BoxedTimedelta(datetime.timedelta):  # noqa: PLW1641
     ref: Ref | None = None
 
     def __eq__(self, other: Any) -> bool:

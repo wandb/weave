@@ -516,7 +516,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         )
 
 
-class MatchAnyDatetime:
+class MatchAnyDatetime:  # noqa: PLW1641
     def __eq__(self, other):
         return isinstance(other, datetime.datetime)
 
