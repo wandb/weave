@@ -109,16 +109,25 @@ def get_info_loglines(
 def capture_output(callbacks: list[Callable[[], None]]):
     captured_logs = io.StringIO()
 
-    # Store original stdout and logging handlers
+    # Store original logging configuration
     old_handlers = logging.getLogger().handlers[:]
+    old_level = logging.getLogger().level
+    weave_logger = logging.getLogger("weave")
+    old_weave_handlers = weave_logger.handlers[:]
+    old_weave_level = weave_logger.level
+    old_weave_propagate = weave_logger.propagate
 
     # Create a new handler for capturing logs
     log_handler = logging.StreamHandler(captured_logs)
     log_handler.setFormatter(logging.Formatter("%(message)s"))
 
-    # Replace stdout and logging handlers
+    # Capture both root and weave-prefixed logger output for deterministic tests.
     root_logger = logging.getLogger()
     root_logger.handlers = [log_handler]
+    root_logger.setLevel(logging.INFO)
+    weave_logger.handlers = [log_handler]
+    weave_logger.setLevel(logging.INFO)
+    weave_logger.propagate = False
 
     try:
         yield captured_logs
@@ -128,6 +137,10 @@ def capture_output(callbacks: list[Callable[[], None]]):
         for callback in callbacks:
             callback()
         root_logger.handlers = old_handlers
+        root_logger.setLevel(old_level)
+        weave_logger.handlers = old_weave_handlers
+        weave_logger.setLevel(old_weave_level)
+        weave_logger.propagate = old_weave_propagate
 
 
 def flushing_callback(client):
@@ -136,22 +149,3 @@ def flushing_callback(client):
         time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
 
     return _callback
-
-
-def flush_until_output_contains(
-    client,
-    captured_logs: io.StringIO,
-    expected_text: str,
-    max_attempts: int = 50,
-    sleep_interval_s: float = 0.01,
-) -> None:
-    for _ in range(max_attempts):
-        client.flush()
-        if expected_text in captured_logs.getvalue():
-            return
-        time.sleep(sleep_interval_s)
-
-    raise AssertionError(
-        f"Timed out waiting for output text after {max_attempts} attempts: "
-        f"{expected_text!r}. Captured logs: {captured_logs.getvalue()!r}"
-    )

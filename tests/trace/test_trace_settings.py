@@ -8,11 +8,7 @@ import pytest
 import tenacity
 
 import weave
-from tests.trace.util import (
-    capture_output,
-    flush_until_output_contains,
-    flushing_callback,
-)
+from tests.trace.util import capture_output, flushing_callback
 from weave.trace.constants import TRACE_CALL_EMOJI, TRACE_OBJECT_EMOJI
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import get_parallelism_settings
@@ -118,7 +114,11 @@ def test_print_call_link_setting(client_creator):
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
-            flush_until_output_contains(client, captured, TRACE_CALL_EMOJI)
+            for _ in range(50):
+                client.flush()
+                if TRACE_CALL_EMOJI in captured.getvalue():
+                    break
+                time.sleep(0.01)
     assert TRACE_CALL_EMOJI in captured.getvalue()
 
 
@@ -135,7 +135,11 @@ def test_print_call_link_env(client):
     callbacks = [flushing_callback(client)]
     with capture_output(callbacks) as captured:
         func()
-        flush_until_output_contains(client, captured, TRACE_CALL_EMOJI)
+        for _ in range(50):
+            client.flush()
+            if TRACE_CALL_EMOJI in captured.getvalue():
+                break
+            time.sleep(0.01)
 
     assert TRACE_CALL_EMOJI in captured.getvalue()
 
