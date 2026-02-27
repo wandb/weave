@@ -312,6 +312,7 @@ exclude = ["rules"]
 "!/tests/**/*.py" = ["RUF059"]
 "weave/trace/serialization/op_type.py" = ["RUF100", "N802"]
 "weave/trace_server/costs/update_costs.py" = ["PLW1514"]
+"weave/type_handlers/Video/video.py" = ["PLW0603"]
 "weave/type_handlers/Audio/audio.py" = ["PLW1514"]
 "weave/type_handlers/Content/content.py" = ["PLW1514"]
 
