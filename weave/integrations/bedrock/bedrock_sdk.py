@@ -104,7 +104,7 @@ def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
     """
     try:
         aws_region_name = os.environ.get("AWS_REGION_NAME")
-        profile_id = profile_arn.split("/")[-1]
+        profile_id = profile_arn.rsplit("/", maxsplit=1)[-1]
         bedrock_client = boto3.client("bedrock", region_name=aws_region_name)
 
         response = bedrock_client.get_inference_profile(
@@ -120,7 +120,7 @@ def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
         return model_id  # noqa: TRY300
     except Exception:
         # Fallback to simple inference profile if the application inference profile format fails
-        model_part = profile_arn.split("/")[-1]
+        model_part = profile_arn.rsplit("/", maxsplit=1)[-1]
         model_name = re.sub(r"^[a-z]{2}\.", "", model_part)
         return model_name
 

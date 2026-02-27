@@ -7,7 +7,7 @@ from collections.abc import Iterable, Iterator
 from typing import Any
 
 from weave.trace import util
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import weave_client_context
 from weave.trace.display import display
 from weave.trace.display.rich import pydantic_util
 from weave.trace.display.rich.container import AbstractRichContainer

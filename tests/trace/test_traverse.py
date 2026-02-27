@@ -114,8 +114,8 @@ class TestObjectPathDunderMethods:
 
 class TestObjectPathComparePaths:
     def test_simple_cases(self) -> None:
-        assert ObjectPath(["foo"]).__eq__(42) is NotImplemented
-        assert ObjectPath(["foo"]).__ne__(42) is NotImplemented
+        assert ObjectPath(["foo"]).__eq__(42) is NotImplemented  # noqa: PLC2801
+        assert ObjectPath(["foo"]).__ne__(42) is NotImplemented  # noqa: PLC2801
         assert ObjectPath(["foo"]) == ObjectPath(["foo"])
         assert ObjectPath(["foo"]) != ObjectPath(["foo", 42])
         assert ObjectPath(["foo", 10]) == ObjectPath(["foo", 10])

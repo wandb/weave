@@ -262,6 +262,7 @@ select = [
   "PT018",   # https://docs.astral.sh/ruff/rules/pytest-composite-assertion/
   "PT022",   # https://docs.astral.sh/ruff/rules/pytest-useless-yield-fixture/
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
+  "PLC",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "PLW",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
@@ -290,6 +291,12 @@ ignore = [
   "D417",
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
+  # Existing code intentionally uses many lazy imports and private symbols;
+  # keep these disabled until we do a dedicated cleanup.
+  "PLC0415", # https://docs.astral.sh/ruff/rules/import-outside-top-level/
+  "PLC2701", # https://docs.astral.sh/ruff/rules/import-private-name/
+  # Keep explicit empty-string checks for readability in tests and parsing paths.
+  "PLC1901", # https://docs.astral.sh/ruff/rules/compare-to-empty-string/
 ]
 
 [tool.ruff.lint.isort]
