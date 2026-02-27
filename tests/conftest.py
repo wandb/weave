@@ -203,16 +203,6 @@ class InMemoryWeaveLogCollector(logging.Handler):
             for record in logs
             if record.levelname == levelname
             and record.name.startswith("weave")
-            # (Tim) For some reason that i cannot figure out, there is some test that
-            # a) is trying to connect to the PROD trace server
-            # b) seemingly doesn't fail
-            # c) Logs these errors.
-            # I would love to fix this, but I have not been able to pin down which test
-            # is causing it and need to ship this PR, so I am just going to filter it out
-            # for now.
-            and not record.msg.startswith(
-                "Task failed: HTTPError: 400 Client Error: Bad Request for url: https://trace.wandb.ai/"
-            )
             # Exclude legacy
             and not record.name.startswith("weave.weave_server")
             and "legacy" not in record.name
