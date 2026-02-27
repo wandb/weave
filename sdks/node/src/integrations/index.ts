@@ -1,4 +1,5 @@
 export {wrapOpenAI} from './openai';
+export {wrapGoogleGenAI} from './googleGenAI';
 export {
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
