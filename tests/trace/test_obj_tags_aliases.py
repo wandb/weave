@@ -897,6 +897,136 @@ def test_tag_deduplication():
     assert req.tags == ["a", "b"]
 
 
+# --- List endpoints ---
+
+
+def test_tags_list_empty_project(client: WeaveClient):
+    """Empty project returns empty list."""
+    res = client.server.tags_list(tsi.TagsListReq(project_id=client._project_id()))
+    assert res.tags == []
+
+
+def test_tags_list_returns_distinct(client: WeaveClient):
+    """Multiple objects with overlapping tags returns deduplicated sorted list."""
+    oid1, d1 = _publish_obj(client, "tl_obj1")
+    oid2, d2 = _publish_obj(client, "tl_obj2")
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=oid1,
+            digest=d1,
+            tags=["beta", "alpha"],
+        )
+    )
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=oid2,
+            digest=d2,
+            tags=["alpha", "gamma"],
+        )
+    )
+
+    res = client.server.tags_list(tsi.TagsListReq(project_id=client._project_id()))
+    assert res.tags == ["alpha", "beta", "gamma"]
+
+
+def test_tags_list_excludes_removed(client: WeaveClient):
+    """Removed tags don't appear in the list."""
+    oid, d = _publish_obj(client, "tl_rm_obj")
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=oid,
+            digest=d,
+            tags=["keep", "remove-me"],
+        )
+    )
+    client.server.obj_remove_tags(
+        tsi.ObjRemoveTagsReq(
+            project_id=client._project_id(),
+            object_id=oid,
+            digest=d,
+            tags=["remove-me"],
+        )
+    )
+
+    res = client.server.tags_list(tsi.TagsListReq(project_id=client._project_id()))
+    assert res.tags == ["keep"]
+
+
+def test_aliases_list_empty_project(client: WeaveClient):
+    """Empty project returns empty list."""
+    res = client.server.aliases_list(
+        tsi.AliasesListReq(project_id=client._project_id())
+    )
+    assert res.aliases == []
+
+
+def test_aliases_list_returns_distinct(client: WeaveClient):
+    """Returns deduplicated sorted aliases."""
+    oid1, d1 = _publish_obj(client, "al_obj1")
+    oid2, d2 = _publish_obj(client, "al_obj2")
+
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=oid1,
+            digest=d1,
+            alias="production",
+        )
+    )
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=oid2,
+            digest=d2,
+            alias="canary",
+        )
+    )
+
+    res = client.server.aliases_list(
+        tsi.AliasesListReq(project_id=client._project_id())
+    )
+    assert res.aliases == ["canary", "production"]
+
+
+def test_aliases_list_excludes_removed(client: WeaveClient):
+    """Removed aliases don't appear in the list."""
+    oid, d = _publish_obj(client, "al_rm_obj")
+
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=oid,
+            digest=d,
+            alias="keep-alias",
+        )
+    )
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=oid,
+            digest=d,
+            alias="remove-alias",
+        )
+    )
+    client.server.obj_remove_alias(
+        tsi.ObjRemoveAliasReq(
+            project_id=client._project_id(),
+            object_id=oid,
+            alias="remove-alias",
+        )
+    )
+
+    res = client.server.aliases_list(
+        tsi.AliasesListReq(project_id=client._project_id())
+    )
+    assert res.aliases == ["keep-alias"]
+
+
 def test_tag_version_like_accepted():
     """Version-like names (v0, v1, ...) are accepted for tags (only reserved for aliases)."""
     tsi.ObjAddTagsReq(
