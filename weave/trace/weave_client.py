@@ -1179,13 +1179,16 @@ class WeaveClient:
         )
         return result.num_deleted
 
-    def add_tags(self, obj_ref: ObjectRef, tags: list[str]) -> None:
+    def add_tags(self, obj_ref: str | ObjectRef, tags: list[str]) -> None:
         """Add tags to an object version.
 
         Args:
-            obj_ref: Reference to the object version.
+            obj_ref: Reference to the object version, either an ObjectRef or a
+                weave:/// URI string.
             tags: List of tag strings to add.
         """
+        if isinstance(obj_ref, str):
+            obj_ref = ObjectRef.parse_uri(obj_ref)
         self.server.obj_add_tags(
             ObjAddTagsReq(
                 project_id=self._project_id(),
@@ -1195,13 +1198,16 @@ class WeaveClient:
             )
         )
 
-    def remove_tags(self, obj_ref: ObjectRef, tags: list[str]) -> None:
+    def remove_tags(self, obj_ref: str | ObjectRef, tags: list[str]) -> None:
         """Remove tags from an object version.
 
         Args:
-            obj_ref: Reference to the object version.
+            obj_ref: Reference to the object version, either an ObjectRef or a
+                weave:/// URI string.
             tags: List of tag strings to remove.
         """
+        if isinstance(obj_ref, str):
+            obj_ref = ObjectRef.parse_uri(obj_ref)
         self.server.obj_remove_tags(
             ObjRemoveTagsReq(
                 project_id=self._project_id(),
@@ -1211,13 +1217,16 @@ class WeaveClient:
             )
         )
 
-    def set_alias(self, obj_ref: ObjectRef, alias: str) -> None:
+    def set_alias(self, obj_ref: str | ObjectRef, alias: str) -> None:
         """Set an alias for an object version.
 
         Args:
-            obj_ref: Reference to the object version.
+            obj_ref: Reference to the object version, either an ObjectRef or a
+                weave:/// URI string.
             alias: The alias name to set (e.g., "production", "staging").
         """
+        if isinstance(obj_ref, str):
+            obj_ref = ObjectRef.parse_uri(obj_ref)
         self.server.obj_set_alias(
             ObjSetAliasReq(
                 project_id=self._project_id(),

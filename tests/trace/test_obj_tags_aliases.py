@@ -1115,6 +1115,35 @@ def test_sdk_list_aliases(client: WeaveClient):
     assert "my-alias" in aliases
 
 
+def test_sdk_string_ref(client: WeaveClient):
+    """add_tags, remove_tags, and set_alias accept string URIs."""
+    ref = weave.publish({"data": "test"}, name="sdk_str_ref_obj")
+    uri = ref.uri()
+
+    client.add_tags(uri, ["from-string"])
+    client.set_alias(uri, "str-alias")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "from-string" in res.objs[0].tags
+    assert "str-alias" in res.objs[0].aliases
+
+    client.remove_tags(uri, ["from-string"])
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "from-string" not in res.objs[0].tags
+
+
 def test_tag_version_like_accepted():
     """Version-like names (v0, v1, ...) are accepted for tags (only reserved for aliases)."""
     tsi.ObjAddTagsReq(
