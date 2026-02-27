@@ -40,6 +40,7 @@ from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
+from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.feedback import FeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -853,6 +854,8 @@ class WeaveClient:
 
                 return True
             except Exception:
+                if get_raise_on_captured_errors():
+                    raise
                 return False
 
         def on_complete(f: Future) -> None:
@@ -1491,6 +1494,8 @@ class WeaveClient:
                     runnable_ref_uri=runnable_ref_uri,
                 )
             except Exception:
+                if get_raise_on_captured_errors():
+                    raise
                 return ""
 
         return self.future_executor.defer(send_score_call)

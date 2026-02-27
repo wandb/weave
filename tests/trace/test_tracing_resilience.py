@@ -14,6 +14,7 @@ from tests.trace.util import DummyTestException
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.op import _add_accumulator
+from weave.trace import weave_client as weave_client_module
 
 
 def assert_no_current_call():
@@ -76,6 +77,70 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
         "Task failed: DummyTestException: ('FAILURE - file_create": 1,
         "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
     }
+
+
+@pytest.mark.disable_logging_error_check
+def test_raise_on_captured_errors_surfaces_call_start_background_errors(
+    client, monkeypatch
+):
+    class FailingCallProcessor:
+        def enqueue_start(self, *args, **kwargs):
+            raise DummyTestException("FAILURE - call_start")
+
+    monkeypatch.setattr(
+        weave_client_module,
+        "_get_call_processor",
+        lambda _server: FailingCallProcessor(),
+    )
+
+    @weave.op
+    def simple_op():
+        return "hello"
+
+    client.set_autoflush(False)
+    try:
+        with raise_on_captured_errors(True):
+            assert simple_op() == "hello"
+            with pytest.raises(DummyTestException, match="FAILURE - call_start"):
+                client.flush()
+    finally:
+        client.set_autoflush(True)
+
+    assert_no_current_call()
+
+
+@pytest.mark.disable_logging_error_check
+def test_raise_on_captured_errors_surfaces_score_feedback_background_errors(
+    client, monkeypatch
+):
+    @weave.op
+    def my_op(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def my_score(input_x: int, model_output: int):
+        return {"in_range": input_x < model_output}
+
+    def fail_add_runnable_feedback(*args, **kwargs):
+        raise DummyTestException("FAILURE - feedback_create")
+
+    monkeypatch.setattr(client, "_add_runnable_feedback", fail_add_runnable_feedback)
+
+    client.set_autoflush(False)
+    try:
+        call_res, call = my_op.call(1)
+        assert call_res == 2
+        score_res, score_call = my_score.call(1, call_res)
+        assert score_res == {"in_range": True}
+
+        with raise_on_captured_errors(True):
+            client._send_score_call(call, score_call)
+            with pytest.raises(DummyTestException, match="FAILURE - feedback_create"):
+                client.flush()
+    finally:
+        client.set_autoflush(True)
+
+    assert_no_current_call()
 
 
 @pytest.mark.disable_logging_error_check

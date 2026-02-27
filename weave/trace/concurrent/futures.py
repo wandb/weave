@@ -121,8 +121,7 @@ class FutureExecutor:
             with self._active_futures_lock:
                 self._active_futures.discard(fut)
                 if exception := fut.exception():
-                    if get_raise_on_captured_errors():
-                        self._pending_raise_exception = exception
+                    self._pending_raise_exception = exception
 
         with self._active_futures_lock:
             self._active_futures.add(result_future)
@@ -227,8 +226,7 @@ class FutureExecutor:
 
             if exception := future.exception():
                 logger.error(f"Task failed: {_format_exception(exception)}")
-                if get_raise_on_captured_errors():
-                    self._pending_raise_exception = exception
+                self._pending_raise_exception = exception
 
     def _pop_pending_raise_exception(self) -> BaseException | None:
         with self._active_futures_lock:
