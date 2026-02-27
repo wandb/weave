@@ -11,7 +11,12 @@ import weave
 from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
 from weave.trace.op_protocol import Op, OpKind
-from weave.trace.serialization.serialize import is_primitive, stringify
+from weave.trace.serialization.serialize import (
+    DEFAULT_MAX_DICTIFY_DEPTH,
+    NO_MAX_DICTIFY_DEPTH,
+    is_primitive,
+    stringify,
+)
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
@@ -146,7 +151,10 @@ def get_op_name_for_callback(instance: Any, inputs: dict[str, Any]) -> str:
 
 
 def dictify(
-    obj: Any, maxdepth: int = 0, depth: int = 1, seen: set[int] | None = None
+    obj: Any,
+    maxdepth: int = DEFAULT_MAX_DICTIFY_DEPTH,
+    depth: int = 1,
+    seen: set[int] | None = None,
 ) -> Any:
     """Recursively compute a dictionary representation of an object."""
     if seen is None:
@@ -163,7 +171,7 @@ def dictify(
         else:
             seen.add(obj_id)
 
-    if maxdepth > 0 and depth > maxdepth:
+    if maxdepth != NO_MAX_DICTIFY_DEPTH and depth > maxdepth:
         # TODO: If obj at this point is a simple type,
         #       maybe we should just return it rather than stringify
         return stringify(obj)
@@ -191,7 +199,7 @@ def dictify(
                     k = k.__name__ if isinstance(k, type) else k
                     if isinstance(k, str) and should_redact(k):
                         to_dict_result[k] = REDACTED_VALUE
-                    elif maxdepth == 0 or depth < maxdepth:
+                    elif maxdepth == NO_MAX_DICTIFY_DEPTH or depth < maxdepth:
                         to_dict_result[k] = dictify(v, maxdepth, depth + 1)
                     else:
                         to_dict_result[k] = stringify(v)
@@ -228,7 +236,7 @@ def dictify(
                 val = getattr(obj, attr)
                 if callable(val):
                     continue
-                if maxdepth == 0 or depth < maxdepth:
+                if maxdepth == NO_MAX_DICTIFY_DEPTH or depth < maxdepth:
                     result[attr] = dictify(val, maxdepth, depth + 1, seen)
                 else:
                     result[attr] = stringify(val)
