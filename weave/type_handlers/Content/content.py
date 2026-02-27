@@ -30,7 +30,7 @@ def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Content:
 
     metadata_path = artifact.path("metadata.json")
 
-    with open(metadata_path, encoding="utf-8") as f:
+    with open(metadata_path) as f:
         metadata: ResolvedContentArgsWithoutData = json.load(f)
 
     with open(artifact.path("content"), "rb") as f:
