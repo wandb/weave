@@ -8,7 +8,7 @@ from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from weave.trace import urls
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op_protocol import Op

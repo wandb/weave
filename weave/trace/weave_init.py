@@ -7,7 +7,7 @@ from json import JSONDecodeError
 from weave.compat import wandb
 from weave.telemetry import trace_sentry
 from weave.trace import env, init_message, weave_client
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import weave_client_context
 from weave.trace.settings import (
     should_redact_pii,
     should_use_stainless_server,

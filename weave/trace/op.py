@@ -35,8 +35,7 @@ from typing import (
 from typing_extensions import ParamSpec, TypeIs, Unpack
 
 from weave.trace import box, settings
-from weave.trace.context import call_context
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import (
     call_attributes,
     get_tracing_enabled,

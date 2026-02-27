@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable
 
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import weave_client_context
 from weave.trace.display import display
 from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.refs import AnyRef, CallRef, Ref

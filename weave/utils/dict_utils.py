@@ -106,8 +106,8 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
             result[k] = sum(values)
 
     # Then recursively sum each collection of nested dictionaries
-    for k in nested_dicts.keys():
-        result[k] = sum_dict_leaves(nested_dicts[k])
+    for k, nested_values in nested_dicts.items():
+        result[k] = sum_dict_leaves(nested_values)
 
     return convert_defaultdict_to_dict(result)
 
