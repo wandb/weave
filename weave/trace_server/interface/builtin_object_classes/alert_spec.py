@@ -53,6 +53,21 @@ class WeaveMetricThresholdSpec(BaseModel):
         "Disambiguates scorers that share the same op class (e.g. multiple LLMAsAJudgeScorer instances). "
         "Filterable via inputs.self on scorer calls or input_refs on CallsFilter.",
     )
+    source_type: Literal["op", "monitor", "feedback"] | None = Field(
+        default=None,
+        description="Data source type for the alert. None or 'op' means call-based, "
+        "'monitor' means monitor-based, 'feedback' means feedback-based.",
+    )
+    feedback_type_filter: str | None = Field(
+        default=None,
+        description="Feedback type to filter on (e.g. 'wandb.runnable.my_scorer'). "
+        "Required when source_type='feedback'.",
+    )
+    aggregation_mode: Literal["per_trace", "all"] | None = Field(
+        default=None,
+        description="How to aggregate feedback metrics. 'per_trace' groups by trace_id, "
+        "'all' considers all matching feedback. Required when source_type='feedback'.",
+    )
 
 
 class AlertSpec(base_object_def.BaseObject):

@@ -124,6 +124,7 @@ from weave.trace_server.feedback import (
     format_feedback_to_res,
     format_feedback_to_row,
     process_feedback_payload,
+    resolve_trace_id_from_weave_ref,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -5318,7 +5319,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         validate_feedback_create_req(req, self)
 
         processed_payload = process_feedback_payload(req)
-        row = format_feedback_to_row(req, processed_payload)
+        trace_id = resolve_trace_id_from_weave_ref(
+            req.weave_ref, self, req.project_id
+        )
+        row = format_feedback_to_row(req, processed_payload, trace_id=trace_id)
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
         self._insert(
             TABLE_FEEDBACK.name,
@@ -5345,7 +5349,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             validate_feedback_create_req(feedback_req, self)
 
             processed_payload = process_feedback_payload(feedback_req)
-            row = format_feedback_to_row(feedback_req, processed_payload)
+            trace_id = resolve_trace_id_from_weave_ref(
+                feedback_req.weave_ref, self, feedback_req.project_id
+            )
+            row = format_feedback_to_row(
+                feedback_req, processed_payload, trace_id=trace_id
+            )
             rows_to_insert.append(row)
             results.append(format_feedback_to_res(row))
 
