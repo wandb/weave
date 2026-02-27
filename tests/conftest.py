@@ -17,7 +17,7 @@ from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
-from weave.trace.context import weave_client_context
+from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.caching_middleware_trace_server import (
@@ -361,13 +361,21 @@ def create_client(
 
 
 @pytest.fixture
-def zero_stack():
+def clear_call_stack():
+    assert call_context.get_call_stack() == [], (
+        "Call stack must be empty at test start. "
+        "A previous test likely leaked call-context state."
+    )
     with set_call_stack([]):
         yield
+        assert call_context.get_call_stack() == [], (
+            "Call stack must be empty at test end. "
+            "This test leaked call-context state."
+        )
 
 
 @pytest.fixture
-def client(zero_stack, request, trace_server, caching_client_isolation):
+def client(clear_call_stack, request, trace_server, caching_client_isolation):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality.
 
@@ -387,7 +395,7 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
 
 
 @pytest.fixture
-def client_creator(zero_stack, request, trace_server, caching_client_isolation):
+def client_creator(clear_call_stack, request, trace_server, caching_client_isolation):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first).
 
     Note: caching_client_isolation is explicitly depended on to ensure the cache
