@@ -261,30 +261,24 @@ class ObjectMetadataQueryBuilder:
         t = self._main_table_alias
         non_latest = [a for a in aliases if a != "latest"]
         has_latest = "latest" in aliases
-        if non_latest and has_latest:
-            self._conditions.append(f"""
-                (is_latest = 1 OR ({t}.project_id, {t}.object_id) IN (
-                    SELECT project_id, object_id
+        alias_subquery = f"""({t}.project_id, {t}.object_id, {t}.digest) IN (
+                    SELECT project_id, object_id, argMax(digest, created_at) AS digest
                     FROM aliases
                     PREWHERE project_id = {{project_id: String}}
                     WHERE alias IN {{filter_aliases: Array(String)}}
                     GROUP BY project_id, object_id, alias
                     HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
-                ))
+                )"""
+        if non_latest and has_latest:
+            self._conditions.append(f"""
+                (is_latest = 1 OR {alias_subquery})
             """)
             self.parameters["filter_aliases"] = non_latest
         elif has_latest:
             self._conditions.append("is_latest = 1")
         else:
             self._conditions.append(f"""
-                ({t}.project_id, {t}.object_id) IN (
-                    SELECT project_id, object_id
-                    FROM aliases
-                    PREWHERE project_id = {{project_id: String}}
-                    WHERE alias IN {{filter_aliases: Array(String)}}
-                    GROUP BY project_id, object_id, alias
-                    HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
-                )
+                {alias_subquery}
             """)
             self.parameters["filter_aliases"] = non_latest
 

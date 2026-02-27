@@ -399,6 +399,46 @@ def test_objs_query_filter_by_aliases(client: WeaveClient):
     assert res.objs[0].object_id == object_id
 
 
+def test_objs_query_filter_by_alias_returns_only_aliased_version(client: WeaveClient):
+    """Filtering by alias should return only the specific version the alias points to,
+    not all versions of the object.
+    """
+    weave.publish({"v": 0}, name="alias_version_filter")
+    weave.publish({"v": 1}, name="alias_version_filter")
+    weave.publish({"v": 2}, name="alias_version_filter")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=["alias_version_filter"]),
+            sort_by=[tsi.SortBy(field="created_at", direction="asc")],
+        )
+    )
+    assert len(res.objs) == 3
+    v1 = res.objs[1]  # middle version
+
+    # Alias only v1
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=v1.object_id,
+            digest=v1.digest,
+            alias="pinned",
+        )
+    )
+
+    # Filter by alias — should return only v1, not all 3 versions
+    filtered = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(aliases=["pinned"]),
+        )
+    )
+    assert len(filtered.objs) == 1
+    assert filtered.objs[0].digest == v1.digest
+    assert filtered.objs[0].version_index == 1
+
+
 # --- Alias resolution in obj_read ---
 
 

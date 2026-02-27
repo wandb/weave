@@ -61,6 +61,21 @@ def test_add_aliases_condition():
     assert "aliases" in query
     assert "filter_aliases" in query
     assert builder.parameters["filter_aliases"] == ["production", "canary"]
+    # Alias filter should be version-specific (include digest)
+    assert "main.digest" in query.replace(" ", "").replace("\n", "")
+
+
+def test_add_aliases_condition_with_latest():
+    """Filtering by both 'latest' and a real alias should OR them."""
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    builder.add_aliases_condition(["latest", "production"])
+
+    query = builder.conditions_part
+    assert "is_latest = 1" in query
+    assert "filter_aliases" in query
+    assert builder.parameters["filter_aliases"] == ["production"]
+    # The real alias branch should still filter by digest
+    assert "argMax(digest" in query
 
 
 def test_tags_condition_in_full_query():
