@@ -98,6 +98,7 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_runnable_ref_selector,
 )
 from weave.trace_server.trace_server_interface import (
+    AliasesListReq,
     CallEndReq,
     CallsDeleteReq,
     CallsFilter,
@@ -136,6 +137,7 @@ from weave.trace_server.trace_server_interface import (
     TableCreateRes,
     TableSchemaForInsert,
     TableUpdateReq,
+    TagsListReq,
     TraceServerInterface,
     TraceStatus,
 )
@@ -1239,6 +1241,16 @@ class WeaveClient:
                 alias=alias,
             )
         )
+
+    def list_tags(self) -> list[str]:
+        """List all distinct tags in the project."""
+        res = self.server.tags_list(TagsListReq(project_id=self._project_id()))
+        return res.tags
+
+    def list_aliases(self) -> list[str]:
+        """List all distinct aliases in the project."""
+        res = self.server.aliases_list(AliasesListReq(project_id=self._project_id()))
+        return res.aliases
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:

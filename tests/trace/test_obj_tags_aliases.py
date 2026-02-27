@@ -1095,6 +1095,26 @@ def test_aliases_list_excludes_removed(client: WeaveClient):
     assert res.aliases == ["keep-alias"]
 
 
+# --- SDK list_tags / list_aliases ---
+
+
+def test_sdk_list_tags(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_list_tags_obj")
+    client.add_tags(ref, ["zeta", "alpha"])
+
+    tags = client.list_tags()
+    assert "alpha" in tags
+    assert "zeta" in tags
+
+
+def test_sdk_list_aliases(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_list_aliases_obj")
+    client.set_alias(ref, "my-alias")
+
+    aliases = client.list_aliases()
+    assert "my-alias" in aliases
+
+
 def test_tag_version_like_accepted():
     """Version-like names (v0, v1, ...) are accepted for tags (only reserved for aliases)."""
     tsi.ObjAddTagsReq(

@@ -685,6 +685,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             "/obj/alias/remove", req, tsi.ObjRemoveAliasReq, tsi.ObjRemoveAliasRes
         )
 
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        return self._generic_request(
+            "/obj/tags/list", req, tsi.TagsListReq, tsi.TagsListRes
+        )
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        return self._generic_request(
+            "/obj/aliases/list", req, tsi.AliasesListReq, tsi.AliasesListRes
+        )
+
     @validate_call
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         return self._generic_request(
