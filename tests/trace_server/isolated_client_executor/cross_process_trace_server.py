@@ -268,6 +268,12 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         # This method has a different signature, so we need to create a payload
         raise NotImplementedError("ensure_project_exists is not implemented")
 
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        """Resolve external project IDs to internal IDs."""
+        return self._send_request("project_ids_external_to_internal", req)
+
     # Regular method implementations (reduced duplication)
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Export OTEL traces."""

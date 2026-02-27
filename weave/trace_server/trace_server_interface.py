@@ -1107,6 +1107,20 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
+class ProjectIdsExternalToInternalReq(BaseModelStrict):
+    project_ids: list[str] = Field(
+        description="External project IDs to resolve, each in 'entity/project' format.",
+        examples=[["entity-a/project-a", "entity-b/project-b"]],
+    )
+
+
+class ProjectIdsExternalToInternalRes(BaseModel):
+    project_id_map: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of internal project ID to external project ID.",
+    )
+
+
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
@@ -2453,6 +2467,11 @@ class TraceServerInterface(Protocol):
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
+
+    def project_ids_external_to_internal(
+        self, req: ProjectIdsExternalToInternalReq
+    ) -> ProjectIdsExternalToInternalRes:
+        raise NotImplementedError("project_ids_external_to_internal is not implemented")
 
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...

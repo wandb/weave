@@ -3,7 +3,9 @@ import pytest
 from tests.trace_server.conftest import get_trace_server_flag
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
+    b64,
 )
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -24,3 +26,18 @@ def test_skip_clickhouse_client(
 ):
     assert isinstance(trace_server, TestOnlyUserInjectingExternalTraceServer)
     assert get_trace_server_flag(request) != "clickhouse"
+
+
+def test_project_ids_external_to_internal_mapping(
+    trace_server: TestOnlyUserInjectingExternalTraceServer,
+):
+    req = tsi.ProjectIdsExternalToInternalReq(
+        project_ids=["shawn/project-a", "shawn/project-b", "shawn/project-a"]
+    )
+
+    res = trace_server.project_ids_external_to_internal(req)
+
+    assert res.project_id_map == {
+        b64("shawn/project-a"): "shawn/project-a",
+        b64("shawn/project-b"): "shawn/project-b",
+    }

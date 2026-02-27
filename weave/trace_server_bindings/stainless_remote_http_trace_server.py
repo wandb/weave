@@ -19,6 +19,7 @@ from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcesso
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
+    handle_response_error,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
     process_batch_with_retry,
@@ -29,6 +30,7 @@ from weave.trace_server_bindings.models import (
     ServerInfoRes,
     StartBatchItem,
 )
+from weave.utils import http_requests
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
@@ -420,6 +422,32 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._update_client_headers()
         response = self._stainless_client.services.server_info()
         return ServerInfoRes.model_validate(response.model_dump())
+
+    @validate_call
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        """Resolve external project IDs to internal IDs.
+
+        Returns a map keyed by internal ID with external IDs as values.
+        """
+        headers = self._extra_headers.copy()
+        if retry_id := get_current_retry_id():
+            headers["X-Weave-Retry-Id"] = retry_id
+
+        auth = None
+        if self._username or self._password:
+            auth = (self._username, self._password)
+
+        url = "/project_ids/external_to_internal"
+        response = http_requests.post(
+            self.trace_server_url + url,
+            data=req.model_dump_json(by_alias=True).encode("utf-8"),
+            auth=auth,
+            headers=headers,
+        )
+        handle_response_error(response, url)
+        return tsi.ProjectIdsExternalToInternalRes.model_validate(response.json())
 
     @validate_call
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
