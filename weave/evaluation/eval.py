@@ -267,17 +267,26 @@ class Evaluation(Object):
         ):
             n_complete += 1
             logger.info(f"Evaluated {n_complete} of {num_rows} examples")
+            normalized_eval_row: dict[str, Any]
             if eval_row is None:
                 normalized_eval_row = {self._output_key: None, "scores": {}}
             else:
-                normalized_eval_row = eval_row
-                normalized_eval_row["scores"] = normalized_eval_row.get("scores", {})
+                normalized_eval_row = dict(eval_row)
+
+            raw_scores = normalized_eval_row.get("scores")
+            scores: dict[str, Any]
+            if isinstance(raw_scores, dict):
+                scores = raw_scores
+            else:
+                scores = {}
+            normalized_eval_row["scores"] = scores
+
             if self.scorers:
                 for scorer in self.scorers:
                     scorer_attributes = get_scorer_attributes(scorer)
                     scorer_name = scorer_attributes.scorer_name
-                    if scorer_name not in normalized_eval_row["scores"]:
-                        normalized_eval_row["scores"][scorer_name] = {}
+                    if scorer_name not in scores:
+                        scores[scorer_name] = {}
             eval_rows.append((index, normalized_eval_row))
         eval_rows.sort(key=lambda x: x[0])
         table_rows = [eval_row for _, eval_row in eval_rows]
