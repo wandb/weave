@@ -1035,8 +1035,18 @@ def test_save_model(client):
 
     model = MyModel(prompt="input is: {input}")
     ref = client._save_object(model, "my-model")
-    model2 = client.get(ref)
-    assert model2.predict("x") == "input is: x"
+    deadline = time.time() + 5
+    while True:
+        try:
+            model2 = client.get(ref)
+            assert model2.predict("x") == "input is: x"
+            break
+        except (NotFoundError, sqliteNotFoundError):
+            # ClickHouse-backed tests can briefly read before file rows are visible.
+            if time.time() >= deadline:
+                raise
+            client.flush()
+            time.sleep(0.05)
 
 
 @pytest.mark.skip(reason="TODO: Skip flake")
