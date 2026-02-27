@@ -28,6 +28,87 @@ def unbatched_server():
     return StainlessRemoteHTTPTraceServer("http://example.com")
 
 
+def make_feedback_create_req(
+    feedback_id: str = "feedback-id",
+) -> tsi.FeedbackCreateReq:
+    return tsi.FeedbackCreateReq(
+        id=feedback_id,
+        project_id="entity/project",
+        weave_ref="weave:///entity/project/object/name:digest",
+        feedback_type="custom",
+        payload={"score": 1},
+    )
+
+
+def test_flush_feedback_empty_batch_is_noop():
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server._stainless_client.feedback.batch_create = MagicMock()
+
+    try:
+        server._flush_feedback([])
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    server._stainless_client.feedback.batch_create.assert_not_called()
+
+
+def test_flush_feedback_sends_batch_without_id_fields():
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    feedback = make_feedback_create_req()
+    server._stainless_client.feedback.batch_create = MagicMock()
+
+    try:
+        server._flush_feedback([feedback])
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    server._stainless_client.feedback.batch_create.assert_called_once()
+    sent_batch = server._stainless_client.feedback.batch_create.call_args.kwargs[
+        "batch"
+    ]
+    assert sent_batch == [
+        feedback.model_dump(exclude={"id", "created_at"}, exclude_none=True)
+    ]
+
+
+def test_flush_feedback_falls_back_to_individual_on_404():
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    feedback_batch = [
+        make_feedback_create_req("feedback-1"),
+        make_feedback_create_req("feedback-2"),
+    ]
+
+    class _BatchNotFoundError(Exception):
+        status_code = 404
+
+    server._stainless_client.feedback.batch_create = MagicMock(
+        side_effect=_BatchNotFoundError()
+    )
+    server._stainless_client.feedback.create = MagicMock()
+
+    try:
+        server._flush_feedback(feedback_batch)
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    assert server._stainless_client.feedback.batch_create.call_count == 1
+    assert server._stainless_client.feedback.create.call_count == len(feedback_batch)
+
+    for call in server._stainless_client.feedback.create.call_args_list:
+        kwargs = call.kwargs
+        assert "id" not in kwargs
+        assert "created_at" not in kwargs
+
+
 def test_call_start_ok(unbatched_server):
     """Test successful call_start request."""
     call_id = generate_id()
