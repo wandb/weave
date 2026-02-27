@@ -16,7 +16,7 @@ from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 MAX_ALIAS_LENGTH = 128
 MAX_TAG_LENGTH = 256
 TAG_REGEX = re.compile(r"^[-\w]+( [-\w]+)*$")
-_INVALID_ALIAS_CHARACTERS = "/:"
+_INVALID_ALIAS_CHARACTERS = frozenset("/:")
 _VERSION_LIKE_PATTERN = re.compile(r"^v\d+$")
 _RESERVED_ALIAS_NAMES = {"latest"}
 
