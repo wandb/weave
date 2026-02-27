@@ -3758,7 +3758,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         placeholders = ",".join("?" * len(object_ids))
         cursor.execute(
-            f"SELECT object_id, digest, tag FROM tags WHERE project_id = ? AND object_id IN ({placeholders})",
+            f"SELECT object_id, digest, tag FROM tags WHERE project_id = ? AND object_id IN ({placeholders}) ORDER BY object_id, digest, tag",
             [project_id] + list(object_ids),
         )
         result: dict[tuple[str, str], list[str]] = {}

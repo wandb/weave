@@ -61,6 +61,7 @@ def make_get_tags_query(
             AND object_id IN {object_ids: Array(String)}
         GROUP BY project_id, object_id, digest, tag
         HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+        ORDER BY object_id, digest, tag
     """
     parameters = {
         "project_id": project_id,
