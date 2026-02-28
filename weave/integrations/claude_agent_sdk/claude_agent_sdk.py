@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib
 import logging
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Any
 
 from weave.integrations.patcher import NoOpPatcher, Patcher
@@ -57,6 +58,12 @@ async def _pre_tool_use_hook(
     tool_input = hook_input.get("tool_input", {})
     tool_use_id = hook_input.get("tool_use_id", "")
 
+    display_name = tool_name
+    if tool_name == "Bash" and isinstance(tool_input, dict):
+        command = tool_input.get("command", "")
+        if command:
+            display_name = f"Bash: {command}"
+
     call = wc.create_call(
         op="claude_agent_sdk.tool_use",
         inputs={
@@ -64,7 +71,8 @@ async def _pre_tool_use_hook(
             "tool_input": tool_input,
         },
         parent=_current_parent_call,
-        display_name=tool_name,
+        display_name=display_name,
+        attributes={"weave": {"kind": "tool"}},
         use_stack=False,
     )
 
@@ -128,6 +136,7 @@ def _extract_inputs(prompt: Any, options: Any) -> dict[str, Any]:
 
     if isinstance(prompt, str):
         inputs["prompt"] = prompt
+        inputs["messages"] = [{"role": "user", "content": prompt}]
     else:
         inputs["prompt"] = "<async_iterable>"
 
@@ -139,6 +148,10 @@ def _extract_inputs(prompt: Any, options: Any) -> dict[str, Any]:
         system_prompt = _safe_get(options, "system_prompt")
         if isinstance(system_prompt, str):
             inputs["system_prompt"] = system_prompt
+            if "messages" in inputs:
+                inputs["messages"].insert(
+                    0, {"role": "system", "content": system_prompt}
+                )
 
         max_turns = _safe_get(options, "max_turns")
         if max_turns is not None:
@@ -151,12 +164,29 @@ def _extract_inputs(prompt: Any, options: Any) -> dict[str, Any]:
     return inputs
 
 
-def _extract_output(result_message: Any, accumulated_text: str) -> dict[str, Any]:
-    """Extract structured output from the ResultMessage."""
+def _extract_output(
+    result_message: Any,
+    accumulated_content: list[dict[str, Any]],
+    model: str | None,
+) -> dict[str, Any]:
+    """Extract structured output from the ResultMessage.
+
+    The output is formatted to match the Anthropic Message structure so the
+    Weave UI can render it as a chat view with text, thinking, and tool_use
+    content blocks.
+    """
     output: dict[str, Any] = {}
 
+    # Core Anthropic-compatible fields for the chat view
+    output["role"] = "assistant"
+    output["type"] = "message"
+    output["content"] = accumulated_content
+    if model is not None:
+        output["model"] = model
+    output["stop_reason"] = "end_turn"
+
+    # Additional metadata from the ResultMessage
     output["result"] = _safe_get(result_message, "result")
-    output["text"] = accumulated_text
     output["is_error"] = _safe_get(result_message, "is_error", False)
     output["num_turns"] = _safe_get(result_message, "num_turns", 0)
     output["session_id"] = _safe_get(result_message, "session_id", "")
@@ -185,6 +215,8 @@ class TracingAsyncIterator:
         self._inputs = inputs
         self._parent_call: Any = None
         self._accumulated_text: str = ""
+        self._accumulated_content: list[dict[str, Any]] = []
+        self._model: str | None = None
         self._started = False
 
     def __aiter__(self) -> TracingAsyncIterator:
@@ -202,7 +234,8 @@ class TracingAsyncIterator:
                     op="claude_agent_sdk.query",
                     inputs=self._inputs,
                     parent=call_context.get_current_call(),
-                    display_name="Claude Agent",
+                    display_name=f"claude-code-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                    attributes={"weave": {"kind": "agent"}},
                     use_stack=False,
                 )
                 # Publish parent call so hooks (running in a different async
@@ -237,7 +270,22 @@ class TracingAsyncIterator:
 
         # Finish parent call when ResultMessage arrives
         if isinstance(message, sdk.ResultMessage) and self._parent_call is not None and wc is not None:
-            output = _extract_output(message, self._accumulated_text)
+            output = _extract_output(
+                message, self._accumulated_content, self._model
+            )
+            # Set summary explicitly because finish_call's automatic
+            # extraction is bypassed when the call has _children (it
+            # sums children's summaries instead of reading from output).
+            usage = _safe_get(message, "usage")
+            if isinstance(usage, dict) and self._model:
+                self._parent_call.summary = {
+                    "usage": {
+                        self._model: {
+                            "requests": 1,
+                            **usage,
+                        }
+                    }
+                }
             wc.finish_call(self._parent_call, output=output)
             self._parent_call = None
             _current_parent_call = None
@@ -245,16 +293,36 @@ class TracingAsyncIterator:
         return message
 
     def _log_assistant_message(self, wc: Any, sdk: Any, message: Any) -> None:
-        """Create child calls for content blocks in an AssistantMessage."""
+        """Create child calls and accumulate content blocks from an AssistantMessage."""
         text_parts: list[str] = []
         thinking_parts: list[str] = []
+
+        # Track model from the first AssistantMessage
+        msg_model = _safe_get(message, "model")
+        if msg_model is not None and self._model is None:
+            self._model = msg_model
 
         for block in message.content:
             if isinstance(block, sdk.TextBlock):
                 text_parts.append(block.text)
                 self._accumulated_text += block.text
+                self._accumulated_content.append(
+                    {"type": "text", "text": block.text}
+                )
             elif isinstance(block, sdk.ThinkingBlock):
-                thinking_parts.append(block.text)
+                thinking_parts.append(block.thinking)
+                self._accumulated_content.append(
+                    {"type": "thinking", "thinking": block.thinking}
+                )
+            elif isinstance(block, sdk.ToolUseBlock):
+                self._accumulated_content.append(
+                    {
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input,
+                    }
+                )
 
         # Create a child call for thinking if present
         if thinking_parts:
@@ -264,6 +332,7 @@ class TracingAsyncIterator:
                 inputs={},
                 parent=self._parent_call,
                 display_name="Thinking",
+                attributes={"weave": {"kind": "llm"}},
                 use_stack=False,
             )
             wc.finish_call(call, output={"thinking": thinking_text})
@@ -276,9 +345,10 @@ class TracingAsyncIterator:
                 inputs={},
                 parent=self._parent_call,
                 display_name="Assistant Turn",
+                attributes={"weave": {"kind": "llm"}},
                 use_stack=False,
             )
-            wc.finish_call(call, output={"text": response_text, "model": _safe_get(message, "model")})
+            wc.finish_call(call, output={"text": response_text, "model": msg_model})
 
 
 async def _string_to_async_iterable(prompt: str) -> AsyncIterator[dict[str, Any]]:

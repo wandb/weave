@@ -37,7 +37,8 @@ class FakeTextBlock:
 
 @dataclass
 class FakeThinkingBlock:
-    text: str
+    thinking: str
+    signature: str = ""
 
 
 @dataclass
@@ -187,11 +188,13 @@ def mock_sdk() -> Generator[MagicMock, None, None]:
 class TestExtractInputs:
     def test_string_prompt(self) -> None:
         inputs = _extract_inputs("Hello", None)
-        assert inputs == {"prompt": "Hello"}
+        assert inputs["prompt"] == "Hello"
+        assert inputs["messages"] == [{"role": "user", "content": "Hello"}]
 
     def test_async_iterable_prompt(self) -> None:
         inputs = _extract_inputs(_aiter_messages([]), None)
         assert inputs["prompt"] == "<async_iterable>"
+        assert "messages" not in inputs
 
     def test_with_options(self) -> None:
         opts = FakeClaudeAgentOptions(
@@ -206,6 +209,10 @@ class TestExtractInputs:
         assert inputs["system_prompt"] == "Be helpful"
         assert inputs["max_turns"] == 5
         assert inputs["permission_mode"] == "acceptEdits"
+        assert inputs["messages"] == [
+            {"role": "system", "content": "Be helpful"},
+            {"role": "user", "content": "Hello"},
+        ]
 
     def test_none_options_fields_excluded(self) -> None:
         opts = FakeClaudeAgentOptions()
@@ -224,9 +231,16 @@ class TestExtractOutput:
             total_cost_usd=0.01,
             usage={"input_tokens": 100, "output_tokens": 50},
         )
-        output = _extract_output(result, "accumulated text")
+        content = [{"type": "text", "text": "accumulated text"}]
+        output = _extract_output(result, content, "claude-sonnet-4-20250514")
+        # Anthropic-compatible fields
+        assert output["role"] == "assistant"
+        assert output["type"] == "message"
+        assert output["content"] == [{"type": "text", "text": "accumulated text"}]
+        assert output["model"] == "claude-sonnet-4-20250514"
+        assert output["stop_reason"] == "end_turn"
+        # Metadata fields
         assert output["result"] == "42"
-        assert output["text"] == "accumulated text"
         assert output["num_turns"] == 3
         assert output["duration_ms"] == 500
         assert output["total_cost_usd"] == 0.01
@@ -234,13 +248,18 @@ class TestExtractOutput:
 
     def test_no_cost(self) -> None:
         result = FakeResultMessage(total_cost_usd=None)
-        output = _extract_output(result, "")
+        output = _extract_output(result, [], None)
         assert "total_cost_usd" not in output
 
     def test_no_usage(self) -> None:
         result = FakeResultMessage(usage=None)
-        output = _extract_output(result, "")
+        output = _extract_output(result, [], None)
         assert "usage" not in output
+
+    def test_no_model(self) -> None:
+        result = FakeResultMessage()
+        output = _extract_output(result, [], None)
+        assert "model" not in output
 
 
 class TestMergeHooks:
@@ -305,8 +324,9 @@ class TestPreToolUseHook:
         call_kwargs = mock_wc.create_call.call_args
         assert call_kwargs.kwargs["op"] == "claude_agent_sdk.tool_use"
         assert call_kwargs.kwargs["inputs"]["tool_name"] == "Bash"
-        assert call_kwargs.kwargs["display_name"] == "Bash"
+        assert call_kwargs.kwargs["display_name"] == "Bash: ls"
         assert call_kwargs.kwargs["parent"] is mock_parent
+        assert call_kwargs.kwargs["attributes"] == {"weave": {"kind": "tool"}}
         assert "tu_123" in _active_tool_calls
 
     def test_noop_without_client(self) -> None:
@@ -390,7 +410,11 @@ class TestTracingAsyncIterator:
         messages = [
             FakeAssistantMessage(content=[FakeTextBlock(text="Hello ")]),
             FakeAssistantMessage(content=[FakeTextBlock(text="world")]),
-            FakeResultMessage(result="Hello world", num_turns=1),
+            FakeResultMessage(
+                result="Hello world",
+                num_turns=1,
+                usage={"input_tokens": 100, "output_tokens": 50},
+            ),
         ]
 
         async def run() -> list[Any]:
@@ -413,12 +437,33 @@ class TestTracingAsyncIterator:
         assert len(result) == 3
         # 1 parent + 2 assistant turn child calls = 3 create_call
         assert mock_wc.create_call.call_count == 3
+        # Parent call has kind="llm" attribute
+        parent_create = mock_wc.create_call.call_args_list[0]
+        assert parent_create.kwargs["attributes"] == {"weave": {"kind": "agent"}}
         # 2 assistant turn finish + 1 parent finish = 3 finish_call
         assert mock_wc.finish_call.call_count == 3
-        # Last finish_call is the parent with accumulated text
+        # Last finish_call is the parent with Anthropic-compatible output
         parent_finish = mock_wc.finish_call.call_args_list[-1]
-        assert parent_finish.kwargs["output"]["text"] == "Hello world"
-        assert parent_finish.kwargs["output"]["result"] == "Hello world"
+        parent_output = parent_finish.kwargs["output"]
+        assert parent_output["role"] == "assistant"
+        assert parent_output["type"] == "message"
+        assert parent_output["content"] == [
+            {"type": "text", "text": "Hello "},
+            {"type": "text", "text": "world"},
+        ]
+        assert parent_output["model"] == "claude-sonnet-4-20250514"
+        assert parent_output["stop_reason"] == "end_turn"
+        assert parent_output["result"] == "Hello world"
+        # Usage is stored in standard Weave summary slots
+        assert mock_parent_call.summary == {
+            "usage": {
+                "claude-sonnet-4-20250514": {
+                    "requests": 1,
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                }
+            }
+        }
 
     def test_creates_thinking_child_call(self, mock_sdk: MagicMock) -> None:
         mock_wc = MagicMock()
@@ -428,7 +473,7 @@ class TestTracingAsyncIterator:
         messages = [
             FakeAssistantMessage(
                 content=[
-                    FakeThinkingBlock(text="Let me think about this..."),
+                    FakeThinkingBlock(thinking="Let me think about this..."),
                     FakeTextBlock(text="The answer is 42."),
                 ]
             ),
@@ -461,6 +506,13 @@ class TestTracingAsyncIterator:
         # Third call is the assistant turn child
         assert create_calls[2].kwargs["op"] == "claude_agent_sdk.assistant_turn"
         assert create_calls[2].kwargs["display_name"] == "Assistant Turn"
+        # Parent output contains both thinking and text content blocks
+        parent_finish = mock_wc.finish_call.call_args_list[-1]
+        parent_output = parent_finish.kwargs["output"]
+        assert parent_output["content"] == [
+            {"type": "thinking", "thinking": "Let me think about this..."},
+            {"type": "text", "text": "The answer is 42."},
+        ]
 
     def test_finishes_with_exception_on_error(self, mock_sdk: MagicMock) -> None:
         mock_wc = MagicMock()
