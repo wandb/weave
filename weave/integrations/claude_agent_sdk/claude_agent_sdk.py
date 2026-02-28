@@ -33,6 +33,16 @@ def _safe_get(obj: Any, attr: str, default: Any = None) -> Any:
     return getattr(obj, attr, default)
 
 
+# Map of tool_use_id -> Call for in-flight tool uses.
+_active_tool_calls: dict[str, Any] = {}
+
+# The current parent call for hooks to attach child calls to.
+# Hooks fire in a different async context (SDK's anyio task group), so
+# call_context.get_current_call() won't find the parent.  We store it
+# explicitly instead.
+_current_parent_call: Any = None
+
+
 async def _pre_tool_use_hook(
     hook_input: Any,
     matched: str | None,
@@ -47,20 +57,18 @@ async def _pre_tool_use_hook(
     tool_input = hook_input.get("tool_input", {})
     tool_use_id = hook_input.get("tool_use_id", "")
 
-    parent = call_context.get_current_call()
-
     call = wc.create_call(
         op="claude_agent_sdk.tool_use",
         inputs={
             "tool_name": tool_name,
             "tool_input": tool_input,
         },
-        parent=parent,
+        parent=_current_parent_call,
         display_name=tool_name,
+        use_stack=False,
     )
 
-    # Store the call on the context so PostToolUse can find it.
-    # We use a dict on the module to avoid mutating the SDK context object.
+    # Store the call so PostToolUse can finish it.
     _active_tool_calls[tool_use_id] = call
 
     return {}
@@ -87,10 +95,6 @@ async def _post_tool_use_hook(
         )
 
     return {}
-
-
-# Map of tool_use_id -> Call for in-flight tool uses.
-_active_tool_calls: dict[str, Any] = {}
 
 
 def _merge_hooks(
@@ -187,6 +191,7 @@ class TracingAsyncIterator:
         return self
 
     async def __anext__(self) -> Any:
+        global _current_parent_call
         wc = get_weave_client()
 
         # Create the parent call on first iteration
@@ -198,7 +203,11 @@ class TracingAsyncIterator:
                     inputs=self._inputs,
                     parent=call_context.get_current_call(),
                     display_name="Claude Agent",
+                    use_stack=False,
                 )
+                # Publish parent call so hooks (running in a different async
+                # context) can attach child calls to it.
+                _current_parent_call = self._parent_call
 
         try:
             message = await self._iterator.__anext__()
@@ -211,11 +220,13 @@ class TracingAsyncIterator:
                     output={"text": self._accumulated_text},
                 )
                 self._parent_call = None
+                _current_parent_call = None
             raise
         except Exception as exc:
             if self._parent_call is not None and wc is not None:
                 wc.finish_call(self._parent_call, exception=exc)
                 self._parent_call = None
+                _current_parent_call = None
             raise
 
         sdk = importlib.import_module("claude_agent_sdk")
@@ -228,11 +239,28 @@ class TracingAsyncIterator:
 
         # Finish parent call when ResultMessage arrives
         if isinstance(message, sdk.ResultMessage) and self._parent_call is not None and wc is not None:
-                output = _extract_output(message, self._accumulated_text)
-                wc.finish_call(self._parent_call, output=output)
-                self._parent_call = None
+            output = _extract_output(message, self._accumulated_text)
+            wc.finish_call(self._parent_call, output=output)
+            self._parent_call = None
+            _current_parent_call = None
 
         return message
+
+
+async def _string_to_async_iterable(prompt: str) -> AsyncIterator[dict[str, Any]]:
+    """Convert a string prompt to an async iterable of message dicts.
+
+    The SDK's InternalClient.process_query() closes stdin immediately for
+    string prompts, which prevents hook callback responses from being sent
+    back. By converting to an async iterable, the SDK uses stream_input()
+    which keeps stdin open until the first result arrives.
+    """
+    yield {
+        "type": "user",
+        "session_id": "",
+        "message": {"role": "user", "content": prompt},
+        "parent_tool_use_id": None,
+    }
 
 
 def _patch_query(original_fn: Any) -> Any:
@@ -269,7 +297,16 @@ def _patch_query(original_fn: Any) -> Any:
         )
 
         inputs = _extract_inputs(prompt, options)
-        iterator = original_fn(prompt=prompt, options=options, transport=transport)
+
+        # Convert string prompts to async iterables so the SDK keeps stdin
+        # open for hook callback responses (see _string_to_async_iterable).
+        effective_prompt: Any = prompt
+        if isinstance(prompt, str):
+            effective_prompt = _string_to_async_iterable(prompt)
+
+        iterator = original_fn(
+            prompt=effective_prompt, options=options, transport=transport
+        )
         tracing_iter = TracingAsyncIterator(iterator, inputs)
 
         async for msg in tracing_iter:

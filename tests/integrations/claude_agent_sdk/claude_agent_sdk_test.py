@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import weave.integrations.claude_agent_sdk.claude_agent_sdk as _integration_mod
 from weave.integrations.claude_agent_sdk.claude_agent_sdk import (
     ClaudeAgentSDKPatcher,
     TracingAsyncIterator,
@@ -152,8 +153,10 @@ async def _aiter_messages(messages: list[Any]) -> AsyncIterator[Any]:
 def _clear_active_tool_calls() -> Generator[None, None, None]:
     """Ensure tool call tracking state is clean between tests."""
     _active_tool_calls.clear()
+    _integration_mod._current_parent_call = None
     yield
     _active_tool_calls.clear()
+    _integration_mod._current_parent_call = None
 
 
 @pytest.fixture
@@ -270,6 +273,7 @@ class TestPreToolUseHook:
         mock_wc = MagicMock()
         mock_call = MagicMock()
         mock_wc.create_call.return_value = mock_call
+        mock_parent = MagicMock()
 
         hook_input = {
             "tool_name": "Bash",
@@ -281,13 +285,11 @@ class TestPreToolUseHook:
             "hook_event_name": "PreToolUse",
         }
 
+        _integration_mod._current_parent_call = mock_parent
         with patch(
             "weave.integrations.claude_agent_sdk.claude_agent_sdk.get_weave_client",
             return_value=mock_wc,
-        ), patch(
-            "weave.integrations.claude_agent_sdk.claude_agent_sdk.call_context"
-        ) as mock_ctx:
-            mock_ctx.get_current_call.return_value = MagicMock()
+        ):
             result = asyncio.get_event_loop().run_until_complete(
                 _pre_tool_use_hook(hook_input, None, None)
             )
@@ -298,6 +300,7 @@ class TestPreToolUseHook:
         assert call_kwargs.kwargs["op"] == "claude_agent_sdk.tool_use"
         assert call_kwargs.kwargs["inputs"]["tool_name"] == "Bash"
         assert call_kwargs.kwargs["display_name"] == "Bash"
+        assert call_kwargs.kwargs["parent"] is mock_parent
         assert "tu_123" in _active_tool_calls
 
     def test_noop_without_client(self) -> None:
