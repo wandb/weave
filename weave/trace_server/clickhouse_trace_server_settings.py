@@ -26,6 +26,19 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE = 1 * 1024 * 1024  # 1 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
+# Payload offloading threshold.  Before every batch insert (call_start/call_end,
+# calls_complete, and OTEL export), each row's total JSON payload is measured.
+# When it exceeds this limit, large string leaves are offloaded to Content
+# storage (file storage) and, as a last resort, entire columns are replaced with
+# ENTITY_TOO_LARGE_PAYLOAD so the row fits within ClickHouse limits.
+PROACTIVE_OFFLOAD_BYTES_LIMIT = 1 * 1024 * 1024  # 1 MiB
+
+# Minimum string length (in characters) to offload to Content storage when a row
+# exceeds the offload threshold. Strings shorter than this are left inline;
+# longer ones are stored as Content objects in file storage so the row can fit
+# within limits without data loss.
+LARGE_STRING_OFFLOAD_MAX_CHARS = 100 * 1024  # 100k characters
+
 
 # Table naming conventions for distributed mode
 # In distributed mode, local tables use this suffix (e.g., "calls_complete_local")

@@ -50,10 +50,11 @@ from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
+from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
 from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.validation_util import CHValidationError
+from weave.type_wrappers.Content.content import Content
 from weave.utils.project_id import from_project_id, to_project_id
 
 ## Hacky interface compatibility helpers
@@ -3605,32 +3606,25 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         # no need to strip in sqlite
         return
 
-    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
     max_size = 10 * 1024
 
-    # Patch _insert_call_batch to raise InsertTooLarge
-    def mock_insert_call_batch(self, batch):
-        # mock raise insert error
-        if len(str(batch)) > max_size:
-            raise InsertTooLarge(
-                "Database insertion failed. Record too large. "
-                "A likely cause is that a single row or cell exceeded "
-                "the limit. If logging images, save them as `Image.PIL`."
-            )
-        original_insert_call_batch(self, batch)
-
+    # Lower the proactive offload threshold so our 10KB test data triggers it.
+    # Also lower the per-string offload threshold so individual strings in the
+    # test data are large enough to be offloaded to Content storage.
     monkeypatch.setattr(
         weave.trace_server.clickhouse_trace_server_settings,
-        "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
+        "PROACTIVE_OFFLOAD_BYTES_LIMIT",
         max_size,
     )
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
-        "_insert_call_batch",
-        mock_insert_call_batch,
+        weave.trace_server.clickhouse_trace_server_settings,
+        "LARGE_STRING_OFFLOAD_MAX_CHARS",
+        1024,
     )
 
-    # Use a dictionary that will exceed our new 10KB limit
+    # Use a dictionary that will exceed our new 10KB limit.
+    # Dict values are small ints (no large string leaves to offload),
+    # so the fallback replaces the whole column with ENTITY_TOO_LARGE_PAYLOAD.
     data = {"dictionary": {f"{i}": i for i in range(max_size // 10)}}
 
     @weave.op
@@ -3644,35 +3638,45 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
     assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
 
-    # now test for inputs/output as raw string
+    # Now test for inputs/output as raw string.
+    # Large string leaf values are offloaded to Content storage (preserving
+    # data) instead of being replaced with ENTITY_TOO_LARGE_PAYLOAD.
     @weave.op
     def test_op_str(input_data: str):
         return input_data
 
-    test_op_str(json.dumps(data))
+    str_data = json.dumps(data)
+    test_op_str(str_data)
 
     calls = list(test_op_str.calls())
     assert len(calls) == 1
-    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    # Output string is offloaded to Content storage
+    assert isinstance(calls[0].output, Content)
+    assert calls[0].output.data == str_data.encode("utf-8")
+    # Input string value is offloaded to Content storage within the inputs dict
+    assert isinstance(calls[0].inputs["input_data"], Content)
+    assert calls[0].inputs["input_data"].data == str_data.encode("utf-8")
 
-    # and now list
+    # and now list — large strings within lists are also offloaded to Content
     @weave.op
     def test_op_list(input_data: list[str]):
         return input_data
 
-    test_op_list([json.dumps(data)])
+    list_data = [json.dumps(data)]
+    test_op_list(list_data)
 
     calls = list(test_op_list.calls())
     assert len(calls) == 1
-    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-
-    error_messages = [
-        record.message for record in caplog.records if record.levelname == "ERROR"
-    ]
-    for error_message in error_messages:
-        assert "Retrying with large objects stripped" in error_message
+    # Output list elements with large strings are offloaded to Content storage
+    assert isinstance(calls[0].output, list)
+    assert len(calls[0].output) == 1
+    assert isinstance(calls[0].output[0], Content)
+    assert calls[0].output[0].data == str_data.encode("utf-8")
+    # Input list elements are similarly offloaded
+    assert isinstance(calls[0].inputs["input_data"], list)
+    assert len(calls[0].inputs["input_data"]) == 1
+    assert isinstance(calls[0].inputs["input_data"][0], Content)
+    assert calls[0].inputs["input_data"][0].data == str_data.encode("utf-8")
 
     # test that when inputs + output > max_size but input < max_size
     # we only strip the inputs

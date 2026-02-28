@@ -1,7 +1,10 @@
-"""Base64 content conversion utilities for trace server.
+"""Content conversion utilities for trace server.
 
-This module handles automatic detection and replacement of base64 encoded content
-with content objects stored in bucket storage.
+This module handles automatic detection and replacement of large or encoded content
+with Content objects stored in bucket storage. Supports:
+- Base64 encoded strings (detected by pattern matching)
+- Data URI strings (e.g., data:image/png;base64,...)
+- Arbitrary large strings (offloaded when payloads exceed ClickHouse row limits)
 """
 
 import json
@@ -35,12 +38,15 @@ AUTO_CONVERSION_MIN_SIZE = 1024  # 1 KiB
 
 
 def is_base64(value: str) -> bool:
-    """Huerestic to quickly check if a string is likely base64.
-    We do not decode here because Content already does decode based 'true' validation
+    """Heuristic to quickly check if a string is likely base64.
+
+    We do not decode here because Content already does decode-based validation.
+
     Args:
-        value: String to check
+        value: String to check.
+
     Returns:
-        True if the string is possibly valid base64
+        True if the string is possibly valid base64.
     """
     return BASE64_PATTERN.match(value) is not None
 
@@ -66,14 +72,12 @@ def store_content_object(
     """Create a proper Content object structure and store its files.
 
     Args:
-        data: Raw byte content
-        original_schema: The schema to restore the original base64 string
-        mimetype: MIME type of the content
-        project_id: Project ID for storage
-        trace_server: Trace server instance for file storage
+        content_obj: Content wrapper holding the raw bytes and metadata.
+        project_id: Project ID for storage.
+        trace_server: Trace server instance for file storage.
 
     Returns:
-        Dict representing the Content object in the proper format
+        Dict representing the Content object in the proper format.
     """
     content_data = content_obj.data
     content_metadata = json.dumps(content_obj.model_dump(exclude={"data"})).encode(
@@ -169,6 +173,47 @@ def replace_base64_with_content_objects(
                     )
 
             return val
+        return val
+
+    return _visit(vals)
+
+
+@ddtrace.tracer.wrap(name="replace_large_strings_with_content_objects")
+def replace_large_strings_with_content_objects(
+    vals: T,
+    project_id: str,
+    trace_server: TraceServerInterface,
+    max_chars: int,
+) -> T:
+    """Recursively replace large string values with Content objects in file storage.
+
+    Walks the value tree and converts any string leaf whose character count exceeds
+    ``max_chars`` into a Content object stored via the trace server's file storage.
+    The original string is preserved as ``text/plain`` content, and a Content
+    reference dict is returned in its place.
+
+    Note: the threshold is measured in *characters* (``len(val)``), not bytes.
+    For ASCII-dominated content this is equivalent; for multi-byte UTF-8 strings
+    the character count is a safe lower bound on byte size.
+    """
+
+    def _visit(val: Any) -> Any:
+        if isinstance(val, dict):
+            return {k: _visit(v) for k, v in val.items()}
+        elif isinstance(val, list):
+            return [_visit(v) for v in val]
+        elif isinstance(val, str) and len(val) > max_chars:
+            try:
+                content: Content[Any] = Content.from_text(val)
+                return store_content_object(content, project_id, trace_server)
+            except Exception as e:
+                logger.warning(
+                    "Failed to offload large string (%d chars) to content storage: %s",
+                    len(val),
+                    e,
+                    exc_info=True,
+                )
+                return val
         return val
 
     return _visit(vals)
