@@ -62,7 +62,7 @@ export class WandbServerApi {
         !result.viewer.defaultEntity ||
         !result.viewer.defaultEntity.name
       ) {
-        throw new Error('Default entity name not found in the response');
+        throw new Error('Default team or entity name not found in the response');
       }
       return result.viewer.defaultEntity.name;
     } catch (error) {
