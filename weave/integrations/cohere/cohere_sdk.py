@@ -194,6 +194,122 @@ def cohere_stream_wrapper_v2(settings: OpSettings) -> Callable:
     return wrapper
 
 
+def cohere_rerank_wrapper(settings: OpSettings) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        def _post_process_response(fn: Callable) -> Any:
+            @wraps(fn)
+            def _wrapper(*args: Any, **kwargs: Any) -> Any:
+                response = fn(*args, **kwargs)
+
+                try:
+                    from cohere.types.rerank_response import RerankResponse
+                    from cohere.types.api_meta import ApiMeta
+                    from cohere.types.api_meta_api_version import ApiMetaApiVersion
+                    from cohere.types.api_meta_billed_units import ApiMetaBilledUnits
+
+                    # Create a new instance with modified `meta`
+                    response_dict = response.dict()
+                    response_dict["meta"] = ApiMeta(
+                        api_version=ApiMetaApiVersion(
+                            version=response.meta.api_version.version,
+                            is_deprecated=response.meta.api_version.is_deprecated,
+                            is_experimental=response.meta.api_version.is_experimental,
+                        ),
+                        billed_units=ApiMetaBilledUnits(
+                            input_tokens=response.meta.billed_units.input_tokens,
+                            output_tokens=0,  # Rerank doesn't have output tokens
+                            search_units=response.meta.billed_units.search_units,
+                            classifications=response.meta.billed_units.classifications,
+                        ),
+                        warnings=response.meta.warnings,
+                    )
+
+                    # Add usage data in the format Weave expects
+                    response_dict["usage"] = {
+                        "billed_units": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Rerank doesn't have output tokens
+                            "search_units": response.meta.billed_units.search_units,
+                        },
+                        "tokens": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Rerank doesn't have output tokens
+                        },
+                    }
+
+                    response = RerankResponse(**response_dict)
+                except:
+                    pass  # prompt to upgrade cohere sdk
+
+                return response
+
+            return _wrapper
+
+        op_kwargs = settings.model_dump()
+        op = weave.op(_post_process_response(fn), **op_kwargs)
+        return op
+
+    return wrapper
+
+
+def cohere_rerank_wrapper_async(settings: OpSettings) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        def _post_process_response(fn: Callable) -> Any:
+            @wraps(fn)
+            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+                response = await fn(*args, **kwargs)
+
+                try:
+                    from cohere.types.rerank_response import RerankResponse
+                    from cohere.types.api_meta import ApiMeta
+                    from cohere.types.api_meta_api_version import ApiMetaApiVersion
+                    from cohere.types.api_meta_billed_units import ApiMetaBilledUnits
+
+                    # Create a new instance with modified `meta`
+                    response_dict = response.dict()
+                    response_dict["meta"] = ApiMeta(
+                        api_version=ApiMetaApiVersion(
+                            version=response.meta.api_version.version,
+                            is_deprecated=response.meta.api_version.is_deprecated,
+                            is_experimental=response.meta.api_version.is_experimental,
+                        ),
+                        billed_units=ApiMetaBilledUnits(
+                            input_tokens=response.meta.billed_units.input_tokens,
+                            output_tokens=0,  # Rerank doesn't have output tokens
+                            search_units=response.meta.billed_units.search_units,
+                            classifications=response.meta.billed_units.classifications,
+                        ),
+                        warnings=response.meta.warnings,
+                    )
+
+                    # Add usage data in the format Weave expects
+                    response_dict["usage"] = {
+                        "billed_units": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Rerank doesn't have output tokens
+                            "search_units": response.meta.billed_units.search_units,
+                        },
+                        "tokens": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Rerank doesn't have output tokens
+                        },
+                    }
+
+                    response = RerankResponse(**response_dict)
+                except:
+                    pass  # prompt to upgrade cohere sdk
+
+                return response
+
+            return _wrapper
+
+        op_kwargs = settings.model_dump()
+        op = weave.op(_post_process_response(fn), **op_kwargs)
+        return op
+
+    return wrapper
+
+
 def get_cohere_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
@@ -257,6 +373,12 @@ def get_cohere_patcher(
             "kind": base.kind or "llm",
         }
     )
+    rerank_settings = base.model_copy(
+        update={"name": base.name or "cohere.Client.rerank"}
+    )
+    async_rerank_settings = base.model_copy(
+        update={"name": base.name or "cohere.AsyncClient.rerank"}
+    )
 
     _cohere_patcher = MultiPatcher(
         [
@@ -306,6 +428,18 @@ def get_cohere_patcher(
                 lambda: importlib.import_module("cohere"),
                 "AsyncClientV2.chat_stream",
                 cohere_stream_wrapper_v2(async_chat_stream_v2_settings),
+            ),
+            # Add patch for rerank
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "Client.rerank",
+                cohere_rerank_wrapper(rerank_settings),
+            ),
+            # Add patch for async rerank
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "AsyncClient.rerank",
+                cohere_rerank_wrapper_async(async_rerank_settings),
             ),
         ]
     )
