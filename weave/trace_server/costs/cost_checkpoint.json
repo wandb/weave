@@ -17359,6 +17359,14 @@
       "created_at": "2026-01-27 20:14:08"
     }
   ],
+  "gpt-5.3-codex": [
+    {
+      "provider": "openai",
+      "input": 1.75e-06,
+      "output": 1.4e-05,
+      "created_at": "2026-02-27 00:00:00"
+    }
+  ],
   "groq/meta-llama/llama-guard-4-12b": [
     {
       "provider": "groq",
