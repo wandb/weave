@@ -903,6 +903,7 @@ class EvaluationLogger:
         self,
         summary: dict | None = None,
         auto_summarize: bool = True,
+        summary_key: str = "output",
     ) -> None:
         """Log a summary dict to the Evaluation.
 
@@ -913,23 +914,20 @@ class EvaluationLogger:
             logger.warning("(NO-OP): Evaluation already finalized, cannot log summary.")
             return
 
-        if summary is None:
-            summary = {}
-
         # Calculate summary
         if auto_summarize:
             data_to_summarize = [
                 pred._captured_scores for pred in self._accumulated_predictions
             ]
-            summary_data = auto_summarize_fn(data_to_summarize)
+            auto_summary_data = auto_summarize_fn(data_to_summarize)
         else:
-            summary_data = summary
+            auto_summary_data = {}
 
         final_summary = {}
-        if summary_data:
-            final_summary = summary_data
+        if auto_summary_data:
+            final_summary = auto_summary_data
         if summary is not None:
-            final_summary = {**final_summary, "output": summary}
+            final_summary = {**final_summary, summary_key: summary}
 
         # Call the summarize op
         assert self._evaluate_call is not None, (
