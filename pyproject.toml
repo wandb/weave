@@ -158,6 +158,7 @@ notdiamond = [
 openai = ["openai>=1.99.9,<1.100.0"]
 openai_agents = ["openai-agents>=0.0.4"]
 presidio = [
+  "pip>=20.0",                    # needed for spaCy model download path in presidio analyzer
   "presidio-analyzer==2.2.357; python_version < '3.13'",
   "presidio-anonymizer==2.2.357; python_version < '3.13'",
 ]
