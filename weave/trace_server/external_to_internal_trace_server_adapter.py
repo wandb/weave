@@ -267,6 +267,31 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.obj_delete, req)
 
+    # Tag/alias requests contain only plain identifiers (no refs to convert)
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.obj_add_tags(req)
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.obj_remove_tags(req)
+
+    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.obj_set_alias(req)
+
+    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.obj_remove_alias(req)
+
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.tags_list(req)
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.aliases_list(req)
+
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
         return self._ref_apply(self._internal_trace_server.table_create, req)
