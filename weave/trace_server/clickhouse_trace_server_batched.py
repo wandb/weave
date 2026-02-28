@@ -5844,6 +5844,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        if self.kafka_producer is None:
+            raise ValueError("Kafka producer is not set")
+
+        self.kafka_producer.produce_score_calls(req)
+
+        return tsi.CallsScoreRes()
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:

@@ -1,3 +1,4 @@
+import json
 import logging
 import socket
 from typing import Any
@@ -24,6 +25,7 @@ from weave.trace_server.environment import (
 )
 
 CALL_ENDED_TOPIC = "weave.call_ended"
+SCORE_CALLS_TOPIC = "weave.score_calls"
 
 DEFAULT_MAX_BUFFER_SIZE = 10000
 
@@ -125,6 +127,50 @@ class KafkaProducer(ConfluentKafkaProducer):
         self.produce(
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
+            key=publish_key,
+        )
+
+        if flush_immediately:
+            self.flush()
+
+    def produce_score_calls(
+        self, req: tsi.CallsScoreReq, flush_immediately: bool = True
+    ) -> None:
+        """Produce a score_calls message to Kafka.
+
+        Args:
+            req: The CallsScoreReq containing project_id, call_ids, scorer_refs, and wb_user_id
+            flush_immediately: Whether to flush the producer immediately (default True)
+        """
+        buffer_size = len(self)
+
+        if buffer_size >= self.max_buffer_size:
+            logger.error(
+                "Kafka producer buffer full, dropping score_calls message",
+                extra={
+                    "buffer_size": buffer_size,
+                    "max_buffer_size": self.max_buffer_size,
+                    "project_id": req.project_id,
+                    "call_ids_count": len(req.call_ids),
+                },
+            )
+            set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
+            return
+
+        payload = {
+            "project_id": req.project_id,
+            "call_ids": req.call_ids,
+            "scorer_refs": req.scorer_refs,
+            "wb_user_id": req.wb_user_id,
+        }
+
+        publish_key = None
+        if kafka_partition_by_project_id():
+            publish_key = req.project_id
+
+        self.produce(
+            topic=SCORE_CALLS_TOPIC,
+            value=json.dumps(payload),
             key=publish_key,
         )
 

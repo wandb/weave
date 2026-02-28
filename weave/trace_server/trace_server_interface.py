@@ -1574,6 +1574,17 @@ class EvaluationStatusRes(BaseModel):
     )
 
 
+class CallsScoreReq(BaseModelStrict):
+    project_id: str
+    call_ids: list[str] = Field(description="List of call IDs to score")
+    scorer_refs: list[str] = Field(description="List of scorer refs to apply")
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class CallsScoreRes(BaseModel):
+    pass
+
+
 class OpCreateBody(BaseModel):
     """Request body for creating an Op object via REST API.
 
@@ -2581,6 +2592,9 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+
+    # Scoring API
+    def calls_score(self, req: CallsScoreReq) -> CallsScoreRes: ...
 
 
 class ObjectInterface(Protocol):
