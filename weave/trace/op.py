@@ -318,11 +318,39 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     )
 
 
+def _raw_call_inputs_for_failed_binding(
+    func: Op, args: tuple[Any, ...], kwargs: dict[str, Any]
+) -> dict[str, Any]:
+    """Capture user-provided inputs without signature binding."""
+    inputs: dict[str, Any] = dict(kwargs)
+    sig = inspect.signature(func)
+    params = list(sig.parameters.values())
+
+    for index, value in enumerate(args):
+        fallback_name = f"_arg{index}"
+        input_name = fallback_name
+
+        if index < len(params):
+            param = params[index]
+            if param.kind in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            ):
+                input_name = param.name
+
+        if input_name in inputs:
+            input_name = fallback_name
+        inputs[input_name] = value
+
+    return inputs
+
+
 def _create_call(
     func: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
     use_stack: bool = True,
+    _inputs_override: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> Call:
     """Create a call object for the given op.
@@ -340,12 +368,15 @@ def _create_call(
     """
     client = weave_client_context.require_weave_client()
 
-    pargs = None
-    if func._on_input_handler is not None:
-        pargs = func._on_input_handler(func, args, kwargs)
-    if not pargs:
-        pargs = _default_on_input_handler(func, args, kwargs)
-    inputs_with_defaults = pargs.inputs
+    if _inputs_override is None:
+        pargs = None
+        if func._on_input_handler is not None:
+            pargs = func._on_input_handler(func, args, kwargs)
+        if not pargs:
+            pargs = _default_on_input_handler(func, args, kwargs)
+        inputs_with_defaults = pargs.inputs
+    else:
+        inputs_with_defaults = dict(_inputs_override)
 
     # This should probably be configurable, but for now we redact the api_key
     if "api_key" in inputs_with_defaults:
@@ -376,6 +407,26 @@ def _create_call(
         use_stack=use_stack,
         _call_id_override=preferred_call_id,
     )
+
+
+def _record_call_for_input_error(
+    op: Op,
+    error: OpCallError,
+    __weave: WeaveKwargs,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+) -> None:
+    """Best-effort tracing for input binding failures."""
+    try:
+        call = _create_call(
+            op,
+            __weave=__weave,
+            _inputs_override=_raw_call_inputs_for_failed_binding(op, args, kwargs),
+        )
+        client = weave_client_context.require_weave_client()
+        client.finish_call(call, exception=error, op=op)
+    except Exception:
+        log_once(logger.error, CALL_CREATE_MSG.format(traceback.format_exc()))
 
 
 def is_tracing_setting_disabled() -> bool:
@@ -462,6 +513,7 @@ def _call_sync_func(
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
+        _record_call_for_input_error(op, e, __weave, args, kwargs)
         raise e
     except Exception as e:
         if get_raise_on_captured_errors():
@@ -589,6 +641,7 @@ async def _call_async_func(
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
+        _record_call_for_input_error(op, e, __weave, args, kwargs)
         raise e
     except Exception as e:
         if get_raise_on_captured_errors():
@@ -722,7 +775,8 @@ def _call_sync_gen(
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
         call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
-    except OpCallError:
+    except OpCallError as e:
+        _record_call_for_input_error(op, e, __weave, args, kwargs)
         raise
     except Exception:
         if get_raise_on_captured_errors():
@@ -942,7 +996,8 @@ async def _call_async_gen(
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
         call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
-    except OpCallError:
+    except OpCallError as e:
+        _record_call_for_input_error(op, e, __weave, args, kwargs)
         raise
     except Exception:
         if get_raise_on_captured_errors():
