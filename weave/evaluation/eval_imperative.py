@@ -1039,3 +1039,206 @@ class ImperativeEvaluationLogger(EvaluationLogger):
             "be removed in a future version."
         )
         super().__init__(*args, **kwargs)
+
+
+
+
+
+class LiteEvaluationLogger(EvaluationLogger):
+    """Simplified interface for logging evaluations with Weave.
+
+    Combines prediction and score logging into a single `log_example()` call.
+    Automatically calls `log_summary()` at program exit via atexit.
+
+    **Important:** All parameters (inputs, output, scores) must be dicts.
+
+    Args:
+        model: Model identifier string or Model instance.
+        dataset: Dataset identifier string, Dataset instance, or list of dicts.
+        eval_attributes: Optional dict of evaluation metadata.
+        scorers: Optional list of predefined scorer names.
+        name: Optional name for the evaluation call.
+
+    Example:
+        ```python
+        import weave
+        weave.init("my-project")
+
+        logger = LiteEvaluationLogger(model="my_model_v1", dataset="test_set")
+
+        logger.log_example(
+            inputs={"question": "What is 2+2?"},
+            output={"answer": "4"},
+            scores={"correct": True, "confidence": 0.95}
+        )
+
+        # Summary auto-logged at exit, or call manually 
+
+        ```
+    """
+
+    _done: bool = PrivateAttr(default=False)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize and register custom atexit handler."""
+        # Call parent initialization
+        super().model_post_init(__context)
+
+        # Remove from parent's global registry - we'll handle our own cleanup
+        if self in _active_evaluation_loggers:
+            _active_evaluation_loggers.remove(self)
+
+        # Register our own atexit handler
+        atexit.register(self._finalize_at_exit)
+
+    def _finalize_at_exit(self) -> None:
+        """Called automatically at program exit to finalize the evaluation."""
+        if self._done or self._is_finalized:
+            return
+        try:
+            self.log_summary()
+        except Exception:
+            logger.error("Error during automatic finalization at exit", exc_info=True)
+
+    def log_example(
+        self,
+        inputs: dict,
+        output: dict,
+        scores: dict[str, float | bool | dict],
+    ) -> None:
+        """Log a single prediction example with its scores.
+
+        This is the main method for adding data to your evaluation. It combines
+        logging a prediction and its associated scores into a single call, then
+        automatically finalizes the prediction.
+
+        This is equivalent to calling:
+        ```python
+        pred = logger.log_prediction(inputs, output)
+        for name, value in scores.items():
+            pred.log_score(name, value)
+        pred.finish()
+        ```
+
+        Why all three parameters are dicts:
+        -------------------------------
+        We enforce dict notation for inputs, output, AND scores for consistency
+        and clarity:
+
+        - **Consistency**: All three parameters have the same structure
+        - **Named fields**: Dict keys make it clear what each value represents
+          (vs positional tuples/lists)
+        - **Multiple outputs**: Models that return multiple values can use named
+          keys like {"answer": "...", "confidence": 0.95, "reasoning": "..."}
+        - **Better UI rendering**: Weave UI displays dict keys as named columns
+        - **Extensibility**: Can add new fields without breaking existing code
+
+        For simple single-value outputs, just wrap them:
+        ```python
+        output={"result": "4"}  # instead of just "4"
+        ```
+
+        Args:
+            inputs: Dictionary of inputs passed to the model. Must be a dict.
+            output: Dictionary of model outputs. Must be a dict for consistency
+                and to support named multi-output models.
+            scores: Dictionary mapping scorer names to score values. Scores can be
+                floats, bools, or dicts. Must be a dict.
+
+        Raises:
+            TypeError: If inputs, output, or scores are not dictionaries.
+            ValueError: If called after log_summary() has been called.
+
+        Example:
+            Simple single output:
+            ```python
+            logger.log_example(
+                inputs={"question": "What is the capital of France?"},
+                output={"answer": "Paris"},
+                scores={"correct": True, "latency_ms": 250}
+            )
+            ```
+
+            Multiple outputs (why dict is better):
+            ```python
+            logger.log_example(
+                inputs={"text": "This movie was great!"},
+                output={
+                    "sentiment": "positive",
+                    "confidence": 0.95,
+                    "reasoning": "Contains positive words like 'great'"
+                },
+                scores={
+                    "accuracy": 1.0,
+                    "confidence": 0.95,
+                    "latency_ms": 123
+                }
+            )
+            ```
+        """
+        if self._done:
+            raise ValueError(
+                "Cannot log example after log_summary() has been called. "
+                "Create a new LiteEvaluationLogger instance to start a new evaluation."
+            )
+
+        # Validate all parameters are dicts
+        for param_name, param_value in [("inputs", inputs), ("output", output), ("scores", scores)]:
+            if not isinstance(param_value, dict):
+                raise TypeError(
+                    f"{param_name} must be a dict, got {type(param_value).__name__}. "
+                    f"Wrap in a dict, e.g., {{'{param_name[:-1] if param_name.endswith('s') else param_name}': {param_value!r}}}"
+                )
+
+        # Log the prediction using parent class method
+        pred = self.log_prediction(inputs=inputs, output=output)
+
+        # Log all scores
+        for scorer_name, score_value in scores.items():
+            pred.log_score(scorer_name, score_value)
+
+        # Finish this prediction
+        pred.finish()
+
+    def log_summary(
+        self,
+        summary: dict | None = None,
+        auto_summarize: bool = True,
+    ) -> None:
+        """Finalize the evaluation and log aggregate metrics.
+
+        Called automatically at program exit if not called explicitly.
+        Prevents further examples from being logged.
+
+        Args:
+            summary: Optional dict of custom aggregate metrics.
+            auto_summarize: Whether to automatically calculate aggregate metrics
+                from logged scores. Defaults to True.
+
+        Example:
+            ```python
+            logger.log_summary({"overall_accuracy": 0.85})
+            ```
+        """
+        if self._done:
+            logger.warning("log_summary() already called, ignoring subsequent call.")
+            return
+
+        self._done = True
+
+        # Call parent's log_summary with both parameters
+        super().log_summary(summary=summary, auto_summarize=auto_summarize)
+
+    def finish(self, exception: BaseException | None = None) -> None:
+        """Clean up the evaluation resources explicitly without logging a summary.
+
+        This behaves the same as the base class - it will finalize the evaluation
+        WITHOUT automatically calling log_summary(). If you want a summary, you must
+        call log_summary() explicitly before calling finish().
+
+        The automatic log_summary() behavior only happens via atexit, not via finish().
+
+        Args:
+            exception: Optional exception to attach to the evaluation.
+        """
+        super().finish(exception=exception)
