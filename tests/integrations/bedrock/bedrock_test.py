@@ -189,6 +189,97 @@ MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE = {
     "usage": {"inputTokens": 25, "outputTokens": 30, "totalTokens": 55},
 }
 
+# Mock streaming events for invoke_model_with_response_stream (Anthropic Claude format)
+# These simulate the SSE events from Anthropic Claude via Bedrock's invoke_model_with_response_stream
+MOCK_INVOKE_STREAM_EVENTS = [
+    {
+        "chunk": {
+            "bytes": json.dumps(
+                {
+                    "type": "message_start",
+                    "message": {
+                        "id": "msg_bdrk_stream_01",
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [],
+                        "model": "claude-3-5-sonnet-20240620",
+                        "stop_reason": None,
+                        "stop_sequence": None,
+                        "usage": {"input_tokens": 40, "output_tokens": 1},
+                    },
+                }
+            ).encode("utf-8")
+        }
+    },
+    {
+        "chunk": {
+            "bytes": json.dumps(
+                {
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {"type": "text", "text": ""},
+                }
+            ).encode("utf-8")
+        }
+    },
+    {
+        "chunk": {
+            "bytes": json.dumps(
+                {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "text_delta", "text": "To list "},
+                }
+            ).encode("utf-8")
+        }
+    },
+    {
+        "chunk": {
+            "bytes": json.dumps(
+                {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "text_delta", "text": "all text files"},
+                }
+            ).encode("utf-8")
+        }
+    },
+    {
+        "chunk": {
+            "bytes": json.dumps(
+                {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {
+                        "type": "text_delta",
+                        "text": " in the current directory",
+                    },
+                }
+            ).encode("utf-8")
+        }
+    },
+    {
+        "chunk": {
+            "bytes": json.dumps({"type": "content_block_stop", "index": 0}).encode(
+                "utf-8"
+            )
+        }
+    },
+    {
+        "chunk": {
+            "bytes": json.dumps(
+                {
+                    "type": "message_delta",
+                    "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                    "usage": {"output_tokens": 30},
+                }
+            ).encode("utf-8")
+        }
+    },
+    {"chunk": {"bytes": json.dumps({"type": "message_stop"}).encode("utf-8")}},
+]
+
+
 # Mock response for bedrock-agent-runtime invoke_agent
 MOCK_INVOKE_AGENT_EVENTS = [
     {"chunk": {"bytes": b"Hello! I'm here to help you. How can I assist you today?"}},
@@ -249,6 +340,37 @@ def mock_converse_make_api_call(self, operation_name: str, api_params: dict) -> 
 def mock_invoke_make_api_call(self, operation_name: str, api_params: dict) -> dict:
     if operation_name == "InvokeModel":
         return MOCK_INVOKE_RESPONSE
+    return orig(self, operation_name, api_params)
+
+
+def mock_invoke_stream_make_api_call(
+    self, operation_name: str, api_params: dict
+) -> dict:
+    if operation_name == "InvokeModelWithResponseStream":
+
+        class MockStreamBody:
+            def __iter__(self):
+                yield from MOCK_INVOKE_STREAM_EVENTS
+
+        return {"body": MockStreamBody(), "contentType": "application/json"}
+    return orig(self, operation_name, api_params)
+
+
+def mock_invoke_stream_exception_make_api_call(
+    self, operation_name: str, api_params: dict
+) -> dict:
+    if operation_name == "InvokeModelWithResponseStream":
+        from botocore.exceptions import ClientError
+
+        raise ClientError(
+            error_response={
+                "Error": {
+                    "Code": "ValidationException",
+                    "Message": "The provided model identifier is invalid.",
+                }
+            },
+            operation_name="InvokeModelWithResponseStream",
+        )
     return orig(self, operation_name, api_params)
 
 
@@ -627,3 +749,128 @@ def test_bedrock_agent_invoke_agent(
     summary = call.summary
     assert summary is not None, "Summary should not be None"
     assert "usage" in summary
+
+
+@pytest.mark.skip_clickhouse_client
+@mock_aws
+def test_bedrock_invoke_stream(client: weave.trace.weave_client.WeaveClient) -> None:
+    """
+    Requirement: Streaming invoke_model calls are traced with token usage
+    Interface: patch_client patches invoke_model_with_response_stream, traces appear in Weave
+    Given: A Bedrock runtime client that has been patched with patch_client()
+    When: The user calls invoke_model_with_response_stream() and iterates through the response
+    Then: A trace is captured with accumulated content and token usage in the summary
+    """
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=mock_invoke_stream_make_api_call,
+    ):
+        body = json.dumps(
+            {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 30,
+                "temperature": 0.7,
+                "messages": [{"role": "user", "content": invoke_prompt}],
+            }
+        )
+
+        response = bedrock_client.invoke_model_with_response_stream(
+            modelId=model_id,
+            body=body,
+            contentType="application/json",
+            accept="application/json",
+        )
+
+        # Consume the stream to trigger accumulation
+        stream = response.get("body")
+        assert stream is not None, "Stream body not found in response"
+
+        accumulated_text = ""
+        for event in stream:
+            if "chunk" in event:
+                chunk_data = json.loads(event["chunk"]["bytes"].decode("utf-8"))
+                if chunk_data.get("type") == "content_block_delta":
+                    delta = chunk_data.get("delta", {})
+                    if delta.get("type") == "text_delta":
+                        accumulated_text += delta.get("text", "")
+
+        assert "To list all text files" in accumulated_text
+
+    # Verify that a trace was captured
+    calls = list(client.get_calls())
+    assert len(calls) == 1, "Expected exactly one trace call for streaming invoke"
+    call = calls[0]
+
+    assert call.exception is None
+    assert call.ended_at is not None
+    assert "BedrockRuntime.invoke_stream" in call.op_name
+
+    # Check the accumulated output contains the streamed content
+    output = call.output
+    assert output is not None
+    assert "content" in output
+    assert "To list all text files" in output["content"]
+
+    # Verify token usage in summary
+    summary = call.summary
+    assert summary is not None, "Summary should not be None"
+    model_usage = summary["usage"][model_id]
+    assert model_usage["requests"] == 1
+    # Token counts from streaming: input_tokens=40 from message_start, output_tokens=30 from message_delta
+    assert model_usage["prompt_tokens"] == 40
+    assert model_usage["completion_tokens"] == 30
+    assert model_usage["total_tokens"] == 70
+
+
+@pytest.mark.skip_clickhouse_client
+@mock_aws
+def test_bedrock_invoke_stream_exception_handling(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """
+    Requirement: Exceptions during streaming invoke are captured in traces
+    Interface: patch_client patches invoke_model_with_response_stream, exceptions are traced
+    Given: A patched Bedrock client where the API call raises a validation exception
+    When: The user calls invoke_model_with_response_stream() with invalid parameters
+    Then: The exception is raised and captured in the trace
+    """
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=mock_invoke_stream_exception_make_api_call,
+    ):
+        body = json.dumps(
+            {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 30,
+                "temperature": 0.7,
+                "messages": [{"role": "user", "content": invoke_prompt}],
+            }
+        )
+
+        with pytest.raises(Exception) as exc_info:
+            bedrock_client.invoke_model_with_response_stream(
+                modelId="invalid-model-id",
+                body=body,
+                contentType="application/json",
+                accept="application/json",
+            )
+
+        assert "ValidationException" in str(exc_info.value)
+        assert "The provided model identifier is invalid" in str(exc_info.value)
+
+    # Check that a trace was captured even with the exception
+    calls = list(client.get_calls())
+    assert len(calls) == 1, "Expected exactly one trace call even with exception"
+    call = calls[0]
+
+    # Verify the exception was captured in the trace
+    assert call.exception is not None
+    assert "ValidationException" in str(call.exception)
+    assert call.ended_at is not None
+    assert call.output is None
