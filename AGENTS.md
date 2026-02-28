@@ -254,6 +254,11 @@ npm run test
 - Add JSDoc comments for TypeScript code
 - Update this file when introducing new patterns or concepts
 
+### OTEL Event Parsing
+
+- `weave/trace_server/opentelemetry/attributes.py` now folds OTEL span events into an `events.*` namespace so we can treat agent-style event payloads (e.g. `gen_ai.user.message`, `gen_ai.choice`) just like standard attributes.
+- `weave/trace_server/opentelemetry/constants.py` should receive new keys for any additional event-based providers so inputs/outputs/tool metadata flow into ClickHouse without custom code elsewhere.
+
 ---
 
 ## Integration Patching
