@@ -3491,6 +3491,10 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "gpt-5.3-codex": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-5-mini": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
