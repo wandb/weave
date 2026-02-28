@@ -247,12 +247,12 @@ export class WeaveClient {
     limit: number = 1000
   ): AsyncIterableIterator<CallSchema> {
     const resp =
-      await this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost({
+      await debugResponse( () => this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost({
         project_id: this.projectId,
         filter,
         include_costs: includeCosts,
         limit,
-      });
+      }));
 
     const reader = resp.body!.getReader();
     const decoder = new TextDecoder();
@@ -419,13 +419,13 @@ export class WeaveClient {
       }
 
       const serializedObj = await this.serializedVal(obj);
-      const response = await this.traceServerApi.obj.objCreateObjCreatePost({
+      const response = await debugResponse( () => this.traceServerApi.obj.objCreateObjCreatePost({
         obj: {
           project_id: this.projectId,
-          object_id: objId,
+          object_id: objId!,
           val: serializedObj,
         },
-      });
+      }));
       return new ObjectRef(this.projectId, objId, response.data.digest);
     })();
 
@@ -461,13 +461,13 @@ export class WeaveClient {
         _bases: classChain.slice(1),
         ...saveAttrs,
       };
-      const response = await this.traceServerApi.obj.objCreateObjCreatePost({
+      const response = await debugResponse( () => this.traceServerApi.obj.objCreateObjCreatePost({
         obj: {
           project_id: this.projectId,
-          object_id: objId,
+          object_id: objId!,
           val: saveValue,
         },
-      });
+      }));
       const ref = new ObjectRef(this.projectId, objId, response.data.digest);
       return ref;
     })();
@@ -486,22 +486,22 @@ export class WeaveClient {
       });
       const rows = await this.serializedVal(rowsWithoutRefs);
       const response =
-        await this.traceServerApi.table.tableCreateTableCreatePost({
+        await debugResponse( () => this.traceServerApi.table.tableCreateTableCreatePost({
           table: {
             project_id: this.projectId,
             rows,
           },
-        });
+        }));
       const ref = new TableRef(this.projectId, response.data.digest);
       return ref;
     })();
     const tableQueryPromise = (async () => {
       const tableRef = await table.__savedRef;
       const tableQueryRes =
-        await this.traceServerApi.table.tableQueryTableQueryPost({
+        await debugResponse( () => this.traceServerApi.table.tableQueryTableQueryPost({
           project_id: this.projectId,
           digest: tableRef?.digest!,
-        });
+        }));
       return {
         tableDigest: tableRef?.digest!,
         tableQueryResult: tableQueryRes.data,
@@ -725,13 +725,13 @@ export class WeaveClient {
         'obj.py',
         new Blob([formattedOpFn])
       );
-      const response = await this.traceServerApi.obj.objCreateObjCreatePost({
+      const response = await debugResponse( () => this.traceServerApi.obj.objCreateObjCreatePost({
         obj: {
           project_id: this.projectId,
           object_id: resolvedObjId,
           val: saveValue,
         },
-      });
+      }));
       const ref = new OpRef(
         this.projectId,
         resolvedObjId,
@@ -1032,4 +1032,36 @@ function objectNameToId(name: string): string {
   }
 
   return res;
+}
+
+// Wrapper of last-resort for traceServerApi requests that occasionally throw
+// Response objects
+function debugResponse<R>( fn: () => Promise<R> ) {
+  return fn().catch( async e => {
+    // If it's a real error, rethrow it
+    if ( e instanceof Error ) {
+      throw e;
+    }
+
+    // Does it look response-y?
+    else if ( e && typeof e === 'object' && 'bodyUsed' in e ) {
+      const url = e.url ??  'unknown url';
+      const status = e.status ?? 'unknown status';
+
+      let body : string = 'no body';
+      try {
+        const eCopy = e.clone();
+        body = await eCopy.text();
+      } catch (e) {
+
+      }
+
+      throw new Error(`Trace Server API returned ${status} for ${url}: ${body.substring(0, 256)}`);
+    }
+
+    // wrap it in a real error so it has a stack trace and send it on its way
+    else {
+      throw new Error("Uncaught error thrown in traceServerApi: " + String(e));
+    }
+  })
 }
