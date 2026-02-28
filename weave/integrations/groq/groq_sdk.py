@@ -112,7 +112,7 @@ def get_groq_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _groq_patcher
+    global _groq_patcher  # noqa: PLW0603
     if _groq_patcher is not None:
         return _groq_patcher
 

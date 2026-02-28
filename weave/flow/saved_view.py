@@ -763,7 +763,7 @@ class SavedView:
             return f"{weave_root}/{self.view_type}?view={self.ref.name}"
         return None
 
-    def _repr_pretty_(self, p: Any, cycle: bool) -> None:
+    def _repr_pretty_(self, p: Any, cycle: bool) -> None:  # noqa: PLW3201
         """Show a nicely formatted table in ipython."""
         if cycle:
             p.text("SavedView(...)")

@@ -52,7 +52,7 @@ def read_model_to_provider_info_map(
 ) -> dict[str, LLMModelProviderInfo]:
     full_path = os.path.join(os.path.dirname(__file__), file_name)
     try:
-        with open(full_path) as f:
+        with open(full_path, encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logger.exception(
@@ -110,7 +110,7 @@ def read_model_id_to_details_map(
 ) -> dict[str, LLMModelDetails]:
     full_path = os.path.join(os.path.dirname(__file__), file_name)
     try:
-        with open(full_path) as f:
+        with open(full_path, encoding="utf-8") as f:
             loaded = json.load(f)
             return {model["id"]: model for model in loaded["models"]}
     except Exception as e:
@@ -128,7 +128,7 @@ def main(
 
     # Start with information about CoreWeave hosted models
     full_path_hosted = os.path.join(os.path.dirname(__file__), HOSTED_MODEL_INFO_FILE)
-    with open(full_path_hosted) as f:
+    with open(full_path_hosted, encoding="utf-8") as f:
         hosted_models = json.load(f)
     for model in hosted_models["models"]:
         provider = model["provider"]
@@ -187,7 +187,7 @@ def main(
             providers[k] = litellm_info
     full_path_output = os.path.join(os.path.dirname(__file__), file_name)
     os.makedirs(os.path.dirname(full_path_output), exist_ok=True)
-    with open(full_path_output, "w") as f:
+    with open(full_path_output, "w", encoding="utf-8") as f:
         json.dump(providers, f, indent=2)
     print(
         f"Updated model to model provider info file at: {full_path_output}. {len(providers)} models updated."

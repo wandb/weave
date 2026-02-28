@@ -565,7 +565,7 @@ def get_autogen_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _autogen_patcher
+    global _autogen_patcher  # noqa: PLW0603
     if _autogen_patcher is not None:
         return _autogen_patcher
 

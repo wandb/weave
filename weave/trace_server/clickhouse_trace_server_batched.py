@@ -49,6 +49,7 @@ from weave.trace_server import (
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
+from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
@@ -757,18 +758,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         with self.call_batch():
             for complete_call in req.batch:
-                complete_call = process_complete_call_to_content(complete_call, self)
+                processed_complete_call = process_complete_call_to_content(
+                    complete_call, self
+                )
 
                 # Determine write target based on project, this should be the same for all
                 # calls in the batch, subsequent calls just hit the in-memory cache. This
                 # is here for technical correctness, in case we relax project_id target
                 # constraints intra-batch
                 write_target = self.table_routing_resolver.resolve_v2_write_target(
-                    complete_call.project_id,
+                    processed_complete_call.project_id,
                     self.ch_client,
                 )
 
-                ch_call = _complete_call_to_ch_insertable(complete_call)
+                ch_call = _complete_call_to_ch_insertable(processed_complete_call)
                 if write_target == WriteTarget.CALLS_COMPLETE:
                     self._insert_call_complete(ch_call)
                 else:
@@ -776,9 +779,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
                 _maybe_enqueue_minimal_call_end(
                     self.kafka_producer,
-                    complete_call.project_id,
-                    complete_call.id,
-                    complete_call.ended_at,
+                    processed_complete_call.project_id,
+                    processed_complete_call.id,
+                    processed_complete_call.ended_at,
                 )
 
         return tsi.CallsUpsertCompleteRes()
@@ -4902,6 +4905,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         res = self.calls_delete(calls_delete_req)
         return tsi.ScoreDeleteRes(num_deleted=res.num_deleted)
+
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Return grouped prediction/trial/score data for evaluation results."""
+        return eval_helpers.eval_results_query(self, req)
 
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05

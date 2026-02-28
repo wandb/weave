@@ -1045,9 +1045,7 @@ def test_trace_call_query_timings(client):
         # Mock only the .now() method, keep everything else as-is
         mock_datetime_class.now = mock.Mock(side_effect=mock_now)
         # Preserve other datetime functionality
-        mock_datetime_class.side_effect = lambda *args, **kw: datetime.datetime(
-            *args, **kw
-        )
+        mock_datetime_class.side_effect = datetime.datetime
 
         for i in range(num_calls):
             call_index = i

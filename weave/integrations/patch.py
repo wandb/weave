@@ -475,7 +475,7 @@ def register_import_hook() -> None:
     if not should_implicitly_patch_integrations():
         return
 
-    global _IMPORT_HOOK
+    global _IMPORT_HOOK  # noqa: PLW0603
 
     # Only register if not already registered
     if _IMPORT_HOOK is None:
@@ -486,7 +486,7 @@ def register_import_hook() -> None:
 
 def unregister_import_hook() -> None:
     """Unregister the import hook (useful for testing or cleanup)."""
-    global _IMPORT_HOOK
+    global _IMPORT_HOOK  # noqa: PLW0603
 
     if _IMPORT_HOOK is not None:
         try:
@@ -498,5 +498,5 @@ def unregister_import_hook() -> None:
 
 def reset_patched_integrations() -> None:
     """Reset the set of patched integrations (useful for testing)."""
-    global _PATCHED_INTEGRATIONS
+    global _PATCHED_INTEGRATIONS  # noqa: PLW0603
     _PATCHED_INTEGRATIONS = set()

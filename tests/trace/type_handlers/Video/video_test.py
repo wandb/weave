@@ -456,6 +456,7 @@ def test_many_videos_will_consistently_log():
         ["python", "tests/trace/type_handlers/Video/video_saving_script.py"],
         capture_output=True,
         text=True,
+        check=False,
     )
 
     # This should always be True because the future executor won't raise an exception

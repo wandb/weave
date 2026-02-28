@@ -94,7 +94,7 @@ llm_as_a_judge_scorer_digest = (
 library_cases = [
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel",
-        runtime_object_factory=lambda: make_evaluation(),
+        runtime_object_factory=make_evaluation,
         inline_call_param=False,
         is_legacy=False,
         exp_json={
@@ -307,7 +307,7 @@ library_cases = [
     ),
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v4)",
-        runtime_object_factory=lambda: make_evaluation(),
+        runtime_object_factory=make_evaluation,
         inline_call_param=False,
         is_legacy=True,
         exp_json={
@@ -520,7 +520,7 @@ library_cases = [
     # Uses llm_as_a_judge_scorer_legacy_digest because the exp_val was captured from Python < 3.13
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v3)",
-        runtime_object_factory=lambda: make_evaluation(),
+        runtime_object_factory=make_evaluation,
         inline_call_param=False,
         is_legacy=True,
         exp_json={
@@ -730,7 +730,7 @@ library_cases = [
     ),
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v3)",
-        runtime_object_factory=lambda: make_evaluation(),
+        runtime_object_factory=make_evaluation,
         inline_call_param=False,
         is_legacy=True,
         exp_json={
@@ -940,7 +940,7 @@ library_cases = [
     ),
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v2)",
-        runtime_object_factory=lambda: make_evaluation(),
+        runtime_object_factory=make_evaluation,
         inline_call_param=False,
         is_legacy=True,
         exp_json={
@@ -1146,7 +1146,7 @@ library_cases = [
     ),
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (Legacy)",
-        runtime_object_factory=lambda: make_evaluation(),
+        runtime_object_factory=make_evaluation,
         inline_call_param=False,
         is_legacy=True,
         exp_json={
@@ -1351,7 +1351,7 @@ library_cases = [
     ),
     SerializationTestCase(
         id="Library Objects - Model, Prompt",
-        runtime_object_factory=lambda: make_model(),
+        runtime_object_factory=make_model,
         inline_call_param=False,
         is_legacy=False,
         exp_json={

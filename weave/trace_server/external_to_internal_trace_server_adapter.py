@@ -760,6 +760,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.score_delete, req)
 
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Query grouped evaluation results with project ID conversion."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.eval_results_query, req)
+
     # Calls V2 API
     def calls_complete(
         self, req: tsi.CallsUpsertCompleteReq

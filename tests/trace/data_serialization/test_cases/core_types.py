@@ -13,7 +13,7 @@ core_cases = [
     # Core Types
     SerializationTestCase(
         id="Op",
-        runtime_object_factory=lambda: make_op(),
+        runtime_object_factory=make_op,
         inline_call_param=False,
         is_legacy=False,
         exp_json={

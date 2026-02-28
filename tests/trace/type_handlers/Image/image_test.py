@@ -226,6 +226,7 @@ async def test_many_images_will_consistently_log():
         ["python", "trace/type_handlers/Image/image_saving_script.py"],
         capture_output=True,
         text=True,
+        check=False,
     )
 
     # This should always be True because the future executor won't raise an exception

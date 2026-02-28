@@ -95,9 +95,9 @@ def init(
 
     parse_and_apply_settings(settings)
 
-    global _global_postprocess_inputs
-    global _global_postprocess_output
-    global _global_attributes
+    global _global_postprocess_inputs  # noqa: PLW0603
+    global _global_postprocess_output  # noqa: PLW0603
+    global _global_attributes  # noqa: PLW0603
 
     _global_postprocess_inputs = global_postprocess_inputs
     _global_postprocess_output = global_postprocess_output

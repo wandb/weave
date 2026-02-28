@@ -23,9 +23,12 @@ def train_router(
     """Currently only supports EvaluationResults with a single score column."""
     router_dataset: dict[str, pd.DataFrame] = {}
 
-    for model, eval_results in model_evals.items():
-        if isinstance(model, weave.Model):
-            model = model.name or f"model-{_placeholder_model_name()}"
+    for model_key, eval_results in model_evals.items():
+        model = (
+            model_key.name or f"model-{_placeholder_model_name()}"
+            if isinstance(model_key, weave.Model)
+            else model_key
+        )
 
         score_col_name, eval_df = _build_dataframe(model, eval_results)
         router_dataset[model] = eval_df
@@ -142,10 +145,14 @@ def _build_dataframe(
     for row in dataset.rows:
         df_row = {}
         for col, val in row.items():
+            row_col = col
+            row_value = val
             if col == "scores":
-                col, val = _get_score_column(model, val, score_col_name=score_col_name)
-                score_col_name = score_col_name or col
-            df_row[col] = val
+                row_col, row_value = _get_score_column(
+                    model, val, score_col_name=score_col_name
+                )
+                score_col_name = score_col_name or row_col
+            df_row[row_col] = row_value
         df_rows.append(df_row)
 
     if score_col_name is None:

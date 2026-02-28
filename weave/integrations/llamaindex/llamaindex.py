@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 def get_weave_client() -> WeaveClient | None:
     """Get the weave client, returning None if weave hasn't been initialized."""
-    global _weave_client_instance
+    global _weave_client_instance  # noqa: PLW0603
     if _weave_client_instance is None:
         try:
             _weave_client_instance = weave_client_context.require_weave_client()
@@ -552,7 +552,7 @@ class LLamaIndexPatcher(Patcher):  # pyright: ignore[reportRedeclaration]
 
     def attempt_patch(self) -> bool:
         """Attempts to patch LlamaIndex instrumentation and set up Weave handlers."""
-        global _import_failed
+        global _import_failed  # noqa: PLW0602
         if _import_failed:
             return False
 

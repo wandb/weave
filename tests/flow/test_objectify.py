@@ -114,10 +114,9 @@ def resolve_ref_futures(ref: RefWithExtra) -> RefWithExtra:
     extras = ref._extra
     new_extras = []
     for name, val in zip(extras[::2], extras[1::2], strict=False):
-        if isinstance(val, Future):
-            val = val.result()
+        resolved_val = val.result() if isinstance(val, Future) else val
         new_extras.append(name)
-        new_extras.append(val)
+        new_extras.append(resolved_val)
     ref = replace(ref, _extra=tuple(new_extras))
     return ref
 
