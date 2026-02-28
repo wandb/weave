@@ -7,6 +7,7 @@ import inspect
 import logging
 import random
 import sys
+import threading
 import traceback
 import weakref
 from collections import defaultdict
@@ -76,6 +77,9 @@ R = TypeVar("R")
 
 logger = logging.getLogger(__name__)
 
+# Lock to protect is_op() checks in multi-threaded contexts.
+# Python's Protocol isinstance checks are not thread-safe in Python < 3.12.
+_is_op_lock = threading.Lock()
 
 CALL_CREATE_MSG = "Error creating call:\n{}"
 ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
@@ -1393,9 +1397,14 @@ def maybe_unbind_method(oplike: Op | MethodType | partial) -> Op:
 
 
 def is_op(obj: Any) -> TypeIs[Op]:
-    """Check if an object is an Op."""
+    """Check if an object is an Op.
+
+    Uses a lock to protect against thread-safety issues with Protocol
+    isinstance checks in Python < 3.12.
+    """
     if sys.version_info < (3, 12):
-        return isinstance(obj, Op)
+        with _is_op_lock:
+            return isinstance(obj, Op)
 
     return all(hasattr(obj, attr) for attr in Op.__annotations__)
 
