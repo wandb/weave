@@ -12,9 +12,6 @@ Requirements:
 import asyncio
 import os
 
-# Allow running from within a Claude Code session
-os.environ.pop("CLAUDECODE", None)
-
 import claude_agent_sdk
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage
 
