@@ -36,6 +36,11 @@ class FakeTextBlock:
 
 
 @dataclass
+class FakeThinkingBlock:
+    text: str
+
+
+@dataclass
 class FakeToolUseBlock:
     id: str
     name: str
@@ -166,6 +171,7 @@ def mock_sdk() -> Generator[MagicMock, None, None]:
     mock.AssistantMessage = FakeAssistantMessage
     mock.ResultMessage = FakeResultMessage
     mock.TextBlock = FakeTextBlock
+    mock.ThinkingBlock = FakeThinkingBlock
     mock.ToolUseBlock = FakeToolUseBlock
     mock.ClaudeAgentOptions = FakeClaudeAgentOptions
     mock.HookMatcher = FakeHookMatcher
@@ -405,11 +411,56 @@ class TestTracingAsyncIterator:
         result = asyncio.get_event_loop().run_until_complete(run())
 
         assert len(result) == 3
-        mock_wc.create_call.assert_called_once()
-        mock_wc.finish_call.assert_called_once()
-        finish_kwargs = mock_wc.finish_call.call_args
-        assert finish_kwargs.kwargs["output"]["text"] == "Hello world"
-        assert finish_kwargs.kwargs["output"]["result"] == "Hello world"
+        # 1 parent + 2 assistant turn child calls = 3 create_call
+        assert mock_wc.create_call.call_count == 3
+        # 2 assistant turn finish + 1 parent finish = 3 finish_call
+        assert mock_wc.finish_call.call_count == 3
+        # Last finish_call is the parent with accumulated text
+        parent_finish = mock_wc.finish_call.call_args_list[-1]
+        assert parent_finish.kwargs["output"]["text"] == "Hello world"
+        assert parent_finish.kwargs["output"]["result"] == "Hello world"
+
+    def test_creates_thinking_child_call(self, mock_sdk: MagicMock) -> None:
+        mock_wc = MagicMock()
+        mock_parent_call = MagicMock()
+        mock_wc.create_call.return_value = mock_parent_call
+
+        messages = [
+            FakeAssistantMessage(
+                content=[
+                    FakeThinkingBlock(text="Let me think about this..."),
+                    FakeTextBlock(text="The answer is 42."),
+                ]
+            ),
+            FakeResultMessage(result="42"),
+        ]
+
+        async def run() -> list[Any]:
+            collected = []
+            with patch(
+                "weave.integrations.claude_agent_sdk.claude_agent_sdk.get_weave_client",
+                return_value=mock_wc,
+            ), patch(
+                "weave.integrations.claude_agent_sdk.claude_agent_sdk.call_context"
+            ):
+                iterator = TracingAsyncIterator(
+                    _aiter_messages(messages), {"prompt": "test"}
+                )
+                async for msg in iterator:
+                    collected.append(msg)
+            return collected
+
+        asyncio.get_event_loop().run_until_complete(run())
+
+        # 1 parent + 1 thinking + 1 assistant turn = 3 create_call
+        assert mock_wc.create_call.call_count == 3
+        create_calls = mock_wc.create_call.call_args_list
+        # Second call is the thinking child
+        assert create_calls[1].kwargs["op"] == "claude_agent_sdk.thinking"
+        assert create_calls[1].kwargs["display_name"] == "Thinking"
+        # Third call is the assistant turn child
+        assert create_calls[2].kwargs["op"] == "claude_agent_sdk.assistant_turn"
+        assert create_calls[2].kwargs["display_name"] == "Assistant Turn"
 
     def test_finishes_with_exception_on_error(self, mock_sdk: MagicMock) -> None:
         mock_wc = MagicMock()
@@ -435,8 +486,11 @@ class TestTracingAsyncIterator:
                         pass
 
         asyncio.get_event_loop().run_until_complete(run())
-        mock_wc.finish_call.assert_called_once()
-        assert mock_wc.finish_call.call_args.kwargs.get("exception") is not None
+        # 1 assistant turn finish + 1 parent finish with exception = 2
+        assert mock_wc.finish_call.call_count == 2
+        # Last finish_call is the parent with the exception
+        parent_finish = mock_wc.finish_call.call_args_list[-1]
+        assert parent_finish.kwargs.get("exception") is not None
 
     def test_no_tracing_without_client(self, mock_sdk: MagicMock) -> None:
         messages = [

@@ -231,11 +231,9 @@ class TracingAsyncIterator:
 
         sdk = importlib.import_module("claude_agent_sdk")
 
-        # Accumulate text from AssistantMessages
-        if isinstance(message, sdk.AssistantMessage):
-            for block in message.content:
-                if isinstance(block, sdk.TextBlock):
-                    self._accumulated_text += block.text
+        # Create child calls for AssistantMessages
+        if isinstance(message, sdk.AssistantMessage) and wc is not None and self._parent_call is not None:
+            self._log_assistant_message(wc, sdk, message)
 
         # Finish parent call when ResultMessage arrives
         if isinstance(message, sdk.ResultMessage) and self._parent_call is not None and wc is not None:
@@ -245,6 +243,42 @@ class TracingAsyncIterator:
             _current_parent_call = None
 
         return message
+
+    def _log_assistant_message(self, wc: Any, sdk: Any, message: Any) -> None:
+        """Create child calls for content blocks in an AssistantMessage."""
+        text_parts: list[str] = []
+        thinking_parts: list[str] = []
+
+        for block in message.content:
+            if isinstance(block, sdk.TextBlock):
+                text_parts.append(block.text)
+                self._accumulated_text += block.text
+            elif isinstance(block, sdk.ThinkingBlock):
+                thinking_parts.append(block.text)
+
+        # Create a child call for thinking if present
+        if thinking_parts:
+            thinking_text = "\n".join(thinking_parts)
+            call = wc.create_call(
+                op="claude_agent_sdk.thinking",
+                inputs={},
+                parent=self._parent_call,
+                display_name="Thinking",
+                use_stack=False,
+            )
+            wc.finish_call(call, output={"thinking": thinking_text})
+
+        # Create a child call for the assistant's text response if present
+        if text_parts:
+            response_text = "\n".join(text_parts)
+            call = wc.create_call(
+                op="claude_agent_sdk.assistant_turn",
+                inputs={},
+                parent=self._parent_call,
+                display_name="Assistant Turn",
+                use_stack=False,
+            )
+            wc.finish_call(call, output={"text": response_text, "model": _safe_get(message, "model")})
 
 
 async def _string_to_async_iterable(prompt: str) -> AsyncIterator[dict[str, Any]]:
