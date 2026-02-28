@@ -35,6 +35,22 @@ class IdConverter:
     def int_to_ext_user_id(self, user_id: str) -> str:
         raise NotImplementedError()
 
+    def get_auth_user(self) -> typing.Any:
+        """Return the authenticated user from auth scope, if available.
+
+        Used to populate wb_username on calls that belong to the current user.
+        Returns an object with `id` and `username` attributes, or None.
+        """
+        return None
+
+    def get_username_for_user_id(self, user_id: str) -> str | None:
+        """Look up the username for a given external user ID.
+
+        Implementations should cache results for efficiency. Returns None if the
+        username cannot be resolved.
+        """
+        return None
+
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -151,6 +167,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             res.call.wb_run_id = self._idc.int_to_ext_run_id(res.call.wb_run_id)
         if res.call.wb_user_id is not None:
             res.call.wb_user_id = self._idc.int_to_ext_user_id(res.call.wb_user_id)
+            res.call.wb_username = self._idc.get_username_for_user_id(
+                res.call.wb_user_id
+            )
         return res
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
@@ -178,6 +197,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
             if call.wb_user_id is not None:
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
+                call.wb_username = self._idc.get_username_for_user_id(call.wb_user_id)
         return res
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
@@ -207,6 +227,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
             if call.wb_user_id is not None:
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
+                call.wb_username = self._idc.get_username_for_user_id(call.wb_user_id)
             yield call
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
