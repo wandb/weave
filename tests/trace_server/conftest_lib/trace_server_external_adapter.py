@@ -156,6 +156,22 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().score_delete(req)
 
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        req.wb_user_id = self._user_id
+        return super().obj_add_tags(req)
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        req.wb_user_id = self._user_id
+        return super().obj_remove_tags(req)
+
+    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+        req.wb_user_id = self._user_id
+        return super().obj_set_alias(req)
+
+    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+        req.wb_user_id = self._user_id
+        return super().obj_remove_alias(req)
+
 
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface,

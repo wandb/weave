@@ -665,6 +665,36 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
         )
 
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        return self._generic_request(
+            "/obj/tags/add", req, tsi.ObjAddTagsReq, tsi.ObjAddTagsRes
+        )
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        return self._generic_request(
+            "/obj/tags/remove", req, tsi.ObjRemoveTagsReq, tsi.ObjRemoveTagsRes
+        )
+
+    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+        return self._generic_request(
+            "/obj/alias/set", req, tsi.ObjSetAliasReq, tsi.ObjSetAliasRes
+        )
+
+    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+        return self._generic_request(
+            "/obj/alias/remove", req, tsi.ObjRemoveAliasReq, tsi.ObjRemoveAliasRes
+        )
+
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        return self._generic_request(
+            "/obj/tags/list", req, tsi.TagsListReq, tsi.TagsListRes
+        )
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        return self._generic_request(
+            "/obj/aliases/list", req, tsi.AliasesListReq, tsi.AliasesListRes
+        )
+
     @validate_call
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         return self._generic_request(

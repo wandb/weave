@@ -98,6 +98,7 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_runnable_ref_selector,
 )
 from weave.trace_server.trace_server_interface import (
+    AliasesListReq,
     CallEndReq,
     CallsDeleteReq,
     CallsFilter,
@@ -114,14 +115,18 @@ from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
+    ObjAddTagsReq,
     ObjCreateReq,
     ObjCreateRes,
     ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
+    ObjRemoveAliasReq,
+    ObjRemoveTagsReq,
     ObjSchema,
     ObjSchemaForInsert,
+    ObjSetAliasReq,
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
@@ -132,6 +137,7 @@ from weave.trace_server.trace_server_interface import (
     TableCreateRes,
     TableSchemaForInsert,
     TableUpdateReq,
+    TagsListReq,
     TraceServerInterface,
     TraceStatus,
 )
@@ -1172,6 +1178,88 @@ class WeaveClient:
             )
         )
         return result.num_deleted
+
+    def add_tags(self, obj_ref: str | ObjectRef, tags: list[str]) -> None:
+        """Add tags to an object version.
+
+        Args:
+            obj_ref: Reference to the object version, either an ObjectRef or a
+                weave:/// URI string.
+            tags: List of tag strings to add.
+        """
+        if isinstance(obj_ref, str):
+            obj_ref = ObjectRef.parse_uri(obj_ref)
+        self.server.obj_add_tags(
+            ObjAddTagsReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                tags=tags,
+            )
+        )
+
+    def remove_tags(self, obj_ref: str | ObjectRef, tags: list[str]) -> None:
+        """Remove tags from an object version.
+
+        Args:
+            obj_ref: Reference to the object version, either an ObjectRef or a
+                weave:/// URI string.
+            tags: List of tag strings to remove.
+        """
+        if isinstance(obj_ref, str):
+            obj_ref = ObjectRef.parse_uri(obj_ref)
+        self.server.obj_remove_tags(
+            ObjRemoveTagsReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                tags=tags,
+            )
+        )
+
+    def set_alias(self, obj_ref: str | ObjectRef, alias: str) -> None:
+        """Set an alias for an object version.
+
+        Args:
+            obj_ref: Reference to the object version, either an ObjectRef or a
+                weave:/// URI string.
+            alias: The alias name to set (e.g., "production", "staging").
+        """
+        if isinstance(obj_ref, str):
+            obj_ref = ObjectRef.parse_uri(obj_ref)
+        self.server.obj_set_alias(
+            ObjSetAliasReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                alias=alias,
+            )
+        )
+
+    def remove_alias(self, object_id: str, alias: str) -> None:
+        """Remove an alias from an object.
+
+        Args:
+            object_id: The object name.
+            alias: The alias name to remove.
+        """
+        self.server.obj_remove_alias(
+            ObjRemoveAliasReq(
+                project_id=self._project_id(),
+                object_id=object_id,
+                alias=alias,
+            )
+        )
+
+    def list_tags(self) -> list[str]:
+        """List all distinct tags in the project."""
+        res = self.server.tags_list(TagsListReq(project_id=self._project_id()))
+        return res.tags
+
+    def list_aliases(self) -> list[str]:
+        """List all distinct aliases in the project."""
+        res = self.server.aliases_list(AliasesListReq(project_id=self._project_id()))
+        return res.aliases
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:

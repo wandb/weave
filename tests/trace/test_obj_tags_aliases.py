@@ -794,6 +794,74 @@ def test_multiple_aliases_on_object(client: WeaveClient):
 # --- obj_read with real digest (not alias) ---
 
 
+# --- SDK client methods (WeaveClient.add_tags, remove_tags, set_alias, remove_alias) ---
+
+
+def test_sdk_add_tags(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_add_tags_obj")
+
+    client.add_tags(ref, ["alpha", "beta"])
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert res.objs[0].tags == ["alpha", "beta"]
+
+
+def test_sdk_remove_tags(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_rm_tags_obj")
+
+    client.add_tags(ref, ["x", "y"])
+    client.remove_tags(ref, ["x"])
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert res.objs[0].tags == ["y"]
+
+
+def test_sdk_set_alias(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_set_alias_obj")
+
+    client.set_alias(ref, "production")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "production" in res.objs[0].aliases
+
+
+def test_sdk_remove_alias(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_rm_alias_obj")
+
+    client.set_alias(ref, "staging")
+    client.remove_alias(ref.name, "staging")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "staging" not in (res.objs[0].aliases or [])
+
+
+# --- obj_read with real digest (not alias) ---
+
+
 def test_obj_read_with_real_digest(client: WeaveClient):
     """obj_read with a content-addressed digest should not attempt alias resolution."""
     object_id, digest = _publish_obj(client, "real_digest_obj")
@@ -1025,6 +1093,55 @@ def test_aliases_list_excludes_removed(client: WeaveClient):
         tsi.AliasesListReq(project_id=client._project_id())
     )
     assert res.aliases == ["keep-alias"]
+
+
+# --- SDK list_tags / list_aliases ---
+
+
+def test_sdk_list_tags(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_list_tags_obj")
+    client.add_tags(ref, ["zeta", "alpha"])
+
+    tags = client.list_tags()
+    assert "alpha" in tags
+    assert "zeta" in tags
+
+
+def test_sdk_list_aliases(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_list_aliases_obj")
+    client.set_alias(ref, "my-alias")
+
+    aliases = client.list_aliases()
+    assert "my-alias" in aliases
+
+
+def test_sdk_string_ref(client: WeaveClient):
+    """add_tags, remove_tags, and set_alias accept string URIs."""
+    ref = weave.publish({"data": "test"}, name="sdk_str_ref_obj")
+    uri = ref.uri()
+
+    client.add_tags(uri, ["from-string"])
+    client.set_alias(uri, "str-alias")
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "from-string" in res.objs[0].tags
+    assert "str-alias" in res.objs[0].aliases
+
+    client.remove_tags(uri, ["from-string"])
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "from-string" not in res.objs[0].tags
 
 
 def test_tag_version_like_accepted():
