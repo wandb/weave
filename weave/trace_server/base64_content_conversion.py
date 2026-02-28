@@ -33,6 +33,8 @@ BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 # Minimum size to create a file (to avoid making more data than what the original is)
 AUTO_CONVERSION_MIN_SIZE = 1024  # 1 KiB
 
+CONTENT_CLASS = "weave.type_wrappers.Content.content.Content"
+
 
 def is_base64(value: str) -> bool:
     """Huerestic to quickly check if a string is likely base64.
@@ -96,7 +98,7 @@ def store_content_object(
     # We exclude the load op because it isn't possible to get from the server side
     return {
         "_type": "CustomWeaveType",
-        "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
+        "weave_type": {"type": CONTENT_CLASS},
         "files": {"content": content_res.digest, "metadata.json": metadata_res.digest},
     }
 
