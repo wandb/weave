@@ -144,6 +144,17 @@ openai.images.generate({
 
 For a complete setup guide for ESM projects, see the [TypeScript SDK: Third-Party Integration Guide](https://weave-docs.wandb.ai/guides/integrations/js).
 
+### Optional: Stainless Trace API Client
+
+Weave can use the Stainless-generated trace API client when enabled. Install the optional dependency and set the env var:
+
+```bash
+npm install weave-server-sdk
+export WEAVE_USE_STAINLESS_SERVER=true
+```
+
+When `WEAVE_USE_STAINLESS_SERVER` is set, trace server calls are routed through `weave-server-sdk`. Otherwise the bundled trace client is used.
+
 ### Evaluations
 
 ```typescript

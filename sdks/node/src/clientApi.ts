@@ -1,6 +1,6 @@
-import {Api as TraceServerApi} from './generated/traceServerApi';
 import {makeSettings, SettingsInit} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
+import {createTraceServerApi} from './traceServerApiFactory';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
 import {createFetchWithRetry} from './utils/retry';
@@ -33,14 +33,10 @@ export async function login(apiKey: string, host?: string) {
   const {traceBaseUrl} = getUrls(host);
 
   // Test the connection to the traceServerApi
-  const testTraceServerApi = new TraceServerApi({
-    baseUrl: traceBaseUrl,
-    baseApiParams: {
-      headers: {
-        'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
-        Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
-      },
-    },
+  const testTraceServerApi = createTraceServerApi({
+    traceBaseUrl,
+    apiKey,
+    userAgent: `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
   });
   try {
     await testTraceServerApi.health.readRootHealthGet({});
@@ -117,14 +113,10 @@ export async function init(
       }
     );
 
-    const traceServerApi = new TraceServerApi({
-      baseUrl: traceBaseUrl,
-      baseApiParams: {
-        headers: {
-          'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
-          Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
-        },
-      },
+    const traceServerApi = createTraceServerApi({
+      traceBaseUrl,
+      apiKey,
+      userAgent: `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
       customFetch: concurrencyLimitedFetch,
     });
 
