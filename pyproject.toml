@@ -467,6 +467,7 @@ test = [
   "weave[trace_server]",
   "moto[s3]>=5.0.0",
   "respx",
+  "claude-agent-sdk>=0.1.44",
 ]
 
 [tool.uv]
