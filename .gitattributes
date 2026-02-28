@@ -1,3 +1,5 @@
 *.png binary
 *.jpg binary
 *.gif binary
+uv.lock linguist-generated=true
+tests/integrations/claude_plugin/*.py linguist-generated=true
