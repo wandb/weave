@@ -45,7 +45,8 @@ def test_query_light_column_with_costs() -> None:
             llm_usage AS (
                 -- From the all_calls we get the usage data for LLMs
                 SELECT
-                    *,
+                    id,
+                    started_at,
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                     arrayJoin(
                         if(
@@ -99,12 +100,12 @@ def test_query_light_column_with_costs() -> None:
                     OR (llm_token_prices.pricing_level_id = {pb_4:String}))) )
             -- Final Select, which just selects the correct fields, and adds a costs object
             SELECT
-                id,
-                started_at,
-                if( any(llm_id) = 'weave_dummy_llm_id' or any(llm_token_prices.id) == '',
-                any(summary_dump),
+                ranked_prices.id,
+                ranked_prices.started_at,
+                if( any(ranked_prices.llm_id) = 'weave_dummy_llm_id' or any(llm_token_prices.id) == '',
+                any(all_calls.summary_dump),
                 concat(
-                    left(any(summary_dump), length(any(summary_dump)) - 1),
+                    left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1),
                     ',"weave":{',
                         '"costs":',
                         concat(
@@ -112,23 +113,23 @@ def test_query_light_column_with_costs() -> None:
                             arrayStringConcat(
                                 groupUniqArray(
                                     concat(
-                                        '"', toString(llm_id), '":{',
-                                        '"prompt_tokens":', toString(prompt_tokens), ',',
-                                        '"completion_tokens":', toString(completion_tokens), ',',
-                                        '"requests":', toString(requests), ',',
-                                        '"total_tokens":', toString(total_tokens), ',',
-                                        '"prompt_token_cost":', toString(prompt_token_cost), ',',
-                                        '"completion_token_cost":', toString(completion_token_cost), ',',
-                                        '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',',
-                                        '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
-                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit),  '",',
-                                        '"completion_token_cost_unit":"', toString(completion_token_cost_unit),  '",',
-                                        '"effective_date":"', toString(effective_date),  '",',
-                                        '"provider_id":"', toString(provider_id),  '",',
-                                        '"pricing_level":"', toString(pricing_level),  '",',
-                                        '"pricing_level_id":"', toString(pricing_level_id),  '",',
-                                        '"created_by":"', toString(created_by),  '",',
-                                        '"created_at":"', toString(created_at),
+                                        '"', toString(ranked_prices.llm_id), '":{',
+                                        '"prompt_tokens":', toString(ranked_prices.prompt_tokens), ',',
+                                        '"completion_tokens":', toString(ranked_prices.completion_tokens), ',',
+                                        '"requests":', toString(ranked_prices.requests), ',',
+                                        '"total_tokens":', toString(ranked_prices.total_tokens), ',',
+                                        '"prompt_token_cost":', toString(ranked_prices.prompt_token_cost), ',',
+                                        '"completion_token_cost":', toString(ranked_prices.completion_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString(ranked_prices.prompt_tokens * ranked_prices.prompt_token_cost), ',',
+                                        '"completion_tokens_total_cost":', toString(ranked_prices.completion_tokens * ranked_prices.completion_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(ranked_prices.prompt_token_cost_unit),  '",',
+                                        '"completion_token_cost_unit":"', toString(ranked_prices.completion_token_cost_unit),  '",',
+                                        '"effective_date":"', toString(ranked_prices.effective_date),  '",',
+                                        '"provider_id":"', toString(ranked_prices.provider_id),  '",',
+                                        '"pricing_level":"', toString(ranked_prices.pricing_level),  '",',
+                                        '"pricing_level_id":"', toString(ranked_prices.pricing_level_id),  '",',
+                                        '"created_by":"', toString(ranked_prices.created_by),  '",',
+                                        '"created_at":"', toString(ranked_prices.created_at),
                                     '"}'
                                     )
                                 ), ','
@@ -138,8 +139,9 @@ def test_query_light_column_with_costs() -> None:
                     '}' )
                 ) AS summary_dump
             FROM ranked_prices
+            JOIN all_calls ON ranked_prices.id = all_calls.id
             WHERE (rank = {pb_5:UInt64})
-            GROUP BY id, started_at
+            GROUP BY ranked_prices.id, ranked_prices.started_at
         """,
         {
             "pb_0": ["a", "b"],
@@ -192,7 +194,9 @@ def test_query_with_costs_and_attributes_order() -> None:
                             OR JSONType(any(calls_merged.attributes_dump)) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), '$'), 'null'), '')) ASC),
              llm_usage AS
             (-- From the all_calls we get the usage data for LLMs
-             SELECT *,
+             SELECT id,
+                    started_at,
+                    attributes_dump,
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                     arrayJoin(if(usage_raw != ''
                                  and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
@@ -234,16 +238,17 @@ def test_query_with_costs_and_attributes_order() -> None:
                                             AND ((llm_token_prices.pricing_level_id = {pb_1:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_2:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_3:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
-        SELECT id,
-               started_at,
-               attributes_dump,
-               if(any(llm_id) = 'weave_dummy_llm_id'
-                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }') , '}')) AS summary_dump
+        SELECT ranked_prices.id,
+               ranked_prices.started_at,
+               ranked_prices.attributes_dump,
+               if(any(ranked_prices.llm_id) = 'weave_dummy_llm_id'
+                  or any(llm_token_prices.id) == '', any(all_calls.summary_dump), concat(left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(ranked_prices.llm_id), '":{', '"prompt_tokens":', toString(ranked_prices.prompt_tokens), ',', '"completion_tokens":', toString(ranked_prices.completion_tokens), ',', '"requests":', toString(ranked_prices.requests), ',', '"total_tokens":', toString(ranked_prices.total_tokens), ',', '"prompt_token_cost":', toString(ranked_prices.prompt_token_cost), ',', '"completion_token_cost":', toString(ranked_prices.completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(ranked_prices.prompt_tokens * ranked_prices.prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(ranked_prices.completion_tokens * ranked_prices.completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(ranked_prices.prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(ranked_prices.completion_token_cost_unit), '",', '"effective_date":"', toString(ranked_prices.effective_date), '",', '"provider_id":"', toString(ranked_prices.provider_id), '",', '"pricing_level":"', toString(ranked_prices.pricing_level), '",', '"pricing_level_id":"', toString(ranked_prices.pricing_level_id), '",', '"created_by":"', toString(ranked_prices.created_by), '",', '"created_at":"', toString(ranked_prices.created_at), '"}')), ','), '} }') , '}')) AS summary_dump
         FROM ranked_prices
+        JOIN all_calls ON ranked_prices.id = all_calls.id
         WHERE (rank = {pb_4:UInt64})
-        GROUP BY id,
-                 started_at,
-                 attributes_dump
+        GROUP BY ranked_prices.id,
+                 ranked_prices.started_at,
+                 ranked_prices.attributes_dump
             ORDER BY (NOT (JSONType(any(ranked_prices.attributes_dump)) = 'Null'
                            OR JSONType(any(ranked_prices.attributes_dump)) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), '$'), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), '$'), 'null'), '')) ASC
             """,
@@ -300,7 +305,8 @@ def test_query_with_costs_and_feedback_order() -> None:
                             OR JSONType(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_1:String}, {pb_2:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_3:String}), 'null'), '')) DESC, toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_3:String}), 'null'), '')) DESC),
              llm_usage AS
             (-- From the all_calls we get the usage data for LLMs
-             SELECT *,
+             SELECT id,
+                    started_at,
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                     arrayJoin(if(usage_raw != ''
                                  and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
@@ -342,15 +348,16 @@ def test_query_with_costs_and_feedback_order() -> None:
                                             AND ((llm_token_prices.pricing_level_id = {pb_5:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_6:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_7:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
-        SELECT id,
-               started_at,
-               if(any(llm_id) = 'weave_dummy_llm_id'
-                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
+        SELECT ranked_prices.id,
+               ranked_prices.started_at,
+               if(any(ranked_prices.llm_id) = 'weave_dummy_llm_id'
+                  or any(llm_token_prices.id) == '', any(all_calls.summary_dump), concat(left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(ranked_prices.llm_id), '":{', '"prompt_tokens":', toString(ranked_prices.prompt_tokens), ',', '"completion_tokens":', toString(ranked_prices.completion_tokens), ',', '"requests":', toString(ranked_prices.requests), ',', '"total_tokens":', toString(ranked_prices.total_tokens), ',', '"prompt_token_cost":', toString(ranked_prices.prompt_token_cost), ',', '"completion_token_cost":', toString(ranked_prices.completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(ranked_prices.prompt_tokens * ranked_prices.prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(ranked_prices.completion_tokens * ranked_prices.completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(ranked_prices.prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(ranked_prices.completion_token_cost_unit), '",', '"effective_date":"', toString(ranked_prices.effective_date), '",', '"provider_id":"', toString(ranked_prices.provider_id), '",', '"pricing_level":"', toString(ranked_prices.pricing_level), '",', '"pricing_level_id":"', toString(ranked_prices.pricing_level_id), '",', '"created_by":"', toString(ranked_prices.created_by), '",', '"created_at":"', toString(ranked_prices.created_at), '"}')), ','), '} }'), '}')) AS summary_dump
         FROM ranked_prices
+        JOIN all_calls ON ranked_prices.id = all_calls.id
         LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', ranked_prices.id))
         WHERE (rank = {pb_8:UInt64})
-        GROUP BY id,
-                 started_at
+        GROUP BY ranked_prices.id,
+                 ranked_prices.started_at
         ORDER BY (NOT (JSONType(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_1:String}, {pb_2:String}) = 'Null'
                        OR JSONType(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_1:String}, {pb_2:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_3:String}), 'null'), '')) DESC, toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_3:String}), 'null'), '')) DESC
         """,
@@ -412,7 +419,9 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
                                 OR JSONType(any(calls_merged.attributes_dump), {pb_0:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), '')) ASC),
              llm_usage AS
             (-- From the all_calls we get the usage data for LLMs
-             SELECT *,
+             SELECT id,
+                    started_at,
+                    attributes_dump,
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                     arrayJoin(if(usage_raw != ''
                                  and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
@@ -454,16 +463,17 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
                                             AND ((llm_token_prices.pricing_level_id = {pb_3:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_4:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_5:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
-        SELECT id,
-               started_at,
-               attributes_dump,
-               if(any(llm_id) = 'weave_dummy_llm_id'
-                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }') , '}')) AS summary_dump
+        SELECT ranked_prices.id,
+               ranked_prices.started_at,
+               ranked_prices.attributes_dump,
+               if(any(ranked_prices.llm_id) = 'weave_dummy_llm_id'
+                  or any(llm_token_prices.id) == '', any(all_calls.summary_dump), concat(left(any(all_calls.summary_dump), length(any(all_calls.summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(ranked_prices.llm_id), '":{', '"prompt_tokens":', toString(ranked_prices.prompt_tokens), ',', '"completion_tokens":', toString(ranked_prices.completion_tokens), ',', '"requests":', toString(ranked_prices.requests), ',', '"total_tokens":', toString(ranked_prices.total_tokens), ',', '"prompt_token_cost":', toString(ranked_prices.prompt_token_cost), ',', '"completion_token_cost":', toString(ranked_prices.completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(ranked_prices.prompt_tokens * ranked_prices.prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(ranked_prices.completion_tokens * ranked_prices.completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(ranked_prices.prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(ranked_prices.completion_token_cost_unit), '",', '"effective_date":"', toString(ranked_prices.effective_date), '",', '"provider_id":"', toString(ranked_prices.provider_id), '",', '"pricing_level":"', toString(ranked_prices.pricing_level), '",', '"pricing_level_id":"', toString(ranked_prices.pricing_level_id), '",', '"created_by":"', toString(ranked_prices.created_by), '",', '"created_at":"', toString(ranked_prices.created_at), '"}')), ','), '} }') , '}')) AS summary_dump
         FROM ranked_prices
+        JOIN all_calls ON ranked_prices.id = all_calls.id
         WHERE (rank = {pb_6:UInt64})
-        GROUP BY id,
-                 started_at,
-                 attributes_dump
+        GROUP BY ranked_prices.id,
+                 ranked_prices.started_at,
+                 ranked_prices.attributes_dump
         ORDER BY (NOT (JSONType(any(ranked_prices.attributes_dump), {pb_0:String}) = 'Null'
                        OR JSONType(any(ranked_prices.attributes_dump), {pb_0:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), {pb_1:String}), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), {pb_1:String}), 'null'), '')) ASC
         """,
