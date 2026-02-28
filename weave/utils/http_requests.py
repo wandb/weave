@@ -146,6 +146,11 @@ class LoggingHTTPTransport(httpx.HTTPTransport):
         start_time = time()
         response = super().handle_request(request)
         elapsed_time = time() - start_time
+        # Read the response body so we can access .text in pprint_response.
+        # At the transport level, the response stream hasn't been consumed yet
+        # (the client layer normally handles that), so accessing .text without
+        # reading first raises ResponseNotRead.
+        response.read()
         console.print(Text("----- Response below -----", style=STYLE_DIVIDER_RESPONSE))
         console.print(
             Text("Elapsed Time: ", style=STYLE_LABEL),
