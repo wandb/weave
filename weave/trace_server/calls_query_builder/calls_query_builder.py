@@ -1092,6 +1092,38 @@ class CallsQuery(BaseModel):
         if not should_optimize and not self.include_costs and not object_ref_conditions:
             return self._as_sql_base_format(pb, table_alias_resolved)
 
+        # For calls_complete: never use the two-step filtered_calls CTE pattern.
+        # calls_complete has one complete row per call (no GROUP BY / aggregation),
+        # so a single query pass is both simpler and significantly faster.
+        if self.read_table == ReadTable.CALLS_COMPLETE:
+            ctes, field_to_object_join_alias_map = build_object_ref_ctes(
+                pb, self.project_id, object_ref_conditions
+            )
+
+            base_sql = self._as_sql_base_format(
+                pb,
+                table_alias_resolved,
+                field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
+            )
+
+            if not self.include_costs:
+                if ctes.has_ctes():
+                    raw_sql = ctes.to_sql() + "\n" + base_sql
+                    return safely_format_sql(raw_sql, logger)
+                return base_sql
+
+            ctes.add_cte(CTE_ALL_CALLS, base_sql)
+            self._add_cost_ctes_to_builder(ctes, pb)
+
+            select_fields = [field.field for field in self.select_fields]
+            final_select = get_cost_final_select(
+                pb, select_fields, self.order_fields, self.project_id
+            )
+
+            raw_sql = ctes.to_sql() + "\n" + final_select
+            return safely_format_sql(raw_sql, logger)
+
         # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(
             project_id=self.project_id, read_table=self.read_table
