@@ -30,7 +30,7 @@ export type DatasetRow = Record<string, any> & {
  * @example
  * // Create a dataset
  * const dataset = new Dataset({
- *   id: 'grammar-dataset',
+ *   name: 'grammar-dataset',
  *   rows: [
  *     { id: '0', sentence: "He no likes ice cream.", correction: "He doesn't like ice cream." },
  *     { id: '1', sentence: "She goed to the store.", correction: "She went to the store." },
