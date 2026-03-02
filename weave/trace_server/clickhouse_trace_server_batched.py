@@ -178,11 +178,11 @@ from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_queues_stats_query,
 )
 from weave.trace_server.query_builder.obj_tags_query_builder import (
-    make_assert_obj_version_exists_query,
     make_get_aliases_query,
     make_get_tags_query,
     make_list_aliases_query,
     make_list_tags_query,
+    make_obj_version_exists_query,
     make_resolve_alias_query,
 )
 from weave.trace_server.query_builder.objects_query_builder import (
@@ -1796,13 +1796,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, project_id: str, object_id: str, digest: str
     ) -> None:
         """Raise NotFoundError if the object version doesn't exist or is deleted."""
-        query, parameters = make_assert_obj_version_exists_query(
-            project_id, object_id, digest
-        )
-        found = False
-        for _ in self._query_stream(query, parameters):
-            found = True
-        if not found:
+        query, parameters = make_obj_version_exists_query(project_id, object_id, digest)
+        result = self._query(query, parameters)
+        if not result.result_rows:
             raise NotFoundError(f"Object version {object_id}:{digest} not found")
 
     def _insert_tags(
@@ -1856,45 +1852,49 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        assert req.wb_user_id, "wb_user_id is required for obj_add_tags"
         self._assert_obj_version_exists(req.project_id, req.object_id, req.digest)
         self._insert_tags(
             req.project_id,
             req.object_id,
             req.digest,
             req.tags,
-            wb_user_id=req.wb_user_id or "",
+            wb_user_id=req.wb_user_id,
         )
         return tsi.ObjAddTagsRes()
 
     def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        assert req.wb_user_id, "wb_user_id is required for obj_remove_tags"
         self._insert_tags(
             req.project_id,
             req.object_id,
             req.digest,
             req.tags,
-            wb_user_id=req.wb_user_id or "",
+            wb_user_id=req.wb_user_id,
             deleted_at=datetime.datetime.now(datetime.timezone.utc),
         )
         return tsi.ObjRemoveTagsRes()
 
     def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+        assert req.wb_user_id, "wb_user_id is required for obj_set_alias"
         self._assert_obj_version_exists(req.project_id, req.object_id, req.digest)
         self._insert_alias(
             req.project_id,
             req.object_id,
             req.alias,
             req.digest,
-            wb_user_id=req.wb_user_id or "",
+            wb_user_id=req.wb_user_id,
         )
         return tsi.ObjSetAliasRes()
 
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+        assert req.wb_user_id, "wb_user_id is required for obj_remove_alias"
         self._insert_alias(
             req.project_id,
             req.object_id,
             req.alias,
             digest="",  # doesn't matter; dedup key is (project_id, object_id, alias)
-            wb_user_id=req.wb_user_id or "",
+            wb_user_id=req.wb_user_id,
             deleted_at=datetime.datetime.now(datetime.timezone.utc),
         )
         return tsi.ObjRemoveAliasRes()
@@ -1923,8 +1923,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not object_ids:
             return {}
         query, parameters = make_get_tags_query(project_id, object_ids)
+        query_result = self._query(query, parameters)
         result: dict[tuple[str, str], list[str]] = {}
-        for row in self._query_stream(query, parameters):
+        for row in query_result.result_rows:
             key = (row[0], row[1])
             result.setdefault(key, []).append(row[2])
         return result
@@ -1943,12 +1944,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not object_ids:
             return {}
         query, parameters = make_get_aliases_query(project_id, object_ids)
+        query_result = self._query(query, parameters)
         result: dict[tuple[str, str], list[str]] = {}
-        for row in self._query_stream(query, parameters):
+        for row in query_result.result_rows:
             key = (row[0], row[1])
             result.setdefault(key, []).append(row[2])
         return result
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._maybe_resolve_alias")
     def _maybe_resolve_alias(
         self,
         project_id: str,
@@ -1970,8 +1973,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if tsc.digest_is_content_hash(digest):
             return None
         query, parameters = make_resolve_alias_query(project_id, object_id, digest)
-        for row in self._query_stream(query, parameters):
-            return row[0]
+        result = self._query(query, parameters)
+        if result.result_rows:
+            return result.result_rows[0][0]
         return None
 
     def _enrich_objs_with_tags_and_aliases(

@@ -1,9 +1,9 @@
 import sqlparse
 
 from weave.trace_server.query_builder.obj_tags_query_builder import (
-    make_assert_obj_version_exists_query,
     make_get_aliases_query,
     make_get_tags_query,
+    make_obj_version_exists_query,
     make_resolve_alias_query,
 )
 from weave.trace_server.query_builder.objects_query_builder import (
@@ -30,8 +30,8 @@ def _assert_sql(
 # --- obj_tags_query_builder functions ---
 
 
-def test_make_assert_obj_version_exists_query():
-    query, params = make_assert_obj_version_exists_query("proj", "obj1", "abc123")
+def test_make_obj_version_exists_query():
+    query, params = make_obj_version_exists_query("proj", "obj1", "abc123")
 
     expected_query = """
         SELECT 1

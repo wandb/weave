@@ -6,20 +6,6 @@ from weave.trace_server import validation_util
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
 from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 
-# --- Tag and Alias validation ---
-# Follows W&B Models conventions:
-#   - Tags: alphanumeric, hyphens, underscores, single spaces between words,
-#     max 256 chars.  Matches W&B Models TAG_REGEX.
-#   - Aliases: broad charset, disallow "/" and ":", length 1-128,
-#     reserve "latest" and version patterns (v\d+), reject whitespace-only.
-
-MAX_ALIAS_LENGTH = 128
-MAX_TAG_LENGTH = 256
-TAG_REGEX = re.compile(r"^[-\w]+( [-\w]+)*$")
-_INVALID_ALIAS_CHARACTERS = frozenset("/:")
-_VERSION_LIKE_PATTERN = re.compile(r"^v\d+$")
-_RESERVED_ALIAS_NAMES = {"latest"}
-
 
 def validate_tag_name(name: str) -> None:
     """Validate a tag name against W&B Models TAG_REGEX.
@@ -198,3 +184,18 @@ def validate_purge_req_multiple(
         raise InvalidRequest(invalid_message)
     for item in value:
         validate_purge_req_one(item)
+
+
+# --- Tag and Alias validation ---
+# Follows W&B Models conventions:
+#   - Tags: alphanumeric, hyphens, underscores, single spaces between words,
+#     max 256 chars.  Matches W&B Models TAG_REGEX.
+#   - Aliases: broad charset, disallow "/" and ":", length 1-128,
+#     reserve "latest" and version patterns (v\d+), reject whitespace-only.
+
+MAX_ALIAS_LENGTH = 128
+MAX_TAG_LENGTH = 256
+TAG_REGEX = re.compile(r"^[-\w]+( [-\w]+)*$")
+_INVALID_ALIAS_CHARACTERS = frozenset("/:")
+_VERSION_LIKE_PATTERN = re.compile(r"^v\d+$")
+_RESERVED_ALIAS_NAMES = {"latest"}

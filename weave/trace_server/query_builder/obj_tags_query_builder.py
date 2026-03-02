@@ -8,7 +8,7 @@ objects_query_builder.make_objects_val_query_and_parameters.
 from typing import Any
 
 
-def make_assert_obj_version_exists_query(
+def make_obj_version_exists_query(
     project_id: str,
     object_id: str,
     digest: str,
