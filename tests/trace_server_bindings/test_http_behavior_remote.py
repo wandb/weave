@@ -73,6 +73,36 @@ def test_call_start_ok(mock_post, unbatched_server):
 
 
 @patch("weave.utils.http_requests.post")
+def test_project_ids_external_to_internal_ok(mock_post, unbatched_server):
+    """Test successful project ID resolution request."""
+    req = tsi.ProjectIdsExternalToInternalReq(
+        project_ids=["entity-a/project-a", "entity-b/project-b"]
+    )
+    expected_map = {
+        "entity-a/project-a": "internal-project-a",
+        "entity-b/project-b": "internal-project-b",
+    }
+
+    mock_post.return_value = httpx.Response(
+        200,
+        json=dict(tsi.ProjectIdsExternalToInternalRes(project_id_map=expected_map)),
+        request=httpx.Request(
+            "POST", "http://example.com/project_ids/external_to_internal"
+        ),
+    )
+
+    res = unbatched_server.project_ids_external_to_internal(req)
+
+    assert res.project_id_map == expected_map
+    mock_post.assert_called_once()
+    called_url = mock_post.call_args[0][0]
+    assert called_url == "http://example.com/project_ids/external_to_internal"
+
+    sent_payload = json.loads(mock_post.call_args[1]["data"].decode("utf-8"))
+    assert sent_payload == req.model_dump(mode="json")
+
+
+@patch("weave.utils.http_requests.post")
 def test_400_no_retry(mock_post, unbatched_server):
     """Test that 400 errors are not retried."""
     call_id = generate_id()
