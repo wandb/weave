@@ -49,6 +49,7 @@ from weave.trace_server import (
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
+from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
@@ -253,7 +254,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._database = database
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
+        self._init_lock = threading.Lock()
         self._file_storage_client: FileStorageClient | None = None
+        self._file_storage_client_initialized = False
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
@@ -332,10 +335,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @property
     def file_storage_client(self) -> FileStorageClient | None:
-        if self._file_storage_client is not None:
+        if self._file_storage_client_initialized:
             return self._file_storage_client
-        self._file_storage_client = maybe_get_storage_client_from_env()
-        return self._file_storage_client
+        with self._init_lock:
+            if self._file_storage_client_initialized:
+                return self._file_storage_client
+            self._file_storage_client = maybe_get_storage_client_from_env()
+            self._file_storage_client_initialized = True
+            return self._file_storage_client
 
     @property
     def kafka_producer(self) -> KafkaProducer | None:
@@ -344,15 +351,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return None
         if self._kafka_producer is not None:
             return self._kafka_producer
-        self._kafka_producer = KafkaProducer.from_env()
-        return self._kafka_producer
+        with self._init_lock:
+            if self._kafka_producer is not None:
+                return self._kafka_producer
+            self._kafka_producer = KafkaProducer.from_env()
+            return self._kafka_producer
 
     @property
     def table_routing_resolver(self) -> TableRoutingResolver:
         if self._table_routing_resolver is not None:
             return self._table_routing_resolver
-        self._table_routing_resolver = TableRoutingResolver()
-        return self._table_routing_resolver
+        with self._init_lock:
+            if self._table_routing_resolver is not None:
+                return self._table_routing_resolver
+            self._table_routing_resolver = TableRoutingResolver()
+            return self._table_routing_resolver
 
     @property
     def use_distributed_mode(self) -> bool:
@@ -470,65 +483,65 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         )
                     )
 
-            obj_id_idx_map = defaultdict(list)
-            for idx, (start_call, _) in enumerate(calls):
-                op_name = object_creation_utils.make_safe_name(start_call.op_name)
-                obj_id_idx_map[op_name].append(idx)
+        obj_id_idx_map = defaultdict(list)
+        for idx, (start_call, _) in enumerate(calls):
+            op_name = object_creation_utils.make_safe_name(start_call.op_name)
+            obj_id_idx_map[op_name].append(idx)
 
-            existing_objects = self._get_existing_ops_from_spans(
-                seen_ids=set(obj_id_idx_map.keys()),
-                project_id=req.project_id,
-                limit=len(calls),
+        existing_objects = self._get_existing_ops_from_spans(
+            seen_ids=set(obj_id_idx_map.keys()),
+            project_id=req.project_id,
+            limit=len(calls),
+        )
+        # We know that OTel will always use the placeholder source.
+        # We can instead just reuse the existing file if we know it is present
+        # and create it just once if we are not sure.
+        if len(existing_objects) == 0:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=True
             )
-            # We know that OTel will always use the placeholder source.
-            # We can instead just reuse the existing file if we know it is present
-            # and create it just once if we are not sure.
-            if len(existing_objects) == 0:
-                digest = self._create_or_get_placeholder_ops_digest(
-                    project_id=req.project_id, create=True
-                )
-            else:
-                digest = self._create_or_get_placeholder_ops_digest(
-                    project_id=req.project_id, create=False
-                )
+        else:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=False
+            )
 
-            for obj in existing_objects:
-                op_ref_uri = ri.InternalOpRef(
+        for obj in existing_objects:
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=obj.object_id,
+                version=obj.digest,
+            ).uri()
+
+            # Modify each of the matched start calls in place
+            for idx in obj_id_idx_map[obj.object_id]:
+                calls[idx][0].op_name = op_ref_uri
+            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
+            obj_id_idx_map.pop(obj.object_id)
+
+        obj_creation_batch = []
+        for op_obj_id in obj_id_idx_map.keys():
+            op_val = object_creation_utils.build_op_val(digest)
+            obj_creation_batch.append(
+                tsi.ObjSchemaForInsert(
                     project_id=req.project_id,
-                    name=obj.object_id,
-                    version=obj.digest,
-                ).uri()
-
-                # Modify each of the matched start calls in place
-                for idx in obj_id_idx_map[obj.object_id]:
-                    calls[idx][0].op_name = op_ref_uri
-                # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
-                obj_id_idx_map.pop(obj.object_id)
-
-            obj_creation_batch = []
-            for op_obj_id in obj_id_idx_map.keys():
-                op_val = object_creation_utils.build_op_val(digest)
-                obj_creation_batch.append(
-                    tsi.ObjSchemaForInsert(
-                        project_id=req.project_id,
-                        object_id=op_obj_id,
-                        val=op_val,
-                        wb_user_id=req.wb_user_id,
-                    )
+                    object_id=op_obj_id,
+                    val=op_val,
+                    wb_user_id=req.wb_user_id,
                 )
-            res = self.obj_create_batch(obj_creation_batch)
+            )
+        res = self.obj_create_batch(obj_creation_batch)
 
-            for result in res:
-                if result.object_id is None:
-                    raise RuntimeError("Otel Export - Expected object_id but got None")
+        for result in res:
+            if result.object_id is None:
+                raise RuntimeError("Otel Export - Expected object_id but got None")
 
-                op_ref_uri = ri.InternalOpRef(
-                    project_id=req.project_id,
-                    name=result.object_id,
-                    version=result.digest,
-                ).uri()
-                for idx in obj_id_idx_map[result.object_id]:
-                    calls[idx][0].op_name = op_ref_uri
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=result.object_id,
+                version=result.digest,
+            ).uri()
+            for idx in obj_id_idx_map[result.object_id]:
+                calls[idx][0].op_name = op_ref_uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
@@ -556,7 +569,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 for start, end in calls
             ]
-            self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
+            self._insert_call_complete_batch(rows)
         else:
             rows = []
             for start, end in calls:
@@ -568,7 +581,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 rows.append(
                     _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
                 )
-            self._insert_call_batch(rows, settings=None, do_sync_insert=True)
+            self._insert_call_batch(rows)
 
         # Run callbacks and flush
         for cb in event_callbacks:
@@ -735,18 +748,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         with self.call_batch():
             for complete_call in req.batch:
-                complete_call = process_complete_call_to_content(complete_call, self)
+                processed_complete_call = process_complete_call_to_content(
+                    complete_call, self
+                )
 
                 # Determine write target based on project, this should be the same for all
                 # calls in the batch, subsequent calls just hit the in-memory cache. This
                 # is here for technical correctness, in case we relax project_id target
                 # constraints intra-batch
                 write_target = self.table_routing_resolver.resolve_v2_write_target(
-                    complete_call.project_id,
+                    processed_complete_call.project_id,
                     self.ch_client,
                 )
 
-                ch_call = _complete_call_to_ch_insertable(complete_call)
+                ch_call = _complete_call_to_ch_insertable(processed_complete_call)
                 if write_target == WriteTarget.CALLS_COMPLETE:
                     self._insert_call_complete(ch_call)
                 else:
@@ -754,9 +769,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
                 _maybe_enqueue_minimal_call_end(
                     self.kafka_producer,
-                    complete_call.project_id,
-                    complete_call.id,
-                    complete_call.ended_at,
+                    processed_complete_call.project_id,
+                    processed_complete_call.id,
+                    processed_complete_call.ended_at,
                 )
 
         return tsi.CallsUpsertCompleteRes()
@@ -4655,6 +4670,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         res = self.calls_delete(calls_delete_req)
         return tsi.ScoreDeleteRes(num_deleted=res.num_deleted)
 
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Return grouped prediction/trial/score data for evaluation results."""
+        return eval_helpers.eval_results_query(self, req)
+
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
     ) -> tsi.ObjReadRes:
@@ -4966,6 +4987,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = compute_file_digest(req.content)
+
+        # During a batch, _file_batch accumulates chunks. If we already have
+        # chunks for this (project_id, digest), the content is identical and
+        # we can skip the redundant storage I/O (bucket upload or CH insert).
+        if any(
+            c.project_id == req.project_id and c.digest == digest
+            for c in self._file_batch
+        ):
+            return tsi.FileCreateRes(digest=digest)
+
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 

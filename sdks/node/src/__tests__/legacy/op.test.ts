@@ -8,7 +8,7 @@ jest.mock('weave/clientApi', () => ({
   getGlobalClient: jest.fn(() => ({
     pushNewCall: () => ({currentCall: {}, parentCall: null, newStack: []}),
     createCall: (...args: any[]) => {
-      capturedDisplayName = args.length > 0 ? args[args.length - 1] : undefined;
+      capturedDisplayName = args[8]; // 9th parameter (displayName)
       return Promise.resolve();
     },
     runWithCallStack: async (stack: any, fn: () => any) => fn(),

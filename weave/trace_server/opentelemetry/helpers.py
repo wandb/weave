@@ -136,8 +136,8 @@ def _get_value_from_nested_dict(d: dict[str, Any], key: str) -> Any:
     for part in parts:
         if not isinstance(current, dict) or part not in current:
             if isinstance(current, list) and part.isdigit():
-                part = int(part)
-                current = current[part] if part < len(current) else None
+                part_index = int(part)
+                current = current[part_index] if part_index < len(current) else None
                 continue
             else:
                 return None
@@ -277,16 +277,19 @@ def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
 
     # Process each key-value pair
     for flat_key, value in kv:
+        processed_value = value
         # Weave expects JSON strings to be loaded to display properly, so just try and load every string as json
-        if isinstance(value, str) and (value.startswith("[") or value.startswith("{")):
+        if isinstance(processed_value, str) and (
+            processed_value.startswith("[") or processed_value.startswith("{")
+        ):
             try:
-                value = json.loads(value)
+                processed_value = json.loads(processed_value)
             except json.JSONDecodeError:
                 # If JSON parsing fails, keep the original value
                 pass
 
         # Add the nested key to the result
-        _set_value_in_nested_dict(result_dict, flat_key, value)
+        _set_value_in_nested_dict(result_dict, flat_key, processed_value)
 
     # Convert dictionaries with numeric keys to lists
     return result_dict
@@ -332,10 +335,13 @@ def flatten_attributes(
                     # Recursively flatten nested dictionaries or lists
                     _flatten(value, f"{new_key}.")
                 else:
+                    serialized_value = value
                     # If the value matches a JSON attribute, stringify it
-                    if should_stringify_as_json and not isinstance(value, str):
-                        value = json.dumps(value)
-                    result[new_key] = value
+                    if should_stringify_as_json and not isinstance(
+                        serialized_value, str
+                    ):
+                        serialized_value = json.dumps(serialized_value)
+                    result[new_key] = serialized_value
         elif isinstance(obj, list):
             # Handle lists by using numeric indices as keys
             for i, item in enumerate(obj):
@@ -350,10 +356,13 @@ def flatten_attributes(
                     # Recursively flatten nested dictionaries or lists
                     _flatten(item, f"{new_key}.")
                 else:
+                    serialized_item = item
                     # If the item matches a JSON attribute, stringify it
-                    if should_stringify_as_json and not isinstance(item, str):
-                        item = json.dumps(item)
-                    result[new_key] = item
+                    if should_stringify_as_json and not isinstance(
+                        serialized_item, str
+                    ):
+                        serialized_item = json.dumps(serialized_item)
+                    result[new_key] = serialized_item
 
     _flatten(data)
     return result

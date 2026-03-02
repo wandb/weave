@@ -173,10 +173,13 @@ def flatten_attributes(
                     # Recursively flatten nested dictionaries or lists
                     _flatten(value, f"{new_key}.")
                 else:
+                    serialized_value = value
                     # If the value matches a JSON attribute, stringify it
-                    if should_stringify_as_json and not isinstance(value, str):
-                        value = json.dumps(value)
-                    result[new_key] = value
+                    if should_stringify_as_json and not isinstance(
+                        serialized_value, str
+                    ):
+                        serialized_value = json.dumps(serialized_value)
+                    result[new_key] = serialized_value
         elif isinstance(obj, list):
             # Handle lists by using numeric indices as keys
             for i, item in enumerate(obj):
@@ -191,10 +194,13 @@ def flatten_attributes(
                     # Recursively flatten nested dictionaries or lists
                     _flatten(item, f"{new_key}.")
                 else:
+                    serialized_item = item
                     # If the item matches a JSON attribute, stringify it
-                    if should_stringify_as_json and not isinstance(item, str):
-                        item = json.dumps(item)
-                    result[new_key] = item
+                    if should_stringify_as_json and not isinstance(
+                        serialized_item, str
+                    ):
+                        serialized_item = json.dumps(serialized_item)
+                    result[new_key] = serialized_item
 
     _flatten(data)
     return result

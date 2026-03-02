@@ -175,11 +175,11 @@ def dictify(
     elif isinstance(obj, dict):
         dict_result = {}
         for k, v in obj.items():
-            k = k.__name__ if isinstance(k, type) else k
-            if isinstance(k, str) and should_redact(k):
-                dict_result[k] = REDACTED_VALUE
+            key = k.__name__ if isinstance(k, type) else k
+            if isinstance(key, str) and should_redact(key):
+                dict_result[key] = REDACTED_VALUE
             else:
-                dict_result[k] = dictify(v, maxdepth, depth + 1, seen)
+                dict_result[key] = dictify(v, maxdepth, depth + 1, seen)
         return dict_result
 
     if hasattr(obj, "to_dict"):
@@ -188,13 +188,13 @@ def dictify(
             if isinstance(as_dict, dict):
                 to_dict_result = {}
                 for k, v in as_dict.items():
-                    k = k.__name__ if isinstance(k, type) else k
-                    if isinstance(k, str) and should_redact(k):
-                        to_dict_result[k] = REDACTED_VALUE
+                    key = k.__name__ if isinstance(k, type) else k
+                    if isinstance(key, str) and should_redact(key):
+                        to_dict_result[key] = REDACTED_VALUE
                     elif maxdepth == 0 or depth < maxdepth:
-                        to_dict_result[k] = dictify(v, maxdepth, depth + 1)
+                        to_dict_result[key] = dictify(v, maxdepth, depth + 1)
                     else:
-                        to_dict_result[k] = stringify(v)
+                        to_dict_result[key] = stringify(v)
                 return to_dict_result
         except Exception:
             raise ValueError("to_dict failed") from None

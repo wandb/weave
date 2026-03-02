@@ -65,7 +65,7 @@ def get_benchmark_description(benchmark_path: Path) -> str:
         str: Description of the benchmark.
     """
     try:
-        with open(benchmark_path) as f:
+        with open(benchmark_path, encoding="utf-8") as f:
             content = f.read()
 
         # Look for the very first docstring at the top of the file

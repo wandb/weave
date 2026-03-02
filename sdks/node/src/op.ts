@@ -148,6 +148,17 @@ function createOpWrapper<T extends (...args: any[]) => any>(
 
     const opRefForCall: Op<any> | OpRef = opWrapper as Op<any>;
 
+    // Build attributes from opKind and opColor options
+    const attributes: Record<string, any> = {};
+    if (options?.opKind || options?.opColor) {
+      if (options.opKind) {
+        attributes.kind = options.opKind;
+      }
+      if (options.opColor) {
+        attributes.color = options.opColor;
+      }
+    }
+
     const startCallPromise = client.createCall(
       call,
       opRefForCall,
@@ -157,7 +168,8 @@ function createOpWrapper<T extends (...args: any[]) => any>(
       currentCall,
       parentCall,
       startTime,
-      displayName
+      displayName,
+      Object.keys(attributes).length > 0 ? attributes : undefined
     );
 
     try {

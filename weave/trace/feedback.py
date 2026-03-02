@@ -151,7 +151,7 @@ class FeedbackQuery:
     def refs(self) -> Refs:
         return self.execute().refs()
 
-    def _repr_pretty_(self, p: Any, cycle: bool) -> None:
+    def _repr_pretty_(self, p: Any, cycle: bool) -> None:  # noqa: PLW3201
         """Show a nicely formatted table in ipython."""
         if cycle:
             p.text("FeedbackQuery(...)")

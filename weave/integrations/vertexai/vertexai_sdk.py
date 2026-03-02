@@ -142,7 +142,7 @@ def get_vertexai_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _vertexai_patcher
+    global _vertexai_patcher  # noqa: PLW0603
     if _vertexai_patcher is not None:
         return _vertexai_patcher
 

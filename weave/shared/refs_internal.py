@@ -25,6 +25,9 @@ valid_edge_names = (
     TABLE_ROW_ID_EDGE_NAME,
 )
 
+# Path suffix for dataset row refs: /attr/rows/id/<digest>
+DATASET_ROW_REF_PATH_SUFFIX = f"/{OBJECT_ATTR_EDGE_NAME}/rows/{TABLE_ROW_ID_EDGE_NAME}/"
+
 
 class InvalidInternalRef(ValueError):
     pass
@@ -238,3 +241,51 @@ def string_will_be_interpreted_as_ref(s: str) -> bool:
 
 def any_will_be_interpreted_as_ref_str(val: Any) -> bool:
     return isinstance(val, str) and string_will_be_interpreted_as_ref(val)
+
+
+def try_parse_dataset_row_ref(uri: str) -> tuple[str, str] | None:
+    """Parse a ref string as a dataset row ref.
+
+    Only accepts internal-scheme URIs. Returns (internal_uri, row_digest) if
+    the ref is a valid dataset row ref (object ref with extra attr/rows/id/digest),
+    else None.
+
+    Returns:
+        tuple[str, str] | None: (uri, digest) if valid dataset row ref, else None.
+    """
+    if not uri.startswith(f"{WEAVE_INTERNAL_SCHEME}:///"):
+        return None
+    try:
+        parsed = parse_internal_uri(uri)
+    except InvalidInternalRef:
+        return None
+    if not isinstance(parsed, InternalObjectRef):
+        return None
+    extra = parsed.extra
+    if (
+        len(extra) >= 4
+        and extra[-4] == OBJECT_ATTR_EDGE_NAME
+        and extra[-3] == "rows"
+        and extra[-2] == TABLE_ROW_ID_EDGE_NAME
+    ):
+        digest = extra[-1]
+        if "/" not in digest:
+            return (uri, digest)
+    return None
+
+
+def extract_row_digest_from_ref_path(s: str) -> str | None:
+    """Extract row digest from a ref path containing the dataset row suffix.
+
+    Works for full URIs or relative paths. Returns the digest if the path
+    contains DATASET_ROW_REF_PATH_SUFFIX and the digest part has no slashes.
+
+    Returns:
+        str | None: The row digest if valid, else None.
+    """
+    if DATASET_ROW_REF_PATH_SUFFIX not in s:
+        return None
+    prefix, digest = s.split(DATASET_ROW_REF_PATH_SUFFIX, 1)
+    if prefix and digest and "/" not in digest:
+        return digest
+    return None

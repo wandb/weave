@@ -515,11 +515,11 @@ class WeaveClient:
                 _digest=obj.digest,
             )
             try:
-                obj = ref.get()
+                evaluation_obj = ref.get()
             except Exception:
                 logger.exception(f"Failed to convert {obj} to Evaluation")
             else:
-                lst.append(obj)
+                lst.append(evaluation_obj)
         return lst
 
     @trace_sentry.global_trace_sentry.watch()
@@ -718,7 +718,7 @@ class WeaveClient:
             attributes_dict._set_weave_item("os_version", platform.version())
             attributes_dict._set_weave_item("os_release", platform.release())
 
-        op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
+        op_name_future = self.future_executor.defer(op_def_ref.uri)
 
         # Get thread_id from context
         thread_id = call_context.get_thread_id()
@@ -1831,9 +1831,14 @@ class WeaveClient:
         # Create chunks in parallel using future_executor - defer serialization
         chunk_futures = []
         for raw_chunk in raw_chunks:
-            chunk_future = self.future_executor.defer(
-                lambda chunk=raw_chunk: self._send_table_create(chunk)
-            )
+
+            def make_chunk_task(chunk: list[Any]) -> Callable[[], TableCreateRes]:
+                def chunk_task() -> TableCreateRes:
+                    return self._send_table_create(chunk)
+
+                return chunk_task
+
+            chunk_future = self.future_executor.defer(make_chunk_task(raw_chunk))
             chunk_futures.append(chunk_future)
 
         # Chain the operations using future_executor.then

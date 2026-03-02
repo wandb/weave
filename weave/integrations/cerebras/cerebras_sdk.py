@@ -46,7 +46,7 @@ def get_cerebras_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _cerebras_patcher
+    global _cerebras_patcher  # noqa: PLW0603
     if _cerebras_patcher is not None:
         return _cerebras_patcher
 

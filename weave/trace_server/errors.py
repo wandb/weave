@@ -335,7 +335,7 @@ class ErrorRegistry:
 
 def _get_error_registry() -> ErrorRegistry:
     """Get the global error registry, initializing it if needed."""
-    global _error_registry
+    global _error_registry  # noqa: PLW0603
     if _error_registry is None:
         _error_registry = ErrorRegistry()
     return _error_registry

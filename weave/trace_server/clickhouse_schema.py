@@ -261,3 +261,26 @@ class FileChunkCreateCHInsertable(BaseModel):
 
 
 ALL_FILE_CHUNK_INSERT_COLUMNS = sorted(FileChunkCreateCHInsertable.model_fields.keys())
+
+
+# Tags & Aliases
+class TagCHInsertable(BaseModel):
+    project_id: str
+    object_id: str
+    digest: str
+    tag: str
+    wb_user_id: str = ""
+    deleted_at: datetime.datetime = datetime.datetime.fromtimestamp(0)
+
+
+class AliasCHInsertable(BaseModel):
+    project_id: str
+    object_id: str
+    alias: str
+    digest: str
+    wb_user_id: str = ""
+    deleted_at: datetime.datetime = datetime.datetime.fromtimestamp(0)
+
+
+ALL_TAG_INSERT_COLUMNS = sorted(TagCHInsertable.model_fields.keys())
+ALL_ALIAS_INSERT_COLUMNS = sorted(AliasCHInsertable.model_fields.keys())
