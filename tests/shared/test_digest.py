@@ -14,7 +14,11 @@ from weave.shared import (
 )
 from weave.shared.digest import bytes_digest, str_digest
 from weave.shared.object_class_util import process_incoming_object_val
-from weave.shared.refs_internal import WEAVE_INTERNAL_SCHEME, parse_internal_uri
+from weave.shared.refs_internal import (
+    WEAVE_INTERNAL_SCHEME,
+    InvalidInternalRef,
+    parse_internal_uri,
+)
 
 pytestmark = pytest.mark.trace_server
 
@@ -114,3 +118,44 @@ def test_compute_object_ref_uri_with_external_to_internal_map() -> None:
         uri
         == f"{WEAVE_INTERNAL_SCHEME}:///{internal_id}/object/{object_id}:{expected_digest}"
     )
+
+
+def test_compute_object_ref_uri_stable_across_key_order() -> None:
+    """Dict insertion order must not affect the ref URI."""
+    val_a = {"model": "gpt-4o", "temperature": 0.7, "top_p": 0.9}
+    val_b = {"top_p": 0.9, "model": "gpt-4o", "temperature": 0.7}
+
+    uri_a = compute_object_ref_uri("proj123", "chat-config", val_a)
+    uri_b = compute_object_ref_uri("proj123", "chat-config", val_b)
+
+    assert uri_a == uri_b
+
+
+def test_compute_table_ref_uri_sensitive_to_row_order() -> None:
+    """Reordering rows must produce a different table ref."""
+    rows = [
+        {"prompt": "Hello", "completion": "Hi there"},
+        {"prompt": "Bye", "completion": "Goodbye"},
+    ]
+    digests_forward = [compute_row_digest(r) for r in rows]
+    digests_reversed = [compute_row_digest(r) for r in reversed(rows)]
+
+    uri_forward = compute_table_ref_uri("proj123", digests_forward)
+    uri_reversed = compute_table_ref_uri("proj123", digests_reversed)
+
+    assert uri_forward != uri_reversed
+
+
+@pytest.mark.parametrize(
+    ("project_id", "object_id", "match"),
+    [
+        ("entity/project", "my-scorer", "project_id.*cannot contain '/'"),
+        ("proj123", "bad:name", "name.*cannot contain ':'"),
+    ],
+    ids=["slash-in-project-id", "colon-in-object-id"],
+)
+def test_compute_object_ref_uri_rejects_invalid_names(
+    project_id: str, object_id: str, match: str
+) -> None:
+    with pytest.raises(InvalidInternalRef, match=match):
+        compute_object_ref_uri(project_id, object_id, {"model": "gpt-4o"})
