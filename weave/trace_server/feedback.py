@@ -47,6 +47,7 @@ TABLE_FEEDBACK = Table(
         Column("call_ref", "string", nullable=True),
         Column("trigger_ref", "string", nullable=True),
         Column("queue_id", "string", nullable=True),
+        Column("trace_id", "string", nullable=True),
     ],
 )
 
@@ -220,15 +221,45 @@ def validate_feedback_purge_req(req: tsi.FeedbackPurgeReq) -> None:
         raise InvalidRequest(MESSAGE_INVALID_FEEDBACK_PURGE)
 
 
+def resolve_trace_id_from_weave_ref(
+    weave_ref: str,
+    trace_server: tsi.TraceServerInterface,
+    project_id: str,
+) -> str | None:
+    """Resolve the trace_id for the call referenced by a weave_ref.
+
+    Returns None if the ref is not a call ref or the call cannot be found.
+    """
+    try:
+        parsed = ri.parse_internal_uri(weave_ref)
+    except Exception:
+        return None
+
+    if not isinstance(parsed, ri.InternalCallRef):
+        return None
+
+    try:
+        res = trace_server.call_read(
+            tsi.CallReadReq(project_id=project_id, id=parsed.id)
+        )
+        if res.call is not None:
+            return res.call.trace_id
+    except Exception:
+        pass
+    return None
+
+
 def format_feedback_to_row(
     feedback_req: tsi.FeedbackCreateReq,
     processed_payload: dict[str, Any],
+    trace_id: str | None = None,
 ) -> Row:
     """Create a feedback row from a feedback request and processed payload.
 
     Args:
         feedback_req: The feedback create request.
         processed_payload: The processed payload from process_feedback_payload.
+        trace_id: Optional trace_id resolved from the call referenced by weave_ref.
 
     Returns:
         Row: The feedback row ready for insertion.
@@ -256,6 +287,7 @@ def format_feedback_to_row(
         "call_ref": feedback_req.call_ref,
         "trigger_ref": feedback_req.trigger_ref,
         "queue_id": feedback_req.queue_id,
+        "trace_id": trace_id,
     }
 
 
