@@ -100,8 +100,9 @@ def compute_object_ref_uri(
     """Compute the internal ref URI for an object.
 
     Combines digest computation with internal ref construction.
-    The project_id should be an internal project ID (resolved via
-    project_ids_external_to_internal if starting from entity/project).
+    The project_id must be an internal project ID — typically resolved once
+    via project_ids_external_to_internal during weave.init and cached for
+    the lifetime of the session.
     """
     digest = compute_object_digest(val, builtin_object_class)
     return InternalObjectRef(
@@ -117,8 +118,9 @@ def compute_table_ref_uri(
 ) -> str:
     """Compute the internal ref URI for a table.
 
-    The project_id should be an internal project ID (resolved via
-    project_ids_external_to_internal if starting from entity/project).
+    The project_id must be an internal project ID — typically resolved once
+    via project_ids_external_to_internal during weave.init and cached for
+    the lifetime of the session.
     """
     digest = compute_table_digest(row_digests)
     return InternalTableRef(
