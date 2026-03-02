@@ -74,6 +74,7 @@ from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
+from weave.trace_server.environment import wf_clickhouse_calls_shard_key
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +88,9 @@ VIEW_SUFFIX = "_view"
 
 # Tables that use ID-based sharding (sipHash64(field)) instead of random sharding
 # in distributed mode. Maps table name to the field used for sharding.
-# This ensures all data for a specific ID goes to the same shard, enabling
-# efficient point lookups.
-ID_SHARDED_TABLES: dict[str, str] = {"calls_complete": "id"}
+# calls_complete: shard key is configurable via WF_CLICKHOUSE_CALLS_SHARD_KEY env var
+# Valid values: "trace_id" (default), "id", "project_id"
+ID_SHARDED_TABLES: dict[str, str] = {"calls_complete": wf_clickhouse_calls_shard_key()}
 
 
 @dataclass(frozen=True)
