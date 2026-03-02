@@ -13,6 +13,7 @@ export {
   wrapOpenAI,
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
+  instrumentRealtimeSession,
 } from './integrations';
 export {weaveAudio, weaveImage, WeaveAudio, WeaveImage} from './media';
 export {op} from './op';
