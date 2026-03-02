@@ -3,6 +3,8 @@ import sqlparse
 from weave.trace_server.query_builder.obj_tags_query_builder import (
     make_get_aliases_query,
     make_get_tags_query,
+    make_list_aliases_query,
+    make_list_tags_query,
     make_obj_version_exists_query,
     make_resolve_alias_query,
 )
@@ -173,6 +175,63 @@ WHERE (((main.project_id,
     _assert_sql(
         expected_query, expected_params, builder.conditions_part, builder.parameters
     )
+
+
+def test_add_aliases_condition_latest_only():
+    """Filtering by only 'latest' should produce a simple is_latest = 1 condition."""
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    builder.add_aliases_condition(["latest"])
+
+    expected_query = """
+WHERE ((is_latest = 1)
+       AND (deleted_at IS NULL))
+    """
+    expected_params = {
+        "project_id": "test_project",
+    }
+
+    _assert_sql(
+        expected_query, expected_params, builder.conditions_part, builder.parameters
+    )
+
+
+# --- list queries ---
+
+
+def test_make_list_tags_query():
+    query, params = make_list_tags_query("proj")
+
+    expected_query = """
+        SELECT tag
+        FROM tags
+        PREWHERE project_id = {project_id: String}
+        GROUP BY project_id, tag
+        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+        ORDER BY tag
+    """
+    expected_params = {
+        "project_id": "proj",
+    }
+
+    _assert_sql(expected_query, expected_params, query, params)
+
+
+def test_make_list_aliases_query():
+    query, params = make_list_aliases_query("proj")
+
+    expected_query = """
+        SELECT alias
+        FROM aliases
+        PREWHERE project_id = {project_id: String}
+        GROUP BY project_id, alias
+        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+        ORDER BY alias
+    """
+    expected_params = {
+        "project_id": "proj",
+    }
+
+    _assert_sql(expected_query, expected_params, query, params)
 
 
 def test_add_aliases_condition_with_latest():

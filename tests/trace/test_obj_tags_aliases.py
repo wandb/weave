@@ -77,6 +77,46 @@ def test_remove_tags(client: WeaveClient):
     assert res.objs[0].tags == ["b"]
 
 
+def test_readd_tag_after_removal(client: WeaveClient):
+    """Removing a tag and re-adding it should make it appear again."""
+    object_id, digest = _publish_obj(client, "readd_tag_obj")
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            tags=["ephemeral"],
+        )
+    )
+    client.server.obj_remove_tags(
+        tsi.ObjRemoveTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            tags=["ephemeral"],
+        )
+    )
+    # Re-add the same tag
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            tags=["ephemeral"],
+        )
+    )
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert res.objs[0].tags == ["ephemeral"]
+
+
 def test_add_tags_idempotent(client: WeaveClient):
     object_id, digest = _publish_obj(client, "tag_idem_obj")
 
@@ -886,6 +926,36 @@ def test_alias_whitespace_only():
         )
 
 
+def test_alias_empty_string():
+    """Empty string alias should be rejected."""
+    with pytest.raises(ValidationError):
+        tsi.ObjSetAliasReq(
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            alias="",
+        )
+
+
+def test_alias_too_long():
+    """Alias longer than 128 characters should be rejected."""
+    with pytest.raises(ValidationError):
+        tsi.ObjSetAliasReq(
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            alias="a" * 129,
+        )
+
+    # Exactly 128 should be fine
+    tsi.ObjSetAliasReq(
+        project_id="test/proj",
+        object_id="obj",
+        digest="abc123",
+        alias="a" * 128,
+    )
+
+
 def test_tag_deduplication():
     """Duplicate tags in a single request should be deduplicated."""
     req = tsi.ObjAddTagsReq(
@@ -1025,6 +1095,29 @@ def test_aliases_list_excludes_removed(client: WeaveClient):
         tsi.AliasesListReq(project_id=client._project_id())
     )
     assert res.aliases == ["keep-alias"]
+
+
+def test_tag_named_latest_allowed(client: WeaveClient):
+    """'latest' is reserved for aliases but is a perfectly valid tag name."""
+    object_id, digest = _publish_obj(client, "tag_latest_obj")
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            tags=["latest"],
+        )
+    )
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "latest" in res.objs[0].tags
 
 
 def test_tag_version_like_accepted():
@@ -1259,3 +1352,151 @@ def test_cross_object_digest_isolation(client: WeaveClient):
 )
 def test_digest_is_content_hash(digest: str, expected: bool):
     assert digest_is_content_hash(digest) == expected
+
+
+# --- Additional coverage: alias resolution, combined filters, batch enrichment ---
+
+
+def test_obj_read_nonexistent_alias(client: WeaveClient):
+    """obj_read with a digest that looks like an alias but doesn't exist should raise NotFoundError."""
+    object_id, _ = _publish_obj(client, "read_noalias_obj")
+
+    with pytest.raises(NotFoundError):
+        client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id=object_id,
+                digest="nonexistent-alias",
+            )
+        )
+
+
+def test_filter_combined_tags_and_aliases(client: WeaveClient):
+    """Filtering with both tags and aliases simultaneously should AND the conditions."""
+    oid1, d1 = _publish_obj(client, "combo_obj1")
+    oid2, d2 = _publish_obj(client, "combo_obj2")
+    oid3, d3 = _publish_obj(client, "combo_obj3")
+
+    # obj1: has tag "reviewed" and alias "production"
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=oid1,
+            digest=d1,
+            tags=["reviewed"],
+        )
+    )
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=oid1,
+            digest=d1,
+            alias="production",
+        )
+    )
+
+    # obj2: has tag "reviewed" but no alias "production"
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=oid2,
+            digest=d2,
+            tags=["reviewed"],
+        )
+    )
+
+    # obj3: has alias "production" but no tag "reviewed"
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=oid3,
+            digest=d3,
+            alias="production",
+        )
+    )
+
+    # Filter with both tag AND alias — only obj1 should match
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(
+                tags=["reviewed"],
+                aliases=["production"],
+            ),
+        )
+    )
+    assert len(res.objs) == 1
+    assert res.objs[0].object_id == oid1
+
+
+def test_batch_enrichment_multiple_objects(client: WeaveClient):
+    """Enrich 3+ distinct objects in one objs_query call and verify each gets correct tags/aliases."""
+    oid1, d1 = _publish_obj(client, "batch_enrich_a")
+    oid2, d2 = _publish_obj(client, "batch_enrich_b")
+    oid3, d3 = _publish_obj(client, "batch_enrich_c")
+
+    # obj1: tags=["alpha"], alias="prod"
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=oid1,
+            digest=d1,
+            tags=["alpha"],
+        )
+    )
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=oid1,
+            digest=d1,
+            alias="prod",
+        )
+    )
+
+    # obj2: tags=["beta"], no alias
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=oid2,
+            digest=d2,
+            tags=["beta"],
+        )
+    )
+
+    # obj3: no tags, alias="canary"
+    client.server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=client._project_id(),
+            object_id=oid3,
+            digest=d3,
+            alias="canary",
+        )
+    )
+
+    # Query all three with enrichment
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(
+                object_ids=[oid1, oid2, oid3],
+            ),
+            include_tags_and_aliases=True,
+        )
+    )
+    objs_by_id = {o.object_id: o for o in res.objs}
+
+    assert len(objs_by_id) == 3
+
+    # obj1: tags=["alpha"], aliases include "prod" and "latest"
+    assert objs_by_id[oid1].tags == ["alpha"]
+    assert "prod" in objs_by_id[oid1].aliases
+    assert "latest" in objs_by_id[oid1].aliases
+
+    # obj2: tags=["beta"], only "latest" alias (no real alias)
+    assert objs_by_id[oid2].tags == ["beta"]
+    assert objs_by_id[oid2].aliases == ["latest"]
+
+    # obj3: no tags, aliases include "canary" and "latest"
+    assert objs_by_id[oid3].tags == []
+    assert "canary" in objs_by_id[oid3].aliases
+    assert "latest" in objs_by_id[oid3].aliases
