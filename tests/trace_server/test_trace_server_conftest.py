@@ -41,3 +41,20 @@ def test_project_ids_external_to_internal_mapping(
         b64("shawn/project-a"): "shawn/project-a",
         b64("shawn/project-b"): "shawn/project-b",
     }
+
+
+def test_sqlite_project_ids_external_to_internal_passthrough():
+    sqlite_server = SqliteTraceServer("file::memory:?cache=shared")
+    req = tsi.ProjectIdsExternalToInternalReq(
+        project_ids=["internal-project-a", "internal-project-b", "internal-project-a"]
+    )
+
+    try:
+        res = sqlite_server.project_ids_external_to_internal(req)
+    finally:
+        sqlite_server.close()
+
+    assert res.project_id_map == {
+        "internal-project-a": "internal-project-a",
+        "internal-project-b": "internal-project-b",
+    }
