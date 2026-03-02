@@ -6431,7 +6431,7 @@ def test_calls_query_ordering_with_costs_comprehensive(client):
     )
     assert len(calls) == 3
     # Calls with values come first, then NULLs
-    calls_with_priority = [c for c in calls if c.id in [call1.id, call2.id]]
+    calls_with_priority = [c for c in calls if c.id in {call1.id, call2.id}]
     assert calls_with_priority[0].id == call2.id  # priority 1
     assert calls_with_priority[1].id == call1.id  # priority 2
 

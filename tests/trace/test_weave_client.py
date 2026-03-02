@@ -1546,7 +1546,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         table_create_from_digests_records = [
             r for r in records if r[0] == "table_create_from_digests"
         ]
-        obj_records = [r for r in records if r[0] in ["obj_create", "obj_read"]]
+        obj_records = [r for r in records if r[0] in {"obj_create", "obj_read"}]
 
         # Expected: 2 table_create calls (first + second) + 1 table_create_from_digests (chunking merge)
         assert len(table_create_records) == 2, (

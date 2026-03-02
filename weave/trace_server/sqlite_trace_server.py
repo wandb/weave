@@ -544,7 +544,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         select_columns = [
             key
             for key in tsi.CallSchema.model_fields.keys()
-            if key not in ["storage_size_bytes", "total_storage_size_bytes"]
+            if key not in {"storage_size_bytes", "total_storage_size_bytes"}
         ]
         if req.columns:
             # TODO(gst): allow json fields to be selected
@@ -689,12 +689,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                             json_path = sort_field[len("summary.") :]
                             sort_field = "summary"
 
-                assert direction in [
+                assert direction in {
                     "ASC",
                     "DESC",
                     "asc",
                     "desc",
-                ], f"Invalid order_by direction: {direction}"
+                }, f"Invalid order_by direction: {direction}"
                 if json_path:
                     sort_field = (
                         f"json_extract({sort_field}, '{quote_json_path(json_path)}')"

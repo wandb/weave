@@ -2734,7 +2734,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if (
             current_state is not None
             and req.annotation_state != "in_progress"
-            and current_state not in ("in_progress", "unstarted")
+            and current_state not in {"in_progress", "unstarted"}
         ):
             raise ValueError(
                 f"Invalid state transition from '{current_state}' to '{req.annotation_state}'. "
@@ -7179,7 +7179,7 @@ def _setup_completion_model_info(
         credentials_satisfied = is_vertex_provider and vertex_credentials
         if (
             not api_key
-            and provider not in ("bedrock", "bedrock_converse")
+            and provider not in {"bedrock", "bedrock_converse"}
             and not credentials_satisfied
         ):
             raise MissingLLMApiKeyError(

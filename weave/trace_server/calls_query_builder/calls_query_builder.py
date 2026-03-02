@@ -860,7 +860,7 @@ class CallsQuery(BaseModel):
         if field in DISALLOWED_FILTERING_FIELDS:
             raise ValueError(f"Field {field} is not allowed in ORDER BY")
         direction = direction.upper()
-        if direction not in ("ASC", "DESC"):
+        if direction not in {"ASC", "DESC"}:
             raise ValueError(f"Direction {direction} is not allowed")
         direction = cast(Literal["ASC", "DESC"], direction)
         self.order_fields.append(
@@ -1140,14 +1140,13 @@ class CallsQuery(BaseModel):
                     base_field = get_field_by_name(field_obj.field)
                     if base_field not in select_query.select_fields:
                         select_query.select_fields.append(base_field)
-                else:
-                    # For non-dynamic fields (like started_at, op_name, etc.),
-                    # add the field directly to ensure it's available in CTEs
-                    if field_obj not in select_query.select_fields:
-                        assert isinstance(field_obj, CallsMergedField), (
-                            "Field must be a CallsMergedField"
-                        )
-                        select_query.select_fields.append(field_obj)
+                # For non-dynamic fields (like started_at, op_name, etc.),
+                # add the field directly to ensure it's available in CTEs
+                elif field_obj not in select_query.select_fields:
+                    assert isinstance(field_obj, CallsMergedField), (
+                        "Field must be a CallsMergedField"
+                    )
+                    select_query.select_fields.append(field_obj)
 
         filtered_calls_sql = filter_query._as_sql_base_format(
             pb,
@@ -1251,11 +1250,10 @@ class CallsQuery(BaseModel):
                 and is_object_ref_operand(condition.operand, expand_columns)
             ):
                 non_object_ref_conditions.append(condition)
-            else:
-                if condition._consumed_fields is not None:
-                    object_ref_fields_consumed.update(
-                        f.field for f in condition._consumed_fields
-                    )
+            elif condition._consumed_fields is not None:
+                object_ref_fields_consumed.update(
+                    f.field for f in condition._consumed_fields
+                )
 
         optimization_conditions = process_query_to_optimization_sql(
             non_object_ref_conditions, pb, table_alias, self.read_table

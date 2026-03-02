@@ -53,7 +53,6 @@ class BytesMedia(GeneratedMedia):
     def save(self, filename: str) -> None:
         with open(filename, "wb") as f:
             f.write(self._data)
-        return
 
 
 # --- Generation Functions ---
