@@ -81,9 +81,11 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
         return self._user_map.int_to_ext(user_id, b64(user_id))
 
 
-class TestOnlyUserInjectingExternalTraceServer(
+class UserInjectingExternalTraceServer(
     external_to_internal_trace_server_adapter.ExternalTraceServer
 ):
+    # Tests-only adapter that injects a fixed user id into external-facing requests.
+
     def __init__(
         self,
         internal_trace_server: tsi.TraceServerInterface,
@@ -161,8 +163,8 @@ def externalize_trace_server(
     trace_server: tsi.TraceServerInterface,
     user_id: str = "test_user",
     id_converter: external_to_internal_trace_server_adapter.IdConverter | None = None,
-) -> TestOnlyUserInjectingExternalTraceServer:
-    return TestOnlyUserInjectingExternalTraceServer(
+) -> UserInjectingExternalTraceServer:
+    return UserInjectingExternalTraceServer(
         trace_server,
         id_converter or DummyIdConverter(),
         user_id,

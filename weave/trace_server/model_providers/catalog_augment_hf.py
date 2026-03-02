@@ -84,6 +84,7 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
     url = f"https://huggingface.co/api/models/{model_name}"
     with httpx.Client(timeout=30.0) as client:
         response = client.get(url)
+        response.raise_for_status()
         d = response.json()
     filtered = pick_keys(d, HF_KEYS_TO_KEEP)
     license = d.get("cardData", {}).get("license")
