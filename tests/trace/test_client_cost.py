@@ -1,4 +1,5 @@
-from datetime import datetime
+import datetime
+import uuid
 
 import pytest
 
@@ -28,7 +29,7 @@ def test_cost_apis(client):
         "my_model_to_delete3": {
             "prompt_token_cost": 25,
             "completion_token_cost": 30,
-            "effective_date": datetime(2021, 4, 22),
+            "effective_date": datetime.datetime(2021, 4, 22),
         },
         "my_model_to_delete4": {
             "prompt_token_cost": 35,
@@ -84,7 +85,7 @@ def test_cost_apis(client):
         llm_id="my_model_to_delete3",
         prompt_token_cost=500,
         completion_token_cost=1000,
-        effective_date=datetime(1998, 10, 3),
+        effective_date=datetime.datetime(1998, 10, 3),
     )
 
     assert len(res.ids) == 1
@@ -197,3 +198,110 @@ def test_purge_only_ids(client):
             ),
         )
     )
+
+
+def test_costs_streamed_with_all_fields(client):
+    """Costs returned by calls_query_stream include extra metadata fields
+    (provider_id, effective_date, pricing_level, etc.) and must not fail
+    Pydantic validation even when some of those fields are absent.
+    """
+    if client_is_sqlite(client):
+        return
+
+    project_id = client._project_id()
+
+    # 1. Create cost entry with optional metadata fields populated
+    client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=project_id,
+            costs={
+                "test-llm": {
+                    "prompt_token_cost": 0.001,
+                    "completion_token_cost": 0.002,
+                    "provider_id": "test-provider",
+                    "effective_date": datetime.datetime(
+                        2024, 1, 1, tzinfo=datetime.timezone.utc
+                    ),
+                },
+            },
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+
+    # 2. Create a call with matching usage data
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=trace_id,
+                started_at=now,
+                op_name=f"weave:///{project_id}/op/test_op:v1",
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=now + datetime.timedelta(seconds=1),
+                summary={
+                    "usage": {
+                        "test-llm": {
+                            "prompt_tokens": 100,
+                            "completion_tokens": 50,
+                            "total_tokens": 150,
+                            "requests": 1,
+                        }
+                    }
+                },
+            )
+        )
+    )
+
+    # 3. Stream calls back with include_costs — this is the read path that
+    #    previously failed with Pydantic validation errors when LLMCostSchema
+    #    required all fields.
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                include_costs=True,
+            )
+        )
+    )
+    assert len(calls) == 1
+
+    call = calls[0]
+    assert call.summary is not None
+    costs = call.summary.get("weave", {}).get("costs", {})
+    assert "test-llm" in costs
+
+    cost_entry = costs["test-llm"]
+
+    # Verify core cost calculations
+    assert cost_entry["prompt_tokens"] == 100
+    assert cost_entry["completion_tokens"] == 50
+    assert cost_entry["prompt_token_cost"] == pytest.approx(0.001)
+    assert cost_entry["completion_token_cost"] == pytest.approx(0.002)
+    assert cost_entry["prompt_tokens_total_cost"] == pytest.approx(100 * 0.001)
+    assert cost_entry["completion_tokens_total_cost"] == pytest.approx(50 * 0.002)
+
+    # Verify the extra metadata fields that come from the llm_token_prices
+    # table are present — these are the fields that caused the original
+    # validation error when LLMCostSchema didn't have total=False.
+    assert cost_entry["provider_id"] == "test-provider"
+    assert cost_entry["pricing_level"] == "project"
+    assert cost_entry["pricing_level_id"] is not None
+    assert cost_entry["created_at"] is not None
+    assert cost_entry["created_by"] is not None
+    assert cost_entry["effective_date"] is not None
+    assert cost_entry["prompt_token_cost_unit"] == "USD"
+    assert cost_entry["completion_token_cost_unit"] == "USD"

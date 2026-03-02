@@ -41,7 +41,7 @@ class LLMUsageSchema(TypedDict, total=False):
     total_tokens: int | None
 
 
-class LLMCostSchema(LLMUsageSchema):
+class LLMCostSchema(LLMUsageSchema, total=False):
     prompt_tokens_total_cost: float | None
     completion_tokens_total_cost: float | None
     prompt_token_cost: float | None

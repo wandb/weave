@@ -434,11 +434,13 @@ class WeaveTable(Traceable):  # noqa: PLW1641
             or self.table_ref._row_digests is None
             or self._prefetched_rows is None
         ):
-            if get_raise_on_captured_errors():
-                raise
-            logger.error(
-                "Expected all row digests and prefetched rows to be set, falling back to remote iteration"
+            msg = (
+                "Expected all row digests and prefetched rows to be set, falling back"
+                " to remote iteration"
             )
+            if get_raise_on_captured_errors():
+                raise ValueError(msg)
+            logger.error(msg)
             yield from self._remote_iter()
             return
 
@@ -448,11 +450,14 @@ class WeaveTable(Traceable):  # noqa: PLW1641
             row_digest_len = len(self.table_ref._row_digests)
             prefetched_rows_len = len(self._prefetched_rows)
             if row_digest_len != prefetched_rows_len:
-                if get_raise_on_captured_errors():
-                    raise
-                logger.error(
-                    f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
+                msg = (
+                    "Expected length of row digests "
+                    f"({row_digest_len}) to match prefetched rows "
+                    f"({prefetched_rows_len}). Falling back to remote iteration."
                 )
+                if get_raise_on_captured_errors():
+                    raise ValueError(msg)
+                logger.error(msg)
                 yield from self._remote_iter()
                 return
 
