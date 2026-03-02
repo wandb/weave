@@ -28,6 +28,7 @@ PROVIDER_TO_API_KEY_NAME_MAP = {
     "xai": "XAI_API_KEY",
     "vertex_ai": "VERTEXAI_JSON_CREDENTIALS",
     "vertex_ai-language-models": "VERTEXAI_JSON_CREDENTIALS",
+    "fireworks_ai": "FIREWORKS_API_KEY",
 }
 
 # Provider names that use Vertex credentials (same as keys in PROVIDER_TO_API_KEY_NAME_MAP).

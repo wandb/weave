@@ -19542,5 +19542,165 @@
       "output": 1.5e-05,
       "created_at": "2026-02-17 12:59:31"
     }
+  ],
+  "fireworks_ai/accounts/fireworks/models/glm-4p7": [
+    {
+      "provider": "fireworks_ai",
+      "input": 6e-07,
+      "output": 2.2e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/minimax-m2p1": [
+    {
+      "provider": "fireworks_ai",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "fireworks_ai/glm-4p7": [
+    {
+      "provider": "fireworks_ai",
+      "input": 6e-07,
+      "output": 2.2e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "fireworks_ai/kimi-k2p5": [
+    {
+      "provider": "fireworks_ai",
+      "input": 6e-07,
+      "output": 3e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "fireworks_ai/minimax-m2p1": [
+    {
+      "provider": "fireworks_ai",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "gemini-3.1-pro-preview": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "gemini-3.1-pro-preview-customtools": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "vertex_ai/gemini-3.1-pro-preview": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "vertex_ai/gemini-3.1-pro-preview-customtools": [
+    {
+      "provider": "vertex_ai",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "gemini/gemini-3.1-pro-preview": [
+    {
+      "provider": "gemini",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "gemini/gemini-3.1-pro-preview-customtools": [
+    {
+      "provider": "gemini",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "gpt-5.3-codex": [
+    {
+      "provider": "openai",
+      "input": 1.75e-06,
+      "output": 1.4e-05,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "groq/openai/gpt-oss-safeguard-20b": [
+    {
+      "provider": "groq",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "mistral/devstral-small-latest": [
+    {
+      "provider": "mistral",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "mistral/devstral-latest": [
+    {
+      "provider": "mistral",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "mistral/devstral-medium-latest": [
+    {
+      "provider": "mistral",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "openrouter/minimax/minimax-m2.5": [
+    {
+      "provider": "openrouter",
+      "input": 3e-07,
+      "output": 1.1e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "coreweave/MiniMaxAI/MiniMax-M2.5": [
+    {
+      "provider": "coreweave",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "coreweave/zai-org/GLM-5-FP8": [
+    {
+      "provider": "coreweave",
+      "input": 1e-06,
+      "output": 3.2e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "coreweave/moonshotai/Kimi-K2.5": [
+    {
+      "provider": "coreweave",
+      "input": 5e-07,
+      "output": 2.85e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
   ]
 }
