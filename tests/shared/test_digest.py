@@ -75,7 +75,10 @@ def test_compute_table_ref_uri() -> None:
     project_id = "internal-proj-abc"
     rows = [
         {"input": "What is RAG?", "expected": "Retrieval-augmented generation"},
-        {"input": "Explain RLHF", "expected": "Reinforcement learning from human feedback"},
+        {
+            "input": "Explain RLHF",
+            "expected": "Reinforcement learning from human feedback",
+        },
     ]
     row_digests = [compute_row_digest(r) for r in rows]
 
@@ -107,4 +110,7 @@ def test_compute_object_ref_uri_with_external_to_internal_map() -> None:
     uri = compute_object_ref_uri(internal_id, object_id, val)
 
     expected_digest = compute_object_digest(val)
-    assert uri == f"{WEAVE_INTERNAL_SCHEME}:///{internal_id}/object/{object_id}:{expected_digest}"
+    assert (
+        uri
+        == f"{WEAVE_INTERNAL_SCHEME}:///{internal_id}/object/{object_id}:{expected_digest}"
+    )
