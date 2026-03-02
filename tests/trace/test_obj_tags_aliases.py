@@ -1182,6 +1182,29 @@ def test_sdk_list_aliases(client: WeaveClient):
     assert "my-alias" in aliases
 
 
+def test_tag_named_latest_allowed(client: WeaveClient):
+    """'latest' is reserved for aliases but is a perfectly valid tag name."""
+    object_id, digest = _publish_obj(client, "tag_latest_obj")
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            tags=["latest"],
+        )
+    )
+
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "latest" in res.objs[0].tags
+
+
 def test_tag_version_like_accepted():
     """Version-like names (v0, v1, ...) are accepted for tags (only reserved for aliases)."""
     tsi.ObjAddTagsReq(
