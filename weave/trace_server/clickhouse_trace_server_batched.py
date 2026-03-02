@@ -1792,7 +1792,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     # --- Tags & Aliases ---
 
-    def _assert_obj_version_exists(
+    def _ensure_obj_version_exists(
         self, project_id: str, object_id: str, digest: str
     ) -> None:
         """Raise NotFoundError if the object version doesn't exist or is deleted."""
@@ -1853,7 +1853,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
         assert req.wb_user_id, "wb_user_id is required for obj_add_tags"
-        self._assert_obj_version_exists(req.project_id, req.object_id, req.digest)
+        self._ensure_obj_version_exists(req.project_id, req.object_id, req.digest)
         self._insert_tags(
             req.project_id,
             req.object_id,
@@ -1877,7 +1877,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
         assert req.wb_user_id, "wb_user_id is required for obj_set_alias"
-        self._assert_obj_version_exists(req.project_id, req.object_id, req.digest)
+        self._ensure_obj_version_exists(req.project_id, req.object_id, req.digest)
         self._insert_alias(
             req.project_id,
             req.object_id,

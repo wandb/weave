@@ -1185,7 +1185,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
 
-    def _assert_obj_version_exists(
+    def _ensure_obj_version_exists(
         self,
         cursor: sqlite3.Cursor,
         project_id: str,
@@ -1203,7 +1203,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
-            self._assert_obj_version_exists(
+            self._ensure_obj_version_exists(
                 cursor, req.project_id, req.object_id, req.digest
             )
             for tag in req.tags:
@@ -1229,7 +1229,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
-            self._assert_obj_version_exists(
+            self._ensure_obj_version_exists(
                 cursor, req.project_id, req.object_id, req.digest
             )
             cursor.execute(
