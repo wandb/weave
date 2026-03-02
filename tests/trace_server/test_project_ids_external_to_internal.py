@@ -1,7 +1,5 @@
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
-    TestOnlyUserInjectingExternalTraceServer as UserInjectingExternalTraceServer,
-)
-from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    TestOnlyUserInjectingExternalTraceServer,
     b64,
 )
 from weave.trace_server import trace_server_interface as tsi
@@ -9,7 +7,7 @@ from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
 def test_project_ids_external_to_internal_mapping(
-    trace_server: UserInjectingExternalTraceServer,
+    trace_server: TestOnlyUserInjectingExternalTraceServer,
 ):
     req = tsi.ProjectIdsExternalToInternalReq(
         project_ids=["shawn/project-a", "shawn/project-b", "shawn/project-a"]
