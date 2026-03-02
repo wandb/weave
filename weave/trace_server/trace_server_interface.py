@@ -1118,6 +1118,7 @@ class ProjectIdsExternalToInternalRes(BaseModel):
     project_id_map: dict[str, str] = Field(
         default_factory=dict,
         description="Mapping of external project ID to internal project ID.",
+        examples=[{"entity-a/project-a": "internal-project-a"}],
     )
 
 
@@ -2470,8 +2471,7 @@ class TraceServerInterface(Protocol):
 
     def project_ids_external_to_internal(
         self, req: ProjectIdsExternalToInternalReq
-    ) -> ProjectIdsExternalToInternalRes:
-        raise NotImplementedError("project_ids_external_to_internal is not implemented")
+    ) -> ProjectIdsExternalToInternalRes: ...
 
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
