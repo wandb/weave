@@ -263,3 +263,57 @@ WHERE (((is_latest = 1
     _assert_sql(
         expected_query, expected_params, builder.conditions_part, builder.parameters
     )
+
+
+def test_add_aliases_condition_latest_only():
+    """Filtering by only 'latest' should produce a simple is_latest = 1 condition."""
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    builder.add_aliases_condition(["latest"])
+
+    expected_query = """
+WHERE ((is_latest = 1)
+       AND (deleted_at IS NULL))
+    """
+    expected_params = {
+        "project_id": "test_project",
+    }
+
+    _assert_sql(
+        expected_query, expected_params, builder.conditions_part, builder.parameters
+    )
+
+
+def test_make_list_tags_query():
+    query, params = make_list_tags_query("proj")
+
+    expected_query = """
+        SELECT tag
+        FROM tags
+        PREWHERE project_id = {project_id: String}
+        GROUP BY project_id, tag
+        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+        ORDER BY tag
+    """
+    expected_params = {
+        "project_id": "proj",
+    }
+
+    _assert_sql(expected_query, expected_params, query, params)
+
+
+def test_make_list_aliases_query():
+    query, params = make_list_aliases_query("proj")
+
+    expected_query = """
+        SELECT alias
+        FROM aliases
+        PREWHERE project_id = {project_id: String}
+        GROUP BY project_id, alias
+        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+        ORDER BY alias
+    """
+    expected_params = {
+        "project_id": "proj",
+    }
+
+    _assert_sql(expected_query, expected_params, query, params)

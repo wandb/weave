@@ -831,9 +831,6 @@ def test_multiple_aliases_on_object(client: WeaveClient):
     assert "stable" not in (res.objs[1].aliases or [])
 
 
-# --- obj_read with real digest (not alias) ---
-
-
 # --- SDK client methods (WeaveClient.add_tags, remove_tags, set_alias, remove_alias) ---
 
 
