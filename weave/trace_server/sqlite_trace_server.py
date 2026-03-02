@@ -241,6 +241,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         cursor.execute(TABLE_FEEDBACK.create_sql())
 
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        # Internal trace servers already operate on internal project IDs, so this is a pass-through.
+        project_id_map = {project_id: project_id for project_id in req.project_ids}
+        return tsi.ProjectIdsExternalToInternalRes(project_id_map=project_id_map)
+
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         res = []
         for item in req.batch:
