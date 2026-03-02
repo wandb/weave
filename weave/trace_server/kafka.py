@@ -133,10 +133,16 @@ class KafkaProducer(ConfluentKafkaProducer):
         if flush_immediately:
             self.flush()
 
+    SCORE_CALLS_CHUNK_SIZE = 100
+
     def produce_score_calls(
         self, req: tsi.CallsScoreReq, flush_immediately: bool = True
     ) -> None:
-        """Produce a score_calls message to Kafka.
+        """Produce score_calls messages to Kafka, chunked to avoid consumer timeouts.
+
+        Large call_ids lists are split into chunks of SCORE_CALLS_CHUNK_SIZE
+        so that each Kafka message can be processed within the consumer's
+        max.poll.interval.ms.
 
         Args:
             req: The CallsScoreReq containing project_id, call_ids, scorer_refs, and wb_user_id
@@ -157,22 +163,24 @@ class KafkaProducer(ConfluentKafkaProducer):
             set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
             return
 
-        payload = {
-            "project_id": req.project_id,
-            "call_ids": req.call_ids,
-            "scorer_refs": req.scorer_refs,
-            "wb_user_id": req.wb_user_id,
-        }
-
         publish_key = None
         if kafka_partition_by_project_id():
             publish_key = req.project_id
 
-        self.produce(
-            topic=SCORE_CALLS_TOPIC,
-            value=json.dumps(payload),
-            key=publish_key,
-        )
+        for i in range(0, len(req.call_ids), self.SCORE_CALLS_CHUNK_SIZE):
+            chunk = req.call_ids[i : i + self.SCORE_CALLS_CHUNK_SIZE]
+            payload = {
+                "project_id": req.project_id,
+                "call_ids": chunk,
+                "scorer_refs": req.scorer_refs,
+                "wb_user_id": req.wb_user_id,
+            }
+
+            self.produce(
+                topic=SCORE_CALLS_TOPIC,
+                value=json.dumps(payload),
+                key=publish_key,
+            )
 
         if flush_immediately:
             self.flush()
