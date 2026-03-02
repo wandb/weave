@@ -262,6 +262,7 @@ select = [
   "PT018",   # https://docs.astral.sh/ruff/rules/pytest-composite-assertion/
   "PT022",   # https://docs.astral.sh/ruff/rules/pytest-useless-yield-fixture/
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
+  "PLE",     # https://docs.astral.sh/ruff/rules/#pylint-ple
   "PLW",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
