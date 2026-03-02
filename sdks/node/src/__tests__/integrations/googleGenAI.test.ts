@@ -2,15 +2,6 @@ import {InMemoryTraceServer} from '../../inMemoryTraceServer';
 import {commonPatchGoogleGenAI} from '../../integrations/googleGenAI';
 import {initWithCustomTraceServer} from '../clientMock';
 
-async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
-  return traceServer.calls
-    .callsStreamQueryPost({
-      project_id: projectId,
-      limit: 100,
-    })
-    .then(result => result.calls);
-}
-
 function createMockGoogleGenAI() {
   const mockGenerateContent = jest
     .fn()
@@ -106,9 +97,7 @@ describe('Google GenAI Integration', () => {
     expect(mockGenerateContent).toHaveBeenCalledTimes(1);
     expect(client.chats.modelsModule).toBe(client.models);
 
-    await inMemoryTraceServer.waitForPendingOperations();
-
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await inMemoryTraceServer.getCalls(testProjectName, 100);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('google.genai.models.generateContent');
     expect(calls[0].inputs).toEqual({
@@ -145,9 +134,7 @@ describe('Google GenAI Integration', () => {
     expect(chunkCount).toBe(3);
     expect(mockGenerateContentStream).toHaveBeenCalledTimes(1);
 
-    await inMemoryTraceServer.waitForPendingOperations();
-
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await inMemoryTraceServer.getCalls(testProjectName, 100);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain(
       'google.genai.models.generateContentStream'
