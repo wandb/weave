@@ -62,7 +62,7 @@ class AttributesDict(dict[str, Any]):
 
     def _set_weave_item(self, subkey: str, value: Any) -> None:
         """Internal method to set items in the 'weave' subdictionary."""
-        dict.__setitem__(self["weave"], subkey, value)
+        dict.__setitem__(self["weave"], subkey, value)  # noqa: PLC2801
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"

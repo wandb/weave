@@ -158,18 +158,18 @@ class Traceable:
 
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
-    attribute = object.__getattribute__(self, name)
+    attribute = object.__getattribute__(self, name)  # noqa: PLC2801
 
     # Starting in pydantic 2.10.0, this handling is needed otherwise getattribute will
     # infinitely recurse.
     if name.startswith("__") and name.endswith("__"):
         return attribute
 
-    if name not in object.__getattribute__(self, "model_fields"):
+    if name not in object.__getattribute__(self, "model_fields"):  # noqa: PLC2801
         return attribute
     if name == "ref":
         try:
-            return object.__getattribute__(self, "ref")
+            return object.__getattribute__(self, "ref")  # noqa: PLC2801
         except AttributeError:
             return None
 

@@ -4725,11 +4725,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         def make_ref_cache_key(ref: ri.InternalObjectRef) -> str:
             return ref.uri()
 
-        for project in refs_by_project_id:
-            project_refs = refs_by_project_id[project]
+        for project, project_refs in refs_by_project_id.items():
             project_results = self._refs_read_batch_within_project(
                 project,
-                refs_by_project_id[project],
+                project_refs,
                 root_val_cache,
             )
             for ref, result in zip(project_refs, project_results, strict=False):
