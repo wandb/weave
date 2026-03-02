@@ -204,6 +204,16 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_HTTP_TIMEOUT`
     """
 
+    trace_log_file_path: str | None = None
+    """Path to a JSONL file where all trace server requests will be logged.
+
+    If set, a logging middleware is inserted into the trace server chain that
+    writes one JSON line per method call (timestamp, method name, serialized request).
+    If None (default), no logging middleware is created.
+
+    Can be overridden with the environment variable `WEAVE_TRACE_LOG_FILE_PATH`
+    """
+
     use_stainless_server: bool = False
     """
     Toggles use of the stainless-generated HTTP client for trace server communication.
@@ -354,6 +364,11 @@ def http_timeout() -> float:
     if timeout is None:
         return 30.0
     return timeout
+
+
+def trace_log_file_path() -> str | None:
+    """Returns the path to the JSONL request log file, or None if disabled."""
+    return _optional_str("trace_log_file_path")
 
 
 def should_use_stainless_server() -> bool:

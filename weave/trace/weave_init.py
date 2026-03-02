@@ -11,6 +11,7 @@ from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import (
     should_redact_pii,
     should_use_stainless_server,
+    trace_log_file_path,
     use_server_cache,
 )
 from weave.trace.wandb_run_context import (
@@ -147,6 +148,14 @@ def init_weave(
     server: TraceServerClientInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
+
+    log_path = trace_log_file_path()
+    if log_path:
+        from weave.trace_server_bindings.logging_middleware_trace_server import (
+            LoggingMiddlewareTraceServer,
+        )
+
+        server = LoggingMiddlewareTraceServer(server, log_path)
 
     client = weave_client.WeaveClient(
         entity_name, project_name, server, ensure_project_exists
