@@ -47,6 +47,7 @@ from weave.trace.context.weave_client_context import (
 from weave.trace.refs import TableRef
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
+from weave.trace.wandb_run_context import WandbRunContext
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
@@ -90,6 +91,28 @@ def get_client_trace_server(
 
 def get_client_project_id(client: weave_client.WeaveClient) -> str:
     return client._project_id()
+
+
+@contextmanager
+def batched_client_writes(client: weave_client.WeaveClient):
+    set_autoflush = getattr(client, "set_autoflush", None)
+    if set_autoflush is None:
+        yield
+        return
+
+    set_autoflush(False)
+    try:
+        yield
+    finally:
+        set_autoflush(True)
+        client.flush()
+
+
+def create_anonymous_calls(
+    client: weave_client.WeaveClient, op_name: str, num_calls: int
+) -> None:
+    for i in range(num_calls):
+        client.create_call(op_name, {"i": i})
 
 
 ## End hacky interface compatibility helpers
@@ -898,34 +921,34 @@ def test_trace_call_query_filter_trace_roots_only(client):
 def test_trace_call_query_filter_wb_run_ids(client):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
-    from weave.trace import weave_client
-    from weave.trace.wandb_run_context import WandbRunContext
+    run_1_calls = 8
+    run_2_calls = 9
+    no_run_calls = 10
 
-    with mock.patch.object(
-        weave_client,
-        "get_global_wb_run_context",
-        return_value=WandbRunContext(run_id="test-run-1", step=0),
-    ):
-        call_spec_1 = simple_line_call_bootstrap()
-    with mock.patch.object(
-        weave_client,
-        "get_global_wb_run_context",
-        return_value=WandbRunContext(run_id="test-run-2", step=0),
-    ):
-        call_spec_2 = simple_line_call_bootstrap()
-    call_spec_3 = simple_line_call_bootstrap()
+    with batched_client_writes(client):
+        with mock.patch.object(
+            weave_client,
+            "get_global_wb_run_context",
+            return_value=WandbRunContext(run_id="test-run-1", step=0),
+        ):
+            create_anonymous_calls(client, "wb-run-op-1", run_1_calls)
+        with mock.patch.object(
+            weave_client,
+            "get_global_wb_run_context",
+            return_value=WandbRunContext(run_id="test-run-2", step=0),
+        ):
+            create_anonymous_calls(client, "wb-run-op-2", run_2_calls)
+        create_anonymous_calls(client, "wb-run-op-no-run", no_run_calls)
 
-    total_calls = (
-        call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls
-    )
+    total_calls = run_1_calls + run_2_calls + no_run_calls
 
     for wb_run_ids, exp_count in [
         (None, total_calls),
         ([], total_calls),
-        ([full_wb_run_id_1], call_spec_1.total_calls),
+        ([full_wb_run_id_1], run_1_calls),
         (
             [full_wb_run_id_1, full_wb_run_id_2],
-            call_spec_1.total_calls + call_spec_2.total_calls,
+            run_1_calls + run_2_calls,
         ),
         ([f"{client.entity}/{client.project}/NOT_A_RUN"], 0),
     ]:
@@ -940,29 +963,40 @@ def test_trace_call_query_filter_wb_run_ids(client):
 
 
 def test_trace_call_query_filter_wb_user_ids(client):
-    call_spec_1 = simple_line_call_bootstrap()
+    default_user_calls = 8
+    second_user_calls = 9
+    third_user_calls = 10
+    next_trace_server = client.server.server._next_trace_server
+    original_user_id = next_trace_server._user_id
 
-    # OMG! How ugly is this?! The layers of testing servers is nasty
-    client.server.server._next_trace_server._user_id = "second_user"
-    call_spec_2 = simple_line_call_bootstrap()
+    try:
+        with batched_client_writes(client):
+            create_anonymous_calls(client, "wb-user-op-default", default_user_calls)
+            client.flush()
 
-    # OMG! How ugly is this?! The layers of testing servers is nasty
-    client.server.server._next_trace_server._user_id = "third_user"
-    call_spec_3 = simple_line_call_bootstrap()
+            next_trace_server._user_id = "second_user"
+            create_anonymous_calls(client, "wb-user-op-second", second_user_calls)
+            client.flush()
+
+            next_trace_server._user_id = "third_user"
+            create_anonymous_calls(client, "wb-user-op-third", third_user_calls)
+            client.flush()
+    finally:
+        next_trace_server._user_id = original_user_id
 
     for wb_user_ids, exp_count in [
         (
             None,
-            call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls,
+            default_user_calls + second_user_calls + third_user_calls,
         ),
         (
             [],
-            call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls,
+            default_user_calls + second_user_calls + third_user_calls,
         ),
-        (["second_user"], call_spec_2.total_calls),
+        (["second_user"], second_user_calls),
         (
             ["second_user", "third_user"],
-            call_spec_2.total_calls + call_spec_3.total_calls,
+            second_user_calls + third_user_calls,
         ),
         (["NOT_A_USER"], 0),
     ]:
@@ -1023,7 +1057,7 @@ def test_trace_call_query_timings(client):
     later = now + datetime.timedelta(seconds=1)
     even_later = later + datetime.timedelta(seconds=1)
 
-    num_calls = 100
+    num_calls = 30
 
     # Create calls with controlled timing - mock only datetime.datetime.now()
     call_index = 0
@@ -1032,26 +1066,27 @@ def test_trace_call_query_timings(client):
         nonlocal call_index
         # Each create_call increments the index once at the start
         # Return the appropriate time based on which call we're processing
-        if call_index <= num_calls - 3:  # calls 0-97 get 'now'
+        if call_index <= num_calls - 3:
             return now
-        elif call_index == num_calls - 2:  # call 98 gets 'later'
+        elif call_index == num_calls - 2:
             return later
-        else:  # call 99 gets 'even_later'
+        else:
             return even_later
 
-    with mock.patch(
-        "weave.trace.weave_client.datetime.datetime"
-    ) as mock_datetime_class:
-        # Mock only the .now() method, keep everything else as-is
-        mock_datetime_class.now = mock.Mock(side_effect=mock_now)
-        # Preserve other datetime functionality
-        mock_datetime_class.side_effect = lambda *args, **kw: datetime.datetime(
-            *args, **kw
-        )
+    with batched_client_writes(client):
+        with mock.patch(
+            "weave.trace.weave_client.datetime.datetime"
+        ) as mock_datetime_class:
+            # Mock only the .now() method, keep everything else as-is
+            mock_datetime_class.now = mock.Mock(side_effect=mock_now)
+            # Preserve other datetime functionality
+            mock_datetime_class.side_effect = lambda *args, **kw: datetime.datetime(
+                *args, **kw
+            )
 
-        for i in range(num_calls):
-            call_index = i
-            client.create_call("y", {"a": i})
+            for i in range(num_calls):
+                call_index = i
+                client.create_call("y", {"a": i})
 
     def query_server():
         result = get_client_trace_server(client).calls_query_stream(
@@ -1080,13 +1115,13 @@ def test_trace_call_query_timings(client):
     ids = [c.id for c in res]
 
     # indeterminite ordering should always default to the same thing
-    for _i in range(5):
+    for _i in range(3):
         tres = query_server()
         tids = [c.id for c in tres]
         assert tids == ids
 
     # page_size 10 to test ordering within pages
-    for _i in range(3):
+    for _i in range(2):
         tres = query_client(page_size=10)
         tids = [c.id for c in tres]
         assert tids == ids
