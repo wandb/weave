@@ -113,7 +113,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.ProjectIdsExternalToInternalReq
     ) -> tsi.ProjectIdsExternalToInternalRes:
         project_id_map = {
-            self._idc.ext_to_int_project_id(project_id): project_id
+            project_id: self._idc.ext_to_int_project_id(project_id)
             for project_id in req.project_ids
         }
         return tsi.ProjectIdsExternalToInternalRes(project_id_map=project_id_map)

@@ -1117,7 +1117,7 @@ class ProjectIdsExternalToInternalReq(BaseModelStrict):
 class ProjectIdsExternalToInternalRes(BaseModel):
     project_id_map: dict[str, str] = Field(
         default_factory=dict,
-        description="Mapping of internal project ID to external project ID.",
+        description="Mapping of external project ID to internal project ID.",
     )
 
 

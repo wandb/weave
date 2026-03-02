@@ -38,8 +38,8 @@ def test_project_ids_external_to_internal_mapping(
     res = trace_server.project_ids_external_to_internal(req)
 
     assert res.project_id_map == {
-        b64("shawn/project-a"): "shawn/project-a",
-        b64("shawn/project-b"): "shawn/project-b",
+        "shawn/project-a": b64("shawn/project-a"),
+        "shawn/project-b": b64("shawn/project-b"),
     }
 
 

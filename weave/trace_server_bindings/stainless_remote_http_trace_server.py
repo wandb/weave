@@ -429,7 +429,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     ) -> tsi.ProjectIdsExternalToInternalRes:
         """Resolve external project IDs to internal IDs.
 
-        Returns a map keyed by internal ID with external IDs as values.
+        Returns a map keyed by external ID with internal IDs as values.
         """
         headers = self._extra_headers.copy()
         if retry_id := get_current_retry_id():

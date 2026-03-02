@@ -79,8 +79,8 @@ def test_project_ids_external_to_internal_ok(mock_post, unbatched_server):
         project_ids=["entity-a/project-a", "entity-b/project-b"]
     )
     expected_map = {
-        "internal-project-a": "entity-a/project-a",
-        "internal-project-b": "entity-b/project-b",
+        "entity-a/project-a": "internal-project-a",
+        "entity-b/project-b": "internal-project-b",
     }
 
     mock_post.return_value = httpx.Response(
