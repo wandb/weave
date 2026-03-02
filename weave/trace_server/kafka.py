@@ -169,9 +169,14 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             # group fast after a transient failure.
             "reconnect.backoff.ms": 100,
             "reconnect.backoff.max.ms": 5_000,
-            # TODO: Re-enable once prod Bufstream supports Kafka >= 2.4.0 protocol.
-            # "partition.assignment.strategy": "cooperative-sticky",  # KIP-429, requires >= 2.4.0
-            # "group.instance.id": socket.gethostname(),  # KIP-345, requires >= 2.3.0
+            # KIP-429: cooperative-sticky gives balanced distribution (like
+            # roundrobin) plus stickiness across rebalances and incremental
+            # partition migration.  This is client-side only — no broker
+            # support required.
+            "partition.assignment.strategy": "cooperative-sticky",
+            # TODO: Enable once Bufstream supports KIP-345 (JoinGroup v5+).
+            # Bufstream 0.3.39 rejects it: "Broker does not support KIP-345".
+            # "group.instance.id": socket.gethostname(),
             **_make_auth_config(),
             **additional_kafka_config,
         }
