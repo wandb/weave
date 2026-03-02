@@ -357,6 +357,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._kafka_producer = KafkaProducer.from_env()
             return self._kafka_producer
 
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        # Internal trace servers already operate on internal project IDs, so this is a pass-through.
+        project_id_map = {project_id: project_id for project_id in req.project_ids}
+        return tsi.ProjectIdsExternalToInternalRes(project_id_map=project_id_map)
+
     @property
     def table_routing_resolver(self) -> TableRoutingResolver:
         if self._table_routing_resolver is not None:
@@ -569,7 +576,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 for start, end in calls
             ]
-            self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
+            self._insert_call_complete_batch(rows)
         else:
             rows = []
             for start, end in calls:
@@ -581,7 +588,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 rows.append(
                     _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
                 )
-            self._insert_call_batch(rows, settings=None, do_sync_insert=True)
+            self._insert_call_batch(rows)
 
         # Run callbacks and flush
         for cb in event_callbacks:
@@ -4725,11 +4732,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         def make_ref_cache_key(ref: ri.InternalObjectRef) -> str:
             return ref.uri()
 
-        for project in refs_by_project_id:
-            project_refs = refs_by_project_id[project]
+        for project, project_refs in refs_by_project_id.items():
             project_results = self._refs_read_batch_within_project(
                 project,
-                refs_by_project_id[project],
+                project_refs,
                 root_val_cache,
             )
             for ref, result in zip(project_refs, project_results, strict=False):

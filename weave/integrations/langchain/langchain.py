@@ -46,8 +46,7 @@ from weave.integrations.integration_utilities import (
 from weave.integrations.langchain.helpers import _extract_usage_data
 from weave.integrations.patcher import Patcher
 from weave.trace.call import Call
-from weave.trace.context import call_context
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import call_context, weave_client_context
 from weave.trace.op_protocol import OpKind
 
 import_failed = False

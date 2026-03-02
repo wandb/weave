@@ -18,6 +18,7 @@ MODELS_BEGIN_FILE = "../model_providers/modelsBegin.json"
 CW_PREFIX = "coreweave/"
 # Amount of historical costs to store for each model
 HISTORICAL_COSTS = 3
+HTTP_TIMEOUT = 30.0
 
 
 class CostDetails(TypedDict):
@@ -49,10 +50,10 @@ def get_current_costs(file_name: str = COST_FILE) -> dict[str, list[CostDetails]
 # Fetches the latest costs from the file(litellm)
 def fetch_new_costs() -> dict[str, CostDetails]:
     try:
-        with httpx.Client() as client:
+        with httpx.Client(timeout=HTTP_TIMEOUT) as client:
             req = client.get(url)
             req.raise_for_status()
-    except httpx.RequestError as e:
+    except httpx.HTTPError as e:
         print("Failed to fetch new costs:", e)
         raise
 

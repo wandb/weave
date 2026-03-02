@@ -110,7 +110,7 @@ def _process_inputs(raw_inputs: dict[str, Any]) -> dict[str, Any]:
 
 def _get_op_name_from_span(span_id: str) -> str:
     """Get operation name from span ID."""
-    op_name_base = span_id.split("-")[0] if "-" in span_id else span_id
+    op_name_base = span_id.split("-", maxsplit=1)[0] if "-" in span_id else span_id
     return f"llama_index.span.{op_name_base}"
 
 
@@ -191,7 +191,11 @@ if not _import_failed:
             # Then add the actual function arguments
             if bound_args is not None:
                 # Get the function name from the span ID
-                func_name = id_.split(".")[-1].split("-")[0] if "." in id_ else None
+                func_name = (
+                    id_.rsplit(".", maxsplit=1)[-1].split("-", maxsplit=1)[0]
+                    if "." in id_
+                    else None
+                )
 
                 try:
                     # Get the raw args and kwargs
