@@ -7,6 +7,7 @@ import httpx
 
 model_providers_url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 MODEL_PROVIDER_INFO_FILE = "model_providers.json"
+HTTP_TIMEOUT = 30.0
 
 # This is a symlink to the catalog file in the frontend to avoid further ground truth dilution.
 HOSTED_MODEL_INFO_FILE = "modelsFinal.json"
@@ -155,10 +156,10 @@ def main(
 
     # Next add in information from the LiteLLM model provider info file
     try:
-        with httpx.Client() as client:
+        with httpx.Client(timeout=HTTP_TIMEOUT) as client:
             req = client.get(model_providers_url)
             req.raise_for_status()
-    except httpx.RequestError as e:
+    except httpx.HTTPError as e:
         print("Failed to fetch models:", e)
         return {}
 
