@@ -155,7 +155,9 @@ def test_object_query_builder_include_deleted():
     assert "deleted_at IS NULL" in builder.conditions_part
 
     # With include_deleted=True, conditions omit "deleted_at IS NULL"
-    builder = ObjectMetadataQueryBuilder(project_id="test_project", include_deleted=True)
+    builder = ObjectMetadataQueryBuilder(
+        project_id="test_project", include_deleted=True
+    )
     assert "deleted_at IS NULL" not in builder.conditions_part
 
     # set_include_deleted can toggle it after construction
