@@ -53,6 +53,7 @@ This project uses `uv` for dependency management. Dependencies are organized int
 - Do NOT use `--extra test` — `test` is a dependency-group, not an optional-dependency. Use `--group test`.
 - `ruff` is not installed in any project dependency group. Use `uvx ruff` to run it.
 - Ruff now enforces `PLW` rules. `PLW0602`, `PLW0603`, `PLW1641`, and `PLW3201` are handled with spot-level inline `# noqa` on specific lines (not global/per-file ignore). Prefer fixing code first; if intentional, suppress only the exact line.
+- Ruff now enforces `SIM` rules (flake8-simplify family). Prefer direct code fixes (`contextlib.suppress`, combined `with` statements, direct condition returns) instead of adding ignores.
 - Be careful with `PLW1514` autofixes on serialization-sensitive code (`weave/type_handlers/Content/content.py`, `weave/type_handlers/Audio/audio.py`) and mocked file I/O (`weave/trace_server/costs/update_costs.py`): adding `encoding=` changed behavior/tests, so these files are explicitly ignored for that rule.
 
 ### Codex Development (nox)

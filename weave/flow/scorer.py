@@ -166,7 +166,7 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
     elif isinstance(val, dict):
         result = {}
         all_keys = list(
-            dict.fromkeys([k for d in data if isinstance(d, dict) for k in d.keys()])
+            dict.fromkeys([k for d in data if isinstance(d, dict) for k in d])
         )
         for k in all_keys:
             if (
@@ -199,10 +199,7 @@ def get_scorer_attributes(
     score_op: Op
     scorer_name: str
     if weave_isinstance(scorer, Scorer):
-        if scorer.name:
-            scorer_name = scorer.name
-        else:
-            scorer_name = scorer.__class__.__name__
+        scorer_name = scorer.name or scorer.__class__.__name__
         try:
             if not is_op(scorer.score):
                 raise TypeError(
@@ -288,7 +285,7 @@ def prepare_scorer_op_args(
     # This allows dataset columns to be mapped to scorer argument names
     if isinstance(scorer, Scorer) and scorer.column_map is not None:
         # Validate that all mapped columns exist in scorer signature
-        for key in scorer.column_map.keys():
+        for key in scorer.column_map:
             if key not in score_arg_names:
                 message = textwrap.dedent(
                     f"""

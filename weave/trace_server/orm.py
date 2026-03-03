@@ -771,7 +771,4 @@ def _is_dynamic_field(field: str, json_columns: list[str]) -> bool:
     """Dynamic fields are fields that are arbitrary values produced by the user."""
     if field in json_columns:
         return True
-    for col in json_columns:
-        if field.startswith(col + "."):
-            return True
-    return False
+    return any(field.startswith(col + ".") for col in json_columns)

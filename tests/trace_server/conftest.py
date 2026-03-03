@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -75,10 +76,7 @@ def pytest_collection_modifyitems(config, items):
     # Note: Filtering based on remote-http-trace-server flag is handled in tests/trace_server_bindings/conftest.py
     for item in items:
         # Check if the test is in the trace_server directory by checking parent directories
-        if "trace_server" in item.path.parts:
-            item.add_marker(pytest.mark.trace_server)
-        # Also mark tests that use the trace_server fixture (for tests outside this dir)
-        elif "trace_server" in item.fixturenames:
+        if "trace_server" in item.path.parts or "trace_server" in item.fixturenames:
             item.add_marker(pytest.mark.trace_server)
 
 
@@ -205,21 +203,15 @@ def get_ch_trace_server(
             continue
 
         # Drop test databases (best effort)
-        try:
+        with contextlib.suppress(Exception):
             ch_client.command(f"DROP DATABASE IF EXISTS {server_config.management_db}")
-        except Exception:
-            pass
 
-        try:
+        with contextlib.suppress(Exception):
             ch_client.command(f"DROP DATABASE IF EXISTS {server_config.unique_db}")
-        except Exception:
-            pass
 
         # Close client connection (best effort)
-        try:
+        with contextlib.suppress(Exception):
             ch_client.close()
-        except Exception:
-            pass
 
 
 @pytest.fixture
@@ -258,15 +250,11 @@ def get_sqlite_trace_server(
 
     # Cleanup after all tests using this fixture complete
     for sqlite_server in servers_to_cleanup:
-        try:
+        with contextlib.suppress(Exception):
             # Drop tables to ensure clean shutdown
             sqlite_server.drop_tables()
-        except Exception:
-            pass  # Best effort cleanup
-        try:
+        with contextlib.suppress(Exception):
             sqlite_server.close()
-        except Exception:
-            pass  # Best effort cleanup
 
 
 class LocalSecretFetcher:

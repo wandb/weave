@@ -97,10 +97,7 @@ def write_video(fp: str, clip: VideoClip) -> None:
     if fmt == VideoFormat.GIF:
         clip.write_gif(fp, fps=fps)
         return
-    if fmt == VideoFormat.WEBM:
-        codec = "libvpx"
-    else:
-        codec = "libx264"
+    codec = "libvpx" if fmt == VideoFormat.WEBM else "libx264"
 
     clip.write_videofile(
         fp,

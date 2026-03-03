@@ -115,8 +115,10 @@ def get_serializer_by_id(id: str) -> Serializer | None:
 
 def get_serializer_for_obj(obj: Any) -> Serializer | None:
     for serializer in SERIALIZERS:
-        if serializer.instance_check and serializer.instance_check(obj):
-            return serializer
-        elif isinstance(obj, serializer.target_class):
+        if (
+            serializer.instance_check
+            and serializer.instance_check(obj)
+            or isinstance(obj, serializer.target_class)
+        ):
             return serializer
     return None

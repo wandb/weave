@@ -557,12 +557,14 @@ class ScoreLogger:
         scorer.__dict__["score"] = MethodType(score_method, scorer)
 
         # attach the score feedback to the predict call
-        with call_context.set_call_stack(
-            [self.evaluate_call, self.predict_and_score_call]
+        with (
+            call_context.set_call_stack(
+                [self.evaluate_call, self.predict_and_score_call]
+            ),
+            _set_current_score(score),
+            attributes(IMPERATIVE_SCORE_MARKER),
         ):
-            with _set_current_score(score):
-                with attributes(IMPERATIVE_SCORE_MARKER):
-                    await self.predict_call.apply_scorer(scorer)
+            await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
         scorer_name = cast(str, scorer.name)
@@ -760,11 +762,8 @@ class EvaluationLogger:
         for pred in self._accumulated_predictions:
             if pred._has_finished:
                 continue
-            try:
+            with contextlib.suppress(Exception):
                 pred.finish()
-            except Exception:
-                # This is best effort.  If we fail, just swallow the error.
-                pass
 
     def _finalize_evaluation(
         self, output: Any = None, exception: BaseException | None = None
@@ -821,18 +820,20 @@ class EvaluationLogger:
         self.model.__dict__["predict"] = self._context_predict_method
 
         try:
-            with call_context.set_call_stack([self._evaluate_call]):
+            with (
+                call_context.set_call_stack([self._evaluate_call]),
+                _set_current_output(output),
+                attributes(IMPERATIVE_EVAL_MARKER),
+            ):
                 # Make the prediction call
-                with _set_current_output(output):
-                    with attributes(IMPERATIVE_EVAL_MARKER):
-                        _, predict_and_score_call = (
-                            self._pseudo_evaluation.predict_and_score.call(
-                                self._pseudo_evaluation,
-                                self.model,
-                                inputs,
-                                __require_explicit_finish=True,
-                            )
-                        )
+                _, predict_and_score_call = (
+                    self._pseudo_evaluation.predict_and_score.call(
+                        self._pseudo_evaluation,
+                        self.model,
+                        inputs,
+                        __require_explicit_finish=True,
+                    )
+                )
         finally:
             # Restore the original predict method
             if original_method is not None:
@@ -937,14 +938,16 @@ class EvaluationLogger:
         )
 
         # Use set_call_stack to temporarily set the evaluation as the parent
-        with call_context.set_call_stack([self._evaluate_call]):
-            try:
-                with _set_current_summary(final_summary):
-                    with attributes(IMPERATIVE_EVAL_MARKER):
-                        self._pseudo_evaluation.summarize()
-            except Exception:
-                logger.error("Error during execution of summarize op.", exc_info=True)
-                # Even if summarize fails, try to finalize with the calculated summary
+        try:
+            with (
+                call_context.set_call_stack([self._evaluate_call]),
+                _set_current_summary(final_summary),
+                attributes(IMPERATIVE_EVAL_MARKER),
+            ):
+                self._pseudo_evaluation.summarize()
+        except Exception:
+            logger.error("Error during execution of summarize op.", exc_info=True)
+            # Even if summarize fails, try to finalize with the calculated summary
 
         self._finalize_evaluation(output=final_summary)
 

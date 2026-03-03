@@ -1,5 +1,6 @@
 # Sqlite Trace Server
 
+import contextlib
 import datetime
 import json
 import logging
@@ -124,14 +125,10 @@ def close_conn_cursor(db_path: str | None = None) -> None:
         db_paths = [db_path] if db_path in conn_map else []
     for path in db_paths:
         conn_cursor = conn_map.pop(path)
-        try:
+        with contextlib.suppress(Exception):
             conn_cursor.cursor.close()
-        except Exception:
-            pass
-        try:
+        with contextlib.suppress(Exception):
             conn_cursor.conn.close()
-        except Exception:
-            pass
     if not conn_map:
         _conn_cursor.set(None)
 
@@ -543,7 +540,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         required_columns = ["id", "trace_id", "project_id", "op_name", "started_at"]
         select_columns = [
             key
-            for key in tsi.CallSchema.model_fields.keys()
+            for key in tsi.CallSchema.model_fields
             if key not in ["storage_size_bytes", "total_storage_size_bytes"]
         ]
         if req.columns:
@@ -1411,9 +1408,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             extra = r.extra
             for extra_index in range(0, len(extra), 2):
                 op, arg = extra[extra_index], extra[extra_index + 1]
-                if op == ri.DICT_KEY_EDGE_NAME:
-                    val = val[arg]
-                elif op == ri.OBJECT_ATTR_EDGE_NAME:
+                if op == ri.DICT_KEY_EDGE_NAME or op == ri.OBJECT_ATTR_EDGE_NAME:
                     val = val[arg]
                 elif op == ri.LIST_INDEX_EDGE_NAME:
                     val = val[int(arg)]

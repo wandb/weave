@@ -383,9 +383,7 @@ def is_tracing_setting_disabled() -> bool:
     if weave_client_context.get_weave_client() is None:
         log_once(logger.warn, UNINITIALIZED_MSG)
         return True
-    if not get_tracing_enabled():
-        return True
-    return False
+    return bool(not get_tracing_enabled())
 
 
 def should_skip_tracing_for_op(op: Op) -> bool:
@@ -396,10 +394,7 @@ def _should_sample_traces(op: Op) -> bool:
     if call_context.get_current_call():
         return False  # Don't sample traces for child calls
 
-    if random.random() > op.tracing_sample_rate:
-        return True  # Sample traces for this call
-
-    return False
+    return random.random() > op.tracing_sample_rate
 
 
 def placeholder_call() -> Call:

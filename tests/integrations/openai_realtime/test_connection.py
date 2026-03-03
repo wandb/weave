@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 
 from weave.integrations.openai_realtime.connection import (
@@ -142,10 +143,8 @@ def test_async_wrapper_basic(monkeypatch):
         conn = WeaveAsyncWebsocketConnection(DummyAsyncConn())
         await conn.send(json.dumps({"type": "response.create"}))
         # Try to receive once
-        try:
+        with contextlib.suppress(Exception):
             await conn.recv()
-        except Exception:
-            pass
         # Session should be set from received message
         assert conn.conversation_manager.state.session_span is not None
 

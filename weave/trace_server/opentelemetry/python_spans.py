@@ -297,7 +297,7 @@ class Span:
             if (
                 nested_top_level_input is not None
                 and isinstance(nested_top_level_input, (dict))
-                and all(type(key) == str for key in nested_top_level_input.keys())
+                and all(type(key) == str for key in nested_top_level_input)
             ):
                 inputs = to_json_serializable(nested_top_level_input)
 

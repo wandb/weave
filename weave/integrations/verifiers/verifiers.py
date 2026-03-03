@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import importlib
 from collections.abc import Callable
@@ -152,11 +153,8 @@ def _wrap_parser_init(settings: OpSettings) -> Callable[[Callable], Callable]:
                     op_kwargs["name"] = (
                         f"verifiers.{self.__class__.__name__}.extract_fn"
                     )
-                try:
+                with contextlib.suppress(Exception):
                     self.extract_fn = weave.op(extract_fn, **op_kwargs)
-                except Exception:
-                    # If wrapping fails, leave the original in place
-                    pass
             return result
 
         return _inner

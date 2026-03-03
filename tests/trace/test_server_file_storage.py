@@ -6,6 +6,7 @@ specific setup requirements.
 """
 
 import base64
+import contextlib
 import os
 from unittest import mock
 
@@ -334,11 +335,8 @@ class TestAzureStorage:
             mock_client.from_connection_string.return_value = azurite_client
 
             # Create test container
-            try:
+            with contextlib.suppress(Exception):
                 azurite_client.create_container(TEST_BUCKET)
-            except Exception:
-                # Container might already exist
-                pass
 
             yield azurite_client
 

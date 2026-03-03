@@ -734,10 +734,7 @@ class Condition(BaseModel):
         return self._consumed_fields
 
     def is_heavy(self, table_alias: str = "calls_merged") -> bool:
-        for field in self._get_consumed_fields(table_alias):
-            if field.is_heavy():
-                return True
-        return False
+        return any(field.is_heavy() for field in self._get_consumed_fields(table_alias))
 
     def is_feedback(self, table_alias: str = "calls_merged") -> bool:
         for field in self._get_consumed_fields(table_alias):
@@ -960,16 +957,12 @@ class CallsQuery(BaseModel):
             return True
 
         # Check for light order filter
-        if (
+        return bool(
             self.order_fields
             and self.limit
             and not has_heavy_filter
             and not has_heavy_order
-        ):
-            return True
-
-        # No predicate pushdown possible
-        return False
+        )
 
     def as_sql(self, pb: ParamBuilder, table_alias: str | None = None) -> str:
         """This is the main entry point for building the query. This method will

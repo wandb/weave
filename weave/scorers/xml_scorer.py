@@ -12,10 +12,7 @@ class ValidXMLScorer(Scorer):
 
     @weave.op
     def score(self, *, output: str | dict, **kwargs: Any) -> dict:
-        if isinstance(output, dict):
-            xml_string = output.get("output", "")
-        else:
-            xml_string = output
+        xml_string = output.get("output", "") if isinstance(output, dict) else output
 
         try:
             ET.fromstring(xml_string)

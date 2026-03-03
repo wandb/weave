@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -157,10 +158,8 @@ def check_min_trace_server_version(
 def print_init_message(
     username: str | None, entity_name: str, project_name: str, read_only: bool
 ) -> None:
-    try:
+    with contextlib.suppress(Exception):
         _print_version_check()
-    except Exception as e:
-        pass
 
     message = ""
     if username is not None:

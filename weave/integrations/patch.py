@@ -8,6 +8,7 @@ This module provides:
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import sys
 from collections.abc import Callable
@@ -489,10 +490,8 @@ def unregister_import_hook() -> None:
     global _IMPORT_HOOK  # noqa: PLW0603
 
     if _IMPORT_HOOK is not None:
-        try:
+        with contextlib.suppress(ValueError):
             sys.meta_path.remove(_IMPORT_HOOK)
-        except ValueError:
-            pass  # Already removed
         _IMPORT_HOOK = None
 
 

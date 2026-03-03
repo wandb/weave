@@ -35,8 +35,8 @@ NON_SENTINEL_FIELDS = ["op_name", "id", "inputs_dump", "trace_id"]
 def test_constants() -> None:
     """Sentinel constants and field sets are internally consistent."""
     assert SENTINEL_STRING == ""
-    assert SENTINEL_DATETIME == datetime.datetime(
-        1970, 1, 1, tzinfo=datetime.timezone.utc
+    assert (
+        datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc) == SENTINEL_DATETIME
     )
     assert SENTINEL_INT == 0
     assert ALL_SENTINEL_FIELDS == (

@@ -149,9 +149,11 @@ def lite_llm_image_generation(
             image_params["style"] = "natural"  # Default style
 
         # Set default size for models that need it
-        if model_name == "dall-e-3":
-            image_params["size"] = "1024x1024"
-        elif model_name == "gpt-image-1" or model_name == "gpt-image-1.5":
+        if (
+            model_name == "dall-e-3"
+            or model_name == "gpt-image-1"
+            or model_name == "gpt-image-1.5"
+        ):
             image_params["size"] = "1024x1024"
         else:
             image_params["size"] = "1024x1024"

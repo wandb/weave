@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import dataclasses
 import datetime
@@ -262,9 +263,7 @@ def map_to_refs(obj: Any) -> Any:
         # above with `_get_direct_ref`
         obj_record = _remove_empty_ref(obj_record)
         return obj_record.map_values(map_to_refs)
-    elif isinstance(obj, Table):
-        return obj.ref
-    elif isinstance(obj, WeaveTable):
+    elif isinstance(obj, (Table, WeaveTable)):
         return obj.ref
     elif isinstance_namedtuple(obj):
         return {k: map_to_refs(v) for k, v in obj._asdict().items()}
@@ -1616,11 +1615,7 @@ class WeaveClient:
             self._save_op(obj)
 
         # Case 3: Table
-        elif isinstance(obj, Table):
-            self._save_table(obj)
-
-        # Case 4: WeaveTable
-        elif isinstance(obj, WeaveTable):
+        elif isinstance(obj, (Table, WeaveTable)):
             self._save_table(obj)
 
         # Special case: Custom recursive handling for WeaveObject with rows
@@ -1710,12 +1705,8 @@ class WeaveClient:
             ref = ObjectRef(self.entity, self.project, name, digest_future)
 
         # Attach the ref to the object
-        try:
+        with contextlib.suppress(Exception):
             set_ref(orig_val, ref)
-        except Exception:
-            # Don't worry if we can't set the ref.
-            # This can happen for primitive types that don't have __dict__
-            pass
 
         return ref
 
@@ -1946,10 +1937,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
-        if not filter:
-            filter = ObjectVersionFilter()
-        else:
-            filter = filter.model_copy()
+        filter = ObjectVersionFilter() if not filter else filter.model_copy()
         filter = cast(ObjectVersionFilter, filter)
         filter.is_op = False
 

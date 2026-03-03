@@ -68,10 +68,7 @@ def evaluation_equality_check(a, b):
     scorers_a = a.scorers
     scorers_b = b.scorers
 
-    if scorers_a != scorers_b:
-        return False
-
-    return True
+    return scorers_a == scorers_b
 
 
 # Runtime serialization produces version-dependent digest (for tests not explicitly using legacy)

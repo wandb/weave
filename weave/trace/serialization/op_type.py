@@ -509,11 +509,7 @@ def find_last_weave_op_function(
                     and decorator.attr == "op"
                     and isinstance(decorator.value, ast.Name)
                     and decorator.value.id == "weave"
-                ):
-                    last_function = node
-                    break  # Break the inner loop, continue with the next function
-                # Check if the decorator is a call to 'weave.op()'
-                elif (
+                ) or (
                     isinstance(decorator, ast.Call)
                     and isinstance(decorator.func, ast.Attribute)
                     and decorator.func.attr == "op"

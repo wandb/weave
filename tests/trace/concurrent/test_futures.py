@@ -189,7 +189,7 @@ def test_max_workers() -> None:
 
     assert all(r == 1 for r in results)
     total_time: float = end_time - start_time
-    assert 4 <= total_time  # Should take about 4 seconds with 1 worker
+    assert total_time >= 4  # Should take about 4 seconds with 1 worker
 
 
 def test_chained_then_operations() -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import importlib
 import logging
 from collections.abc import Callable
@@ -160,10 +161,8 @@ def get_openai_realtime_websocket_patcher(
 
         for attr in dir(original_class):
             if not hasattr(wrapper, attr):
-                try:
+                with contextlib.suppress(AttributeError, TypeError):
                     setattr(wrapper, attr, getattr(original_class, attr))
-                except (AttributeError, TypeError):
-                    pass
 
         return wrapper
 
@@ -260,10 +259,8 @@ def wrap_websocket_sync(websocket_app_class: type) -> Any:
 
     for attr in dir(websocket_app_class):
         if not hasattr(wrapper, attr):
-            try:
+            with contextlib.suppress(AttributeError, TypeError):
                 setattr(wrapper, attr, getattr(websocket_app_class, attr))
-            except (AttributeError, TypeError):
-                pass
 
     return wrapper
 

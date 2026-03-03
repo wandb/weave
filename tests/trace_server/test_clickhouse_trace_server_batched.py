@@ -1,4 +1,5 @@
 import base64
+import contextlib
 import datetime as dt
 import json
 import uuid
@@ -1148,10 +1149,8 @@ def test_file_batch_clears_on_insert_failure():
         }
         server._file_batch.append(file_chunk)
 
-        try:
+        with contextlib.suppress(_MockInsertError):
             server._flush_file_chunks()
-        except _MockInsertError:
-            pass
 
         assert len(server._file_batch) == 0, (
             f"Memory leak: _file_batch retained {len(server._file_batch)} items "

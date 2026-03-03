@@ -50,15 +50,17 @@ def test_get_aws_credentials():
         }
 
     # Test with missing required credentials
-    with mock.patch.dict(
-        os.environ,
-        {
-            "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "key-id",
-        },
-        clear=True,
+    with (
+        mock.patch.dict(
+            os.environ,
+            {
+                "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "key-id",
+            },
+            clear=True,
+        ),
+        pytest.raises(ValueError, match="AWS credentials not set"),
     ):
-        with pytest.raises(ValueError, match="AWS credentials not set"):
-            get_aws_credentials()
+        get_aws_credentials()
 
 
 def test_get_azure_credentials():
@@ -101,9 +103,11 @@ def test_get_azure_credentials():
         }
 
     # Test with missing credentials
-    with mock.patch.dict(os.environ, {}, clear=True):
-        with pytest.raises(ValueError, match="Azure access key not set"):
-            get_azure_credentials()
+    with (
+        mock.patch.dict(os.environ, {}, clear=True),
+        pytest.raises(ValueError, match="Azure access key not set"),
+    ):
+        get_azure_credentials()
 
 
 def test_get_gcp_credentials():
@@ -119,26 +123,30 @@ def test_get_gcp_credentials():
     """
 
     # Test with valid JSON
-    with mock.patch.dict(
-        os.environ,
-        {
-            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
-                test_creds_json.encode()
-            ).decode(),
-        },
+    with (
+        mock.patch.dict(
+            os.environ,
+            {
+                "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
+                    test_creds_json.encode()
+                ).decode(),
+            },
+        ),
+        mock.patch("google.oauth2.service_account.Credentials") as mock_creds,
     ):
-        with mock.patch("google.oauth2.service_account.Credentials") as mock_creds:
-            get_gcp_credentials()
-            mock_creds.from_service_account_info.assert_called_once()
+        get_gcp_credentials()
+        mock_creds.from_service_account_info.assert_called_once()
 
     # Test with invalid JSON
-    with mock.patch.dict(
-        os.environ,
-        {
-            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
-                b"invalid-json"
-            ).decode(),
-        },
+    with (
+        mock.patch.dict(
+            os.environ,
+            {
+                "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
+                    b"invalid-json"
+                ).decode(),
+            },
+        ),
+        pytest.raises(ValueError, match="Invalid GCP credentials JSON"),
     ):
-        with pytest.raises(ValueError, match="Invalid GCP credentials JSON"):
-            get_gcp_credentials()
+        get_gcp_credentials()

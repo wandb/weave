@@ -1,3 +1,4 @@
+import contextlib
 import os
 from tempfile import NamedTemporaryFile
 
@@ -24,7 +25,5 @@ def test_patching_import_order():
         assert pil_image_thread_safety._patched
         image.crop((0, 0, 10, 10))
     finally:
-        try:
+        with contextlib.suppress(OSError, PermissionError):
             os.unlink(temp_path)
-        except (OSError, PermissionError):
-            pass

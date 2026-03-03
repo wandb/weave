@@ -39,9 +39,7 @@ def is_pydantic_model_class(obj: Any) -> bool:
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
-    if isinstance(obj, TableRef):
-        return obj.uri()
-    elif isinstance(obj, ObjectRef):
+    if isinstance(obj, (TableRef, ObjectRef)):
         return obj.uri()
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
@@ -330,9 +328,7 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             cls = BUILTIN_OBJECT_REGISTRY.get(val_type)
             if cls:
                 # Filter out metadata fields before validation
-                obj_data = {
-                    k: v for k, v in obj.items() if k in cls.model_fields.keys()
-                }
+                obj_data = {k: v for k, v in obj.items() if k in cls.model_fields}
                 return cls.model_validate(obj_data)
 
         return ObjectRecord(

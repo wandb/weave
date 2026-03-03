@@ -691,10 +691,7 @@ def _create_datetime_optimization_sql(
     # - "<" / "<=": add buffer to be more permissive
     # For NOT context, invert the buffer direction to keep the filter permissive.
     buffer_seconds = int(DATETIME_BUFFER_TIME_SECONDS)
-    if op_str in ("<", "<="):
-        buffer_sign = 1
-    else:
-        buffer_sign = -1
+    buffer_sign = 1 if op_str in ("<", "<=") else -1
     if NotContext.is_in_not_context():
         buffer_sign *= -1
     timestamp += buffer_sign * buffer_seconds

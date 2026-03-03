@@ -1,3 +1,5 @@
+import contextlib
+
 import pytest
 
 from weave.integrations.integration_utilities import (
@@ -401,10 +403,8 @@ def test_verdict_error_handling_tracing(client: WeaveClient) -> None:
     test_data = Schema.of(input="error test")
 
     # Run the pipeline - expect it to fail gracefully
-    try:
-        response = pipeline.run(test_data, graceful=True)
-    except Exception:
-        pass  # Expected to fail
+    with contextlib.suppress(Exception):
+        pipeline.run(test_data, graceful=True)
 
     # Get calls from Weave client
     calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))

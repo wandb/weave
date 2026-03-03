@@ -252,13 +252,14 @@ def get_mime_and_extension(
         if not extension and magic_ext:
             extension = magic_ext
 
-    if mimetype and extension:
-        return mimetype, extension
-
-    elif (
+    if (
         mimetype
-        and not extension
-        and (extension := get_extension_from_mimetype(mimetype))
+        and extension
+        or (
+            mimetype
+            and not extension
+            and (extension := get_extension_from_mimetype(mimetype))
+        )
     ):
         return mimetype, extension
 

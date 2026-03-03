@@ -164,9 +164,8 @@ async def test_evaluation_resilience(
     client_with_throwing_server.project = "test_evaluation_resilience"
     evaluation, predict = build_evaluation()
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            res = await evaluation.evaluate(predict)
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        res = await evaluation.evaluate(predict)
 
     client_with_throwing_server.finish()
 

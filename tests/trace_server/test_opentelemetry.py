@@ -922,7 +922,7 @@ class TestSemanticConventionParsing:
             }
         )
         extracted_false = get_wandb_attributes(attributes_false)
-        assert "is_turn" not in extracted_false.keys()
+        assert "is_turn" not in extracted_false
         assert extracted_false["thread_id"] == test_thread_id
 
         # Test with only thread_id

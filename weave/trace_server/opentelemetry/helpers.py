@@ -1,4 +1,5 @@
 import base64
+import contextlib
 import json
 import math
 import re
@@ -38,9 +39,7 @@ def to_json_serializable(value: Any) -> Any:
     # Transform common data types into JSON-serializable values.
     if value is None:
         return None
-    elif isinstance(value, (str, bool)):
-        return value
-    elif isinstance(value, int):
+    elif isinstance(value, (str, bool, int)):
         return value
     elif isinstance(value, float):
         # Handle special floats: NaN, inf, -inf
@@ -51,11 +50,7 @@ def to_json_serializable(value: Any) -> Any:
         return [to_json_serializable(item) for item in value]
     elif isinstance(value, dict):
         return {str(k): to_json_serializable(v) for k, v in value.items()}
-    elif isinstance(value, datetime):
-        return value.isoformat()
-    elif isinstance(value, date):  # date without time
-        return value.isoformat()
-    elif isinstance(value, time):  # time without date
+    elif isinstance(value, (datetime, date, time)):
         return value.isoformat()
     elif isinstance(value, timedelta):
         return value.total_seconds()
@@ -192,10 +187,7 @@ def _validate_structure(d: dict[str, Any], key: str, value: Any) -> None:
                 existing_type=type(current[part]),
             )
         # Safe to continue (either missing or a dict); creation happens in setter
-        if part in current:
-            current = current[part]
-        else:
-            current = {}  # placeholder to advance logic without mutating
+        current = current.get(part, {})
 
     # Leaf rule: prevent overwriting an existing mapping with a primitive
     parent = _get_value_from_nested_dict(d, ".".join(parts[:-1])) or {}
@@ -247,9 +239,9 @@ def convert_numeric_keys_to_list(
 
     # Check if all keys are numeric strings and contiguous starting from 0
     try:
-        keys = sorted(int(k) for k in obj.keys())
+        keys = sorted(int(k) for k in obj)
         if keys == list(range(len(keys))) and all(
-            isinstance(k, str) and k.isdigit() for k in obj.keys()
+            isinstance(k, str) and k.isdigit() for k in obj
         ):
             # Convert to list, preserving order
             return [obj[str(i)] for i in range(len(keys))]
@@ -282,11 +274,8 @@ def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
         if isinstance(processed_value, str) and (
             processed_value.startswith("[") or processed_value.startswith("{")
         ):
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 processed_value = json.loads(processed_value)
-            except json.JSONDecodeError:
-                # If JSON parsing fails, keep the original value
-                pass
 
         # Add the nested key to the result
         _set_value_in_nested_dict(result_dict, flat_key, processed_value)
@@ -420,19 +409,15 @@ def unflatten_key_values(
 
 
 def try_parse_int(value: Any) -> Any:
-    try:
+    with contextlib.suppress(BaseException):
         value = int(value)
-    except:
-        pass
     return value
 
 
 def try_convert_numeric_keys_to_list(value: Any) -> Any:
     if isinstance(value, dict):
-        try:
+        with contextlib.suppress(BaseException):
             value = convert_numeric_keys_to_list(value)
-        except:
-            pass
     return value
 
 

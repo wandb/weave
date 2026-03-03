@@ -194,10 +194,7 @@ class PrintTable:
         for row in self._rows:
             row_parts = []
             for i, col in enumerate(self._columns):
-                if i < len(row):
-                    text = row[i]
-                else:
-                    text = ""
+                text = row[i] if i < len(row) else ""
 
                 if col["justify"] == "right":
                     text = text.rjust(widths[i])

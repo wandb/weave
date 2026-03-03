@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 import wave
@@ -19,7 +20,8 @@ audio_file_path = os.path.join(
     "examples",
     "audio.wav",
 )
-AUDIO_BYTES = open(audio_file_path, "rb").read()
+with open(audio_file_path, "rb") as f:
+    AUDIO_BYTES = f.read()
 
 video_file_path = os.path.join(
     os.path.dirname(__file__),
@@ -29,7 +31,12 @@ video_file_path = os.path.join(
     "Video",
     "test_video.mp4",
 )
-VIDEO_BYTES = open(video_file_path, "rb").read()
+with open(video_file_path, "rb") as f:
+    VIDEO_BYTES = f.read()
+
+
+def _wave_read_from_audio_bytes() -> wave.Wave_read:
+    return wave.open(io.BytesIO(AUDIO_BYTES), "rb")
 
 
 def markdown_equality_check(a, b):
@@ -115,7 +122,7 @@ media_cases = [
     # Audio (weave.type_handlers.Audio.audio.Audio)
     SerializationTestCase(
         id="audio",
-        runtime_object_factory=lambda: wave.open(audio_file_path, "rb"),
+        runtime_object_factory=_wave_read_from_audio_bytes,
         inline_call_param=True,
         is_legacy=False,
         exp_json={
@@ -363,7 +370,7 @@ media_cases = [
     ),
     SerializationTestCase(
         id="audio (legacy)",
-        runtime_object_factory=lambda: wave.open(audio_file_path, "rb"),
+        runtime_object_factory=_wave_read_from_audio_bytes,
         inline_call_param=True,
         is_legacy=True,
         exp_json={

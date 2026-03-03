@@ -120,10 +120,7 @@ def get_verdict_patcher(
         return NoOpPatcher()
 
     # Check if verdict tracing is available
-    if not _import_failed:
-        verdict_tracer = VerdictTracerImpl()
-    else:
-        verdict_tracer = None
+    verdict_tracer = VerdictTracerImpl() if not _import_failed else None
 
     global _verdict_patcher  # noqa: PLW0603
     if _verdict_patcher is not None:

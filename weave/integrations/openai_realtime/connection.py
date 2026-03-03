@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+import contextlib
 import json
 import logging
 import threading
@@ -77,10 +78,8 @@ class WeaveMediaConnection:
         # Track conversation state for this connection
         self.conversation_manager = ConversationManager()
         # Attach base URL for downstream exports
-        try:
+        with contextlib.suppress(Exception):
             self.conversation_manager.client_base_url = self.url
-        except Exception:
-            pass
 
         # Wrap user-provided handlers with tracing and session management
         self.wrapped_on_open = self._wrap_handler("on_open", on_open)
@@ -202,10 +201,8 @@ class WeaveMediaConnection:
                 t.join(timeout=float(timeout))
         finally:
             # Stop the worker thread promptly
-            try:
+            with contextlib.suppress(Exception):
                 self.conversation_manager._stop_worker_thread()
-            except Exception:
-                pass
 
 
 class WebSocketApp(WeaveMediaConnection):
@@ -220,10 +217,8 @@ class WeaveAsyncWebsocketConnection:
         self.id = str(uuid.uuid4())
         self.conversation_manager = ConversationManager()
         self._exit_ran = False
-        try:
+        with contextlib.suppress(Exception):
             atexit.register(self._run_exit_handler_once)
-        except Exception:
-            pass
 
     async def send(self, *args: Any, **kwargs: Any) -> None:
         data = args[0] if args else None
@@ -293,10 +288,8 @@ class WeaveAsyncWebsocketConnection:
             if isinstance(timeout, (int, float)) and timeout is not None:
                 t.join(timeout=float(timeout))
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 self.conversation_manager._stop_worker_thread()
-            except Exception:
-                pass
 
 
 class WeaveAiohttpWebsocketConnection:
@@ -309,10 +302,8 @@ class WeaveAiohttpWebsocketConnection:
         self.id = str(uuid.uuid4())
         self.conversation_manager = ConversationManager()
         self._exit_ran = False
-        try:
+        with contextlib.suppress(Exception):
             atexit.register(self._run_exit_handler_once)
-        except Exception:
-            pass
 
     async def send_str(self, data: str, *args: Any, **kwargs: Any) -> None:
         parsed_data = _try_json_load(data)
@@ -392,10 +383,8 @@ class WeaveAiohttpWebsocketConnection:
             if isinstance(timeout, (int, float)) and timeout is not None:
                 t.join(timeout=float(timeout))
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 self.conversation_manager._stop_worker_thread()
-            except Exception:
-                pass
 
 
 # ---- Module-level configuration API called by the patcher ----

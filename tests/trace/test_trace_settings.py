@@ -203,17 +203,15 @@ def speed_test(client, count=5):
 
 
 def test_client_parallelism_setting(client_creator):
-    with mock.patch("os.cpu_count", return_value=4):
-        with client_creator() as client:
-            assert client.future_executor._max_workers == 4
-            assert client.future_executor._executor._max_workers == 4
+    with mock.patch("os.cpu_count", return_value=4), client_creator() as client:
+        assert client.future_executor._max_workers == 4
+        assert client.future_executor._executor._max_workers == 4
 
     parse_and_apply_settings(UserSettings(client_parallelism=1))
-    with mock.patch("os.cpu_count", return_value=4):
-        with client_creator() as client:
-            assert client.future_executor._max_workers == 1
-            assert client.future_executor._executor._max_workers == 1
-            wait_time_1, queue_time_1 = speed_test(client)
+    with mock.patch("os.cpu_count", return_value=4), client_creator() as client:
+        assert client.future_executor._max_workers == 1
+        assert client.future_executor._executor._max_workers == 1
+        wait_time_1, queue_time_1 = speed_test(client)
 
     parse_and_apply_settings(UserSettings(client_parallelism=10))
     with client_creator() as client:
@@ -229,10 +227,9 @@ def test_client_parallelism_setting(client_creator):
 
     # Test explicit None
     parse_and_apply_settings(UserSettings(client_parallelism=None))
-    with mock.patch("os.cpu_count", return_value=4):
-        with client_creator() as client:
-            assert client.future_executor._max_workers == 4
-            assert client.future_executor._executor._max_workers > 0
+    with mock.patch("os.cpu_count", return_value=4), client_creator() as client:
+        assert client.future_executor._max_workers == 4
+        assert client.future_executor._executor._max_workers > 0
 
 
 def test_get_parallelism_settings() -> None:
@@ -280,9 +277,11 @@ def test_retry_max_attempts_settings(client_creator, caplog) -> None:
     def func():
         raise RuntimeError("Test error")
 
-    with client_creator(settings=UserSettings(retry_max_attempts=2)) as client:
-        with pytest.raises(RuntimeError):
-            func()
+    with (
+        client_creator(settings=UserSettings(retry_max_attempts=2)),
+        pytest.raises(RuntimeError),
+    ):
+        func()
 
     retry_attempt_logs = [r for r in caplog.records if r.msg == "retry_attempt"]
     retry_failed_logs = [r for r in caplog.records if r.msg == "retry_failed"]
@@ -344,9 +343,11 @@ def test_retry_max_interval_settings(client_creator, caplog, monkeypatch) -> Non
         raise RuntimeError("Test error")
 
     custom_max_interval = 30.0
-    with client_creator(settings=UserSettings(retry_max_interval=custom_max_interval)):
-        with pytest.raises(RuntimeError):
-            func()
+    with (
+        client_creator(settings=UserSettings(retry_max_interval=custom_max_interval)),
+        pytest.raises(RuntimeError),
+    ):
+        func()
 
     assert custom_max_interval in call_args
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import logging
 import threading
@@ -277,10 +278,8 @@ class StateExporter(BaseModel):
 
         if item_id:
             self.items.pop(item_id, None)
-            try:
+            with contextlib.suppress(ValueError):
                 self.timeline.remove(item_id)
-            except ValueError:
-                pass
 
     def handle_input_audio_cleared(self, _: dict) -> None:
         self.audio_input_buffer.clear()
@@ -688,10 +687,8 @@ class StateExporter(BaseModel):
         with self.fifo_lock:
             # Cancel an existing timer to coalesce checks
             if self.fifo_timer is not None:
-                try:
+                with contextlib.suppress(Exception):
                     self.fifo_timer.cancel()
-                except Exception:
-                    pass
 
             def _cb() -> None:
                 try:

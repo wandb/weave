@@ -8,7 +8,7 @@ import time
 import uuid
 from collections import defaultdict, namedtuple
 from collections.abc import Callable
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from contextvars import copy_context
 from dataclasses import dataclass
 from decimal import Decimal
@@ -568,13 +568,11 @@ def test_trace_call_wb_run_step_query(client):
     )
     exp_start_steps = []
     exp_end_steps = []
-    counter = 0
-    for part in call_spec.part_sequence:
+    for counter, part in enumerate(call_spec.part_sequence):
         if part[0] == "start":
             exp_start_steps.append(counter)
         else:
             exp_end_steps.append(counter)
-        counter += 1
     exp_start_steps_set = set(exp_start_steps)
     found_start_steps_set = {c.wb_run_step for c in res.calls}
     assert found_start_steps_set == exp_start_steps_set
@@ -4985,20 +4983,14 @@ def test_calls_query_with_descendant_error(client):
         except TestException as e:
             return val
 
-    try:
+    with suppress(TestException):
         parent_op(0)
-    except TestException as e:
-        pass
 
-    try:
+    with suppress(TestException):
         parent_op(1)
-    except TestException as e:
-        pass
 
-    try:
+    with suppress(TestException):
         parent_op(2)
-    except TestException as e:
-        pass
 
     calls = list(
         client.server.calls_query_stream(
@@ -5702,8 +5694,8 @@ def test_threads_query_aggregation_fields(client):
     assert isinstance(test_thread.p99_turn_duration_ms, (int, float))
 
     # Test duration percentile ranges (should be between our min and max expected durations)
-    assert 0 <= test_thread.p50_turn_duration_ms
-    assert 0 <= test_thread.p99_turn_duration_ms
+    assert test_thread.p50_turn_duration_ms >= 0
+    assert test_thread.p99_turn_duration_ms >= 0
     assert (
         test_thread.p50_turn_duration_ms <= test_thread.p99_turn_duration_ms
     )  # P99 >= P50

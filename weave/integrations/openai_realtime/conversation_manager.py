@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 from collections.abc import Callable
 from queue import Empty, Queue
 from threading import Lock
 
-logger = logging.getLogger(__name__)
 from weave.integrations.openai_realtime.state_exporter import StateExporter
+
+logger = logging.getLogger(__name__)
 
 Handler = Callable[[dict], None]
 
@@ -115,19 +117,14 @@ class ConversationManager:
                 continue
             # Sentinel to unblock during shutdown
             if event is None:
-                try:
+                with contextlib.suppress(ValueError):
                     self._queue.task_done()
-                except ValueError:
-                    pass
                 continue
             try:
                 self.process_event(event)
             finally:
-                try:
+                with contextlib.suppress(ValueError):
                     self._queue.task_done()
-                except ValueError:
-                    # If task_done called more times than items; guard against misuse
-                    pass
 
     async def submit_event(self, event: dict) -> None:
         """Async-compatible enqueue; places the event onto the worker queue."""

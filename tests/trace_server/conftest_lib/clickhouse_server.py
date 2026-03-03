@@ -1,3 +1,4 @@
+import contextlib
 import os
 import shutil
 import signal
@@ -174,10 +175,8 @@ def ensure_clickhouse_db_process_running(
                     pass  # Process already dead
 
         if temp_dir and os.path.exists(temp_dir):
-            try:
+            with contextlib.suppress(Exception):
                 shutil.rmtree(temp_dir)
-            except Exception:
-                pass  # Best effort cleanup
 
     return cleanup
 

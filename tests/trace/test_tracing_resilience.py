@@ -35,9 +35,8 @@ def test_resilience_to_user_code_errors(client):
         throws()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            do_test()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        do_test()
 
     # The user's exception should be raised - even if we're not capturing errors
     with pytest.raises(DummyTestException):
@@ -56,9 +55,8 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            do_test()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        do_test()
 
     # We should gracefully handle the error and return a value
     res = do_test()
@@ -93,9 +91,8 @@ def test_resilience_to_output_handler_errors(client, log_collector):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            do_test()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        do_test()
 
     # We should gracefully handle the error and return a value
     res = do_test()
@@ -124,9 +121,8 @@ async def test_resilience_to_output_handler_errors_async(client, log_collector):
         return await simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            await do_test()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        await do_test()
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -154,10 +150,9 @@ def test_resilience_to_accumulator_make_accumulator_errors(client, log_collector
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            # Consume the generator to trigger the make_accumulator call
-            list(do_test())
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        # Consume the generator to trigger the make_accumulator call
+        list(do_test())
 
     # We should gracefully handle the error and return a value
     res = do_test()
@@ -190,11 +185,10 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            # Consume the generator to trigger the make_accumulator call
-            res = await do_test()
-            l = [item async for item in res]
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        # Consume the generator to trigger the make_accumulator call
+        res = await do_test()
+        l = [item async for item in res]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -225,9 +219,8 @@ def test_resilience_to_accumulator_accumulation_errors(client, log_collector):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            list(do_test())
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        list(do_test())
 
     # We should gracefully handle the error and return a value
     res = do_test()
@@ -265,10 +258,9 @@ async def test_resilience_to_accumulator_accumulation_errors_async(
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            res = await do_test()
-            l = [item async for item in res]
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        res = await do_test()
+        l = [item async for item in res]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -308,9 +300,8 @@ def test_resilience_to_accumulator_should_accumulate_errors(client, log_collecto
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            list(do_test())
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        list(do_test())
 
     # We should gracefully handle the error and return a value
     res = do_test()
@@ -353,11 +344,10 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            # Consume the generator
-            gen = await do_test()
-            _ = [i async for i in gen]
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        # Consume the generator
+        gen = await do_test()
+        _ = [i async for i in gen]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -402,10 +392,9 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            # Consume the generator to trigger the make_accumulator call
-            list(do_test())
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        # Consume the generator to trigger the make_accumulator call
+        list(do_test())
 
     # We should gracefully handle the error and return a value
     res = do_test()
@@ -449,11 +438,10 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            # Consume the generator to trigger the make_accumulator call
-            res = await do_test()
-            l = [item async for item in res]
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        # Consume the generator to trigger the make_accumulator call
+        res = await do_test()
+        l = [item async for item in res]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -477,9 +465,8 @@ def test_resilience_to_accumulator_internal_errors(client):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            list(do_test())
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        list(do_test())
 
     # User errors should still be raised
     with pytest.raises(DummyTestException):
@@ -499,15 +486,13 @@ async def test_resilience_to_accumulator_internal_errors_async(client):
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            res = await do_test()
-            l = [item async for item in res]
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        res = await do_test()
+        l = [item async for item in res]
 
-    with raise_on_captured_errors(False):
-        with pytest.raises(DummyTestException):
-            res = await do_test()
-            l = [item async for item in res]
+    with raise_on_captured_errors(False), pytest.raises(DummyTestException):
+        res = await do_test()
+        l = [item async for item in res]
 
 
 # =============================================================================
@@ -543,9 +528,8 @@ def test_resilience_to_postprocess_inputs_errors(client, log_collector):
     def simple_op():
         return "hello"
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            simple_op()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        simple_op()
 
     res = simple_op()
     assert res == "hello"
@@ -561,9 +545,8 @@ async def test_resilience_to_postprocess_inputs_errors_async(client, log_collect
     async def simple_op():
         return "hello"
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            await simple_op()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        await simple_op()
 
     res = await simple_op()
     assert res == "hello"
@@ -578,9 +561,8 @@ def test_resilience_to_postprocess_output_errors(client, log_collector):
     def simple_op():
         return "hello"
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            simple_op()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        simple_op()
 
     res = simple_op()
     assert res == "hello"
@@ -596,9 +578,8 @@ async def test_resilience_to_postprocess_output_errors_async(client, log_collect
     async def simple_op():
         return "hello"
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            await simple_op()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        await simple_op()
 
     res = await simple_op()
     assert res == "hello"
@@ -613,9 +594,8 @@ def test_resilience_to_call_display_name_errors(client, log_collector):
     def simple_op():
         return "hello"
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            simple_op()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        simple_op()
 
     res = simple_op()
     assert res == "hello"
@@ -631,9 +611,8 @@ async def test_resilience_to_call_display_name_errors_async(client, log_collecto
     async def simple_op():
         return "hello"
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            await simple_op()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        await simple_op()
 
     res = await simple_op()
     assert res == "hello"
@@ -650,9 +629,8 @@ def test_resilience_to_on_input_handler_errors(client, log_collector):
 
     simple_op._set_on_input_handler(_bad_input_handler)
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            simple_op()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        simple_op()
 
     res = simple_op()
     assert res == "hello"
@@ -670,9 +648,8 @@ async def test_resilience_to_on_input_handler_errors_async(client, log_collector
 
     simple_op._set_on_input_handler(_bad_input_handler)
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            await simple_op()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        await simple_op()
 
     res = await simple_op()
     assert res == "hello"
@@ -689,9 +666,8 @@ def test_resilience_to_on_finish_handler_errors(client, log_collector):
 
     simple_op._set_on_finish_handler(_bad_finish_handler)
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            simple_op()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        simple_op()
 
     res = simple_op()
     assert res == "hello"
@@ -709,9 +685,8 @@ async def test_resilience_to_on_finish_handler_errors_async(client, log_collecto
 
     simple_op._set_on_finish_handler(_bad_finish_handler)
 
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            await simple_op()
+    with raise_on_captured_errors(True), pytest.raises(DummyTestException):
+        await simple_op()
 
     res = await simple_op()
     assert res == "hello"

@@ -131,12 +131,14 @@ def test_get_default_host_settings_file(tmp_path, host_and_base_url):
 
 def test_get_default_host_fallback():
     """If there is no env var or settings file, it should fallback to api.wandb.ai."""
-    with patch.dict(os.environ, {}, clear=True):
-        with patch(
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch(
             "weave.compat.wandb.wandb_thin.login._get_host_from_settings",
             return_value=None,
-        ):
-            assert _get_default_host() == "api.wandb.ai"
+        ),
+    ):
+        assert _get_default_host() == "api.wandb.ai"
 
 
 def test_get_host_from_settings_missing_file(tmp_path):

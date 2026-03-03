@@ -306,7 +306,7 @@ def test_groq_tool_call(
     @weave.op
     def get_game_score(team_name: str) -> str:
         """Get the current score for a given NBA game."""
-        if "warriors" in team_name.lower():
+        if "warriors" in team_name.lower() or "lakers" in team_name.lower():
             return json.dumps(
                 {
                     "game_id": "401585601",
@@ -317,29 +317,7 @@ def test_groq_tool_call(
                     "away_team_score": 128,
                 }
             )
-        elif "lakers" in team_name.lower():
-            return json.dumps(
-                {
-                    "game_id": "401585601",
-                    "status": "Final",
-                    "home_team": "Los Angeles Lakers",
-                    "home_team_score": 121,
-                    "away_team": "Golden State Warriors",
-                    "away_team_score": 128,
-                }
-            )
-        elif "nuggets" in team_name.lower():
-            return json.dumps(
-                {
-                    "game_id": "401585577",
-                    "status": "Final",
-                    "home_team": "Miami Heat",
-                    "home_team_score": 88,
-                    "away_team": "Denver Nuggets",
-                    "away_team_score": 100,
-                }
-            )
-        elif "heat" in team_name.lower():
+        elif "nuggets" in team_name.lower() or "heat" in team_name.lower():
             return json.dumps(
                 {
                     "game_id": "401585577",

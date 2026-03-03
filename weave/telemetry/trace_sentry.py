@@ -10,6 +10,7 @@ This file is a trimmed down version of the original WandB Sentry module.
 from __future__ import annotations
 
 import atexit
+import contextlib
 import functools
 import logging
 import os
@@ -126,10 +127,8 @@ class Sentry:
             client_options=self.hub.client.options,  # type: ignore
             mechanism={"type": "generic", "handled": handled},
         )
-        try:
+        with contextlib.suppress(Exception):
             self.hub.capture_event(event, hint=hint)  # type: ignore
-        except Exception:
-            pass
 
         # if the status is not explicitly set, we'll set it to "crashed" if the exception
         # was unhandled, or "errored" if it was handled
@@ -253,10 +252,7 @@ def _is_local_dev_install(module: Any) -> bool:
     if hasattr(module, "__file__"):
         module_path = module.__file__
         # Check if the path is within any of the site-packages directories
-        for directory in site.getsitepackages():
-            if directory in module_path:
-                return False
-        return True
+        return all(directory not in module_path for directory in site.getsitepackages())
     else:
         return False
 

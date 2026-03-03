@@ -179,71 +179,71 @@ def test_realistic_health_check_revival_scenario():
         processed_items.extend(batch)
         time.sleep(0.05)  # Simulate some processing time
 
-    with patch(
-        "weave.trace_server_bindings.async_batch_processor.logger"
-    ) as mock_logger:
-        # Use shorter intervals for faster testing
-        with patch(
+    with (
+        patch(
+            "weave.trace_server_bindings.async_batch_processor.logger"
+        ) as mock_logger,
+        patch(
             "weave.trace_server_bindings.async_batch_processor.HEALTH_CHECK_INTERVAL",
             0.5,
-        ):
-            processor = AsyncBatchProcessor(
-                tracking_processor_fn,
-                max_batch_size=10,
-                min_batch_interval=0.1,
-            )
+        ),
+    ):
+        # Use shorter intervals for faster testing
+        processor = AsyncBatchProcessor(
+            tracking_processor_fn,
+            max_batch_size=10,
+            min_batch_interval=0.1,
+        )
 
-            # Step 1: Process 5 items successfully
-            processor.enqueue([1, 2, 3, 4, 5])
-            time.sleep(0.3)  # Wait for processing
+        # Step 1: Process 5 items successfully
+        processor.enqueue([1, 2, 3, 4, 5])
+        time.sleep(0.3)  # Wait for processing
 
-            # Verify initial processing worked
-            assert len(processed_items) == 5
-            assert processed_items == [1, 2, 3, 4, 5]
-            assert processor.processing_thread.is_alive()
-            assert processor.health_check_thread.is_alive()
+        # Verify initial processing worked
+        assert len(processed_items) == 5
+        assert processed_items == [1, 2, 3, 4, 5]
+        assert processor.processing_thread.is_alive()
+        assert processor.health_check_thread.is_alive()
 
-            # Step 2: Kill the processing thread (simulate thread death)
-            original_processing_thread = processor.processing_thread
+        # Step 2: Kill the processing thread (simulate thread death)
+        original_processing_thread = processor.processing_thread
 
-            # Mock the processing thread to appear dead
-            with patch.object(
-                processor.processing_thread, "is_alive", return_value=False
-            ):
-                # Step 3: Immediately enqueue another item
-                processor.enqueue([6])
+        # Mock the processing thread to appear dead
+        with patch.object(processor.processing_thread, "is_alive", return_value=False):
+            # Step 3: Immediately enqueue another item
+            processor.enqueue([6])
 
-                # Step 4: Initial assertions - item should be queued but not processed yet
-                assert processor.num_outstanding_jobs == 1  # Item 6 is in queue
-                assert len(processed_items) == 5  # Still only processed first 5 items
-                assert not processor.processing_thread.is_alive()  # Thread appears dead
+            # Step 4: Initial assertions - item should be queued but not processed yet
+            assert processor.num_outstanding_jobs == 1  # Item 6 is in queue
+            assert len(processed_items) == 5  # Still only processed first 5 items
+            assert not processor.processing_thread.is_alive()  # Thread appears dead
 
-                # Step 5: Wait for health check cycle (0.5 seconds + a bit extra)
-                time.sleep(0.7)
+            # Step 5: Wait for health check cycle (0.5 seconds + a bit extra)
+            time.sleep(0.7)
 
-            # Step 6: Final assertions - health check should have revived the thread
-            # Give a moment for the new thread to process the queued item
-            time.sleep(0.2)
+        # Step 6: Final assertions - health check should have revived the thread
+        # Give a moment for the new thread to process the queued item
+        time.sleep(0.2)
 
-            # The processing thread should be different (new thread created)
-            assert processor.processing_thread != original_processing_thread
-            assert processor.processing_thread.is_alive()
-            # Health check alive
-            assert processor.health_check_thread.is_alive()
+        # The processing thread should be different (new thread created)
+        assert processor.processing_thread != original_processing_thread
+        assert processor.processing_thread.is_alive()
+        # Health check alive
+        assert processor.health_check_thread.is_alive()
 
-            # The queued item should have been processed
-            assert len(processed_items) == 6
-            assert processed_items[-1] == 6  # Item 6 was processed
-            assert processor.num_outstanding_jobs == 0  # Queue is empty
+        # The queued item should have been processed
+        assert len(processed_items) == 6
+        assert processed_items[-1] == 6  # Item 6 was processed
+        assert processor.num_outstanding_jobs == 0  # Queue is empty
 
-            # Step 7: Test that everything continues to work normally
-            processor.enqueue([7, 8, 9])
-            time.sleep(0.2)
+        # Step 7: Test that everything continues to work normally
+        processor.enqueue([7, 8, 9])
+        time.sleep(0.2)
 
-            assert len(processed_items) == 9
-            assert processed_items[-3:] == [7, 8, 9]
+        assert len(processed_items) == 9
+        assert processed_items[-3:] == [7, 8, 9]
 
-            processor.stop_accepting_new_work_and_flush_queue()
+        processor.stop_accepting_new_work_and_flush_queue()
 
 
 @pytest.mark.disable_logging_error_check

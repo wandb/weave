@@ -252,10 +252,7 @@ def test_serialization_correctness(
 
         # Similarly to the publish flow, if we are in legacy mode, then we just
         # use the expected json directly.
-        if is_legacy:
-            val = case.exp_json
-        else:
-            val = runtime_object
+        val = case.exp_json if is_legacy else runtime_object
 
         func(val)
         client.flush()

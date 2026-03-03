@@ -519,7 +519,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             obj_id_idx_map.pop(obj.object_id)
 
         obj_creation_batch = []
-        for op_obj_id in obj_id_idx_map.keys():
+        for op_obj_id in obj_id_idx_map:
             op_val = object_creation_utils.build_op_val(digest)
             obj_creation_batch.append(
                 tsi.ObjSchemaForInsert(
@@ -2942,10 +2942,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Extract file reference from the val if it's a file-based op
 
             try:
-                if complex_query:
-                    val = json.loads(obj.val_dump)
-                else:
-                    val = obj.val
+                val = json.loads(obj.val_dump) if complex_query else obj.val
                 if isinstance(val, dict) and val.get("_type") == "CustomWeaveType":
                     files = val.get("files", {})
                     if object_creation_utils.OP_SOURCE_FILE_NAME in files:
@@ -4809,9 +4806,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 for obj in valid_objects:
                     root_val_cache[make_obj_cache_key(obj)] = json.loads(obj.val_dump)
 
-            return [
-                root_val_cache.get(make_root_ref_cache_key(ref), None) for ref in refs
-            ]
+            return [root_val_cache.get(make_root_ref_cache_key(ref)) for ref in refs]
 
         # Represents work left to do for resolving a ref
         @dataclasses.dataclass
@@ -4865,9 +4860,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         )
                 if val is None:
                     return empty_result
-                if op == ri.DICT_KEY_EDGE_NAME:
-                    val = val.get(arg)
-                elif op == ri.OBJECT_ATTR_EDGE_NAME:
+                if op == ri.DICT_KEY_EDGE_NAME or op == ri.OBJECT_ATTR_EDGE_NAME:
                     val = val.get(arg)
                 elif op == ri.LIST_INDEX_EDGE_NAME:
                     index = int(arg)
@@ -5106,10 +5099,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             len(project_allow_list) == 1 and project_allow_list[0] == "*"
         )
 
-        if not universally_enabled and project_id not in project_allow_list:
-            return False
-
-        return True
+        return not (not universally_enabled and project_id not in project_allow_list)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest

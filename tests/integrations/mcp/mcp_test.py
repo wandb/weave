@@ -73,39 +73,41 @@ async def run_client():
     )
 
     # Connect to the server using stdio
-    async with stdio_client(server_params) as (read, write):
-        async with ClientSession(read, write) as session:
-            # Initialize the connection
-            await session.initialize()
-            print("Connection initialized successfully!")
+    async with (
+        stdio_client(server_params) as (read, write),
+        ClientSession(read, write) as session,
+    ):
+        # Initialize the connection
+        await session.initialize()
+        print("Connection initialized successfully!")
 
-            # List available tools
-            tools = await session.list_tools()
-            print(f"Available tools: {[tool.name for tool in tools.tools]}")
+        # List available tools
+        tools = await session.list_tools()
+        print(f"Available tools: {[tool.name for tool in tools.tools]}")
 
-            # List resources
-            resources = await session.list_resources()
-            print(
-                f"Available resources: {[resource.name for resource in resources.resources]}"
-            )
+        # List resources
+        resources = await session.list_resources()
+        print(
+            f"Available resources: {[resource.name for resource in resources.resources]}"
+        )
 
-            # List prompts
-            prompts = await session.list_prompts()
-            print(f"Available prompts: {[prompt.name for prompt in prompts.prompts]}")
+        # List prompts
+        prompts = await session.list_prompts()
+        print(f"Available prompts: {[prompt.name for prompt in prompts.prompts]}")
 
-            # Call the add tool
-            result = await session.call_tool("add", arguments={"a": 1, "b": 2})
-            print(f"Result of add(1, 2): {result}")
+        # Call the add tool
+        result = await session.call_tool("add", arguments={"a": 1, "b": 2})
+        print(f"Result of add(1, 2): {result}")
 
-            # Get a resource
-            resource = await session.read_resource("greeting://cw")
-            print(f"Resource: {resource}")
+        # Get a resource
+        resource = await session.read_resource("greeting://cw")
+        print(f"Resource: {resource}")
 
-            # Generate a prompt
-            prompt = await session.get_prompt(
-                "review_code", arguments={"code": "print('Hello, world!')"}
-            )
-            print(f"Prompt: {prompt}")
+        # Generate a prompt
+        prompt = await session.get_prompt(
+            "review_code", arguments={"code": "print('Hello, world!')"}
+        )
+        print(f"Prompt: {prompt}")
 
 
 def main():

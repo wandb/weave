@@ -18,7 +18,4 @@ def do_contains_words_action(
 ) -> Any:
     target_words = config.target_words
     text = json.dumps(call.output)
-    for word in target_words:
-        if word in text:
-            return True
-    return False
+    return any(word in text for word in target_words)

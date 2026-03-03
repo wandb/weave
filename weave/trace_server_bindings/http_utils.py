@@ -310,10 +310,7 @@ def check_endpoint_exists(
         # Check if this is a 404 (method not found)
         response = getattr(e, "response", None)
         status_code = getattr(response, "status_code", None) if response else None
-        if status_code:
-            endpoint_exists = status_code != 404
-        else:
-            endpoint_exists = False
+        endpoint_exists = status_code != 404 if status_code else False
     else:
         endpoint_exists = True
 

@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import os
 import random
 import tempfile
@@ -36,10 +37,8 @@ def get_image():
         return image
     finally:
         # Clean up the temp file
-        try:
+        with contextlib.suppress(OSError, PermissionError):
             os.unlink(temp_file_path)
-        except (OSError, PermissionError):
-            pass  # File might already be deleted or locked
 
 
 def test_multiple_loads():

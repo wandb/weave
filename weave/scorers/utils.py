@@ -40,13 +40,9 @@ def stringify(output: Any) -> str:
     """
     if isinstance(output, str):
         return output
-    elif isinstance(output, int):
+    elif isinstance(output, (int, float)):
         return str(output)
-    elif isinstance(output, float):
-        return str(output)
-    elif isinstance(output, (list, tuple)):
-        return json.dumps(output, indent=2)
-    elif isinstance(output, dict):
+    elif isinstance(output, (list, tuple, dict)):
         return json.dumps(output, indent=2)
     elif isinstance(output, BaseModel):
         return output.model_dump_json(indent=2)

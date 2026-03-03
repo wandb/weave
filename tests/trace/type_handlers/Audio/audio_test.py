@@ -1,4 +1,5 @@
 import base64
+import io
 import os
 import wave
 
@@ -14,10 +15,24 @@ TEST_WAV_FILE = os.path.join(TEST_AUDIO_DIR, "audio.wav")
 TEST_MP3_FILE = os.path.join(TEST_AUDIO_DIR, "audio.mp3")
 
 
+def _read_bytes(path: str) -> bytes:
+    with open(path, "rb") as f:
+        return f.read()
+
+
+def _read_prefix(path: str, num_bytes: int) -> bytes:
+    with open(path, "rb") as f:
+        return f.read(num_bytes)
+
+
+def _open_wave_read(path: str) -> wave.Wave_read:
+    return wave.open(io.BytesIO(_read_bytes(path)), "rb")
+
+
 class TestWaveRead:
     def test_audio_publish(self, client: WeaveClient) -> None:
         client.project = "test_audio_publish"
-        audio = wave.open(TEST_WAV_FILE, "rb")
+        audio = _open_wave_read(TEST_WAV_FILE)
         weave.publish(audio)
 
         ref = get_ref(audio)
@@ -27,7 +42,7 @@ class TestWaveRead:
 
     def test_audio_as_dataset_cell(self, client: WeaveClient) -> None:
         client.project = "test_audio_as_dataset_cell"
-        audio = wave.open(TEST_WAV_FILE, "rb")
+        audio = _open_wave_read(TEST_WAV_FILE)
         dataset = weave.Dataset(rows=weave.Table([{"audio": audio}]))
         weave.publish(dataset)
 
@@ -43,7 +58,7 @@ class TestWaveRead:
             return {"out_audio": in_audio}
 
         client.project = "test_audio_as_call_io"
-        audio = wave.open(TEST_WAV_FILE, "rb")
+        audio = _open_wave_read(TEST_WAV_FILE)
 
         exp_bytes = audio.readframes(5)
         audio.rewind()
@@ -73,7 +88,7 @@ class TestWeaveAudio:
         # Ensure filetype was parsed correctly from the path
         assert audio_file.endswith(gotten_audio.format)
         # Ensure at least the first 10 bytes are the same
-        assert open(audio_file, "rb").read(10) == gotten_audio.data[:10]
+        assert _read_prefix(audio_file, 10) == gotten_audio.data[:10]
 
     @pytest.mark.parametrize(
         "audio_file_and_format", [(TEST_MP3_FILE, "mp3"), (TEST_WAV_FILE, "wav")]
@@ -83,7 +98,7 @@ class TestWeaveAudio:
     ) -> None:
         client.project = "test_audio_publish_from_bytes"
         audio_file, format = audio_file_and_format
-        audio_bytes = open(audio_file, "rb").read()
+        audio_bytes = _read_bytes(audio_file)
         audio = Audio.from_data(data=audio_bytes, format=format)
 
         ref = weave.publish(audio)
@@ -94,7 +109,7 @@ class TestWeaveAudio:
         assert audio_file.endswith(gotten_audio.format)
 
         # Ensure at least the first 10 bytes are the same
-        assert open(audio_file, "rb").read(10) == gotten_audio.data[:10]
+        assert _read_prefix(audio_file, 10) == gotten_audio.data[:10]
 
     @pytest.mark.parametrize(
         "audio_file_and_format", [(TEST_MP3_FILE, "mp3"), (TEST_WAV_FILE, "wav")]
@@ -104,7 +119,7 @@ class TestWeaveAudio:
     ) -> None:
         client.project = "test_audio_publish_from_encoded_bytes"
         audio_file, format = audio_file_and_format
-        audio_bytes = open(audio_file, "rb").read()
+        audio_bytes = _read_bytes(audio_file)
         encoded_bytes = base64.b64encode(audio_bytes)
         audio = Audio.from_data(data=encoded_bytes, format=format)
 
@@ -113,7 +128,7 @@ class TestWeaveAudio:
         gotten_audio = ref.get()
 
         # Ensure at least the first 10 bytes of the original file and decoded data are the same
-        assert open(audio_file, "rb").read(10) == gotten_audio.data[:10]
+        assert _read_prefix(audio_file, 10) == gotten_audio.data[:10]
 
     def test_audio_fails_on_unsupported_format(self, client: WeaveClient) -> None:
         client.project = "test_audio_fails_on_unsupported_format"

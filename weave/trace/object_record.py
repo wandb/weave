@@ -99,10 +99,7 @@ def getmembers(
     """Return all members of an object as (name, value) pairs sorted by name.
     Optionally, only return members that satisfy a given predicate.
     """
-    if isclass(object):
-        mro = (object,) + getmro(object)
-    else:
-        mro = ()
+    mro = (object,) + getmro(object) if isclass(object) else ()
     results = []
     processed = set()
     names = dir(object)

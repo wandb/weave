@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import contextlib
 import json
 import os
 import wave
@@ -67,10 +68,8 @@ def try_decode(data: str | bytes) -> bytes:
     Returns:
         bytes: The decoded data as bytes
     """
-    try:
+    with contextlib.suppress(binascii.Error):
         data = base64.b64decode(data, validate=True)
-    except binascii.Error:
-        pass
 
     if isinstance(data, str):
         data = data.encode("utf-8")
@@ -168,7 +167,8 @@ class Audio(Generic[T]):
                 f"Invalid file path {path}, file must end in one of: mp3 or wav"
             )
 
-        data = open(path, "rb").read()
+        with open(path, "rb") as f:
+            data = f.read()
         return cls(data=data, format=cast(SUPPORTED_FORMATS_TYPE, format_str))
 
     def export(self, path: str | bytes | Path | os.PathLike) -> None:

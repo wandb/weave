@@ -29,10 +29,7 @@ def aggregate_usage_with_descendants(
     # This materializes the calls into memory, which is not ideal for
     # large traces, but is necessary for this approach.
     # Reuse the input list directly when possible to avoid an extra copy.
-    if isinstance(calls, list):
-        calls_list = calls
-    else:
-        calls_list = list(calls)
+    calls_list = calls if isinstance(calls, list) else list(calls)
     if not calls_list:
         return {}
 

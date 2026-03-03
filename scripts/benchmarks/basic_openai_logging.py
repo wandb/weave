@@ -28,6 +28,8 @@ import weave
 # This is unfortunate, but needed to make the script runnable both as a uv
 # script and as a helper in the test suite
 sys.path.insert(0, str(Path(__file__).parent))
+import contextlib
+
 from utils import utils
 
 console = Console()
@@ -70,10 +72,8 @@ def time_function_calls(
     """
     # Perform warm-up calls
     for _ in range(warmup):
-        try:
+        with contextlib.suppress(Exception):
             func()
-        except Exception:
-            pass
 
     times = []
     for _ in range(iterations):

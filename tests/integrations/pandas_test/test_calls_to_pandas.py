@@ -1,3 +1,5 @@
+import contextlib
+
 import pandas as pd
 import pytest
 
@@ -21,10 +23,8 @@ def logging_example(client):
     with weave.attributes({"tag": "test", "version": "1.0"}):
         func("Bob", 25)
 
-    try:
+    with contextlib.suppress(BaseException):
         raising_func("Claire", 35)
-    except:
-        pass
 
 
 def test_calls_to_pandas_basic(logging_example, client):

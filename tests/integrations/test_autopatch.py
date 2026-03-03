@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 import types
 from typing import Any, cast
@@ -196,10 +197,8 @@ def test_init_weave_calls_patching(setup_env, monkeypatch):
         assert patch_calls["register_import_hook"] == 1
 
         if client:
-            try:
+            with contextlib.suppress(Exception):
                 client.finish()
-            except Exception:
-                pass
 
 
 def test_implicit_patching_disabled_via_settings(setup_env, monkeypatch):

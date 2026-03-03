@@ -41,6 +41,4 @@ class ObjectRefStrMatcher:  # noqa: PLW1641
             return False
         if self.digest is not None and self.digest != other_ref.digest:
             return False
-        if self.extra is not None and self.extra != other_ref.extra:
-            return False
-        return True
+        return not (self.extra is not None and self.extra != other_ref.extra)

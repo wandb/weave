@@ -149,10 +149,7 @@ def _openai_chunk_has_content(chunk: ChatCompletionChunk) -> bool:
     Returns:
         True if the chunk contains content, False otherwise.
     """
-    for choice in chunk.choices:
-        if choice.delta and choice.delta.content:
-            return True
-    return False
+    return any(choice.delta and choice.delta.content for choice in chunk.choices)
 
 
 def openai_accumulator(
@@ -323,8 +320,7 @@ def should_use_accumulator(inputs: dict) -> bool:
         # This is very critical. When `"X-Stainless-Raw-Response` is true, the response
         # is an APIResponse object. This is very hard to mock/patch for the streaming use
         # case, so we don't even try.
-        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response")
-        == "true"
+        and inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response") != "true"
     )
 
 
@@ -405,9 +401,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
             return _wrapper
 
         def _openai_stream_options_is_set(inputs: dict) -> bool:
-            if inputs.get("stream_options") is not None:
-                return True
-            return False
+            return inputs.get("stream_options") is not None
 
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
@@ -452,9 +446,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
             return _wrapper
 
         def _openai_stream_options_is_set(inputs: dict) -> bool:
-            if inputs.get("stream_options") is not None:
-                return True
-            return False
+            return inputs.get("stream_options") is not None
 
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
@@ -624,36 +616,12 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
             ResponseOutputItemDoneEvent,
             ResponseRefusalDoneEvent,
             ResponseTextDoneEvent,
-        ),
-    ):
-        pass  # Nothing to do here
-
-    # 3b. "Tool Completed" events
-    elif isinstance(
-        value,
-        (
             ResponseCodeInterpreterCallCompletedEvent,
             ResponseFileSearchCallCompletedEvent,
             ResponseWebSearchCallCompletedEvent,
-        ),
-    ):
-        pass  # Nothing to do here
-
-    # 3c. "Tool In Progress" events
-    elif isinstance(
-        value,
-        (
             ResponseCodeInterpreterCallInProgressEvent,
             ResponseFileSearchCallInProgressEvent,
             ResponseWebSearchCallInProgressEvent,
-        ),
-    ):
-        pass  # Nothing to do here
-
-    # 3d. "Tool Action" events
-    elif isinstance(
-        value,
-        (
             ResponseCodeInterpreterCallInterpretingEvent,
             ResponseFileSearchCallSearchingEvent,
             ResponseWebSearchCallSearchingEvent,

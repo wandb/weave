@@ -100,9 +100,7 @@ def make_mutation(
 
 
 def unwrap(val: Any) -> Any:
-    if isinstance(val, Traceable):
-        return val.unwrap()
-    elif isinstance(val, ObjectRecord):
+    if isinstance(val, (Traceable, ObjectRecord)):
         return val.unwrap()
     elif isinstance(val, dict):
         return {k: unwrap(v) for k, v in val.items()}
@@ -668,10 +666,7 @@ class WeaveList(Traceable, list):  # noqa: PLW1641
             return False
         if len(self) != len(other):
             return False
-        for v1, v2 in zip(self, other, strict=False):
-            if v1 != v2:
-                return False
-        return True
+        return all(v1 == v2 for v1, v2 in zip(self, other, strict=False))
 
     def unwrap(self) -> Any:
         return unwrap(list(self))

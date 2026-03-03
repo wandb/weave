@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 import logging
 import traceback
@@ -275,10 +276,7 @@ class Evaluation(Object):
 
             raw_scores = normalized_eval_row.get("scores")
             scores: dict[str, Any]
-            if isinstance(raw_scores, dict):
-                scores = raw_scores
-            else:
-                scores = {}
+            scores = raw_scores if isinstance(raw_scores, dict) else {}
             normalized_eval_row["scores"] = scores
 
             if self.scorers:
@@ -429,10 +427,8 @@ def _safe_summarize_to_str(summary: dict) -> str:
     try:
         summary_str = json.dumps(summary, indent=2)
     except Exception:
-        try:
+        with contextlib.suppress(Exception):
             summary_str = str(summary)
-        except Exception:
-            pass
     return summary_str
 
 

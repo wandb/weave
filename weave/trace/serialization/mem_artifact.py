@@ -46,10 +46,7 @@ class MemTraceFilesArtifact:
     @contextlib.contextmanager
     def new_file(self, path: str, binary: bool = False) -> Iterator[StringIO | BytesIO]:
         f: StringIO | BytesIO
-        if binary:
-            f = BytesIO()
-        else:
-            f = StringIO()
+        f = BytesIO() if binary else StringIO()
         yield f
         self.path_contents[path] = f.getvalue()  # type: ignore
         f.close()

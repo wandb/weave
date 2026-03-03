@@ -89,20 +89,22 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
     # Step 2: test that we can in-place execute one action at a time.
     _, call = example_op.call("i've been very meditative and mindful today")
 
-    with secret_fetcher_context(DummySecretFetcher()):
-        with patch("litellm.completion") as mock_completion:
-            mock_completion.return_value = ModelResponse.model_validate(
-                primitive_mock_response
+    with (
+        secret_fetcher_context(DummySecretFetcher()),
+        patch("litellm.completion") as mock_completion,
+    ):
+        mock_completion.return_value = ModelResponse.model_validate(
+            primitive_mock_response
+        )
+        client.server.actions_execute_batch(
+            ActionsExecuteBatchReq.model_validate(
+                {
+                    "project_id": client._project_id(),
+                    "action_ref": action_ref_uri,
+                    "call_ids": [call.id],
+                }
             )
-            client.server.actions_execute_batch(
-                ActionsExecuteBatchReq.model_validate(
-                    {
-                        "project_id": client._project_id(),
-                        "action_ref": action_ref_uri,
-                        "call_ids": [call.id],
-                    }
-                )
-            )
+        )
 
     feedbacks = list(call.feedback)
     assert len(feedbacks) == 1
@@ -180,20 +182,22 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
     # Step 2: test that we can in-place execute one action at a time.
     _, call = example_op.call("i've been very meditative and mindful today")
 
-    with secret_fetcher_context(DummySecretFetcher()):
-        with patch("litellm.completion") as mock_completion:
-            mock_completion.return_value = ModelResponse.model_validate(
-                structured_mock_response
+    with (
+        secret_fetcher_context(DummySecretFetcher()),
+        patch("litellm.completion") as mock_completion,
+    ):
+        mock_completion.return_value = ModelResponse.model_validate(
+            structured_mock_response
+        )
+        client.server.actions_execute_batch(
+            ActionsExecuteBatchReq.model_validate(
+                {
+                    "project_id": client._project_id(),
+                    "action_ref": action_ref_uri,
+                    "call_ids": [call.id],
+                }
             )
-            client.server.actions_execute_batch(
-                ActionsExecuteBatchReq.model_validate(
-                    {
-                        "project_id": client._project_id(),
-                        "action_ref": action_ref_uri,
-                        "call_ids": [call.id],
-                    }
-                )
-            )
+        )
 
     feedbacks = list(call.feedback)
     assert len(feedbacks) == 1
