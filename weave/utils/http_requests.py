@@ -6,9 +6,10 @@ import datetime
 import json
 import os
 import threading
+from collections.abc import Callable
 from time import time
-from typing import Any
-from urllib.request import getproxies, proxy_bypass_environment
+from typing import Any, cast
+from urllib import request as urllib_request
 
 import httpx
 from httpx import Request, Response
@@ -134,13 +135,19 @@ def pprint_response(response: Response) -> None:
         console.print("  None", style=STYLE_NONE)
 
 
+_proxy_bypass_environment = cast(
+    Callable[[str], bool],
+    getattr(urllib_request, "proxy_bypass_environment", urllib_request.proxy_bypass),
+)
+
+
 def _get_proxy_for_url(url: httpx.URL) -> str | None:
     """Resolve proxy URL from environment for this request URL."""
     host = url.host
-    if host and proxy_bypass_environment(host):
+    if host and _proxy_bypass_environment(host):
         return None
 
-    proxies = getproxies()
+    proxies = urllib_request.getproxies()
     return proxies.get(url.scheme) or proxies.get("all")
 
 
