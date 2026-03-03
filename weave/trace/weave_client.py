@@ -98,7 +98,6 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_runnable_ref_selector,
 )
 from weave.trace_server.trace_server_interface import (
-    AliasesListReq,
     CallEndReq,
     CallsDeleteReq,
     CallsFilter,
@@ -115,18 +114,14 @@ from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
-    ObjAddTagsReq,
     ObjCreateReq,
     ObjCreateRes,
     ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
-    ObjRemoveAliasReq,
-    ObjRemoveTagsReq,
     ObjSchema,
     ObjSchemaForInsert,
-    ObjSetAliasReq,
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
@@ -137,7 +132,6 @@ from weave.trace_server.trace_server_interface import (
     TableCreateRes,
     TableSchemaForInsert,
     TableUpdateReq,
-    TagsListReq,
     TraceServerInterface,
     TraceStatus,
 )
@@ -1178,143 +1172,6 @@ class WeaveClient:
             )
         )
         return result.num_deleted
-
-    @trace_sentry.global_trace_sentry.watch()
-    def add_tags(self, object: ObjectRef, tags: list[str]) -> None:
-        """Add tags to an object version.
-
-        Args:
-            object: Reference to the object version.
-            tags: List of tag strings to add.
-        """
-        self.server.obj_add_tags(
-            ObjAddTagsReq(
-                project_id=self._project_id(),
-                object_id=object.name,
-                digest=object.digest,
-                tags=tags,
-            )
-        )
-
-    @trace_sentry.global_trace_sentry.watch()
-    def remove_tags(self, object: ObjectRef, tags: list[str]) -> None:
-        """Remove tags from an object version.
-
-        Args:
-            object: Reference to the object version.
-            tags: List of tag strings to remove.
-        """
-        self.server.obj_remove_tags(
-            ObjRemoveTagsReq(
-                project_id=self._project_id(),
-                object_id=object.name,
-                digest=object.digest,
-                tags=tags,
-            )
-        )
-
-    @trace_sentry.global_trace_sentry.watch()
-    def get_tags(self, object: ObjectRef) -> list[str]:
-        """Get tags for an object version.
-
-        Args:
-            object: Reference to the object version.
-
-        Returns:
-            List of tag strings.
-        """
-        res = self.server.objs_query(
-            ObjQueryReq(
-                project_id=self._project_id(),
-                filter=ObjectVersionFilter(
-                    object_ids=[object.name],
-                ),
-                include_tags_and_aliases=True,
-            )
-        )
-        for obj in res.objs:
-            if obj.digest == object.digest:
-                return obj.tags or []
-        return []
-
-    @trace_sentry.global_trace_sentry.watch()
-    def set_alias(self, object: ObjectRef, alias: str) -> None:
-        """Set an alias for an object version.
-
-        Args:
-            object: Reference to the object version.
-            alias: The alias name to set (e.g., "production", "staging").
-        """
-        self.server.obj_set_alias(
-            ObjSetAliasReq(
-                project_id=self._project_id(),
-                object_id=object.name,
-                digest=object.digest,
-                alias=alias,
-            )
-        )
-
-    @trace_sentry.global_trace_sentry.watch()
-    def remove_alias(self, object: ObjectRef, alias: str) -> None:
-        """Remove an alias from an object.
-
-        Args:
-            object: Reference to the object (digest is not used since aliases are object-scoped).
-            alias: The alias name to remove.
-        """
-        self.server.obj_remove_alias(
-            ObjRemoveAliasReq(
-                project_id=self._project_id(),
-                object_id=object.name,
-                alias=alias,
-            )
-        )
-
-    @trace_sentry.global_trace_sentry.watch()
-    def get_aliases(self, object: ObjectRef) -> list[str]:
-        """Get aliases for an object version.
-
-        Args:
-            object: Reference to the object version.
-
-        Returns:
-            List of alias strings.
-        """
-        res = self.server.objs_query(
-            ObjQueryReq(
-                project_id=self._project_id(),
-                filter=ObjectVersionFilter(
-                    object_ids=[object.name],
-                ),
-                include_tags_and_aliases=True,
-            )
-        )
-        for obj in res.objs:
-            if obj.digest == object.digest:
-                return obj.aliases or []
-        return []
-
-    @trace_sentry.global_trace_sentry.watch()
-    def list_tags(self) -> list[str]:
-        """List all distinct tags in the project.
-
-        Returns:
-            Sorted list of all tag strings in the project.
-        """
-        res = self.server.tags_list(TagsListReq(project_id=self._project_id()))
-        return res.tags
-
-    @trace_sentry.global_trace_sentry.watch()
-    def list_aliases(self) -> list[str]:
-        """List all distinct aliases in the project.
-
-        Returns:
-            Sorted list of all alias strings in the project.
-        """
-        res = self.server.aliases_list(
-            AliasesListReq(project_id=self._project_id())
-        )
-        return res.aliases
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
