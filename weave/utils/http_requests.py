@@ -8,6 +8,7 @@ import os
 import threading
 from time import time
 from typing import Any
+from urllib.request import getproxies, proxy_bypass_environment
 
 import httpx
 from httpx import Request, Response
@@ -133,18 +134,43 @@ def pprint_response(response: Response) -> None:
         console.print("  None", style=STYLE_NONE)
 
 
-class LoggingHTTPTransport(httpx.HTTPTransport):
+def _get_proxy_for_url(url: httpx.URL) -> str | None:
+    """Resolve proxy URL from environment for this request URL."""
+    host = url.host
+    if host and proxy_bypass_environment(host):
+        return None
+
+    proxies = getproxies()
+    return proxies.get(url.scheme) or proxies.get("all")
+
+
+class LoggingHTTPTransport(httpx.BaseTransport):
+    def __init__(self, *, limits: httpx.Limits) -> None:
+        self._limits = limits
+        self._lock = threading.Lock()
+        self._transports: dict[str | None, httpx.HTTPTransport] = {}
+
+    def _get_transport_for_request(self, request: httpx.Request) -> httpx.HTTPTransport:
+        proxy = _get_proxy_for_url(request.url)
+        with self._lock:
+            transport = self._transports.get(proxy)
+            if transport is None:
+                transport = httpx.HTTPTransport(proxy=proxy, limits=self._limits)
+                self._transports[proxy] = transport
+            return transport
+
     def handle_request(
         self,
         request: httpx.Request,
     ) -> httpx.Response:
+        transport = self._get_transport_for_request(request)
         if os.environ.get("WEAVE_DEBUG_HTTP") != "1":
-            return super().handle_request(request)
+            return transport.handle_request(request)
 
         console.print(Text("-" * 21, style=STYLE_DIVIDER_REQUEST))
         pprint_request(request)
         start_time = time()
-        response = super().handle_request(request)
+        response = transport.handle_request(request)
         elapsed_time = time() - start_time
         console.print(Text("----- Response below -----", style=STYLE_DIVIDER_RESPONSE))
         console.print(
@@ -155,6 +181,14 @@ class LoggingHTTPTransport(httpx.HTTPTransport):
         pprint_response(response)
         return response
 
+    def close(self) -> None:
+        with self._lock:
+            transports = list(self._transports.values())
+            self._transports = {}
+
+        for transport in transports:
+            transport.close()
+
 
 def _get_http_timeout() -> float:
     """Get the HTTP timeout from settings."""
@@ -164,16 +198,13 @@ def _get_http_timeout() -> float:
     return http_timeout()
 
 
-def _get_proxy_from_env() -> str | None:
-    return os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY") or os.getenv("ALL_PROXY")
-
+_CLIENT_LIMITS = httpx.Limits(max_connections=None, max_keepalive_connections=None)
 
 client = httpx.Client(
     # HTTPX doesn't read proxy env vars when a custom transport is provided,
-    # so we need to read them manually and pass them here.
-    transport=LoggingHTTPTransport(proxy=_get_proxy_from_env()),
+    # so proxy routing is handled in LoggingHTTPTransport per request URL.
+    transport=LoggingHTTPTransport(limits=_CLIENT_LIMITS),
     timeout=_get_http_timeout(),
-    limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
 )
 
 
