@@ -8,6 +8,11 @@ from datetime import datetime
 from functools import wraps
 from typing import Any
 
+from weave.integrations.claude_agent_sdk.display_utils import (
+    response_display_name,
+    session_display_name,
+    tool_use_display_name,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context.weave_client_context import get_weave_client
@@ -55,6 +60,7 @@ def _process_conversation(
     root_call = wc.create_call(
         op=f"claude-session-{str(datetime.now())}",
         inputs=root_inputs,
+        display_name=session_display_name(user_prompt),
         attributes={"kind": "agent"},
         use_stack=False,
     )
@@ -152,6 +158,9 @@ def _process_conversation(
             tool_call = wc.create_call(
                 op=f"claude_agent_sdk.tool_use.{tool_block.name}",
                 inputs={"history": history, "message": serialized_msg},
+                display_name=tool_use_display_name(
+                    tool_block.name, tool_block.input
+                ),
                 parent=root_call,
                 attributes={"kind": "tool"},
                 use_stack=False,
@@ -167,6 +176,7 @@ def _process_conversation(
             llm_call = wc.create_call(
                 op="claude_agent_sdk.response",
                 inputs={"history": history},
+                display_name=response_display_name(msg.model),
                 parent=root_call,
                 attributes={"kind": "llm"},
                 use_stack=False,
