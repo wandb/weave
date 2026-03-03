@@ -1901,13 +1901,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
         query, parameters = make_list_tags_query(req.project_id)
-        query_result = self.ch_client.query(query, parameters)
+        query_result = self._query(query, parameters)
         tags = [row[0] for row in query_result.result_rows]
         return tsi.TagsListRes(tags=tags)
 
     def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
         query, parameters = make_list_aliases_query(req.project_id)
-        query_result = self.ch_client.query(query, parameters)
+        query_result = self._query(query, parameters)
         aliases = [row[0] for row in query_result.result_rows]
         return tsi.AliasesListRes(aliases=aliases)
 
