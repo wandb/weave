@@ -839,14 +839,7 @@ def test_sdk_add_tags(client: WeaveClient):
 
     client.add_tags(ref, ["alpha", "beta"])
 
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client._project_id(),
-            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
-            include_tags_and_aliases=True,
-        )
-    )
-    assert res.objs[0].tags == ["alpha", "beta"]
+    assert sorted(client.get_tags(ref)) == ["alpha", "beta"]
 
 
 def test_sdk_remove_tags(client: WeaveClient):
@@ -855,14 +848,16 @@ def test_sdk_remove_tags(client: WeaveClient):
     client.add_tags(ref, ["x", "y"])
     client.remove_tags(ref, ["x"])
 
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client._project_id(),
-            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
-            include_tags_and_aliases=True,
-        )
-    )
-    assert res.objs[0].tags == ["y"]
+    assert client.get_tags(ref) == ["y"]
+
+
+def test_sdk_get_tags(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_get_tags_obj")
+
+    assert client.get_tags(ref) == []
+
+    client.add_tags(ref, ["tag1", "tag2"])
+    assert sorted(client.get_tags(ref)) == ["tag1", "tag2"]
 
 
 def test_sdk_set_alias(client: WeaveClient):
@@ -870,30 +865,29 @@ def test_sdk_set_alias(client: WeaveClient):
 
     client.set_alias(ref, "production")
 
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client._project_id(),
-            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
-            include_tags_and_aliases=True,
-        )
-    )
-    assert "production" in res.objs[0].aliases
+    assert "production" in client.get_aliases(ref)
 
 
 def test_sdk_remove_alias(client: WeaveClient):
     ref = weave.publish({"data": "test"}, name="sdk_rm_alias_obj")
 
     client.set_alias(ref, "staging")
-    client.remove_alias(ref.name, "staging")
+    client.remove_alias(ref, "staging")
 
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client._project_id(),
-            filter=tsi.ObjectVersionFilter(object_ids=[ref.name]),
-            include_tags_and_aliases=True,
-        )
-    )
-    assert "staging" not in (res.objs[0].aliases or [])
+    assert "staging" not in client.get_aliases(ref)
+
+
+def test_sdk_get_aliases(client: WeaveClient):
+    ref = weave.publish({"data": "test"}, name="sdk_get_aliases_obj")
+
+    # Every latest version has a virtual "latest" alias
+    aliases = client.get_aliases(ref)
+    assert "latest" in aliases
+
+    client.set_alias(ref, "canary")
+    aliases = client.get_aliases(ref)
+    assert "canary" in aliases
+    assert "latest" in aliases
 
 
 # --- obj_read with real digest (not alias) ---
