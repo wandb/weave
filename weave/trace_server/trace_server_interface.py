@@ -1575,6 +1575,12 @@ class EvaluationStatusRes(BaseModel):
 
 
 class CallsScoreReq(BaseModelStrict):
+    """Request to enqueue scoring jobs for a list of calls.
+
+    Scoring is performed asynchronously by the call_scoring_worker, which
+    consumes messages from Kafka and applies each scorer_ref to each call_id.
+    """
+
     project_id: str
     call_ids: list[str] = Field(description="List of call IDs to score")
     scorer_refs: list[str] = Field(description="List of scorer refs to apply")
@@ -1582,6 +1588,13 @@ class CallsScoreReq(BaseModelStrict):
 
 
 class CallsScoreRes(BaseModel):
+    """Empty response for calls_score.
+
+    Defined as a model (rather than returning None) to follow the convention
+    used throughout this interface and to allow fields to be added later
+    without a breaking change.
+    """
+
     pass
 
 

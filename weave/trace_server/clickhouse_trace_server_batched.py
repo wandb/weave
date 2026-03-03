@@ -5836,6 +5836,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return evaluation_status(self, req)
 
     def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        """Enqueue scoring jobs for a list of calls.
+
+        Publishes the request to Kafka, where it will be consumed by the
+        call_scoring_worker and applied asynchronously.
+        """
         if self.kafka_producer is None:
             raise ValueError("Kafka producer is not set")
 

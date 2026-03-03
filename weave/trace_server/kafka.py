@@ -1,4 +1,3 @@
-import json
 import logging
 import socket
 from typing import Any
@@ -148,6 +147,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             req: The CallsScoreReq containing project_id, call_ids, scorer_refs, and wb_user_id
             flush_immediately: Whether to flush the producer immediately (default True)
         """
+        # len(self) returns the number of messages currently queued in the producer buffer
         buffer_size = len(self)
 
         if buffer_size >= self.max_buffer_size:
@@ -169,16 +169,9 @@ class KafkaProducer(ConfluentKafkaProducer):
 
         for i in range(0, len(req.call_ids), self.SCORE_CALLS_CHUNK_SIZE):
             chunk = req.call_ids[i : i + self.SCORE_CALLS_CHUNK_SIZE]
-            payload = {
-                "project_id": req.project_id,
-                "call_ids": chunk,
-                "scorer_refs": req.scorer_refs,
-                "wb_user_id": req.wb_user_id,
-            }
-
             self.produce(
                 topic=SCORE_CALLS_TOPIC,
-                value=json.dumps(payload),
+                value=req.model_copy(update={"call_ids": chunk}).model_dump_json(),
                 key=publish_key,
             )
 
