@@ -88,10 +88,48 @@ def _process_conversation(
             d["role"] = "result"
         return d
 
-    # Second pass: create child calls and build full messages list
+    def _is_thinking_only(msg: Any) -> bool:
+        """Check if an AssistantMessage contains only ThinkingBlocks."""
+        return isinstance(msg, AssistantMessage) and all(
+            isinstance(b, ThinkingBlock) for b in msg.content
+        )
+
+    # Merge consecutive assistant messages so thinking blocks attach to
+    # the message they were reasoning for. A thinking-only assistant message
+    # gets its content prepended to the next assistant message.
+    merged: list[Any] = []
+    pending_thinking: list[Any] = []  # ThinkingBlock objects waiting to attach
+    for msg in messages:
+        if _is_thinking_only(msg):
+            pending_thinking.extend(msg.content)
+            continue
+        if isinstance(msg, AssistantMessage) and pending_thinking:
+            # Prepend pending thinking blocks into this message's content
+            msg = AssistantMessage(
+                content=list(pending_thinking) + list(msg.content),
+                model=msg.model,
+                parent_tool_use_id=msg.parent_tool_use_id,
+                error=msg.error,
+            )
+            pending_thinking.clear()
+        merged.append(msg)
+    # If there are leftover thinking blocks with no following assistant message,
+    # emit them as a standalone assistant message
+    if pending_thinking:
+        merged.append(AssistantMessage(
+            content=list(pending_thinking),
+            model="unknown",
+            parent_tool_use_id=None,
+            error=None,
+        ))
+
+    # Build full messages list and create child calls from merged messages
     accumulated_messages: list[dict[str, Any]] = []
 
-    for msg in messages:
+    for msg in merged:
+        # Snapshot history before appending the current message
+        history = list(accumulated_messages)
+
         # Serialize every message into the accumulated list
         accumulated_messages.append(_serialize_msg(msg))
 
@@ -101,14 +139,11 @@ def _process_conversation(
 
         serialized_msg = _serialize_msg(msg)
 
-        text_parts = []
-        thinking_parts = []
+        has_text_or_thinking = False
         tool_uses = []
         for block in msg.content:
-            if isinstance(block, ThinkingBlock):
-                thinking_parts.append(block.thinking)
-            elif isinstance(block, TextBlock):
-                text_parts.append(block.text)
+            if isinstance(block, (ThinkingBlock, TextBlock)):
+                has_text_or_thinking = True
             elif isinstance(block, ToolUseBlock):
                 tool_uses.append(block)
 
@@ -116,7 +151,7 @@ def _process_conversation(
         for tool_block in tool_uses:
             tool_call = wc.create_call(
                 op=f"claude_agent_sdk.tool_use.{tool_block.name}",
-                inputs={"message": serialized_msg},
+                inputs={"history": history, "message": serialized_msg},
                 parent=root_call,
                 attributes={"kind": "tool"},
                 use_stack=False,
@@ -128,10 +163,10 @@ def _process_conversation(
             wc.finish_call(tool_call, output=tool_output)
 
         # Create LLM response child call if there is text or thinking content
-        if text_parts or thinking_parts:
+        if has_text_or_thinking:
             llm_call = wc.create_call(
                 op="claude_agent_sdk.response",
-                inputs={"message": serialized_msg},
+                inputs={"history": history},
                 parent=root_call,
                 attributes={"kind": "llm"},
                 use_stack=False,
