@@ -36,6 +36,32 @@ import type {RealtimeSessionLike} from './openai.realtime.agent.types';
 // ============================================================================
 
 /**
+ * Wrap raw PCM16 mono audio into a WAV container.
+ * The OpenAI Realtime API streams 24 kHz, 16-bit, mono PCM.
+ */
+function pcmToWav(pcm: Buffer): Buffer {
+  const channels = 1;
+  const sampleRate = 24000;
+  const bitDepth = 16;
+  const wav = Buffer.alloc(44 + pcm.length);
+  wav.write('RIFF', 0);
+  wav.writeUInt32LE(36 + pcm.length, 4);
+  wav.write('WAVE', 8);
+  wav.write('fmt ', 12);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20); // PCM
+  wav.writeUInt16LE(channels, 22);
+  wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(sampleRate * channels * (bitDepth / 8), 28);
+  wav.writeUInt16LE(channels * (bitDepth / 8), 32);
+  wav.writeUInt16LE(bitDepth, 34);
+  wav.write('data', 36);
+  wav.writeUInt32LE(pcm.length, 40);
+  wav.set(pcm, 44); // Uint8Array.set — accepts ArrayLike<number>, no Buffer-copy type issues
+  return wav;
+}
+
+/**
  * Normalises a raw usage object (which may use camelCase or snake_case keys)
  * into the `LLMUsageSchema` shape expected by the Weave backend.
  *
@@ -99,6 +125,8 @@ export class WeaveRealtimeTracingAdapter {
   // Current Audio Out call and which responseId it belongs to
   private audioCallId: string | null = null;
   private audioResponseId: string | null = null;
+  // Accumulated PCM chunks per responseId — assembled into WAV on close
+  private audioChunks = new Map<string, Buffer[]>();
 
   // In-flight tool calls: toolCallId → Weave callId
   private toolCalls = new Map<string, string>();
@@ -138,6 +166,7 @@ export class WeaveRealtimeTracingAdapter {
     this.session.off('agent_tool_start', this.onToolStart);
     this.session.off('agent_tool_end', this.onToolEnd);
     // Close any calls left open
+    this.audioChunks.clear();
     this.closeAudioCall({});
     for (const [responseId] of this.generationCalls) {
       this.closeGenerationCall(responseId, {status: 'detached'});
@@ -204,7 +233,13 @@ export class WeaveRealtimeTracingAdapter {
    */
   private onAudio = (event: any): void => {
     const responseId: string | undefined = event?.responseId;
-    if (responseId && this.audioCallId === null) {
+    if (!responseId) return;
+    // Accumulate raw PCM chunks
+    const chunks = this.audioChunks.get(responseId) ?? [];
+    chunks.push(Buffer.from(event.data as ArrayBuffer));
+    this.audioChunks.set(responseId, chunks);
+    // Open the Audio Out call on the first chunk
+    if (this.audioCallId === null) {
       this.openAudioCall(responseId);
     }
   };
@@ -220,6 +255,7 @@ export class WeaveRealtimeTracingAdapter {
   private onConnectionChange = (status: string): void => {
     if (status === 'disconnected') {
       // Close Audio Out and all open Generation calls (e.g. abrupt disconnect)
+      this.audioChunks.clear();
       this.closeAudioCall({});
       for (const [responseId] of this.generationCalls) {
         this.closeGenerationCall(responseId, {status: 'disconnected'});
@@ -423,16 +459,35 @@ export class WeaveRealtimeTracingAdapter {
     const client = getGlobalClient();
     if (!client || !this.audioCallId) return;
 
-    client.saveCallEnd({
-      project_id: client.projectId,
-      id: this.audioCallId,
-      ended_at: new Date().toISOString(),
-      output,
-      summary: {},
-    });
-
+    // Snapshot and clear state immediately so re-entrant calls are safe
+    const callId = this.audioCallId;
+    const responseId = this.audioResponseId;
+    const endedAt = new Date().toISOString();
     this.audioCallId = null;
     this.audioResponseId = null;
+
+    const chunks = responseId ? this.audioChunks.get(responseId) : undefined;
+    if (responseId) this.audioChunks.delete(responseId);
+
+    (async () => {
+      let finalOutput = output;
+      if (chunks && chunks.length > 0) {
+        try {
+          const pcm = Buffer.concat(chunks as unknown as Uint8Array[]);
+          const audioRef = await client.serializeAudio(pcmToWav(pcm));
+          finalOutput = {...output, audio: audioRef};
+        } catch {
+          // fall through with original output
+        }
+      }
+      client.saveCallEnd({
+        project_id: client.projectId,
+        id: callId,
+        ended_at: endedAt,
+        output: finalOutput,
+        summary: {},
+      });
+    })();
   }
 
   private openToolCall(
