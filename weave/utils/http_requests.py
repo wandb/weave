@@ -6,9 +6,8 @@ import datetime
 import json
 import os
 import threading
-from collections.abc import Callable
 from time import time
-from typing import Any, cast
+from typing import Any
 from urllib import request as urllib_request
 
 import httpx
@@ -34,6 +33,7 @@ STYLE_ERROR = "red"
 STYLE_DIVIDER_REQUEST = "white"
 STYLE_DIVIDER_RESPONSE = "bright_black"
 THEME_JSON = "ansi_dark"
+CLIENT_LIMITS = httpx.Limits(max_connections=None, max_keepalive_connections=None)
 
 
 def decode_str(string: str | bytes) -> str:
@@ -135,16 +135,10 @@ def pprint_response(response: Response) -> None:
         console.print("  None", style=STYLE_NONE)
 
 
-_proxy_bypass_environment = cast(
-    Callable[[str], bool],
-    getattr(urllib_request, "proxy_bypass_environment", urllib_request.proxy_bypass),
-)
-
-
 def _get_proxy_for_url(url: httpx.URL) -> str | None:
     """Resolve proxy URL from environment for this request URL."""
     host = url.host
-    if host and _proxy_bypass_environment(host):
+    if host and urllib_request.proxy_bypass_environment(host):
         return None
 
     proxies = urllib_request.getproxies()
@@ -205,12 +199,10 @@ def _get_http_timeout() -> float:
     return http_timeout()
 
 
-_CLIENT_LIMITS = httpx.Limits(max_connections=None, max_keepalive_connections=None)
-
 client = httpx.Client(
     # HTTPX doesn't read proxy env vars when a custom transport is provided,
     # so proxy routing is handled in LoggingHTTPTransport per request URL.
-    transport=LoggingHTTPTransport(limits=_CLIENT_LIMITS),
+    transport=LoggingHTTPTransport(limits=CLIENT_LIMITS),
     timeout=_get_http_timeout(),
 )
 
