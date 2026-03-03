@@ -1318,9 +1318,7 @@ class WeaveClient:
         Returns:
             Sorted list of all alias strings in the project.
         """
-        res = self.server.aliases_list(
-            AliasesListReq(project_id=self._project_id())
-        )
+        res = self.server.aliases_list(AliasesListReq(project_id=self._project_id()))
         return res.aliases
 
     @trace_sentry.global_trace_sentry.watch()
