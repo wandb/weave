@@ -4,7 +4,7 @@ import dataclasses
 import importlib
 import logging
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Any
 
@@ -22,14 +22,10 @@ logger = logging.getLogger(__name__)
 _claude_agent_sdk_patcher: MultiPatcher | None = None
 
 
-def _process_conversation(
-    messages: list[Any],
-    user_prompt: str | None,
-) -> None:
-    wc = get_weave_client()
-    if wc is None:
-        return
+# ── Shared helpers ───────────────────────────────────────────────────
 
+
+def _get_sdk_types() -> tuple:
     from claude_agent_sdk import (
         AssistantMessage,
         ResultMessage,
@@ -41,76 +37,91 @@ def _process_conversation(
         UserMessage,
     )
 
-    if not messages:
-        return
-
-    # Extract ResultMessage for metadata
-    result_msg = None
-    for msg in messages:
-        if isinstance(msg, ResultMessage):
-            result_msg = msg
-            break
-
-    # Build root call inputs
-    root_inputs: dict[str, Any] = {}
-    if user_prompt is not None:
-        root_inputs["prompt"] = user_prompt
-
-    # Create root "conversation" call
-    root_call = wc.create_call(
-        op=f"claude-session-{str(datetime.now())}",
-        inputs=root_inputs,
-        display_name=session_display_name(user_prompt),
-        attributes={"kind": "agent"},
-        use_stack=False,
+    return (
+        AssistantMessage,
+        ResultMessage,
+        SystemMessage,
+        TextBlock,
+        ThinkingBlock,
+        ToolResultBlock,
+        ToolUseBlock,
+        UserMessage,
     )
 
-    # Track tool results by tool_use_id for matching
-    tool_results: dict[str, Any] = {}
 
-    # First pass: collect tool results from all message types
-    for msg in messages:
-        content = None
-        if isinstance(msg, UserMessage) and isinstance(msg.content, list):
-            content = msg.content
-        elif isinstance(msg, AssistantMessage):
-            content = msg.content
-        if content:
-            for block in content:
-                if isinstance(block, ToolResultBlock):
-                    tool_results[block.tool_use_id] = block
+def _serialize_msg(msg: Any) -> dict[str, Any]:
+    (
+        AssistantMessage,
+        ResultMessage,
+        SystemMessage,
+        _,
+        _,
+        _,
+        _,
+        UserMessage,
+    ) = _get_sdk_types()
+    d = dataclasses.asdict(msg)
+    if isinstance(msg, UserMessage):
+        d["role"] = "user"
+    elif isinstance(msg, AssistantMessage):
+        d["role"] = "assistant"
+    elif isinstance(msg, SystemMessage):
+        d["role"] = "system"
+    elif isinstance(msg, ResultMessage):
+        d["role"] = "result"
+    return d
 
-    def _serialize_msg(msg: Any) -> dict[str, Any]:
-        """Serialize a dataclass message, preserving all fields."""
-        d = dataclasses.asdict(msg)
-        # Tag with role based on type
-        if isinstance(msg, UserMessage):
-            d["role"] = "user"
-        elif isinstance(msg, AssistantMessage):
-            d["role"] = "assistant"
-        elif isinstance(msg, SystemMessage):
-            d["role"] = "system"
-        elif isinstance(msg, ResultMessage):
-            d["role"] = "result"
-        return d
 
-    def _is_thinking_only(msg: Any) -> bool:
-        """Check if an AssistantMessage contains only ThinkingBlocks."""
-        return isinstance(msg, AssistantMessage) and all(
-            isinstance(b, ThinkingBlock) for b in msg.content
+# ── Inline message processor ────────────────────────────────────────
+
+
+def _process_message_inline(
+    msg: Any,
+    wc: Any,
+    root_call: Any,
+    state: dict[str, Any],
+) -> None:
+    """Process a single streamed message, creating/finishing child calls
+    in real time so that started_at/ended_at reflect actual latency.
+
+    ``state`` keys:
+      - pending_thinking: buffered ThinkingBlock objects
+      - open_tool_calls: dict[tool_use_id, Call]
+      - response_start_time: datetime when we started waiting for a response
+      - accumulated_messages: list of serialized messages (shared history)
+      - root_model: first model name seen
+    """
+    (
+        AssistantMessage,
+        _,
+        SystemMessage,
+        TextBlock,
+        ThinkingBlock,
+        ToolResultBlock,
+        ToolUseBlock,
+        UserMessage,
+    ) = _get_sdk_types()
+
+    pending_thinking = state["pending_thinking"]
+    open_tool_calls = state["open_tool_calls"]
+    accumulated = state["accumulated_messages"]
+
+    def _is_thinking_only(m: Any) -> bool:
+        return isinstance(m, AssistantMessage) and all(
+            isinstance(b, ThinkingBlock) for b in m.content
         )
 
-    # Merge consecutive assistant messages so thinking blocks attach to
-    # the message they were reasoning for. A thinking-only assistant message
-    # gets its content prepended to the next assistant message.
-    merged: list[Any] = []
-    pending_thinking: list[Any] = []  # ThinkingBlock objects waiting to attach
-    for msg in messages:
-        if _is_thinking_only(msg):
-            pending_thinking.extend(msg.content)
-            continue
-        if isinstance(msg, AssistantMessage) and pending_thinking:
-            # Prepend pending thinking blocks into this message's content
+    # Buffer thinking-only assistant messages
+    if _is_thinking_only(msg):
+        pending_thinking.extend(msg.content)
+        return
+
+    if isinstance(msg, AssistantMessage):
+        if state["root_model"] is None and msg.model:
+            state["root_model"] = msg.model
+
+        # Merge buffered thinking
+        if pending_thinking:
             msg = AssistantMessage(
                 content=list(pending_thinking) + list(msg.content),
                 model=msg.model,
@@ -118,46 +129,35 @@ def _process_conversation(
                 error=msg.error,
             )
             pending_thinking.clear()
-        merged.append(msg)
-    # If there are leftover thinking blocks with no following assistant message,
-    # emit them as a standalone assistant message
-    if pending_thinking:
-        merged.append(AssistantMessage(
-            content=list(pending_thinking),
-            model="unknown",
-            parent_tool_use_id=None,
-            error=None,
-        ))
 
-    # Build full messages list and create child calls from merged messages
-    accumulated_messages: list[dict[str, Any]] = []
+        serialized = _serialize_msg(msg)
+        history = list(accumulated)
+        accumulated.append(serialized)
 
-    for msg in merged:
-        # Snapshot history before appending the current message
-        history = list(accumulated_messages)
+        has_text_or_thinking = any(
+            isinstance(b, (ThinkingBlock, TextBlock)) for b in msg.content
+        )
+        tool_uses = [b for b in msg.content if isinstance(b, ToolUseBlock)]
 
-        # Serialize every message into the accumulated list
-        accumulated_messages.append(_serialize_msg(msg))
+        if has_text_or_thinking:
+            resp_call = wc.create_call(
+                op="claude_agent_sdk.response",
+                inputs={"history": history},
+                display_name=response_display_name(msg.model),
+                parent=root_call,
+                attributes={"kind": "llm"},
+                use_stack=False,
+                started_at=state["response_start_time"],
+            )
+            wc.finish_call(resp_call, output=serialized)
+        # Reset — next response timing starts fresh
+        state["response_start_time"] = None
 
-        # Additionally create child calls for assistant messages
-        if not isinstance(msg, AssistantMessage):
-            continue
-
-        serialized_msg = _serialize_msg(msg)
-
-        has_text_or_thinking = False
-        tool_uses = []
-        for block in msg.content:
-            if isinstance(block, (ThinkingBlock, TextBlock)):
-                has_text_or_thinking = True
-            elif isinstance(block, ToolUseBlock):
-                tool_uses.append(block)
-
-        # Create tool child calls
+        # Open tool calls
         for tool_block in tool_uses:
             tool_call = wc.create_call(
                 op=f"claude_agent_sdk.tool_use.{tool_block.name}",
-                inputs={"history": history, "message": serialized_msg},
+                inputs={"message": serialized},
                 display_name=tool_use_display_name(
                     tool_block.name, tool_block.input
                 ),
@@ -165,29 +165,53 @@ def _process_conversation(
                 attributes={"kind": "tool"},
                 use_stack=False,
             )
-            tool_output: dict[str, Any] = {}
-            if tool_block.id in tool_results:
-                result_block = tool_results[tool_block.id]
-                tool_output = dataclasses.asdict(result_block)
-            wc.finish_call(tool_call, output=tool_output)
+            open_tool_calls[tool_block.id] = tool_call
 
-        # Create LLM response child call if there is text or thinking content
-        if has_text_or_thinking:
-            llm_call = wc.create_call(
-                op="claude_agent_sdk.response",
-                inputs={"history": history},
-                display_name=response_display_name(msg.model),
-                parent=root_call,
-                attributes={"kind": "llm"},
-                use_stack=False,
+    elif isinstance(msg, UserMessage):
+        accumulated.append(_serialize_msg(msg))
+
+        # Finish matching tool calls
+        content = msg.content if isinstance(msg.content, list) else []
+        for block in content:
+            if (
+                isinstance(block, ToolResultBlock)
+                and block.tool_use_id in open_tool_calls
+            ):
+                tool_call = open_tool_calls.pop(block.tool_use_id)
+                wc.finish_call(tool_call, output=dataclasses.asdict(block))
+
+        # Model will respond next — record the start time
+        state["response_start_time"] = datetime.now(tz=timezone.utc)
+
+    else:
+        # SystemMessage or other types
+        accumulated.append(_serialize_msg(msg))
+        # Insert user prompt into history after the SystemMessage
+        if isinstance(msg, SystemMessage) and state["user_prompt"] is not None:
+            accumulated.append(
+                {"role": "user", "content": state["user_prompt"]}
             )
-            wc.finish_call(llm_call, output=serialized_msg)
 
-    # Build root output
+
+def _finalize_stream(
+    wc: Any,
+    root_call: Any,
+    state: dict[str, Any],
+    result_msg: Any,
+) -> None:
+    """Close any open calls and finish the root call."""
+    for tc in state["open_tool_calls"].values():
+        wc.finish_call(tc, output={})
+    state["open_tool_calls"].clear()
+
     root_output: dict[str, Any] = {
         "status": "completed",
-        "messages": accumulated_messages,
+        "messages": state["accumulated_messages"],
     }
+    if state["root_model"]:
+        root_output["model"] = state["root_model"]
+
+    exception = None
     if result_msg is not None:
         if result_msg.usage:
             root_output["usage"] = result_msg.usage
@@ -199,37 +223,101 @@ def _process_conversation(
             root_output["result"] = result_msg.result
         if result_msg.is_error:
             root_output["status"] = "error"
+            exception = Exception(
+                result_msg.result or "Conversation ended with error"
+            )
 
-    exception = None
-    if result_msg is not None and result_msg.is_error:
-        exception = Exception(result_msg.result or "Conversation ended with error")
-
-    if exception:
-        wc.finish_call(root_call, output=root_output, exception=exception)
-    else:
-        wc.finish_call(root_call, output=root_output)
+    wc.finish_call(root_call, output=root_output, exception=exception)
 
 
-def _patched_init_wrapper(
-    settings: IntegrationSettings,
-) -> Any:
+def _make_initial_state(user_prompt: str | None = None) -> dict[str, Any]:
+    return {
+        "pending_thinking": [],
+        "open_tool_calls": {},
+        "response_start_time": None,
+        "accumulated_messages": [],
+        "root_model": None,
+        "user_prompt": user_prompt,
+    }
+
+
+# ── Patchers ─────────────────────────────────────────────────────────
+
+
+def _patched_query_wrapper(settings: IntegrationSettings) -> Any:
+    """Wrap the module-level ``query()`` async generator."""
+
+    def wrapper(original_query: Any) -> Any:
+        @wraps(original_query)
+        async def wrapped_query(
+            *,
+            prompt: Any,
+            options: Any = None,
+            transport: Any = None,
+        ) -> AsyncIterator[Any]:
+            from claude_agent_sdk import ResultMessage
+
+            wc = get_weave_client()
+            if wc is None:
+                async for msg in original_query(
+                    prompt=prompt, options=options, transport=transport
+                ):
+                    yield msg
+                return
+
+            user_prompt = prompt if isinstance(prompt, str) else None
+            root_inputs: dict[str, Any] = {}
+            if user_prompt is not None:
+                root_inputs["prompt"] = user_prompt
+
+            root_call = wc.create_call(
+                op=f"claude-session-{str(datetime.now())}",
+                inputs=root_inputs,
+                display_name=session_display_name(user_prompt),
+                attributes={"kind": "agent"},
+                use_stack=False,
+            )
+
+            state = _make_initial_state(user_prompt)
+            # Record when we start waiting for the first model response
+            state["response_start_time"] = datetime.now(tz=timezone.utc)
+
+            result_msg = None
+            try:
+                async for msg in original_query(
+                    prompt=prompt, options=options, transport=transport
+                ):
+                    if isinstance(msg, ResultMessage):
+                        result_msg = msg
+                    else:
+                        _process_message_inline(msg, wc, root_call, state)
+                    yield msg
+            finally:
+                _finalize_stream(wc, root_call, state, result_msg)
+
+        return wrapped_query
+
+    return wrapper
+
+
+def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
+    """Wrap ``ClaudeSDKClient.__init__`` to intercept ``receive_response``
+    and trace calls inline with real timestamps."""
+
     def wrapper(original_init: Any) -> Any:
         @wraps(original_init)
         def patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
             original_init(self, *args, **kwargs)
 
-            # Store original methods
             original_query = self.query
             original_receive_response = self.receive_response
 
-            # State for this instance
             user_prompt_holder: list[str | None] = [None]
 
             @wraps(original_query)
             async def wrapped_query(
                 prompt: Any, session_id: str = "default"
             ) -> None:
-                # Capture prompt if it's a string
                 if isinstance(prompt, str):
                     user_prompt_holder[0] = prompt
                 else:
@@ -238,12 +326,43 @@ def _patched_init_wrapper(
 
             @wraps(original_receive_response)
             async def wrapped_receive_response() -> AsyncIterator[Any]:
-                accumulated: list[Any] = []
-                async for msg in original_receive_response():
-                    accumulated.append(msg)
-                    yield msg
-                # After iteration completes, process the conversation
-                _process_conversation(accumulated, user_prompt_holder[0])
+                from claude_agent_sdk import ResultMessage
+
+                wc = get_weave_client()
+                if wc is None:
+                    async for msg in original_receive_response():
+                        yield msg
+                    return
+
+                user_prompt = user_prompt_holder[0]
+                root_inputs: dict[str, Any] = {}
+                if user_prompt is not None:
+                    root_inputs["prompt"] = user_prompt
+
+                root_call = wc.create_call(
+                    op=f"claude-session-{str(datetime.now())}",
+                    inputs=root_inputs,
+                    display_name=session_display_name(user_prompt),
+                    attributes={"kind": "agent"},
+                    use_stack=False,
+                )
+
+                state = _make_initial_state(user_prompt)
+                # Record when we start waiting for the first model response
+                state["response_start_time"] = datetime.now(tz=timezone.utc)
+
+                result_msg = None
+                try:
+                    async for msg in original_receive_response():
+                        if isinstance(msg, ResultMessage):
+                            result_msg = msg
+                        else:
+                            _process_message_inline(
+                                msg, wc, root_call, state
+                            )
+                        yield msg
+                finally:
+                    _finalize_stream(wc, root_call, state, result_msg)
 
             self.query = wrapped_query
             self.receive_response = wrapped_receive_response
@@ -268,6 +387,11 @@ def get_claude_agent_sdk_patcher(
 
     _claude_agent_sdk_patcher = MultiPatcher(
         [
+            SymbolPatcher(
+                lambda: importlib.import_module("claude_agent_sdk"),
+                "query",
+                _patched_query_wrapper(settings),
+            ),
             SymbolPatcher(
                 lambda: importlib.import_module("claude_agent_sdk"),
                 "ClaudeSDKClient.__init__",
