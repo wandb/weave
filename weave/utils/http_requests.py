@@ -8,7 +8,6 @@ import os
 import threading
 from time import time
 from typing import Any
-from urllib import request as urllib_request
 
 import httpx
 from httpx import Request, Response
@@ -127,72 +126,47 @@ def pprint_response(response: Response) -> None:
         pprint_header((key, value))
 
     console.print(Text("Body:", style=STYLE_LABEL))
+    try:
+        body_text = response.text
+    except httpx.ResponseNotRead:
+        console.print("  [stream not read]", style=STYLE_NONE)
+        return
+
     if response.headers.get("Content-Type") == "application/json":
-        pprint_json(response.text)
-    elif response.text:
-        console.print(Text(response.text, style=STYLE_BODY))
+        pprint_json(body_text)
+    elif body_text:
+        console.print(Text(body_text, style=STYLE_BODY))
     else:
         console.print("  None", style=STYLE_NONE)
 
 
-def _get_proxy_for_url(url: httpx.URL) -> str | None:
-    """Resolve proxy URL from environment for this request URL."""
-    host = url.host
-    # This call enforces NO_PROXY semantics when running with our custom transport.
-    # Runtime CPython exposes urllib.request.proxy_bypass_environment, but the
-    # pre-commit mypy/typeshed bundle (mirrors-mypy v1.17.0) does not declare it.
-    # Keep this ignore tightly scoped to this line so typing stays strict elsewhere.
-    if host and urllib_request.proxy_bypass_environment(host):  # type: ignore[attr-defined]
-        return None
-
-    proxies = urllib_request.getproxies()
-    return proxies.get(url.scheme) or proxies.get("all")
+def _is_debug_http_enabled() -> bool:
+    return os.environ.get("WEAVE_DEBUG_HTTP") == "1"
 
 
-class LoggingHTTPTransport(httpx.BaseTransport):
-    def __init__(self, *, limits: httpx.Limits) -> None:
-        self._limits = limits
-        self._lock = threading.Lock()
-        self._transports: dict[str | None, httpx.HTTPTransport] = {}
+def _log_request(request: Request) -> None:
+    if not _is_debug_http_enabled():
+        return
 
-    def _get_transport_for_request(self, request: httpx.Request) -> httpx.HTTPTransport:
-        proxy = _get_proxy_for_url(request.url)
-        with self._lock:
-            transport = self._transports.get(proxy)
-            if transport is None:
-                transport = httpx.HTTPTransport(proxy=proxy, limits=self._limits)
-                self._transports[proxy] = transport
-            return transport
+    request.extensions["weave_start_time"] = time()
+    console.print(Text("-" * 21, style=STYLE_DIVIDER_REQUEST))
+    pprint_request(request)
 
-    def handle_request(
-        self,
-        request: httpx.Request,
-    ) -> httpx.Response:
-        transport = self._get_transport_for_request(request)
-        if os.environ.get("WEAVE_DEBUG_HTTP") != "1":
-            return transport.handle_request(request)
 
-        console.print(Text("-" * 21, style=STYLE_DIVIDER_REQUEST))
-        pprint_request(request)
-        start_time = time()
-        response = transport.handle_request(request)
+def _log_response(response: Response) -> None:
+    if not _is_debug_http_enabled():
+        return
+
+    console.print(Text("----- Response below -----", style=STYLE_DIVIDER_RESPONSE))
+    start_time = response.request.extensions.get("weave_start_time")
+    if isinstance(start_time, (int, float)):
         elapsed_time = time() - start_time
-        console.print(Text("----- Response below -----", style=STYLE_DIVIDER_RESPONSE))
         console.print(
             Text("Elapsed Time: ", style=STYLE_LABEL),
             Text(f"{elapsed_time:.2f} seconds", style=STYLE_METADATA),
             sep="",
         )
-        pprint_response(response)
-        return response
-
-    def close(self) -> None:
-        with self._lock:
-            transports = list(self._transports.values())
-            self._transports = {}
-
-        for transport in transports:
-            transport.close()
+    pprint_response(response)
 
 
 def _get_http_timeout() -> float:
@@ -204,10 +178,11 @@ def _get_http_timeout() -> float:
 
 
 client = httpx.Client(
-    # HTTPX doesn't read proxy env vars when a custom transport is provided,
-    # so proxy routing is handled in LoggingHTTPTransport per request URL.
-    transport=LoggingHTTPTransport(limits=CLIENT_LIMITS),
+    # Use HTTPX's default transport so env proxy handling (including NO_PROXY)
+    # works natively.
+    event_hooks={"request": [_log_request], "response": [_log_response]},
     timeout=_get_http_timeout(),
+    limits=CLIENT_LIMITS,
 )
 
 
