@@ -124,6 +124,8 @@ from weave.trace_server.trace_server_interface import (
     ObjSchemaForInsert,
     Query,
     RefsReadBatchReq,
+    ServiceProjectInfoReq,
+    ServiceProjectInfoRes,
     StartedCallSchemaForInsert,
     TableAppendSpec,
     TableAppendSpecPayload,
@@ -354,6 +356,8 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+        self._service_project_info = self._fetch_project_info()
 
     ################ High Level Convenience Methods ################
 
@@ -1936,6 +1940,15 @@ class WeaveClient:
 
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
+
+    def _fetch_project_info(self) -> ServiceProjectInfoRes | None:
+        try:
+            return self.server.project_ids_external_to_internal(
+                ServiceProjectInfoReq(project_ids=[self._project_id()])
+            )
+        except Exception:
+            logger.debug("Failed to fetch project info", exc_info=True)
+            return None
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
