@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
+from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
@@ -156,7 +157,6 @@ from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
-from weave.trace_server.op_ref_cache import OpRefCache
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
@@ -261,7 +261,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
-        self._op_ref_cache = OpRefCache()
+        self._op_ref_cache: TTLCache[tuple[str, str], str] = TTLCache(
+            maxsize=50_000, ttl=86_400
+        )
+        self._op_ref_cache_lock = threading.Lock()
 
     def __del__(self) -> None:
         """Flush the Kafka producer on cleanup to avoid dropping in-flight messages."""
@@ -498,11 +501,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             obj_id_idx_map[op_name].append(idx)
 
         # Step 1: Check cache for all op names in the batch
-        cached = self._op_ref_cache.get_many(req.project_id, set(obj_id_idx_map.keys()))
-        for op_name, uri in cached.items():
-            for idx in obj_id_idx_map[op_name]:
-                calls[idx][0].op_name = uri
-            obj_id_idx_map.pop(op_name)
+        with self._op_ref_cache_lock:
+            for op_name in list(obj_id_idx_map):
+                cached_uri = self._op_ref_cache.get((req.project_id, op_name))
+                if cached_uri is not None:
+                    for idx in obj_id_idx_map[op_name]:
+                        calls[idx][0].op_name = cached_uri
+                    obj_id_idx_map.pop(op_name)
 
         # Step 2: Query CH for remaining (uncached) op names
         if obj_id_idx_map:
@@ -520,7 +525,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # We can instead just reuse the existing file if we know it is present
         # and create it just once if we are not sure.
         # Skip entirely when all ops were resolved from cache.
-        digest = ""
         if obj_id_idx_map:
             if len(existing_objects) == 0:
                 digest = self._create_or_get_placeholder_ops_digest(
@@ -570,7 +574,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             new_cache_entries[result.object_id] = op_ref_uri
 
         # Populate cache with everything we resolved from CH
-        self._op_ref_cache.put_many(req.project_id, new_cache_entries)
+        with self._op_ref_cache_lock:
+            for op_name, uri in new_cache_entries.items():
+                self._op_ref_cache[req.project_id, op_name] = uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
