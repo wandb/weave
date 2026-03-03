@@ -140,7 +140,6 @@ class Sentry:
         if client is not None:
             client.flush()
 
-
     @_safe_noop
     def start_session(self) -> None:
         """Start a new session."""

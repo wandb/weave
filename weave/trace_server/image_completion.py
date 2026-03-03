@@ -138,9 +138,7 @@ def lite_llm_image_generation(
         # Only set quality parameter for models that support it (DALL-E 3 and gpt-image-1)
         if model_name in {"dall-e-3", "gpt-image-1", "gpt-image-1.5"}:
             default_quality = (
-                "high"
-                if model_name in {"gpt-image-1", "gpt-image-1.5"}
-                else "standard"
+                "high" if model_name in {"gpt-image-1", "gpt-image-1.5"} else "standard"
             )
             image_params["quality"] = default_quality
 
