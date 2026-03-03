@@ -269,8 +269,8 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         raise NotImplementedError("ensure_project_exists is not implemented")
 
     def project_ids_external_to_internal(
-        self, req: tsi.ProjectIdsExternalToInternalReq
-    ) -> tsi.ProjectIdsExternalToInternalRes:
+        self, req: tsi.ServiceProjectInfoReq
+    ) -> tsi.ServiceProjectInfoRes:
         """Resolve external project IDs to internal IDs."""
         return self._send_request("project_ids_external_to_internal", req)
 

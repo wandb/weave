@@ -1107,14 +1107,14 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
-class ProjectIdsExternalToInternalReq(BaseModelStrict):
+class ServiceProjectInfoReq(BaseModelStrict):
     project_ids: list[str] = Field(
         description="External project IDs to resolve, each in 'entity/project' format.",
         examples=[["entity-a/project-a", "entity-b/project-b"]],
     )
 
 
-class ProjectIdsExternalToInternalRes(BaseModel):
+class ServiceProjectInfoRes(BaseModel):
     project_id_map: dict[str, str] = Field(
         default_factory=dict,
         description="Mapping of external project ID to internal project ID.",
@@ -2470,8 +2470,8 @@ class TraceServerInterface(Protocol):
         return EnsureProjectExistsRes(project_name=project)
 
     def project_ids_external_to_internal(
-        self, req: ProjectIdsExternalToInternalReq
-    ) -> ProjectIdsExternalToInternalRes: ...
+        self, req: ServiceProjectInfoReq
+    ) -> ServiceProjectInfoRes: ...
 
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...

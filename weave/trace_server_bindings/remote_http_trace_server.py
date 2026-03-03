@@ -563,13 +563,13 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def project_ids_external_to_internal(
-        self, req: tsi.ProjectIdsExternalToInternalReq
-    ) -> tsi.ProjectIdsExternalToInternalRes:
+        self, req: tsi.ServiceProjectInfoReq
+    ) -> tsi.ServiceProjectInfoRes:
         return self._generic_request(
-            "/project_ids/external_to_internal",
+            "/service/project_info",
             req,
-            tsi.ProjectIdsExternalToInternalReq,
-            tsi.ProjectIdsExternalToInternalRes,
+            tsi.ServiceProjectInfoReq,
+            tsi.ServiceProjectInfoRes,
         )
 
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:

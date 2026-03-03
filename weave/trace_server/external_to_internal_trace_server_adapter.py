@@ -110,13 +110,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._internal_trace_server.ensure_project_exists(entity, project)
 
     def project_ids_external_to_internal(
-        self, req: tsi.ProjectIdsExternalToInternalReq
-    ) -> tsi.ProjectIdsExternalToInternalRes:
+        self, req: tsi.ServiceProjectInfoReq
+    ) -> tsi.ServiceProjectInfoRes:
         project_id_map = {
             project_id: self._idc.ext_to_int_project_id(project_id)
             for project_id in req.project_ids
         }
-        return tsi.ProjectIdsExternalToInternalRes(project_id_map=project_id_map)
+        return tsi.ServiceProjectInfoRes(project_id_map=project_id_map)
 
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # Convert project_id at request level

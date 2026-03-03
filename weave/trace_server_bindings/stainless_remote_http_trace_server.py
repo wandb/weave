@@ -425,8 +425,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def project_ids_external_to_internal(
-        self, req: tsi.ProjectIdsExternalToInternalReq
-    ) -> tsi.ProjectIdsExternalToInternalRes:
+        self, req: tsi.ServiceProjectInfoReq
+    ) -> tsi.ServiceProjectInfoRes:
         """Resolve external project IDs to internal IDs.
 
         Returns a map keyed by external ID with internal IDs as values.
@@ -439,7 +439,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if self._username or self._password:
             auth = (self._username, self._password)
 
-        url = "/project_ids/external_to_internal"
+        url = "/service/project_info"
         response = http_requests.post(
             self.trace_server_url + url,
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
@@ -447,7 +447,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             headers=headers,
         )
         handle_response_error(response, url)
-        return tsi.ProjectIdsExternalToInternalRes.model_validate(response.json())
+        return tsi.ServiceProjectInfoRes.model_validate(response.json())
 
     @validate_call
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:

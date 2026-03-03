@@ -9,7 +9,7 @@ from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 def test_project_ids_external_to_internal_mapping(
     trace_server: TestOnlyUserInjectingExternalTraceServer,
 ):
-    req = tsi.ProjectIdsExternalToInternalReq(
+    req = tsi.ServiceProjectInfoReq(
         project_ids=["shawn/project-a", "shawn/project-b", "shawn/project-a"]
     )
 
@@ -23,7 +23,7 @@ def test_project_ids_external_to_internal_mapping(
 
 def test_sqlite_project_ids_external_to_internal_passthrough():
     sqlite_server = SqliteTraceServer("file::memory:?cache=shared")
-    req = tsi.ProjectIdsExternalToInternalReq(
+    req = tsi.ServiceProjectInfoReq(
         project_ids=["internal-project-a", "internal-project-b", "internal-project-a"]
     )
 

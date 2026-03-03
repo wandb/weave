@@ -54,7 +54,7 @@ def test_call_start_ok(unbatched_server):
 @patch("weave.utils.http_requests.post")
 def test_project_ids_external_to_internal_ok(mock_post, unbatched_server):
     """Test successful project ID resolution request."""
-    req = tsi.ProjectIdsExternalToInternalReq(
+    req = tsi.ServiceProjectInfoReq(
         project_ids=["entity-a/project-a", "entity-b/project-b"]
     )
     expected_map = {
@@ -64,9 +64,9 @@ def test_project_ids_external_to_internal_ok(mock_post, unbatched_server):
 
     mock_post.return_value = httpx.Response(
         200,
-        json=dict(tsi.ProjectIdsExternalToInternalRes(project_id_map=expected_map)),
+        json=dict(tsi.ServiceProjectInfoRes(project_id_map=expected_map)),
         request=httpx.Request(
-            "POST", "http://example.com/project_ids/external_to_internal"
+            "POST", "http://example.com/service/project_info"
         ),
     )
 
@@ -75,7 +75,7 @@ def test_project_ids_external_to_internal_ok(mock_post, unbatched_server):
     assert res.project_id_map == expected_map
     mock_post.assert_called_once()
     called_url = mock_post.call_args[0][0]
-    assert called_url == "http://example.com/project_ids/external_to_internal"
+    assert called_url == "http://example.com/service/project_info"
 
     sent_payload = json.loads(mock_post.call_args[1]["data"].decode("utf-8"))
     assert sent_payload == req.model_dump(mode="json")

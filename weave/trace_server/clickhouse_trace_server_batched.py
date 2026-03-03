@@ -358,11 +358,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return self._kafka_producer
 
     def project_ids_external_to_internal(
-        self, req: tsi.ProjectIdsExternalToInternalReq
-    ) -> tsi.ProjectIdsExternalToInternalRes:
+        self, req: tsi.ServiceProjectInfoReq
+    ) -> tsi.ServiceProjectInfoRes:
         # Internal trace servers already operate on internal project IDs, so this is a pass-through.
         project_id_map = {project_id: project_id for project_id in req.project_ids}
-        return tsi.ProjectIdsExternalToInternalRes(project_id_map=project_id_map)
+        return tsi.ServiceProjectInfoRes(project_id_map=project_id_map)
 
     @property
     def table_routing_resolver(self) -> TableRoutingResolver:
