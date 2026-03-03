@@ -1941,10 +1941,14 @@ class WeaveClient:
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
 
-    def _fetch_project_info(self) -> ServiceProjectInfoRes | None:
+    def _fetch_project_info(
+        self, project_ids: list[str] | None = None
+    ) -> ServiceProjectInfoRes | None:
+        if project_ids is None:
+            project_ids = [self._project_id()]
         try:
             return self.server.project_ids_external_to_internal(
-                ServiceProjectInfoReq(project_ids=[self._project_id()])
+                ServiceProjectInfoReq(project_ids=project_ids)
             )
         except Exception:
             logger.debug("Failed to fetch project info", exc_info=True)
