@@ -2917,9 +2917,10 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
 ):
     """Test calls_complete table with hardcoded filter, JSON condition, and summary field ordering.
 
-    This test demonstrates that for calls_complete, when there is a hardcoded filter
-    (op_names, trace_ids) plus a JSON condition on summary, the optimizer creates a
-    CTE to filter by the light conditions first, then joins back to get the full row.
+    This test demonstrates that for calls_complete, even when there is a hardcoded filter
+    (op_names, trace_ids) plus a JSON condition on summary, we use a single query pass
+    instead of the two-step CTE pattern. calls_complete has one row per call (no GROUP BY),
+    so a single query is both simpler and significantly faster.
     Additionally, it tests ordering by summary.weave.status which uses direct column
     access without any() aggregation functions (unlike calls_merged).
     """
@@ -2952,31 +2953,6 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
     assert_sql(
         cq,
         """
-        WITH filtered_calls AS (
-            SELECT calls_complete.id AS id
-            FROM calls_complete
-            PREWHERE calls_complete.project_id = {pb_12:String}
-            WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
-                    OR (calls_complete.op_name IS NULL))
-                AND (calls_complete.trace_id = {pb_4:String}
-                    OR calls_complete.trace_id IS NULL)
-            AND (
-                ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:UInt64}))
-                AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
-            )
-            ORDER BY CASE
-                WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
-                WHEN IFNULL(
-                    toInt64OrNull(
-                        coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
-                    ),
-                    0
-                ) > 0 THEN {pb_9:String}
-                WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
-                ELSE {pb_8:String}
-                END ASC
-            LIMIT 100
-        )
         SELECT
             calls_complete.id AS id,
             calls_complete.started_at AS started_at,
@@ -2984,18 +2960,26 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             calls_complete.ended_at AS ended_at
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_12:String}
-        WHERE (calls_complete.id IN filtered_calls)
+        WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
+                OR (calls_complete.op_name IS NULL))
+            AND (calls_complete.trace_id = {pb_4:String}
+                OR calls_complete.trace_id IS NULL)
+        AND (
+            ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:UInt64}))
+            AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
+        )
         ORDER BY CASE
-            WHEN calls_complete.exception != {pb_13:String} THEN {pb_6:String}
+            WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
             WHEN IFNULL(
                 toInt64OrNull(
                     coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
                 ),
                 0
             ) > 0 THEN {pb_9:String}
-            WHEN calls_complete.ended_at = {pb_14:DateTime64(6)} THEN {pb_7:String}
+            WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
             ELSE {pb_8:String}
             END ASC
+        LIMIT 100
         """,
         {
             "pb_0": '$."latency"',
@@ -3011,8 +2995,6 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             "pb_10": "",
             "pb_11": SENTINEL_DATETIME,
             "pb_12": "project",
-            "pb_13": "",
-            "pb_14": SENTINEL_DATETIME,
         },
     )
 

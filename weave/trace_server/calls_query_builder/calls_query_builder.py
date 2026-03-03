@@ -1045,7 +1045,9 @@ class CallsQuery(BaseModel):
         if not self.select_fields:
             raise ValueError("Missing select columns")
 
-        # Determine if we should optimize!
+        # Determine if we should use the two-step filtered_calls CTE pattern.
+        # Only relevant for calls_merged (where GROUP BY makes the two-pass
+        # approach worthwhile). For calls_complete, we always use single-pass.
         should_optimize = self._should_optimize()
 
         # Important: Always inject deleted_at into the query.
@@ -1092,82 +1094,100 @@ class CallsQuery(BaseModel):
         if not should_optimize and not self.include_costs and not object_ref_conditions:
             return self._as_sql_base_format(pb, table_alias_resolved)
 
-        # Build two queries, first filter query CTE, then select the columns
-        filter_query = CallsQuery(
-            project_id=self.project_id, read_table=self.read_table
+        # Use the filtered_calls CTE (two-pass) pattern only for calls_merged
+        # where it reduces rows before expensive GROUP BY aggregation.
+        # For calls_complete (one row per call, no GROUP BY), always use a
+        # single-pass query — it's both simpler and significantly faster.
+        use_filter_cte = self.read_table != ReadTable.CALLS_COMPLETE and (
+            should_optimize or self.include_costs or bool(object_ref_conditions)
         )
-        select_query = CallsQuery(
-            project_id=self.project_id,
-            include_storage_size=self.include_storage_size,
-            include_total_storage_size=self.include_total_storage_size,
-            read_table=self.read_table,
-        )
-
-        # Select Fields:
-        filter_query.add_field("id")
-        for field in self.select_fields:
-            select_query.select_fields.append(field)
 
         ctes, field_to_object_join_alias_map = build_object_ref_ctes(
             pb, self.project_id, object_ref_conditions
         )
 
-        for condition in self.query_conditions:
-            filter_query.query_conditions.append(condition)
+        if use_filter_cte:
+            # Build two queries: a filter CTE that narrows rows by light
+            # conditions first, then a select query that loads heavy columns
+            # only for the matched ids.
+            filter_query = CallsQuery(
+                project_id=self.project_id, read_table=self.read_table
+            )
+            select_query = CallsQuery(
+                project_id=self.project_id,
+                include_storage_size=self.include_storage_size,
+                include_total_storage_size=self.include_total_storage_size,
+                read_table=self.read_table,
+            )
 
-        filter_query.hardcoded_filter = self.hardcoded_filter
+            filter_query.add_field("id")
+            for field in self.select_fields:
+                select_query.select_fields.append(field)
 
-        # Order Fields:
-        filter_query.order_fields = self.order_fields
-        filter_query.limit = self.limit
-        filter_query.offset = self.offset
-        # SUPER IMPORTANT: still need to re-sort the final query
-        select_query.order_fields = self.order_fields
+            for condition in self.query_conditions:
+                filter_query.query_conditions.append(condition)
 
-        # When using the CTE pattern, ensure all fields used in ordering
-        # are selected in select_query so they're available in the final query's ORDER BY.
-        if self.include_costs:
-            for order_field in self.order_fields:
-                field_obj = order_field.field
-                # Skip feedback fields - they're handled via LEFT JOIN and don't need to be selected
-                if isinstance(field_obj, CallsMergedFeedbackPayloadField):
-                    continue
+            filter_query.hardcoded_filter = self.hardcoded_filter
+            filter_query.order_fields = self.order_fields
+            filter_query.limit = self.limit
+            filter_query.offset = self.offset
+            # SUPER IMPORTANT: still need to re-sort the final query
+            select_query.order_fields = self.order_fields
 
-                if isinstance(
-                    field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
-                ):
-                    # we need to add the base field, not the dynamic one
-                    base_field = get_field_by_name(field_obj.field)
-                    if base_field not in select_query.select_fields:
-                        select_query.select_fields.append(base_field)
-                else:
-                    # For non-dynamic fields (like started_at, op_name, etc.),
-                    # add the field directly to ensure it's available in CTEs
-                    if field_obj not in select_query.select_fields:
-                        assert isinstance(field_obj, CallsMergedField), (
-                            "Field must be a CallsMergedField"
-                        )
-                        select_query.select_fields.append(field_obj)
+            # When using the CTE pattern with costs, ensure all fields used in
+            # ordering are selected in select_query so they're available in the
+            # final query's ORDER BY.
+            if self.include_costs:
+                for order_field in self.order_fields:
+                    field_obj = order_field.field
+                    # Skip feedback fields - they're handled via LEFT JOIN
+                    if isinstance(field_obj, CallsMergedFeedbackPayloadField):
+                        continue
 
-        filtered_calls_sql = filter_query._as_sql_base_format(
-            pb,
-            table_alias_resolved,
-            field_to_object_join_alias_map=field_to_object_join_alias_map,
-            expand_columns=self.expand_columns,
-        )
-        ctes.add_cte(CTE_FILTERED_CALLS, filtered_calls_sql)
+                    if isinstance(
+                        field_obj,
+                        (CallsMergedDynamicField, QueryBuilderDynamicField),
+                    ):
+                        base_field = get_field_by_name(field_obj.field)
+                        if base_field not in select_query.select_fields:
+                            select_query.select_fields.append(base_field)
+                    else:
+                        if field_obj not in select_query.select_fields:
+                            assert isinstance(field_obj, CallsMergedField), (
+                                "Field must be a CallsMergedField"
+                            )
+                            select_query.select_fields.append(field_obj)
 
-        base_sql = select_query._as_sql_base_format(
-            pb,
-            table_alias_resolved,
-            id_subquery_name=CTE_FILTERED_CALLS,
-            field_to_object_join_alias_map=field_to_object_join_alias_map,
-            expand_columns=self.expand_columns,
-        )
+            filtered_calls_sql = filter_query._as_sql_base_format(
+                pb,
+                table_alias_resolved,
+                field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
+            )
+            ctes.add_cte(CTE_FILTERED_CALLS, filtered_calls_sql)
+
+            base_sql = select_query._as_sql_base_format(
+                pb,
+                table_alias_resolved,
+                id_subquery_name=CTE_FILTERED_CALLS,
+                field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
+            )
+        else:
+            # Single-pass: the full query (with all filters, ordering, and
+            # limit) is built directly — no filtered_calls CTE needed.
+            base_sql = self._as_sql_base_format(
+                pb,
+                table_alias_resolved,
+                field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
+            )
 
         if not self.include_costs:
-            raw_sql = ctes.to_sql() + "\n" + base_sql
-            return safely_format_sql(raw_sql, logger)
+            if ctes.has_ctes():
+                raw_sql = ctes.to_sql() + "\n" + base_sql
+                return safely_format_sql(raw_sql, logger)
+            return base_sql
 
         ctes.add_cte(CTE_ALL_CALLS, base_sql)
         self._add_cost_ctes_to_builder(ctes, pb)
