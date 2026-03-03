@@ -890,6 +890,140 @@ def test_sdk_get_aliases(client: WeaveClient):
     assert "latest" in aliases
 
 
+def test_sdk_add_tags_idempotent(client: WeaveClient):
+    """Adding the same tag multiple times should not create duplicates."""
+    ref = weave.publish({"data": "test"}, name="sdk_idem_tags_obj")
+
+    client.add_tags(ref, ["dup"])
+    client.add_tags(ref, ["dup"])
+    client.add_tags(ref, ["dup"])
+
+    assert client.get_tags(ref) == ["dup"]
+
+
+def test_sdk_remove_nonexistent_tag(client: WeaveClient):
+    """Removing a tag that was never added should succeed silently."""
+    ref = weave.publish({"data": "test"}, name="sdk_rm_noexist_tag")
+
+    client.remove_tags(ref, ["never-added"])
+
+    assert client.get_tags(ref) == []
+
+
+def test_sdk_readd_tag_after_removal(client: WeaveClient):
+    """Removing then re-adding a tag should make it appear again."""
+    ref = weave.publish({"data": "test"}, name="sdk_readd_tag_obj")
+
+    client.add_tags(ref, ["ephemeral"])
+    client.remove_tags(ref, ["ephemeral"])
+    assert client.get_tags(ref) == []
+
+    client.add_tags(ref, ["ephemeral"])
+    assert client.get_tags(ref) == ["ephemeral"]
+
+
+def test_sdk_tags_scoped_to_version(client: WeaveClient):
+    """Tags on v0 should not appear on v1."""
+    ref_v0 = weave.publish({"v": 0}, name="sdk_tag_scope_obj")
+    ref_v1 = weave.publish({"v": 1}, name="sdk_tag_scope_obj")
+
+    client.add_tags(ref_v0, ["v0-only"])
+
+    assert "v0-only" in client.get_tags(ref_v0)
+    assert client.get_tags(ref_v1) == []
+
+
+def test_sdk_alias_reassignment(client: WeaveClient):
+    """Setting an alias on v1 should move it away from v0."""
+    ref_v0 = weave.publish({"v": 0}, name="sdk_alias_reassign")
+    ref_v1 = weave.publish({"v": 1}, name="sdk_alias_reassign")
+
+    client.set_alias(ref_v0, "staging")
+    assert "staging" in client.get_aliases(ref_v0)
+
+    # Move alias to v1
+    client.set_alias(ref_v1, "staging")
+    assert "staging" not in client.get_aliases(ref_v0)
+    assert "staging" in client.get_aliases(ref_v1)
+
+
+def test_sdk_remove_nonexistent_alias(client: WeaveClient):
+    """Removing an alias that was never set should succeed silently."""
+    ref = weave.publish({"data": "test"}, name="sdk_rm_noexist_alias")
+
+    client.remove_alias(ref, "never-set")
+
+
+def test_sdk_multiple_tags_and_aliases(client: WeaveClient):
+    """An object version can have multiple tags and aliases simultaneously."""
+    ref = weave.publish({"data": "test"}, name="sdk_multi_obj")
+
+    client.add_tags(ref, ["reviewed", "production", "v2"])
+    client.set_alias(ref, "prod")
+    client.set_alias(ref, "stable")
+
+    tags = client.get_tags(ref)
+    assert sorted(tags) == ["production", "reviewed", "v2"]
+
+    aliases = client.get_aliases(ref)
+    assert "prod" in aliases
+    assert "stable" in aliases
+    assert "latest" in aliases
+
+
+def test_sdk_add_tags_error_nonexistent_object(client: WeaveClient):
+    """Adding tags to a non-existent object should raise NotFoundError."""
+    from weave.trace.refs import ObjectRef
+
+    fake_ref = ObjectRef(
+        entity="test",
+        project="test",
+        name="nonexistent_object",
+        _digest="0000000000000000000000000000000000000000000",
+    )
+    with pytest.raises(NotFoundError):
+        client.add_tags(fake_ref, ["tag"])
+
+
+def test_sdk_set_alias_error_nonexistent_object(client: WeaveClient):
+    """Setting an alias on a non-existent object should raise NotFoundError."""
+    from weave.trace.refs import ObjectRef
+
+    fake_ref = ObjectRef(
+        entity="test",
+        project="test",
+        name="nonexistent_object",
+        _digest="0000000000000000000000000000000000000000000",
+    )
+    with pytest.raises(NotFoundError):
+        client.set_alias(fake_ref, "prod")
+
+
+def test_sdk_list_tags_excludes_removed(client: WeaveClient):
+    """list_tags should not include tags that have been removed."""
+    ref = weave.publish({"data": "test"}, name="sdk_list_tags_rm_obj")
+
+    client.add_tags(ref, ["keep", "remove-me"])
+    client.remove_tags(ref, ["remove-me"])
+
+    tags = client.list_tags()
+    assert "keep" in tags
+    assert "remove-me" not in tags
+
+
+def test_sdk_list_aliases_excludes_removed(client: WeaveClient):
+    """list_aliases should not include aliases that have been removed."""
+    ref = weave.publish({"data": "test"}, name="sdk_list_aliases_rm_obj")
+
+    client.set_alias(ref, "keep-alias")
+    client.set_alias(ref, "remove-alias")
+    client.remove_alias(ref, "remove-alias")
+
+    aliases = client.list_aliases()
+    assert "keep-alias" in aliases
+    assert "remove-alias" not in aliases
+
+
 # --- obj_read with real digest (not alias) ---
 
 
