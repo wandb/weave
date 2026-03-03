@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import dataclasses
 import importlib
 import logging
 from collections.abc import AsyncIterator
+from datetime import datetime
 from functools import wraps
 from typing import Any
 
@@ -26,9 +28,12 @@ def _process_conversation(
     from claude_agent_sdk import (
         AssistantMessage,
         ResultMessage,
+        SystemMessage,
         TextBlock,
+        ThinkingBlock,
         ToolResultBlock,
         ToolUseBlock,
+        UserMessage,
     )
 
     if not messages:
@@ -48,69 +53,96 @@ def _process_conversation(
 
     # Create root "conversation" call
     root_call = wc.create_call(
-        op="claude_agent_sdk.ClaudeSDKClient.conversation",
+        op=f"claude-session-{str(datetime.now())}",
         inputs=root_inputs,
         attributes={"kind": "agent"},
         use_stack=False,
     )
 
-    # Process messages to create child calls
     # Track tool results by tool_use_id for matching
     tool_results: dict[str, Any] = {}
 
-    # First pass: collect tool results from UserMessage and AssistantMessage
+    # First pass: collect tool results from all message types
     for msg in messages:
-        if isinstance(msg, AssistantMessage):
-            for block in msg.content:
+        content = None
+        if isinstance(msg, UserMessage) and isinstance(msg.content, list):
+            content = msg.content
+        elif isinstance(msg, AssistantMessage):
+            content = msg.content
+        if content:
+            for block in content:
                 if isinstance(block, ToolResultBlock):
                     tool_results[block.tool_use_id] = block
 
-    # Second pass: create child calls
+    def _serialize_msg(msg: Any) -> dict[str, Any]:
+        """Serialize a dataclass message, preserving all fields."""
+        d = dataclasses.asdict(msg)
+        # Tag with role based on type
+        if isinstance(msg, UserMessage):
+            d["role"] = "user"
+        elif isinstance(msg, AssistantMessage):
+            d["role"] = "assistant"
+        elif isinstance(msg, SystemMessage):
+            d["role"] = "system"
+        elif isinstance(msg, ResultMessage):
+            d["role"] = "result"
+        return d
+
+    # Second pass: create child calls and build full messages list
+    accumulated_messages: list[dict[str, Any]] = []
+
     for msg in messages:
+        # Serialize every message into the accumulated list
+        accumulated_messages.append(_serialize_msg(msg))
+
+        # Additionally create child calls for assistant messages
         if not isinstance(msg, AssistantMessage):
             continue
 
-        # Separate content into text blocks and tool use blocks
+        serialized_msg = _serialize_msg(msg)
+
         text_parts = []
+        thinking_parts = []
         tool_uses = []
         for block in msg.content:
-            if isinstance(block, TextBlock):
+            if isinstance(block, ThinkingBlock):
+                thinking_parts.append(block.thinking)
+            elif isinstance(block, TextBlock):
                 text_parts.append(block.text)
             elif isinstance(block, ToolUseBlock):
                 tool_uses.append(block)
 
-        # Create tool calls for each tool use
+        # Create tool child calls
         for tool_block in tool_uses:
             tool_call = wc.create_call(
                 op=f"claude_agent_sdk.tool_use.{tool_block.name}",
-                inputs={"input": tool_block.input},
+                inputs={"message": serialized_msg},
                 parent=root_call,
                 attributes={"kind": "tool"},
                 use_stack=False,
             )
-            # Find the matching tool result
             tool_output: dict[str, Any] = {}
             if tool_block.id in tool_results:
                 result_block = tool_results[tool_block.id]
-                tool_output["content"] = result_block.content
-                if result_block.is_error:
-                    tool_output["is_error"] = True
+                tool_output = dataclasses.asdict(result_block)
             wc.finish_call(tool_call, output=tool_output)
 
-        # Create LLM response call if there is text content
-        if text_parts:
-            text = "\n".join(text_parts)
+        # Create LLM response child call if there is text or thinking content
+        if text_parts or thinking_parts:
             llm_call = wc.create_call(
                 op="claude_agent_sdk.response",
-                inputs={"model": msg.model},
+                inputs={"message": serialized_msg},
                 parent=root_call,
                 attributes={"kind": "llm"},
                 use_stack=False,
             )
-            wc.finish_call(llm_call, output={"text": text})
+            wc.finish_call(llm_call, output=serialized_msg)
 
     # Build root output
-    root_output: dict[str, Any] = {"status": "completed"}
+    root_output: dict[str, Any] = {
+        "status": "completed",
+        "messages": accumulated_messages,
+    }
     if result_msg is not None:
         if result_msg.usage:
             root_output["usage"] = result_msg.usage
