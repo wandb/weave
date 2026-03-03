@@ -28,7 +28,7 @@ class DelegatingTraceServerMixin:
     optional_delegated_methods: frozenset[str] = frozenset()
 
     def _delegated_server(self) -> Any:
-        return object.__getattribute__(self, "_next_trace_server")
+        return self._next_trace_server
 
     def __getattribute__(self, name: str) -> Any:
         # If the name is private, then resolve it on the wrapper.

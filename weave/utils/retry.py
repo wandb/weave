@@ -4,24 +4,26 @@ import logging
 from collections.abc import Callable
 from contextvars import ContextVar
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import httpx
 import tenacity
 from pydantic import ValidationError
+from typing_extensions import ParamSpec
 
 from weave.trace.settings import retry_max_attempts, retry_max_interval
 from weave.trace_server.ids import generate_id
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
+P = ParamSpec("P")
+R = TypeVar("R")
 
 # Context variable to store retry ID for correlation
 _retry_id: ContextVar[str] = ContextVar("retry_id")
 
 
-def with_retry(func: Callable[..., T]) -> Callable[..., T]:
+def with_retry(func: Callable[P, R]) -> Callable[P, R]:
     """Decorator that applies configurable retry logic to a function.
     Retry configuration is determined by:
     1. Values from weave.trace.settings (if available)
@@ -31,7 +33,7 @@ def with_retry(func: Callable[..., T]) -> Callable[..., T]:
     """
 
     @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> T:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         # Generate a retry ID for this request (shared across all attempts)
         retry_id = generate_id()
         retry_id_token = _retry_id.set(retry_id)
@@ -46,7 +48,7 @@ def with_retry(func: Callable[..., T]) -> Callable[..., T]:
         )
 
         try:
-            return retry(func, *args, **kwargs)
+            return cast(R, retry(func, *args, **kwargs))
         finally:
             # Always clean up the retry ID
             _retry_id.reset(retry_id_token)

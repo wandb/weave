@@ -197,7 +197,7 @@ def get_verifiers_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _verifiers_patcher
+    global _verifiers_patcher  # noqa: PLW0603
     if _verifiers_patcher is not None:
         return _verifiers_patcher
 

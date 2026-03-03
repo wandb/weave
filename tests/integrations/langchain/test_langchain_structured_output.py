@@ -7,7 +7,8 @@ crashing. This is a regression test for https://github.com/wandb/weave/issues/46
 
 import datetime
 from collections.abc import Generator
-from uuid import uuid4
+from typing import Any
+from uuid import UUID, uuid4
 
 import pytest
 from langchain_core.load import dumpd
@@ -38,7 +39,7 @@ def _run_tracer_lifecycle(
     client: WeaveClient,
     kwargs: dict,
 ) -> list:
-    """Drive a WeaveTracer through a full on_chat_model_start → _finish_run cycle
+    """Drive a WeaveTracer through a full on_chat_model_start -> _finish_run cycle
     and return the recorded calls.
     """
     tracer = WeaveTracer()
@@ -80,7 +81,7 @@ def test_tracer_traces_call_when_kwargs_contain_pydantic_model_class(
 ) -> None:
     """Requirement: WeaveTracer must successfully trace LLM calls that use
                  with_structured_output(PydanticModel), without errors.
-    Interface: WeaveTracer callback lifecycle (on_chat_model_start → finish)
+    Interface: WeaveTracer callback lifecycle (on_chat_model_start -> finish)
     Given: kwargs containing a Pydantic model class (simulating with_structured_output)
     When: A full tracer start/end lifecycle completes
     Then: A trace call is recorded with both start and end times, no exception.
@@ -113,7 +114,7 @@ def test_tracer_traces_call_when_kwargs_contain_arbitrary_non_serializable_objec
 ) -> None:
     """Requirement: WeaveTracer must be robust against ANY non-JSON-serializable
                  object in kwargs, not just Pydantic model classes.
-    Interface: WeaveTracer callback lifecycle (on_chat_model_start → finish)
+    Interface: WeaveTracer callback lifecycle (on_chat_model_start -> finish)
     Given: kwargs containing a custom class instance, a set, and a lambda
     When: A full tracer start/end lifecycle completes
     Then: A trace call is recorded with both start and end times, no exception.
@@ -141,3 +142,62 @@ def test_tracer_traces_call_when_kwargs_contain_arbitrary_non_serializable_objec
     assert "_Custom" in extra["custom_obj"]
     assert isinstance(extra["a_lambda"], str)
     assert "lambda" in extra["a_lambda"]
+
+
+# -- Pydantic v2 Run (reproduces langchain-core >=1.0 behavior) ---------------
+# langchain-core 1.x migrated Run to native pydantic v2, where .json(encoder=...)
+# raises TypeError. This model reproduces that exact surface for testing.
+
+
+class PydanticV2Run(BaseModel):
+    """Minimal pydantic v2 Run stand-in with the same fields _run_to_dict touches."""
+
+    id: UUID
+    name: str
+    run_type: str
+    start_time: datetime.datetime
+    end_time: datetime.datetime | None = None
+    extra: dict[str, Any] = {}
+    inputs: dict[str, Any] | None = None
+    outputs: dict[str, Any] | None = None
+    serialized: dict[str, Any] = {}
+    events: list[dict[str, Any]] = []
+    child_runs: list[Any] = []
+    parent_run_id: UUID | None = None
+    reference_example_id: UUID | None = None
+    trace_id: UUID | None = None
+    dotted_order: str | None = None
+
+
+def test_run_to_dict_with_pydantic_v2_run_and_model_class_in_extra() -> None:
+    """Regression test for TypeError when langchain-core >=1.0 Run (pydantic v2)
+    is passed to _run_to_dict with a Pydantic model class in extra kwargs.
+
+    This reproduces the exact error:
+        TypeError('The `encoder` argument is no longer supported;
+                   use field serializers instead.')
+    """
+    from weave.integrations.langchain.langchain import _run_to_dict
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    run = PydanticV2Run(
+        id=uuid4(),
+        name="ChatOpenAI",
+        run_type="llm",
+        start_time=now,
+        end_time=now,
+        extra={
+            "invocation_params": {"model": "gpt-4o-mini", "response_format": Process}
+        },
+        inputs={"messages": ["test"]},
+        outputs={"generations": [{"text": "response"}]},
+    )
+
+    # _run_to_dict must not raise TypeError
+    result = _run_to_dict(run, as_input=False)
+
+    assert isinstance(result, dict)
+    response_format = result["extra"]["invocation_params"]["response_format"]
+    assert response_format["title"] == "Process"
+    assert response_format["type"] == "object"
+    assert "canonical_process_name" in response_format["properties"]

@@ -96,7 +96,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: trace-no-server
           name: trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
           fail_ci_if_error: false
@@ -234,7 +234,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: trace-tests
           name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
           fail_ci_if_error: false
@@ -287,7 +287,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: windows-trace-no-server
           name: windows-trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
           fail_ci_if_error: false
@@ -367,7 +367,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: windows-trace-tests
           name: windows-trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
           fail_ci_if_error: false

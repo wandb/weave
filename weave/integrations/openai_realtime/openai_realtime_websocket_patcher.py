@@ -140,7 +140,7 @@ def get_openai_realtime_websocket_patcher(
     except Exception:
         logger.exception("Failed to configure realtime finish timeout; using default")
 
-    global _websocket_patcher
+    global _websocket_patcher  # noqa: PLW0603
     if _websocket_patcher is not None:
         return _websocket_patcher
 

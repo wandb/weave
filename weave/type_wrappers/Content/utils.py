@@ -45,7 +45,7 @@ def _get_mimetypes_module() -> ModuleType:
     This ensures the module is only loaded into memory when it's first needed
     and that its custom types are only added once.
     """
-    global _mimetypes_module
+    global _mimetypes_module  # noqa: PLW0603
     if _mimetypes_module is None:
         import mimetypes as _m
 
@@ -62,7 +62,7 @@ def _get_resolver() -> Any:
     falls back to polyfile (pure Python, buffer-only MIME detection).
     Returns None if neither library is available.
     """
-    global _resolver
+    global _resolver  # noqa: PLW0603
     if _resolver is not _UNSET:
         return _resolver
 

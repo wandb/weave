@@ -262,6 +262,9 @@ select = [
   "PT018",   # https://docs.astral.sh/ruff/rules/pytest-composite-assertion/
   "PT022",   # https://docs.astral.sh/ruff/rules/pytest-useless-yield-fixture/
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
+  "PLC",     # https://docs.astral.sh/ruff/rules/#pylint-pl
+  "PLE",     # https://docs.astral.sh/ruff/rules/#pylint-ple
+  "PLW",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
   "RUF013",  # https://docs.astral.sh/ruff/rules/implicit-optional/
@@ -289,6 +292,12 @@ ignore = [
   "D417",
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
+  # Existing code intentionally uses many lazy imports and private symbols;
+  # keep these disabled until we do a dedicated cleanup.
+  "PLC0415", # https://docs.astral.sh/ruff/rules/import-outside-top-level/
+  "PLC2701", # https://docs.astral.sh/ruff/rules/import-private-name/
+  # Keep explicit empty-string checks for readability in tests and parsing paths.
+  "PLC1901", # https://docs.astral.sh/ruff/rules/compare-to-empty-string/
 ]
 
 [tool.ruff.lint.isort]
@@ -310,6 +319,10 @@ exclude = ["rules"]
 "!/weave/trace/**/*.py" = ["T201"]
 "!/tests/**/*.py" = ["RUF059"]
 "weave/trace/serialization/op_type.py" = ["RUF100", "N802"]
+"weave/trace_server/costs/update_costs.py" = ["PLW1514"]
+"weave/type_handlers/Video/video.py" = ["PLW0603"]
+"weave/type_handlers/Audio/audio.py" = ["PLW1514"]
+"weave/type_handlers/Content/content.py" = ["PLW1514"]
 
 [tool.pyright]
 include = ["weave"]
@@ -336,7 +349,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.29-dev0"
+current_version = "0.52.30-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

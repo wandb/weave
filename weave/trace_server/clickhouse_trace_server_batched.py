@@ -49,6 +49,7 @@ from weave.trace_server import (
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
+from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
@@ -356,6 +357,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._kafka_producer = KafkaProducer.from_env()
             return self._kafka_producer
 
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        # Internal trace servers already operate on internal project IDs, so this is a pass-through.
+        project_id_map = {project_id: project_id for project_id in req.project_ids}
+        return tsi.ProjectIdsExternalToInternalRes(project_id_map=project_id_map)
+
     @property
     def table_routing_resolver(self) -> TableRoutingResolver:
         if self._table_routing_resolver is not None:
@@ -568,7 +576,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 for start, end in calls
             ]
-            self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
+            self._insert_call_complete_batch(rows)
         else:
             rows = []
             for start, end in calls:
@@ -580,7 +588,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 rows.append(
                     _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
                 )
-            self._insert_call_batch(rows, settings=None, do_sync_insert=True)
+            self._insert_call_batch(rows)
 
         # Run callbacks and flush
         for cb in event_callbacks:
@@ -747,18 +755,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         with self.call_batch():
             for complete_call in req.batch:
-                complete_call = process_complete_call_to_content(complete_call, self)
+                processed_complete_call = process_complete_call_to_content(
+                    complete_call, self
+                )
 
                 # Determine write target based on project, this should be the same for all
                 # calls in the batch, subsequent calls just hit the in-memory cache. This
                 # is here for technical correctness, in case we relax project_id target
                 # constraints intra-batch
                 write_target = self.table_routing_resolver.resolve_v2_write_target(
-                    complete_call.project_id,
+                    processed_complete_call.project_id,
                     self.ch_client,
                 )
 
-                ch_call = _complete_call_to_ch_insertable(complete_call)
+                ch_call = _complete_call_to_ch_insertable(processed_complete_call)
                 if write_target == WriteTarget.CALLS_COMPLETE:
                     self._insert_call_complete(ch_call)
                 else:
@@ -766,9 +776,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
                 _maybe_enqueue_minimal_call_end(
                     self.kafka_producer,
-                    complete_call.project_id,
-                    complete_call.id,
-                    complete_call.ended_at,
+                    processed_complete_call.project_id,
+                    processed_complete_call.id,
+                    processed_complete_call.ended_at,
                 )
 
         return tsi.CallsUpsertCompleteRes()
@@ -4667,6 +4677,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         res = self.calls_delete(calls_delete_req)
         return tsi.ScoreDeleteRes(num_deleted=res.num_deleted)
 
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Return grouped prediction/trial/score data for evaluation results."""
+        return eval_helpers.eval_results_query(self, req)
+
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
     ) -> tsi.ObjReadRes:
@@ -4716,11 +4732,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         def make_ref_cache_key(ref: ri.InternalObjectRef) -> str:
             return ref.uri()
 
-        for project in refs_by_project_id:
-            project_refs = refs_by_project_id[project]
+        for project, project_refs in refs_by_project_id.items():
             project_results = self._refs_read_batch_within_project(
                 project,
-                refs_by_project_id[project],
+                project_refs,
                 root_val_cache,
             )
             for ref, result in zip(project_refs, project_results, strict=False):

@@ -111,7 +111,7 @@ def get_mistral_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _mistral_patcher
+    global _mistral_patcher  # noqa: PLW0603
     if _mistral_patcher is not None:
         return _mistral_patcher
 

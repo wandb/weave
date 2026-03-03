@@ -55,7 +55,7 @@ class DummyWeaveClient:
 def test_weave_media_connection_wrapping_sends_and_receives(monkeypatch):
     import weave.integrations.openai_realtime.state_exporter as se
 
-    monkeypatch.setattr(se, "require_weave_client", lambda: DummyWeaveClient())
+    monkeypatch.setattr(se, "require_weave_client", DummyWeaveClient)
 
     mc = WeaveMediaConnection(
         url="ws://example",
@@ -136,7 +136,7 @@ class DummyAsyncConn:
 def test_async_wrapper_basic(monkeypatch):
     import weave.integrations.openai_realtime.state_exporter as se
 
-    monkeypatch.setattr(se, "require_weave_client", lambda: DummyWeaveClient())
+    monkeypatch.setattr(se, "require_weave_client", DummyWeaveClient)
 
     async def _drive_async_wrapper():
         conn = WeaveAsyncWebsocketConnection(DummyAsyncConn())

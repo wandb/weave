@@ -125,7 +125,7 @@ def get_huggingface_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _huggingface_patcher
+    global _huggingface_patcher  # noqa: PLW0603
     if _huggingface_patcher is not None:
         return _huggingface_patcher
 

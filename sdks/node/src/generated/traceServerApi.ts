@@ -427,7 +427,7 @@ export interface EndedCallSchemaForInsert {
   /** Exception */
   exception?: string | null;
   /** Output */
-  output?: null;
+  output?: any;
   summary: SummaryInsertMap;
 }
 
