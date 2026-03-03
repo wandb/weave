@@ -138,7 +138,11 @@ def pprint_response(response: Response) -> None:
 def _get_proxy_for_url(url: httpx.URL) -> str | None:
     """Resolve proxy URL from environment for this request URL."""
     host = url.host
-    if host and urllib_request.proxy_bypass_environment(host):
+    # This call enforces NO_PROXY semantics when running with our custom transport.
+    # Runtime CPython exposes urllib.request.proxy_bypass_environment, but the
+    # pre-commit mypy/typeshed bundle (mirrors-mypy v1.17.0) does not declare it.
+    # Keep this ignore tightly scoped to this line so typing stays strict elsewhere.
+    if host and urllib_request.proxy_bypass_environment(host):  # type: ignore[attr-defined]
         return None
 
     proxies = urllib_request.getproxies()
