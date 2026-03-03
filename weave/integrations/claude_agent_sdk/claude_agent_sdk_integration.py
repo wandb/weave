@@ -244,23 +244,27 @@ def _make_initial_state(user_prompt: str | None = None) -> dict[str, Any]:
 # ── Patchers ─────────────────────────────────────────────────────────
 
 
-def _patched_query_wrapper(settings: IntegrationSettings) -> Any:
-    """Wrap the module-level ``query()`` async generator."""
+def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
+    """Wrap ``InternalClient.process_query`` — the async generator that
+    both ``query()`` and ``ClaudeSDKClient`` ultimately delegate to."""
 
-    def wrapper(original_query: Any) -> Any:
-        @wraps(original_query)
-        async def wrapped_query(
-            *,
+    def wrapper(original_process_query: Any) -> Any:
+        @wraps(original_process_query)
+        async def wrapped_process_query(
+            self_client: Any,
             prompt: Any,
-            options: Any = None,
+            options: Any,
             transport: Any = None,
         ) -> AsyncIterator[Any]:
             from claude_agent_sdk import ResultMessage
 
             wc = get_weave_client()
             if wc is None:
-                async for msg in original_query(
-                    prompt=prompt, options=options, transport=transport
+                async for msg in original_process_query(
+                    self_client,
+                    prompt=prompt,
+                    options=options,
+                    transport=transport,
                 ):
                     yield msg
                 return
@@ -279,13 +283,15 @@ def _patched_query_wrapper(settings: IntegrationSettings) -> Any:
             )
 
             state = _make_initial_state(user_prompt)
-            # Record when we start waiting for the first model response
             state["response_start_time"] = datetime.now(tz=timezone.utc)
 
             result_msg = None
             try:
-                async for msg in original_query(
-                    prompt=prompt, options=options, transport=transport
+                async for msg in original_process_query(
+                    self_client,
+                    prompt=prompt,
+                    options=options,
+                    transport=transport,
                 ):
                     if isinstance(msg, ResultMessage):
                         result_msg = msg
@@ -295,7 +301,7 @@ def _patched_query_wrapper(settings: IntegrationSettings) -> Any:
             finally:
                 _finalize_stream(wc, root_call, state, result_msg)
 
-        return wrapped_query
+        return wrapped_process_query
 
     return wrapper
 
@@ -388,9 +394,11 @@ def get_claude_agent_sdk_patcher(
     _claude_agent_sdk_patcher = MultiPatcher(
         [
             SymbolPatcher(
-                lambda: importlib.import_module("claude_agent_sdk"),
-                "query",
-                _patched_query_wrapper(settings),
+                lambda: importlib.import_module(
+                    "claude_agent_sdk._internal.client"
+                ),
+                "InternalClient.process_query",
+                _patched_process_query_wrapper(settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("claude_agent_sdk"),
