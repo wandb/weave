@@ -1,52 +1,35 @@
--- calls_complete v2 schema
---
--- NOTE: This migration was retroactively updated to create the v2 schema
--- directly (non-nullable sentinels, ReplacingMergeTree, TTL, partitioning).
--- The original v1 schema used Nullable columns and plain MergeTree.
--- Migration 024 handles the v1 -> v2 upgrade for any instances that already
--- ran the original version of this file. For fresh installs, 024's rename
--- dance is harmless on empty tables.
-
 CREATE TABLE calls_complete (
-    -- Primary fields
     id              String,
     project_id      String,
     created_at      DateTime64(3) DEFAULT now64(3),
+
     trace_id        String,
     op_name         String,
     started_at      DateTime64(6),
+    ended_at        Nullable(DateTime64(6)),
 
-    -- DateTime fields: sentinel = epoch zero (toDateTime64(0, N))
-    ended_at        DateTime64(6) DEFAULT toDateTime64(0, 6),
-    updated_at      DateTime64(3) DEFAULT toDateTime64(0, 3),
-    deleted_at      DateTime64(3) DEFAULT toDateTime64(0, 3),
+    updated_at      Nullable(DateTime64(3)),
+    deleted_at      Nullable(DateTime64(3)),
 
-    -- String fields: sentinel = '' (empty string)
-    parent_id       String DEFAULT '',
-    display_name    String DEFAULT '',
-    exception       String DEFAULT '',
-    otel_dump       String DEFAULT '',
-    wb_user_id      String DEFAULT '',
-    wb_run_id       String DEFAULT '',
-    thread_id       String DEFAULT '',
-    turn_id         String DEFAULT '',
+    parent_id       Nullable(String),
+    display_name    Nullable(String),
 
-    -- Non-nullable data fields
+    attributes_dump String,
     inputs_dump     String,
     input_refs      Array(String),
     output_dump     String,
     summary_dump    String,
+    otel_dump       Nullable(String),
+    exception       Nullable(String),
     output_refs     Array(String),
 
-    attributes_dump String,
+    wb_user_id      Nullable(String),
+    wb_run_id       Nullable(String),
+    wb_run_step     Nullable(UInt64),
+    wb_run_step_end Nullable(UInt64),
 
-    -- UInt64 fields: non-nullable, 0 = not set
-    wb_run_step     UInt64 DEFAULT 0,
-    wb_run_step_end UInt64 DEFAULT 0,
-
-    -- TTL and source tracking
-    ttl_at          DateTime DEFAULT '2100-01-01 00:00:00',
-    source          Enum8('direct' = 1, 'dual' = 2, 'migration' = 3) DEFAULT 'direct',
+    thread_id       Nullable(String),
+    turn_id         Nullable(String),
 
     -- Bloom filter for needle in the haystack searches
     INDEX idx_parent_id parent_id TYPE bloom_filter GRANULARITY 1,
@@ -55,7 +38,7 @@ CREATE TABLE calls_complete (
     -- larger JSON dump fields. 32KB per granule, ~4GB index size per 1B rows
     INDEX idx_inputs_dump inputs_dump TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1,
     INDEX idx_output_dump output_dump TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1,
-    INDEX idx_summary_dump summary_dump TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1,
+    INDEX idx_attributes_dump attributes_dump TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1,
     -- Set for equality searches with low cardinality ids, high granularity for
     -- smaller index memory size
     INDEX idx_wb_run_id wb_run_id TYPE set(100) GRANULARITY 4,
@@ -65,12 +48,10 @@ CREATE TABLE calls_complete (
     -- Minmax for range searches
     INDEX idx_ended_at ended_at TYPE minmax GRANULARITY 1,
     INDEX idx_id id TYPE minmax GRANULARITY 1
-) ENGINE = ReplacingMergeTree(created_at)
-PARTITION BY toYYYYMM(started_at)
+) ENGINE = MergeTree
 ORDER BY (project_id, started_at, id)
-TTL ttl_at DELETE
 SETTINGS
-    min_bytes_for_wide_part=0,
+    -- Required for lightweight updates
     enable_block_number_column=1,
     enable_block_offset_column=1;
 
@@ -80,25 +61,25 @@ CREATE TABLE calls_complete_stats
     project_id String,
     id String,
     trace_id SimpleAggregateFunction(any, String),
-    parent_id SimpleAggregateFunction(any, String),
+    parent_id SimpleAggregateFunction(any, Nullable(String)),
     op_name SimpleAggregateFunction(any, String),
     started_at SimpleAggregateFunction(any, DateTime64(6)),
-    ended_at SimpleAggregateFunction(any, DateTime64(6)),
+    ended_at SimpleAggregateFunction(any, Nullable(DateTime64(6))),
     attributes_size_bytes SimpleAggregateFunction(any, UInt64),
     inputs_size_bytes SimpleAggregateFunction(any, UInt64),
     output_size_bytes SimpleAggregateFunction(any, UInt64),
     summary_size_bytes SimpleAggregateFunction(any, UInt64),
-    otel_size_bytes SimpleAggregateFunction(any, UInt64),
-    exception_size_bytes SimpleAggregateFunction(any, UInt64),
-    wb_user_id SimpleAggregateFunction(any, String),
-    wb_run_id SimpleAggregateFunction(any, String),
-    wb_run_step SimpleAggregateFunction(any, UInt64),
-    wb_run_step_end SimpleAggregateFunction(any, UInt64),
-    thread_id SimpleAggregateFunction(any, String),
-    turn_id SimpleAggregateFunction(any, String),
+    otel_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
+    exception_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
+    wb_user_id SimpleAggregateFunction(any, Nullable(String)),
+    wb_run_id SimpleAggregateFunction(any, Nullable(String)),
+    wb_run_step SimpleAggregateFunction(any, Nullable(UInt64)),
+    wb_run_step_end SimpleAggregateFunction(any, Nullable(UInt64)),
+    thread_id SimpleAggregateFunction(any, Nullable(String)),
+    turn_id SimpleAggregateFunction(any, Nullable(String)),
     created_at SimpleAggregateFunction(min, DateTime64(3)),
-    updated_at SimpleAggregateFunction(max, DateTime64(3)),
-    display_name AggregateFunction(argMax, String, DateTime64(3))
+    updated_at SimpleAggregateFunction(max, Nullable(DateTime64(3))),
+    display_name AggregateFunction(argMax, Nullable(String), DateTime64(3))
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, id);
 
