@@ -77,7 +77,7 @@ def download_model_from_huggingface_hub(model_name: str) -> str:
     """
     from huggingface_hub import snapshot_download
 
-    model_dir_name = model_name.split("/")[-1].replace(":", "_")
+    model_dir_name = model_name.rsplit("/", maxsplit=1)[-1].replace(":", "_")
     local_dir = Path(scorers_dir()) / model_dir_name
     return snapshot_download(model_name, local_dir=str(local_dir))
 

@@ -41,7 +41,7 @@ class LLMUsageSchema(TypedDict, total=False):
     total_tokens: int | None
 
 
-class LLMCostSchema(LLMUsageSchema):
+class LLMCostSchema(LLMUsageSchema, total=False):
     prompt_tokens_total_cost: float | None
     completion_tokens_total_cost: float | None
     prompt_token_cost: float | None
@@ -1105,6 +1105,21 @@ class FilesStatsRes(BaseModel):
 
 class EnsureProjectExistsRes(BaseModel):
     project_name: str
+
+
+class ProjectIdsExternalToInternalReq(BaseModelStrict):
+    project_ids: list[str] = Field(
+        description="External project IDs to resolve, each in 'entity/project' format.",
+        examples=[["entity-a/project-a", "entity-b/project-b"]],
+    )
+
+
+class ProjectIdsExternalToInternalRes(BaseModel):
+    project_id_map: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of external project ID to internal project ID.",
+        examples=[{"entity-a/project-a": "internal-project-a"}],
+    )
 
 
 class CostCreateInput(BaseModelStrict):
@@ -2453,6 +2468,10 @@ class TraceServerInterface(Protocol):
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
+
+    def project_ids_external_to_internal(
+        self, req: ProjectIdsExternalToInternalReq
+    ) -> ProjectIdsExternalToInternalRes: ...
 
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...

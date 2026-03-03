@@ -13,8 +13,7 @@ from weave import type_handlers  # noqa: F401
 from weave.trace import urls, weave_client, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
-from weave.trace.context import call_context
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
 from weave.trace.display.term import configure_logger, update_logger_level
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
