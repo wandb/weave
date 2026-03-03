@@ -156,6 +156,7 @@ from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
+from weave.trace_server.op_ref_cache import OpRefCache
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
@@ -260,6 +261,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
+        self._op_ref_cache = OpRefCache()
 
     def __del__(self) -> None:
         """Flush the Kafka producer on cleanup to avoid dropping in-flight messages."""
@@ -495,23 +497,39 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             op_name = object_creation_utils.make_safe_name(start_call.op_name)
             obj_id_idx_map[op_name].append(idx)
 
-        existing_objects = self._get_existing_ops_from_spans(
-            seen_ids=set(obj_id_idx_map.keys()),
-            project_id=req.project_id,
-            limit=len(calls),
-        )
+        # Step 1: Check cache for all op names in the batch
+        cached = self._op_ref_cache.get_many(req.project_id, set(obj_id_idx_map.keys()))
+        for op_name, uri in cached.items():
+            for idx in obj_id_idx_map[op_name]:
+                calls[idx][0].op_name = uri
+            obj_id_idx_map.pop(op_name)
+
+        # Step 2: Query CH for remaining (uncached) op names
+        if obj_id_idx_map:
+            existing_objects = self._get_existing_ops_from_spans(
+                seen_ids=set(obj_id_idx_map.keys()),
+                project_id=req.project_id,
+                limit=len(calls),
+            )
+        else:
+            existing_objects = []
+
+        new_cache_entries: dict[str, str] = {}
+
         # We know that OTel will always use the placeholder source.
         # We can instead just reuse the existing file if we know it is present
         # and create it just once if we are not sure.
-        if len(existing_objects) == 0:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=True
-            )
-        else:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=False
-            )
-
+        # Skip entirely when all ops were resolved from cache.
+        digest = ""
+        if obj_id_idx_map:
+            if len(existing_objects) == 0:
+                digest = self._create_or_get_placeholder_ops_digest(
+                    project_id=req.project_id, create=True
+                )
+            else:
+                digest = self._create_or_get_placeholder_ops_digest(
+                    project_id=req.project_id, create=False
+                )
         for obj in existing_objects:
             op_ref_uri = ri.InternalOpRef(
                 project_id=req.project_id,
@@ -519,12 +537,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 version=obj.digest,
             ).uri()
 
-            # Modify each of the matched start calls in place
             for idx in obj_id_idx_map[obj.object_id]:
                 calls[idx][0].op_name = op_ref_uri
-            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
             obj_id_idx_map.pop(obj.object_id)
+            new_cache_entries[obj.object_id] = op_ref_uri
 
+        # Step 3: Create new ops in CH
         obj_creation_batch = []
         for op_obj_id in obj_id_idx_map.keys():
             op_val = object_creation_utils.build_op_val(digest)
@@ -549,6 +567,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ).uri()
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
+            new_cache_entries[result.object_id] = op_ref_uri
+
+        # Populate cache with everything we resolved from CH
+        self._op_ref_cache.put_many(req.project_id, new_cache_entries)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
