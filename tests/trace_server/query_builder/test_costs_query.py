@@ -766,16 +766,8 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
         WHERE (rank = {pb_9:UInt64})
         GROUP BY id,
                  started_at
-        ORDER BY (NOT (JSONType(CASE
-                                    WHEN feedback.feedback_type = {pb_1:String} THEN feedback.payload_dump
-                                END, {pb_2:String}, {pb_3:String}) = 'Null'
-                       OR JSONType(CASE
-                                       WHEN feedback.feedback_type = {pb_1:String} THEN feedback.payload_dump
-                                   END, {pb_2:String}, {pb_3:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(CASE
-                                                                                                                                    WHEN feedback.feedback_type = {pb_1:String} THEN feedback.payload_dump
-                                                                                                                                END, {pb_4:String}), 'null'), '')) DESC, toString(coalesce(nullIf(JSON_VALUE(CASE
-                                                                                                                                                                                                                 WHEN feedback.feedback_type = {pb_1:String} THEN feedback.payload_dump
-                                                                                                                                                                                                             END, {pb_4:String}), 'null'), '')) DESC
+        ORDER BY (NOT (JSONType(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_1:String}), {pb_2:String}, {pb_3:String}) = 'Null'
+                       OR JSONType(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_1:String}), {pb_2:String}, {pb_3:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_1:String}), {pb_4:String}), 'null'), '')) DESC, toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_1:String}), {pb_4:String}), 'null'), '')) DESC
         """,
         {
             "pb_0": SENTINEL_DATETIME,

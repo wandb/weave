@@ -6377,6 +6377,56 @@ async def test_calls_query_sort_by_feedback_field_with_costs(client):
     assert calls[1].id == call_ids[1]  # call2 has score 8
 
 
+def test_calls_query_sort_by_agg_field_with_costs(client):
+    """Test sorting by an aggregate field (display_name) with costs enabled.
+
+    This is a regression test to ensure that fields using aggregate functions
+    like argMaxMerge (display_name) or any (op_name) don't re-apply the
+    aggregate function on already-materialized columns in the cost query's
+    final SELECT.
+    """
+
+    @weave.op
+    def my_op(x: int) -> int:
+        return x
+
+    _, call_a = my_op.call(1)
+    call_a.set_display_name("alpha")
+
+    _, call_b = my_op.call(2)
+    call_b.set_display_name("beta")
+
+    filter = tsi.CallsFilter(call_ids=[call_a.id, call_b.id])
+
+    # Sort by display_name ascending with costs - exercises argMaxMerge field
+    sort_by = [{"field": "display_name", "direction": "asc"}]
+    calls = list(
+        client.get_calls(
+            sort_by=sort_by,
+            columns=["id", "display_name"],
+            filter=filter,
+            include_costs=True,
+        )
+    )
+    assert len(calls) == 2
+    assert calls[0].id == call_a.id  # "alpha" sorts before "beta"
+    assert calls[1].id == call_b.id
+
+    # Sort descending
+    sort_by = [{"field": "display_name", "direction": "desc"}]
+    calls = list(
+        client.get_calls(
+            sort_by=sort_by,
+            columns=["id", "display_name"],
+            filter=filter,
+            include_costs=True,
+        )
+    )
+    assert len(calls) == 2
+    assert calls[0].id == call_b.id  # "beta" sorts before "alpha" desc
+    assert calls[1].id == call_a.id
+
+
 def test_calls_query_ordering_with_costs_comprehensive(client):
     @weave.op
     def my_op(x: int) -> int:
