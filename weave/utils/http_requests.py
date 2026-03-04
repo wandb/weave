@@ -32,6 +32,7 @@ STYLE_ERROR = "red"
 STYLE_DIVIDER_REQUEST = "white"
 STYLE_DIVIDER_RESPONSE = "bright_black"
 THEME_JSON = "ansi_dark"
+CLIENT_LIMITS = httpx.Limits(max_connections=None, max_keepalive_connections=None)
 
 
 def decode_str(string: str | bytes) -> str:
@@ -125,35 +126,47 @@ def pprint_response(response: Response) -> None:
         pprint_header((key, value))
 
     console.print(Text("Body:", style=STYLE_LABEL))
+    try:
+        body_text = response.text
+    except httpx.ResponseNotRead:
+        console.print("  [stream not read]", style=STYLE_NONE)
+        return
+
     if response.headers.get("Content-Type") == "application/json":
-        pprint_json(response.text)
-    elif response.text:
-        console.print(Text(response.text, style=STYLE_BODY))
+        pprint_json(body_text)
+    elif body_text:
+        console.print(Text(body_text, style=STYLE_BODY))
     else:
         console.print("  None", style=STYLE_NONE)
 
 
-class LoggingHTTPTransport(httpx.HTTPTransport):
-    def handle_request(
-        self,
-        request: httpx.Request,
-    ) -> httpx.Response:
-        if os.environ.get("WEAVE_DEBUG_HTTP") != "1":
-            return super().handle_request(request)
+def _is_debug_http_enabled() -> bool:
+    return os.environ.get("WEAVE_DEBUG_HTTP") == "1"
 
-        console.print(Text("-" * 21, style=STYLE_DIVIDER_REQUEST))
-        pprint_request(request)
-        start_time = time()
-        response = super().handle_request(request)
+
+def _log_request(request: Request) -> None:
+    if not _is_debug_http_enabled():
+        return
+
+    request.extensions["weave_start_time"] = time()
+    console.print(Text("-" * 21, style=STYLE_DIVIDER_REQUEST))
+    pprint_request(request)
+
+
+def _log_response(response: Response) -> None:
+    if not _is_debug_http_enabled():
+        return
+
+    console.print(Text("----- Response below -----", style=STYLE_DIVIDER_RESPONSE))
+    start_time = response.request.extensions.get("weave_start_time")
+    if isinstance(start_time, (int, float)):
         elapsed_time = time() - start_time
-        console.print(Text("----- Response below -----", style=STYLE_DIVIDER_RESPONSE))
         console.print(
             Text("Elapsed Time: ", style=STYLE_LABEL),
             Text(f"{elapsed_time:.2f} seconds", style=STYLE_METADATA),
             sep="",
         )
-        pprint_response(response)
-        return response
+    pprint_response(response)
 
 
 def _get_http_timeout() -> float:
@@ -164,16 +177,12 @@ def _get_http_timeout() -> float:
     return http_timeout()
 
 
-def _get_proxy_from_env() -> str | None:
-    return os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY") or os.getenv("ALL_PROXY")
-
-
 client = httpx.Client(
-    # HTTPX doesn't read proxy env vars when a custom transport is provided,
-    # so we need to read them manually and pass them here.
-    transport=LoggingHTTPTransport(proxy=_get_proxy_from_env()),
+    # Use HTTPX's default transport so env proxy handling (including NO_PROXY)
+    # works natively.
+    event_hooks={"request": [_log_request], "response": [_log_response]},
     timeout=_get_http_timeout(),
-    limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
+    limits=CLIENT_LIMITS,
 )
 
 
