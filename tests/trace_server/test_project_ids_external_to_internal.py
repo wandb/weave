@@ -3,7 +3,6 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     b64,
 )
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
 def test_project_ids_external_to_internal_mapping(
@@ -18,21 +17,4 @@ def test_project_ids_external_to_internal_mapping(
     assert res.project_id_map == {
         "shawn/project-a": b64("shawn/project-a"),
         "shawn/project-b": b64("shawn/project-b"),
-    }
-
-
-def test_sqlite_project_ids_external_to_internal_passthrough():
-    sqlite_server = SqliteTraceServer("file::memory:?cache=shared")
-    req = tsi.ProjectIdsExternalToInternalReq(
-        project_ids=["internal-project-a", "internal-project-b", "internal-project-a"]
-    )
-
-    try:
-        res = sqlite_server.project_ids_external_to_internal(req)
-    finally:
-        sqlite_server.close()
-
-    assert res.project_id_map == {
-        "internal-project-a": "internal-project-a",
-        "internal-project-b": "internal-project-b",
     }

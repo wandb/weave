@@ -24,3 +24,6 @@ class TraceServerClientInterface(FullTraceServerInterface, Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes: ...
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes: ...

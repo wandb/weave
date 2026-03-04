@@ -2493,10 +2493,6 @@ class TraceServerInterface(Protocol):
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
 
-    def project_ids_external_to_internal(
-        self, req: ProjectIdsExternalToInternalReq
-    ) -> ProjectIdsExternalToInternalRes: ...
-
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
