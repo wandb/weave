@@ -582,8 +582,8 @@ def test_otel_many_unique_ops_in_batch(trace_server, clickhouse_trace_server):
 
     by_op: dict[str, set[str]] = defaultdict(set)
     for c in calls_after:
-        for name in op_names:
-            if name in c.op_name:
+        for name in sorted(op_names, key=len, reverse=True):
+            if f"/op/{name}:" in c.op_name:
                 by_op[name].add(c.op_name)
                 break
     for name, uri_set in by_op.items():
