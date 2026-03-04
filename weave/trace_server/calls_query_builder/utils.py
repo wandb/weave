@@ -9,6 +9,11 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder, clickhouse_cast, quote_json_path_parts
 
 
+def safe_alias(field_name: str) -> str:
+    """Backtick-quote field names containing dots for use as SQL aliases."""
+    return f"`{field_name}`" if "." in field_name else field_name
+
+
 def param_slot(param_name: str, param_type: str) -> str:
     """Helper function to create a parameter slot for a clickhouse query."""
     return f"{{{param_name}:{param_type}}}"

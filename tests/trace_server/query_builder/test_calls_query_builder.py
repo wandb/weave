@@ -1587,6 +1587,43 @@ def test_query_with_summary_weave_latency_ms_filter() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("read_table", "expected_table"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_summary_weave_field_select_backtick_quoting(
+    read_table: ReadTable, expected_table: str
+) -> None:
+    """Regression: summary.weave.* fields used as SQL aliases must be backtick-quoted.
+
+    Without quoting, ClickHouse interprets dots as nested field access, causing
+    SYNTAX_ERROR (code 62).  This test verifies the fix for all three computed
+    summary fields on both read tables.
+    """
+    cq = CallsQuery(project_id="project", read_table=read_table)
+    cq.add_field("id")
+    cq.add_field("summary.weave.trace_name")
+    cq.add_field("summary.weave.status")
+    cq.add_field("summary.weave.latency_ms")
+
+    pb = ParamBuilder("pb")
+    sql = cq.as_sql(pb)
+
+    # All three dotted aliases MUST appear backtick-quoted
+    assert "AS `summary.weave.trace_name`" in sql
+    assert "AS `summary.weave.status`" in sql
+    assert "AS `summary.weave.latency_ms`" in sql
+
+    # And must NOT appear unquoted
+    import re
+
+    unquoted = re.findall(r"\bAS\s+summary\.weave\.\w+", sql)
+    assert unquoted == [], f"Found unquoted dotted aliases: {unquoted}"
+
+
 def test_query_with_summary_weave_trace_name_sort() -> None:
     """Test sorting by summary.weave.trace_name field."""
     cq = CallsQuery(project_id="project")
