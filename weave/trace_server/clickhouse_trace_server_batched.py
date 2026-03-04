@@ -285,7 +285,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             producer = self.kafka_producer
             if producer is not None:
                 # 10 second timeout for flushing remaining messages
-                producer.flush(10)
+                producer.flush(timeout=10)
         except Exception:
             pass
 
@@ -655,7 +655,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         producer = self.kafka_producer
         if producer is not None:
             # Non-blocking flush to avoid convoy effect — see KafkaProducer.produce_call_end.
-            producer.flush(0)
+            producer.flush(timeout=0)
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
