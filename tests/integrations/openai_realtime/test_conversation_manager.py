@@ -56,7 +56,7 @@ class DummyState:
 
 def test_conversation_manager_dispatch_sync(monkeypatch):
     # Patch StateExporter used by ConversationManager to our dummy
-    monkeypatch.setattr(cm_mod, "StateExporter", lambda: DummyState())
+    monkeypatch.setattr(cm_mod, "StateExporter", DummyState)
     mgr = cm_mod.ConversationManager()
 
     msg = {
@@ -83,7 +83,7 @@ def test_conversation_manager_dispatch_sync(monkeypatch):
 
 
 def test_conversation_manager_worker_queue(monkeypatch):
-    monkeypatch.setattr(cm_mod, "StateExporter", lambda: DummyState())
+    monkeypatch.setattr(cm_mod, "StateExporter", DummyState)
     mgr = cm_mod.ConversationManager()
 
     msg = {"type": "input_audio_buffer.cleared", "event_id": "event_1"}

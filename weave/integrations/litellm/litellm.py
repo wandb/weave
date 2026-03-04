@@ -111,7 +111,7 @@ def get_litellm_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _litellm_patcher
+    global _litellm_patcher  # noqa: PLW0603
     if _litellm_patcher is not None:
         return _litellm_patcher
 

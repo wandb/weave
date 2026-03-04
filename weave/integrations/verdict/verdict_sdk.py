@@ -125,7 +125,7 @@ def get_verdict_patcher(
     else:
         verdict_tracer = None
 
-    global _verdict_patcher
+    global _verdict_patcher  # noqa: PLW0603
     if _verdict_patcher is not None:
         return _verdict_patcher
 

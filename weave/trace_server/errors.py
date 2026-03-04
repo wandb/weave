@@ -335,7 +335,7 @@ class ErrorRegistry:
 
 def _get_error_registry() -> ErrorRegistry:
     """Get the global error registry, initializing it if needed."""
-    global _error_registry
+    global _error_registry  # noqa: PLW0603
     if _error_registry is None:
         _error_registry = ErrorRegistry()
     return _error_registry
@@ -413,7 +413,7 @@ def handle_clickhouse_query_error(e: Exception) -> None:
         ) from e
 
     # Re-raise the original exception if no known pattern matches
-    raise
+    raise e
 
 
 def _format_missing_llm_api_key(exc: Exception) -> dict[str, Any]:

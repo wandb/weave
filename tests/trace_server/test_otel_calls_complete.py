@@ -148,7 +148,7 @@ def _create_otel_export_req(
 
     processed = tsi.ProcessedResourceSpans(
         entity=TEST_ENTITY,
-        project=project_id.split("/")[-1],
+        project=project_id.rsplit("/", maxsplit=1)[-1],
         run_id=None,
         resource_spans=resource_spans,
     )

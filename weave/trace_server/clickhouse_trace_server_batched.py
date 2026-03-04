@@ -357,6 +357,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._kafka_producer = KafkaProducer.from_env()
             return self._kafka_producer
 
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        # Internal trace servers already operate on internal project IDs, so this is a pass-through.
+        project_id_map = {project_id: project_id for project_id in req.project_ids}
+        return tsi.ProjectIdsExternalToInternalRes(project_id_map=project_id_map)
+
     @property
     def table_routing_resolver(self) -> TableRoutingResolver:
         if self._table_routing_resolver is not None:
@@ -569,7 +576,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 for start, end in calls
             ]
-            self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
+            self._insert_call_complete_batch(rows)
         else:
             rows = []
             for start, end in calls:
@@ -581,7 +588,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 rows.append(
                     _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
                 )
-            self._insert_call_batch(rows, settings=None, do_sync_insert=True)
+            self._insert_call_batch(rows)
 
         # Run callbacks and flush
         for cb in event_callbacks:
@@ -748,18 +755,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         with self.call_batch():
             for complete_call in req.batch:
-                complete_call = process_complete_call_to_content(complete_call, self)
+                processed_complete_call = process_complete_call_to_content(
+                    complete_call, self
+                )
 
                 # Determine write target based on project, this should be the same for all
                 # calls in the batch, subsequent calls just hit the in-memory cache. This
                 # is here for technical correctness, in case we relax project_id target
                 # constraints intra-batch
                 write_target = self.table_routing_resolver.resolve_v2_write_target(
-                    complete_call.project_id,
+                    processed_complete_call.project_id,
                     self.ch_client,
                 )
 
-                ch_call = _complete_call_to_ch_insertable(complete_call)
+                ch_call = _complete_call_to_ch_insertable(processed_complete_call)
                 if write_target == WriteTarget.CALLS_COMPLETE:
                     self._insert_call_complete(ch_call)
                 else:
@@ -767,9 +776,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
                 _maybe_enqueue_minimal_call_end(
                     self.kafka_producer,
-                    complete_call.project_id,
-                    complete_call.id,
-                    complete_call.ended_at,
+                    processed_complete_call.project_id,
+                    processed_complete_call.id,
+                    processed_complete_call.ended_at,
                 )
 
         return tsi.CallsUpsertCompleteRes()
@@ -4723,11 +4732,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         def make_ref_cache_key(ref: ri.InternalObjectRef) -> str:
             return ref.uri()
 
-        for project in refs_by_project_id:
-            project_refs = refs_by_project_id[project]
+        for project, project_refs in refs_by_project_id.items():
             project_results = self._refs_read_batch_within_project(
                 project,
-                refs_by_project_id[project],
+                project_refs,
                 root_val_cache,
             )
             for ref, result in zip(project_refs, project_results, strict=False):
@@ -5841,6 +5849,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
+
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        """Enqueue scoring jobs for a list of calls.
+
+        Publishes the request to Kafka, where it will be consumed by the
+        call_scoring_worker and applied asynchronously.
+        """
+        if self.kafka_producer is None:
+            raise ValueError("Kafka producer is not set")
+
+        self.kafka_producer.produce_score_calls(req)
+
+        return tsi.CallsScoreRes()
 
     # Private Methods
     @property

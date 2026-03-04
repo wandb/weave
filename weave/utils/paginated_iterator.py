@@ -12,18 +12,18 @@ if TYPE_CHECKING:
     import pandas as pd
 
 T = TypeVar("T")
-R = TypeVar("R", covariant=True)
+R_co = TypeVar("R_co", covariant=True)
 
 
 class FetchFunc(Protocol[T]):
     def __call__(self, offset: int, limit: int) -> list[T]: ...
 
 
-TransformFunc = Callable[[T], R]
+TransformFunc = Callable[[T], R_co]
 SizeFunc = Callable[[], int]
 
 
-class PaginatedIterator(Generic[T, R]):
+class PaginatedIterator(Generic[T, R_co]):
     """An iterator that fetches pages of items from a server and optionally transforms them
     into a more user-friendly type.
     """
@@ -32,7 +32,7 @@ class PaginatedIterator(Generic[T, R]):
         self,
         fetch_func: FetchFunc[T],
         page_size: int = 1000,
-        transform_func: TransformFunc[T, R] | None = None,
+        transform_func: TransformFunc[T, R_co] | None = None,
         size_func: SizeFunc | None = None,
         limit: int | None = None,
         offset: int | None = None,
@@ -57,8 +57,8 @@ class PaginatedIterator(Generic[T, R]):
     @overload
     def _get_one(self: PaginatedIterator[T, T], index: int) -> T: ...
     @overload
-    def _get_one(self: PaginatedIterator[T, R], index: int) -> R: ...
-    def _get_one(self, index: int) -> T | R:
+    def _get_one(self: PaginatedIterator[T, R_co], index: int) -> R_co: ...
+    def _get_one(self, index: int) -> T | R_co:
         if index < 0:
             raise IndexError("Negative indexing not supported")
 
@@ -83,8 +83,8 @@ class PaginatedIterator(Generic[T, R]):
     @overload
     def _get_slice(self: PaginatedIterator[T, T], key: slice) -> Iterator[T]: ...
     @overload
-    def _get_slice(self: PaginatedIterator[T, R], key: slice) -> Iterator[R]: ...
-    def _get_slice(self, key: slice) -> Iterator[T] | Iterator[R]:
+    def _get_slice(self: PaginatedIterator[T, R_co], key: slice) -> Iterator[R_co]: ...
+    def _get_slice(self, key: slice) -> Iterator[T] | Iterator[R_co]:
         if (start := key.start or 0) < 0:
             raise ValueError("Negative start not supported")
         if (stop := key.stop) is not None and stop < 0:
@@ -113,12 +113,12 @@ class PaginatedIterator(Generic[T, R]):
     @overload
     def __getitem__(self: PaginatedIterator[T, T], key: int) -> T: ...
     @overload
-    def __getitem__(self: PaginatedIterator[T, R], key: int) -> R: ...
+    def __getitem__(self: PaginatedIterator[T, R_co], key: int) -> R_co: ...
     @overload
     def __getitem__(self: PaginatedIterator[T, T], key: slice) -> list[T]: ...
     @overload
-    def __getitem__(self: PaginatedIterator[T, R], key: slice) -> list[R]: ...
-    def __getitem__(self, key: slice | int) -> T | R | list[T] | list[R]:
+    def __getitem__(self: PaginatedIterator[T, R_co], key: slice) -> list[R_co]: ...
+    def __getitem__(self, key: slice | int) -> T | R_co | list[T] | list[R_co]:
         if isinstance(key, slice):
             return list(self._get_slice(key))
         return self._get_one(key)
@@ -126,15 +126,15 @@ class PaginatedIterator(Generic[T, R]):
     @overload
     def __iter__(self: PaginatedIterator[T, T]) -> Iterator[T]: ...
     @overload
-    def __iter__(self: PaginatedIterator[T, R]) -> Iterator[R]: ...
-    def __iter__(self) -> Iterator[T] | Iterator[R]:
+    def __iter__(self: PaginatedIterator[T, R_co]) -> Iterator[R_co]: ...
+    def __iter__(self) -> Iterator[T] | Iterator[R_co]:
         return self._get_slice(slice(0, None, 1))
 
     @overload
     def __next__(self: PaginatedIterator[T, T]) -> T: ...
     @overload
-    def __next__(self: PaginatedIterator[T, R]) -> R: ...
-    def __next__(self) -> T | R:
+    def __next__(self: PaginatedIterator[T, R_co]) -> R_co: ...
+    def __next__(self) -> T | R_co:
         try:
             item = self._get_one(self._next_index)
         except IndexError as exc:

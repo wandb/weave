@@ -114,7 +114,7 @@ def get_smolagents_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _smolagents_patcher
+    global _smolagents_patcher  # noqa: PLW0603
     if _smolagents_patcher is not None:
         return _smolagents_patcher
 

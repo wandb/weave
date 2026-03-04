@@ -63,7 +63,7 @@ def read_results_from_csv(filename: str) -> list[dict[str, str]]:
     console.print(f"Reading results from {filename}...")
 
     results = []
-    with open(filename, newline="") as csvfile:
+    with open(filename, encoding="utf-8", newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             results.append(row)
@@ -90,7 +90,7 @@ def write_csv_with_headers(
     """
     console.print(f"Writing results to {filename}...")
 
-    with open(filename, "w", newline="") as csvfile:
+    with open(filename, "w", encoding="utf-8", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(headers)
         writer.writerows(rows)
