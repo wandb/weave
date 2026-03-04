@@ -268,24 +268,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._database_ensured = False
 
     def __del__(self) -> None:
-        """Flush the Kafka producer on cleanup to avoid dropping in-flight messages."""
-        if (
-            not self._call_batch
-            and not self._calls_complete_batch
-            and not self._file_batch
-        ):
-            return
-        try:
-            self._flush_all_batches_in_order()
-        except Exception:
-            pass
-        finally:
-            self._file_batch = []
-            self._call_batch = []
-            self._calls_complete_batch = []
-            self._flush_immediately = True
+        """Flush batches and the Kafka producer on cleanup."""
+        if self._call_batch or self._calls_complete_batch or self._file_batch:
+            try:
+                self._flush_all_batches_in_order()
+            except Exception:
+                pass
+            finally:
+                self._file_batch = []
+                self._call_batch = []
+                self._calls_complete_batch = []
+                self._flush_immediately = True
 
-        # At shutdown, do a blocking flush to drain remaining kafka messages.
+        # Always drain remaining kafka messages at shutdown.
         try:
             producer = self.kafka_producer
             if producer is not None:
@@ -658,12 +653,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _flush_kafka_producer(self) -> None:
         producer = self.kafka_producer
         if producer is not None:
-            # Use a short non-blocking flush instead of an unbounded flush().
-            # The producer is a process-level singleton shared across all request
-            # threads, so flush() (no timeout) blocks until ALL in-flight messages
-            # from every concurrent request are acknowledged — causing a convoy
-            # effect under load.  flush(0) triggers a delivery attempt for queued
-            # messages and returns immediately.
+            # Non-blocking flush to avoid convoy effect — see KafkaProducer.produce_call_end.
             producer.flush(0)
 
     @contextmanager
