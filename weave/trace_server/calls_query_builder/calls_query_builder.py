@@ -273,7 +273,8 @@ class CallsMergedSummaryField(CallsMergedField):
         read_table: "ReadTable" = ReadTable.CALLS_MERGED,
         **kwargs: Any,
     ) -> str:
-        return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn, read_table=read_table)} AS {self.field}"
+        alias = f"`{self.field}`" if "." in self.field else self.field
+        return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn, read_table=read_table)} AS {alias}"
 
     def is_heavy(self) -> bool:
         # These are computed from non-heavy fields (status uses exception and ended_at)
