@@ -185,23 +185,25 @@ def compare_paths(path1: ObjectPath, path2: ObjectPath) -> int:
     """
     # Compare elements pairwise
     for e1, e2 in zip(path1, path2, strict=False):
-        # If elements are same type, compare directly
-        if (
-            isinstance(e1, str)
-            and isinstance(e2, str)
-            or isinstance(e1, int)
-            and isinstance(e2, int)
-        ):
-            if e1 < e2:
+        # If elements are same type, compare directly.
+        if isinstance(e1, str):
+            if isinstance(e2, str):
+                if e1 < e2:
+                    return -1
+                if e1 > e2:
+                    return 1
+            else:
+                # If different types, strings come before integers.
                 return -1
-            if e1 > e2:
+        else:
+            if isinstance(e2, int):
+                if e1 < e2:
+                    return -1
+                if e1 > e2:
+                    return 1
+            else:
+                # If different types, integers come after strings.
                 return 1
-
-        # If different types, strings come before integers
-        if isinstance(e1, str) and isinstance(e2, int):
-            return -1
-        if isinstance(e1, int) and isinstance(e2, str):
-            return 1
 
     # If we get here, all common elements were equal
     # Shorter paths come before longer paths

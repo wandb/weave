@@ -1,8 +1,10 @@
+import logging
 import sys
 
 import weave
 from tests.trace.data_serialization.spec import SerializationTestCase
 from weave.scorers import LLMAsAJudgeScorer
+from weave.trace.ref_util import remove_ref
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     LLMStructuredCompletionModel,
 )
@@ -26,6 +28,16 @@ class MyScorer(weave.Scorer):
 
 
 def make_evaluation():
+    # Keep evaluation op code capture stable across publish/input flows.
+    logging.getLogger("weave.evaluation.eval").setLevel(logging.DEBUG)
+    # Ensure support-op objects are written into the fresh test DB on every run.
+    remove_ref(weave.Evaluation.evaluate)
+    remove_ref(weave.Evaluation.predict_and_score)
+    remove_ref(weave.Evaluation.summarize)
+    remove_ref(weave.Scorer.summarize)
+    remove_ref(MyScorer.score)
+    remove_ref(LLMAsAJudgeScorer.score)
+    remove_ref(LLMStructuredCompletionModel.predict)
     dataset = [{"user_input": "Tim"}, {"user_input": "Sweeney"}]
     return weave.Evaluation(
         dataset=dataset,
@@ -76,7 +88,7 @@ def evaluation_equality_check(a, b):
 # When doing this, replace "llm_as_a_judge_scorer_digest" with the current value of llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_old_python
 # Do this, rather than creating a new variable, because each new version of legacy test case will need a different value.
 llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_current_python = (
-    "hoglXaCXaJbyUlwhJClqC0S0gYzalCBrEUP62OEC8t8"
+    "5gK9K3LSTniXjpmFOdFtCDsdRvbEf8N3N4kQRXUbUZg"
 )
 llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_old_python = (
     "hoglXaCXaJbyUlwhJClqC0S0gYzalCBrEUP62OEC8t8"
@@ -100,14 +112,14 @@ library_cases = [
             "description": None,
             "dataset": "weave:///shawn/test-project/object/Dataset:YLYVrBqCtlMOa770T1oPssqYnf9rgqdnY5hVCwRcrm8",
             "scorers": [
-                "weave:///shawn/test-project/object/MyScorer:PsKeaqLtvkkwDLD9x3HZlIn4Srt8LgDH6rTiMAQM8jg",
+                "weave:///shawn/test-project/object/MyScorer:rSKendTjpTZyugvUP6sXPp3F0EfonEv33HmxPM5ppIQ",
                 f"weave:///shawn/test-project/object/LLMAsAJudgeScorer:{llm_as_a_judge_scorer_digest}",
             ],
             "preprocess_model_input": None,
             "trials": 1,
             "metadata": None,
             "evaluation_name": None,
-            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:YX1LHRCfMQoUADiL4qkOb5cZNf6rSPfRiaxx0nGY6ZU",
+            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:A55pqXB2X8r4CrOUE1FtIFLXBMXZ24CxzvPDYsrDYLc",
             "predict_and_score": "weave:///shawn/test-project/op/Evaluation.predict_and_score:jd4m1EJuNnrGmHeiGY1T2CUngsk9x7knOgRJ2sYpU2g",
             "summarize": "weave:///shawn/test-project/op/Evaluation.summarize:Y0s05NYTuqlmXieehHPogfq2JXKl4Y1Xgy8CKumdmjI",
             "_class_name": "Evaluation",
@@ -128,12 +140,11 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.evaluate",
-                "digest": "YX1LHRCfMQoUADiL4qkOb5cZNf6rSPfRiaxx0nGY6ZU",
+                "digest": "A55pqXB2X8r4CrOUE1FtIFLXBMXZ24CxzvPDYsrDYLc",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    # Updated with eager_call_start=True
-                    "files": {"obj.py": "fRY5WjYY6bLcWxTHn3ymVTCU1OUC4I19qKMwPdYp9k8"},
+                    "files": {"obj.py": "ZDX98BenvOsFxQblbl8mAbgC3wfmI5oMJbOKBLqvGWE"},
                 },
             },
             {
@@ -147,14 +158,14 @@ library_cases = [
             },
             {
                 "object_id": "MyScorer",
-                "digest": "PsKeaqLtvkkwDLD9x3HZlIn4Srt8LgDH6rTiMAQM8jg",
+                "digest": "rSKendTjpTZyugvUP6sXPp3F0EfonEv33HmxPM5ppIQ",
                 "exp_val": {
                     "_type": "MyScorer",
                     "name": None,
                     "description": None,
                     "column_map": None,
                     "score": "weave:///shawn/test-project/op/MyScorer.score:lwLZn8tYQ025uYUv8SPwa1TlVfWSbzVSyw4aDynz1yQ",
-                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
+                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:inb5BBJYaXDdUaEimRsLkHEdCIFY2kh47n17tYwmq24",
                     "_class_name": "MyScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
                 },
@@ -176,7 +187,7 @@ library_cases = [
                     ],
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                     "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:6xWBXgbLjYI67G1Uvms2dCWP2izbVABBwvqmx00CUT4",
-                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
+                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:inb5BBJYaXDdUaEimRsLkHEdCIFY2kh47n17tYwmq24",
                     "_class_name": "LLMAsAJudgeScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
                 },
@@ -259,26 +270,26 @@ library_cases = [
             },
             {
                 "object_id": "Scorer.summarize",
-                "digest": "LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
+                "digest": "inb5BBJYaXDdUaEimRsLkHEdCIFY2kh47n17tYwmq24",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "mfCJxTVupdfb98h8MKgrxYxRwh4ZkEfjqVKvRKpzcZo"},
+                    "files": {"obj.py": "pk3YXqEgxEM4xya2x2M0biAY8Aj7pSj4QLm5XQFs9R8"},
                 },
             },
         ],
         exp_files=[
             {
-                "digest": "fRY5WjYY6bLcWxTHn3ymVTCU1OUC4I19qKMwPdYp9k8",
-                "exp_content": b'import weave\nfrom weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        try:\n            summary_str = str(summary)\n        except Exception:\n            pass\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (DEBUG)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@weave.op\n@op(call_display_name=default_evaluation_display_name, eager_call_start=True)\nasync def evaluate(self, model: Op | Model) -> dict:\n    eval_results = await self.get_eval_results(model)\n    summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info(f"Evaluation summary {summary_str}")\n\n    return summary\n',
+                "digest": "ZDX98BenvOsFxQblbl8mAbgC3wfmI5oMJbOKBLqvGWE",
+                "exp_content": b'import weave\nfrom weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        with contextlib.suppress(Exception):\n            summary_str = str(summary)\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (DEBUG)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@weave.op\n@op(call_display_name=default_evaluation_display_name, eager_call_start=True)\nasync def evaluate(self, model: Op | Model) -> dict:\n    eval_results = await self.get_eval_results(model)\n    summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info(f"Evaluation summary {summary_str}")\n\n    return summary\n',
             },
             {
                 "digest": "Y7lSNR7UXFYVtxWyD8GOE3CFXRWfdLX2n1mcYfbSErs",
                 "exp_content": b"import weave\n\n@weave.op\ndef score(self, user_input: str, output: str) -> str:\n    return user_input in output\n",
             },
             {
-                "digest": "mfCJxTVupdfb98h8MKgrxYxRwh4ZkEfjqVKvRKpzcZo",
-                "exp_content": b'import weave\nfrom numbers import Number\nfrom typing import Any\nfrom pydantic.main import BaseModel\nfrom weave.trace.op import op\n\ndef _import_numpy() -> Any | None:\n    try:\n        import numpy\n    except ImportError:\n        return None\n    return numpy\n\ndef auto_summarize(data: list) -> dict[str, Any] | None:\n    """Automatically summarize a list of (potentially nested) dicts.\n\n    Computes:\n        - avg for numeric cols\n        - count and fraction for boolean cols\n        - other col types are ignored\n\n    If col is all None, result is None\n\n    Returns:\n      dict of summary stats, with structure matching input dict structure.\n    """\n    if not data:\n        return {}\n    data = [x for x in data if x is not None]\n\n    if not data:\n        return None\n\n    val = data[0]\n\n    if isinstance(val, bool):\n        return {\n            "true_count": (true_count := sum(1 for x in data if x)),\n            "true_fraction": true_count / len(data),\n        }\n    elif isinstance(val, Number):\n        if np := _import_numpy():\n            return {"mean": np.mean(data).item()}\n        else:\n            return {"mean": sum(data) / len(data)}\n    elif isinstance(val, dict):\n        result = {}\n        all_keys = list(\n            dict.fromkeys([k for d in data if isinstance(d, dict) for k in d.keys()])\n        )\n        for k in all_keys:\n            if (\n                summary := auto_summarize(\n                    [x.get(k) for x in data if isinstance(x, dict)]\n                )\n            ) is not None:\n                if k in summary:\n                    result.update(summary)\n                else:\n                    result[k] = summary\n        if not result:\n            return None\n        return result\n    elif isinstance(val, BaseModel):\n        return auto_summarize([x.model_dump() for x in data])\n    return None\n\n@weave.op\n@op\ndef summarize(self, score_rows: list) -> dict | None:\n    return auto_summarize(score_rows)\n',
+                "digest": "pk3YXqEgxEM4xya2x2M0biAY8Aj7pSj4QLm5XQFs9R8",
+                "exp_content": b'import weave\nfrom numbers import Number\nfrom typing import Any\nfrom pydantic.main import BaseModel\nfrom weave.trace.op import op\n\ndef _import_numpy() -> Any | None:\n    try:\n        import numpy\n    except ImportError:\n        return None\n    return numpy\n\ndef auto_summarize(data: list) -> dict[str, Any] | None:\n    """Automatically summarize a list of (potentially nested) dicts.\n\n    Computes:\n        - avg for numeric cols\n        - count and fraction for boolean cols\n        - other col types are ignored\n\n    If col is all None, result is None\n\n    Returns:\n      dict of summary stats, with structure matching input dict structure.\n    """\n    if not data:\n        return {}\n    data = [x for x in data if x is not None]\n\n    if not data:\n        return None\n\n    val = data[0]\n\n    if isinstance(val, bool):\n        return {\n            "true_count": (true_count := sum(1 for x in data if x)),\n            "true_fraction": true_count / len(data),\n        }\n    elif isinstance(val, Number):\n        if np := _import_numpy():\n            return {"mean": np.mean(data).item()}\n        else:\n            return {"mean": sum(data) / len(data)}\n    elif isinstance(val, dict):\n        result = {}\n        all_keys = list(\n            dict.fromkeys([k for d in data if isinstance(d, dict) for k in d])\n        )\n        for k in all_keys:\n            if (\n                summary := auto_summarize(\n                    [x.get(k) for x in data if isinstance(x, dict)]\n                )\n            ) is not None:\n                if k in summary:\n                    result.update(summary)\n                else:\n                    result[k] = summary\n        if not result:\n            return None\n        return result\n    elif isinstance(val, BaseModel):\n        return auto_summarize([x.model_dump() for x in data])\n    return None\n\n@weave.op\n@op\ndef summarize(self, score_rows: list) -> dict | None:\n    return auto_summarize(score_rows)\n',
             },
             {
                 "digest": "ZHD4K7uUDPT93NdVQO3I6F9Xah9AEceWYBSQXg1bZPM",
