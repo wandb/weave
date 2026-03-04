@@ -127,6 +127,13 @@ nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace
 
 **Note:** ClickHouse tests require Docker to be running. If Docker is not available or you encounter Docker connection errors, use SQLite backend with `--trace-server=sqlite`.
 
+#### Known Slow Test Patterns
+
+- The standard `client` fixture uses `TestOnlyFlushingWeaveClient` (`tests/conftest.py`), which calls `_flush()` after every public client method. This is intentionally strict for consistency, but it amplifies runtime for write-heavy tests.
+- `simple_line_call_bootstrap()` (`tests/trace/test_client_trace.py`) is expensive. One invocation creates 25 traced calls plus many object writes; tests that call it 3 times generate ~75 calls and ~100 object creates before assertions.
+- `test_trace_call_query_timings` performs many paginated reads. `client.get_calls(page_size=10)` consumed via `list(...)` triggers repeated `calls_query_stream` fetches (currently 39 stream queries in that test body) plus stats queries.
+- For write-heavy tests that do not depend on immediate read-after-write behavior, temporarily disabling autoflush (for example via a local `batched_client_writes` context manager) and explicitly calling `client.flush()` can significantly reduce runtime. If assertions depend on request-time metadata injection (e.g. `_user_id`), flush per metadata bucket before mutating that context.
+
 #### Remote HTTP Trace Server Implementation Selection
 
 The `--remote-http-trace-server` flag controls which **remote HTTP trace server implementation** is used for testing trace server bindings:
