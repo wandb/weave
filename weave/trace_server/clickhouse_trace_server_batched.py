@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
+from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
@@ -260,6 +261,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
+        self._op_ref_cache: TTLCache[tuple[str, str], str] = TTLCache(
+            maxsize=50_000, ttl=86_400
+        )
+        self._op_ref_cache_lock = threading.Lock()
 
     def __del__(self) -> None:
         """Flush the Kafka producer on cleanup to avoid dropping in-flight messages."""
@@ -409,21 +414,57 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
-    ) -> list[tsi.ObjSchema]:
-        obj_version_filter = tsi.ObjectVersionFilter(
-            object_ids=list(seen_ids),
-            latest_only=True,
-            is_op=True,
-        )
+    ) -> dict[str, str]:
+        """Look up existing op ref URIs, using an in-memory TTL cache to skip repeated CH queries.
 
-        return self.objs_query(
-            tsi.ObjQueryReq(
-                project_id=project_id,
-                filter=obj_version_filter,
-                metadata_only=True,
-                limit=limit,
-            ),
-        ).objs
+        Returns a dict of op_name -> op_ref_uri for all ops that already exist
+        (either from cache or from CH).
+        """
+        resolved: dict[str, str] = {}
+        uncached_ids: set[str] = set()
+
+        # Check cache first
+        with self._op_ref_cache_lock:
+            for op_name in seen_ids:
+                cached_uri = self._op_ref_cache.get((project_id, op_name))
+                if cached_uri is not None:
+                    resolved[op_name] = cached_uri
+                else:
+                    uncached_ids.add(op_name)
+
+        # Query CH only for uncached ops
+        if uncached_ids:
+            obj_version_filter = tsi.ObjectVersionFilter(
+                object_ids=list(uncached_ids),
+                latest_only=True,
+                is_op=True,
+            )
+            ch_results = self.objs_query(
+                tsi.ObjQueryReq(
+                    project_id=project_id,
+                    filter=obj_version_filter,
+                    metadata_only=True,
+                    limit=limit,
+                ),
+            ).objs
+
+            # Populate cache and resolved dict with CH results
+            with self._op_ref_cache_lock:
+                for obj in ch_results:
+                    uri = ri.InternalOpRef(
+                        project_id=project_id,
+                        name=obj.object_id,
+                        version=obj.digest,
+                    ).uri()
+                    self._op_ref_cache[project_id, obj.object_id] = uri
+                    resolved[obj.object_id] = uri
+
+        return resolved
+
+    def _cache_op_ref(self, project_id: str, op_name: str, uri: str) -> None:
+        """Cache a resolved op ref URI."""
+        with self._op_ref_cache_lock:
+            self._op_ref_cache[project_id, op_name] = uri
 
     def _create_or_get_placeholder_ops_digest(
         self, project_id: str, create: bool
@@ -495,15 +536,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             op_name = object_creation_utils.make_safe_name(start_call.op_name)
             obj_id_idx_map[op_name].append(idx)
 
-        existing_objects = self._get_existing_ops_from_spans(
+        existing_ops = self._get_existing_ops_from_spans(
             seen_ids=set(obj_id_idx_map.keys()),
             project_id=req.project_id,
             limit=len(calls),
         )
+
+        for op_name, op_ref_uri in existing_ops.items():
+            # Modify each of the matched start calls in place
+            for idx in obj_id_idx_map[op_name]:
+                calls[idx][0].op_name = op_ref_uri
+            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
+            obj_id_idx_map.pop(op_name)
+
         # We know that OTel will always use the placeholder source.
         # We can instead just reuse the existing file if we know it is present
         # and create it just once if we are not sure.
-        if len(existing_objects) == 0:
+        if len(existing_ops) == 0:
             digest = self._create_or_get_placeholder_ops_digest(
                 project_id=req.project_id, create=True
             )
@@ -511,20 +560,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest = self._create_or_get_placeholder_ops_digest(
                 project_id=req.project_id, create=False
             )
-
-        for obj in existing_objects:
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=obj.object_id,
-                version=obj.digest,
-            ).uri()
-
-            # Modify each of the matched start calls in place
-            for idx in obj_id_idx_map[obj.object_id]:
-                calls[idx][0].op_name = op_ref_uri
-            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
-            obj_id_idx_map.pop(obj.object_id)
-
         obj_creation_batch = []
         for op_obj_id in obj_id_idx_map.keys():
             op_val = object_creation_utils.build_op_val(digest)
@@ -549,6 +584,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ).uri()
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
+            # Cache newly created ops so subsequent batches skip the CH query
+            self._cache_op_ref(req.project_id, result.object_id, op_ref_uri)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
