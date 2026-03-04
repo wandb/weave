@@ -552,26 +552,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # We know that OTel will always use the placeholder source.
         # We can instead just reuse the existing file if we know it is present
         # and create it just once if we are not sure.
-        # Only compute the digest if there are new ops to create.
+        if len(existing_ops) == 0:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=True
+            )
+        else:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=False
+            )
         obj_creation_batch = []
-        if obj_id_idx_map:
-            if len(existing_ops) == 0:
-                digest = self._create_or_get_placeholder_ops_digest(
-                    project_id=req.project_id, create=True
-                )
-            else:
-                digest = self._create_or_get_placeholder_ops_digest(
-                    project_id=req.project_id, create=False
-                )
-            for op_obj_id in obj_id_idx_map.keys():
-                op_val = object_creation_utils.build_op_val(digest)
-                obj_creation_batch.append(
-                    tsi.ObjSchemaForInsert(
-                        project_id=req.project_id,
-                        object_id=op_obj_id,
-                        val=op_val,
-                        wb_user_id=req.wb_user_id,
-                    )
+        for op_obj_id in obj_id_idx_map.keys():
+            op_val = object_creation_utils.build_op_val(digest)
+            obj_creation_batch.append(
+                tsi.ObjSchemaForInsert(
+                    project_id=req.project_id,
+                    object_id=op_obj_id,
+                    val=op_val,
+                    wb_user_id=req.wb_user_id,
                 )
         res = self.obj_create_batch(obj_creation_batch)
 
