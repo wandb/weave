@@ -5,6 +5,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     HardCodedFilter,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
 
 
@@ -781,4 +782,48 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
             "pb_8": "",
             "pb_9": 1,
         },
+    )
+
+
+def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
+    """Test that summary.weave.trace_name is backtick-quoted when used with costs.
+
+    Regression test: ClickHouse error code 62 (SYNTAX_ERROR) occurred because
+    the dotted alias `summary.weave.trace_name` was interpreted as nested field
+    access instead of a column identifier. The alias must be backtick-quoted
+    in the all_calls CTE SELECT, the final SELECT, and the final GROUP BY.
+    """
+    cq = CallsQuery(
+        project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True
+    )
+    cq.add_field("id")
+    cq.add_field("summary.weave.trace_name")
+    cq.add_field("started_at")
+
+    pb = ParamBuilder("pb")
+    sql = cq.as_sql(pb)
+
+    # The alias in the all_calls CTE SELECT must be backtick-quoted
+    assert "AS `summary.weave.trace_name`" in sql, (
+        "Expected backtick-quoted alias in all_calls CTE, got unquoted"
+    )
+
+    # The final SELECT and GROUP BY must also use the backtick-quoted name.
+    # After the cost CTEs, the final SELECT references columns from ranked_prices.
+    # Split at the final select comment to isolate it.
+    final_select_marker = "-- Final Select"
+    assert final_select_marker in sql
+    final_select = sql[sql.index(final_select_marker) :]
+
+    # The final SELECT must reference the backtick-quoted column
+    assert "`summary.weave.trace_name`" in final_select, (
+        "Expected backtick-quoted field in final SELECT/GROUP BY, got unquoted"
+    )
+
+    # The unquoted form must NOT appear as a bare identifier in the final select
+    # (it's fine inside comments or the CASE expression, but not as a standalone column ref)
+    # Check that GROUP BY uses the quoted form
+    group_by_section = final_select[final_select.index("GROUP BY") :]
+    assert "`summary.weave.trace_name`" in group_by_section, (
+        "Expected backtick-quoted field in GROUP BY clause"
     )
