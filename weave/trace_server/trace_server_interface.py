@@ -1589,6 +1589,30 @@ class EvaluationStatusRes(BaseModel):
     )
 
 
+class CallsScoreReq(BaseModelStrict):
+    """Request to enqueue scoring jobs for a list of calls.
+
+    Scoring is performed asynchronously by the call_scoring_worker, which
+    consumes messages from Kafka and applies each scorer_ref to each call_id.
+    """
+
+    project_id: str
+    call_ids: list[str] = Field(description="List of call IDs to score")
+    scorer_refs: list[str] = Field(description="List of scorer refs to apply")
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class CallsScoreRes(BaseModel):
+    """Empty response for calls_score.
+
+    Defined as a model (rather than returning None) to follow the convention
+    used throughout this interface and to allow fields to be added later
+    without a breaking change.
+    """
+
+    pass
+
+
 class OpCreateBody(BaseModel):
     """Request body for creating an Op object via REST API.
 
@@ -2600,6 +2624,9 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+
+    # Scoring API
+    def calls_score(self, req: CallsScoreReq) -> CallsScoreRes: ...
 
 
 class ObjectInterface(Protocol):
