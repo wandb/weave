@@ -2745,6 +2745,43 @@ def test_call_query_stream_columns_with_costs(client):
     assert calls[0].summary.get("weave", {}).get("costs") is None
 
 
+def test_call_query_stream_trace_name_column_with_costs(client):
+    if client_is_sqlite(client):
+        return
+
+    @weave.op
+    def my_traced_op(x: int) -> dict[str, Any]:
+        return {
+            "result": x * 2,
+            "usage": {"prompt_tokens": 5, "completion_tokens": 3},
+            "model": "cost_trace_name_model",
+        }
+
+    my_traced_op(1)
+
+    client.add_cost(
+        "cost_trace_name_model",
+        Decimal("0.00001"),
+        Decimal("0.00003"),
+        datetime.datetime.now(tz=datetime.timezone.utc),
+    )
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                columns=["id", "summary.weave.trace_name"],
+                include_costs=True,
+            )
+        )
+    )
+
+    assert len(calls) == 1
+    assert calls[0].summary is not None
+    assert calls[0].summary.get("weave", {}).get("costs") is not None
+    assert "my_traced_op" in calls[0].summary["weave"]["trace_name"]
+
+
 def test_read_call_start_with_cost(client):
     if client_is_sqlite(client):
         # dont run this test for sqlite

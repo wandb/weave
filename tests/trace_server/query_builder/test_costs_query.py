@@ -785,13 +785,7 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
 
 
 def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
-    """Test that summary.weave.trace_name is backtick-quoted when used with costs.
-
-    Regression test: ClickHouse error code 62 (SYNTAX_ERROR) occurred because
-    the dotted alias `summary.weave.trace_name` was interpreted as nested field
-    access instead of a column identifier. The alias must be backtick-quoted
-    in the all_calls CTE SELECT, the final SELECT, and the final GROUP BY.
-    """
+    """Test that summary.weave.trace_name is backtick-quoted when used with costs."""
     cq = CallsQuery(
         project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True
     )
