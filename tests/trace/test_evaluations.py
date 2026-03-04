@@ -9,12 +9,12 @@ from PIL import Image
 
 import weave
 from tests.trace.util import AnyIntMatcher, AnyStrMatcher
-
-_LATENCY_TOL = 10 if sys.platform == "win32" else 1
 from weave import Evaluation, Model
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
 from weave.trace_server import trace_server_interface as tsi
+
+_LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
 
 def flatten_calls(

@@ -4,8 +4,6 @@ from unittest import mock
 
 import pytest
 
-_LATENCY_TOL = 10 if sys.platform == "win32" else 1
-
 import weave
 from tests.trace.util import client_is_sqlite
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
@@ -26,6 +24,8 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.trace_server.workers.evaluate_model_worker import evaluate_model_worker
 from weave.utils.project_id import from_project_id, to_project_id
+
+_LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
 
 @pytest.mark.asyncio

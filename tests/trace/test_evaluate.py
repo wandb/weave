@@ -263,7 +263,9 @@ async def test_basic_evaluation_with_scorer_styles(
     predict_and_score_calls = list(evaluation.predict_and_score.calls())
     assert len(predict_and_score_calls) == 3
     outputs = [c.output for c in predict_and_score_calls]
-    assert all(o.pop("model_latency") == pytest.approx(0, abs=_LATENCY_TOL) for o in outputs)
+    assert all(
+        o.pop("model_latency") == pytest.approx(0, abs=_LATENCY_TOL) for o in outputs
+    )
 
     # Build expected output dynamically
     expected_output = {
