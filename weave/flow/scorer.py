@@ -37,6 +37,10 @@ class Scorer(Object):
         super().model_post_init(__context)
         _validate_scorer_signature(self)
 
+    @property
+    def display_name(self) -> str:
+        return self.name or self.__class__.__name__
+
     @op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError

@@ -63,8 +63,28 @@ class Monitor(Object):
 
     sampling_rate: float = Field(ge=0, le=1, default=1)
     scorers: list[Scorer]
-    op_names: list[str]
+    op_names: list[str] = Field(default_factory=list)
     query: Query | None = None
+    merged_scorers_prompt_header: str | None = Field(
+        default=None,
+        description="Text prepended before the merged classifier prompts.",
+    )
+    merged_scorers_prompt_footer: str | None = Field(
+        default=None,
+        description="Text appended after the merged classifier prompts.",
+    )
+    merge_scorers: bool = Field(
+        default=False,
+        description="If True, the scorers will be merged into a single scorer.",
+    )
+    merged_scorers_prompt_section_header: str = Field(
+        default="{display_name}",
+        description="Text to prepend before each merged scorer prompt (use `{display_name}` to access the scorer's name).",
+    )
+    is_traced: bool = Field(
+        default=False,
+        description="Trace this monitor's scorers and any downstream LLM calls.",
+    )
     active: bool = False
 
     # Debounced scoring is enabled when this is present, and disabled when it is not.

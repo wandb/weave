@@ -1807,11 +1807,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Annotation queues not supported in SQLite."""
         raise NotImplementedError("Annotation queues are not supported in SQLite")
 
-    def categorize_traces(
-        self, req: tsi.CategorizeTracesReq
-    ) -> tsi.CategorizeTracesRes:
-        raise NotImplementedError("Categorization is not supported in SQLite mode")
-
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         if self._evaluate_model_dispatcher is None:
             raise ValueError("Evaluate model dispatcher is not set")
