@@ -785,13 +785,7 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
 
 
 def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
-    """Regression: summary.weave.trace_name must be backtick-quoted in cost queries.
-
-    When include_costs=True and a dotted summary field is selected, the field
-    appears in the cost final SELECT and GROUP BY clauses.  Without backtick-
-    quoting, ClickHouse raises SYNTAX_ERROR (code 62) because it interprets
-    the dots as nested field access.
-    """
+    """Test that summary.weave.trace_name is backtick-quoted when used with costs."""
     cq = CallsQuery(
         project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True
     )
