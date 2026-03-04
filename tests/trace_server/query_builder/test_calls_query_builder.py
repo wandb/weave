@@ -1587,6 +1587,112 @@ def test_query_with_summary_weave_latency_ms_filter() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("read_table", "expected_table"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_summary_weave_field_select_backtick_quoting(
+    read_table: ReadTable, expected_table: str
+) -> None:
+    """Regression: summary.weave.* fields used as SQL aliases must be backtick-quoted.
+
+    Without quoting, ClickHouse interprets dots as nested field access, causing
+    SYNTAX_ERROR (code 62).  This test verifies the fix for all three computed
+    summary fields on both read tables.
+    """
+    cq = CallsQuery(project_id="project", read_table=read_table)
+    cq.add_field("id")
+    cq.add_field("summary.weave.trace_name")
+    cq.add_field("summary.weave.status")
+    cq.add_field("summary.weave.latency_ms")
+
+    if read_table == ReadTable.CALLS_MERGED:
+        assert_sql(
+            cq,
+            f"""
+            SELECT {expected_table}.id AS id,
+                CASE
+                    WHEN argMaxMerge({expected_table}.display_name) IS NOT NULL
+                        AND argMaxMerge({expected_table}.display_name) != '' THEN argMaxMerge({expected_table}.display_name)
+                    WHEN any({expected_table}.op_name) IS NOT NULL
+                        AND any({expected_table}.op_name) LIKE 'weave-trace-internal:///%' THEN
+                            regexpExtract(toString(any({expected_table}.op_name)), '/([^/:]*):', 1)
+                    ELSE any({expected_table}.op_name)
+                END AS `summary.weave.trace_name`,
+                CASE
+                    WHEN any({expected_table}.exception) IS NOT NULL THEN {{pb_1:String}}
+                    WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any({expected_table}.summary_dump), {{pb_0:String}}), 'null'), '')), 0) > 0 THEN {{pb_4:String}}
+                    WHEN any({expected_table}.ended_at) IS NULL THEN {{pb_2:String}}
+                    ELSE {{pb_3:String}}
+                END AS `summary.weave.status`,
+                CASE
+                    WHEN any({expected_table}.ended_at) IS NULL THEN NULL
+                    ELSE (toUnixTimestamp64Milli(any({expected_table}.ended_at)) - toUnixTimestamp64Milli(any({expected_table}.started_at)))
+                END AS `summary.weave.latency_ms`
+            FROM {expected_table}
+            PREWHERE {expected_table}.project_id = {{pb_5:String}}
+            GROUP BY ({expected_table}.project_id, {expected_table}.id)
+            HAVING (
+                ((any({expected_table}.deleted_at) IS NULL))
+                AND
+                ((NOT ((any({expected_table}.started_at) IS NULL))))
+            )
+            """,
+            {
+                "pb_0": '$."status_counts"."error"',
+                "pb_1": "error",
+                "pb_2": "running",
+                "pb_3": "success",
+                "pb_4": "descendant_error",
+                "pb_5": "project",
+            },
+        )
+    else:
+        assert_sql(
+            cq,
+            f"""
+            SELECT {expected_table}.id AS id,
+                CASE
+                    WHEN {expected_table}.display_name != {{pb_0:String}} THEN {expected_table}.display_name
+                    WHEN {expected_table}.op_name IS NOT NULL
+                        AND {expected_table}.op_name LIKE 'weave-trace-internal:///%' THEN
+                            regexpExtract(toString({expected_table}.op_name), '/([^/:]*):', 1)
+                    ELSE {expected_table}.op_name
+                END AS `summary.weave.trace_name`,
+                CASE
+                    WHEN {expected_table}.exception != {{pb_6:String}} THEN {{pb_2:String}}
+                    WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE({expected_table}.summary_dump, {{pb_1:String}}), 'null'), '')), 0) > 0 THEN {{pb_5:String}}
+                    WHEN {expected_table}.ended_at = {{pb_7:DateTime64(6)}} THEN {{pb_3:String}}
+                    ELSE {{pb_4:String}}
+                END AS `summary.weave.status`,
+                CASE
+                    WHEN {expected_table}.ended_at = {{pb_8:DateTime64(6)}} THEN NULL
+                    ELSE (toUnixTimestamp64Milli({expected_table}.ended_at) - toUnixTimestamp64Milli({expected_table}.started_at))
+                END AS `summary.weave.latency_ms`
+            FROM {expected_table}
+            PREWHERE {expected_table}.project_id = {{pb_10:String}}
+            WHERE 1
+              AND ({expected_table}.deleted_at = {{pb_9:DateTime64(3)}})
+            """,
+            {
+                "pb_0": "",
+                "pb_1": '$."status_counts"."error"',
+                "pb_2": "error",
+                "pb_3": "running",
+                "pb_4": "success",
+                "pb_5": "descendant_error",
+                "pb_6": "",
+                "pb_7": SENTINEL_DATETIME,
+                "pb_8": SENTINEL_DATETIME,
+                "pb_9": SENTINEL_DATETIME,
+                "pb_10": "project",
+            },
+        )
+
+
 def test_query_with_summary_weave_trace_name_sort() -> None:
     """Test sorting by summary.weave.trace_name field."""
     cq = CallsQuery(project_id="project")
