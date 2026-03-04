@@ -1,10 +1,13 @@
 import datetime
 import json
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Optional
 
 import httpx
+
+logger = logging.getLogger(__name__)
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 
 # =============================================================================
@@ -317,12 +320,13 @@ class ErrorRegistry:
             OperationalError as CHOperationalError,
         )
 
-        self.register(
-            CHDatabaseError, 502, lambda exc: {"reason": "Temporary backend error"}
-        )
-        self.register(
-            CHOperationalError, 502, lambda exc: {"reason": "Temporary backend error"}
-        )
+        def _format_ch_error(exc: Exception) -> dict[str, Any]:
+            """Log the actual ClickHouse error before returning generic message."""
+            logger.exception("ClickHouse error (returning generic 502): %s", exc)
+            return {"reason": "Temporary backend error"}
+
+        self.register(CHDatabaseError, 502, _format_ch_error)
+        self.register(CHOperationalError, 502, _format_ch_error)
 
         # GraphQL transport errors
         self.register(TransportQueryError, 403, lambda exc: {"reason": "Forbidden"})

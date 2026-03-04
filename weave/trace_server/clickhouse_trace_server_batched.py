@@ -127,6 +127,14 @@ from weave.trace_server.feedback import (
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
+from weave.trace_server.feedback_payload_schema import (
+    build_feedback_payload_sample_query,
+    discover_payload_schema,
+)
+from weave.trace_server.feedback_stats_query_builder import (
+    build_feedback_stats_query,
+    build_feedback_stats_window_query,
+)
 from weave.trace_server.file_storage import (
     FileStorageClient,
     FileStorageReadError,
@@ -146,7 +154,6 @@ from weave.trace_server.llm_completion import (
     _build_choices_array,
     _build_completion_response,
     get_custom_provider_info,
-    lite_llm_completion,
     lite_llm_completion_stream,
     resolve_and_apply_prompt,
 )
@@ -221,6 +228,43 @@ logger.setLevel(logging.INFO)
 # maxsize: Maximum connections per pool (set higher than thread count to avoid blocking)
 # num_pools: Number of distinct connection pools (for different hosts/configs)
 _CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
+
+# Aggregation prefixes for window_stats column parsing, ordered longest-first so that
+# "count_true" and "count_false" are matched before the shorter "count" prefix.
+_WINDOW_STAT_AGG_PREFIXES = (
+    "count_true",
+    "count_false",
+    "avg",
+    "sum",
+    "min",
+    "max",
+    "count",
+)
+
+
+def _parse_window_stat_col(col: str) -> tuple[str, str] | None:
+    """Parse a window-stats column alias into (agg_key, metric_slug).
+
+    Column aliases are produced by aggregation_selects_for_metric, e.g.:
+      avg_output_score → ("avg", "output_score")
+      count_true_output_score → ("count_true", "output_score")
+      p95_output_score → ("p95", "output_score")
+
+    Returns None if the column does not match any known pattern.
+    """
+    for prefix in _WINDOW_STAT_AGG_PREFIXES:
+        if col.startswith(prefix + "_"):
+            return prefix, col[len(prefix) + 1 :]
+    # Percentile columns: p5_slug, p95_slug, p99_slug, etc.
+    if (
+        "_" in col
+        and col[0] == "p"
+        and col[1 : col.index("_")].replace(".", "").isdigit()
+    ):
+        idx = col.index("_")
+        return col[:idx], col[idx + 1 :]
+    return None
+
 
 # Precomputed list of (column_index, field_name) for every sentinel field that appears
 # in ALL_CALL_COMPLETE_INSERT_COLUMNS.  Used by _insert_call_complete_batch to enforce
@@ -1094,6 +1138,71 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             usage_buckets=usage_buckets,
             call_buckets=call_buckets,
         )
+
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        """Return aggregated feedback statistics over time buckets.
+
+        Extracts numeric values from payload_dump via json_path and aggregates
+        by time bucket. Filters by project_id, optional feedback_type and trigger_ref.
+        Also includes window-level stats (min, max, avg, percentiles) over the full range.
+        """
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        if not req.metrics:
+            return tsi.FeedbackStatsRes(
+                start=req.start,
+                end=end,
+                granularity=3600,
+                timezone=req.timezone or "UTC",
+                buckets=[],
+            )
+        pb = ParamBuilder()
+        query_result = build_feedback_stats_query(req, pb)
+        result = self._query(query_result.sql, query_result.parameters)
+        buckets = rows_to_bucket_dicts(query_result.columns, result.result_rows)
+
+        window_stats: dict[str, tsi.FeedbackWindowStat] | None = None
+        pb_window = ParamBuilder()
+        window_query = build_feedback_stats_window_query(req, pb_window)
+        if window_query is not None:
+            window_result = self._query(window_query.sql, window_query.parameters)
+            if window_result.result_rows:
+                row = window_result.result_rows[0]
+                raw_stats: dict[str, dict[str, float | None]] = {}
+                for idx, col in enumerate(window_query.columns):
+                    if idx >= len(row):
+                        break
+                    parsed = _parse_window_stat_col(col)
+                    if parsed is None:
+                        continue
+                    key, slug = parsed
+                    val = row[idx]
+                    raw_stats.setdefault(slug, {})[key] = (
+                        float(val) if val is not None else None
+                    )
+                window_stats = {
+                    slug: tsi.FeedbackWindowStat(**stats)
+                    for slug, stats in raw_stats.items()
+                }
+
+        return tsi.FeedbackStatsRes(
+            start=query_result.start,
+            end=query_result.end,
+            granularity=query_result.granularity_seconds,
+            timezone=req.timezone or "UTC",
+            buckets=buckets,
+            window_stats=window_stats,
+        )
+
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        """Discover feedback payload schema from sample rows."""
+        pb = ParamBuilder()
+        sql, params = build_feedback_payload_sample_query(req, pb)
+        result = self._query(sql, params)
+        payload_strs = [row[0] for row in result.result_rows if row and row[0]]
+        paths = discover_payload_schema(payload_strs)
+        return tsi.FeedbackPayloadSchemaRes(paths=paths)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.trace_usage")
     def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
@@ -5506,8 +5615,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Build summary with usage info if available
         summary: tsi.SummaryInsertMap = {}
-        if "usage" in res.response:
-            summary["usage"] = {model_name: res.response["usage"]}
+        # # if "usage" in res.response:
+        #     summary["usage"] = {model_name: res.response["usage"]}
 
         # Check for exception
         exception = res.response.get("error")
