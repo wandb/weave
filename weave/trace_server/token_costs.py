@@ -598,7 +598,7 @@ def get_cost_final_select(
     order_by = ""
     if order_fields:
         order_parts = [
-            of.as_sql(pb, "ranked_prices", use_agg_fn=False) for of in order_fields
+            of.as_sql(pb, "ranked_prices", use_agg_fn=True) for of in order_fields
         ]
         order_by = f"ORDER BY {', '.join(order_parts)}"
 
