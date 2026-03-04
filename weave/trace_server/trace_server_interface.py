@@ -1555,6 +1555,18 @@ class EvaluateModelRes(BaseModel):
     call_id: str
 
 
+class CategorizeTracesReq(BaseModelStrict):
+    project_id: str
+    call_ids: list[str]
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+    external_project_id: str | None = None
+    wb_username: str | None = None
+
+
+class CategorizeTracesRes(BaseModel):
+    pass
+
+
 class EvaluationStatusReq(BaseModelStrict):
     project_id: str
     call_id: str
@@ -2620,6 +2632,11 @@ class TraceServerInterface(Protocol):
     def annotator_queue_items_progress_update(
         self, req: AnnotatorQueueItemsProgressUpdateReq
     ) -> AnnotatorQueueItemsProgressUpdateRes: ...
+
+    # Categorization API
+    def categorize_traces(
+        self, req: CategorizeTracesReq
+    ) -> CategorizeTracesRes: ...
 
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...

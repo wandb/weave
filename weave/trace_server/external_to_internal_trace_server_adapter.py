@@ -523,6 +523,17 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.annotator_queue_items_progress_update, req
         )
 
+    def categorize_traces(
+        self, req: tsi.CategorizeTracesReq
+    ) -> tsi.CategorizeTracesRes:
+        # Preserve the external project ID before conversion so the worker
+        # can use it for completions API calls without a Gorilla lookup.
+        req.external_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._internal_trace_server.categorize_traces(req)
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
