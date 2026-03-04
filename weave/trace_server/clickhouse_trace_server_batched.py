@@ -570,6 +570,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     val=op_val,
                     wb_user_id=req.wb_user_id,
                 )
+            )
         res = self.obj_create_batch(obj_creation_batch)
 
         for result in res:
