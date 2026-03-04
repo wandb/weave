@@ -4,6 +4,8 @@ from unittest import mock
 
 import pytest
 
+_LATENCY_TOL = 10 if sys.platform == "win32" else 1
+
 import weave
 from tests.trace.util import client_is_sqlite
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
@@ -84,7 +86,7 @@ async def test_evaluation_status(client):
         output={
             "output": {"mean": 3.0},
             "scorer": {"mean": 1.0},
-            "model_latency": {"mean": pytest.approx(0, abs=1)},
+            "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
         }
     )
 
@@ -374,9 +376,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         assert eval_call.summary["weave"]["status"] == TraceStatus.DESCENDANT_ERROR
         assert eval_call.output == {
             "LLMAsAJudgeScorer": None,
-            "model_latency": {"mean": pytest.approx(0, abs=2)}
-            if sys.platform != "win32"
-            else {"mean": pytest.approx(0, abs=10)},
+            "model_latency": {"mean": pytest.approx(0, abs=max(2, _LATENCY_TOL))},
         }
     else:
         assert eval_call.summary["status_counts"] == {
@@ -387,5 +387,5 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         assert eval_call.output == {
             "output": {"score": {"mean": 9.0}},
             "LLMAsAJudgeScorer": {"score": {"mean": 9.0}},
-            "model_latency": {"mean": pytest.approx(0, abs=1)},
+            "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
         }
