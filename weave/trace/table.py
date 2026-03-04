@@ -6,7 +6,7 @@ from typing import Any
 from weave.trace.refs import TableRef
 
 
-class Table:
+class Table:  # noqa: PLW1641
     ref: TableRef | None
 
     def __init__(self, rows: list[dict]) -> None:

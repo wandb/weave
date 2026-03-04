@@ -12,7 +12,6 @@ Optimization SQL is applied before GROUP BY, reducing memory usage and
 improving performance for complex conditions.
 """
 
-import datetime
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -21,6 +20,7 @@ from pydantic import BaseModel
 from weave.trace_server.calls_query_builder.utils import (
     NotContext,
     param_slot,
+    timestamp_to_datetime_str,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import clickhouse_cast
@@ -654,13 +654,6 @@ def _create_like_optimized_in_condition(
     return or_sql
 
 
-def _timestamp_to_datetime_str(timestamp: int) -> str:
-    """Converts a timestamp to a datetime string."""
-    return datetime.datetime.fromtimestamp(
-        timestamp, tz=datetime.timezone.utc
-    ).strftime("%Y-%m-%d %H:%M:%S.%f")
-
-
 def _create_datetime_optimization_sql(
     operation: tsi_query.GtOperation
     | tsi_query.GteOperation
@@ -706,7 +699,7 @@ def _create_datetime_optimization_sql(
         buffer_sign *= -1
     timestamp += buffer_sign * buffer_seconds
 
-    datetime_str = _timestamp_to_datetime_str(timestamp)
+    datetime_str = timestamp_to_datetime_str(timestamp)
 
     param_name = pb.add_param(datetime_str)
     return (

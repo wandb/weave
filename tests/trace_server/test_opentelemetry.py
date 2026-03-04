@@ -203,6 +203,78 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     assert len(res.calls) == 0
 
 
+def test_otel_export_multiple_processed_spans(client: weave_client.WeaveClient):
+    """Test that exporting multiple ProcessedResourceSpans produces correct calls.
+
+    Regression test: the object creation code was previously nested inside the
+    per-processed-span loop, causing it to re-process already-resolved calls on
+    the 2nd+ iteration and corrupt their op_name with a mangled ref URI.
+    """
+    project_id = client._project_id()
+
+    # Build two separate ProcessedResourceSpans, each with one span
+    processed_spans = []
+    expected_span_ids = []
+    for i in range(2):
+        span = create_test_span()
+        span.name = f"span_{i}"
+        expected_span_ids.append(hexlify(span.span_id).decode("ascii"))
+
+        scope = InstrumentationScope()
+        scope.name = "test_instrumentation"
+        scope.version = "1.0.0"
+
+        scope_spans = ScopeSpans()
+        scope_spans.scope.CopyFrom(scope)
+        scope_spans.spans.append(span)
+
+        resource = Resource()
+        kv = KeyValue()
+        kv.key = "service.name"
+        kv.value.string_value = "test_service"
+        resource.attributes.append(kv)
+
+        resource_spans = ResourceSpans()
+        resource_spans.resource.CopyFrom(resource)
+        resource_spans.scope_spans.append(scope_spans)
+
+        processed_spans.append(
+            tsi.ProcessedResourceSpans(
+                entity="test-entity",
+                project="test-project",
+                run_id=f"run_{i}" if i > 0 else None,
+                resource_spans=resource_spans,
+            )
+        )
+
+    export_req = tsi.OTelExportReq(
+        project_id=project_id,
+        processed_spans=processed_spans,
+        wb_user_id="abcd123",
+    )
+
+    response = client.server.otel_export(export_req)
+    assert isinstance(response, tsi.OTelExportRes)
+    assert response.partial_success is None
+
+    # Both spans should be ingested
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=project_id))
+    assert len(res.calls) == 2
+
+    ingested_ids = {c.id for c in res.calls}
+    for sid in expected_span_ids:
+        assert sid in ingested_ids
+
+    # In clickhouse, every call's op_name must be a valid ref URI, not a
+    # mangled/re-sanitized name.  The sqlite server doesn't do op object
+    # resolution, so we skip this assertion there.
+    if not client_is_sqlite(client):
+        for call in res.calls:
+            assert call.op_name.startswith("weave:///"), (
+                f"op_name should be a ref URI, got: {call.op_name}"
+            )
+
+
 def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
     """Test the otel_export method with turn and thread attributes."""
     # Create a test export request

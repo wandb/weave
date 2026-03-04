@@ -63,9 +63,8 @@ def log_dropped_feedback_batch(
     logger.error(f"Error sending batch of {len(batch)} feedback events to server")
     dropped_feedback_types = []
     for item in batch:
-        if hasattr(item, "req"):
-            item = item.req
-        dropped_feedback_types.append(item.feedback_type)
+        feedback_item = item.req if hasattr(item, "req") else item
+        dropped_feedback_types.append(feedback_item.feedback_type)
     if dropped_feedback_types:
         logger.error(f"dropped feedback types: {dropped_feedback_types}")
     response = getattr(e, "response", None)

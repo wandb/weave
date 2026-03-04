@@ -106,6 +106,12 @@ class InsertTooLarge(Error):
     pass
 
 
+class LightweightUpdateNotAllowedError(Error):
+    """Raised when ClickHouse lightweight updates are not enabled."""
+
+    pass
+
+
 # User error
 class InvalidFieldError(Error):
     """Raised when a field is invalid."""
@@ -285,6 +291,7 @@ class ErrorRegistry:
 
         # 502
         self.register(QueryMemoryLimitExceededError, 502)
+        self.register(LightweightUpdateNotAllowedError, 502)
 
         # 504
         self.register(QueryTimeoutExceededError, 504)
@@ -328,7 +335,7 @@ class ErrorRegistry:
 
 def _get_error_registry() -> ErrorRegistry:
     """Get the global error registry, initializing it if needed."""
-    global _error_registry
+    global _error_registry  # noqa: PLW0603
     if _error_registry is None:
         _error_registry = ErrorRegistry()
     return _error_registry
@@ -394,9 +401,19 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "expects a UInt64, will fail: Value -10000000000 cannot be parsed as UInt64. "
             "To resolve, ensure all query parameters are of the correct type and within valid ranges."
         ) from e
+    if "SUPPORT_IS_DISABLED" in error_str and "Lightweight updates" in error_str:
+        raise LightweightUpdateNotAllowedError(
+            "Lightweight updates are not allowed on the ClickHouse backend. "
+            "This is a backend configuration issue that needs to be resolved."
+        ) from e
+    if "UNKNOWN_TYPE_OF_QUERY" in error_str and "UpdateQuery" in error_str:
+        raise LightweightUpdateNotAllowedError(
+            "Lightweight update queries are not supported by this ClickHouse version or configuration. "
+            "This is a ClickHouse version issue that needs to be resolved."
+        ) from e
 
     # Re-raise the original exception if no known pattern matches
-    raise
+    raise e
 
 
 def _format_missing_llm_api_key(exc: Exception) -> dict[str, Any]:

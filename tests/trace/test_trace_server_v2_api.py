@@ -13,7 +13,16 @@ This module tests the V2 API endpoints for:
 The tests run against both SQLite and ClickHouse backends.
 """
 
+import asyncio
+import datetime
+
+import pytest
+
+import weave
+from weave.evaluation.eval_imperative import EvaluationLogger
+from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.ids import generate_id
 from weave.utils.project_id import from_project_id
 
 
@@ -1718,3 +1727,760 @@ class ScoreEvalRunModel(weave.Model):
         read_res = client.server.score_read(read_req)
 
         assert read_res.evaluation_run_id == run_res.evaluation_run_id
+
+
+class TestEvalResultsReadAPI:
+    """Tests for the read-oriented eval results API."""
+
+    def test_eval_results_query_intersection(self, client):
+        """Keeps only rows shared by all requested evaluations."""
+        project_id = client._project_id()
+        entity, project = from_project_id(project_id)
+
+        scorer_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="intersection_scorer",
+                op_source_code="def score(output):\n    return 1",
+            )
+        )
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        run_a = client.server.evaluation_run_create(
+            tsi.EvaluationRunCreateReq(
+                project_id=project_id,
+                evaluation="eval://a",
+                model="model://a",
+            )
+        )
+        run_b = client.server.evaluation_run_create(
+            tsi.EvaluationRunCreateReq(
+                project_id=project_id,
+                evaluation="eval://b",
+                model="model://b",
+            )
+        )
+
+        pred_a_shared = client.server.prediction_create(
+            tsi.PredictionCreateReq(
+                project_id=project_id,
+                model="model://a",
+                inputs={"x": "shared"},
+                output="a-shared",
+                evaluation_run_id=run_a.evaluation_run_id,
+            )
+        )
+        pred_a_only = client.server.prediction_create(
+            tsi.PredictionCreateReq(
+                project_id=project_id,
+                model="model://a",
+                inputs={"x": "only-a"},
+                output="a-only",
+                evaluation_run_id=run_a.evaluation_run_id,
+            )
+        )
+        pred_b_shared = client.server.prediction_create(
+            tsi.PredictionCreateReq(
+                project_id=project_id,
+                model="model://b",
+                inputs={"x": "shared"},
+                output="b-shared",
+                evaluation_run_id=run_b.evaluation_run_id,
+            )
+        )
+
+        client.server.score_create(
+            tsi.ScoreCreateReq(
+                project_id=project_id,
+                prediction_id=pred_a_shared.prediction_id,
+                scorer=scorer_ref,
+                value=0.5,
+                evaluation_run_id=run_a.evaluation_run_id,
+            )
+        )
+        client.server.score_create(
+            tsi.ScoreCreateReq(
+                project_id=project_id,
+                prediction_id=pred_a_only.prediction_id,
+                scorer=scorer_ref,
+                value=0.2,
+                evaluation_run_id=run_a.evaluation_run_id,
+            )
+        )
+        client.server.score_create(
+            tsi.ScoreCreateReq(
+                project_id=project_id,
+                prediction_id=pred_b_shared.prediction_id,
+                scorer=scorer_ref,
+                value=0.8,
+                evaluation_run_id=run_b.evaluation_run_id,
+            )
+        )
+
+        client.server.prediction_finish(
+            tsi.PredictionFinishReq(
+                project_id=project_id,
+                prediction_id=pred_a_shared.prediction_id,
+            )
+        )
+        client.server.prediction_finish(
+            tsi.PredictionFinishReq(
+                project_id=project_id,
+                prediction_id=pred_a_only.prediction_id,
+            )
+        )
+        client.server.prediction_finish(
+            tsi.PredictionFinishReq(
+                project_id=project_id,
+                prediction_id=pred_b_shared.prediction_id,
+            )
+        )
+
+        res = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run_a.evaluation_run_id, run_b.evaluation_run_id],
+                require_intersection=True,
+            )
+        )
+
+        assert res.total_rows == 1
+        assert len(res.rows) == 1
+        assert {e.evaluation_call_id for e in res.rows[0].evaluations} == {
+            run_a.evaluation_run_id,
+            run_b.evaluation_run_id,
+        }
+
+    def test_eval_results_summary_pass_signal(self, client):
+        """Aggregates pass-rate stats from scorer outputs with `passed` booleans."""
+        project_id = client._project_id()
+        entity, project = from_project_id(project_id)
+
+        scorer_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="pass_scorer",
+                op_source_code="def score(output):\n    return 1",
+            )
+        )
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        run = client.server.evaluation_run_create(
+            tsi.EvaluationRunCreateReq(
+                project_id=project_id,
+                evaluation="eval://pass",
+                model="model://pass",
+            )
+        )
+        prediction = client.server.prediction_create(
+            tsi.PredictionCreateReq(
+                project_id=project_id,
+                model="model://pass",
+                inputs={"x": "pass-data"},
+                output="output",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+
+        prediction_call = client.server.call_read(
+            tsi.CallReadReq(project_id=project_id, id=prediction.prediction_id)
+        ).call
+        assert prediction_call is not None
+        assert prediction_call.parent_id is not None
+        predict_and_score_id = prediction_call.parent_id
+
+        score_call_id = generate_id()
+        client.server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=predict_and_score_id,
+                    op_name="PassScorer.score",
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    attributes={
+                        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                            constants.SCORE_ATTR_KEY: "true",
+                            constants.SCORE_SCORER_ATTR_KEY: scorer_ref,
+                        }
+                    },
+                    inputs={"self": scorer_ref},
+                    wb_user_id="test-user",
+                )
+            )
+        )
+        client.server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    output={"passed": True},
+                    summary={},
+                )
+            )
+        )
+        client.server.prediction_finish(
+            tsi.PredictionFinishReq(
+                project_id=project_id, prediction_id=prediction.prediction_id
+            )
+        )
+
+        summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+            )
+        ).summary
+
+        eval_summary = next(
+            e
+            for e in summary.evaluations
+            if e.evaluation_call_id == run.evaluation_run_id
+        )
+        scorer_stats = next(
+            s
+            for s in eval_summary.scorer_stats
+            if s.scorer_key == "pass_scorer" and s.path == "passed"
+        )
+        assert eval_summary.trial_count == 1
+        assert scorer_stats.path == "passed"
+        assert scorer_stats.value_type == "binary"
+        assert scorer_stats.pass_known_count == 1
+        assert scorer_stats.pass_true_count == 1
+        assert scorer_stats.pass_rate == 1.0
+
+    def test_eval_results_summary_nested_passed_dimension(self, client):
+        """Verify scorer_stats emits one entry per flattened leaf (e.g. token_distance.passed)."""
+        project_id = client._project_id()
+        entity, project = from_project_id(project_id)
+
+        scorer_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="token_distance",
+                op_source_code="def score(output):\n    return 0",
+            )
+        )
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        run = client.server.evaluation_run_create(
+            tsi.EvaluationRunCreateReq(
+                project_id=project_id,
+                evaluation="eval://token",
+                model="model://token",
+            )
+        )
+        prediction = client.server.prediction_create(
+            tsi.PredictionCreateReq(
+                project_id=project_id,
+                model="model://token",
+                inputs={"x": "data"},
+                output="output",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        prediction_call = client.server.call_read(
+            tsi.CallReadReq(project_id=project_id, id=prediction.prediction_id)
+        ).call
+        assert prediction_call is not None
+        assert prediction_call.parent_id is not None
+
+        score_call_id = generate_id()
+        client.server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=prediction_call.parent_id,
+                    op_name="TokenDistance.score",
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    attributes={
+                        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                            constants.SCORE_ATTR_KEY: "true",
+                            constants.SCORE_SCORER_ATTR_KEY: scorer_ref,
+                        }
+                    },
+                    inputs={"self": scorer_ref},
+                    wb_user_id="test-user",
+                )
+            )
+        )
+        client.server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    output={"passed": True, "distance_tokens": 0},
+                    summary={},
+                )
+            )
+        )
+        client.server.prediction_finish(
+            tsi.PredictionFinishReq(
+                project_id=project_id, prediction_id=prediction.prediction_id
+            )
+        )
+
+        summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+            )
+        ).summary
+
+        eval_summary = next(
+            e
+            for e in summary.evaluations
+            if e.evaluation_call_id == run.evaluation_run_id
+        )
+        assert eval_summary.trial_count == 1
+        assert len(eval_summary.scorer_stats) == 2
+
+        passed_stats = next(
+            s
+            for s in eval_summary.scorer_stats
+            if s.scorer_key == "token_distance" and s.path == "passed"
+        )
+        assert passed_stats.value_type == "binary"
+        assert passed_stats.pass_known_count == 1
+        assert passed_stats.pass_true_count == 1
+        assert passed_stats.pass_rate == 1.0
+
+        distance_stats = next(
+            s
+            for s in eval_summary.scorer_stats
+            if s.scorer_key == "token_distance" and s.path == "distance_tokens"
+        )
+        assert distance_stats.value_type == "continuous"
+        assert distance_stats.numeric_count == 1
+        assert distance_stats.numeric_mean == 0.0
+
+    def test_eval_results_from_high_level_evaluation(self, client):
+        """Run a real weave.Evaluation then verify eval_results_query and summary."""
+        project_id = client._project_id()
+
+        class MatchScorer(weave.Scorer):
+            @weave.op
+            def score(self, target, output):
+                return {"passed": target == output}
+
+        @weave.op
+        def length_scorer(target, output) -> float:
+            return abs(len(str(output)) - len(str(target)))
+
+        @weave.op
+        async def predict(input) -> str:
+            return str(eval(input))
+
+        dataset_rows = [
+            {"input": "1 + 2", "target": "3"},
+            {"input": "2 ** 4", "target": "16"},
+        ]
+
+        evaluation = weave.Evaluation(
+            name="high-level-test",
+            dataset=dataset_rows,
+            scorers=[MatchScorer(), length_scorer],
+        )
+        asyncio.run(evaluation.evaluate(predict))
+        client.flush()
+
+        all_calls = list(
+            client.server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    columns=["id", "op_name"],
+                )
+            )
+        )
+        eval_root_id = next(
+            c.id for c in all_calls if c.op_name and "Evaluation.evaluate" in c.op_name
+        )
+
+        res = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[eval_root_id],
+            )
+        )
+
+        assert res.total_rows == 2
+        for row in res.rows:
+            assert len(row.evaluations) == 1
+            eval_entry = row.evaluations[0]
+            assert eval_entry.evaluation_call_id == eval_root_id
+            assert len(eval_entry.trials) == 1
+            trial = eval_entry.trials[0]
+            assert trial.model_output is not None
+            assert trial.predict_call_id is not None
+            assert "MatchScorer" in trial.scores
+            assert "length_scorer" in trial.scores
+
+        summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[eval_root_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+            )
+        ).summary
+        assert summary.row_count == 2
+        eval_sum = next(
+            e for e in summary.evaluations if e.evaluation_call_id == eval_root_id
+        )
+        assert eval_sum.trial_count == 2
+        stats_by_key_path = {(s.scorer_key, s.path): s for s in eval_sum.scorer_stats}
+        match_stats = stats_by_key_path.get(("MatchScorer", "passed"))
+        assert match_stats is not None
+        assert match_stats.pass_known_count == 2
+        assert match_stats.pass_true_count == 2
+        assert match_stats.pass_rate == 1.0
+
+    def test_eval_results_from_imperative_evaluation(self, client):
+        """Run a real EvaluationLogger then verify eval_results_query and summary."""
+        project_id = client._project_id()
+
+        ev = EvaluationLogger()
+
+        pred1 = ev.log_prediction(inputs={"q": "hello"}, output="world")
+        pred1.log_score(scorer="accuracy", score=True)
+        pred1.log_score(scorer="confidence", score=0.9)
+        pred1.finish()
+
+        pred2 = ev.log_prediction(inputs={"q": "foo"}, output="bar")
+        pred2.log_score(scorer="accuracy", score=False)
+        pred2.log_score(scorer="confidence", score=0.3)
+        pred2.finish()
+
+        pred3 = ev.log_prediction(inputs={"q": "baz"}, output="qux")
+        pred3.log_score(scorer="accuracy", score=True)
+        pred3.log_score(scorer="confidence", score=0.7)
+        pred3.finish()
+
+        ev.log_summary({"accuracy_mean": 0.67})
+        client.flush()
+
+        eval_root_id = ev._evaluate_call.id
+
+        res = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[eval_root_id],
+            )
+        )
+
+        assert res.total_rows == 3
+        for row in res.rows:
+            assert len(row.evaluations) == 1
+            eval_entry = row.evaluations[0]
+            assert eval_entry.evaluation_call_id == eval_root_id
+            assert len(eval_entry.trials) == 1
+            trial = eval_entry.trials[0]
+            assert trial.model_output is not None
+            assert "accuracy" in trial.scores
+            assert "confidence" in trial.scores
+
+        summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[eval_root_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+            )
+        ).summary
+        assert summary.row_count == 3
+        eval_sum = next(
+            e for e in summary.evaluations if e.evaluation_call_id == eval_root_id
+        )
+        assert eval_sum.trial_count == 3
+        stats_by_key_path = {(s.scorer_key, s.path): s for s in eval_sum.scorer_stats}
+        acc = stats_by_key_path.get(("accuracy", None))
+        assert acc is not None
+        assert acc.pass_known_count == 3
+        assert acc.pass_true_count == 2
+        assert acc.pass_rate == pytest.approx(2 / 3)
+
+        conf = stats_by_key_path.get(("confidence", None))
+        assert conf is not None
+        assert conf.numeric_count == 3
+        assert conf.numeric_mean == pytest.approx((0.9 + 0.3 + 0.7) / 3)
+        assert conf.pass_known_count == 0
+
+    def test_eval_results_summary_numeric_mean(self, client):
+        """Verify numeric aggregation in eval_results_summary."""
+        project_id = client._project_id()
+        entity, project = from_project_id(project_id)
+
+        scorer_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="numeric_scorer",
+                op_source_code="def score(output):\n    return 1.0",
+            )
+        )
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        run = client.server.evaluation_run_create(
+            tsi.EvaluationRunCreateReq(
+                project_id=project_id,
+                evaluation="eval://numeric",
+                model="model://numeric",
+            )
+        )
+
+        score_values = [0.5, 0.8, 0.2]
+        for i, val in enumerate(score_values):
+            pred = client.server.prediction_create(
+                tsi.PredictionCreateReq(
+                    project_id=project_id,
+                    model="model://numeric",
+                    inputs={"row_id": i},
+                    output=f"output-{i}",
+                    evaluation_run_id=run.evaluation_run_id,
+                )
+            )
+            client.server.score_create(
+                tsi.ScoreCreateReq(
+                    project_id=project_id,
+                    prediction_id=pred.prediction_id,
+                    scorer=scorer_ref,
+                    value=val,
+                    evaluation_run_id=run.evaluation_run_id,
+                )
+            )
+            client.server.prediction_finish(
+                tsi.PredictionFinishReq(
+                    project_id=project_id,
+                    prediction_id=pred.prediction_id,
+                )
+            )
+
+        summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+            )
+        ).summary
+
+        eval_sum = next(
+            e
+            for e in summary.evaluations
+            if e.evaluation_call_id == run.evaluation_run_id
+        )
+        assert eval_sum.trial_count == 3
+        stats = next(
+            s
+            for s in eval_sum.scorer_stats
+            if s.scorer_key == "numeric_scorer" and s.path is None
+        )
+        assert stats.numeric_count == 3
+        assert stats.numeric_mean == pytest.approx(0.5, abs=1e-9)
+        assert stats.pass_rate is None
+        assert stats.pass_known_count == 0
+
+    def test_eval_results_query_multiple_scorers(self, client):
+        """Verify multiple scorers appear in query and summary results."""
+        project_id = client._project_id()
+        entity, project = from_project_id(project_id)
+
+        scorer_a_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="scorer_alpha",
+                op_source_code="def score(output):\n    return True",
+            )
+        )
+        scorer_a_ref = f"weave:///{entity}/{project}/object/{scorer_a_res.object_id}:{scorer_a_res.digest}"
+        scorer_b_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="scorer_beta",
+                op_source_code="def score(output):\n    return 0.5",
+            )
+        )
+        scorer_b_ref = f"weave:///{entity}/{project}/object/{scorer_b_res.object_id}:{scorer_b_res.digest}"
+
+        run = client.server.evaluation_run_create(
+            tsi.EvaluationRunCreateReq(
+                project_id=project_id,
+                evaluation="eval://multi",
+                model="model://multi",
+            )
+        )
+
+        for i in range(2):
+            pred = client.server.prediction_create(
+                tsi.PredictionCreateReq(
+                    project_id=project_id,
+                    model="model://multi",
+                    inputs={"row_id": i},
+                    output=f"out-{i}",
+                    evaluation_run_id=run.evaluation_run_id,
+                )
+            )
+            prediction_call = client.server.call_read(
+                tsi.CallReadReq(project_id=project_id, id=pred.prediction_id)
+            ).call
+            assert prediction_call is not None
+            assert prediction_call.parent_id is not None
+            pas_id = prediction_call.parent_id
+
+            score_a_id = generate_id()
+            client.server.call_start(
+                tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=score_a_id,
+                        trace_id=run.evaluation_run_id,
+                        parent_id=pas_id,
+                        op_name="ScorerAlpha.score",
+                        started_at=datetime.datetime.now(datetime.timezone.utc),
+                        attributes={
+                            constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                                constants.SCORE_ATTR_KEY: "true",
+                                constants.SCORE_SCORER_ATTR_KEY: scorer_a_ref,
+                            }
+                        },
+                        inputs={"self": scorer_a_ref},
+                        wb_user_id="test-user",
+                    )
+                )
+            )
+            client.server.call_end(
+                tsi.CallEndReq(
+                    end=tsi.EndedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=score_a_id,
+                        ended_at=datetime.datetime.now(datetime.timezone.utc),
+                        output={"passed": i == 0},
+                        summary={},
+                    )
+                )
+            )
+
+            client.server.score_create(
+                tsi.ScoreCreateReq(
+                    project_id=project_id,
+                    prediction_id=pred.prediction_id,
+                    scorer=scorer_b_ref,
+                    value=0.1 * (i + 1),
+                    evaluation_run_id=run.evaluation_run_id,
+                )
+            )
+            client.server.prediction_finish(
+                tsi.PredictionFinishReq(
+                    project_id=project_id,
+                    prediction_id=pred.prediction_id,
+                )
+            )
+
+        res = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+            )
+        )
+        assert res.total_rows == 2
+        for row in res.rows:
+            trial = row.evaluations[0].trials[0]
+            assert "scorer_alpha" in trial.scores
+            assert "scorer_beta" in trial.scores
+
+        summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+            )
+        ).summary
+        eval_sum = next(
+            e
+            for e in summary.evaluations
+            if e.evaluation_call_id == run.evaluation_run_id
+        )
+        stats_by_key_path = {(s.scorer_key, s.path): s for s in eval_sum.scorer_stats}
+        alpha = stats_by_key_path.get(("scorer_alpha", "passed"))
+        assert alpha is not None
+        assert alpha.pass_known_count == 2
+        assert alpha.pass_true_count == 1
+        assert alpha.pass_rate == pytest.approx(0.5)
+
+        beta = stats_by_key_path.get(("scorer_beta", None))
+        assert beta is not None
+        assert beta.numeric_count == 2
+        assert beta.numeric_mean == pytest.approx(0.15)
+
+    def test_eval_results_query_combined_sections_match_separate_calls(self, client):
+        """Combined eval_results/query sections should match separate query+summary."""
+        project_id = client._project_id()
+        ev = EvaluationLogger()
+
+        pred1 = ev.log_prediction(inputs={"q": "hello"}, output="world")
+        pred1.log_score(scorer="accuracy", score=True)
+        pred1.log_score(scorer="confidence", score=0.9)
+        pred1.finish()
+
+        pred2 = ev.log_prediction(inputs={"q": "foo"}, output="bar")
+        pred2.log_score(scorer="accuracy", score=False)
+        pred2.log_score(scorer="confidence", score=0.3)
+        pred2.finish()
+
+        client.flush()
+        eval_root_id = ev._evaluate_call.id
+
+        separate_query = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[eval_root_id],
+                require_intersection=True,
+                include_raw_data_rows=True,
+                resolve_row_refs=True,
+            )
+        )
+        separate_summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[eval_root_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+                summary_require_intersection=False,
+            )
+        ).summary
+
+        combined_query = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[eval_root_id],
+                require_intersection=True,
+                include_raw_data_rows=True,
+                resolve_row_refs=True,
+                include_rows=True,
+                include_summary=True,
+                summary_require_intersection=False,
+            )
+        )
+
+        assert combined_query.total_rows == separate_query.total_rows
+        assert [r.model_dump() for r in combined_query.rows] == [
+            r.model_dump() for r in separate_query.rows
+        ]
+        assert combined_query.summary is not None
+        assert combined_query.summary.model_dump() == separate_summary.model_dump()

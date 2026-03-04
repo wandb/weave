@@ -268,6 +268,12 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         # This method has a different signature, so we need to create a payload
         raise NotImplementedError("ensure_project_exists is not implemented")
 
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        """Resolve external project IDs to internal IDs."""
+        return self._send_request("project_ids_external_to_internal", req)
+
     # Regular method implementations (reduced duplication)
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Export OTEL traces."""
@@ -450,6 +456,18 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
     ) -> tsi.AnnotationQueueReadRes:
         """Read an annotation queue."""
         return self._send_request("annotation_queue_read", req)
+
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        """Update an annotation queue."""
+        return self._send_request("annotation_queue_update", req)
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        """Delete (soft-delete) an annotation queue."""
+        return self._send_request("annotation_queue_delete", req)
 
     def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq

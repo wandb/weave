@@ -1,6 +1,6 @@
 from typing import TypeVar, overload
 
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server.errors import InvalidRequest
 
 T = TypeVar(

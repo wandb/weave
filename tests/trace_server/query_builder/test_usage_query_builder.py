@@ -1225,7 +1225,7 @@ def test_calls_complete_basic():
                     WHERE cm.project_id = {pb_0:String}
                       AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                       AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                      AND cm.deleted_at IS NULL )) ARRAY
+                      AND cm.deleted_at = toDateTime64(0, 3) )) ARRAY
               JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
            GROUP BY bucket,
                     model),
@@ -1252,6 +1252,85 @@ def test_calls_complete_basic():
             "pb_4": 3600,
         },
         ["timestamp", "model", "sum_total_tokens", "avg_total_tokens", "count"],
+        3600,
+        exp_start=start_dt,
+        exp_end=end_dt,
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+
+def test_calls_complete_trace_roots_only_filter():
+    """Test trace_roots_only filter uses sentinel check for calls_complete.
+
+    In calls_complete, parent_id is a non-nullable String with '' as the
+    sentinel for NULL, so trace_roots_only must check parent_id = '' instead
+    of parent_id IS NULL.
+    """
+    start_dt = datetime.datetime(2024, 12, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    end_dt = datetime.datetime(2024, 12, 2, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    metrics = [UsageMetricSpec(metric="total_tokens")]
+    req = CallStatsReq(
+        project_id="entity/project",
+        start=start_dt,
+        end=end_dt,
+        granularity=3600,
+        filter=CallsFilter(trace_roots_only=True),
+    )
+    assert_usage_sql(
+        req,
+        metrics,
+        """
+        WITH all_buckets AS
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(started_at, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT started_at,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT cm.started_at AS started_at,
+                           cm.summary_dump AS summary_dump
+                    FROM calls_complete AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at = toDateTime64(0, 3)
+                      AND parent_id = {pb_5:String} )) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
+        SELECT all_buckets.bucket AS timestamp,
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
+        FROM all_buckets
+        CROSS JOIN all_models
+        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
+        AND all_models.model = aggregated_data.model
+        ORDER BY all_buckets.bucket,
+                 all_models.model
+        """,
+        {
+            "pb_0": "entity/project",
+            "pb_1": 1733011200.0,
+            "pb_2": 1733097600.0,
+            "pb_3": "UTC",
+            "pb_4": 3600,
+            "pb_5": "",
+        },
+        ["timestamp", "model", "sum_total_tokens", "count"],
         3600,
         exp_start=start_dt,
         exp_end=end_dt,
@@ -1298,7 +1377,7 @@ def test_calls_complete_with_filter():
                     WHERE cm.project_id = {pb_0:String}
                       AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                       AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                      AND cm.deleted_at IS NULL
+                      AND cm.deleted_at = toDateTime64(0, 3)
                       AND op_name IN {pb_5:Array(String)} )) ARRAY
               JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
            GROUP BY bucket,

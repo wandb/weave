@@ -4,7 +4,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Iterator
 from typing import Any, Literal, cast
 
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 
 CallStatus = Literal["running", "completed", "failed"]

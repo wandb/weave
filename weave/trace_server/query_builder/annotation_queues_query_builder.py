@@ -4,7 +4,10 @@ This module provides query building functions for the queue-based call annotatio
 following the same patterns as threads_query_builder.py and other query builders in the codebase.
 """
 
-from weave.trace_server.calls_query_builder.calls_query_builder import ReadTable
+from weave.trace_server.calls_query_builder.calls_query_builder import (
+    ReadTable,
+    _format_table_name_with_cluster,
+)
 from weave.trace_server.common_interface import (
     AnnotationQueueItemsFilter,
     SortBy,
@@ -222,6 +225,108 @@ def make_queue_create_query(
         {{{scorer_refs_param}: Array(String)}},
         {{{created_by_param}: String}}
     )
+    """
+
+    return query
+
+
+def make_queue_delete_query(
+    project_id: str,
+    queue_id: str,
+    pb: ParamBuilder,
+    cluster_name: str | None = None,
+) -> str:
+    """Generate an UPDATE query to soft-delete an annotation queue.
+
+    Sets the deleted_at timestamp to the current time.
+
+    Args:
+        project_id: The project ID
+        queue_id: The queue ID (UUID as string)
+        pb: Parameter builder for safe SQL parameter injection
+        cluster_name: Optional ClickHouse cluster name for distributed mutations
+
+    Returns:
+        SQL query string for soft-deleting a queue
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+
+    # Format table name with ON CLUSTER if cluster_name is provided
+    formatted_table = _format_table_name_with_cluster("annotation_queues", cluster_name)
+
+    query = f"""
+    UPDATE {formatted_table} SET
+        deleted_at = now64(3),
+        updated_at = now64(3)
+    WHERE project_id = {{{project_id_param}: String}}
+        AND id = {{{queue_id_param}: String}}
+        AND deleted_at IS NULL
+    """
+
+    return query
+
+
+def make_queue_update_query(
+    project_id: str,
+    queue_id: str,
+    pb: ParamBuilder,
+    cluster_name: str | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    scorer_refs: list[str] | None = None,
+) -> str:
+    """Generate an UPDATE query to modify an annotation queue.
+
+    All fields except project_id and queue_id are optional - only provided fields will be updated.
+    Always updates the updated_at timestamp.
+
+    Args:
+        project_id: The project ID
+        queue_id: The queue ID (UUID as string)
+        pb: Parameter builder for safe SQL parameter injection
+        cluster_name: Optional ClickHouse cluster name for distributed mutations
+        name: Optional new queue name
+        description: Optional new queue description
+        scorer_refs: Optional new array of scorer weave refs
+
+    Returns:
+        SQL query string for updating a queue
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+
+    # Build SET clauses for fields that are provided
+    set_clauses = []
+
+    if name is not None:
+        name_param = pb.add_param(name)
+        set_clauses.append(f"name = {{{name_param}:String}}")
+
+    if description is not None:
+        description_param = pb.add_param(description)
+        set_clauses.append(f"description = {{{description_param}:Nullable(String)}}")
+
+    if scorer_refs is not None:
+        scorer_refs_param = pb.add_param(scorer_refs)
+        set_clauses.append(f"scorer_refs = {{{scorer_refs_param}:Array(String)}}")
+
+    # Always update the updated_at timestamp
+    set_clauses.append("updated_at = now64(3)")
+
+    set_clause = ",\n            ".join(set_clauses)
+
+    # Format table name with ON CLUSTER if cluster_name is provided
+    formatted_table = _format_table_name_with_cluster("annotation_queues", cluster_name)
+
+    query = f"""
+        UPDATE {formatted_table}
+        SET
+            {set_clause}
+        WHERE project_id = {{{project_id_param}:String}}
+            AND id = {{{queue_id_param}:String}}
+            AND deleted_at IS NULL
     """
 
     return query
@@ -536,3 +641,48 @@ def make_queue_items_query(
         sql_query += f" OFFSET {{{offset_param}: Int64}}"
 
     return sql_query
+
+
+def make_annotator_progress_update_query(
+    project_id: str,
+    queue_item_id: str,
+    annotator_id: str,
+    annotation_state: str,
+    pb: ParamBuilder,
+    cluster_name: str | None = None,
+) -> str:
+    """Generate an UPDATE query to update annotator progress for a queue item.
+
+    Args:
+        project_id: The project ID
+        queue_item_id: The queue item ID (UUID as string)
+        annotator_id: The annotator's wb_user_id
+        annotation_state: The new annotation state
+        pb: Parameter builder for safe SQL parameter injection
+        cluster_name: Optional ClickHouse cluster name for distributed mutations
+
+    Returns:
+        SQL query string for updating annotator progress
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_item_id_param = pb.add_param(queue_item_id)
+    annotator_id_param = pb.add_param(annotator_id)
+    annotation_state_param = pb.add_param(annotation_state)
+
+    # Format table name with ON CLUSTER if cluster_name is provided
+    formatted_table = _format_table_name_with_cluster(
+        "annotator_queue_items_progress", cluster_name
+    )
+
+    query = f"""
+    UPDATE {formatted_table}
+    SET
+        annotation_state = {{{annotation_state_param}: String}},
+        updated_at = now64(3)
+    WHERE project_id = {{{project_id_param}: String}}
+      AND queue_item_id = {{{queue_item_id_param}: String}}
+      AND annotator_id = {{{annotator_id_param}: String}}
+      AND deleted_at IS NULL
+    """
+
+    return query

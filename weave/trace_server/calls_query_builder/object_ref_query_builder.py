@@ -246,6 +246,7 @@ class ObjectRefCondition(BaseModel):
             pb: Parameter builder for SQL parameters
             table_alias: Table alias to use in the query
             field_to_object_join_alias_map: Mapping from condition keys to CTE names
+            use_agg_fn: Whether to use aggregate functions
 
         Returns:
             str: SQL condition string

@@ -7,7 +7,12 @@ from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import Context, copy_context
 from functools import partial, wraps
 from threading import Thread as _Thread
-from typing import Any
+from typing import Any, TypeVar
+
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 LOG_ONCE_MESSAGE_SUFFIX = " (subsequent messages of this type will be suppressed)"
 logged_messages = []
@@ -156,12 +161,12 @@ def is_notebook() -> bool:
     return True
 
 
-def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def deprecated(new_name: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator to mark a function as deprecated and redirect users to `new_name`."""
 
-    def deco(func: Callable[..., Any]) -> Callable[..., Any]:
+    def deco(func: Callable[P, R]) -> Callable[P, R]:
         @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             warnings.warn(
                 f"{func.__name__} is deprecated and will be removed in a future version. Use {new_name} instead.",
                 DeprecationWarning,

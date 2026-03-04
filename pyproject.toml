@@ -246,6 +246,7 @@ select = [
   "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
+  "SIM101",  # https://docs.astral.sh/ruff/rules/duplicate-isinstance-call/
   "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
   "N801",    # https://docs.astral.sh/ruff/rules/invalid-class-name/
   "N802",    # https://docs.astral.sh/ruff/rules/invalid-function-name/
@@ -261,6 +262,9 @@ select = [
   "PT018",   # https://docs.astral.sh/ruff/rules/pytest-composite-assertion/
   "PT022",   # https://docs.astral.sh/ruff/rules/pytest-useless-yield-fixture/
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
+  "PLC",     # https://docs.astral.sh/ruff/rules/#pylint-pl
+  "PLE",     # https://docs.astral.sh/ruff/rules/#pylint-ple
+  "PLW",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
   "RUF013",  # https://docs.astral.sh/ruff/rules/implicit-optional/
@@ -277,6 +281,7 @@ select = [
   "E711",    # https://docs.astral.sh/ruff/rules/none-comparison/
   "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
   "PYI019",  # https://docs.astral.sh/ruff/rules/custom-type-var-for-self/
+  "FA",      # https://docs.astral.sh/ruff/rules/#flake8-future-annotations-fa
 ]
 ignore = [
   # Fix these when possible.  They are formatting changes related to the docs!
@@ -287,6 +292,12 @@ ignore = [
   "D417",
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
+  # Existing code intentionally uses many lazy imports and private symbols;
+  # keep these disabled until we do a dedicated cleanup.
+  "PLC0415", # https://docs.astral.sh/ruff/rules/import-outside-top-level/
+  "PLC2701", # https://docs.astral.sh/ruff/rules/import-private-name/
+  # Keep explicit empty-string checks for readability in tests and parsing paths.
+  "PLC1901", # https://docs.astral.sh/ruff/rules/compare-to-empty-string/
 ]
 
 [tool.ruff.lint.isort]
@@ -307,6 +318,11 @@ exclude = ["rules"]
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
 "!/tests/**/*.py" = ["RUF059"]
+"weave/trace/serialization/op_type.py" = ["RUF100", "N802"]
+"weave/trace_server/costs/update_costs.py" = ["PLW1514"]
+"weave/type_handlers/Video/video.py" = ["PLW0603"]
+"weave/type_handlers/Audio/audio.py" = ["PLW1514"]
+"weave/type_handlers/Content/content.py" = ["PLW1514"]
 
 [tool.pyright]
 include = ["weave"]
@@ -333,7 +349,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.27-dev0"
+current_version = "0.52.31-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -429,7 +445,7 @@ test = [
   "pytest-xdist>=3.1.0",
   "pytest-rerunfailures>=14.0",
   "pytest-shard==0.1.2",
-  "clickhouse_connect==0.7.0",
+  "clickhouse_connect==0.11.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
   "freezegun",
@@ -449,6 +465,10 @@ test = [
   # Media Generation
   "opencv-python", # Video generation
   "reportlab",     # PDF generation
+
+  # MIME type detection (requires libmagic system library on Linux/macOS)
+  "python-magic; sys_platform != 'win32'",
+  "python-magic-bin; sys_platform == 'win32'",
 
   "confluent-kafka",
 

@@ -15,6 +15,7 @@ from _ast import AsyncFunctionDef, ExceptHandler
 from collections.abc import Callable
 from typing import Any, TypedDict, get_args, get_origin
 
+from weave.shared.digest import str_digest
 from weave.trace import settings
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.op import as_op, is_op
@@ -22,7 +23,6 @@ from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization import serializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-from weave.trace_server.trace_server_interface_util import str_digest
 from weave.utils.ipython import (
     ClassNotFoundError,
     get_class_source,
@@ -501,7 +501,7 @@ def find_last_weave_op_function(
     last_function = None
 
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) or isinstance(node, AsyncFunctionDef):
+        if isinstance(node, (ast.FunctionDef, AsyncFunctionDef)):
             for decorator in node.decorator_list:
                 # Check if the decorator is 'weave.op' (attribute without call)
                 if (

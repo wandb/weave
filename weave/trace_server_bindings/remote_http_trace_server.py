@@ -561,6 +561,17 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, "/server_info")
         return ServerInfoRes.model_validate(r.json())
 
+    @validate_call
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        return self._generic_request(
+            "/project_ids/external_to_internal",
+            req,
+            tsi.ProjectIdsExternalToInternalReq,
+            tsi.ProjectIdsExternalToInternalRes,
+        )
+
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
@@ -930,6 +941,36 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.AnnotationQueueReadRes,
             method="GET",
             params={"project_id": req.project_id},
+        )
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}",
+            req,
+            tsi.AnnotationQueueDeleteReq,
+            tsi.AnnotationQueueDeleteRes,
+            method="DELETE",
+            params={"project_id": req.project_id},
+        )
+
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        # Convert to Body type to exclude queue_id from request body (it's in the URL path)
+        body = his.AnnotationQueueUpdateBody(
+            project_id=req.project_id,
+            name=req.name,
+            description=req.description,
+            scorer_refs=req.scorer_refs,
+        )
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}",
+            body,
+            his.AnnotationQueueUpdateBody,
+            tsi.AnnotationQueueUpdateRes,
+            method="PUT",
         )
 
     def annotation_queue_add_calls(

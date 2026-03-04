@@ -8,7 +8,7 @@ from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from weave.trace import urls
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op_protocol import Op
@@ -286,6 +286,11 @@ class Call:
             deleted_at=self.deleted_at,
             thread_id=self.thread_id,
             turn_id=self.turn_id,
+            wb_run_id=self.wb_run_id,
+            wb_run_step=self.wb_run_step,
+            wb_run_step_end=self.wb_run_step_end,
+            storage_size_bytes=self.storage_size_bytes,
+            total_storage_size_bytes=self.total_storage_size_bytes,
         )
 
 
@@ -313,6 +318,11 @@ class CallDict(TypedDict):
     deleted_at: datetime.datetime | None
     thread_id: str | None
     turn_id: str | None
+    wb_run_id: str | None
+    wb_run_step: int | None
+    wb_run_step_end: int | None
+    storage_size_bytes: int | None
+    total_storage_size_bytes: int | None
 
 
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]

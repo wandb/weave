@@ -1,11 +1,18 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from typing_extensions import TypedDict
+
+if TYPE_CHECKING:
+    from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+else:
+    try:
+        from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+    except ImportError:
+        ResourceSpans = Any
 
 from weave.trace_server import http_service_interface as his
 from weave.trace_server.common_interface import (
@@ -34,7 +41,7 @@ class LLMUsageSchema(TypedDict, total=False):
     total_tokens: int | None
 
 
-class LLMCostSchema(LLMUsageSchema):
+class LLMCostSchema(LLMUsageSchema, total=False):
     prompt_tokens_total_cost: float | None
     completion_tokens_total_cost: float | None
     prompt_token_cost: float | None
@@ -463,6 +470,12 @@ class CompletionsCreateRequestInputs(BaseModel):
         description="Dictionary of template variables to substitute in prompt messages. "
         "Variables in messages like '{variable_name}' will be replaced with the corresponding values. "
         "Applied to both prompt messages (if prompt is provided) and regular messages.",
+    )
+    vertex_credentials: str | None = Field(
+        None,
+        description="JSON string of Vertex AI service account credentials. "
+        "When provided for vertex_ai models (e.g. vertex_ai/gemini-2.5-pro), used for authentication "
+        "instead of api_key. Not persisted in trace storage.",
     )
 
 
@@ -1100,6 +1113,21 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
+class ProjectIdsExternalToInternalReq(BaseModelStrict):
+    project_ids: list[str] = Field(
+        description="External project IDs to resolve, each in 'entity/project' format.",
+        examples=[["entity-a/project-a", "entity-b/project-b"]],
+    )
+
+
+class ProjectIdsExternalToInternalRes(BaseModel):
+    project_id_map: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of external project ID to internal project ID.",
+        examples=[{"entity-a/project-a": "internal-project-a"}],
+    )
+
+
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
@@ -1283,6 +1311,48 @@ class AnnotationQueueReadReq(BaseModelStrict):
 
 class AnnotationQueueReadRes(BaseModel):
     """Response from reading an annotation queue."""
+
+    queue: AnnotationQueueSchema
+
+
+class AnnotationQueueDeleteReq(BaseModelStrict):
+    """Request to delete (soft-delete) an annotation queue."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueDeleteRes(BaseModel):
+    """Response from deleting an annotation queue."""
+
+    queue: AnnotationQueueSchema
+
+
+class AnnotationQueueUpdateReq(BaseModelStrict):
+    """Request to update an annotation queue.
+
+    All fields except project_id and queue_id are optional - only provided fields will be updated.
+    """
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    name: str | None = Field(None, examples=["Updated Queue Name"])
+    description: str | None = Field(None, examples=["Updated description"])
+    scorer_refs: list[str] | None = Field(
+        None,
+        examples=[
+            [
+                "weave:///entity/project/scorer/error_severity:abc123",
+                "weave:///entity/project/scorer/resolution_quality:def456",
+            ]
+        ],
+    )
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueUpdateRes(BaseModel):
+    """Response from updating an annotation queue."""
 
     queue: AnnotationQueueSchema
 
@@ -1523,6 +1593,30 @@ class EvaluationStatusRes(BaseModel):
         | EvaluationStatusFailed
         | EvaluationStatusComplete
     )
+
+
+class CallsScoreReq(BaseModelStrict):
+    """Request to enqueue scoring jobs for a list of calls.
+
+    Scoring is performed asynchronously by the call_scoring_worker, which
+    consumes messages from Kafka and applies each scorer_ref to each call_id.
+    """
+
+    project_id: str
+    call_ids: list[str] = Field(description="List of call IDs to score")
+    scorer_refs: list[str] = Field(description="List of scorer refs to apply")
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class CallsScoreRes(BaseModel):
+    """Empty response for calls_score.
+
+    Defined as a model (rather than returning None) to follow the convention
+    used throughout this interface and to allow fields to be added later
+    without a breaking change.
+    """
+
+    pass
 
 
 class OpCreateBody(BaseModel):
@@ -2254,11 +2348,160 @@ class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
 
 
+class EvalResultsQueryBody(BaseModelStrict):
+    evaluation_call_ids: list[str] | None = Field(
+        default=None,
+        description="Evaluation root call IDs to include.",
+    )
+    evaluation_run_ids: list[str] | None = Field(
+        default=None,
+        description="Alias for evaluation call IDs from the Evaluation Runs API.",
+    )
+    require_intersection: bool = Field(
+        default=False,
+        description="When true, only include rows present in all requested evaluations.",
+    )
+    include_raw_data_rows: bool = Field(
+        default=False,
+        description=(
+            "When true, populate raw_data_row on each result row. "
+            "Inline rows are returned as their dict value; dataset-referenced rows are "
+            "returned as the ref string unless resolve_row_refs is also true."
+        ),
+    )
+    resolve_row_refs: bool = Field(
+        default=False,
+        description=(
+            "When true (requires include_raw_data_rows=True), resolve dataset-row "
+            "reference strings to actual row data via a table lookup. "
+            "When false, dataset-row refs are returned as-is."
+        ),
+    )
+    include_rows: bool = Field(
+        default=True,
+        description=(
+            "When true, include grouped row/trial data in `rows` and compute "
+            "`total_rows` for the requested row-level view."
+        ),
+    )
+    include_summary: bool = Field(
+        default=False,
+        description=(
+            "When true, include aggregated scorer/evaluation summary data in `summary`."
+        ),
+    )
+    summary_require_intersection: bool | None = Field(
+        default=None,
+        description=(
+            "Optional intersection behavior for the summary section. When null, "
+            "the value of `require_intersection` is used."
+        ),
+    )
+    limit: int | None = Field(
+        default=None,
+        description="Optional row-level page size applied after grouping and intersection.",
+    )
+    offset: int = Field(
+        default=0,
+        description="Optional row-level page offset applied after grouping and intersection.",
+    )
+
+    @model_validator(mode="after")
+    def validate_identifiers(self) -> "EvalResultsQueryBody":
+        """Validate that at least one evaluation identifier is provided."""
+        call_ids = self.evaluation_call_ids or []
+        run_ids = self.evaluation_run_ids or []
+        if not call_ids and not run_ids:
+            raise ValueError(
+                "At least one of evaluation_call_ids or evaluation_run_ids must be provided"
+            )
+        return self
+
+
+class EvalResultsQueryReq(EvalResultsQueryBody):
+    project_id: str
+
+
+class EvalResultsTrial(BaseModel):
+    predict_and_score_call_id: str
+    predict_call_id: str | None = None
+    model_output: Any | None = None
+    scores: dict[str, Any] = Field(default_factory=dict)
+    model_latency_seconds: float | None = None
+    total_tokens: int | None = None
+    scorer_call_ids: dict[str, str] = Field(default_factory=dict)
+
+
+class EvalResultsRowEvaluation(BaseModel):
+    evaluation_call_id: str
+    trials: list[EvalResultsTrial] = Field(default_factory=list)
+
+
+class EvalResultsRow(BaseModel):
+    row_digest: str
+    raw_data_row: Any | None = None
+    evaluations: list[EvalResultsRowEvaluation] = Field(default_factory=list)
+
+
+class EvalResultsQueryRes(BaseModel):
+    rows: list[EvalResultsRow]
+    total_rows: int
+    summary: "EvalResultsSummaryRes | None" = None
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Non-fatal warnings (e.g. failed to resolve dataset row refs).",
+    )
+
+
+class EvalResultsScorerStats(BaseModel):
+    """Stats for a single flattened score dimension (scorer_key or scorer_key.path.to.leaf)."""
+
+    scorer_key: str
+    path: str | None = Field(
+        default=None,
+        description=(
+            "Dot-joined subpath for nested dimensions, e.g. 'passed' for "
+            "token_distance.passed. None for root-level scalar scorers."
+        ),
+    )
+    value_type: Literal["binary", "continuous"] | None = Field(
+        default=None,
+        description="Type of the leaf value: binary (bool) or continuous (number).",
+    )
+    trial_count: int = 0
+    numeric_count: int = 0
+    numeric_mean: float | None = None
+    pass_true_count: int = 0
+    pass_known_count: int = 0
+    pass_rate: float | None = None
+    pass_signal_coverage: float | None = None
+
+
+class EvalResultsEvaluationSummary(BaseModel):
+    evaluation_call_id: str
+    trial_count: int = 0
+    scorer_stats: list[EvalResultsScorerStats] = Field(default_factory=list)
+    evaluation_ref: str | None = None
+    model_ref: str | None = None
+    display_name: str | None = None
+    trace_id: str | None = None
+    started_at: str | None = None
+
+
+class EvalResultsSummaryRes(BaseModel):
+    row_count: int = 0
+    evaluations: list[EvalResultsEvaluationSummary] = Field(default_factory=list)
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
+
+    def project_ids_external_to_internal(
+        self, req: ProjectIdsExternalToInternalReq
+    ) -> ProjectIdsExternalToInternalRes: ...
 
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
@@ -2360,6 +2603,14 @@ class TraceServerInterface(Protocol):
         self, req: AnnotationQueueReadReq
     ) -> AnnotationQueueReadRes: ...
 
+    def annotation_queue_delete(
+        self, req: AnnotationQueueDeleteReq
+    ) -> AnnotationQueueDeleteRes: ...
+
+    def annotation_queue_update(
+        self, req: AnnotationQueueUpdateReq
+    ) -> AnnotationQueueUpdateRes: ...
+
     def annotation_queue_add_calls(
         self, req: AnnotationQueueAddCallsReq
     ) -> AnnotationQueueAddCallsRes: ...
@@ -2379,6 +2630,9 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+
+    # Scoring API
+    def calls_score(self, req: CallsScoreReq) -> CallsScoreRes: ...
 
 
 class ObjectInterface(Protocol):
@@ -2457,6 +2711,7 @@ class ObjectInterface(Protocol):
     def score_read(self, req: ScoreReadReq) -> ScoreReadRes: ...
     def score_list(self, req: ScoreListReq) -> Iterator[ScoreReadRes]: ...
     def score_delete(self, req: ScoreDeleteReq) -> ScoreDeleteRes: ...
+    def eval_results_query(self, req: EvalResultsQueryReq) -> EvalResultsQueryRes: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):
@@ -2660,6 +2915,8 @@ class TraceUsageRes(BaseModel):
 
     # Mapping from call_id to usage metrics (own + descendants)
     call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
+    # Unique IDs of calls in the result set that have not ended yet.
+    unfinished_call_ids: list[str] = Field(default_factory=list)
 
 
 # --- /calls/usage endpoint (root call usage across multiple traces) ---
@@ -2695,3 +2952,5 @@ class CallsUsageRes(BaseModel):
 
     # Mapping from root call_id to aggregated usage metrics (root + descendants)
     call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
+    # Unique IDs of calls considered for rollup that have not ended yet.
+    unfinished_call_ids: list[str] = Field(default_factory=list)

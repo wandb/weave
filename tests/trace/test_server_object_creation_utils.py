@@ -231,3 +231,32 @@ def test_make_safe_name_with_angle_brackets() -> None:
         assert test_op.name == "opname", (
             f"Op creation failed for input '{test_input}': got name '{test_op.name}'"
         )
+
+
+def test_make_safe_name_strips_all_invalid_characters() -> None:
+    r"""Test that make_safe_name strips all characters invalid for object names.
+
+    The object name validator only allows [\\w._-] (alphanumeric, underscore,
+    dot, dash). make_safe_name must strip everything else so that downstream
+    validation never rejects a sanitized name.
+    """
+    # Characters that previously slipped through and caused InvalidFieldError
+    assert object_creation_utils.make_safe_name("prefix:suffix") == "prefixsuffix"
+    assert object_creation_utils.make_safe_name("base64data==end") == "base64dataend"
+    assert (
+        object_creation_utils.make_safe_name(
+            "weave-trace-internal:___abc123==_op_llen:xyz"
+        )
+        == "weave-trace-internal___abc123_op_llenxyz"
+    )
+
+    # Spaces and slashes become underscores; other invalid chars are removed
+    assert object_creation_utils.make_safe_name("a b/c:d=e<f>g") == "a_b_cdefg"
+
+    # Valid characters are preserved
+    assert (
+        object_creation_utils.make_safe_name("valid.name-123_ok") == "valid.name-123_ok"
+    )
+
+    # None becomes "unknown"
+    assert object_creation_utils.make_safe_name(None) == "unknown"

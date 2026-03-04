@@ -8,13 +8,11 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from weave.shared.pydantic_util import pydantic_asdict_one_level
 from weave.trace.op import is_op
-from weave.trace_server.client_server_common.pydantic_util import (
-    pydantic_asdict_one_level,
-)
 
 
-class ObjectRecord:
+class ObjectRecord:  # noqa: PLW1641
     _class_name: str
     _bases: list[str]
 
@@ -69,7 +67,7 @@ def class_all_bases_names(cls: type) -> list[str]:
 
 def pydantic_object_record(obj: BaseModel) -> ObjectRecord:
     attrs = pydantic_asdict_one_level(obj)
-    for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
+    for k, v in getmembers(obj, is_op, lambda e: None):
         attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
@@ -86,7 +84,7 @@ def dataclass_object_record(obj: Any) -> ObjectRecord:
     if not dataclasses.is_dataclass(obj):
         raise ValueError(f"{obj} is not a dataclass")
     attrs = dataclass_asdict_one_level(obj)
-    for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
+    for k, v in getmembers(obj, is_op, lambda e: None):
         attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)  # type: ignore[arg-type]

@@ -55,7 +55,7 @@ def normalize_scorers_in_flattened(
 
 
 def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
+    return ref.rsplit("/", maxsplit=1)[-1].split(":", maxsplit=1)[0]
 
 
 class MyModel(Model):

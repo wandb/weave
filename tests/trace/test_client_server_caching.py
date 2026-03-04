@@ -364,8 +364,8 @@ def test_cache_isolation_between_tests(tmp_path, monkeypatch):
     assert cache_server_2._safe_cache_get("test_key") == "test_value_2"
 
     # Cleanup
-    cache_server_1.__del__()
-    cache_server_2.__del__()
+    cache_server_1.close()
+    cache_server_2.close()
 
 
 def test_cache_persistence_across_client_instances(tmp_path):
@@ -381,7 +381,7 @@ def test_cache_persistence_across_client_instances(tmp_path):
     # Create first cache instance and store something
     cache_server_1 = CachingMiddlewareTraceServer(base_server, cache_dir)
     cache_server_1._safe_cache_set("persistent_key", "persistent_value")
-    cache_server_1.__del__()  # Simulate client shutdown
+    cache_server_1.close()  # Simulate client shutdown
 
     # Create second cache instance with same directory
     cache_server_2 = CachingMiddlewareTraceServer(base_server, cache_dir)
@@ -391,7 +391,7 @@ def test_cache_persistence_across_client_instances(tmp_path):
     assert cached_value == "persistent_value"
 
     # Cleanup
-    cache_server_2.__del__()
+    cache_server_2.close()
 
 
 def test_cache_existence_check_optimization(tmp_path):
@@ -520,4 +520,4 @@ def test_cache_directory_creation(tmp_path):
     cache_server._safe_cache_set("creation_test", "success")
     assert cache_server._safe_cache_get("creation_test") == "success"
 
-    cache_server.__del__()
+    cache_server.close()

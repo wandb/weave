@@ -13,7 +13,7 @@ core_cases = [
     # Core Types
     SerializationTestCase(
         id="Op",
-        runtime_object_factory=lambda: make_op(),
+        runtime_object_factory=make_op,
         inline_call_param=False,
         is_legacy=False,
         exp_json={
@@ -40,14 +40,14 @@ core_cases = [
             "name": None,
             "description": None,
             "my_name": "John",
-            "say_hello": "weave:///shawn/test-project/op/CustomObject.say_hello:TLgRYvsemwoveeGJcNDuzY5jUFcgSZdWdB2eZdKe598",
+            "say_hello": "weave:///shawn/test-project/op/CustomObject.say_hello:uAuGcTP39TqYOX27waNSJL9YGZIxbiy4KyJoEDkJeIM",
             "_class_name": "CustomObject",
             "_bases": ["Object", "BaseModel"],
         },
         exp_objects=[
             {
                 "object_id": "CustomObject.say_hello",
-                "digest": "TLgRYvsemwoveeGJcNDuzY5jUFcgSZdWdB2eZdKe598",
+                "digest": "uAuGcTP39TqYOX27waNSJL9YGZIxbiy4KyJoEDkJeIM",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},

@@ -27,8 +27,12 @@ def aggregate_usage_with_descendants(
     Uses a bottom-up traversal to avoid recursion limits.
     """
     # This materializes the calls into memory, which is not ideal for
-    # large traces, but is necessary for this approach
-    calls_list = list(calls)
+    # large traces, but is necessary for this approach.
+    # Reuse the input list directly when possible to avoid an extra copy.
+    if isinstance(calls, list):
+        calls_list = calls
+    else:
+        calls_list = list(calls)
     if not calls_list:
         return {}
 

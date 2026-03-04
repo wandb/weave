@@ -127,7 +127,7 @@ def get_mcp_client_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _mcp_client_patcher
+    global _mcp_client_patcher  # noqa: PLW0603
     if _mcp_client_patcher is not None:
         return _mcp_client_patcher
 

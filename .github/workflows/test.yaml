@@ -80,6 +80,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
@@ -94,7 +96,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: trace-no-server
           name: trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
           fail_ci_if_error: false
@@ -186,6 +188,8 @@ jobs:
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
       - name: Install SQLite dev package
         run: sudo apt update && sudo apt install -y libsqlite3-dev
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
@@ -230,7 +234,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: trace-tests
           name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
           fail_ci_if_error: false
@@ -283,7 +287,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: windows-trace-no-server
           name: windows-trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
           fail_ci_if_error: false
@@ -363,7 +367,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: windows-trace-tests
           name: windows-trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
           fail_ci_if_error: false

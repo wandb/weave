@@ -3,7 +3,7 @@ from typing import Any
 from weave.trace.refs import ObjectRef, OpRef, Ref
 
 
-class ObjectRefStrMatcher:
+class ObjectRefStrMatcher:  # noqa: PLW1641
     def __init__(
         self,
         entity: str | None = None,

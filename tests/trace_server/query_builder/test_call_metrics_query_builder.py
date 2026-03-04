@@ -763,7 +763,7 @@ def test_calls_complete_latency_basic():
                  WHERE cm.project_id = {pb_0:String}
                    AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                    AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                   AND cm.deleted_at IS NULL ))
+                   AND cm.deleted_at = toDateTime64(0, 3) ))
            GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
                COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
@@ -819,7 +819,7 @@ def test_calls_complete_call_and_error_counts():
              (SELECT toStartOfInterval(started_at, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
                      1 AS m_call_count,
                      if(
-                        exception IS NOT NULL, 1, 0) AS m_error_count
+                        exception != {pb_5:String}, 1, 0) AS m_error_count
               FROM
                 (SELECT cm.started_at AS started_at,
                         cm.started_at AS started_at,
@@ -830,7 +830,7 @@ def test_calls_complete_call_and_error_counts():
                  WHERE cm.project_id = {pb_0:String}
                    AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                    AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                   AND cm.deleted_at IS NULL ))
+                   AND cm.deleted_at = toDateTime64(0, 3) ))
            GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
                COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
@@ -846,8 +846,77 @@ def test_calls_complete_call_and_error_counts():
             "pb_2": 1733097600.0,
             "pb_3": "UTC",
             "pb_4": 3600,
+            "pb_5": "",
         },
         ["timestamp", "sum_call_count", "sum_error_count", "count"],
+        3600,
+        exp_start=start_dt,
+        exp_end=end_dt,
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+
+def test_calls_complete_trace_roots_only_filter():
+    """Test trace_roots_only filter uses sentinel check for calls_complete.
+
+    In calls_complete, parent_id is a non-nullable String with '' as the
+    sentinel for NULL, so trace_roots_only must check parent_id = '' instead
+    of parent_id IS NULL.
+    """
+    start_dt = datetime.datetime(2024, 12, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    end_dt = datetime.datetime(2024, 12, 2, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    metrics = [CallMetricSpec(metric="latency_ms", aggregations=[AggregationType.AVG])]
+    req = CallStatsReq(
+        project_id="entity/project",
+        start=start_dt,
+        end=end_dt,
+        granularity=3600,
+        filter=CallsFilter(trace_roots_only=True),
+    )
+    assert_call_metrics_sql(
+        req,
+        metrics,
+        """
+        WITH all_buckets AS
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  avgOrNull(m_latency_ms) AS avg_latency_ms,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(started_at, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+              FROM
+                (SELECT cm.started_at AS started_at,
+                        cm.started_at AS started_at,
+                        cm.ended_at AS ended_at,
+                        cm.exception AS
+                 exception
+                 FROM calls_complete AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at = toDateTime64(0, 3)
+                   AND parent_id = {pb_5:String} ))
+           GROUP BY bucket)
+        SELECT all_buckets.bucket AS timestamp,
+               COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
+               COALESCE(aggregated_data.count, 0) AS count
+        FROM all_buckets
+        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
+        ORDER BY all_buckets.bucket
+        """,
+        {
+            "pb_0": "entity/project",
+            "pb_1": 1733011200.0,
+            "pb_2": 1733097600.0,
+            "pb_3": "UTC",
+            "pb_4": 3600,
+            "pb_5": "",
+        },
+        ["timestamp", "avg_latency_ms", "count"],
         3600,
         exp_start=start_dt,
         exp_end=end_dt,
@@ -892,7 +961,7 @@ def test_calls_complete_with_filter():
                  WHERE cm.project_id = {pb_0:String}
                    AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                    AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                   AND cm.deleted_at IS NULL
+                   AND cm.deleted_at = toDateTime64(0, 3)
                    AND op_name IN {pb_5:Array(String)} ))
            GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,

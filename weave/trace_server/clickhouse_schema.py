@@ -2,7 +2,7 @@ import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server import validation
 
 # =============================================================================
@@ -111,6 +111,10 @@ class CallCompleteCHInsertable(
 
     This represents a call that is already finished at insertion time, with both
     start and end information provided together.
+
+    Note: The pydantic model uses None for "not set" values. Conversion to
+    ClickHouse sentinel values (empty string, epoch zero) happens at insert time
+    via ch_sentinel_values.to_ch_value().
     """
 
     started_at: datetime.datetime
@@ -122,6 +126,8 @@ class CallCompleteCHInsertable(
     summary_dump: str
     otel_dump: str | None = None
     wb_run_step_end: int | None = None
+    ttl_at: datetime.datetime = datetime.datetime(2100, 1, 1)
+    source: str = "direct"
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
         validation.wb_run_step_validator
@@ -255,3 +261,26 @@ class FileChunkCreateCHInsertable(BaseModel):
 
 
 ALL_FILE_CHUNK_INSERT_COLUMNS = sorted(FileChunkCreateCHInsertable.model_fields.keys())
+
+
+# Tags & Aliases
+class TagCHInsertable(BaseModel):
+    project_id: str
+    object_id: str
+    digest: str
+    tag: str
+    wb_user_id: str = ""
+    deleted_at: datetime.datetime = datetime.datetime.fromtimestamp(0)
+
+
+class AliasCHInsertable(BaseModel):
+    project_id: str
+    object_id: str
+    alias: str
+    digest: str
+    wb_user_id: str = ""
+    deleted_at: datetime.datetime = datetime.datetime.fromtimestamp(0)
+
+
+ALL_TAG_INSERT_COLUMNS = sorted(TagCHInsertable.model_fields.keys())
+ALL_ALIAS_INSERT_COLUMNS = sorted(AliasCHInsertable.model_fields.keys())

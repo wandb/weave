@@ -1,7 +1,7 @@
 import base64
 import uuid
 
-from weave.trace_server import refs_internal
+from weave.shared import refs_internal
 
 
 class CHValidationError(Exception):

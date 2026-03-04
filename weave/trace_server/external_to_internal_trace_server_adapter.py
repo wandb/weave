@@ -109,6 +109,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EnsureProjectExistsRes:
         return self._internal_trace_server.ensure_project_exists(entity, project)
 
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        project_id_map = {
+            project_id: self._idc.ext_to_int_project_id(project_id)
+            for project_id in req.project_ids
+        }
+        return tsi.ProjectIdsExternalToInternalRes(project_id_map=project_id_map)
+
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # Convert project_id at request level
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
@@ -470,6 +479,18 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.annotation_queue_read, req)
 
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.annotation_queue_update, req)
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.annotation_queue_delete, req)
+
     def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq
     ) -> tsi.AnnotationQueueAddCallsRes:
@@ -513,6 +534,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_status, req)
+
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        """Translate external IDs to internal IDs before forwarding to the internal server."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.calls_score, req)
 
     # === V2 APIs ===
 
@@ -722,6 +750,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.score_delete, req)
+
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Query grouped evaluation results with project ID conversion."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.eval_results_query, req)
 
     # Calls V2 API
     def calls_complete(
