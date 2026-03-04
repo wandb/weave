@@ -241,6 +241,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         cursor.execute(TABLE_FEEDBACK.create_sql())
 
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        # Internal trace servers already operate on internal project IDs, so this is a pass-through.
+        project_id_map = {project_id: project_id for project_id in req.project_ids}
+        return tsi.ProjectIdsExternalToInternalRes(project_id_map=project_id_map)
+
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         res = []
         for item in req.batch:
@@ -1821,6 +1828,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
+
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        raise NotImplementedError("Calls scoring is not supported in SQLite")
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         """Create an op object by delegating to obj_create.

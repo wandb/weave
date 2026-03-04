@@ -1107,6 +1107,21 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
+class ProjectIdsExternalToInternalReq(BaseModelStrict):
+    project_ids: list[str] = Field(
+        description="External project IDs to resolve, each in 'entity/project' format.",
+        examples=[["entity-a/project-a", "entity-b/project-b"]],
+    )
+
+
+class ProjectIdsExternalToInternalRes(BaseModel):
+    project_id_map: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of external project ID to internal project ID.",
+        examples=[{"entity-a/project-a": "internal-project-a"}],
+    )
+
+
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
@@ -1572,6 +1587,30 @@ class EvaluationStatusRes(BaseModel):
         | EvaluationStatusFailed
         | EvaluationStatusComplete
     )
+
+
+class CallsScoreReq(BaseModelStrict):
+    """Request to enqueue scoring jobs for a list of calls.
+
+    Scoring is performed asynchronously by the call_scoring_worker, which
+    consumes messages from Kafka and applies each scorer_ref to each call_id.
+    """
+
+    project_id: str
+    call_ids: list[str] = Field(description="List of call IDs to score")
+    scorer_refs: list[str] = Field(description="List of scorer refs to apply")
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class CallsScoreRes(BaseModel):
+    """Empty response for calls_score.
+
+    Defined as a model (rather than returning None) to follow the convention
+    used throughout this interface and to allow fields to be added later
+    without a breaking change.
+    """
+
+    pass
 
 
 class OpCreateBody(BaseModel):
@@ -2454,6 +2493,10 @@ class TraceServerInterface(Protocol):
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
 
+    def project_ids_external_to_internal(
+        self, req: ProjectIdsExternalToInternalReq
+    ) -> ProjectIdsExternalToInternalRes: ...
+
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
@@ -2581,6 +2624,9 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+
+    # Scoring API
+    def calls_score(self, req: CallsScoreReq) -> CallsScoreRes: ...
 
 
 class ObjectInterface(Protocol):

@@ -357,6 +357,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._kafka_producer = KafkaProducer.from_env()
             return self._kafka_producer
 
+    def project_ids_external_to_internal(
+        self, req: tsi.ProjectIdsExternalToInternalReq
+    ) -> tsi.ProjectIdsExternalToInternalRes:
+        # Internal trace servers already operate on internal project IDs, so this is a pass-through.
+        project_id_map = {project_id: project_id for project_id in req.project_ids}
+        return tsi.ProjectIdsExternalToInternalRes(project_id_map=project_id_map)
+
     @property
     def table_routing_resolver(self) -> TableRoutingResolver:
         if self._table_routing_resolver is not None:
@@ -5842,6 +5849,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
+
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        """Enqueue scoring jobs for a list of calls.
+
+        Publishes the request to Kafka, where it will be consumed by the
+        call_scoring_worker and applied asynchronously.
+        """
+        if self.kafka_producer is None:
+            raise ValueError("Kafka producer is not set")
+
+        self.kafka_producer.produce_score_calls(req)
+
+        return tsi.CallsScoreRes()
 
     # Private Methods
     @property

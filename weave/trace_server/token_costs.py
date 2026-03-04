@@ -580,7 +580,10 @@ def get_cost_final_select(
         Complete SQL SELECT statement
     """
     final_fields = _prepare_final_select_fields(select_fields, order_fields)
-    fields_str = ", ".join(final_fields)
+    # Backtick-quote field names containing dots (e.g. summary.weave.trace_name)
+    # so ClickHouse treats them as identifiers rather than nested field access.
+    quoted_fields = [f"`{f}`" if "." in f else f for f in final_fields]
+    fields_str = ", ".join(quoted_fields)
 
     # Build SELECT clause with cost calculation
     summary_dump = _build_cost_summary_dump_snippet()
@@ -592,7 +595,7 @@ def get_cost_final_select(
         feedback_join = "\n" + _build_feedback_join(pb, project_id, "ranked_prices")
 
     where_clause = f"WHERE (rank = {{{pb.add_param(1)}:UInt64}})"
-    group_by = f"GROUP BY {', '.join(final_fields)}"
+    group_by = f"GROUP BY {', '.join(quoted_fields)}"
     order_by = ""
     if order_fields:
         order_parts = [of.as_sql(pb, "ranked_prices") for of in order_fields]
