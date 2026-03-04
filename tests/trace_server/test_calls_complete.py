@@ -1679,3 +1679,138 @@ def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
     total_error_count = sum(b.get("sum_error_count", 0) for b in result.call_buckets)
     assert total_call_count == 2, f"Expected 2 calls, got {total_call_count}"
     assert total_error_count == 1, f"Expected 1 error, got {total_error_count}"
+
+
+def test_calls_complete_converts_wb_metadata(trace_server, clickhouse_trace_server):
+    """Test that calls_complete converts wb_run_id and wb_user_id through the external adapter.
+
+    Regression test: the calls_complete endpoint was missing the
+    ext_to_int_run_id conversion for wb_run_id, causing a ValidationError
+    when callers passed a W&B run path (entity/project/run_name).
+
+    This test sets every field on CompletedCallSchemaForInsert to verify
+    the full round-trip through the external-to-internal adapter.
+    """
+    project_id = f"{TEST_ENTITY}/calls_complete_wb_metadata"
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+    ext_run_id = "some-run-id"
+    ext_user_id = "test_user"
+
+    # Insert a completed call with every field populated
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[
+                tsi.CompletedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=trace_id,
+                    op_name="test_op",
+                    started_at=now,
+                    ended_at=now + datetime.timedelta(seconds=1),
+                    attributes={"attr_key": "attr_val"},
+                    inputs={"x": 1},
+                    output={"y": 2},
+                    summary={"usage": {}, "status_counts": {}},
+                    display_name="test_call",
+                    parent_id=None,
+                    thread_id="thread-1",
+                    turn_id="turn-1",
+                    exception=None,
+                    wb_user_id=ext_user_id,
+                    wb_run_id=ext_run_id,
+                    wb_run_step=5,
+                    wb_run_step_end=10,
+                )
+            ]
+        )
+    )
+
+    # Verify internal storage has converted IDs
+    internal_project_id = b64(project_id)
+    row = _fetch_call_row(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_id,
+        ["wb_run_id", "wb_user_id", "wb_run_step", "wb_run_step_end"],
+    )
+    assert row is not None
+    stored_run_id, stored_user_id, stored_run_step, stored_run_step_end = row
+    # wb_run_id should be converted to internal format (base64:original)
+    assert stored_run_id == b64(ext_run_id) + ":" + ext_run_id
+    # wb_user_id should be converted to internal format (base64)
+    assert stored_user_id == b64(ext_user_id)
+    # integer fields pass through unchanged
+    assert stored_run_step == 5
+    assert stored_run_step_end == 10
+
+    # Read back and verify the external adapter converts back to external format
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.wb_run_id == ext_run_id
+    assert call.wb_user_id == ext_user_id
+    assert call.wb_run_step == 5
+    assert call.wb_run_step_end == 10
+    assert call.display_name == "test_call"
+    assert call.thread_id == "thread-1"
+    assert call.turn_id == "turn-1"
+    assert call.inputs == {"x": 1}
+    assert call.output == {"y": 2}
+
+
+def test_call_start_v2_converts_wb_run_id(trace_server, clickhouse_trace_server):
+    """Test that call_start_v2 converts wb_run_id from external to internal format."""
+    project_id = f"{TEST_ENTITY}/call_start_v2_wb_run_id"
+    # Seed a calls_complete row so routing goes to calls_complete
+    seed_call = _make_completed_call(
+        project_id,
+        str(uuid.uuid4()),
+        str(uuid.uuid4()),
+        datetime.datetime.now(),
+        datetime.datetime.now() + datetime.timedelta(seconds=1),
+    )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[seed_call]))
+
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    ext_run_id = "v2-run-id"
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    trace_server.call_start_v2(
+        tsi.CallStartV2Req(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=trace_id,
+                op_name="test_op",
+                started_at=now,
+                attributes={},
+                inputs={},
+                wb_run_id=ext_run_id,
+                wb_run_step=3,
+            )
+        )
+    )
+
+    # Verify internal storage has converted run_id
+    internal_project_id = b64(project_id)
+    row = _fetch_call_row(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_id,
+        ["wb_run_id", "wb_run_step"],
+    )
+    assert row is not None
+    stored_run_id, stored_run_step = row
+    assert stored_run_id == b64(ext_run_id) + ":" + ext_run_id
+    assert stored_run_step == 3
+
+    # Verify read path converts back
+    calls = _fetch_calls_stream(trace_server, project_id)
+    started_call = _find_call_by_id(calls, call_id)
+    assert started_call is not None
+    assert started_call.wb_run_id == ext_run_id

@@ -765,6 +765,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         """Batch complete calls, converting project_id."""
         for item in req.batch:
             item.project_id = self._idc.ext_to_int_project_id(item.project_id)
+            if item.wb_run_id is not None:
+                item.wb_run_id = self._idc.ext_to_int_run_id(item.wb_run_id)
             if item.wb_user_id is not None:
                 item.wb_user_id = self._idc.ext_to_int_user_id(item.wb_user_id)
         return self._ref_apply(self._internal_trace_server.calls_complete, req)
@@ -772,6 +774,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
         """Start a single call (v2), converting project_id."""
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
+        if req.start.wb_run_id is not None:
+            req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
         if req.start.wb_user_id is not None:
             req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
         return self._ref_apply(self._internal_trace_server.call_start_v2, req)
