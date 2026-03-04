@@ -658,8 +658,8 @@ def test_query_calls_complete_with_costs_and_attributes_order() -> None:
         GROUP BY id,
                  started_at,
                  attributes_dump
-        ORDER BY (NOT (JSONType(any(ranked_prices.attributes_dump), {pb_1:String}) = 'Null'
-                       OR JSONType(any(ranked_prices.attributes_dump), {pb_1:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), {pb_2:String}), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), {pb_2:String}), 'null'), '')) ASC
+        ORDER BY (NOT (JSONType(ranked_prices.attributes_dump, {pb_1:String}) = 'Null'
+                       OR JSONType(ranked_prices.attributes_dump, {pb_1:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, {pb_2:String}), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, {pb_2:String}), 'null'), '')) ASC
         """,
         {
             "pb_0": SENTINEL_DATETIME,
