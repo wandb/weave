@@ -284,6 +284,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         try:
             producer = self.kafka_producer
             if producer is not None:
+                # 10 second timeout for flushing remaining messages
                 producer.flush(10)
         except Exception:
             pass
