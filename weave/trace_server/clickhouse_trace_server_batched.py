@@ -265,24 +265,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             maxsize=50_000, ttl=86_400
         )
         self._op_ref_cache_lock = threading.Lock()
+        self._database_ensured = False
 
     def __del__(self) -> None:
-        """Flush the Kafka producer on cleanup to avoid dropping in-flight messages."""
-        if (
-            not self._call_batch
-            and not self._calls_complete_batch
-            and not self._file_batch
-        ):
-            return
+        """Flush batches and the Kafka producer on cleanup."""
+        if self._call_batch or self._calls_complete_batch or self._file_batch:
+            try:
+                self._flush_all_batches_in_order()
+            except Exception:
+                pass
+            finally:
+                self._file_batch = []
+                self._call_batch = []
+                self._calls_complete_batch = []
+                self._flush_immediately = True
+
+        # Always drain remaining kafka messages at shutdown.
         try:
-            self._flush_all_batches_in_order()
+            producer = self.kafka_producer
+            if producer is not None:
+                producer.flush(10)
         except Exception:
             pass
-        finally:
-            self._file_batch = []
-            self._call_batch = []
-            self._calls_complete_batch = []
-            self._flush_immediately = True
 
     @property
     def _flush_immediately(self) -> bool:
@@ -649,7 +653,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _flush_kafka_producer(self) -> None:
         producer = self.kafka_producer
         if producer is not None:
-            producer.flush()
+            # Non-blocking flush to avoid convoy effect — see KafkaProducer.produce_call_end.
+            producer.flush(0)
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
@@ -5912,6 +5917,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
 
+    def _ensure_database(self, client: CHClient) -> None:
+        """Run CREATE DATABASE IF NOT EXISTS once per process."""
+        if self._database_ensured:
+            return
+        with self._init_lock:
+            if self._database_ensured:
+                return
+            client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
+            self._database_ensured = True
+
     def _mint_client(self) -> CHClient:
         """Create a new ClickHouse client using the shared pool manager."""
         client = clickhouse_connect.get_client(
@@ -5922,8 +5937,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             secure=self._port == 8443,
             pool_mgr=_CH_POOL_MANAGER,
         )
-        # Safely create the database if it does not exist
-        client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
+        self._ensure_database(client)
         client.database = self._database
         return client
 
