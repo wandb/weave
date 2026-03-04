@@ -73,6 +73,9 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
+### Design Docs
+
+- [dev_docs/FeedbackStatsAndSchema.md](dev_docs/FeedbackStatsAndSchema.md) – Feedback payload schema discovery and feedback stats queries. **When changing `feedback_payload_schema.py`, `feedback_stats_query_builder.py`, or related APIs, update this doc** (SQL shape, filters, constraints, changelog).
 
 ## Python Testing Guidelines
 

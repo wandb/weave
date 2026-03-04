@@ -1076,6 +1076,169 @@ class FeedbackCreateBatchRes(BaseModel):
     res: list[FeedbackCreateRes]
 
 
+# --- Feedback stats (aggregated scorer outputs over time) ---
+
+
+class AggregationType(str, Enum):
+    """Aggregation functions supported by feedback and call stats metrics."""
+
+    SUM = "sum"
+    AVG = "avg"
+    MIN = "min"
+    MAX = "max"
+    COUNT = "count"
+    COUNT_TRUE = "count_true"
+    COUNT_FALSE = "count_false"
+
+
+class FeedbackMetricSpec(BaseModelStrict):
+    """Specification for a feedback payload metric to aggregate."""
+
+    json_path: str = Field(
+        description="Dot path into payload_dump (e.g. 'output', 'output.score')."
+    )
+    value_type: Literal["numeric", "boolean", "categorical"] = Field(
+        default="numeric",
+        description="Type of value at path. numeric: avg/min/max; boolean: count_true/count_false.",
+    )
+    aggregations: list[AggregationType] = Field(
+        default_factory=lambda: [
+            AggregationType.AVG,
+            AggregationType.MIN,
+            AggregationType.MAX,
+        ],
+        description="Aggregation functions to compute. Defaults to avg/min/max for numeric metrics.",
+    )
+    percentiles: list[float] = Field(
+        default_factory=list,
+        description="Percentile values to compute (0–100), e.g. [5, 50, 95].",
+    )
+
+
+class FeedbackStatsReq(BaseModelStrict):
+    """Request for aggregated feedback statistics over time buckets."""
+
+    project_id: str
+    start: datetime.datetime = Field(
+        description="Inclusive start time (UTC, ISO 8601)."
+    )
+    end: datetime.datetime | None = Field(
+        default=None,
+        description="Exclusive end time (UTC, ISO 8601). Defaults to now if omitted.",
+    )
+    granularity: int | None = Field(
+        default=None,
+        description="Bucket size in seconds. If omitted, auto-selected based on time range.",
+    )
+    timezone: str = Field(
+        default="UTC", description="IANA timezone for bucket alignment."
+    )
+    feedback_type: str | None = Field(
+        default=None, description="Filter by feedback_type."
+    )
+    trigger_ref: str | None = Field(
+        default=None,
+        description="Filter by trigger_ref (exact or prefix match for all-versions).",
+    )
+    metrics: list[FeedbackMetricSpec] = Field(
+        default_factory=list,
+        description="Metrics to aggregate from payload_dump.",
+    )
+
+
+class FeedbackWindowStat(BaseModel):
+    """Aggregated statistics for a single metric over the full query window."""
+
+    avg: float | None = None
+    min: float | None = None
+    max: float | None = None
+    sum: float | None = None
+    count: float | None = None
+    count_true: float | None = None
+    count_false: float | None = None
+    p1: float | None = None
+    p5: float | None = None
+    p50: float | None = None
+    p95: float | None = None
+    p99: float | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+class FeedbackStatsRes(BaseModel):
+    """Response with time-series feedback statistics."""
+
+    start: datetime.datetime = Field(description="Resolved start time (UTC)")
+    end: datetime.datetime = Field(description="Resolved end time (UTC)")
+    granularity: int = Field(description="Bucket size used (in seconds)")
+    timezone: str = Field(description="Timezone used for bucket alignment")
+    buckets: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Time-bucketed aggregations. Each dict has 'timestamp' (ISO string), "
+            "'count' (int), and '{agg}_{slug}' keys for each requested metric+aggregation."
+        ),
+    )
+    window_stats: dict[str, FeedbackWindowStat] | None = Field(
+        default=None,
+        description=(
+            "Aggregations over the full query window, keyed by metric slug "
+            "(e.g. 'output_score'). Present only when metrics are requested."
+        ),
+    )
+
+
+# --- Feedback payload schema (discovered paths for stats) ---
+
+
+class FeedbackPayloadPath(BaseModelStrict):
+    """Discovered path in feedback payload with inferred type."""
+
+    json_path: str = Field(description="Dot path into payload (e.g. 'output.score').")
+    value_type: Literal["numeric", "boolean", "categorical"] = Field(
+        default="numeric",
+        description="Inferred type of value at path.",
+    )
+
+
+class FeedbackPayloadSchemaReq(BaseModelStrict):
+    """Request for feedback payload schema discovery."""
+
+    project_id: str
+    start: datetime.datetime = Field(
+        description="Inclusive start time (UTC, ISO 8601)."
+    )
+    end: datetime.datetime | None = Field(
+        default=None,
+        description="Exclusive end time (UTC, ISO 8601). Defaults to now if omitted.",
+    )
+    feedback_type: str | None = Field(
+        default=None, description="Filter by feedback_type."
+    )
+    trigger_ref: str | None = Field(
+        default=None,
+        description="Filter by trigger_ref (exact or prefix match for all-versions).",
+    )
+    sample_limit: int = Field(
+        default=2000,
+        ge=1,
+        le=5000,
+        description=(
+            "Max distinct trigger_refs to sample for schema discovery. "
+            "Advanced: the default (2000) is sufficient for most projects."
+        ),
+    )
+
+
+class FeedbackPayloadSchemaRes(BaseModel):
+    """Response with discovered feedback payload paths and types."""
+
+    paths: list[FeedbackPayloadPath] = Field(
+        default_factory=list,
+        description="Discovered leaf paths with inferred value types.",
+    )
+
+
 class FileCreateReq(BaseModelStrict):
     project_id: str
     name: str
@@ -2532,6 +2695,10 @@ class TraceServerInterface(Protocol):
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
+    def feedback_stats(self, req: FeedbackStatsReq) -> FeedbackStatsRes: ...
+    def feedback_payload_schema(
+        self, req: FeedbackPayloadSchemaReq
+    ) -> FeedbackPayloadSchemaRes: ...
 
     # Action API
     def actions_execute_batch(
@@ -2690,16 +2857,6 @@ class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):
     """
 
     pass
-
-
-class AggregationType(str, Enum):
-    """Basic aggregation functions for metrics."""
-
-    SUM = "sum"
-    AVG = "avg"
-    MIN = "min"
-    MAX = "max"
-    COUNT = "count"
 
 
 UsageMetric = Literal[

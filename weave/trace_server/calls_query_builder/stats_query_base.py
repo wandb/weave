@@ -142,6 +142,10 @@ def aggregation_selects_for_metric(
             results.append((f"maxOrNull({col})", f"max_{metric}"))
         elif agg == AggregationType.COUNT:
             results.append((f"countOrNull({col})", f"count_{metric}"))
+        elif agg == AggregationType.COUNT_TRUE:
+            results.append((f"countIf({col} = 1)", f"count_true_{metric}"))
+        elif agg == AggregationType.COUNT_FALSE:
+            results.append((f"countIf({col} = 0)", f"count_false_{metric}"))
         else:
             raise ValueError(f"Unsupported aggregation type: {agg}")
 
