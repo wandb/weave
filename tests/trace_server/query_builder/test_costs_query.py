@@ -246,8 +246,8 @@ def test_query_with_costs_and_attributes_order() -> None:
         GROUP BY id,
                  started_at,
                  attributes_dump
-            ORDER BY (NOT (JSONType(any(ranked_prices.attributes_dump)) = 'Null'
-                           OR JSONType(any(ranked_prices.attributes_dump)) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), '$'), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), '$'), 'null'), '')) ASC
+            ORDER BY (NOT (JSONType(ranked_prices.attributes_dump) = 'Null'
+                           OR JSONType(ranked_prices.attributes_dump) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, '$'), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, '$'), 'null'), '')) ASC
             """,
         {
             "pb_0": "UHJvamVjdEludGVybmFsSWQ6NDI3Mjk1MTc=",
@@ -466,8 +466,8 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
         GROUP BY id,
                  started_at,
                  attributes_dump
-        ORDER BY (NOT (JSONType(any(ranked_prices.attributes_dump), {pb_0:String}) = 'Null'
-                       OR JSONType(any(ranked_prices.attributes_dump), {pb_0:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), {pb_1:String}), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), {pb_1:String}), 'null'), '')) ASC
+        ORDER BY (NOT (JSONType(ranked_prices.attributes_dump, {pb_0:String}) = 'Null'
+                       OR JSONType(ranked_prices.attributes_dump, {pb_0:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, {pb_1:String}), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, {pb_1:String}), 'null'), '')) ASC
         """,
         {
             "pb_0": "sort_key",
@@ -658,8 +658,8 @@ def test_query_calls_complete_with_costs_and_attributes_order() -> None:
         GROUP BY id,
                  started_at,
                  attributes_dump
-        ORDER BY (NOT (JSONType(any(ranked_prices.attributes_dump), {pb_1:String}) = 'Null'
-                       OR JSONType(any(ranked_prices.attributes_dump), {pb_1:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), {pb_2:String}), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(any(ranked_prices.attributes_dump), {pb_2:String}), 'null'), '')) ASC
+        ORDER BY (NOT (JSONType(ranked_prices.attributes_dump, {pb_1:String}) = 'Null'
+                       OR JSONType(ranked_prices.attributes_dump, {pb_1:String}) IS NULL)) desc, toFloat64OrNull(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, {pb_2:String}), 'null'), '')) ASC, toString(coalesce(nullIf(JSON_VALUE(ranked_prices.attributes_dump, {pb_2:String}), 'null'), '')) ASC
         """,
         {
             "pb_0": SENTINEL_DATETIME,
@@ -780,5 +780,103 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
             "pb_7": "default",
             "pb_8": "",
             "pb_9": 1,
+        },
+    )
+
+
+def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
+    """Test that summary.weave.trace_name is backtick-quoted when used with costs."""
+    cq = CallsQuery(
+        project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True
+    )
+    cq.add_field("id")
+    cq.add_field("summary.weave.trace_name")
+    cq.add_field("started_at")
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS
+          (SELECT calls_merged.id AS id
+           FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)
+           HAVING (((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
+             all_calls AS
+          (SELECT calls_merged.id AS id,
+                  CASE
+                      WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL
+                           AND argMaxMerge(calls_merged.display_name) != '' THEN argMaxMerge(calls_merged.display_name)
+                      WHEN any(calls_merged.op_name) IS NOT NULL
+                           AND any(calls_merged.op_name) LIKE 'weave-trace-internal:///%' THEN regexpExtract(toString(any(calls_merged.op_name)), '/([^/:]*):', 1)
+                      ELSE any(calls_merged.op_name)
+                  END AS `summary.weave.trace_name`,
+                  any(calls_merged.started_at) AS started_at
+           FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+           WHERE (calls_merged.id IN filtered_calls)
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)),
+             llm_usage AS
+          (-- From the all_calls we get the usage data for LLMs
+         SELECT *,
+                ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
+                arrayJoin(if(usage_raw != ''
+                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                kv.1 AS llm_id,
+                JSONExtractInt(kv.2, 'requests') AS requests,
+                (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
+                (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
+                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+           FROM all_calls),
+             ranked_prices AS
+          (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
+         SELECT *,
+                llm_token_prices.id,
+                llm_token_prices.pricing_level,
+                llm_token_prices.pricing_level_id,
+                llm_token_prices.provider_id,
+                llm_token_prices.llm_id,
+                llm_token_prices.effective_date,
+                llm_token_prices.prompt_token_cost,
+                llm_token_prices.completion_token_cost,
+                llm_token_prices.prompt_token_cost_unit,
+                llm_token_prices.completion_token_cost_unit,
+                llm_token_prices.created_by,
+                llm_token_prices.created_at,
+                ROW_NUMBER() OVER (PARTITION BY llm_usage.id, llm_usage.llm_id
+                                   ORDER BY CASE -- Order by effective_date
+                                                WHEN llm_usage.started_at >= llm_token_prices.effective_date THEN 1
+                                                ELSE 2
+                                            END, CASE -- Order by pricing level then by effective_date
+                                                 -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_PARAM THEN 1
+                                                     WHEN llm_token_prices.pricing_level = 'project'
+                                                          AND llm_token_prices.pricing_level_id = 'UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=' THEN 2
+                                                     WHEN llm_token_prices.pricing_level = 'default'
+                                                          AND llm_token_prices.pricing_level_id = 'default' THEN 3
+                                                     ELSE 4
+                                                 END, llm_token_prices.effective_date DESC) AS rank
+           FROM llm_usage
+           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+                                          AND ((llm_token_prices.pricing_level_id = {pb_1:String})
+                                               OR (llm_token_prices.pricing_level_id = {pb_2:String})
+                                               OR (llm_token_prices.pricing_level_id = {pb_3:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
+        SELECT id,
+               `summary.weave.trace_name`,
+               started_at,
+               if(any(llm_id) = 'weave_dummy_llm_id'
+                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
+        FROM ranked_prices
+        WHERE (rank = {pb_4:UInt64})
+        GROUP BY id,
+                 `summary.weave.trace_name`,
+                 started_at
+        """,
+        {
+            "pb_0": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
+            "pb_1": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
+            "pb_2": "default",
+            "pb_3": "",
+            "pb_4": 1,
         },
     )
