@@ -7,7 +7,6 @@ from collections.abc import Callable, Iterator
 from typing import Any, TypeVar
 from zoneinfo import ZoneInfo
 
-import httpx
 from pydantic import BaseModel, validate_call
 from typing_extensions import Self
 from weave_server_sdk import Client as StainlessClient
@@ -424,29 +423,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
-        """Get project info including internal project IDs.
-
-        Args:
-            req: Projects info request with external project IDs.
-
-        Returns:
-            List of ProjectsInfoRes with internal project IDs.
-        """
-        headers = self._extra_headers.copy()
-
-        auth = None
-        if self._username or self._password:
-            auth = (self._username, self._password)
-
-        url = self.trace_server_url + "/service/projects_info"
-        response = httpx.post(
-            url,
-            content=req.model_dump_json(by_alias=True).encode("utf-8"),
-            auth=auth,
-            headers=headers,
+        self._update_client_headers()
+        response = self._stainless_client.services.projects_info(
+            project_ids=req.project_ids,
         )
-        response.raise_for_status()
-        return [tsi.ProjectsInfoRes.model_validate(item) for item in response.json()]
+        return [
+            tsi.ProjectsInfoRes.model_validate(item.model_dump())
+            for item in response
+        ]
 
     @validate_call
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
