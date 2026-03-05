@@ -3268,7 +3268,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         val = result.obj.val
 
         # Extract name and description from val data
-        name = val.get("name")
+        name = val.get("name", result.obj.object_id)
         description = val.get("description")
 
         # Create the response with all required fields
@@ -3298,14 +3298,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Yield back the full ScorerReadRes for each scorer
         for obj in obj_res.objs:
-            name = None
+            name = obj.object_id  # fallback to object_id
             description = None
             score_op = ""
 
             if hasattr(obj, "val") and obj.val:
                 val = obj.val
                 if isinstance(val, dict):
-                    name = val.get("name")
+                    name = val.get("name", obj.object_id)
                     description = val.get("description")
                     score_op = val.get("score", "")
 
