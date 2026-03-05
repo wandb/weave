@@ -82,10 +82,19 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
         Dict[str, Any]: Dictionary containing filtered HuggingFace model information.
     """
     url = f"https://huggingface.co/api/models/{model_name}"
-    with httpx.Client(timeout=30.0) as client:
-        response = client.get(url)
-        response.raise_for_status()
-        d = response.json()
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.get(url)
+            response.raise_for_status()
+            d = response.json()
+    except httpx.HTTPError as e:
+        print(f"\nFailed to get HuggingFace info for {model_name}: {e}")
+        print("This may be expected for a prerelease model\n")
+        return {
+            "likesHuggingFace": 0,
+            "downloadsHuggingFace": 0,
+            "license": "unknown",
+        }
     filtered = pick_keys(d, HF_KEYS_TO_KEEP)
     license = d.get("cardData", {}).get("license")
     if license:
