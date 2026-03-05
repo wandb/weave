@@ -17,11 +17,7 @@ from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallba
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.trace_server_bindings.client_interface import (
-    ProjectsInfoReq,
-    ProjectsInfoRes,
-    TraceServerClientInterface,
-)
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     log_dropped_call_batch,
@@ -427,7 +423,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return ServerInfoRes.model_validate(response.model_dump())
 
     @validate_call
-    def projects_info(self, req: ProjectsInfoReq) -> list[ProjectsInfoRes]:
+    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
         """Get project info including internal project IDs.
 
         Args:
@@ -450,7 +446,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             headers=headers,
         )
         response.raise_for_status()
-        return [ProjectsInfoRes.model_validate(item) for item in response.json()]
+        return [tsi.ProjectsInfoRes.model_validate(item) for item in response.json()]
 
     @validate_call
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
