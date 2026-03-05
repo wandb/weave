@@ -428,8 +428,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             project_ids=req.project_ids,
         )
         return [
-            tsi.ProjectsInfoRes.model_validate(item.model_dump())
-            for item in response
+            tsi.ProjectsInfoRes.model_validate(item.model_dump()) for item in response
         ]
 
     @validate_call
