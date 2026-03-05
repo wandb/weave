@@ -61,6 +61,17 @@ def response_display_name(model: str | None) -> str:
     return "Response"
 
 
+def turn_display_name(prompt: str | None, max_words: int = 8) -> str:
+    """Generate display name for a turn call from the first few words of the prompt."""
+    if not prompt:
+        return "Turn"
+    words = prompt.split()[:max_words]
+    name = " ".join(words)
+    if len(prompt.split()) > max_words:
+        name += "..."
+    return name
+
+
 def session_display_name(prompt: str | None) -> str:
     """Generate display name for the root session call."""
     if prompt:

@@ -9,9 +9,8 @@ from functools import wraps
 from typing import Any
 
 from weave.integrations.claude_agent_sdk.display_utils import (
-    response_display_name,
-    session_display_name,
     tool_use_display_name,
+    turn_display_name,
 )
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
@@ -134,24 +133,7 @@ def _process_message_inline(
         history = list(accumulated)
         accumulated.append(serialized)
 
-        has_text_or_thinking = any(
-            isinstance(b, (ThinkingBlock, TextBlock)) for b in msg.content
-        )
         tool_uses = [b for b in msg.content if isinstance(b, ToolUseBlock)]
-
-        if has_text_or_thinking:
-            resp_call = wc.create_call(
-                op="claude_agent_sdk.response",
-                inputs={"history": history},
-                display_name=response_display_name(msg.model),
-                parent=root_call,
-                attributes={"kind": "llm"},
-                use_stack=False,
-                started_at=state["response_start_time"],
-            )
-            wc.finish_call(resp_call, output=serialized)
-        # Reset — next response timing starts fresh
-        state["response_start_time"] = None
 
         # Open tool calls
         for tool_block in tool_uses:
@@ -215,6 +197,17 @@ def _finalize_stream(
     if result_msg is not None:
         if result_msg.usage:
             root_output["usage"] = result_msg.usage
+            # Set summary directly so usage propagates even when tool
+            # call children exist (children path skips output-based summary).
+            if state["root_model"]:
+                root_call.summary = {
+                    "usage": {
+                        state["root_model"]: {
+                            "requests": 1,
+                            **result_msg.usage,
+                        }
+                    }
+                }
         if result_msg.total_cost_usd is not None:
             root_output["total_cost_usd"] = result_msg.total_cost_usd
         root_output["duration_ms"] = result_msg.duration_ms
@@ -241,6 +234,21 @@ def _make_initial_state(user_prompt: str | None = None) -> dict[str, Any]:
     }
 
 
+def _resolve_thread_id() -> tuple[str, bool]:
+    """Return (thread_id, already_set).
+
+    If a thread_id is already in context, reuse it.  Otherwise generate
+    one in the form ``claude-session-YYYY-MM-DD-HH-MM-SS``.
+    """
+    from weave.trace.context import call_context
+
+    existing = call_context.get_thread_id()
+    if existing is not None:
+        return existing, True
+    now = datetime.now(tz=timezone.utc)
+    return f"claude-session-{now.strftime('%Y-%m-%d-%H-%M-%S')}", False
+
+
 # ── Patchers ─────────────────────────────────────────────────────────
 
 
@@ -257,6 +265,7 @@ def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
             transport: Any = None,
         ) -> AsyncIterator[Any]:
             from claude_agent_sdk import ResultMessage
+            from weave.trace.context import call_context
 
             wc = get_weave_client()
             if wc is None:
@@ -274,32 +283,35 @@ def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
             if user_prompt is not None:
                 root_inputs["prompt"] = user_prompt
 
-            root_call = wc.create_call(
-                op=f"claude-session-{str(datetime.now())}",
-                inputs=root_inputs,
-                display_name=session_display_name(user_prompt),
-                attributes={"kind": "agent"},
-                use_stack=False,
-            )
+            thread_id, _ = _resolve_thread_id()
 
-            state = _make_initial_state(user_prompt)
-            state["response_start_time"] = datetime.now(tz=timezone.utc)
+            with call_context.set_thread_id(thread_id):
+                root_call = wc.create_call(
+                    op="claude_agent_sdk.query",
+                    inputs=root_inputs,
+                    display_name=turn_display_name(user_prompt),
+                    attributes={"kind": "agent"},
+                    use_stack=False,
+                )
 
-            result_msg = None
-            try:
-                async for msg in original_process_query(
-                    self_client,
-                    prompt=prompt,
-                    options=options,
-                    transport=transport,
-                ):
-                    if isinstance(msg, ResultMessage):
-                        result_msg = msg
-                    else:
-                        _process_message_inline(msg, wc, root_call, state)
-                    yield msg
-            finally:
-                _finalize_stream(wc, root_call, state, result_msg)
+                state = _make_initial_state(user_prompt)
+                state["response_start_time"] = datetime.now(tz=timezone.utc)
+
+                result_msg = None
+                try:
+                    async for msg in original_process_query(
+                        self_client,
+                        prompt=prompt,
+                        options=options,
+                        transport=transport,
+                    ):
+                        if isinstance(msg, ResultMessage):
+                            result_msg = msg
+                        else:
+                            _process_message_inline(msg, wc, root_call, state)
+                        yield msg
+                finally:
+                    _finalize_stream(wc, root_call, state, result_msg)
 
         return wrapped_process_query
 
@@ -315,46 +327,13 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
         def patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
             original_init(self, *args, **kwargs)
 
-            # Session-level state stored on the instance
-            self._weave_session_call: Any = None
-            self._weave_thread_id: str | None = None
             self._weave_turn_counter: int = 0
+            self._weave_thread_id: str | None = None
 
-            original_connect = self.connect
-            original_disconnect = self.disconnect
             original_query = self.query
             original_receive_response = self.receive_response
 
             user_prompt_holder: list[str | None] = [None]
-
-            @wraps(original_connect)
-            async def wrapped_connect(
-                prompt: Any = None,
-            ) -> None:
-                await original_connect(prompt)
-                wc = get_weave_client()
-                if wc is not None:
-                    from weave.trace_server.ids import generate_id
-
-                    self._weave_thread_id = generate_id()
-                    self._weave_session_call = wc.create_call(
-                        op="claude_agent_sdk.session",
-                        inputs={},
-                        display_name="Session",
-                        attributes={"kind": "agent"},
-                        use_stack=False,
-                    )
-
-            @wraps(original_disconnect)
-            async def wrapped_disconnect() -> None:
-                wc = get_weave_client()
-                if wc is not None and self._weave_session_call is not None:
-                    wc.finish_call(
-                        self._weave_session_call,
-                        output={"status": "completed"},
-                    )
-                    self._weave_session_call = None
-                await original_disconnect()
 
             @wraps(original_query)
             async def wrapped_query(
@@ -372,7 +351,7 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
                 from weave.trace.context import call_context
 
                 wc = get_weave_client()
-                if wc is None or self._weave_session_call is None:
+                if wc is None:
                     async for msg in original_receive_response():
                         yield msg
                     return
@@ -384,13 +363,15 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
                 if user_prompt is not None:
                     turn_inputs["prompt"] = user_prompt
 
-                # Set thread_id context so child calls pick it up
+                if self._weave_thread_id is None:
+                    thread_id, _ = _resolve_thread_id()
+                    self._weave_thread_id = thread_id
+
                 with call_context.set_thread_id(self._weave_thread_id):
                     turn_call = wc.create_call(
                         op="claude_agent_sdk.turn",
                         inputs=turn_inputs,
-                        display_name=session_display_name(user_prompt),
-                        parent=self._weave_session_call,
+                        display_name=turn_display_name(user_prompt),
                         attributes={"kind": "agent"},
                         use_stack=False,
                     )
@@ -411,8 +392,6 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
                     finally:
                         _finalize_stream(wc, turn_call, state, result_msg)
 
-            self.connect = wrapped_connect
-            self.disconnect = wrapped_disconnect
             self.query = wrapped_query
             self.receive_response = wrapped_receive_response
 
