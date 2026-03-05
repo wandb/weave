@@ -11,7 +11,9 @@ from weave.trace.weave_client import WeaveClient
 
 def _op_name_matches(call_op_name: str, expected: str) -> bool:
     """Check that an op name URI contains the expected op name portion."""
-    return f"/op/{expected}:" in call_op_name or call_op_name.endswith(f"/op/{expected}")
+    return f"/op/{expected}:" in call_op_name or call_op_name.endswith(
+        f"/op/{expected}"
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -28,9 +30,7 @@ def _make_text_block(text: str) -> object:
     return TextBlock(text=text)
 
 
-def _make_tool_use_block(
-    id: str, name: str, input: dict
-) -> object:
+def _make_tool_use_block(id: str, name: str, input: dict) -> object:
     from claude_agent_sdk import ToolUseBlock
 
     return ToolUseBlock(id=id, name=name, input=input)
@@ -98,9 +98,7 @@ async def _run_conversation(messages: list, prompt: str = "Hello") -> list:
         for msg in messages:
             yield msg
 
-    with patch.object(
-        ClaudeSDKClient, "__init__", ClaudeSDKClient.__init__
-    ):
+    with patch.object(ClaudeSDKClient, "__init__", ClaudeSDKClient.__init__):
         client = object.__new__(ClaudeSDKClient)
         # Set up the mock state expected by patched __init__
         client.query = AsyncMock()
@@ -134,7 +132,9 @@ async def test_simple_conversation(client: WeaveClient) -> None:
 
     # Root call
     root = calls[0]
-    assert _op_name_matches(root.op_name, "claude_agent_sdk.ClaudeSDKClient.conversation")
+    assert _op_name_matches(
+        root.op_name, "claude_agent_sdk.ClaudeSDKClient.conversation"
+    )
     assert root.inputs["prompt"] == "Hello"
     assert root.output["status"] == "completed"
     assert root.output["usage"] == {"input_tokens": 10, "output_tokens": 20}
@@ -152,15 +152,21 @@ async def test_simple_conversation(client: WeaveClient) -> None:
 async def test_tool_use_conversation(client: WeaveClient) -> None:
     """User prompt + tool use + tool result + text response."""
     messages = [
-        _make_assistant_message([
-            _make_tool_use_block("tool_1", "get_weather", {"city": "NYC"}),
-        ]),
-        _make_user_message([
-            _make_tool_result_block("tool_1", content="Sunny, 72F"),
-        ]),
-        _make_assistant_message([
-            _make_text_block("The weather in NYC is sunny and 72F!"),
-        ]),
+        _make_assistant_message(
+            [
+                _make_tool_use_block("tool_1", "get_weather", {"city": "NYC"}),
+            ]
+        ),
+        _make_user_message(
+            [
+                _make_tool_result_block("tool_1", content="Sunny, 72F"),
+            ]
+        ),
+        _make_assistant_message(
+            [
+                _make_text_block("The weather in NYC is sunny and 72F!"),
+            ]
+        ),
         _make_result_message(),
     ]
 
@@ -170,7 +176,9 @@ async def test_tool_use_conversation(client: WeaveClient) -> None:
     assert len(calls) == 3
 
     root = calls[0]
-    assert _op_name_matches(root.op_name, "claude_agent_sdk.ClaudeSDKClient.conversation")
+    assert _op_name_matches(
+        root.op_name, "claude_agent_sdk.ClaudeSDKClient.conversation"
+    )
     assert root.inputs["prompt"] == "What's the weather in NYC?"
 
     # Tool call
@@ -191,17 +199,23 @@ async def test_tool_use_conversation(client: WeaveClient) -> None:
 async def test_multiple_tool_uses(client: WeaveClient) -> None:
     """User prompt + assistant with 2 tools + results + text."""
     messages = [
-        _make_assistant_message([
-            _make_tool_use_block("tool_1", "get_weather", {"city": "NYC"}),
-            _make_tool_use_block("tool_2", "get_time", {"timezone": "EST"}),
-        ]),
-        _make_user_message([
-            _make_tool_result_block("tool_1", content="Sunny, 72F"),
-            _make_tool_result_block("tool_2", content="3:00 PM"),
-        ]),
-        _make_assistant_message([
-            _make_text_block("NYC is sunny at 72F, and it's 3:00 PM EST."),
-        ]),
+        _make_assistant_message(
+            [
+                _make_tool_use_block("tool_1", "get_weather", {"city": "NYC"}),
+                _make_tool_use_block("tool_2", "get_time", {"timezone": "EST"}),
+            ]
+        ),
+        _make_user_message(
+            [
+                _make_tool_result_block("tool_1", content="Sunny, 72F"),
+                _make_tool_result_block("tool_2", content="3:00 PM"),
+            ]
+        ),
+        _make_assistant_message(
+            [
+                _make_text_block("NYC is sunny at 72F, and it's 3:00 PM EST."),
+            ]
+        ),
         _make_result_message(),
     ]
 
@@ -211,7 +225,9 @@ async def test_multiple_tool_uses(client: WeaveClient) -> None:
     assert len(calls) == 4
 
     root = calls[0]
-    assert _op_name_matches(root.op_name, "claude_agent_sdk.ClaudeSDKClient.conversation")
+    assert _op_name_matches(
+        root.op_name, "claude_agent_sdk.ClaudeSDKClient.conversation"
+    )
 
     # Two tool calls
     tool1 = calls[1]
@@ -245,7 +261,9 @@ async def test_multi_turn_conversation(client: WeaveClient) -> None:
     assert len(calls) == 4  # root + 3 LLM calls
 
     root = calls[0]
-    assert _op_name_matches(root.op_name, "claude_agent_sdk.ClaudeSDKClient.conversation")
+    assert _op_name_matches(
+        root.op_name, "claude_agent_sdk.ClaudeSDKClient.conversation"
+    )
     assert root.output["num_turns"] == 3
 
     for i, expected_text in enumerate(
@@ -315,12 +333,16 @@ async def test_empty_conversation(client: WeaveClient) -> None:
 async def test_call_hierarchy(client: WeaveClient) -> None:
     """Verify parent-child relationships between calls."""
     messages = [
-        _make_assistant_message([
-            _make_tool_use_block("t1", "search", {"q": "test"}),
-        ]),
-        _make_user_message([
-            _make_tool_result_block("t1", content="found it"),
-        ]),
+        _make_assistant_message(
+            [
+                _make_tool_use_block("t1", "search", {"q": "test"}),
+            ]
+        ),
+        _make_user_message(
+            [
+                _make_tool_result_block("t1", content="found it"),
+            ]
+        ),
         _make_assistant_message([_make_text_block("Here's what I found.")]),
         _make_result_message(),
     ]
@@ -342,12 +364,16 @@ async def test_call_hierarchy(client: WeaveClient) -> None:
 async def test_op_names(client: WeaveClient) -> None:
     """Verify correct op names on each call type."""
     messages = [
-        _make_assistant_message([
-            _make_tool_use_block("t1", "calculator", {"expr": "2+2"}),
-        ]),
-        _make_user_message([
-            _make_tool_result_block("t1", content="4"),
-        ]),
+        _make_assistant_message(
+            [
+                _make_tool_use_block("t1", "calculator", {"expr": "2+2"}),
+            ]
+        ),
+        _make_user_message(
+            [
+                _make_tool_result_block("t1", content="4"),
+            ]
+        ),
         _make_assistant_message([_make_text_block("The answer is 4.")]),
         _make_result_message(),
     ]
@@ -358,7 +384,9 @@ async def test_op_names(client: WeaveClient) -> None:
     assert len(calls) == 3
 
     root = calls[0]
-    assert _op_name_matches(root.op_name, "claude_agent_sdk.ClaudeSDKClient.conversation")
+    assert _op_name_matches(
+        root.op_name, "claude_agent_sdk.ClaudeSDKClient.conversation"
+    )
 
     tool_call = calls[1]
     assert _op_name_matches(tool_call.op_name, "claude_agent_sdk.tool_use.calculator")
@@ -387,12 +415,18 @@ async def test_transparent_message_yielding(client: WeaveClient) -> None:
 async def test_tool_result_with_error(client: WeaveClient) -> None:
     """Verify tool calls with is_error=True in tool result."""
     messages = [
-        _make_assistant_message([
-            _make_tool_use_block("t1", "risky_op", {"x": 1}),
-        ]),
-        _make_user_message([
-            _make_tool_result_block("t1", content="Permission denied", is_error=True),
-        ]),
+        _make_assistant_message(
+            [
+                _make_tool_use_block("t1", "risky_op", {"x": 1}),
+            ]
+        ),
+        _make_user_message(
+            [
+                _make_tool_result_block(
+                    "t1", content="Permission denied", is_error=True
+                ),
+            ]
+        ),
         _make_assistant_message([_make_text_block("The operation failed.")]),
         _make_result_message(),
     ]
