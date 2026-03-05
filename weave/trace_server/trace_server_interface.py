@@ -1107,6 +1107,19 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
+class ProjectsInfoReq(BaseModelStrict):
+    project_ids: list[str] = Field(
+        description="External project IDs in 'entity/project' format.",
+        examples=[["entity-a/project-a", "entity-b/project-b"]],
+    )
+
+
+class ProjectsInfoRes(BaseModel):
+    internal_project_ids: list[str] = Field(
+        description="Internal project IDs, in the same order as the request.",
+    )
+
+
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
