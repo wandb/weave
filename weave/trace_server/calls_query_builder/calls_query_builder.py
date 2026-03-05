@@ -135,6 +135,9 @@ class QueryBuilderField(BaseModel):
 
 
 class CallsMergedField(QueryBuilderField):
+    def is_feedback_field(self) -> bool:
+        return False
+
     def is_heavy(self) -> bool:
         return False
 
@@ -284,6 +287,9 @@ class CallsMergedSummaryField(CallsMergedField):
 class CallsMergedFeedbackPayloadField(CallsMergedField):
     feedback_type: str
     extra_path: list[str]
+
+    def is_feedback_field(self) -> bool:
+        return True
 
     @classmethod
     def from_path(cls, path: str) -> Self:

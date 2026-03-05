@@ -597,7 +597,18 @@ def get_cost_final_select(
     group_by = f"GROUP BY {', '.join(safe_fields)}"
     order_by = ""
     if order_fields:
-        order_parts = [of.as_sql(pb, "ranked_prices") for of in order_fields]
+        order_parts = [
+            # Feedback fields need use_agg_fn=True because they come from a
+            # JOIN and aren't in the GROUP BY.  All other fields (e.g.
+            # CallsMergedAggField with argMaxMerge) have already been
+            # materialized to plain columns by the CTEs, so use_agg_fn=False.
+            of.as_sql(
+                pb,
+                "ranked_prices",
+                use_agg_fn=of.field.is_feedback_field(),
+            )
+            for of in order_fields
+        ]
         order_by = f"ORDER BY {', '.join(order_parts)}"
 
     parts = [select_clause, from_clause]
