@@ -24,41 +24,14 @@ _claude_agent_sdk_patcher: MultiPatcher | None = None
 # ── Shared helpers ───────────────────────────────────────────────────
 
 
-def _get_sdk_types() -> tuple:
+def _serialize_msg(msg: Any) -> dict[str, Any]:
     from claude_agent_sdk import (
         AssistantMessage,
         ResultMessage,
         SystemMessage,
-        TextBlock,
-        ThinkingBlock,
-        ToolResultBlock,
-        ToolUseBlock,
         UserMessage,
     )
 
-    return (
-        AssistantMessage,
-        ResultMessage,
-        SystemMessage,
-        TextBlock,
-        ThinkingBlock,
-        ToolResultBlock,
-        ToolUseBlock,
-        UserMessage,
-    )
-
-
-def _serialize_msg(msg: Any) -> dict[str, Any]:
-    (
-        AssistantMessage,
-        ResultMessage,
-        SystemMessage,
-        _,
-        _,
-        _,
-        _,
-        UserMessage,
-    ) = _get_sdk_types()
     d = dataclasses.asdict(msg)
     if isinstance(msg, UserMessage):
         d["role"] = "user"
@@ -90,16 +63,15 @@ def _process_message_inline(
       - accumulated_messages: list of serialized messages (shared history)
       - root_model: first model name seen
     """
-    (
+    from claude_agent_sdk import (
         AssistantMessage,
-        _,
         SystemMessage,
         TextBlock,
         ThinkingBlock,
         ToolResultBlock,
         ToolUseBlock,
         UserMessage,
-    ) = _get_sdk_types()
+    )
 
     pending_thinking = state["pending_thinking"]
     open_tool_calls = state["open_tool_calls"]
@@ -140,7 +112,9 @@ def _process_message_inline(
             tool_call = wc.create_call(
                 op=f"claude_agent_sdk.tool_use.{tool_block.name}",
                 inputs={"message": serialized},
-                display_name=tool_use_display_name(tool_block.name, tool_block.input),
+                display_name=tool_use_display_name(
+                    tool_block.name, tool_block.input
+                ),
                 parent=root_call,
                 attributes={"kind": "tool"},
                 use_stack=False,
@@ -168,7 +142,9 @@ def _process_message_inline(
         accumulated.append(_serialize_msg(msg))
         # Insert user prompt into history after the SystemMessage
         if isinstance(msg, SystemMessage) and state["user_prompt"] is not None:
-            accumulated.append({"role": "user", "content": state["user_prompt"]})
+            accumulated.append(
+                {"role": "user", "content": state["user_prompt"]}
+            )
 
 
 def _finalize_stream(
@@ -212,7 +188,9 @@ def _finalize_stream(
             root_output["result"] = result_msg.result
         if result_msg.is_error:
             root_output["status"] = "error"
-            exception = Exception(result_msg.result or "Conversation ended with error")
+            exception = Exception(
+                result_msg.result or "Conversation ended with error"
+            )
 
     wc.finish_call(root_call, output=root_output, exception=exception)
 
@@ -248,8 +226,7 @@ def _resolve_thread_id() -> tuple[str, bool]:
 
 def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
     """Wrap ``InternalClient.process_query`` — the async generator that
-    both ``query()`` and ``ClaudeSDKClient`` ultimately delegate to.
-    """
+    both ``query()`` and ``ClaudeSDKClient`` ultimately delegate to."""
 
     def wrapper(original_process_query: Any) -> Any:
         @wraps(original_process_query)
@@ -260,7 +237,6 @@ def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
             transport: Any = None,
         ) -> AsyncIterator[Any]:
             from claude_agent_sdk import ResultMessage
-
             from weave.trace.context import call_context
 
             wc = get_weave_client()
@@ -316,8 +292,7 @@ def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
 
 def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
     """Wrap ``ClaudeSDKClient.__init__`` to create a session-level parent
-    call that spans the client lifetime, with each turn as a child.
-    """
+    call that spans the client lifetime, with each turn as a child."""
 
     def wrapper(original_init: Any) -> Any:
         @wraps(original_init)
@@ -333,7 +308,9 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
             user_prompt_holder: list[str | None] = [None]
 
             @wraps(original_query)
-            async def wrapped_query(prompt: Any, session_id: str = "default") -> None:
+            async def wrapped_query(
+                prompt: Any, session_id: str = "default"
+            ) -> None:
                 if isinstance(prompt, str):
                     user_prompt_holder[0] = prompt
                 else:
@@ -343,7 +320,6 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
             @wraps(original_receive_response)
             async def wrapped_receive_response() -> AsyncIterator[Any]:
                 from claude_agent_sdk import ResultMessage
-
                 from weave.trace.context import call_context
 
                 wc = get_weave_client()
@@ -381,7 +357,9 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
                             if isinstance(msg, ResultMessage):
                                 result_msg = msg
                             else:
-                                _process_message_inline(msg, wc, turn_call, state)
+                                _process_message_inline(
+                                    msg, wc, turn_call, state
+                                )
                             yield msg
                     finally:
                         _finalize_stream(wc, turn_call, state, result_msg)
@@ -410,7 +388,9 @@ def get_claude_agent_sdk_patcher(
     _claude_agent_sdk_patcher = MultiPatcher(
         [
             SymbolPatcher(
-                lambda: importlib.import_module("claude_agent_sdk._internal.client"),
+                lambda: importlib.import_module(
+                    "claude_agent_sdk._internal.client"
+                ),
                 "InternalClient.process_query",
                 _patched_process_query_wrapper(settings),
             ),
