@@ -308,6 +308,14 @@ def test_create_db_sql(mock_costs):
             "CREATE TABLE test (id Int32) ENGINE = ReplacingMergeTree(created_at)",
             "CREATE TABLE test (id Int32) ENGINE = ReplicatedReplacingMergeTree(created_at)",
         ),
+        (
+            "CREATE TABLE test (id Int32) ENGINE = ReplacingMergeTree(created_at)",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedReplacingMergeTree(created_at)",
+        ),
+        (
+            "CREATE TABLE test (id Int32) ENGINE = ReplacingMergeTree(toDateTime64(created_at, 3))",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedReplacingMergeTree(toDateTime64(created_at, 3))",
+        ),
         # Non-MergeTree engines should be unchanged
         (
             "CREATE TABLE test (id Int32) ENGINE = Memory",
