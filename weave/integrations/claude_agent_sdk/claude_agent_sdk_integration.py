@@ -295,8 +295,8 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
         def patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
             original_init(self, *args, **kwargs)
 
-            self._weave_turn_counter: int = 0
-            self._weave_thread_id: str | None = None
+            self._weave_turn_counter = 0
+            self._weave_thread_id = None
 
             original_query = self.query
             original_receive_response = self.receive_response
