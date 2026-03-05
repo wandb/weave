@@ -300,6 +300,16 @@ def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def patch_claude_agent_sdk(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for Claude Agent SDK."""
+    _patch_integration(
+        module_path="weave.integrations.claude_agent_sdk.claude_agent_sdk",
+        patcher_func_getter_name="get_claude_agent_sdk_patcher",
+        triggering_symbols=["claude_agent_sdk"],
+        settings=settings,
+    )
+
+
 # Mapping of module names to patch functions for implicit patching
 # When a module is already imported, we'll automatically call its patch function
 
@@ -331,6 +341,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "langchain_core": patch_langchain,
     "llama_index": patch_llamaindex,
     "openai_realtime": patch_openai_realtime,
+    "claude_agent_sdk": patch_claude_agent_sdk,
 }
 
 
