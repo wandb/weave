@@ -302,7 +302,11 @@ def test_create_db_sql(mock_costs):
         ),
         (
             "CREATE TABLE test (id Int32) ENGINE = MergeTree()",
-            "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree()",
+        ),
+        (
+            "CREATE TABLE test (id Int32) ENGINE = ReplacingMergeTree(created_at)",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedReplacingMergeTree(created_at)",
         ),
         # Non-MergeTree engines should be unchanged
         (
@@ -333,6 +337,30 @@ def test_format_replicated_sql_distributed():
     )
     assert (
         "ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
+        in result
+    )
+
+
+def test_format_replicated_sql_distributed_with_engine_args():
+    """Test that engine args like (created_at) are merged into the ZK path params."""
+    distributed_migrator = DistributedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
+    )
+    result = distributed_migrator._format_replicated_sql_distributed(
+        "CREATE TABLE test (id Int32) ENGINE = ReplacingMergeTree(created_at)",
+        "test_db",
+    )
+    assert (
+        "ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}', created_at)"
+        in result
+    )
+
+    # AggregatingMergeTree() should not get extra args
+    result = distributed_migrator._format_replicated_sql_distributed(
+        "CREATE TABLE test (id Int32) ENGINE = AggregatingMergeTree()", "test_db"
+    )
+    assert (
+        "ReplicatedAggregatingMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
         in result
     )
 
@@ -578,6 +606,20 @@ def test_non_replicated_preserves_table_names(migrator):
             "ALTER TABLE test ADD COLUMN x Int32",
             "ALTER TABLE test ON CLUSTER test_cluster ADD COLUMN x Int32",
         ),
+        # DROP TABLE cases
+        (
+            "DROP TABLE IF EXISTS my_table",
+            "DROP TABLE IF EXISTS my_table ON CLUSTER test_cluster",
+        ),
+        (
+            "DROP TABLE my_table",
+            "DROP TABLE my_table ON CLUSTER test_cluster",
+        ),
+        # RENAME TABLE cases (ON CLUSTER at end)
+        (
+            "RENAME TABLE foo TO bar",
+            "RENAME TABLE foo TO bar ON CLUSTER test_cluster",
+        ),
     ],
 )
 def test_add_on_cluster_clause(input_sql, expected_sql):
@@ -816,14 +858,100 @@ SELECT project_id,
 
 def test_skip_materialize_command_distributed(distributed_migrator):
     """Test that commands with MATERIALIZE keyword are skipped in distributed mode."""
-    # Command with MATERIALIZE keyword (e.g., ALTER TABLE ... MATERIALIZE COLUMN)
     materialize_command = "ALTER TABLE test_table MATERIALIZE COLUMN some_column"
 
     distributed_migrator._execute_migration_command("test_db", materialize_command)
 
-    # Should not execute any commands (skipped)
     assert distributed_migrator.ch_client.command.call_count == 0
     assert distributed_migrator.ch_client.database == "original_db"
+
+
+def test_skip_insert_command_distributed(distributed_migrator):
+    """Test that INSERT INTO commands are skipped in distributed mode."""
+    insert_command = "INSERT INTO calls_complete_new SELECT * FROM calls_complete"
+
+    distributed_migrator._execute_migration_command("test_db", insert_command)
+
+    assert distributed_migrator.ch_client.command.call_count == 0
+    assert distributed_migrator.ch_client.database == "original_db"
+
+
+def test_rename_table_distributed(distributed_migrator):
+    """Test RENAME TABLE in distributed mode renames local, drops old distributed, creates new."""
+    distributed_migrator._execute_migration_command(
+        "test_db", "RENAME TABLE calls_complete TO calls_complete_old"
+    )
+
+    assert distributed_migrator.ch_client.command.call_count == 3
+    assert distributed_migrator.ch_client.database == "original_db"
+
+    # 1. Rename local table
+    rename_sql = distributed_migrator.ch_client.command.call_args_list[0][0][0]
+    assert (
+        rename_sql
+        == "RENAME TABLE calls_complete_local TO calls_complete_old_local ON CLUSTER test_cluster"
+    )
+
+    # 2. Drop old distributed table
+    drop_sql = distributed_migrator.ch_client.command.call_args_list[1][0][0]
+    assert drop_sql == "DROP TABLE IF EXISTS calls_complete ON CLUSTER test_cluster"
+
+    # 3. Create new distributed table
+    create_sql = distributed_migrator.ch_client.command.call_args_list[2][0][0]
+    assert "calls_complete_old" in create_sql
+    assert "ON CLUSTER test_cluster" in create_sql
+    assert "Distributed" in create_sql
+    assert "calls_complete_old_local" in create_sql
+
+
+def test_rename_table_distributed_picks_up_shard_key(distributed_migrator):
+    """Test that RENAME TABLE to a name in ID_SHARDED_TABLES uses the correct shard key."""
+    distributed_migrator._execute_migration_command(
+        "test_db", "RENAME TABLE calls_complete_new TO calls_complete"
+    )
+
+    assert distributed_migrator.ch_client.command.call_count == 3
+
+    # The new distributed table should use sipHash64(trace_id) for calls_complete
+    create_sql = distributed_migrator.ch_client.command.call_args_list[2][0][0]
+    assert "sipHash64(trace_id)" in create_sql
+    assert "calls_complete_local" in create_sql
+
+
+def test_rename_table_replicated(replicated_migrator):
+    """Test RENAME TABLE in replicated mode adds ON CLUSTER at the end."""
+    replicated_migrator._execute_migration_command("test_db", "RENAME TABLE foo TO bar")
+
+    assert replicated_migrator.ch_client.command.call_count == 1
+    call_sql = replicated_migrator.ch_client.command.call_args_list[0][0][0]
+    assert call_sql == "RENAME TABLE foo TO bar ON CLUSTER test_cluster"
+
+
+def test_drop_table_distributed(distributed_migrator):
+    """Test DROP TABLE in distributed mode drops both local and distributed tables with ON CLUSTER."""
+    distributed_migrator._execute_migration_command(
+        "test_db", "DROP TABLE IF EXISTS my_table"
+    )
+
+    assert distributed_migrator.ch_client.command.call_count == 2
+    assert distributed_migrator.ch_client.database == "original_db"
+
+    local_sql = distributed_migrator.ch_client.command.call_args_list[0][0][0]
+    assert "DROP TABLE IF EXISTS my_table_local ON CLUSTER test_cluster" == local_sql
+
+    distributed_sql = distributed_migrator.ch_client.command.call_args_list[1][0][0]
+    assert "DROP TABLE IF EXISTS my_table ON CLUSTER test_cluster" == distributed_sql
+
+
+def test_drop_table_replicated(replicated_migrator):
+    """Test DROP TABLE in replicated mode adds ON CLUSTER."""
+    replicated_migrator._execute_migration_command(
+        "test_db", "DROP TABLE IF EXISTS my_table"
+    )
+
+    assert replicated_migrator.ch_client.command.call_count == 1
+    call_sql = replicated_migrator.ch_client.command.call_args_list[0][0][0]
+    assert call_sql == "DROP TABLE IF EXISTS my_table ON CLUSTER test_cluster"
 
 
 def test_index_operations_only_on_local_tables_distributed(distributed_migrator):
