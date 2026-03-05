@@ -304,6 +304,14 @@ def test_create_db_sql(mock_costs):
             "CREATE TABLE test (id Int32) ENGINE = MergeTree()",
             "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree",
         ),
+        (
+            "CREATE TABLE test (id Int32) ENGINE = ReplacingMergeTree(created_at)",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedReplacingMergeTree(created_at)",
+        ),
+        (
+            "CREATE TABLE test (id Int32) ENGINE = ReplacingMergeTree(toDateTime64(created_at, 3))",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedReplacingMergeTree(toDateTime64(created_at, 3))",
+        ),
         # Non-MergeTree engines should be unchanged
         (
             "CREATE TABLE test (id Int32) ENGINE = Memory",
@@ -333,6 +341,21 @@ def test_format_replicated_sql_distributed():
     )
     assert (
         "ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
+        in result
+    )
+
+
+def test_format_replicated_sql_distributed_preserves_engine_args():
+    """Test distributed formatting preserves engine args, including nested parentheses."""
+    distributed_migrator = DistributedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
+    )
+    result = distributed_migrator._format_replicated_sql_distributed(
+        "CREATE TABLE test (id Int32) ENGINE = ReplacingMergeTree(toDateTime64(created_at, 3))",
+        "test_db",
+    )
+    assert (
+        "ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}', toDateTime64(created_at, 3))"
         in result
     )
 
