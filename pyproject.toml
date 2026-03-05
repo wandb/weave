@@ -264,7 +264,7 @@ select = [
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
   "PLC",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "PLE",     # https://docs.astral.sh/ruff/rules/#pylint-ple
-  "PLR",     # https://docs.astral.sh/ruff/rules/#pylint-pl
+  "PLR",     # https://docs.astral.sh/ruff/rules/#pylint-plr
   "PLW",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/

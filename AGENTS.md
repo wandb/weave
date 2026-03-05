@@ -52,9 +52,7 @@ This project uses `uv` for dependency management. Dependencies are organized int
 - Do NOT use bare `python -m pytest` — the `python` on PATH may be from a uv cache, not the project `.venv`. Always use `uv run`.
 - Do NOT use `--extra test` — `test` is a dependency-group, not an optional-dependency. Use `--group test`.
 - `ruff` is not installed in any project dependency group. Use `uvx ruff` to run it.
-- In environments where `uvx` is unavailable, use `uv tool run ruff ...` as a drop-in fallback.
 - Ruff now enforces `PLW` rules. `PLW0602`, `PLW0603`, `PLW1641`, and `PLW3201` are handled with spot-level inline `# noqa` on specific lines (not global/per-file ignore). Prefer fixing code first; if intentional, suppress only the exact line.
-- Ruff now also enables `PLR` rules. High-noise structural checks are globally ignored for now (`PLR0904`, `PLR0911`, `PLR0912`, `PLR0913`, `PLR0914`, `PLR0915`, `PLR0917`, `PLR1702`, `PLR2004`, `PLR6301`) while lower-noise rules should be fixed directly.
 - Be careful with `PLW1514` autofixes on serialization-sensitive code (`weave/type_handlers/Content/content.py`, `weave/type_handlers/Audio/audio.py`) and mocked file I/O (`weave/trace_server/costs/update_costs.py`): adding `encoding=` changed behavior/tests, so these files are explicitly ignored for that rule.
 
 ### Codex Development (nox)
