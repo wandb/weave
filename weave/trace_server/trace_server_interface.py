@@ -767,7 +767,8 @@ class ObjAddTagsReq(BaseModelStrict):
 
     @model_validator(mode="after")
     def validate_tags(self) -> "ObjAddTagsReq":
-        # Deduplicate while preserving order
+        # Deduplicate — order doesn't matter for a batch add, but
+        # dict.fromkeys preserves insertion order (stable for tests).
         self.tags = list(dict.fromkeys(self.tags))
         for tag in self.tags:
             validate_tag_name(tag)
