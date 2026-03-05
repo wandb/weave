@@ -21,7 +21,11 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
-from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.client_interface import (
+    ProjectsInfoReq,
+    ProjectsInfoRes,
+    TraceServerClientInterface,
+)
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     CallsCompleteModeRequired,
@@ -562,13 +566,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         return ServerInfoRes.model_validate(r.json())
 
     @validate_call
-    def projects_info(self, req: tsi.ProjectsInfoReq) -> tsi.ProjectsInfoRes:
-        return self._generic_request(
-            "/service/projects_info",
-            req,
-            tsi.ProjectsInfoReq,
-            tsi.ProjectsInfoRes,
-        )
+    def projects_info(self, req: ProjectsInfoReq) -> list[ProjectsInfoRes]:
+        r = self._post_request_executor("/service/projects_info", req)
+        handle_response_error(r, "/service/projects_info")
+        return [ProjectsInfoRes.model_validate(item) for item in r.json()]
 
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # TODO: Add docs link (DOCS-1390)
