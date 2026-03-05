@@ -720,6 +720,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         """Creates a new call."""
+        # Converts the user-provided call details into a clickhouse schema.
+        # This does validation and conversion of the input data as well
+        # as enforcing business rules and defaults
         span = ddtrace.tracer.current_span()
         if span:
             span.set_tag("weave_trace_server.insert_call_count", 1)
