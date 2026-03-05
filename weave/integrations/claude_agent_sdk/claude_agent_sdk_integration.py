@@ -307,18 +307,54 @@ def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
 
 
 def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
-    """Wrap ``ClaudeSDKClient.__init__`` to intercept ``receive_response``
-    and trace calls inline with real timestamps."""
+    """Wrap ``ClaudeSDKClient.__init__`` to create a session-level parent
+    call that spans the client lifetime, with each turn as a child."""
 
     def wrapper(original_init: Any) -> Any:
         @wraps(original_init)
         def patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
             original_init(self, *args, **kwargs)
 
+            # Session-level state stored on the instance
+            self._weave_session_call: Any = None
+            self._weave_thread_id: str | None = None
+            self._weave_turn_counter: int = 0
+
+            original_connect = self.connect
+            original_disconnect = self.disconnect
             original_query = self.query
             original_receive_response = self.receive_response
 
             user_prompt_holder: list[str | None] = [None]
+
+            @wraps(original_connect)
+            async def wrapped_connect(
+                prompt: Any = None,
+            ) -> None:
+                await original_connect(prompt)
+                wc = get_weave_client()
+                if wc is not None:
+                    from weave.trace_server.ids import generate_id
+
+                    self._weave_thread_id = generate_id()
+                    self._weave_session_call = wc.create_call(
+                        op="claude_agent_sdk.session",
+                        inputs={},
+                        display_name="Session",
+                        attributes={"kind": "agent"},
+                        use_stack=False,
+                    )
+
+            @wraps(original_disconnect)
+            async def wrapped_disconnect() -> None:
+                wc = get_weave_client()
+                if wc is not None and self._weave_session_call is not None:
+                    wc.finish_call(
+                        self._weave_session_call,
+                        output={"status": "completed"},
+                    )
+                    self._weave_session_call = None
+                await original_disconnect()
 
             @wraps(original_query)
             async def wrapped_query(
@@ -333,43 +369,50 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
             @wraps(original_receive_response)
             async def wrapped_receive_response() -> AsyncIterator[Any]:
                 from claude_agent_sdk import ResultMessage
+                from weave.trace.context import call_context
 
                 wc = get_weave_client()
-                if wc is None:
+                if wc is None or self._weave_session_call is None:
                     async for msg in original_receive_response():
                         yield msg
                     return
 
                 user_prompt = user_prompt_holder[0]
-                root_inputs: dict[str, Any] = {}
+                self._weave_turn_counter += 1
+
+                turn_inputs: dict[str, Any] = {}
                 if user_prompt is not None:
-                    root_inputs["prompt"] = user_prompt
+                    turn_inputs["prompt"] = user_prompt
 
-                root_call = wc.create_call(
-                    op=f"claude-session-{str(datetime.now())}",
-                    inputs=root_inputs,
-                    display_name=session_display_name(user_prompt),
-                    attributes={"kind": "agent"},
-                    use_stack=False,
-                )
+                # Set thread_id context so child calls pick it up
+                with call_context.set_thread_id(self._weave_thread_id):
+                    turn_call = wc.create_call(
+                        op="claude_agent_sdk.turn",
+                        inputs=turn_inputs,
+                        display_name=session_display_name(user_prompt),
+                        parent=self._weave_session_call,
+                        attributes={"kind": "agent"},
+                        use_stack=False,
+                    )
 
-                state = _make_initial_state(user_prompt)
-                # Record when we start waiting for the first model response
-                state["response_start_time"] = datetime.now(tz=timezone.utc)
+                    state = _make_initial_state(user_prompt)
+                    state["response_start_time"] = datetime.now(tz=timezone.utc)
 
-                result_msg = None
-                try:
-                    async for msg in original_receive_response():
-                        if isinstance(msg, ResultMessage):
-                            result_msg = msg
-                        else:
-                            _process_message_inline(
-                                msg, wc, root_call, state
-                            )
-                        yield msg
-                finally:
-                    _finalize_stream(wc, root_call, state, result_msg)
+                    result_msg = None
+                    try:
+                        async for msg in original_receive_response():
+                            if isinstance(msg, ResultMessage):
+                                result_msg = msg
+                            else:
+                                _process_message_inline(
+                                    msg, wc, turn_call, state
+                                )
+                            yield msg
+                    finally:
+                        _finalize_stream(wc, turn_call, state, result_msg)
 
+            self.connect = wrapped_connect
+            self.disconnect = wrapped_disconnect
             self.query = wrapped_query
             self.receive_response = wrapped_receive_response
 

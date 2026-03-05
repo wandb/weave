@@ -54,7 +54,7 @@ def _make_assistant_message(
     )
 
 
-def _make_user_message(content: str) -> object:
+def _make_user_message(content: str | list) -> object:
     from claude_agent_sdk import UserMessage
 
     return UserMessage(
@@ -155,7 +155,7 @@ async def test_tool_use_conversation(client: WeaveClient) -> None:
         _make_assistant_message([
             _make_tool_use_block("tool_1", "get_weather", {"city": "NYC"}),
         ]),
-        _make_assistant_message([
+        _make_user_message([
             _make_tool_result_block("tool_1", content="Sunny, 72F"),
         ]),
         _make_assistant_message([
@@ -195,7 +195,7 @@ async def test_multiple_tool_uses(client: WeaveClient) -> None:
             _make_tool_use_block("tool_1", "get_weather", {"city": "NYC"}),
             _make_tool_use_block("tool_2", "get_time", {"timezone": "EST"}),
         ]),
-        _make_assistant_message([
+        _make_user_message([
             _make_tool_result_block("tool_1", content="Sunny, 72F"),
             _make_tool_result_block("tool_2", content="3:00 PM"),
         ]),
@@ -318,7 +318,7 @@ async def test_call_hierarchy(client: WeaveClient) -> None:
         _make_assistant_message([
             _make_tool_use_block("t1", "search", {"q": "test"}),
         ]),
-        _make_assistant_message([
+        _make_user_message([
             _make_tool_result_block("t1", content="found it"),
         ]),
         _make_assistant_message([_make_text_block("Here's what I found.")]),
@@ -345,7 +345,7 @@ async def test_op_names(client: WeaveClient) -> None:
         _make_assistant_message([
             _make_tool_use_block("t1", "calculator", {"expr": "2+2"}),
         ]),
-        _make_assistant_message([
+        _make_user_message([
             _make_tool_result_block("t1", content="4"),
         ]),
         _make_assistant_message([_make_text_block("The answer is 4.")]),
@@ -390,7 +390,7 @@ async def test_tool_result_with_error(client: WeaveClient) -> None:
         _make_assistant_message([
             _make_tool_use_block("t1", "risky_op", {"x": 1}),
         ]),
-        _make_assistant_message([
+        _make_user_message([
             _make_tool_result_block("t1", content="Permission denied", is_error=True),
         ]),
         _make_assistant_message([_make_text_block("The operation failed.")]),
