@@ -152,7 +152,7 @@ FROM calls_complete;
 
 -- Step 4: Drop old stats infrastructure, drop migration view, rename tables
 DROP VIEW IF EXISTS calls_complete_stats_view;
-DROP TABLE IF EXISTS calls_complete_stats;
+DROP TABLE IF EXISTS calls_complete_stats SYNC;
 DROP VIEW IF EXISTS calls_complete_migration_view;
 RENAME TABLE calls_complete TO calls_complete_old;
 RENAME TABLE calls_complete_new TO calls_complete;
