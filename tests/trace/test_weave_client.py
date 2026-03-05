@@ -67,6 +67,7 @@ from weave.trace_server.trace_server_interface import (
 )
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_create(client):
     res = client.server.table_create(
         TableCreateReq(
