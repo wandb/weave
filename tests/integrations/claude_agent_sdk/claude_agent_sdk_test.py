@@ -213,15 +213,14 @@ async def test_thinking_query(
 
     root_call = calls[0]
     assert root_call.output["status"] == "completed"
-    assert root_call.output["result"] == "After careful consideration, the answer is 42."
+    assert (
+        root_call.output["result"] == "After careful consideration, the answer is 42."
+    )
 
     # Verify thinking was captured in messages
     output_msgs = root_call.output["messages"]
     # System + user prompt + assistant (with merged thinking + text)
-    assert any(
-        msg.get("role") == "assistant"
-        for msg in output_msgs
-    )
+    assert any(msg.get("role") == "assistant" for msg in output_msgs)
 
 
 # =====================================================================
