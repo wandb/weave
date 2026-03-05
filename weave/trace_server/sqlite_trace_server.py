@@ -3080,10 +3080,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             ):
                 evaluation_run_id = parent_res.call.parent_id
 
+        prediction_inputs = (call.inputs or {}).get("inputs") or {}
+
         return tsi.PredictionReadRes(
             prediction_id=call.id,
             model=attributes.get(constants.PREDICTION_MODEL_ATTR_KEY, ""),
-            inputs=call.inputs.get("inputs") if call.inputs else {},
+            inputs=prediction_inputs,
             output=call.output,
             evaluation_run_id=evaluation_run_id,
             wb_user_id=call.wb_user_id,
@@ -3164,10 +3166,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 ):
                     evaluation_run_id = parent_res.call.parent_id
 
+            prediction_inputs = (call.inputs or {}).get("inputs") or {}
+
             yield tsi.PredictionReadRes(
                 prediction_id=call.id,
                 model=attributes.get(constants.PREDICTION_MODEL_ATTR_KEY, ""),
-                inputs=call.inputs.get("inputs") if call.inputs else {},
+                inputs=prediction_inputs,
                 output=call.output,
                 evaluation_run_id=evaluation_run_id,
                 wb_user_id=call.wb_user_id,
