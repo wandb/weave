@@ -505,7 +505,8 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             engine_prefix = match.group(1) or ""
             if engine_prefix.lower().startswith("replicated"):
                 return match.group(0)
-            return f"ENGINE = Replicated{engine_prefix}MergeTree"
+            engine_args = match.group(2) or ""
+            return f"ENGINE = Replicated{engine_prefix}MergeTree{engine_args}"
 
         return SQLPatterns.MERGETREE_ENGINE.sub(replace_engine, sql_query)
 
@@ -663,6 +664,14 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             if engine_prefix.lower().startswith("replicated"):
                 return match.group(0)
 
+            # Extract original engine args (e.g. "created_at" from ReplacingMergeTree(created_at))
+            engine_args = match.group(2)
+            extra_args = ""
+            if engine_args:
+                inner = engine_args.strip("()")
+                if inner:
+                    extra_args = f", {inner}"
+
             # Extract table name for path
             table_match = SQLPatterns.CREATE_TABLE.search(sql_query)
             if table_match:
@@ -671,9 +680,10 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                     table_name = table_name.split(".")[-1]
                 # Use _local suffix in the path for distributed tables
                 local_table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
-                return f"ENGINE = Replicated{engine_prefix}MergeTree('/clickhouse/tables/{{shard}}/{target_db}/{local_table_name}', '{{replica}}')"
+                return f"ENGINE = Replicated{engine_prefix}MergeTree('/clickhouse/tables/{{shard}}/{target_db}/{local_table_name}', '{{replica}}'{extra_args})"
 
-            return f"ENGINE = Replicated{engine_prefix}MergeTree"
+            engine_args_str = engine_args or ""
+            return f"ENGINE = Replicated{engine_prefix}MergeTree{engine_args_str}"
 
         return SQLPatterns.MERGETREE_ENGINE.sub(replace_engine, sql_query)
 
@@ -1014,8 +1024,10 @@ class SQLPatterns:
     SAFE_IDENTIFIER: Pattern = re.compile(r"^[a-zA-Z0-9_\.]+$")
 
     # Engine patterns
+    # Group 1: engine prefix (e.g. "Replacing", "Aggregating")
+    # Group 2: engine arguments including parens (e.g. "(created_at)" or "()")
     MERGETREE_ENGINE: Pattern = re.compile(
-        r"ENGINE\s*=\s*(\w+)?MergeTree\b(\(\))?", re.IGNORECASE
+        r"ENGINE\s*=\s*(\w+)?MergeTree\b(\([^)]*\))?", re.IGNORECASE
     )
 
     # DDL statement patterns
