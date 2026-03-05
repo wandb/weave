@@ -564,7 +564,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     @validate_call
     def projects_info(self, req: tsi.ProjectsInfoReq) -> tsi.ProjectsInfoRes:
         return self._generic_request(
-            "/projects/info",
+            "/service/projects_info",
             req,
             tsi.ProjectsInfoReq,
             tsi.ProjectsInfoRes,

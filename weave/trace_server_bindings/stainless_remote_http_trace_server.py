@@ -438,7 +438,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if self._username or self._password:
             auth = (self._username, self._password)
 
-        url = self.trace_server_url + "/projects/info"
+        url = self.trace_server_url + "/service/projects_info"
         response = httpx.post(
             url,
             content=req.model_dump_json(by_alias=True).encode("utf-8"),
