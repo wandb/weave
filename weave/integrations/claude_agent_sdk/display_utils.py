@@ -54,6 +54,25 @@ def tool_use_display_name(tool_name: str, tool_input: dict[str, Any]) -> str:
     return f"{tool_name}({params})"
 
 
+def _abbreviate(text: str, max_words: int = 8) -> str:
+    """Abbreviate text to the first few words."""
+    words = text.split()[:max_words]
+    name = " ".join(words)
+    if len(text.split()) > max_words:
+        name += "..."
+    return name
+
+
+def thinking_display_name(thinking: str) -> str:
+    """Generate display name for a thinking block child call."""
+    return f"Thinking: {_abbreviate(thinking)}"
+
+
+def text_display_name(text: str) -> str:
+    """Generate display name for a text block child call."""
+    return f"Text: {_abbreviate(text)}"
+
+
 def response_display_name(model: str | None) -> str:
     """Generate display name for a response call."""
     if model:
