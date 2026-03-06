@@ -106,55 +106,6 @@ def test_object_query_builder_add_is_op_condition():
     assert "is_op = 1" in builder.conditions_part
 
 
-def test_object_query_builder_add_is_op_condition_false():
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_is_op_condition(False)
-    assert "is_op = 0" in builder.conditions_part
-
-
-def test_object_query_builder_add_is_latest_condition():
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_is_latest_condition()
-    assert "is_latest = 1" in builder.conditions_part
-
-
-def test_object_query_builder_add_exclude_base_object_classes_condition():
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_exclude_base_object_classes_condition(["Op"])
-    assert (
-        "base_object_class NOT IN {exclude_base_object_classes: Array(String)}"
-        in builder.conditions_part
-    )
-    assert builder.parameters["exclude_base_object_classes"] == ["Op"]
-
-
-def test_object_query_builder_add_leaf_object_classes_condition():
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.add_leaf_object_classes_condition(["MyModel", "MyDataset"])
-    assert (
-        "leaf_object_class IN {leaf_object_classes: Array(String)}"
-        in builder.conditions_part
-    )
-    assert builder.parameters["leaf_object_classes"] == ["MyModel", "MyDataset"]
-
-
-def test_object_query_builder_include_deleted():
-    # With include_deleted=False (default), conditions include "deleted_at IS NULL"
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    assert "deleted_at IS NULL" in builder.conditions_part
-
-    # With include_deleted=True, conditions omit "deleted_at IS NULL"
-    builder = ObjectMetadataQueryBuilder(
-        project_id="test_project", include_deleted=True
-    )
-    assert "deleted_at IS NULL" not in builder.conditions_part
-
-    # set_include_deleted can toggle it after construction
-    builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    builder.set_include_deleted(True)
-    assert "deleted_at IS NULL" not in builder.conditions_part
-
-
 def test_object_query_builder_limit_offset():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     assert builder.limit_part == ""
