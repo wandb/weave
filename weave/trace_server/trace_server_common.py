@@ -295,3 +295,8 @@ def op_name_matches(op_name: str | None, expected_name: str) -> bool:
 
     # Fallback to direct string comparison for non-URI op names
     return op_name == expected_name
+
+
+def get_prediction_inputs(call_inputs: dict[str, Any] | None) -> dict[str, Any]:
+    """Extract prediction inputs from a call's inputs dict, defaulting to {} if missing or None."""
+    return (call_inputs or {}).get("inputs") or {}

@@ -56,6 +56,7 @@ from weave.trace_server.trace_server_common import (
     digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
+    get_prediction_inputs,
     hydrate_calls_with_feedback,
     make_derived_summary_fields,
     make_feedback_query_req,
@@ -3230,7 +3231,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.PredictionReadRes(
             prediction_id=call.id,
             model=attributes.get(constants.PREDICTION_MODEL_ATTR_KEY, ""),
-            inputs=call.inputs.get("inputs") if call.inputs else {},
+            inputs=get_prediction_inputs(call.inputs),
             output=call.output,
             evaluation_run_id=evaluation_run_id,
             wb_user_id=call.wb_user_id,
@@ -3314,7 +3315,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             yield tsi.PredictionReadRes(
                 prediction_id=call.id,
                 model=attributes.get(constants.PREDICTION_MODEL_ATTR_KEY, ""),
-                inputs=call.inputs.get("inputs") if call.inputs else {},
+                inputs=get_prediction_inputs(call.inputs),
                 output=call.output,
                 evaluation_run_id=evaluation_run_id,
                 wb_user_id=call.wb_user_id,
