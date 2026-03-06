@@ -1005,7 +1005,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         try:
             sql, params = build_model_prices_query(project_id, list(models))
-            result = self._query(sql, params)
+            cost_settings = None
+            if self.use_distributed_mode:
+                cost_settings = ch_settings.CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS
+            result = self._query(sql, params, settings=cost_settings)
         except Exception:
             # If price query fails, return empty prices (costs will be 0)
             return {}
@@ -1241,6 +1244,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
+        settings = None
         cq = CallsQuery(
             project_id=req.project_id,
             read_table=read_table,
@@ -1283,6 +1287,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 *[col for col in columns if col not in summary_columns],
                 "summary_dump",
             ]
+            if self.use_distributed_mode:
+                # If we are using distributed mode, use the distributed cost query settings to avoid:
+                # Code: 48. DB::Exception: Received from localhost:9000.DB::Exception:
+                # Serialization of SortingStep is implemented only for Full sorting. (NOT_IMPLEMENTED)
+                settings = ch_settings.CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS
 
         if req.expand_columns is not None:
             cq.set_expand_columns(req.expand_columns)
@@ -1314,7 +1323,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
