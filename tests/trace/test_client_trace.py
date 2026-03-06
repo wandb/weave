@@ -46,8 +46,8 @@ from weave.trace.context.weave_client_context import (
 )
 from weave.trace.refs import TableRef
 from weave.trace.vals import MissingSelfInstanceError
-from weave.trace.weave_client import sanitize_object_name
 from weave.trace.wandb_run_context import WandbRunContext
+from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
