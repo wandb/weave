@@ -19,7 +19,14 @@ from weave.trace.settings import (
     use_server_cache,
 )
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings.caches import DiskCache, LRUCache, StackedCache
+from weave.trace_server_bindings.caches import CacheProtocol, LRUCache, StackedCache
+
+try:
+    from weave.trace_server_bindings.disk_cache import DiskCache
+
+    _DISKCACHE_AVAILABLE = True
+except ImportError:
+    _DISKCACHE_AVAILABLE = False
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.delegating_trace_server import (
     DelegatingTraceServerMixin,
@@ -448,6 +455,7 @@ def create_memory_disk_cache(
     """Factory function to create a memory+disk stacked cache.
 
     This is the equivalent of the old MemCacheWithDiskCacheBackend but more flexible.
+    Falls back to memory-only caching when diskcache is not installed.
 
     Args:
         cache_dir: Directory path for disk cache storage
@@ -455,13 +463,23 @@ def create_memory_disk_cache(
         memory_size: Maximum number of items in memory cache (default 1000)
 
     Returns:
-        A StackedCache with memory and disk layers
+        A StackedCache with memory and disk layers, or memory-only if diskcache
+        is not installed
     """
     memory_layer: LRUCache[str, str | bytes] = LRUCache(max_size=memory_size)
-    disk_layer = DiskCache(cache_dir, size_limit)
+
+    layers: list[CacheProtocol[str, str | bytes]] = [memory_layer]
+
+    if _DISKCACHE_AVAILABLE:
+        layers.append(DiskCache(cache_dir, size_limit))
+    else:
+        logger.warning(
+            "diskcache is not installed; using memory-only cache. "
+            "Install it with: pip install diskcache"
+        )
 
     return StackedCache(
-        layers=[memory_layer, disk_layer],
+        layers=layers,
         populate_on_hit=True,
         existence_check_optimization=True,  # Enable the "same key = same value" optimization
     )
