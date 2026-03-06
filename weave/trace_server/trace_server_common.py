@@ -105,13 +105,12 @@ def make_derived_summary_fields(
 
     if display_name:
         weave_summary["display_name"] = display_name
+    elif ri.string_will_be_interpreted_as_ref(op_name):
+        op = ri.parse_internal_uri(op_name)
+        if isinstance(op, ri.InternalObjectRef):
+            weave_summary["trace_name"] = op.name
     else:
-        if ri.string_will_be_interpreted_as_ref(op_name):
-            op = ri.parse_internal_uri(op_name)
-            if isinstance(op, ri.InternalObjectRef):
-                weave_summary["trace_name"] = op.name
-        else:
-            weave_summary["trace_name"] = op_name
+        weave_summary["trace_name"] = op_name
 
     summary["weave"] = weave_summary
     return cast(tsi.SummaryMap, summary)

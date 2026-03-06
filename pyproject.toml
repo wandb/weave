@@ -266,6 +266,7 @@ select = [
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
   "PLC",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "PLE",     # https://docs.astral.sh/ruff/rules/#pylint-ple
+  "PLR",     # https://docs.astral.sh/ruff/rules/#pylint-plr
   "PLW",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
@@ -300,6 +301,18 @@ ignore = [
   "PLC2701", # https://docs.astral.sh/ruff/rules/import-private-name/
   # Keep explicit empty-string checks for readability in tests and parsing paths.
   "PLC1901", # https://docs.astral.sh/ruff/rules/compare-to-empty-string/
+  # Initial PLR rollout: defer broad structural and magic-number checks for a
+  # dedicated cleanup pass to keep lint actionable.
+  "PLR0904", # https://docs.astral.sh/ruff/rules/too-many-public-methods/
+  "PLR0911", # https://docs.astral.sh/ruff/rules/too-many-return-statements/
+  "PLR0912", # https://docs.astral.sh/ruff/rules/too-many-branches/
+  "PLR0913", # https://docs.astral.sh/ruff/rules/too-many-arguments/
+  "PLR0914", # https://docs.astral.sh/ruff/rules/too-many-locals/
+  "PLR0915", # https://docs.astral.sh/ruff/rules/too-many-statements/
+  "PLR0917", # https://docs.astral.sh/ruff/rules/too-many-positional-arguments/
+  "PLR1702", # https://docs.astral.sh/ruff/rules/too-many-nested-blocks/
+  "PLR2004", # https://docs.astral.sh/ruff/rules/magic-value-comparison/
+  "PLR6301", # https://docs.astral.sh/ruff/rules/no-self-use/
 ]
 
 [tool.ruff.lint.isort]

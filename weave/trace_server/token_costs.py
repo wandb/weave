@@ -692,7 +692,7 @@ def validate_cost_purge_req(req: tsi.CostPurgeReq) -> None:
     keys = list(expr.keys())
     if len(keys) != 1:
         raise InvalidRequest(MESSAGE_INVALID_COST_PURGE)
-    if keys[0] in ["eq_", "in_"]:
+    if keys[0] in {"eq_", "in_"}:
         validate_purge_req_one(expr, MESSAGE_INVALID_COST_PURGE, keys[0])
     elif keys[0] == "or_":
         validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_COST_PURGE)

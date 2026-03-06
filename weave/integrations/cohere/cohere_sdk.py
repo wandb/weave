@@ -90,14 +90,16 @@ def cohere_accumulator_v2(acc: V2ChatResponse | None, value: Any) -> V2ChatRespo
             acc.message.content.append(text_item)  # type: ignore
 
     elif value.type == "content-delta":
-        if (
+        has_content_delta = (
             hasattr(value, "index")
             and hasattr(value, "delta")
             and hasattr(value.delta, "message")
             and hasattr(value.delta.message, "content")
-            and hasattr(value.delta.message.content, "text")
-            and value.index < len(acc.message.content)  # type: ignore
-        ):
+        )
+        has_text_delta = has_content_delta and hasattr(
+            value.delta.message.content, "text"
+        )
+        if has_text_delta and value.index < len(acc.message.content):  # type: ignore
             current_item = acc.message.content[value.index]  # type: ignore
             if hasattr(current_item, "text"):
                 current_item.text += value.delta.message.content.text

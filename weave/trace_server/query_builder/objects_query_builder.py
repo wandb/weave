@@ -284,7 +284,7 @@ class ObjectMetadataQueryBuilder:
 
     def add_order(self, field: str, direction: str) -> None:
         direction = direction.lower()
-        if direction not in ("asc", "desc"):
+        if direction not in {"asc", "desc"}:
             raise ValueError(f"Direction {direction} is not allowed")
         self._sort_by.append(SortBy(field=field, direction=direction))
 

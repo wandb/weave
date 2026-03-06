@@ -350,7 +350,7 @@ class TestStandaloneBase64Detection:
         # Verify the content mimetype is audio/wav (not text/plain or application/octet-stream)
         metadata_call = trace_server.file_create.call_args_list[1][0][0]
         metadata = json.loads(metadata_call.content)
-        assert metadata["mimetype"] in ["audio/wav", "audio/x-wav", "audio/wave"]
+        assert metadata["mimetype"] in {"audio/wav", "audio/x-wav", "audio/wave"}
 
 
 if __name__ == "__main__":
