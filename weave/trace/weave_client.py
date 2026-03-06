@@ -367,6 +367,11 @@ class WeaveClient:
         # digests computed locally match the server (which computes digests on
         # values with internal refs).
         self._project_id_map: dict[str, str] = {}
+        logger.debug(
+            "WeaveClient.__init__: entity=%s, project=%s, _project_id_map initialized (empty)",
+            self.entity,
+            self.project,
+        )
 
     def _fetch_project_id_map(self, project_ids: list[str]) -> None:
         """Fetch internal project IDs from the server and cache them.
@@ -375,6 +380,10 @@ class WeaveClient:
         projects_info endpoint lands (PR #6286). For now it's a no-op
         to allow _convert_val_to_internal_refs to degrade gracefully.
         """
+        logger.debug(
+            "_fetch_project_id_map: requested project_ids=%s (no-op placeholder)",
+            project_ids,
+        )
 
     ################ High Level Convenience Methods ################
 
@@ -817,7 +826,14 @@ class WeaveClient:
             )
             # Convert refs to internal format for server storage
             inputs_json = self._convert_val_to_internal_refs(inputs_json)
-            op_name_uri = self._convert_val_to_internal_refs(op_def_ref.uri())
+            original_op_uri = op_def_ref.uri()
+            op_name_uri = self._convert_val_to_internal_refs(original_op_uri)
+            logger.debug(
+                "send_start_call: call_id=%s, op_name=%s -> %s",
+                call_id,
+                original_op_uri,
+                op_name_uri,
+            )
             call_start_req = CallStartReq(
                 start=StartedCallSchemaForInsert(
                     project_id=project_id,
@@ -1000,6 +1016,11 @@ class WeaveClient:
             )
             # Convert refs to internal format for server storage
             output_json = self._convert_val_to_internal_refs(output_json)
+            logger.debug(
+                "send_end_call: call_id=%s, output type=%s",
+                call.id,
+                type(output_json).__name__,
+            )
 
             # Capture wb_run_step_end at call end time
             wb_run_context_end = self._get_current_wb_run_context()
@@ -1716,12 +1737,22 @@ class WeaveClient:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
+            logger.debug(
+                "_save_object_basic: serialized object %r, json_val type=%s",
+                name,
+                type(json_val).__name__,
+            )
             # Convert refs to internal format for digest computation.
             # In production the server computes digests after ext->int
             # ref conversion, so we must replicate that here.
             json_val = self._convert_val_to_internal_refs(json_val)
             # Compute digest client-side
             digest = compute_object_digest(json_val)
+            logger.debug(
+                "_save_object_basic: computed client-side digest=%s for object %r",
+                digest,
+                name,
+            )
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
@@ -1762,11 +1793,19 @@ class WeaveClient:
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
         json_rows = to_json(rows, self._project_id(), self)
+        logger.debug(
+            "_send_table_create: serialized %d rows", len(json_rows)
+        )
         # Convert refs to internal format (matches server-side digest computation)
         json_rows = self._convert_val_to_internal_refs(json_rows)
         # Compute digests client-side
         row_digests = [compute_row_digest(row) for row in json_rows]
         table_digest = compute_table_digest(row_digests)
+        logger.debug(
+            "_send_table_create: computed client-side table_digest=%s, %d row_digests",
+            table_digest,
+            len(row_digests),
+        )
         # Send to server for persistence
         req = TableCreateReq(
             table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
@@ -1787,6 +1826,12 @@ class WeaveClient:
             return table.table_ref
 
         chunking_config = self._should_use_chunking(table)
+        logger.debug(
+            "_save_table: use_chunking=%s, use_parallel_chunks=%s, num_rows=%d",
+            chunking_config.use_chunking,
+            chunking_config.use_parallel_chunks,
+            len(list(table.rows)) if hasattr(table.rows, '__len__') else -1,
+        )
         if not chunking_config.use_chunking:
             # Simple case: defer the entire serialization and upload
             res_future: Future[TableCreateRes] = self.future_executor.defer(
@@ -1865,6 +1910,9 @@ class WeaveClient:
         # Create chunks from raw table data (not serialized yet)
         chunk_manager = TableChunkManager()
         raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+        logger.debug(
+            "_create_table_with_parallel_chunks: %d chunks", len(raw_chunks)
+        )
 
         # Create chunks in parallel using future_executor - defer serialization
         chunk_futures = []
@@ -1889,6 +1937,13 @@ class WeaveClient:
 
             # Compute final table digest client-side
             final_digest = compute_table_digest(all_row_digests)
+            logger.debug(
+                "_create_table_with_parallel_chunks: combined %d chunks, "
+                "%d total rows, final_digest=%s",
+                len(chunk_results),
+                len(all_row_digests),
+                final_digest,
+            )
 
             # Create final table from digests on the server for persistence
             create_req = TableCreateFromDigestsReq(
@@ -1911,6 +1966,9 @@ class WeaveClient:
         # Create chunks from raw table data (not serialized yet)
         chunk_manager = TableChunkManager()
         raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+        logger.debug(
+            "_create_table_with_incremental_updates: %d chunks", len(raw_chunks)
+        )
         if not raw_chunks:
             return self.future_executor.defer(lambda: self._send_table_create([]))
 
@@ -1993,10 +2051,22 @@ class WeaveClient:
         Returns val unchanged if _project_id_map is not populated.
         """
         if not self._project_id_map:
+            logger.debug(
+                "_convert_val_to_internal_refs: skipping (no _project_id_map)"
+            )
             return val
+
+        logger.debug(
+            "_convert_val_to_internal_refs: converting with project_id_map=%s",
+            self._project_id_map,
+        )
 
         def ext_to_int_project_id(ext_pid: str) -> str:
             if ext_pid not in self._project_id_map:
+                logger.debug(
+                    "_convert_val_to_internal_refs: fetching mapping for %s",
+                    ext_pid,
+                )
                 self._fetch_project_id_map([ext_pid])
             if ext_pid not in self._project_id_map:
                 raise ValueError(
@@ -2004,7 +2074,12 @@ class WeaveClient:
                 )
             return self._project_id_map[ext_pid]
 
-        return universal_ext_to_int_ref_converter(val, ext_to_int_project_id)
+        result = universal_ext_to_int_ref_converter(val, ext_to_int_project_id)
+        if result != val:
+            logger.debug(
+                "_convert_val_to_internal_refs: refs were converted"
+            )
+        return result
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
