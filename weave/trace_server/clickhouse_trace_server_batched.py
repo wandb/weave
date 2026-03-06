@@ -1005,10 +1005,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         try:
             sql, params = build_model_prices_query(project_id, list(models))
-            cost_settings = None
+            settings = None
             if self.use_distributed_mode:
-                cost_settings = ch_settings.CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS
-            result = self._query(sql, params, settings=cost_settings)
+                # Use patched settings for distributed bug (more info in ch_settings)
+                settings = ch_settings.CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS
+            result = self._query(sql, params, settings=settings)
         except Exception:
             # If price query fails, return empty prices (costs will be 0)
             return {}
@@ -1288,9 +1289,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "summary_dump",
             ]
             if self.use_distributed_mode:
-                # If we are using distributed mode, use the distributed cost query settings to avoid:
-                # Code: 48. DB::Exception: Received from localhost:9000.DB::Exception:
-                # Serialization of SortingStep is implemented only for Full sorting. (NOT_IMPLEMENTED)
+                # Use patched settings for distributed bug (more info in ch_settings)
                 settings = ch_settings.CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS
 
         if req.expand_columns is not None:
