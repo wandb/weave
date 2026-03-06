@@ -21,6 +21,11 @@ from httpx import HTTPStatusError as HTTPError
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
+from weave.shared.digest import (
+    compute_object_digest,
+    compute_row_digest,
+    compute_table_digest,
+)
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -97,6 +102,9 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
+from weave.trace_server.trace_server_converter import (
+    universal_ext_to_int_ref_converter,
+)
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallsDeleteReq,
@@ -115,7 +123,6 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     FileCreateRes,
     ObjCreateReq,
-    ObjCreateRes,
     ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
@@ -354,6 +361,20 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+        # Map from external project ID ("entity/project") to internal project ID.
+        # Populated by _fetch_project_id_map (or directly in tests).
+        # When populated, enables client-side ext→int ref conversion so that
+        # digests computed locally match the server (which computes digests on
+        # values with internal refs).
+        self._project_id_map: dict[str, str] = {}
+
+    def _fetch_project_id_map(self, project_ids: list[str]) -> None:
+        """Fetch internal project IDs from the server and cache them.
+
+        This is a placeholder that will be fully implemented when the
+        projects_info endpoint lands (PR #6286). For now it's a no-op
+        to allow _convert_val_to_internal_refs to degrade gracefully.
+        """
 
     ################ High Level Convenience Methods ################
 
@@ -794,11 +815,14 @@ class WeaveClient:
             inputs_json = to_json(
                 maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
             )
+            # Convert refs to internal format for server storage
+            inputs_json = self._convert_val_to_internal_refs(inputs_json)
+            op_name_uri = self._convert_val_to_internal_refs(op_def_ref.uri())
             call_start_req = CallStartReq(
                 start=StartedCallSchemaForInsert(
                     project_id=project_id,
                     id=call_id,
-                    op_name=op_def_ref.uri(),
+                    op_name=op_name_uri,
                     display_name=call.display_name,
                     trace_id=trace_id,
                     started_at=started_at,
@@ -974,6 +998,8 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
+            # Convert refs to internal format for server storage
+            output_json = self._convert_val_to_internal_refs(output_json)
 
             # Capture wb_run_step_end at call end time
             wb_run_context_end = self._get_current_wb_run_context()
@@ -1496,6 +1522,7 @@ class WeaveClient:
         # Prepare the result payload - we purposely do not map to refs here
         # because we prefer to have the raw data.
         results_json = to_json(output, self._project_id(), self)
+        results_json = self._convert_val_to_internal_refs(results_json)
 
         # # Prepare the supervision payload
 
@@ -1505,11 +1532,11 @@ class WeaveClient:
 
         freq = FeedbackCreateReq(
             project_id=self._project_id(),
-            weave_ref=weave_ref_uri,
+            weave_ref=self._convert_val_to_internal_refs(weave_ref_uri),
             feedback_type=RUNNABLE_FEEDBACK_TYPE_PREFIX + "." + runnable_ref.name,
             payload=payload,
-            runnable_ref=runnable_ref_uri,
-            call_ref=call_ref_uri,
+            runnable_ref=self._convert_val_to_internal_refs(runnable_ref_uri),
+            call_ref=self._convert_val_to_internal_refs(call_ref_uri),
         )
         response = self.server.feedback_create(freq)
 
@@ -1685,10 +1712,16 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
-        def send_obj_create() -> ObjCreateRes:
+        def send_obj_create() -> str:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
+            # Convert refs to internal format for digest computation.
+            # In production the server computes digests after ext->int
+            # ref conversion, so we must replicate that here.
+            json_val = self._convert_val_to_internal_refs(json_val)
+            # Compute digest client-side
+            digest = compute_object_digest(json_val)
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
@@ -1696,12 +1729,10 @@ class WeaveClient:
                     val=json_val,
                 )
             )
-            return self.server.obj_create(req)
+            self.server.obj_create(req)
+            return digest
 
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
+        digest_future: Future[str] = self.future_executor.defer(send_obj_create)
 
         ref: Ref
         if is_op(orig_val):
@@ -1731,10 +1762,17 @@ class WeaveClient:
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
         json_rows = to_json(rows, self._project_id(), self)
+        # Convert refs to internal format (matches server-side digest computation)
+        json_rows = self._convert_val_to_internal_refs(json_rows)
+        # Compute digests client-side
+        row_digests = [compute_row_digest(row) for row in json_rows]
+        table_digest = compute_table_digest(row_digests)
+        # Send to server for persistence
         req = TableCreateReq(
             table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
         )
-        return self.server.table_create(req)
+        self.server.table_create(req)
+        return TableCreateRes(digest=table_digest, row_digests=row_digests)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
@@ -1849,14 +1887,17 @@ class WeaveClient:
             for chunk_result in chunk_results:
                 all_row_digests.extend(chunk_result.row_digests)
 
-            # Create final table from digests
+            # Compute final table digest client-side
+            final_digest = compute_table_digest(all_row_digests)
+
+            # Create final table from digests on the server for persistence
             create_req = TableCreateFromDigestsReq(
                 project_id=self._project_id(), row_digests=all_row_digests
             )
-            create_res = self.server.table_create_from_digests(create_req)
+            self.server.table_create_from_digests(create_req)
 
             return TableCreateRes(
-                digest=create_res.digest,
+                digest=final_digest,
                 row_digests=all_row_digests,
             )
 
@@ -1894,6 +1935,10 @@ class WeaveClient:
             for raw_chunk in raw_chunks[1:]:
                 # Serialize each chunk separately to avoid recursion
                 serialized_chunk = to_json(raw_chunk, self._project_id(), self)
+                # Convert refs to internal format for server storage
+                serialized_chunk = self._convert_val_to_internal_refs(
+                    serialized_chunk
+                )
                 payloads = [TableAppendSpecPayload(row=row) for row in serialized_chunk]
                 update_req = TableUpdateReq(
                     project_id=self._project_id(),
@@ -1936,6 +1981,30 @@ class WeaveClient:
 
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
+
+    def _convert_val_to_internal_refs(self, val: Any) -> Any:
+        """Convert external refs in a serialized value to internal format.
+
+        Uses the cached _project_id_map to convert weave:/// refs to
+        weave-trace-internal:/// refs. This is needed so that client-side
+        digest computation matches the server (which computes digests on
+        values with internal refs).
+
+        Returns val unchanged if _project_id_map is not populated.
+        """
+        if not self._project_id_map:
+            return val
+
+        def ext_to_int_project_id(ext_pid: str) -> str:
+            if ext_pid not in self._project_id_map:
+                self._fetch_project_id_map([ext_pid])
+            if ext_pid not in self._project_id_map:
+                raise ValueError(
+                    f"Cannot resolve internal project ID for: {ext_pid}"
+                )
+            return self._project_id_map[ext_pid]
+
+        return universal_ext_to_int_ref_converter(val, ext_to_int_project_id)
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:

@@ -44,7 +44,9 @@ def to_json(
     elif isinstance(obj, ObjectRef):
         return obj.uri()
     elif isinstance(obj, ObjectRecord):
-        res = {"_type": obj._class_name}
+        # Serialize _class_name through to_json to handle traced values
+        # that may carry refs (e.g. after ref.get() + mutation + re-publish).
+        res = {"_type": to_json(obj._class_name, project_id, client, use_dictify)}
         for k, v in obj.__dict__.items():
             if k == "ref":
                 # Refs are pointers to remote objects and should not be part of

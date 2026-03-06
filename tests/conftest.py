@@ -16,6 +16,9 @@ import weave
 from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    UserInjectingExternalTraceServer,
+)
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
@@ -343,6 +346,27 @@ def create_client(
     client = TestOnlyFlushingWeaveClient(
         TEST_ENTITY, "test-project", make_server_recorder(caching_server)
     )
+    # Populate _project_id_map so that client-side digest computation converts
+    # refs to internal format, matching the ExternalTraceServer adapter behavior.
+    # We use the actual DummyIdConverter from the trace server so that both the
+    # client and server share the same two-way mapping (needed for int→ext
+    # conversion on read-back).
+    if isinstance(trace_server, UserInjectingExternalTraceServer):
+        id_converter = trace_server._idc
+        ext_pid = f"{TEST_ENTITY}/test-project"
+        client._project_id_map = {
+            ext_pid: id_converter.ext_to_int_project_id(ext_pid)
+        }
+
+        def _test_fetch_project_id_map(project_ids: list[str]) -> None:
+            for pid in project_ids:
+                if pid not in client._project_id_map:
+                    client._project_id_map[pid] = (
+                        id_converter.ext_to_int_project_id(pid)
+                    )
+
+        client._fetch_project_id_map = _test_fetch_project_id_map  # type: ignore[assignment]
+
     weave_client_context.set_weave_client_global(client)
     if global_attributes is not None:
         weave.trace.api._global_attributes = global_attributes

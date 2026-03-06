@@ -1529,12 +1529,17 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     )  # Small enough to get multiple updates
 
     # Set the client to use the remote server so calls get recorded
+    orig_client = client
     client = TestOnlyFlushingWeaveClient(
-        entity=client.entity,
-        project=client.project,
+        entity=orig_client.entity,
+        project=orig_client.project,
         server=remote_client,
         ensure_project_exists=False,
     )
+    # Propagate _project_id_map so client-side digest computation matches
+    # the ExternalTraceServer adapter's ref conversion on the server side.
+    client._project_id_map = orig_client._project_id_map.copy()
+    client._fetch_project_id_map = orig_client._fetch_project_id_map  # type: ignore[assignment]
 
     # Create a Table object and save it to trigger chunking logic
     table_obj = weave_client.Table(rows)
