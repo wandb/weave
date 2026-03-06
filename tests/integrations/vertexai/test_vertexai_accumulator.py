@@ -16,9 +16,7 @@ def _make_text_part_mock(text: str) -> Mock:
     return part
 
 
-def _make_function_call_part_mock(
-    name: str, args: dict | None = None
-) -> Mock:
+def _make_function_call_part_mock(name: str, args: dict | None = None) -> Mock:
     """Mock a VertexAI SDK Part whose .text raises AttributeError.
 
     Uses spec=['_raw_part'] so that accessing .text raises AttributeError
