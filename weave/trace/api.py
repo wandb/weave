@@ -114,7 +114,12 @@ def get_client() -> weave_client.WeaveClient | None:
     return weave_client_context.get_weave_client()
 
 
-def publish(obj: Any, name: str | None = None) -> ObjectRef:
+def publish(
+    obj: Any,
+    name: str | None = None,
+    tags: list[str] | None = None,
+    aliases: list[str] | None = None,
+) -> ObjectRef:
     """Save and version a Python object.
 
     Weave creates a new version of the object if the object's name already exists and its content hash does
@@ -123,6 +128,8 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     Args:
         obj: The object to save and version.
         name: The name to save the object under.
+        tags: Optional list of tags to add to the published object version.
+        aliases: Optional list of aliases to set on the published object version.
 
     Returns:
         A Weave Ref to the saved object.
@@ -147,6 +154,12 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     client = weave_client_context.require_weave_client()
 
     ref = client._save_object(obj, save_name, "latest")
+
+    if tags:
+        client.add_tags(ref, tags)
+    if aliases:
+        for alias in aliases:
+            client.set_alias(ref, alias)
 
     if isinstance(ref, ObjectRef):
         if isinstance(ref, weave_client.OpRef):

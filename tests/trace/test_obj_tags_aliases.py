@@ -1713,3 +1713,40 @@ def test_batch_enrichment_multiple_objects(client: WeaveClient):
     assert objs_by_id[oid3].tags == []
     assert "canary" in objs_by_id[oid3].aliases
     assert "latest" in objs_by_id[oid3].aliases
+
+
+# --- publish() with tags/aliases ---
+
+
+def test_publish_with_tags(client: WeaveClient):
+    ref = weave.publish({"data": "tagged"}, name="pub_tags", tags=["alpha", "beta"])
+    tags = client.get_tags(ref)
+    assert sorted(tags) == ["alpha", "beta"]
+
+
+def test_publish_with_aliases(client: WeaveClient):
+    ref = weave.publish(
+        {"data": "aliased"}, name="pub_aliases", aliases=["staging", "canary"]
+    )
+    aliases = client.get_aliases(ref)
+    assert "staging" in aliases
+    assert "canary" in aliases
+
+
+def test_publish_with_tags_and_aliases(client: WeaveClient):
+    ref = weave.publish(
+        {"data": "both"},
+        name="pub_both",
+        tags=["reviewed"],
+        aliases=["production"],
+    )
+    assert client.get_tags(ref) == ["reviewed"]
+    assert "production" in client.get_aliases(ref)
+
+
+def test_publish_tags_aliases_none_default(client: WeaveClient):
+    ref = weave.publish({"data": "plain"}, name="pub_plain")
+    assert client.get_tags(ref) == []
+    # Only the implicit "latest" alias should be present
+    aliases = client.get_aliases(ref)
+    assert aliases == ["latest"]
