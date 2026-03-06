@@ -215,6 +215,34 @@ def digest_is_version_like(digest: str) -> tuple[bool, int]:
         return (False, -1)
 
 
+def digest_is_content_hash(digest: str) -> bool:
+    """Check if a digest looks like a content-addressed hash.
+
+    Recognizes two formats:
+    - Weave digest: 43-char modified base64url (A-Za-z0-9XY), from bytes_digest()
+    - Hex SHA-256: 64 hex characters
+
+    Examples:
+    >>> digest_is_content_hash("oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8")
+    True
+    >>> digest_is_content_hash("a" * 64)
+    True
+    >>> digest_is_content_hash("production")
+    False
+    """
+    # Weave digest: 43-char modified base64url
+    if len(digest) == 43 and digest.isalnum():
+        return True
+    # Hex SHA-256: 64 hex chars
+    if len(digest) == 64:
+        try:
+            int(digest, 16)
+        except ValueError:
+            return False
+        return True
+    return False
+
+
 MAX_FILTER_LENGTH = 1000
 
 
