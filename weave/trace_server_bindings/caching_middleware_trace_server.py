@@ -111,7 +111,7 @@ class CachingMiddlewareTraceServer(
     def __del__(self) -> None:
         """Cleanup method called when object is destroyed."""
         try:
-            self.close()
+            self._cache.close()
         except Exception:
             logger.exception("Error closing cache")
 
