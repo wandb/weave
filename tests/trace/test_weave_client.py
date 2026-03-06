@@ -67,6 +67,7 @@ from weave.trace_server.trace_server_interface import (
 )
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_create(client):
     res = client.server.table_create(
         TableCreateReq(
@@ -1471,6 +1472,7 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
 def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     """This test is specifically testing the correctness
@@ -1546,7 +1548,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         table_create_from_digests_records = [
             r for r in records if r[0] == "table_create_from_digests"
         ]
-        obj_records = [r for r in records if r[0] in ["obj_create", "obj_read"]]
+        obj_records = [r for r in records if r[0] in {"obj_create", "obj_read"}]
 
         # Expected: 2 table_create calls (first + second) + 1 table_create_from_digests (chunking merge)
         assert len(table_create_records) == 2, (

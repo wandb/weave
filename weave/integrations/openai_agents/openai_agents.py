@@ -234,7 +234,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
         # Add any remaining fields to metadata
         for key, value in custom_data.items():
-            if key not in ["input", "output", "metadata", "metrics"]:
+            if key not in {"input", "output", "metadata", "metrics"}:
                 metadata[key] = value
 
         return WeaveDataDict(

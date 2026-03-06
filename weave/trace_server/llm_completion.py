@@ -122,7 +122,7 @@ def resolve_prompt_messages(
             raise NotFoundError(f"Could not find prompt with ref {prompt}")
 
         # Validate that this is a Prompt or MessagesPrompt object
-        if prompt_obj_res.obj.base_object_class not in ("Prompt", "MessagesPrompt"):
+        if prompt_obj_res.obj.base_object_class not in {"Prompt", "MessagesPrompt"}:
             raise InvalidRequest(
                 f"Prompt {prompt} is not a Prompt or MessagesPrompt (found {prompt_obj_res.obj.base_object_class})"
             )
@@ -402,7 +402,7 @@ def _setup_provider_credentials_and_model(
     aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
     azure_api_base, azure_api_version = None, None
 
-    if provider == "bedrock" or provider == "bedrock_converse":
+    if provider in {"bedrock", "bedrock_converse"}:
         aws_access_key_id, aws_secret_access_key, aws_region_name = (
             get_bedrock_credentials(inputs.model)
         )
@@ -416,7 +416,7 @@ def _setup_provider_credentials_and_model(
         if "grok-3-mini" in inputs.model:
             inputs.presence_penalty = None
             inputs.frequency_penalty = None
-    elif provider == "azure" or provider == "azure_ai":
+    elif provider in {"azure", "azure_ai"}:
         azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
 
     return (

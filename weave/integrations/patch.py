@@ -273,6 +273,16 @@ def patch_autogen(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def patch_claude_agent_sdk(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for Claude Agent SDK."""
+    _patch_integration(
+        module_path="weave.integrations.claude_agent_sdk",
+        patcher_func_getter_name="get_claude_agent_sdk_patcher",
+        triggering_symbols=["claude_agent_sdk"],
+        settings=settings,
+    )
+
+
 def patch_langchain() -> None:
     """Enable Weave tracing for LangChain."""
     from weave.integrations.langchain.langchain import langchain_patcher
@@ -324,6 +334,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "langchain_nvidia_ai_endpoints": patch_nvidia,
     "smolagents": patch_smolagents,
     "agents": patch_openai_agents,
+    "claude_agent_sdk": patch_claude_agent_sdk,
     "verdict": patch_verdict,
     "verifiers": patch_verifiers,
     "autogen": patch_autogen,

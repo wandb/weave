@@ -340,7 +340,7 @@ class StateExporter(BaseModel):
 
         for output_idx, output in enumerate(output_list):
             output_type = output.get("type")
-            if output_type in ("function_call", "function_call_output"):
+            if output_type in {"function_call", "function_call_output"}:
                 continue
 
             content_list = output.get("content", [])

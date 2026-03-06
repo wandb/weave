@@ -31,7 +31,7 @@ def pcm_to_wav(
     # Ensure the PCM data length is even (for 16-bit samples)
     if len(pcm_data) % 2 != 0:
         # Pad with a zero byte if odd length
-        pcm_data = pcm_data + b"\x00"
+        pcm_data += b"\x00"
 
     # Create WAV file in memory using wave module for correct formatting
     wav_buffer = io.BytesIO()

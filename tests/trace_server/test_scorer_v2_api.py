@@ -518,3 +518,39 @@ def score(output: str, target: str) -> dict:
 
     assert read_res.name == "json_similarity"
     assert read_res.description == "Complex JSON similarity scorer"
+
+
+def test_scorer_list_with_missing_name_in_val(trace_server):
+    """Regression test: scorer_list should not crash when val has no 'name' key.
+
+    Previously, the ClickHouse implementation would pass name=None to
+    ScorerReadRes, causing a pydantic ValidationError. It should fall
+    back to using object_id as the name.
+    """
+    project_id = f"{TEST_ENTITY}/test_scorer_list_missing_name"
+
+    # Directly create a Scorer object whose val dict has no "name" key.
+    obj_create_req = tsi.ObjCreateReq(
+        obj=tsi.ObjSchemaForInsert(
+            project_id=project_id,
+            object_id="nameless_scorer",
+            val={
+                "_type": "Scorer",
+                "_class_name": "Scorer",
+                "_bases": ["Scorer", "Object", "BaseModel"],
+                "description": "A scorer with no name in val",
+                "score": "",
+            },
+            set_base_object_class="Scorer",
+        )
+    )
+    trace_server.obj_create(obj_create_req)
+
+    # List scorers - should not raise ValidationError
+    list_req = tsi.ScorerListReq(project_id=project_id)
+    scorers = list(trace_server.scorer_list(list_req))
+
+    assert len(scorers) == 1
+    # name should fall back to object_id
+    assert scorers[0].name == "nameless_scorer"
+    assert scorers[0].object_id == "nameless_scorer"

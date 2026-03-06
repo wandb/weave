@@ -390,7 +390,7 @@ def assert_correct_calls_for_rag_chain(calls: list[Call]) -> None:
         ("openai.chat.completions.create", 2),
         ("langchain.Parser.StrOutputParser", 1),
     ]
-    assert (got == exp) or (got == exp_2)
+    assert got in (exp, exp_2)
 
 
 @pytest.fixture

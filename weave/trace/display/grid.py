@@ -158,7 +158,7 @@ class Row:
             name: The column id to set
             value: The value to assign to the column
         """
-        if name in ("grid", "index"):
+        if name in {"grid", "index"}:
             # These are actual attributes of the Row class
             object.__setattr__(self, name, value)
         else:
