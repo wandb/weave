@@ -111,13 +111,15 @@ class CachingMiddlewareTraceServer(
     def __del__(self) -> None:
         """Cleanup method called when object is destroyed."""
         try:
-            self._cache.close()
+            self.close()
         except Exception:
             logger.exception("Error closing cache")
 
     def close(self) -> None:
         """Explicitly close cache resources (preferred over __del__)."""
         self._cache.close()
+        if hasattr(self._next_trace_server, "close"):
+            self._next_trace_server.close()
 
     @classmethod
     def from_env(cls, next_trace_server: TraceServerClientInterface) -> Self:
