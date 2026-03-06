@@ -104,9 +104,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 res.close()
 
     # Standard API Below:
-    def projects_info(
-        self, req: tsi.ProjectsInfoReq
-    ) -> list[tsi.ProjectsInfoRes]:
+    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
         return [
             tsi.ProjectsInfoRes(
                 external_project_id=ext_id,
