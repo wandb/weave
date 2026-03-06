@@ -1,0 +1,66 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-def456"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Let me check the files in the directory."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01ABC",
+          "name": "Bash",
+          "input": {
+            "command": "ls -la"
+          }
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "user",
+    "message": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01ABC",
+          "content": "file1.py\nfile2.py\nREADME.md"
+        }
+      ]
+    }
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "I found 3 files: file1.py, file2.py, and README.md."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 3500,
+    "duration_api_ms": 2800,
+    "is_error": false,
+    "num_turns": 1,
+    "session_id": "s-def456",
+    "total_cost_usd": 0.008,
+    "usage": {
+      "input_tokens": 150,
+      "output_tokens": 75
+    },
+    "result": "I found 3 files: file1.py, file2.py, and README.md."
+  }
+]
