@@ -447,8 +447,6 @@ class WeaveClient:
         ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
             raise TypeError(f"Expected ObjectRef, got {ref}")
-        # Flush deferred writes so the object is available for reading.
-        self._flush()
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
