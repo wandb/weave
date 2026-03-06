@@ -21,6 +21,11 @@ from httpx import HTTPStatusError as HTTPError
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
+from weave.shared.digest import (
+    compute_object_digest,
+    compute_row_digest,
+    compute_table_digest,
+)
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -97,6 +102,7 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
+from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallsDeleteReq,
@@ -115,13 +121,13 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     FileCreateRes,
     ObjCreateReq,
-    ObjCreateRes,
     ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
     ObjSchema,
     ObjSchemaForInsert,
+    ProjectsInfoReq,
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
@@ -354,6 +360,56 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+        # Cache external -> internal project ID mapping.
+        # Must be after processor init since _fetch may trigger a flush.
+        self._project_id_map: dict[str, str] = {}
+        self._fetch_project_id_map()
+
+    def _fetch_project_id_map(self, project_ids: list[str] | None = None) -> None:
+        """Fetch and cache the external -> internal project ID mapping.
+
+        Args:
+            project_ids: External project IDs in 'entity/project' format.
+                Defaults to the current project.
+        """
+        if project_ids is None:
+            project_ids = [to_project_id(self.entity, self.project)]
+        try:
+            res = self.server.projects_info(  # type: ignore[attr-defined]
+                ProjectsInfoReq(project_ids=project_ids)
+            )
+            self._project_id_map.update(
+                {item.external_project_id: item.internal_project_id for item in res}
+            )
+        except Exception:
+            logger.debug("Failed to fetch projects info", exc_info=True)
+
+    def _ext_to_int_project_id(self, ext_id: str) -> str:
+        """Convert an external project ID to an internal project ID.
+
+        Uses the cached mapping, lazily fetching if the project is unknown.
+        """
+        if ext_id not in self._project_id_map:
+            self._fetch_project_id_map([ext_id])
+        return self._project_id_map[ext_id]
+
+    @property
+    def _has_project_id_map(self) -> bool:
+        """Whether the server supports internal project IDs."""
+        return len(self._project_id_map) > 0
+
+    def _prepare_val_for_digest(self, val: Any) -> Any:
+        """Prepare a serialized val for digest computation.
+
+        When the server uses internal refs (production), converts external refs
+        to internal refs so the digest matches server-side computation.
+        When the server doesn't use internal refs (e.g. SQLite test server),
+        returns the val unchanged.
+        """
+        if self._has_project_id_map:
+            return universal_ext_to_int_ref_converter(val, self._ext_to_int_project_id)
+        return val
 
     ################ High Level Convenience Methods ################
 
@@ -1685,29 +1741,26 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
-        def send_obj_create() -> ObjCreateRes:
-            # `to_json` is mostly fast, except for CustomWeaveTypes
-            # which incur network costs to serialize the payload
-            json_val = to_json(val, self._project_id(), self)
-            req = ObjCreateReq(
+        # Serialize and compute digest client-side so the ref is
+        # available immediately (no Future).
+        json_val = to_json(val, self._project_id(), self)
+        digest = compute_object_digest(self._prepare_val_for_digest(json_val))
+
+        self.server.obj_create(
+            ObjCreateReq(
                 obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
+                    project_id=self._project_id(),
                     object_id=name,
                     val=json_val,
                 )
             )
-            return self.server.obj_create(req)
-
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
         )
 
         ref: Ref
         if is_op(orig_val):
-            ref = OpRef(self.entity, self.project, name, digest_future)
+            ref = OpRef(self.entity, self.project, name, digest)
         else:
-            ref = ObjectRef(self.entity, self.project, name, digest_future)
+            ref = ObjectRef(self.entity, self.project, name, digest)
 
         # Attach the ref to the object
         try:
@@ -1729,48 +1782,54 @@ class WeaveClient:
 
         return self._save_object_basic(op, name)
 
-    def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
-        json_rows = to_json(rows, self._project_id(), self)
+    def _send_table_create(self, json_rows: list[Any]) -> TableCreateRes:
+        """Send pre-serialized rows to the server."""
         req = TableCreateReq(
             table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
         )
         return self.server.table_create(req)
+
+    def _serialize_and_digest_rows(
+        self, rows: list[Any]
+    ) -> tuple[list[Any], list[str], str]:
+        """Serialize rows and compute digests client-side.
+
+        Returns:
+            (json_rows, row_digests, table_digest)
+        """
+        json_rows = to_json(rows, self._project_id(), self)
+        digest_rows = self._prepare_val_for_digest(json_rows)
+        row_digests = [compute_row_digest(row) for row in digest_rows]
+        table_digest = compute_table_digest(row_digests)
+        return json_rows, row_digests, table_digest
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
         This is the sister function to _save_object_basic but for Tables.
 
-        Uses chunking and parallel uploads for large tables, with fallback to
-        incremental table_update pattern if table_create_from_digests is not available.
+        Serializes rows and computes digests client-side so the TableRef is
+        available immediately. Uses chunking for large tables.
         """
         # Skip saving the table if it is already persisted.
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
+        # Serialize all rows and compute digests client-side
+        json_rows, row_digests, table_digest = self._serialize_and_digest_rows(
+            list(table.rows)
+        )
+
+        # Construct the ref immediately with known digests
+        table_ref = TableRef(self.entity, self.project, table_digest, row_digests)
+
         chunking_config = self._should_use_chunking(table)
         if not chunking_config.use_chunking:
-            # Simple case: defer the entire serialization and upload
-            res_future: Future[TableCreateRes] = self.future_executor.defer(
-                lambda: self._send_table_create(list(table.rows))
-            )
+            self._send_table_create(json_rows)
         elif chunking_config.use_parallel_chunks:
-            # Need to chunk up, use parallelism
-            res_future = self._create_table_with_parallel_chunks(table)
+            self._upload_table_parallel_chunks(json_rows)
         else:
-            # Legacy method for large tables and old servers
-            res_future = self._create_table_with_incremental_updates(table)
-
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
-        row_digests_future: Future[list[str]] = self.future_executor.then(
-            [res_future], lambda res: res[0].row_digests
-        )
-
-        table_ref = TableRef(
-            self.entity, self.project, digest_future, row_digests_future
-        )
+            self._upload_table_incremental(json_rows)
 
         table.ref = table_ref
 
@@ -1820,81 +1879,52 @@ class WeaveClient:
             use_chunking=use_chunking, use_parallel_chunks=use_parallel_chunks
         )
 
-    def _create_table_with_parallel_chunks(
-        self, table: Table | WeaveTable
-    ) -> Future[TableCreateRes]:
-        """Execute the actual parallel chunk upload."""
-        # Create chunks from raw table data (not serialized yet)
+    def _upload_table_parallel_chunks(self, json_rows: list[Any]) -> None:
+        """Upload pre-serialized rows in parallel chunks, then combine."""
         chunk_manager = TableChunkManager()
-        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+        chunks: list[list[Any]] = chunk_manager.create_chunks(json_rows)
 
-        # Create chunks in parallel using future_executor - defer serialization
+        # Upload each chunk in parallel
         chunk_futures = []
-        for raw_chunk in raw_chunks:
+        for chunk in chunks:
 
-            def make_chunk_task(chunk: list[Any]) -> Callable[[], TableCreateRes]:
+            def make_chunk_task(c: list[Any]) -> Callable[[], TableCreateRes]:
                 def chunk_task() -> TableCreateRes:
-                    return self._send_table_create(chunk)
+                    return self._send_table_create(c)
 
                 return chunk_task
 
-            chunk_future = self.future_executor.defer(make_chunk_task(raw_chunk))
+            chunk_future = self.future_executor.defer(make_chunk_task(chunk))
             chunk_futures.append(chunk_future)
 
-        # Chain the operations using future_executor.then
-        def combine_chunks_and_create_table(
-            chunk_results: list[TableCreateRes],
-        ) -> TableCreateRes:
+        # Combine chunk digests into final table
+        def combine_chunks(chunk_results: list[TableCreateRes]) -> None:
             all_row_digests = []
             for chunk_result in chunk_results:
                 all_row_digests.extend(chunk_result.row_digests)
-
-            # Create final table from digests
-            create_req = TableCreateFromDigestsReq(
-                project_id=self._project_id(), row_digests=all_row_digests
-            )
-            create_res = self.server.table_create_from_digests(create_req)
-
-            return TableCreateRes(
-                digest=create_res.digest,
-                row_digests=all_row_digests,
+            self.server.table_create_from_digests(
+                TableCreateFromDigestsReq(
+                    project_id=self._project_id(), row_digests=all_row_digests
+                )
             )
 
-        # Return a future that will complete when all chunks are done and combined
-        return self.future_executor.then(chunk_futures, combine_chunks_and_create_table)
+        self.future_executor.then(chunk_futures, combine_chunks)
 
-    def _create_table_with_incremental_updates(
-        self, table: Table | WeaveTable
-    ) -> Future[TableCreateRes]:
-        """Create table using incremental table_update pattern (fallback)."""
-        # Create chunks from raw table data (not serialized yet)
+    def _upload_table_incremental(self, json_rows: list[Any]) -> None:
+        """Upload pre-serialized rows using incremental table_update (fallback)."""
         chunk_manager = TableChunkManager()
-        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
-        if not raw_chunks:
-            return self.future_executor.defer(lambda: self._send_table_create([]))
+        chunks: list[list[Any]] = chunk_manager.create_chunks(json_rows)
+        if not chunks:
+            self.future_executor.defer(lambda: self._send_table_create([]))
+            return
 
-        # Create first chunk as the base table - defer serialization
-        first_raw_chunk = raw_chunks[0]
-
-        def create_first_chunk() -> TableCreateRes:
-            serialized_rows = to_json(first_raw_chunk, self._project_id(), self)
-            return self._send_table_create(serialized_rows)
-
-        base_future = self.future_executor.defer(create_first_chunk)
-
-        # Chain the incremental updates sequentially
-        def process_remaining_chunks(
-            base_results: list[TableCreateRes],
-        ) -> TableCreateRes:
-            base_result = base_results[0]
+        # Upload first chunk as base, then append remaining chunks sequentially
+        def upload_all() -> None:
+            base_result = self._send_table_create(chunks[0])
             current_digest = base_result.digest
-            all_row_digests = list(base_result.row_digests)
 
-            # Process remaining chunks sequentially (each depends on previous)
-            for raw_chunk in raw_chunks[1:]:
-                # Serialize each chunk separately to avoid recursion
-                serialized_chunk = to_json(raw_chunk, self._project_id(), self)
-                payloads = [TableAppendSpecPayload(row=row) for row in serialized_chunk]
+            for chunk in chunks[1:]:
+                payloads = [TableAppendSpecPayload(row=row) for row in chunk]
                 update_req = TableUpdateReq(
                     project_id=self._project_id(),
                     base_digest=current_digest,
@@ -1902,15 +1932,8 @@ class WeaveClient:
                 )
                 update_result = self.server.table_update(update_req)
                 current_digest = update_result.digest
-                all_row_digests.extend(update_result.updated_row_digests)
 
-            return TableCreateRes(
-                digest=current_digest,
-                row_digests=all_row_digests,
-            )
-
-        # Chain the sequential processing after the base table is created
-        return self.future_executor.then([base_future], process_remaining_chunks)
+        self.future_executor.defer(upload_all)
 
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
         payloads = [TableAppendSpecPayload(row=row) for row in rows]

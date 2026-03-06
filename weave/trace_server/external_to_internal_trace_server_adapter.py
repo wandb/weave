@@ -104,6 +104,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 res.close()
 
     # Standard API Below:
+    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
+        return [
+            tsi.ProjectsInfoRes(
+                external_project_id=ext_id,
+                internal_project_id=self._idc.ext_to_int_project_id(ext_id),
+            )
+            for ext_id in req.project_ids
+        ]
+
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes:

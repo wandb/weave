@@ -395,6 +395,7 @@ def test_evaluate_table_lazy_iter(client, monkeypatch):
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
+        "projects_info",
         "table_create",
         "obj_create",
         "obj_read",

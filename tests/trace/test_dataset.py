@@ -54,6 +54,7 @@ def test_dataset_laziness(client):
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
+        "projects_info",
     ]
     client.server.attribute_access_log = []
 
@@ -86,6 +87,7 @@ def test_published_dataset_laziness(client):
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
+        "projects_info",
     ]
     client.server.attribute_access_log = []
 
