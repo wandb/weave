@@ -378,7 +378,7 @@ class WeaveClient:
         if project_ids is None:
             project_ids = [to_project_id(self.entity, self.project)]
         try:
-            res = self.server.projects_info(
+            res = self.server.projects_info(  # type: ignore[attr-defined]
                 ProjectsInfoReq(project_ids=project_ids)
             )
             self._project_id_map.update(

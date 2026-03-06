@@ -2596,8 +2596,6 @@ class TraceServerInterface(Protocol):
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
 
-    def projects_info(self, req: ProjectsInfoReq) -> list[ProjectsInfoRes]: ...
-
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
