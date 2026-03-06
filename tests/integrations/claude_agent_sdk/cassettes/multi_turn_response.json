@@ -1,0 +1,61 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-mt001"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Hello! How can I help you?"
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 600,
+    "duration_api_ms": 400,
+    "is_error": false,
+    "num_turns": 1,
+    "session_id": "s-mt001",
+    "total_cost_usd": 0.002,
+    "usage": {
+      "input_tokens": 15,
+      "output_tokens": 8
+    },
+    "result": "Hello! How can I help you?"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The capital of France is Paris."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 700,
+    "duration_api_ms": 500,
+    "is_error": false,
+    "num_turns": 1,
+    "session_id": "s-mt001",
+    "total_cost_usd": 0.003,
+    "usage": {
+      "input_tokens": 30,
+      "output_tokens": 12
+    },
+    "result": "The capital of France is Paris."
+  }
+]
