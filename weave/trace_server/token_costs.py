@@ -597,18 +597,32 @@ def get_cost_final_select(
     group_by = f"GROUP BY {', '.join(safe_fields)}"
     order_by = ""
     if order_fields:
-        order_parts = [
-            # Feedback fields need use_agg_fn=True because they come from a
-            # JOIN and aren't in the GROUP BY.  All other fields (e.g.
-            # CallsMergedAggField with argMaxMerge) have already been
-            # materialized to plain columns by the CTEs, so use_agg_fn=False.
-            of.as_sql(
-                pb,
-                "ranked_prices",
-                use_agg_fn=of.field.is_feedback_field(),
-            )
-            for of in order_fields
-        ]
+        # Circular import avoidance: calls_query_builder imports from token_costs
+        from weave.trace_server.calls_query_builder.calls_query_builder import (
+            CallsMergedSummaryField,
+        )
+
+        order_parts = []
+        for of in order_fields:
+            if isinstance(of.field, CallsMergedSummaryField):
+                # Summary fields (e.g. summary.weave.status) internally
+                # reference summary_dump which is NOT in the GROUP BY (it's
+                # rebuilt with cost data).  Since the summary field is already
+                # computed as an alias in SELECT/GROUP BY, reference the alias
+                # directly instead of re-expanding the expression.
+                order_parts.append(f"{safe_alias(of.field.field)} {of.direction}")
+            else:
+                # Feedback fields need use_agg_fn=True because they come from a
+                # JOIN and aren't in the GROUP BY.  All other fields (e.g.
+                # CallsMergedAggField with argMaxMerge) have already been
+                # materialized to plain columns by the CTEs, so use_agg_fn=False.
+                order_parts.append(
+                    of.as_sql(
+                        pb,
+                        "ranked_prices",
+                        use_agg_fn=of.field.is_feedback_field(),
+                    )
+                )
         order_by = f"ORDER BY {', '.join(order_parts)}"
 
     parts = [select_clause, from_clause]
