@@ -3265,26 +3265,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=req.digest,
         )
         result = self._obj_read_with_retry(obj_req)
-        val = result.obj.val
-
-        # Extract name and description from val data
-        name = val.get("name", result.obj.object_id)
-        description = val.get("description")
-
-        # Create the response with all required fields
-        return tsi.ScorerReadRes(
-            object_id=result.obj.object_id,
-            digest=result.obj.digest,
-            version_index=result.obj.version_index,
-            created_at=result.obj.created_at,
-            name=name,
-            description=description,
-            score_op=val.get("score", ""),
-        )
+        return tsc.scorer_read_res_from_obj(result.obj)
 
     def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
         """List scorer objects by delegating to objs_query with Scorer filtering."""
-        # Query the objects
         scorer_filter = tsi.ObjectVersionFilter(
             base_object_classes=["Scorer"], is_op=False
         )
@@ -3296,28 +3280,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_res = self.objs_query(obj_query_req)
 
-        # Yield back the full ScorerReadRes for each scorer
         for obj in obj_res.objs:
-            name = obj.object_id  # fallback to object_id
-            description = None
-            score_op = ""
-
-            if hasattr(obj, "val") and obj.val:
-                val = obj.val
-                if isinstance(val, dict):
-                    name = val.get("name", obj.object_id)
-                    description = val.get("description")
-                    score_op = val.get("score", "")
-
-            yield tsi.ScorerReadRes(
-                object_id=obj.object_id,
-                digest=obj.digest,
-                version_index=obj.version_index,
-                created_at=obj.created_at,
-                name=name,
-                description=description,
-                score_op=score_op,
-            )
+            yield tsc.scorer_read_res_from_obj(obj)
 
     def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
         """Delete scorer objects by delegating to obj_delete."""

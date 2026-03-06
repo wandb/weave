@@ -267,3 +267,25 @@ def op_name_matches(op_name: str | None, expected_name: str) -> bool:
 
     # Fallback to direct string comparison for non-URI op names
     return op_name == expected_name
+
+
+def scorer_read_res_from_obj(obj: tsi.ObjSchema) -> tsi.ScorerReadRes:
+    """Build a ScorerReadRes from an ObjSchema, with safe fallbacks."""
+    name = obj.object_id
+    description = None
+    score_op = ""
+
+    if hasattr(obj, "val") and obj.val and isinstance(obj.val, dict):
+        name = obj.val.get("name", obj.object_id)
+        description = obj.val.get("description")
+        score_op = obj.val.get("score", "")
+
+    return tsi.ScorerReadRes(
+        object_id=obj.object_id,
+        digest=obj.digest,
+        version_index=obj.version_index,
+        created_at=obj.created_at,
+        name=name,
+        description=description,
+        score_op=score_op,
+    )
