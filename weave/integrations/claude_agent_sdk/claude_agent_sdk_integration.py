@@ -9,6 +9,8 @@ from functools import wraps
 from typing import Any
 
 from weave.integrations.claude_agent_sdk.display_utils import (
+    text_display_name,
+    thinking_display_name,
     tool_use_display_name,
     turn_display_name,
 )
@@ -66,6 +68,7 @@ def _process_message_inline(
     from claude_agent_sdk import (
         AssistantMessage,
         SystemMessage,
+        TextBlock,
         ThinkingBlock,
         ToolResultBlock,
         ToolUseBlock,
@@ -103,6 +106,34 @@ def _process_message_inline(
         serialized = _serialize_msg(msg)
         history = list(accumulated)
         accumulated.append(serialized)
+
+        # Create child calls for thinking blocks
+        thinking_blocks = [b for b in msg.content if isinstance(b, ThinkingBlock)]
+        if thinking_blocks:
+            thinking_text = "\n".join(b.thinking for b in thinking_blocks)
+            thinking_call = wc.create_call(
+                op="claude_agent_sdk.thinking",
+                inputs={},
+                display_name=thinking_display_name(thinking_text),
+                parent=root_call,
+                attributes={"kind": "llm"},
+                use_stack=False,
+            )
+            wc.finish_call(thinking_call, output={"thinking": thinking_text})
+
+        # Create child calls for text blocks
+        text_blocks = [b for b in msg.content if isinstance(b, TextBlock)]
+        if text_blocks:
+            text_content = "\n".join(b.text for b in text_blocks)
+            text_call = wc.create_call(
+                op="claude_agent_sdk.text",
+                inputs={},
+                display_name=text_display_name(text_content),
+                parent=root_call,
+                attributes={"kind": "llm"},
+                use_stack=False,
+            )
+            wc.finish_call(text_call, output={"text": text_content, "model": msg.model})
 
         tool_uses = [b for b in msg.content if isinstance(b, ToolUseBlock)]
 
