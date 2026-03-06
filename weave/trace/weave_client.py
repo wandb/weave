@@ -366,9 +366,7 @@ class WeaveClient:
         self._project_id_map: dict[str, str] = {}
         self._fetch_project_id_map()
 
-    def _fetch_project_id_map(
-        self, project_ids: list[str] | None = None
-    ) -> None:
+    def _fetch_project_id_map(self, project_ids: list[str] | None = None) -> None:
         """Fetch and cache the external -> internal project ID mapping.
 
         Args:
@@ -382,10 +380,7 @@ class WeaveClient:
                 ProjectsInfoReq(project_ids=project_ids)
             )
             self._project_id_map.update(
-                {
-                    item.external_project_id: item.internal_project_id
-                    for item in res
-                }
+                {item.external_project_id: item.internal_project_id for item in res}
             )
         except Exception:
             logger.debug("Failed to fetch projects info", exc_info=True)
@@ -413,9 +408,7 @@ class WeaveClient:
         returns the val unchanged.
         """
         if self._has_project_id_map:
-            return universal_ext_to_int_ref_converter(
-                val, self._ext_to_int_project_id
-            )
+            return universal_ext_to_int_ref_converter(val, self._ext_to_int_project_id)
         return val
 
     ################ High Level Convenience Methods ################
@@ -1831,16 +1824,12 @@ class WeaveClient:
         )
 
         # Construct the ref immediately with known digests
-        table_ref = TableRef(
-            self.entity, self.project, table_digest, row_digests
-        )
+        table_ref = TableRef(self.entity, self.project, table_digest, row_digests)
 
         # Defer only the server upload
         chunking_config = self._should_use_chunking(table)
         if not chunking_config.use_chunking:
-            self.future_executor.defer(
-                lambda: self._send_table_create(json_rows)
-            )
+            self.future_executor.defer(lambda: self._send_table_create(json_rows))
         elif chunking_config.use_parallel_chunks:
             self._upload_table_parallel_chunks(json_rows)
         else:
