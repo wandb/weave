@@ -122,6 +122,7 @@ from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     ObjSchema,
     ObjSchemaForInsert,
+    ProjectsInfoReq,
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
@@ -338,6 +339,10 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
+        # Cache external -> internal project ID mapping
+        self._project_id_map: dict[str, str] = {}
+        self._fetch_project_id_map()
+
         self._server_call_processor: AsyncBatchProcessor | CallBatchProcessor | None = (
             None
         )
@@ -354,6 +359,32 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+    def _fetch_project_id_map(
+        self, project_ids: list[str] | None = None
+    ) -> None:
+        """Fetch and cache the external -> internal project ID mapping.
+
+        Args:
+            project_ids: External project IDs in 'entity/project' format.
+                Defaults to the current project.
+        """
+        if project_ids is None:
+            project_ids = [to_project_id(self.entity, self.project)]
+        try:
+            # projects_info is on TraceServerClientInterface, not TraceServerInterface.
+            # Fix by typing self.server as TraceServerClientInterface.
+            res = self.server.projects_info(  # type: ignore[attr-defined]
+                ProjectsInfoReq(project_ids=project_ids)
+            )
+            self._project_id_map.update(
+                {
+                    item.external_project_id: item.internal_project_id
+                    for item in res
+                }
+            )
+        except Exception:
+            logger.debug("Failed to fetch projects info", exc_info=True)
 
     ################ High Level Convenience Methods ################
 
