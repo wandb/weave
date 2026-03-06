@@ -869,6 +869,12 @@
       "input": 1e-07,
       "output": 3e-07,
       "created_at": "2025-03-24 09:26:55"
+    },
+    {
+      "provider": "mistral",
+      "input": 6e-08,
+      "output": 1.8e-07,
+      "created_at": "2026-03-05 13:03:42"
     }
   ],
   "mistral/mistral-medium": [
@@ -913,6 +919,12 @@
       "input": 2e-06,
       "output": 6e-06,
       "created_at": "2025-01-13 16:54:01"
+    },
+    {
+      "provider": "mistral",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2026-03-05 13:03:42"
     }
   ],
   "mistral/mistral-large-2402": [
@@ -6599,6 +6611,12 @@
       "input": 1e-06,
       "output": 3e-06,
       "created_at": "2025-03-24 09:26:55"
+    },
+    {
+      "provider": "azure_ai",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2026-03-05 13:03:42"
     }
   ],
   "azure_ai/Phi-4-mini-instruct": [
@@ -19701,6 +19719,622 @@
       "input": 5e-07,
       "output": 2.85e-06,
       "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "azure/gpt-audio-1.5-2026-02-23": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "azure/gpt-realtime-1.5-2026-02-23": [
+    {
+      "provider": "azure",
+      "input": 4e-06,
+      "output": 1.6e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "azure/gpt-5.3-codex": [
+    {
+      "provider": "azure",
+      "input": 1.75e-06,
+      "output": 1.4e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "dashscope/qwen3-next-80b-a3b-instruct": [
+    {
+      "provider": "dashscope",
+      "input": 1.5e-07,
+      "output": 1.2e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "dashscope/qwen3-next-80b-a3b-thinking": [
+    {
+      "provider": "dashscope",
+      "input": 1.5e-07,
+      "output": 1.2e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "dashscope/qwen3-vl-235b-a22b-instruct": [
+    {
+      "provider": "dashscope",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "dashscope/qwen3-vl-235b-a22b-thinking": [
+    {
+      "provider": "dashscope",
+      "input": 4e-07,
+      "output": 4e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "dashscope/qwen3-vl-32b-instruct": [
+    {
+      "provider": "dashscope",
+      "input": 1.6e-07,
+      "output": 6.4e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "dashscope/qwen3-vl-32b-thinking": [
+    {
+      "provider": "dashscope",
+      "input": 1.6e-07,
+      "output": 2.87e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "gemini-3.1-flash-image-preview": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 5e-07,
+      "output": 3e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "gemini-3.1-flash-lite-preview": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "gemini/gemini-3.1-flash-lite-preview": [
+    {
+      "provider": "gemini",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "gpt-audio-1.5": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "gpt-5.3-chat-latest": [
+    {
+      "provider": "openai",
+      "input": 1.75e-06,
+      "output": 1.4e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "gpt-5.4": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1.5e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "gpt-5.4-2026-03-05": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1.5e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "gpt-realtime-1.5": [
+    {
+      "provider": "openai",
+      "input": 4e-06,
+      "output": 1.6e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "mistral.devstral-2-123b": [
+    {
+      "provider": "bedrock_converse",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "mistral/magistral-medium-1-2-2509": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "mistral/magistral-small-1-2-2509": [
+    {
+      "provider": "mistral",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "mistral/mistral-large-2512": [
+    {
+      "provider": "mistral",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "mistral/mistral-medium-3-1-2508": [
+    {
+      "provider": "mistral",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "mistral/mistral-small-3-2-2506": [
+    {
+      "provider": "mistral",
+      "input": 6e-08,
+      "output": 1.8e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "mistral/ministral-3-3b-2512": [
+    {
+      "provider": "mistral",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "mistral/ministral-3-8b-2512": [
+    {
+      "provider": "mistral",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "mistral/ministral-3-14b-2512": [
+    {
+      "provider": "mistral",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/deepseek-ai/DeepSeek-R1": [
+    {
+      "provider": "nebius",
+      "input": 8e-07,
+      "output": 2.4e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/deepseek-ai/DeepSeek-R1-0528": [
+    {
+      "provider": "nebius",
+      "input": 8e-07,
+      "output": 2.4e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/deepseek-ai/DeepSeek-R1-Distill-Llama-70B": [
+    {
+      "provider": "nebius",
+      "input": 2.5e-07,
+      "output": 7.5e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/deepseek-ai/DeepSeek-V3": [
+    {
+      "provider": "nebius",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/deepseek-ai/DeepSeek-V3-0324": [
+    {
+      "provider": "nebius",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/google/gemma-3-27b-it": [
+    {
+      "provider": "nebius",
+      "input": 6e-08,
+      "output": 2e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/meta-llama/Llama-3.3-70B-Instruct": [
+    {
+      "provider": "nebius",
+      "input": 1.3e-07,
+      "output": 4e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/meta-llama/Llama-Guard-3-8B": [
+    {
+      "provider": "nebius",
+      "input": 2e-08,
+      "output": 6e-08,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/meta-llama/Meta-Llama-3.1-8B-Instruct": [
+    {
+      "provider": "nebius",
+      "input": 2e-08,
+      "output": 6e-08,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/meta-llama/Meta-Llama-3.1-70B-Instruct": [
+    {
+      "provider": "nebius",
+      "input": 1.3e-07,
+      "output": 4e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/meta-llama/Meta-Llama-3.1-405B-Instruct": [
+    {
+      "provider": "nebius",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/mistralai/Mistral-Nemo-Instruct-2407": [
+    {
+      "provider": "nebius",
+      "input": 4e-08,
+      "output": 1.2e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/NousResearch/Hermes-3-Llama-3.1-405B": [
+    {
+      "provider": "nebius",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/nvidia/Llama-3.1-Nemotron-Ultra-253B-v1": [
+    {
+      "provider": "nebius",
+      "input": 6e-07,
+      "output": 1.8e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/nvidia/Llama-3.3-Nemotron-Super-49B-v1": [
+    {
+      "provider": "nebius",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen3-235B-A22B": [
+    {
+      "provider": "nebius",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen3-32B": [
+    {
+      "provider": "nebius",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen3-30B-A3B": [
+    {
+      "provider": "nebius",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen3-14B": [
+    {
+      "provider": "nebius",
+      "input": 8e-08,
+      "output": 2.4e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen3-4B": [
+    {
+      "provider": "nebius",
+      "input": 8e-08,
+      "output": 2.4e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/QwQ-32B": [
+    {
+      "provider": "nebius",
+      "input": 1.5e-07,
+      "output": 4.5e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen2.5-72B-Instruct": [
+    {
+      "provider": "nebius",
+      "input": 1.3e-07,
+      "output": 4e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen2.5-32B-Instruct": [
+    {
+      "provider": "nebius",
+      "input": 6e-08,
+      "output": 2e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen2.5-Coder-7B": [
+    {
+      "provider": "nebius",
+      "input": 1e-08,
+      "output": 3e-08,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen2.5-VL-72B-Instruct": [
+    {
+      "provider": "nebius",
+      "input": 1.3e-07,
+      "output": 4e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen2-VL-72B-Instruct": [
+    {
+      "provider": "nebius",
+      "input": 1.3e-07,
+      "output": 4e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/Qwen/Qwen2-VL-7B-Instruct": [
+    {
+      "provider": "nebius",
+      "input": 2e-08,
+      "output": 6e-08,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/BAAI/bge-en-icl": [
+    {
+      "provider": "nebius",
+      "input": 1e-08,
+      "output": 0.0,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/BAAI/bge-multilingual-gemma2": [
+    {
+      "provider": "nebius",
+      "input": 1e-08,
+      "output": 0.0,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "nebius/intfloat/e5-mistral-7b-instruct": [
+    {
+      "provider": "nebius",
+      "input": 1e-08,
+      "output": 0.0,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "openrouter/anthropic/claude-sonnet-4.6": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "openrouter/anthropic/claude-opus-4.6": [
+    {
+      "provider": "openrouter",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "openrouter/google/gemini-3.1-pro-preview": [
+    {
+      "provider": "openrouter",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "openrouter/openai/gpt-5.1-codex-max": [
+    {
+      "provider": "openrouter",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "openrouter/qwen/qwen3-coder-plus": [
+    {
+      "provider": "openrouter",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "openrouter/z-ai/glm-5": [
+    {
+      "provider": "openrouter",
+      "input": 8e-07,
+      "output": 2.56e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "openrouter/openrouter/auto": [
+    {
+      "provider": "openrouter",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "openrouter/openrouter/free": [
+    {
+      "provider": "openrouter",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "openrouter/openrouter/bodybuilder": [
+    {
+      "provider": "openrouter",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "perplexity/pplx-embed-v1-0.6b": [
+    {
+      "provider": "perplexity",
+      "input": 4e-09,
+      "output": 0.0,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "perplexity/pplx-embed-v1-4b": [
+    {
+      "provider": "perplexity",
+      "input": 3e-08,
+      "output": 0.0,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "together_ai/Qwen/Qwen3.5-397B-A17B": [
+    {
+      "provider": "together_ai",
+      "input": 6e-07,
+      "output": 3.6e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "vertex_ai/gemini-3.1-flash-image-preview": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 5e-07,
+      "output": 3e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "vertex_ai/gemini-3.1-flash-lite-preview": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2.5e-07,
+      "output": 1.5e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "zai.glm-4.7-flash": [
+    {
+      "provider": "bedrock_converse",
+      "input": 7e-08,
+      "output": 4e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "zai/glm-5": [
+    {
+      "provider": "zai",
+      "input": 1e-06,
+      "output": 3.2e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "zai/glm-5-code": [
+    {
+      "provider": "zai",
+      "input": 1.2e-06,
+      "output": 5e-06,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "bedrock_mantle/openai.gpt-oss-120b": [
+    {
+      "provider": "bedrock_mantle",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "bedrock_mantle/openai.gpt-oss-20b": [
+    {
+      "provider": "bedrock_mantle",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "bedrock_mantle/openai.gpt-oss-safeguard-120b": [
+    {
+      "provider": "bedrock_mantle",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2026-03-05 13:03:42"
+    }
+  ],
+  "bedrock_mantle/openai.gpt-oss-safeguard-20b": [
+    {
+      "provider": "bedrock_mantle",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2026-03-05 13:03:42"
     }
   ]
 }
