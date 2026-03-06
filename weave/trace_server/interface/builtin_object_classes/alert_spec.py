@@ -53,6 +53,10 @@ class WeaveMetricThresholdSpec(BaseModel):
         "Disambiguates scorers that share the same op class (e.g. multiple LLMAsAJudgeScorer instances). "
         "Filterable via inputs.self on scorer calls or input_refs on CallsFilter.",
     )
+    aggregation_function: Literal["mean", "median", "min", "max", "mode"] = Field(
+        default="mean",
+        description="Aggregation function applied to metric values within the window before threshold comparison",
+    )
 
 
 class AlertSpec(base_object_def.BaseObject):

@@ -514,6 +514,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             engine_args = match.group(2) or ""
             if engine_prefix.lower().startswith("replicated"):
                 return match.group(0)
+            engine_args = match.group(2) or ""
             return f"ENGINE = Replicated{engine_prefix}MergeTree{engine_args}"
 
         return SQLPatterns.MERGETREE_ENGINE.sub(replace_engine, sql_query)
@@ -646,9 +647,10 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
 
         curr_db = self.ch_client.database
         self.ch_client.database = target_db
+        command_for_match = SQLPatterns.LINE_COMMENT.sub("", command)
 
         # Skip MATERIALIZE commands (not supported by distributed tables)
-        if SQLPatterns.MATERIALIZE.search(command):
+        if SQLPatterns.MATERIALIZE.search(command_for_match):
             logger.warning(
                 f"Skipping MATERIALIZE command (not supported in distributed mode): {command}"
             )
@@ -656,7 +658,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             return
 
         # Skip INSERT commands (backfill not supported in distributed mode)
-        if SQLPatterns.INSERT_STMT.search(command):
+        if SQLPatterns.INSERT_STMT.search(command_for_match):
             logger.warning(
                 f"Skipping INSERT command (not supported in distributed mode): {command[:100]}..."
             )
@@ -664,15 +666,15 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             return
 
         # Handle RENAME TABLE (local rename + drop/recreate distributed table)
-        if SQLPatterns.RENAME_TABLE_STMT.search(command):
+        if SQLPatterns.RENAME_TABLE_STMT.search(command_for_match):
             self._execute_distributed_rename(command)
             self.ch_client.database = curr_db
             return
 
         # Handle CREATE/DROP VIEW (no local/distributed split, just add ON CLUSTER)
         if SQLPatterns.CREATE_VIEW_STMT.search(
-            command
-        ) or SQLPatterns.DROP_VIEW_STMT.search(command):
+            command_for_match
+        ) or SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
             formatted_command = self._format_replicated_sql(command)
             formatted_command = self._add_on_cluster_clause(formatted_command)
             self.ch_client.command(formatted_command)
@@ -683,7 +685,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         formatted_command = self._format_replicated_sql_distributed(command, target_db)
 
         # Handle ALTER TABLE
-        if SQLPatterns.ALTER_TABLE_STMT.search(formatted_command):
+        if SQLPatterns.ALTER_TABLE_STMT.search(command_for_match):
             self._execute_distributed_alter(formatted_command)
         else:
             # Handle CREATE TABLE and other DDL
@@ -699,6 +701,14 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             engine_args = match.group(2) or ""
             if engine_prefix.lower().startswith("replicated"):
                 return match.group(0)
+
+            # Extract original engine args (e.g. "created_at" from ReplacingMergeTree(created_at))
+            engine_args = match.group(2)
+            extra_args = ""
+            if engine_args:
+                inner = engine_args.strip("()")
+                if inner:
+                    extra_args = f", {inner}"
 
             # Extract table name for path
             table_match = SQLPatterns.CREATE_TABLE.search(sql_query)
@@ -722,7 +732,8 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                     f"'{{replica}}'{extra_args})"
                 )
 
-            return f"ENGINE = Replicated{engine_prefix}MergeTree"
+            engine_args_str = engine_args or ""
+            return f"ENGINE = Replicated{engine_prefix}MergeTree{engine_args_str}"
 
         return SQLPatterns.MERGETREE_ENGINE.sub(replace_engine, sql_query)
 
@@ -1090,7 +1101,9 @@ class SQLPatterns:
     )
     SAFE_IDENTIFIER: Pattern = re.compile(r"^[a-zA-Z0-9_\.]+$")
 
-    # Engine patterns (group 2 captures optional args like (created_at) or ())
+    # Engine patterns
+    # Group 1: engine prefix (e.g. "Replacing", "Aggregating")
+    # Group 2: engine arguments including parens (e.g. "(created_at)" or "()")
     MERGETREE_ENGINE: Pattern = re.compile(
         r"ENGINE\s*=\s*(\w+)?MergeTree\b(\([^)]*\))?", re.IGNORECASE
     )
@@ -1107,6 +1120,7 @@ class SQLPatterns:
     DROP_TABLE_OR_VIEW: Pattern = re.compile(
         r"\bDROP\s+(TABLE|VIEW)\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_.]+)", re.IGNORECASE
     )
+    LINE_COMMENT: Pattern = re.compile(r"(?m)^\s*--.*$")
 
     # ON CLUSTER pattern
     ON_CLUSTER: Pattern = re.compile(r"\bON\s+CLUSTER\b", re.IGNORECASE)
