@@ -35,7 +35,13 @@ class BlockingTraceServer(tsi.TraceServerInterface):
             return super().__getattribute__(item)
         internal_trace_server = super().__getattribute__("internal_trace_server")
 
-        if item in ("attribute_access_log", "remote_request_bytes_limit"):
+        if item in (
+            "attribute_access_log",
+            "remote_request_bytes_limit",
+            "get_call_processor",
+            "get_feedback_processor",
+            "call_processor",
+        ):
             return getattr(internal_trace_server, item)
 
         def wrapper(*args, **kwargs):
@@ -139,6 +145,7 @@ async def test_evaluation_performance(client: WeaveClient):
             "ensure_project_exists": 1,
             "get_call_processor": 2,
             "get_feedback_processor": 2,
+            "projects_info": 1,  # client-side ref digest: fetch ext->int project ID mapping
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops
@@ -186,13 +193,18 @@ async def test_evaluation_resilience(
 
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
-    # Tim: This is very specific and intentiaion, please don't change
+    # Tim: This is very specific and intentional, please don't change
     # this unless you are sure that is the expected behavior.
     # For some reason with high parallelism, some logs are not captured,
     # so instead of exact counts, we just check that the number of unique
     # logs is <= the expected number of logs.
-    assert len(ag_res) == 4
-    assert ag_res["Job failed during flush: ('FAILURE - call_end"] <= 14
-    assert ag_res["Job failed during flush: ('FAILURE - obj_create"] <= 6
-    assert ag_res["Job failed during flush: ('FAILURE - file_create"] <= 6
-    assert ag_res["Job failed during flush: ('FAILURE - table_create"] <= 1
+    # With client-side digest computation, serialization happens synchronously
+    # and all server calls (obj_create, file_create, table_create, call_start,
+    # call_end, feedback_create) are deferred, so all 6 types fail.
+    assert len(ag_res) == 6
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - call_start"] <= 14
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - call_end"] <= 14
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - obj_create"] <= 9
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - file_create"] <= 10
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - feedback_create"] <= 4
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - table_create"] <= 2
