@@ -61,6 +61,7 @@ from weave.trace_server.trace_server_common import (
     make_derived_summary_fields,
     make_feedback_query_req,
     op_name_matches,
+    scorer_read_res_from_obj,
     set_nested_key,
 )
 from weave.trace_server.validation import object_id_validator
@@ -2325,22 +2326,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             digest=req.digest,
         )
         result = self.obj_read(obj_req)
-        val = result.obj.val
-
-        # Extract name and description from val data
-        name = val.get("name", result.obj.object_id)
-        description = val.get("description")
-
-        # Create the response with all required fields
-        return tsi.ScorerReadRes(
-            object_id=result.obj.object_id,
-            digest=result.obj.digest,
-            version_index=result.obj.version_index,
-            created_at=result.obj.created_at,
-            name=name,
-            description=description,
-            score_op=val.get("score", ""),
-        )
+        return scorer_read_res_from_obj(result.obj)
 
     def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
         """List scorer objects by delegating to objs_query with Scorer filtering."""
@@ -2353,27 +2339,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         result = self.objs_query(obj_query_req)
 
         for obj in result.objs:
-            # Extract name, description, and score_op from val data
-            name = obj.object_id  # fallback to object_id
-            description = None
-            score_op = ""
-
-            if hasattr(obj, "val") and obj.val:
-                val = obj.val
-                if isinstance(val, dict):
-                    name = val.get("name", obj.object_id)
-                    description = val.get("description")
-                    score_op = val.get("score", "")
-
-            yield tsi.ScorerReadRes(
-                object_id=obj.object_id,
-                digest=obj.digest,
-                version_index=obj.version_index,
-                created_at=obj.created_at,
-                name=name,
-                description=description,
-                score_op=score_op,
-            )
+            yield scorer_read_res_from_obj(obj)
 
     def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
         """Delete scorer objects by delegating to obj_delete."""
