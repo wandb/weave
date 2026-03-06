@@ -1746,15 +1746,12 @@ class WeaveClient:
         json_val = to_json(val, self._project_id(), self)
         digest = compute_object_digest(self._prepare_val_for_digest(json_val))
 
-        # Defer only the network call
-        self.future_executor.defer(
-            lambda: self.server.obj_create(
-                ObjCreateReq(
-                    obj=ObjSchemaForInsert(
-                        project_id=self._project_id(),
-                        object_id=name,
-                        val=json_val,
-                    )
+        self.server.obj_create(
+            ObjCreateReq(
+                obj=ObjSchemaForInsert(
+                    project_id=self._project_id(),
+                    object_id=name,
+                    val=json_val,
                 )
             )
         )
@@ -1826,10 +1823,9 @@ class WeaveClient:
         # Construct the ref immediately with known digests
         table_ref = TableRef(self.entity, self.project, table_digest, row_digests)
 
-        # Defer only the server upload
         chunking_config = self._should_use_chunking(table)
         if not chunking_config.use_chunking:
-            self.future_executor.defer(lambda: self._send_table_create(json_rows))
+            self._send_table_create(json_rows)
         elif chunking_config.use_parallel_chunks:
             self._upload_table_parallel_chunks(json_rows)
         else:
