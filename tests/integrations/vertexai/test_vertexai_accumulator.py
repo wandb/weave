@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
-from google.cloud.aiplatform_v1beta1.types import content as gapic_content_types
-from google.cloud.aiplatform_v1beta1.types import tool as gapic_tool_types
+import pytest
+
+gapic_content_types = pytest.importorskip("google.cloud.aiplatform_v1beta1.types.content")
+gapic_tool_types = pytest.importorskip("google.cloud.aiplatform_v1beta1.types.tool")
 
 from weave.integrations.vertexai.vertexai_sdk import vertexai_accumulator
 
