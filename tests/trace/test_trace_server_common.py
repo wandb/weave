@@ -1,7 +1,10 @@
+import datetime
+
 from weave.trace_server.trace_server_common import (
     DynamicBatchProcessor,
     LRUCache,
     get_nested_key,
+    make_derived_summary_fields,
     set_nested_key,
 )
 
@@ -78,3 +81,61 @@ def test_dynamic_batch_processor():
     # Verify all items were processed
     flattened = [item for batch in batches for item in batch]
     assert flattened == list(range(15))
+
+
+def test_make_derived_summary_fields_sanitizes_flat_usage():
+    """Flat usage values (ints) should be filtered out; only model-keyed dicts kept."""
+    # Flat format: usage has plain int values instead of model-keyed dicts
+    summary = {
+        "usage": {
+            "input_tokens": 16,
+            "output_tokens": 107,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+        }
+    }
+    result = make_derived_summary_fields(
+        summary=summary,
+        op_name="test_op",
+        started_at=datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc),
+        ended_at=datetime.datetime(2024, 1, 1, 0, 1, tzinfo=datetime.timezone.utc),
+    )
+    # All flat int values should be filtered out
+    assert result["usage"] == {}
+
+
+def test_make_derived_summary_fields_keeps_model_keyed_usage():
+    """Properly model-keyed usage dicts should be preserved."""
+    summary = {
+        "usage": {
+            "gpt-4": {"input_tokens": 16, "output_tokens": 107},
+            "claude-3": {"input_tokens": 10, "output_tokens": 50},
+        }
+    }
+    result = make_derived_summary_fields(
+        summary=summary,
+        op_name="test_op",
+        started_at=datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc),
+        ended_at=datetime.datetime(2024, 1, 1, 0, 1, tzinfo=datetime.timezone.utc),
+    )
+    assert result["usage"] == {
+        "gpt-4": {"input_tokens": 16, "output_tokens": 107},
+        "claude-3": {"input_tokens": 10, "output_tokens": 50},
+    }
+
+
+def test_make_derived_summary_fields_mixed_usage():
+    """Mixed usage with both model-keyed dicts and flat ints keeps only dicts."""
+    summary = {
+        "usage": {
+            "gpt-4": {"input_tokens": 16},
+            "input_tokens": 16,
+        }
+    }
+    result = make_derived_summary_fields(
+        summary=summary,
+        op_name="test_op",
+        started_at=datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc),
+        ended_at=datetime.datetime(2024, 1, 1, 0, 1, tzinfo=datetime.timezone.utc),
+    )
+    assert result["usage"] == {"gpt-4": {"input_tokens": 16}}
