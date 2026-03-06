@@ -117,6 +117,7 @@ async def test_evaluation_performance(client: WeaveClient):
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
+        "projects_info",
     ]
     assert log == gold_log
 

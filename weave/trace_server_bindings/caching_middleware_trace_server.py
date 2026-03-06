@@ -78,7 +78,7 @@ class CachingMiddlewareTraceServer(
 
     _next_trace_server: TraceServerClientInterface
     _cache_prefix: str
-    delegated_methods = DelegatingTraceServerMixin.delegated_methods | {"server_info"}
+    delegated_methods = DelegatingTraceServerMixin.delegated_methods | {"server_info", "projects_info"}
     optional_delegated_methods = frozenset(
         {
             "get_call_processor",
