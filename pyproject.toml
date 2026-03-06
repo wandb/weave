@@ -165,7 +165,7 @@ modal = ["modal", "python-dotenv"]
 mcp = ["mcp[cli]>=1.6.0,<1.10.0; python_version >= '3.10'"]
 vertexai = [
   "vertexai>=1.70.0; platform_python_implementation != 'PyPy' and python_version < '3.13'",
-  "shapely<=2.0.6; platform_python_implementation != 'PyPy'",
+  "shapely<=2.1.2; platform_python_implementation != 'PyPy'",
 ] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 verdict = [
