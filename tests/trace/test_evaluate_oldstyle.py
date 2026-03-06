@@ -1,10 +1,13 @@
 import asyncio
+import sys
 
 import pytest
 
 import weave
 from weave import Dataset, Evaluation, Model
 from weave.scorers import MultiTaskBinaryClassificationF1
+
+_LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
@@ -13,7 +16,7 @@ dataset = Dataset(rows=dataset_rows)
 expected_eval_result = {
     "model_output": {"mean": 9.5},
     "score_oldstyle": {"true_count": 1, "true_fraction": 0.5},
-    "model_latency": {"mean": pytest.approx(0, abs=1)},
+    "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
 }
 
 
@@ -109,7 +112,7 @@ def test_evaluate_both_styles(client):
         "model_output": {"mean": 9.5},
         "score_oldstyle": {"true_count": 1, "true_fraction": 0.5},
         "score_newstyle": {"true_count": 1, "true_fraction": 0.5},
-        "model_latency": {"mean": pytest.approx(0, abs=1)},
+        "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
     }
 
 

@@ -24,6 +24,7 @@ from weave.trace_server.environment import (
 )
 
 CALL_ENDED_TOPIC = "weave.call_ended"
+SCORE_CALLS_TOPIC = "weave.score_calls"
 
 DEFAULT_MAX_BUFFER_SIZE = 10000
 
@@ -129,7 +130,59 @@ class KafkaProducer(ConfluentKafkaProducer):
         )
 
         if flush_immediately:
-            self.flush()
+            # Use a short non-blocking flush instead of an unbounded flush().
+            # The producer is a process-level singleton shared across all request
+            # threads, so flush() (no timeout) blocks until ALL in-flight messages
+            # from every concurrent request are acknowledged — causing a convoy
+            # effect under load.  flush(0) triggers a delivery attempt for queued
+            # messages and returns immediately.
+            self.flush(0)
+
+    SCORE_CALLS_CHUNK_SIZE = 100
+
+    def produce_score_calls(
+        self, req: tsi.CallsScoreReq, flush_immediately: bool = True
+    ) -> None:
+        """Produce score_calls messages to Kafka, chunked to avoid consumer timeouts.
+
+        Large call_ids lists are split into chunks of SCORE_CALLS_CHUNK_SIZE
+        so that each Kafka message can be processed within the consumer's
+        max.poll.interval.ms.
+
+        Args:
+            req: The CallsScoreReq containing project_id, call_ids, scorer_refs, and wb_user_id
+            flush_immediately: Whether to flush the producer immediately (default True)
+        """
+        # len(self) returns the number of messages currently queued in the producer buffer
+        buffer_size = len(self)
+
+        if buffer_size >= self.max_buffer_size:
+            logger.error(
+                "Kafka producer buffer full, dropping score_calls message",
+                extra={
+                    "buffer_size": buffer_size,
+                    "max_buffer_size": self.max_buffer_size,
+                    "project_id": req.project_id,
+                    "call_ids_count": len(req.call_ids),
+                },
+            )
+            set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
+            return
+
+        publish_key = None
+        if kafka_partition_by_project_id():
+            publish_key = req.project_id
+
+        for i in range(0, len(req.call_ids), self.SCORE_CALLS_CHUNK_SIZE):
+            chunk = req.call_ids[i : i + self.SCORE_CALLS_CHUNK_SIZE]
+            self.produce(
+                topic=SCORE_CALLS_TOPIC,
+                value=req.model_copy(update={"call_ids": chunk}).model_dump_json(),
+                key=publish_key,
+            )
+
+        if flush_immediately:
+            self.flush(0)
 
 
 class KafkaConsumer(ConfluentKafkaConsumer):

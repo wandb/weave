@@ -1587,6 +1587,112 @@ def test_query_with_summary_weave_latency_ms_filter() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("read_table", "expected_table"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_summary_weave_field_select_backtick_quoting(
+    read_table: ReadTable, expected_table: str
+) -> None:
+    """Regression: summary.weave.* fields used as SQL aliases must be backtick-quoted.
+
+    Without quoting, ClickHouse interprets dots as nested field access, causing
+    SYNTAX_ERROR (code 62).  This test verifies the fix for all three computed
+    summary fields on both read tables.
+    """
+    cq = CallsQuery(project_id="project", read_table=read_table)
+    cq.add_field("id")
+    cq.add_field("summary.weave.trace_name")
+    cq.add_field("summary.weave.status")
+    cq.add_field("summary.weave.latency_ms")
+
+    if read_table == ReadTable.CALLS_MERGED:
+        assert_sql(
+            cq,
+            f"""
+            SELECT {expected_table}.id AS id,
+                CASE
+                    WHEN argMaxMerge({expected_table}.display_name) IS NOT NULL
+                        AND argMaxMerge({expected_table}.display_name) != '' THEN argMaxMerge({expected_table}.display_name)
+                    WHEN any({expected_table}.op_name) IS NOT NULL
+                        AND any({expected_table}.op_name) LIKE 'weave-trace-internal:///%' THEN
+                            regexpExtract(toString(any({expected_table}.op_name)), '/([^/:]*):', 1)
+                    ELSE any({expected_table}.op_name)
+                END AS `summary.weave.trace_name`,
+                CASE
+                    WHEN any({expected_table}.exception) IS NOT NULL THEN {{pb_1:String}}
+                    WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any({expected_table}.summary_dump), {{pb_0:String}}), 'null'), '')), 0) > 0 THEN {{pb_4:String}}
+                    WHEN any({expected_table}.ended_at) IS NULL THEN {{pb_2:String}}
+                    ELSE {{pb_3:String}}
+                END AS `summary.weave.status`,
+                CASE
+                    WHEN any({expected_table}.ended_at) IS NULL THEN NULL
+                    ELSE (toUnixTimestamp64Milli(any({expected_table}.ended_at)) - toUnixTimestamp64Milli(any({expected_table}.started_at)))
+                END AS `summary.weave.latency_ms`
+            FROM {expected_table}
+            PREWHERE {expected_table}.project_id = {{pb_5:String}}
+            GROUP BY ({expected_table}.project_id, {expected_table}.id)
+            HAVING (
+                ((any({expected_table}.deleted_at) IS NULL))
+                AND
+                ((NOT ((any({expected_table}.started_at) IS NULL))))
+            )
+            """,
+            {
+                "pb_0": '$."status_counts"."error"',
+                "pb_1": "error",
+                "pb_2": "running",
+                "pb_3": "success",
+                "pb_4": "descendant_error",
+                "pb_5": "project",
+            },
+        )
+    else:
+        assert_sql(
+            cq,
+            f"""
+            SELECT {expected_table}.id AS id,
+                CASE
+                    WHEN {expected_table}.display_name != {{pb_0:String}} THEN {expected_table}.display_name
+                    WHEN {expected_table}.op_name IS NOT NULL
+                        AND {expected_table}.op_name LIKE 'weave-trace-internal:///%' THEN
+                            regexpExtract(toString({expected_table}.op_name), '/([^/:]*):', 1)
+                    ELSE {expected_table}.op_name
+                END AS `summary.weave.trace_name`,
+                CASE
+                    WHEN {expected_table}.exception != {{pb_6:String}} THEN {{pb_2:String}}
+                    WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE({expected_table}.summary_dump, {{pb_1:String}}), 'null'), '')), 0) > 0 THEN {{pb_5:String}}
+                    WHEN {expected_table}.ended_at = {{pb_7:DateTime64(6)}} THEN {{pb_3:String}}
+                    ELSE {{pb_4:String}}
+                END AS `summary.weave.status`,
+                CASE
+                    WHEN {expected_table}.ended_at = {{pb_8:DateTime64(6)}} THEN NULL
+                    ELSE (toUnixTimestamp64Milli({expected_table}.ended_at) - toUnixTimestamp64Milli({expected_table}.started_at))
+                END AS `summary.weave.latency_ms`
+            FROM {expected_table}
+            PREWHERE {expected_table}.project_id = {{pb_10:String}}
+            WHERE 1
+              AND ({expected_table}.deleted_at = {{pb_9:DateTime64(3)}})
+            """,
+            {
+                "pb_0": "",
+                "pb_1": '$."status_counts"."error"',
+                "pb_2": "error",
+                "pb_3": "running",
+                "pb_4": "success",
+                "pb_5": "descendant_error",
+                "pb_6": "",
+                "pb_7": SENTINEL_DATETIME,
+                "pb_8": SENTINEL_DATETIME,
+                "pb_9": SENTINEL_DATETIME,
+                "pb_10": "project",
+            },
+        )
+
+
 def test_query_with_summary_weave_trace_name_sort() -> None:
     """Test sorting by summary.weave.trace_name field."""
     cq = CallsQuery(project_id="project")
@@ -2917,9 +3023,10 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
 ):
     """Test calls_complete table with hardcoded filter, JSON condition, and summary field ordering.
 
-    This test demonstrates that for calls_complete, when there is a hardcoded filter
-    (op_names, trace_ids) plus a JSON condition on summary, the optimizer creates a
-    CTE to filter by the light conditions first, then joins back to get the full row.
+    This test demonstrates that for calls_complete, even when there is a hardcoded filter
+    (op_names, trace_ids) plus a JSON condition on summary, we use a single query pass
+    instead of the two-step CTE pattern. calls_complete has one row per call (no GROUP BY),
+    so a single query is both simpler and significantly faster.
     Additionally, it tests ordering by summary.weave.status which uses direct column
     access without any() aggregation functions (unlike calls_merged).
     """
@@ -2952,31 +3059,6 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
     assert_sql(
         cq,
         """
-        WITH filtered_calls AS (
-            SELECT calls_complete.id AS id
-            FROM calls_complete
-            PREWHERE calls_complete.project_id = {pb_12:String}
-            WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
-                    OR (calls_complete.op_name IS NULL))
-                AND (calls_complete.trace_id = {pb_4:String}
-                    OR calls_complete.trace_id IS NULL)
-            AND (
-                ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:UInt64}))
-                AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
-            )
-            ORDER BY CASE
-                WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
-                WHEN IFNULL(
-                    toInt64OrNull(
-                        coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
-                    ),
-                    0
-                ) > 0 THEN {pb_9:String}
-                WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
-                ELSE {pb_8:String}
-                END ASC
-            LIMIT 100
-        )
         SELECT
             calls_complete.id AS id,
             calls_complete.started_at AS started_at,
@@ -2984,18 +3066,26 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             calls_complete.ended_at AS ended_at
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_12:String}
-        WHERE (calls_complete.id IN filtered_calls)
+        WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
+                OR (calls_complete.op_name IS NULL))
+            AND (calls_complete.trace_id = {pb_4:String}
+                OR calls_complete.trace_id IS NULL)
+        AND (
+            ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:UInt64}))
+            AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
+        )
         ORDER BY CASE
-            WHEN calls_complete.exception != {pb_13:String} THEN {pb_6:String}
+            WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
             WHEN IFNULL(
                 toInt64OrNull(
                     coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
                 ),
                 0
             ) > 0 THEN {pb_9:String}
-            WHEN calls_complete.ended_at = {pb_14:DateTime64(6)} THEN {pb_7:String}
+            WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
             ELSE {pb_8:String}
             END ASC
+        LIMIT 100
         """,
         {
             "pb_0": '$."latency"',
@@ -3011,8 +3101,6 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             "pb_10": "",
             "pb_11": SENTINEL_DATETIME,
             "pb_12": "project",
-            "pb_13": "",
-            "pb_14": SENTINEL_DATETIME,
         },
     )
 
