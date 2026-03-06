@@ -558,6 +558,28 @@ def build_cost_ctes(
     ]
 
 
+def get_cost_result_columns(
+    select_fields: list[str],
+    order_fields: list["OrderField"],
+) -> list[str]:
+    """Return the list of result column names for the cost query, in SELECT order.
+
+    When include_costs is True, the cost query adds ORDER BY fields to the SELECT.
+    The server must zip result rows with this list so that 'summary_dump' maps to
+    the actual summary_dump JSON column, not to an order-only column (e.g.
+    summary.weave.status) whose value is a plain string like 'success'.
+
+    Args:
+        select_fields: Requested fields to select.
+        order_fields: Fields to order by.
+
+    Returns:
+        Column names in the same order as the cost query SELECT.
+    """
+    final_fields = _prepare_final_select_fields(select_fields, order_fields)
+    return [safe_alias(f) for f in final_fields] + ["summary_dump"]
+
+
 def get_cost_final_select(
     pb: ParamBuilder,
     select_fields: list[str],
