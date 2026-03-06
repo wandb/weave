@@ -110,6 +110,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "smolagents",
         "mcp",
         "verdict",
+        "claude_agent_sdk",
         "verifiers_test",
         "autogen_tests",
         "trace",
