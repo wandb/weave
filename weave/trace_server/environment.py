@@ -88,6 +88,18 @@ def wf_scoring_worker_kafka_consumer_group_id_override() -> str | None:
     return os.environ.get("SCORING_WORKER_KAFKA_CONSUMER_GROUP_ID")
 
 
+def wf_scoring_worker_debounced_scoring_sampling_rate() -> float:
+    """Sampling rate for debounced scoring (delay > 0). 0.0 = disable, 1.0 = full."""
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_DEBOUNCED_SCORING_SAMPLING_RATE", "1.0"
+    )
+    try:
+        rate = float(raw)
+    except ValueError:
+        return 1.0
+    return max(0.0, min(1.0, rate))
+
+
 # Clickhouse Settings
 
 
