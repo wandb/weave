@@ -155,13 +155,12 @@ def publish(
 
     ref = client._save_object(obj, save_name, "latest")
 
-    if tags:
-        client.add_tags(ref, tags)
-    if aliases:
-        for alias in aliases:
-            client.set_alias(ref, alias)
-
     if isinstance(ref, ObjectRef):
+        if tags:
+            client.add_tags(ref, tags)
+        if aliases:
+            for alias in aliases:
+                client.set_alias(ref, alias)
         if isinstance(ref, weave_client.OpRef):
             url = urls.op_version_path(
                 ref.entity,

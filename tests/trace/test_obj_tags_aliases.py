@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 import weave
+from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError
@@ -973,8 +974,6 @@ def test_sdk_multiple_tags_and_aliases(client: WeaveClient):
 
 def test_sdk_add_tags_error_nonexistent_object(client: WeaveClient):
     """Adding tags to a non-existent object should raise NotFoundError."""
-    from weave.trace.refs import ObjectRef
-
     fake_ref = ObjectRef(
         entity="test",
         project="test",
@@ -987,8 +986,6 @@ def test_sdk_add_tags_error_nonexistent_object(client: WeaveClient):
 
 def test_sdk_set_alias_error_nonexistent_object(client: WeaveClient):
     """Setting an alias on a non-existent object should raise NotFoundError."""
-    from weave.trace.refs import ObjectRef
-
     fake_ref = ObjectRef(
         entity="test",
         project="test",
