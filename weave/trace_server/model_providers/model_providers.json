@@ -699,6 +699,10 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/gpt-audio-1.5-2026-02-23": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/gpt-audio-mini-2025-10-06": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
@@ -724,6 +728,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure/gpt-realtime-2025-08-28": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-realtime-1.5-2026-02-23": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -848,6 +856,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure/gpt-5.2-codex": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5.3-codex": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1276,6 +1288,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure_ai/mistral-document-ai-2505": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/mistral-document-ai-2512": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -2582,6 +2598,14 @@
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
+  "gemini-3.1-flash-image-preview": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "gemini-3.1-flash-lite-preview": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
   "deep-research-pro-preview-12-2025": {
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
@@ -2868,8 +2892,8 @@
     "deprecated_date": "2026-01-29T21:44:57.323963"
   },
   "gemini/gemini-2.5-flash-image": {
-    "litellm_provider": "vertex_ai-language-models",
-    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.5-flash-image-preview": {
     "litellm_provider": "gemini",
@@ -2949,6 +2973,10 @@
     "deprecated_date": "2026-01-29T21:44:57.324444"
   },
   "gemini/gemini-3-pro-preview": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-3.1-flash-lite-preview": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -3332,6 +3360,10 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "gpt-audio-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-audio-2025-08-28": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -3572,6 +3604,10 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "gpt-5.3-chat-latest": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-5.2-pro": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY",
@@ -3585,6 +3621,14 @@
     "deprecated": true,
     "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
     "deprecated_date": "2026-01-29T17:58:16.718606"
+  },
+  "gpt-5.4": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5.4-2026-03-05": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-5-pro": {
     "litellm_provider": "openai",
@@ -3664,6 +3708,10 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-realtime": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-realtime-1.5": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -3891,6 +3939,10 @@
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "mistral.devstral-2-123b": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "mistral.magistral-small-2509": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
@@ -3995,6 +4047,10 @@
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
+  "mistral/magistral-medium-1-2-2509": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
   "mistral/mistral-ocr-latest": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
@@ -4012,6 +4068,10 @@
     "api_key_name": "MISTRAL_API_KEY"
   },
   "mistral/magistral-small-latest": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/magistral-small-1-2-2509": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
@@ -4047,6 +4107,10 @@
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
+  "mistral/mistral-large-2512": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
   "mistral/mistral-medium": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
@@ -4063,11 +4127,31 @@
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
+  "mistral/mistral-medium-3-1-2508": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
   "mistral/mistral-small": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
   "mistral/mistral-small-latest": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/mistral-small-3-2-2506": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/ministral-3-3b-2512": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/ministral-3-8b-2512": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/ministral-3-14b-2512": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
@@ -4563,6 +4647,14 @@
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
+  "vertex_ai/gemini-3.1-flash-image-preview": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.1-flash-lite-preview": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
   "vertex_ai/deep-research-pro-preview-12-2025": {
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
@@ -4723,6 +4815,10 @@
     "deprecated_date": "2026-01-29T18:47:19.050217"
   },
   "zai.glm-4.7": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "zai.glm-4.7-flash": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },

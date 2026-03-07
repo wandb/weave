@@ -2967,6 +2967,19 @@
           "default": null,
           "description": "Scorer object ref identifying which scorer instance within a monitor to alert on. Disambiguates scorers that share the same op class (e.g. multiple LLMAsAJudgeScorer instances). Filterable via inputs.self on scorer calls or input_refs on CallsFilter.",
           "title": "Scorer Ref"
+        },
+        "aggregation_function": {
+          "default": "mean",
+          "description": "Aggregation function applied to metric values within the window before threshold comparison",
+          "enum": [
+            "mean",
+            "median",
+            "min",
+            "max",
+            "mode"
+          ],
+          "title": "Aggregation Function",
+          "type": "string"
         }
       },
       "title": "WeaveMetricThresholdSpec",

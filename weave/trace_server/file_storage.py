@@ -181,7 +181,7 @@ def _is_rate_limit_error(exception: BaseException | None) -> bool:
     # AWS S3 - ClientError with 429 status code or Throttling error
     if isinstance(exception, ClientError):
         error_code = exception.response.get("Error", {}).get("Code", "")
-        if error_code in ["Throttling", "ThrottlingException", "RequestLimitExceeded"]:
+        if error_code in {"Throttling", "ThrottlingException", "RequestLimitExceeded"}:
             return True
         # Check HTTP status code
         if exception.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 429:

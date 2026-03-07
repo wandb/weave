@@ -527,7 +527,7 @@ def shorten_name(
         # Concatenate the delimiter with the next part
         next_delimiter = ""
         while parts[i] in delimiters:
-            next_delimiter = next_delimiter + parts[i]
+            next_delimiter += parts[i]
             i += 1
 
         next_part = f"{next_delimiter}{parts[i]}"

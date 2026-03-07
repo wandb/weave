@@ -94,11 +94,11 @@ class TableRoutingResolver:
             return ReadTable.CALLS_MERGED
 
         if self._mode == CallsStorageServerMode.AUTO:
-            if residence in (
+            if residence in {
                 ProjectDataResidence.COMPLETE_ONLY,
                 ProjectDataResidence.BOTH,
                 ProjectDataResidence.EMPTY,
-            ):
+            }:
                 return ReadTable.CALLS_COMPLETE
             if residence == ProjectDataResidence.MERGED_ONLY:
                 return ReadTable.CALLS_MERGED
@@ -141,10 +141,10 @@ class TableRoutingResolver:
         if self._mode == CallsStorageServerMode.AUTO:
             # V1 writes go to MERGED unless project has any calls_complete data.
             # COMPLETE_ONLY or BOTH → return COMPLETE to signal caller should raise error.
-            if residence in (
+            if residence in {
                 ProjectDataResidence.COMPLETE_ONLY,
                 ProjectDataResidence.BOTH,
-            ):
+            }:
                 return WriteTarget.CALLS_COMPLETE
             return WriteTarget.CALLS_MERGED
 

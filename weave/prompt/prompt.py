@@ -43,11 +43,11 @@ def str_to_message(
 ) -> Message:
     if role is not None:
         return {"role": role, "content": maybe_dedent(content, dedent)}
-    for role in ROLE_COLORS:
-        prefix = role + ":"
+    for detected_role in ROLE_COLORS:
+        prefix = detected_role + ":"
         if content.startswith(prefix):
             return {
-                "role": role,
+                "role": detected_role,
                 "content": maybe_dedent(content[len(prefix) :].lstrip(), dedent),
             }
     return {"role": "user", "content": maybe_dedent(content, dedent)}

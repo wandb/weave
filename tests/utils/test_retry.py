@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import weave.utils.retry as retry
+from weave.utils import retry
 
 
 @patch("weave.utils.retry.retry_max_attempts")

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTE
+from weave.trace_server.calls_query_builder.utils import safe_alias
 from weave.trace_server.clickhouse_schema import SelectableCHCallSchema
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import (
@@ -557,6 +558,28 @@ def build_cost_ctes(
     ]
 
 
+def get_cost_result_columns(
+    select_fields: list[str],
+    order_fields: list["OrderField"],
+) -> list[str]:
+    """Return the list of result column names for the cost query, in SELECT order.
+
+    When include_costs is True, the cost query adds ORDER BY fields to the SELECT.
+    The server must zip result rows with this list so that 'summary_dump' maps to
+    the actual summary_dump JSON column, not to an order-only column (e.g.
+    summary.weave.status) whose value is a plain string like 'success'.
+
+    Args:
+        select_fields: Requested fields to select.
+        order_fields: Fields to order by.
+
+    Returns:
+        Column names in the same order as the cost query SELECT.
+    """
+    final_fields = _prepare_final_select_fields(select_fields, order_fields)
+    return [safe_alias(f) for f in final_fields] + ["summary_dump"]
+
+
 def get_cost_final_select(
     pb: ParamBuilder,
     select_fields: list[str],
@@ -580,10 +603,8 @@ def get_cost_final_select(
         Complete SQL SELECT statement
     """
     final_fields = _prepare_final_select_fields(select_fields, order_fields)
-    # Backtick-quote field names containing dots (e.g. summary.weave.trace_name)
-    # so ClickHouse treats them as identifiers rather than nested field access.
-    quoted_fields = [f"`{f}`" if "." in f else f for f in final_fields]
-    fields_str = ", ".join(quoted_fields)
+    safe_fields = [safe_alias(f) for f in final_fields]
+    fields_str = ", ".join(safe_fields)
 
     # Build SELECT clause with cost calculation
     summary_dump = _build_cost_summary_dump_snippet()
@@ -595,10 +616,35 @@ def get_cost_final_select(
         feedback_join = "\n" + _build_feedback_join(pb, project_id, "ranked_prices")
 
     where_clause = f"WHERE (rank = {{{pb.add_param(1)}:UInt64}})"
-    group_by = f"GROUP BY {', '.join(quoted_fields)}"
+    group_by = f"GROUP BY {', '.join(safe_fields)}"
     order_by = ""
     if order_fields:
-        order_parts = [of.as_sql(pb, "ranked_prices") for of in order_fields]
+        # Circular import avoidance: calls_query_builder imports from token_costs
+        from weave.trace_server.calls_query_builder.calls_query_builder import (
+            CallsMergedSummaryField,
+        )
+
+        order_parts = []
+        for of in order_fields:
+            if isinstance(of.field, CallsMergedSummaryField):
+                # Summary fields (e.g. summary.weave.status) internally
+                # reference summary_dump which is NOT in the GROUP BY (it's
+                # rebuilt with cost data).  Since the summary field is already
+                # computed as an alias in SELECT/GROUP BY, reference the alias
+                # directly instead of re-expanding the expression.
+                order_parts.append(f"{safe_alias(of.field.field)} {of.direction}")
+            else:
+                # Feedback fields need use_agg_fn=True because they come from a
+                # JOIN and aren't in the GROUP BY.  All other fields (e.g.
+                # CallsMergedAggField with argMaxMerge) have already been
+                # materialized to plain columns by the CTEs, so use_agg_fn=False.
+                order_parts.append(
+                    of.as_sql(
+                        pb,
+                        "ranked_prices",
+                        use_agg_fn=of.field.is_feedback_field(),
+                    )
+                )
         order_by = f"ORDER BY {', '.join(order_parts)}"
 
     parts = [select_clause, from_clause]
@@ -682,7 +728,7 @@ def validate_cost_purge_req(req: tsi.CostPurgeReq) -> None:
     keys = list(expr.keys())
     if len(keys) != 1:
         raise InvalidRequest(MESSAGE_INVALID_COST_PURGE)
-    if keys[0] in ["eq_", "in_"]:
+    if keys[0] in {"eq_", "in_"}:
         validate_purge_req_one(expr, MESSAGE_INVALID_COST_PURGE, keys[0])
     elif keys[0] == "or_":
         validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_COST_PURGE)

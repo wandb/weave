@@ -4,13 +4,13 @@ from collections.abc import Generator
 import pytest
 
 import weave.integrations.huggingface.huggingface_inference_client_sdk as hf_sdk
-import weave.integrations.openai.openai_sdk as openai_sdk
-import weave.integrations.smolagents.smolagents_sdk as smolagents_sdk
 from weave.integrations.huggingface.huggingface_inference_client_sdk import (
     get_huggingface_patcher,
 )
 from weave.integrations.integration_utilities import op_name_from_ref
+from weave.integrations.openai import openai_sdk
 from weave.integrations.openai.openai_sdk import get_openai_patcher
+from weave.integrations.smolagents import smolagents_sdk
 from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
 
 
