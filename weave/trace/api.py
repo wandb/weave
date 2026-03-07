@@ -185,7 +185,15 @@ def publish(
             )
         # Ensure logger level is up to date before logging
         update_logger_level()
-        logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
+        msg = f"{TRACE_OBJECT_EMOJI} Published to {url}"
+        if tags or aliases:
+            extras = []
+            if tags:
+                extras.append(f"tags: {', '.join(tags)}")
+            if aliases:
+                extras.append(f"aliases: {', '.join(aliases)}")
+            msg += f" ({'; '.join(extras)})"
+        logger.info(msg)
     return ref
 
 

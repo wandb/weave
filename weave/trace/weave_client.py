@@ -1229,6 +1229,8 @@ class WeaveClient:
             List of tag strings. Returns empty list if the object version
             has no tags.
         """
+        # Uses objs_query instead of obj_read to avoid stale reads from
+        # CachingMiddleware, which caches obj_read but not objs_query.
         res = self.server.objs_query(
             ObjQueryReq(
                 project_id=self._project_id(),
@@ -1287,6 +1289,8 @@ class WeaveClient:
             List of alias strings. Includes the virtual "latest" alias
             if the object version is the latest.
         """
+        # Uses objs_query instead of obj_read to avoid stale reads from
+        # CachingMiddleware, which caches obj_read but not objs_query.
         res = self.server.objs_query(
             ObjQueryReq(
                 project_id=self._project_id(),

@@ -718,6 +718,39 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.objects.delete,
         )
 
+    # Tag and Alias API
+    # NOTE: These methods require the Stainless SDK to include tag/alias endpoints.
+    # Until the SDK spec is updated, these will raise AttributeError at call time.
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        return self._stainless_request(
+            req, tsi.ObjAddTagsRes, self._stainless_client.objects.tags.add
+        )
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        return self._stainless_request(
+            req, tsi.ObjRemoveTagsRes, self._stainless_client.objects.tags.remove
+        )
+
+    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+        return self._stainless_request(
+            req, tsi.ObjSetAliasRes, self._stainless_client.objects.aliases.set
+        )
+
+    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+        return self._stainless_request(
+            req, tsi.ObjRemoveAliasRes, self._stainless_client.objects.aliases.remove
+        )
+
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        return self._stainless_request(
+            req, tsi.TagsListRes, self._stainless_client.objects.tags.list
+        )
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        return self._stainless_request(
+            req, tsi.AliasesListRes, self._stainless_client.objects.aliases.list
+        )
+
     # Table API
     @validate_call
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
