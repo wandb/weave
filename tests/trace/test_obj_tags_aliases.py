@@ -840,7 +840,7 @@ def test_sdk_add_tags(client: WeaveClient):
 
     client.add_tags(ref, ["alpha", "beta"])
 
-    assert sorted(client.get_tags(ref)) == ["alpha", "beta"]
+    assert client.get_tags(ref) == ["alpha", "beta"]
 
 
 def test_sdk_remove_tags(client: WeaveClient):
@@ -858,7 +858,7 @@ def test_sdk_get_tags(client: WeaveClient):
     assert client.get_tags(ref) == []
 
     client.add_tags(ref, ["tag1", "tag2"])
-    assert sorted(client.get_tags(ref)) == ["tag1", "tag2"]
+    assert client.get_tags(ref) == ["tag1", "tag2"]
 
 
 def test_sdk_set_alias(client: WeaveClient):
@@ -964,7 +964,7 @@ def test_sdk_multiple_tags_and_aliases(client: WeaveClient):
     client.set_alias(ref, "stable")
 
     tags = client.get_tags(ref)
-    assert sorted(tags) == ["production", "reviewed", "v2"]
+    assert tags == ["production", "reviewed", "v2"]
 
     aliases = client.get_aliases(ref)
     assert "prod" in aliases
@@ -1297,14 +1297,20 @@ def test_sdk_list_tags(client: WeaveClient):
     tags = client.list_tags()
     assert "alpha" in tags
     assert "zeta" in tags
+    # Verify sorted order is enforced client-side
+    assert tags == sorted(tags)
 
 
 def test_sdk_list_aliases(client: WeaveClient):
     ref = weave.publish({"data": "test"}, name="sdk_list_aliases_obj")
-    client.set_alias(ref, "my-alias")
+    client.set_alias(ref, "zz-alias")
+    client.set_alias(ref, "aa-alias")
 
     aliases = client.list_aliases()
-    assert "my-alias" in aliases
+    assert "aa-alias" in aliases
+    assert "zz-alias" in aliases
+    # Verify sorted order is enforced client-side
+    assert aliases == sorted(aliases)
 
 
 def test_tag_named_latest_allowed(client: WeaveClient):
@@ -1718,7 +1724,7 @@ def test_batch_enrichment_multiple_objects(client: WeaveClient):
 def test_publish_with_tags(client: WeaveClient):
     ref = weave.publish({"data": "tagged"}, name="pub_tags", tags=["alpha", "beta"])
     tags = client.get_tags(ref)
-    assert sorted(tags) == ["alpha", "beta"]
+    assert tags == ["alpha", "beta"]
 
 
 def test_publish_with_aliases(client: WeaveClient):
