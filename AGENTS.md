@@ -248,6 +248,10 @@ npm run test
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
 
+### LLM Provider Routing
+
+- Forge routing is handled in `weave/trace_server/clickhouse_trace_server_batched.py` via `_setup_completion_model_info`, using `FORGE_API_KEY` and optional `FORGE_API_BASE` (default `https://api.forge.tensorblock.co/v1`), and normalizing provider prefixes to lowercase before calling LiteLLM.
+
 ### Documentation
 
 - Update relevant docstrings for Python code
