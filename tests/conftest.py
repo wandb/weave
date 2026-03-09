@@ -369,8 +369,7 @@ def clear_call_stack():
     with set_call_stack([]):
         yield
         assert call_context.get_call_stack() == [], (
-            "Call stack must be empty at test end. "
-            "This test leaked call-context state."
+            "Call stack must be empty at test end. This test leaked call-context state."
         )
 
 

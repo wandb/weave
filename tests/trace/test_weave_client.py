@@ -661,7 +661,7 @@ def test_get_calls_page_size_with_offset(client):
 def test_calls_delete(client):
     call0 = client.create_call("x", {"a": 5, "b": 10}, use_stack=False)
     call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0, use_stack=False)
-    _call0_child2 = client.create_call(
+    _call0_child2 = client.create_call(  # noqa: RUF052
         "x", {"a": 5, "b": 12}, call0_child1, use_stack=False
     )
     call1 = client.create_call("y", {"a": 6, "b": 11}, _call0_child2, use_stack=False)
