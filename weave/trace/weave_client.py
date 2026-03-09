@@ -1229,21 +1229,15 @@ class WeaveClient:
             List of tag strings. Returns empty list if the object version
             has no tags.
         """
-        # Uses objs_query instead of obj_read to avoid stale reads from
-        # CachingMiddleware, which caches obj_read but not objs_query.
-        res = self.server.objs_query(
-            ObjQueryReq(
+        res = self.server.obj_read(
+            ObjReadReq(
                 project_id=self._project_id(),
-                filter=ObjectVersionFilter(
-                    object_ids=[obj_ref.name],
-                ),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
                 include_tags_and_aliases=True,
             )
         )
-        for obj in res.objs:
-            if obj.digest == obj_ref.digest:
-                return obj.tags or []
-        return []
+        return res.obj.tags or []
 
     @trace_sentry.global_trace_sentry.watch()
     def set_alias(self, obj_ref: ObjectRef, alias: str | list[str]) -> None:
@@ -1291,21 +1285,15 @@ class WeaveClient:
             List of alias strings. Includes the virtual "latest" alias
             if the object version is the latest.
         """
-        # Uses objs_query instead of obj_read to avoid stale reads from
-        # CachingMiddleware, which caches obj_read but not objs_query.
-        res = self.server.objs_query(
-            ObjQueryReq(
+        res = self.server.obj_read(
+            ObjReadReq(
                 project_id=self._project_id(),
-                filter=ObjectVersionFilter(
-                    object_ids=[obj_ref.name],
-                ),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
                 include_tags_and_aliases=True,
             )
         )
-        for obj in res.objs:
-            if obj.digest == obj_ref.digest:
-                return obj.aliases or []
-        return []
+        return res.obj.aliases or []
 
     @trace_sentry.global_trace_sentry.watch()
     def list_tags(self) -> list[str]:

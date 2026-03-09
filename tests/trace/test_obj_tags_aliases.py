@@ -1753,3 +1753,111 @@ def test_publish_tags_aliases_none_default(client: WeaveClient):
     # Only the implicit "latest" alias should be present
     aliases = client.get_aliases(ref)
     assert aliases == ["latest"]
+
+
+# --- set_alias with list ---
+
+
+def test_sdk_set_alias_with_list(client: WeaveClient):
+    """set_alias should accept a list of aliases."""
+    ref = weave.publish({"data": "test"}, name="sdk_set_alias_list_obj")
+
+    client.set_alias(ref, ["alpha", "beta", "gamma"])
+
+    aliases = client.get_aliases(ref)
+    assert "alpha" in aliases
+    assert "beta" in aliases
+    assert "gamma" in aliases
+
+
+def test_sdk_set_alias_with_list_single(client: WeaveClient):
+    """set_alias with a single-element list should behave like a string."""
+    ref = weave.publish({"data": "test"}, name="sdk_set_alias_list_single")
+
+    client.set_alias(ref, ["only-one"])
+
+    assert "only-one" in client.get_aliases(ref)
+
+
+def test_sdk_set_alias_with_empty_list(client: WeaveClient):
+    """set_alias with an empty list should be a no-op."""
+    ref = weave.publish({"data": "test"}, name="sdk_set_alias_empty_list")
+
+    client.set_alias(ref, [])
+
+    # Only the implicit "latest" alias should be present
+    assert client.get_aliases(ref) == ["latest"]
+
+
+# --- Top-level weave.* wrapper functions ---
+
+
+def test_weave_add_tags(client: WeaveClient):
+    """weave.add_tags() top-level function should work."""
+    ref = weave.publish({"data": "test"}, name="tl_add_tags_obj")
+
+    weave.add_tags(ref, ["top-level-tag"])
+
+    assert "top-level-tag" in weave.get_tags(ref)
+
+
+def test_weave_remove_tags(client: WeaveClient):
+    """weave.remove_tags() top-level function should work."""
+    ref = weave.publish({"data": "test"}, name="tl_rm_tags_obj")
+
+    weave.add_tags(ref, ["keep", "remove"])
+    weave.remove_tags(ref, ["remove"])
+
+    tags = weave.get_tags(ref)
+    assert "keep" in tags
+    assert "remove" not in tags
+
+
+def test_weave_set_alias(client: WeaveClient):
+    """weave.set_alias() top-level function should work."""
+    ref = weave.publish({"data": "test"}, name="tl_set_alias_obj")
+
+    weave.set_alias(ref, "top-level-alias")
+
+    assert "top-level-alias" in weave.get_aliases(ref)
+
+
+def test_weave_set_alias_list(client: WeaveClient):
+    """weave.set_alias() top-level function should accept a list."""
+    ref = weave.publish({"data": "test"}, name="tl_set_alias_list_obj")
+
+    weave.set_alias(ref, ["alias-a", "alias-b"])
+
+    aliases = weave.get_aliases(ref)
+    assert "alias-a" in aliases
+    assert "alias-b" in aliases
+
+
+def test_weave_remove_alias(client: WeaveClient):
+    """weave.remove_alias() top-level function should work."""
+    ref = weave.publish({"data": "test"}, name="tl_rm_alias_obj")
+
+    weave.set_alias(ref, "ephemeral")
+    weave.remove_alias(ref, "ephemeral")
+
+    assert "ephemeral" not in weave.get_aliases(ref)
+
+
+def test_weave_list_tags(client: WeaveClient):
+    """weave.list_tags() top-level function should work."""
+    ref = weave.publish({"data": "test"}, name="tl_list_tags_obj")
+
+    weave.add_tags(ref, ["global-tag"])
+
+    tags = weave.list_tags()
+    assert "global-tag" in tags
+
+
+def test_weave_list_aliases(client: WeaveClient):
+    """weave.list_aliases() top-level function should work."""
+    ref = weave.publish({"data": "test"}, name="tl_list_aliases_obj")
+
+    weave.set_alias(ref, "global-alias")
+
+    aliases = weave.list_aliases()
+    assert "global-alias" in aliases
