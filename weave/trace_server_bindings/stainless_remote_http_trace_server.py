@@ -720,36 +720,72 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     # Tag and Alias API
     # NOTE: These methods require the Stainless SDK to include tag/alias endpoints.
-    # Until the SDK spec is updated, these will raise AttributeError at call time.
+    # Until the SDK spec is updated, these will raise NotImplementedError at call time.
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
-        return self._stainless_request(
-            req, tsi.ObjAddTagsRes, self._stainless_client.objects.tags.add
-        )
+        try:
+            return self._stainless_request(
+                req, tsi.ObjAddTagsRes, self._stainless_client.objects.tags.add
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Tag operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            )
 
     def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
-        return self._stainless_request(
-            req, tsi.ObjRemoveTagsRes, self._stainless_client.objects.tags.remove
-        )
+        try:
+            return self._stainless_request(
+                req, tsi.ObjRemoveTagsRes, self._stainless_client.objects.tags.remove
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Tag operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            )
 
-    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
-        return self._stainless_request(
-            req, tsi.ObjSetAliasRes, self._stainless_client.objects.aliases.set
-        )
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+        try:
+            return self._stainless_request(
+                req, tsi.ObjSetAliasesRes, self._stainless_client.objects.aliases.set
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Alias operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            )
 
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
-        return self._stainless_request(
-            req, tsi.ObjRemoveAliasRes, self._stainless_client.objects.aliases.remove
-        )
+        try:
+            return self._stainless_request(
+                req, tsi.ObjRemoveAliasRes, self._stainless_client.objects.aliases.remove
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Alias operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            )
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
-        return self._stainless_request(
-            req, tsi.TagsListRes, self._stainless_client.objects.tags.list
-        )
+        try:
+            return self._stainless_request(
+                req, tsi.TagsListRes, self._stainless_client.objects.tags.list
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Tag operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            )
 
     def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
-        return self._stainless_request(
-            req, tsi.AliasesListRes, self._stainless_client.objects.aliases.list
-        )
+        try:
+            return self._stainless_request(
+                req, tsi.AliasesListRes, self._stainless_client.objects.aliases.list
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Alias operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            )
 
     # Table API
     @validate_call

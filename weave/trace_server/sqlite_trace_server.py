@@ -1227,19 +1227,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conn.commit()
         return tsi.ObjRemoveTagsRes()
 
-    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
             self._ensure_obj_version_exists(
                 cursor, req.project_id, req.object_id, req.digest
             )
-            cursor.execute(
-                "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
-                (req.project_id, req.object_id, req.alias, req.digest),
-            )
+            for alias in req.aliases:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
+                    (req.project_id, req.object_id, alias, req.digest),
+                )
             conn.commit()
-        return tsi.ObjSetAliasRes()
+        return tsi.ObjSetAliasesRes()
 
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
         conn, cursor = get_conn_cursor(self.db_path)

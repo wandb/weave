@@ -1886,28 +1886,32 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 column_names=list(TagCHInsertable.model_fields.keys()),
             )
 
-    def _insert_alias(
+    def _insert_aliases(
         self,
         project_id: str,
         object_id: str,
-        alias: str,
+        aliases: list[str],
         digest: str,
         wb_user_id: str = "",
         deleted_at: datetime.datetime | None = None,
     ) -> None:
-        ch_alias = AliasCHInsertable(
-            project_id=project_id,
-            object_id=object_id,
-            alias=alias,
-            digest=digest,
-            wb_user_id=wb_user_id,
-            **({"deleted_at": deleted_at} if deleted_at else {}),
-        )
-        self._insert(
-            "aliases",
-            data=[list(ch_alias.model_dump().values())],
-            column_names=list(ch_alias.model_fields.keys()),
-        )
+        rows = []
+        for alias in aliases:
+            ch_alias = AliasCHInsertable(
+                project_id=project_id,
+                object_id=object_id,
+                alias=alias,
+                digest=digest,
+                wb_user_id=wb_user_id,
+                **({"deleted_at": deleted_at} if deleted_at else {}),
+            )
+            rows.append(list(ch_alias.model_dump().values()))
+        if rows:
+            self._insert(
+                "aliases",
+                data=rows,
+                column_names=list(AliasCHInsertable.model_fields.keys()),
+            )
 
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
         assert req.wb_user_id, "wb_user_id is required for obj_add_tags"
@@ -1933,24 +1937,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.ObjRemoveTagsRes()
 
-    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
-        assert req.wb_user_id, "wb_user_id is required for obj_set_alias"
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+        assert req.wb_user_id, "wb_user_id is required for obj_set_aliases"
         self._ensure_obj_version_exists(req.project_id, req.object_id, req.digest)
-        self._insert_alias(
+        self._insert_aliases(
             req.project_id,
             req.object_id,
-            req.alias,
+            req.aliases,
             req.digest,
             wb_user_id=req.wb_user_id,
         )
-        return tsi.ObjSetAliasRes()
+        return tsi.ObjSetAliasesRes()
 
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
         assert req.wb_user_id, "wb_user_id is required for obj_remove_alias"
-        self._insert_alias(
+        self._insert_aliases(
             req.project_id,
             req.object_id,
-            req.alias,
+            [req.alias],
             digest="",  # doesn't matter; dedup key is (project_id, object_id, alias)
             wb_user_id=req.wb_user_id,
             deleted_at=datetime.datetime.now(datetime.timezone.utc),

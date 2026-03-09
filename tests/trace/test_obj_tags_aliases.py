@@ -158,15 +158,15 @@ def test_remove_tags_nonexistent(client: WeaveClient):
 # --- Alias CRUD ---
 
 
-def test_set_alias(client: WeaveClient):
+def test_set_aliases(client: WeaveClient):
     object_id, digest = _publish_obj(client, "alias_obj")
 
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=object_id,
             digest=digest,
-            alias="production",
+            aliases=["production"],
         )
     )
 
@@ -180,7 +180,7 @@ def test_set_alias(client: WeaveClient):
     assert "production" in res.objs[0].aliases
 
 
-def test_set_alias_reassignment(client: WeaveClient):
+def test_set_aliases_reassignment(client: WeaveClient):
     """Setting an alias on v1 should move it away from v0."""
     weave.publish({"v": 0}, name="alias_reassign")
     weave.publish({"v": 1}, name="alias_reassign")
@@ -195,22 +195,22 @@ def test_set_alias_reassignment(client: WeaveClient):
     v0, v1 = objs[0], objs[1]
 
     # Set alias on v0
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=v0.object_id,
             digest=v0.digest,
-            alias="staging",
+            aliases=["staging"],
         )
     )
 
     # Move alias to v1
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=v1.object_id,
             digest=v1.digest,
-            alias="staging",
+            aliases=["staging"],
         )
     )
 
@@ -229,12 +229,12 @@ def test_set_alias_reassignment(client: WeaveClient):
 def test_remove_alias(client: WeaveClient):
     object_id, digest = _publish_obj(client, "alias_rm_obj")
 
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=object_id,
             digest=digest,
-            alias="temp-alias",
+            aliases=["temp-alias"],
         )
     )
     client.server.obj_remove_alias(
@@ -274,27 +274,27 @@ def test_remove_alias_nonexistent(client: WeaveClient):
 def test_alias_reserved_names():
     """'latest' and version-like names like 'v0' should be rejected at the request level."""
     with pytest.raises(ValidationError):
-        tsi.ObjSetAliasReq(
+        tsi.ObjSetAliasesReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            alias="latest",
+            aliases=["latest"],
         )
 
     with pytest.raises(ValidationError):
-        tsi.ObjSetAliasReq(
+        tsi.ObjSetAliasesReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            alias="v0",
+            aliases=["v0"],
         )
 
     with pytest.raises(ValidationError):
-        tsi.ObjSetAliasReq(
+        tsi.ObjSetAliasesReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            alias="v123",
+            aliases=["v123"],
         )
 
 
@@ -421,12 +421,12 @@ def test_objs_query_filter_by_aliases(client: WeaveClient):
     object_id, digest = _publish_obj(client, "filter_alias_obj")
     _publish_obj(client, "filter_alias_other")
 
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=object_id,
             digest=digest,
-            alias="production",
+            aliases=["production"],
         )
     )
 
@@ -459,12 +459,12 @@ def test_objs_query_filter_by_alias_returns_only_aliased_version(client: WeaveCl
     v1 = res.objs[1]  # middle version
 
     # Alias only v1
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=v1.object_id,
             digest=v1.digest,
-            alias="pinned",
+            aliases=["pinned"],
         )
     )
 
@@ -487,12 +487,12 @@ def test_alias_resolution_in_obj_read(client: WeaveClient):
     """obj_read with digest='production' should resolve the alias to the actual digest."""
     object_id, digest = _publish_obj(client, "resolve_alias_obj")
 
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=object_id,
             digest=digest,
-            alias="production",
+            aliases=["production"],
         )
     )
 
@@ -525,12 +525,12 @@ def test_tags_on_nonexistent_object(client: WeaveClient):
 
 def test_alias_on_nonexistent_object(client: WeaveClient):
     with pytest.raises(NotFoundError):
-        client.server.obj_set_alias(
-            tsi.ObjSetAliasReq(
+        client.server.obj_set_aliases(
+            tsi.ObjSetAliasesReq(
                 project_id=client._project_id(),
                 object_id="nonexistent_object",
                 digest="0000000000000000000000000000000000000000000000000000000000000000",
-                alias="prod",
+                aliases=["prod"],
             )
         )
 
@@ -585,12 +585,12 @@ def test_obj_read_enrichment(client: WeaveClient):
             tags=["reviewed"],
         )
     )
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=object_id,
             digest=digest,
-            alias="prod",
+            aliases=["prod"],
         )
     )
 
@@ -623,12 +623,12 @@ def test_obj_read_enrichment_multi_version(client: WeaveClient):
     v0, v1 = res.objs[0], res.objs[1]
 
     # Add a real alias to v0
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=v0.object_id,
             digest=v0.digest,
-            alias="stable",
+            aliases=["stable"],
         )
     )
 
@@ -717,20 +717,20 @@ def test_obj_read_by_alias_enrichment(client: WeaveClient):
     """obj_read via alias resolution includes all aliases and the virtual 'latest'."""
     object_id, digest = _publish_obj(client, "read_alias_enrich")
 
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=object_id,
             digest=digest,
-            alias="production",
+            aliases=["production"],
         )
     )
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=object_id,
             digest=digest,
-            alias="stable",
+            aliases=["stable"],
         )
     )
 
@@ -801,20 +801,20 @@ def test_multiple_aliases_on_object(client: WeaveClient):
     )
     v0, v1 = res.objs[0], res.objs[1]
 
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=v0.object_id,
             digest=v0.digest,
-            alias="stable",
+            aliases=["stable"],
         )
     )
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=v1.object_id,
             digest=v1.digest,
-            alias="canary",
+            aliases=["canary"],
         )
     )
 
@@ -832,7 +832,7 @@ def test_multiple_aliases_on_object(client: WeaveClient):
     assert "stable" not in (res.objs[1].aliases or [])
 
 
-# --- SDK client methods (WeaveClient.add_tags, remove_tags, set_alias, remove_alias) ---
+# --- SDK client methods (WeaveClient.add_tags, remove_tags, set_aliases, remove_alias) ---
 
 
 def test_sdk_add_tags(client: WeaveClient):
@@ -861,10 +861,10 @@ def test_sdk_get_tags(client: WeaveClient):
     assert client.get_tags(ref) == ["tag1", "tag2"]
 
 
-def test_sdk_set_alias(client: WeaveClient):
+def test_sdk_set_aliases(client: WeaveClient):
     ref = weave.publish({"data": "test"}, name="sdk_set_alias_obj")
 
-    client.set_alias(ref, "production")
+    client.set_aliases(ref, "production")
 
     assert "production" in client.get_aliases(ref)
 
@@ -872,7 +872,7 @@ def test_sdk_set_alias(client: WeaveClient):
 def test_sdk_remove_alias(client: WeaveClient):
     ref = weave.publish({"data": "test"}, name="sdk_rm_alias_obj")
 
-    client.set_alias(ref, "staging")
+    client.set_aliases(ref, "staging")
     client.remove_alias(ref, "staging")
 
     assert "staging" not in client.get_aliases(ref)
@@ -885,7 +885,7 @@ def test_sdk_get_aliases(client: WeaveClient):
     aliases = client.get_aliases(ref)
     assert "latest" in aliases
 
-    client.set_alias(ref, "canary")
+    client.set_aliases(ref, "canary")
     aliases = client.get_aliases(ref)
     assert "canary" in aliases
     assert "latest" in aliases
@@ -939,11 +939,11 @@ def test_sdk_alias_reassignment(client: WeaveClient):
     ref_v0 = weave.publish({"v": 0}, name="sdk_alias_reassign")
     ref_v1 = weave.publish({"v": 1}, name="sdk_alias_reassign")
 
-    client.set_alias(ref_v0, "staging")
+    client.set_aliases(ref_v0, "staging")
     assert "staging" in client.get_aliases(ref_v0)
 
     # Move alias to v1
-    client.set_alias(ref_v1, "staging")
+    client.set_aliases(ref_v1, "staging")
     assert "staging" not in client.get_aliases(ref_v0)
     assert "staging" in client.get_aliases(ref_v1)
 
@@ -960,8 +960,8 @@ def test_sdk_multiple_tags_and_aliases(client: WeaveClient):
     ref = weave.publish({"data": "test"}, name="sdk_multi_obj")
 
     client.add_tags(ref, ["reviewed", "production", "v2"])
-    client.set_alias(ref, "prod")
-    client.set_alias(ref, "stable")
+    client.set_aliases(ref, "prod")
+    client.set_aliases(ref, "stable")
 
     tags = client.get_tags(ref)
     assert tags == ["production", "reviewed", "v2"]
@@ -984,7 +984,7 @@ def test_sdk_add_tags_error_nonexistent_object(client: WeaveClient):
         client.add_tags(fake_ref, ["tag"])
 
 
-def test_sdk_set_alias_error_nonexistent_object(client: WeaveClient):
+def test_sdk_set_aliases_error_nonexistent_object(client: WeaveClient):
     """Setting an alias on a non-existent object should raise NotFoundError."""
     fake_ref = ObjectRef(
         entity="test",
@@ -993,7 +993,7 @@ def test_sdk_set_alias_error_nonexistent_object(client: WeaveClient):
         _digest="0000000000000000000000000000000000000000000",
     )
     with pytest.raises(NotFoundError):
-        client.set_alias(fake_ref, "prod")
+        client.set_aliases(fake_ref, "prod")
 
 
 def test_sdk_list_tags_excludes_removed(client: WeaveClient):
@@ -1012,8 +1012,8 @@ def test_sdk_list_aliases_excludes_removed(client: WeaveClient):
     """list_aliases should not include aliases that have been removed."""
     ref = weave.publish({"data": "test"}, name="sdk_list_aliases_rm_obj")
 
-    client.set_alias(ref, "keep-alias")
-    client.set_alias(ref, "remove-alias")
+    client.set_aliases(ref, "keep-alias")
+    client.set_aliases(ref, "remove-alias")
     client.remove_alias(ref, "remove-alias")
 
     aliases = client.list_aliases()
@@ -1060,89 +1060,89 @@ def test_valid_tag_and_alias_names():
         ],
     )
     # Aliases: broad charset, only '/' and ':' disallowed
-    tsi.ObjSetAliasReq(
+    tsi.ObjSetAliasesReq(
         project_id="test/proj",
         object_id="obj",
         digest="abc123",
-        alias="production",
+        aliases=["production"],
     )
-    tsi.ObjSetAliasReq(
+    tsi.ObjSetAliasesReq(
         project_id="test/proj",
         object_id="obj",
         digest="abc123",
-        alias="my-deploy.v2",
+        aliases=["my-deploy.v2"],
     )
-    tsi.ObjSetAliasReq(
+    tsi.ObjSetAliasesReq(
         project_id="test/proj",
         object_id="obj",
         digest="abc123",
-        alias="has spaces",
+        aliases=["has spaces"],
     )
 
 
 def test_alias_invalid_characters():
     """Aliases cannot contain '/' or ':'."""
     with pytest.raises(ValidationError):
-        tsi.ObjSetAliasReq(
+        tsi.ObjSetAliasesReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            alias="path/slash",
+            aliases=["path/slash"],
         )
     with pytest.raises(ValidationError):
-        tsi.ObjSetAliasReq(
+        tsi.ObjSetAliasesReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            alias="has:colon",
+            aliases=["has:colon"],
         )
 
 
 def test_alias_whitespace_only():
     """Whitespace-only alias names should be rejected."""
     with pytest.raises(ValidationError):
-        tsi.ObjSetAliasReq(
+        tsi.ObjSetAliasesReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            alias="   ",
+            aliases=["   "],
         )
     with pytest.raises(ValidationError):
-        tsi.ObjSetAliasReq(
+        tsi.ObjSetAliasesReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            alias="\t",
+            aliases=["\t"],
         )
 
 
 def test_alias_empty_string():
     """Empty string alias should be rejected."""
     with pytest.raises(ValidationError):
-        tsi.ObjSetAliasReq(
+        tsi.ObjSetAliasesReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            alias="",
+            aliases=[""],
         )
 
 
 def test_alias_too_long():
     """Alias longer than 128 characters should be rejected."""
     with pytest.raises(ValidationError):
-        tsi.ObjSetAliasReq(
+        tsi.ObjSetAliasesReq(
             project_id="test/proj",
             object_id="obj",
             digest="abc123",
-            alias="a" * 129,
+            aliases=["a" * 129],
         )
 
     # Exactly 128 should be fine
-    tsi.ObjSetAliasReq(
+    tsi.ObjSetAliasesReq(
         project_id="test/proj",
         object_id="obj",
         digest="abc123",
-        alias="a" * 128,
+        aliases=["a" * 128],
     )
 
 
@@ -1230,20 +1230,20 @@ def test_aliases_list_returns_distinct(client: WeaveClient):
     oid1, d1 = _publish_obj(client, "al_obj1")
     oid2, d2 = _publish_obj(client, "al_obj2")
 
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=oid1,
             digest=d1,
-            alias="production",
+            aliases=["production"],
         )
     )
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=oid2,
             digest=d2,
-            alias="canary",
+            aliases=["canary"],
         )
     )
 
@@ -1257,20 +1257,20 @@ def test_aliases_list_excludes_removed(client: WeaveClient):
     """Removed aliases don't appear in the list."""
     oid, d = _publish_obj(client, "al_rm_obj")
 
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=oid,
             digest=d,
-            alias="keep-alias",
+            aliases=["keep-alias"],
         )
     )
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=oid,
             digest=d,
-            alias="remove-alias",
+            aliases=["remove-alias"],
         )
     )
     client.server.obj_remove_alias(
@@ -1303,8 +1303,8 @@ def test_sdk_list_tags(client: WeaveClient):
 
 def test_sdk_list_aliases(client: WeaveClient):
     ref = weave.publish({"data": "test"}, name="sdk_list_aliases_obj")
-    client.set_alias(ref, "zz-alias")
-    client.set_alias(ref, "aa-alias")
+    client.set_aliases(ref, "zz-alias")
+    client.set_aliases(ref, "aa-alias")
 
     aliases = client.list_aliases()
     assert "aa-alias" in aliases
@@ -1488,12 +1488,12 @@ def test_alias_on_deleted_object(client: WeaveClient):
     )
 
     with pytest.raises(NotFoundError):
-        client.server.obj_set_alias(
-            tsi.ObjSetAliasReq(
+        client.server.obj_set_aliases(
+            tsi.ObjSetAliasesReq(
                 project_id=client._project_id(),
                 object_id=object_id,
                 digest=digest,
-                alias="should-fail",
+                aliases=["should-fail"],
             )
         )
 
@@ -1513,12 +1513,12 @@ def test_cross_object_digest_isolation(client: WeaveClient):
         )
     )
     # Alias only object B
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=oid_b,
             digest=digest_b,
-            alias="only-on-b",
+            aliases=["only-on-b"],
         )
     )
 
@@ -1602,12 +1602,12 @@ def test_filter_combined_tags_and_aliases(client: WeaveClient):
             tags=["reviewed"],
         )
     )
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=oid1,
             digest=d1,
-            alias="production",
+            aliases=["production"],
         )
     )
 
@@ -1622,12 +1622,12 @@ def test_filter_combined_tags_and_aliases(client: WeaveClient):
     )
 
     # obj3: has alias "production" but no tag "reviewed"
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=oid3,
             digest=d3,
-            alias="production",
+            aliases=["production"],
         )
     )
 
@@ -1660,12 +1660,12 @@ def test_batch_enrichment_multiple_objects(client: WeaveClient):
             tags=["alpha"],
         )
     )
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=oid1,
             digest=d1,
-            alias="prod",
+            aliases=["prod"],
         )
     )
 
@@ -1680,12 +1680,12 @@ def test_batch_enrichment_multiple_objects(client: WeaveClient):
     )
 
     # obj3: no tags, alias="canary"
-    client.server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=client._project_id(),
             object_id=oid3,
             digest=d3,
-            alias="canary",
+            aliases=["canary"],
         )
     )
 
@@ -1755,14 +1755,14 @@ def test_publish_tags_aliases_none_default(client: WeaveClient):
     assert aliases == ["latest"]
 
 
-# --- set_alias with list ---
+# --- set_aliases with list ---
 
 
-def test_sdk_set_alias_with_list(client: WeaveClient):
-    """set_alias should accept a list of aliases."""
+def test_sdk_set_aliases_with_list(client: WeaveClient):
+    """set_aliases should accept a list of aliases."""
     ref = weave.publish({"data": "test"}, name="sdk_set_alias_list_obj")
 
-    client.set_alias(ref, ["alpha", "beta", "gamma"])
+    client.set_aliases(ref, ["alpha", "beta", "gamma"])
 
     aliases = client.get_aliases(ref)
     assert "alpha" in aliases
@@ -1770,20 +1770,20 @@ def test_sdk_set_alias_with_list(client: WeaveClient):
     assert "gamma" in aliases
 
 
-def test_sdk_set_alias_with_list_single(client: WeaveClient):
-    """set_alias with a single-element list should behave like a string."""
+def test_sdk_set_aliases_with_list_single(client: WeaveClient):
+    """set_aliases with a single-element list should behave like a string."""
     ref = weave.publish({"data": "test"}, name="sdk_set_alias_list_single")
 
-    client.set_alias(ref, ["only-one"])
+    client.set_aliases(ref, ["only-one"])
 
     assert "only-one" in client.get_aliases(ref)
 
 
-def test_sdk_set_alias_with_empty_list(client: WeaveClient):
-    """set_alias with an empty list should be a no-op."""
+def test_sdk_set_aliases_with_empty_list(client: WeaveClient):
+    """set_aliases with an empty list should be a no-op."""
     ref = weave.publish({"data": "test"}, name="sdk_set_alias_empty_list")
 
-    client.set_alias(ref, [])
+    client.set_aliases(ref, [])
 
     # Only the implicit "latest" alias should be present
     assert client.get_aliases(ref) == ["latest"]
@@ -1813,20 +1813,20 @@ def test_weave_remove_tags(client: WeaveClient):
     assert "remove" not in tags
 
 
-def test_weave_set_alias(client: WeaveClient):
-    """weave.set_alias() top-level function should work."""
+def test_weave_set_aliases(client: WeaveClient):
+    """weave.set_aliases() top-level function should work."""
     ref = weave.publish({"data": "test"}, name="tl_set_alias_obj")
 
-    weave.set_alias(ref, "top-level-alias")
+    weave.set_aliases(ref, "top-level-alias")
 
     assert "top-level-alias" in weave.get_aliases(ref)
 
 
-def test_weave_set_alias_list(client: WeaveClient):
-    """weave.set_alias() top-level function should accept a list."""
+def test_weave_set_aliases_list(client: WeaveClient):
+    """weave.set_aliases() top-level function should accept a list."""
     ref = weave.publish({"data": "test"}, name="tl_set_alias_list_obj")
 
-    weave.set_alias(ref, ["alias-a", "alias-b"])
+    weave.set_aliases(ref, ["alias-a", "alias-b"])
 
     aliases = weave.get_aliases(ref)
     assert "alias-a" in aliases
@@ -1837,7 +1837,7 @@ def test_weave_remove_alias(client: WeaveClient):
     """weave.remove_alias() top-level function should work."""
     ref = weave.publish({"data": "test"}, name="tl_rm_alias_obj")
 
-    weave.set_alias(ref, "ephemeral")
+    weave.set_aliases(ref, "ephemeral")
     weave.remove_alias(ref, "ephemeral")
 
     assert "ephemeral" not in weave.get_aliases(ref)
@@ -1857,7 +1857,7 @@ def test_weave_list_aliases(client: WeaveClient):
     """weave.list_aliases() top-level function should work."""
     ref = weave.publish({"data": "test"}, name="tl_list_aliases_obj")
 
-    weave.set_alias(ref, "global-alias")
+    weave.set_aliases(ref, "global-alias")
 
     aliases = weave.list_aliases()
     assert "global-alias" in aliases
@@ -1880,7 +1880,7 @@ def test_resolve_by_custom_alias(client: WeaveClient):
     ref_v0 = weave.publish({"v": 0}, name="resolve_custom_obj")
     weave.publish({"v": 1}, name="resolve_custom_obj")
 
-    client.set_alias(ref_v0, "production")
+    client.set_aliases(ref_v0, "production")
 
     obj = weave.ref("resolve_custom_obj:production").get()
     assert obj["v"] == 0
@@ -1891,11 +1891,11 @@ def test_resolve_by_alias_after_reassignment(client: WeaveClient):
     ref_v0 = weave.publish({"v": 0}, name="resolve_reassign_obj")
     ref_v1 = weave.publish({"v": 1}, name="resolve_reassign_obj")
 
-    client.set_alias(ref_v0, "staging")
+    client.set_aliases(ref_v0, "staging")
     assert weave.ref("resolve_reassign_obj:staging").get()["v"] == 0
 
     # Reassign alias to v1
-    client.set_alias(ref_v1, "staging")
+    client.set_aliases(ref_v1, "staging")
     assert weave.ref("resolve_reassign_obj:staging").get()["v"] == 1
 
 
@@ -1923,7 +1923,7 @@ def test_get_by_alias_string(client: WeaveClient):
     ref_v0 = weave.publish({"v": 0}, name="get_alias_obj")
     weave.publish({"v": 1}, name="get_alias_obj")
 
-    client.set_alias(ref_v0, "pinned")
+    client.set_aliases(ref_v0, "pinned")
 
     obj = weave.get("get_alias_obj:pinned")
     assert obj["v"] == 0
@@ -1940,7 +1940,7 @@ def test_resolve_nonexistent_alias_raises(client: WeaveClient):
 def test_resolve_alias_returns_correct_ref_digest(client: WeaveClient):
     """The ref returned from .get() should have the real content digest, not the alias."""
     ref_v0 = weave.publish({"v": 0}, name="resolve_digest_check")
-    client.set_alias(ref_v0, "check-me")
+    client.set_aliases(ref_v0, "check-me")
 
     obj = weave.ref("resolve_digest_check:check-me").get()
     resolved_ref = obj.ref
@@ -1951,7 +1951,7 @@ def test_resolve_alias_returns_correct_ref_digest(client: WeaveClient):
 def test_resolve_multiple_aliases_same_version(client: WeaveClient):
     """Multiple aliases on the same version should all resolve to it."""
     ref = weave.publish({"v": 0}, name="resolve_multi_alias")
-    client.set_alias(ref, ["alpha", "beta", "gamma"])
+    client.set_aliases(ref, ["alpha", "beta", "gamma"])
 
     for alias in ["alpha", "beta", "gamma"]:
         obj = weave.ref(f"resolve_multi_alias:{alias}").get()
@@ -2079,8 +2079,8 @@ def test_aliases_on_multiple_versions(client: WeaveClient):
     ref_v0 = weave.publish({"v": 0}, name="alias_multi_ver")
     ref_v1 = weave.publish({"v": 1}, name="alias_multi_ver")
 
-    weave.set_alias(ref_v0, "old-stable")
-    weave.set_alias(ref_v1, "current")
+    weave.set_aliases(ref_v0, "old-stable")
+    weave.set_aliases(ref_v1, "current")
 
     assert "old-stable" in weave.get_aliases(ref_v0)
     assert "current" not in weave.get_aliases(ref_v0)
@@ -2093,8 +2093,8 @@ def test_aliases_independent_across_objects(client: WeaveClient):
     ref_a = weave.publish({"obj": "a"}, name="alias_indep_a")
     ref_b = weave.publish({"obj": "b"}, name="alias_indep_b")
 
-    weave.set_alias(ref_a, "prod")
-    weave.set_alias(ref_b, "prod")
+    weave.set_aliases(ref_a, "prod")
+    weave.set_aliases(ref_b, "prod")
 
     # Both should have "prod"
     assert "prod" in weave.get_aliases(ref_a)
@@ -2120,8 +2120,8 @@ def test_list_aliases_across_objects(client: WeaveClient):
     ref_a = weave.publish({"obj": "a"}, name="list_alias_cross_a")
     ref_b = weave.publish({"obj": "b"}, name="list_alias_cross_b")
 
-    weave.set_alias(ref_a, "alias-on-a")
-    weave.set_alias(ref_b, "alias-on-b")
+    weave.set_aliases(ref_a, "alias-on-a")
+    weave.set_aliases(ref_b, "alias-on-b")
 
     all_aliases = weave.list_aliases()
     assert "alias-on-a" in all_aliases
@@ -2133,8 +2133,8 @@ def test_list_aliases_deduplicates(client: WeaveClient):
     ref_a = weave.publish({"obj": "a"}, name="list_alias_dedup_a")
     ref_b = weave.publish({"obj": "b"}, name="list_alias_dedup_b")
 
-    weave.set_alias(ref_a, "shared-alias")
-    weave.set_alias(ref_b, "shared-alias")
+    weave.set_aliases(ref_a, "shared-alias")
+    weave.set_aliases(ref_b, "shared-alias")
 
     all_aliases = weave.list_aliases()
     assert "shared-alias" in all_aliases
@@ -2144,7 +2144,7 @@ def test_list_aliases_deduplicates(client: WeaveClient):
 def test_remove_alias_then_resolve_raises(client: WeaveClient):
     """After removing an alias, resolving it should fail."""
     ref = weave.publish({"data": "test"}, name="rm_alias_resolve")
-    client.set_alias(ref, "temporary")
+    client.set_aliases(ref, "temporary")
 
     # Resolves before removal
     assert weave.ref("rm_alias_resolve:temporary").get()["data"] == "test"
@@ -2169,7 +2169,7 @@ def test_tags_and_aliases_full_lifecycle(client: WeaveClient):
     weave.add_tags(ref_v1, ["stable", "reviewed"])
 
     # Alias v1 as production
-    weave.set_alias(ref_v1, "production")
+    weave.set_aliases(ref_v1, "production")
 
     # Resolve alias
     obj = weave.ref("full_lifecycle_obj:production").get()
@@ -2181,7 +2181,7 @@ def test_tags_and_aliases_full_lifecycle(client: WeaveClient):
     assert "production" in weave.get_aliases(ref_v1)
 
     # Reassign alias to v0
-    weave.set_alias(ref_v0, "production")
+    weave.set_aliases(ref_v0, "production")
     obj = weave.ref("full_lifecycle_obj:production").get()
     assert obj["v"] == 0
     assert "production" not in weave.get_aliases(ref_v1)
@@ -2293,12 +2293,12 @@ def test_aliases_do_not_leak_across_projects(client: WeaveClient):
     _, digest_b = _create_obj_in_project(server, proj_b, obj_name)
 
     # Set alias in project A
-    server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=proj_a,
             object_id=obj_name,
             digest=digest_a,
-            alias="production",
+            aliases=["production"],
         )
     )
 
@@ -2369,20 +2369,20 @@ def test_list_aliases_scoped_to_project(client: WeaveClient):
     _, digest_a = _create_obj_in_project(server, proj_a, "obj_a")
     _, digest_b = _create_obj_in_project(server, proj_b, "obj_b")
 
-    server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=proj_a,
             object_id="obj_a",
             digest=digest_a,
-            alias="alias-in-a",
+            aliases=["alias-in-a"],
         )
     )
-    server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=proj_b,
             object_id="obj_b",
             digest=digest_b,
-            alias="alias-in-b",
+            aliases=["alias-in-b"],
         )
     )
 
@@ -2406,12 +2406,12 @@ def test_alias_resolution_scoped_to_project(client: WeaveClient):
     _create_obj_in_project(server, proj_b, obj_name, {"proj": "b"})
 
     # Set alias only in project A
-    server.obj_set_alias(
-        tsi.ObjSetAliasReq(
+    server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
             project_id=proj_a,
             object_id=obj_name,
             digest=digest_a,
-            alias="prod",
+            aliases=["prod"],
         )
     )
 

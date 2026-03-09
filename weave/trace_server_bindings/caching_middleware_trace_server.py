@@ -347,11 +347,11 @@ class CachingMiddlewareTraceServer(
         )
         return self._next_trace_server.obj_remove_tags(req)
 
-    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         # Alias assignment may move the alias from another version, so
         # invalidate all versions of this object.
         self._invalidate_obj_read_cache_all(req.project_id, req.object_id)
-        return self._next_trace_server.obj_set_alias(req)
+        return self._next_trace_server.obj_set_aliases(req)
 
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
         # Alias removal doesn't include digest; invalidate all versions for this object

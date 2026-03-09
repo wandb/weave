@@ -79,7 +79,7 @@ __all__ = [
     "remove_alias",
     "remove_tags",
     "require_current_call",
-    "set_alias",
+    "set_aliases",
     "set_view",
     "thread",
 ]

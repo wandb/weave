@@ -159,7 +159,7 @@ def publish(
         if tags:
             client.add_tags(ref, tags)
         if aliases:
-            client.set_alias(ref, aliases)
+            client.set_aliases(ref, aliases)
         if isinstance(ref, weave_client.OpRef):
             url = urls.op_version_path(
                 ref.entity,
@@ -231,7 +231,7 @@ def get_tags(obj_ref: ObjectRef) -> list[str]:
     return client.get_tags(obj_ref)
 
 
-def set_alias(obj_ref: ObjectRef, alias: str | list[str]) -> None:
+def set_aliases(obj_ref: ObjectRef, alias: str | list[str]) -> None:
     """Set one or more aliases for an object version.
 
     Args:
@@ -239,7 +239,7 @@ def set_alias(obj_ref: ObjectRef, alias: str | list[str]) -> None:
         alias: An alias name or list of alias names to set (e.g., "production").
     """
     client = weave_client_context.require_weave_client()
-    client.set_alias(obj_ref, alias)
+    client.set_aliases(obj_ref, alias)
 
 
 def remove_alias(obj_ref: ObjectRef, alias: str) -> None:
@@ -528,7 +528,7 @@ __all__ = [
     "remove_alias",
     "remove_tags",
     "require_current_call",
-    "set_alias",
+    "set_aliases",
     "set_view",
     "thread",
     "weave_client_context",

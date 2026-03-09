@@ -681,9 +681,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             "/obj/tags/remove", req, tsi.ObjRemoveTagsReq, tsi.ObjRemoveTagsRes
         )
 
-    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         return self._generic_request(
-            "/obj/alias/set", req, tsi.ObjSetAliasReq, tsi.ObjSetAliasRes
+            "/obj/alias/set", req, tsi.ObjSetAliasesReq, tsi.ObjSetAliasesRes
         )
 
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
