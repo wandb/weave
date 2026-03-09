@@ -1,1 +1,1 @@
-from .content import Content as Content
+from weave.type_wrappers.Content.content import Content as Content
