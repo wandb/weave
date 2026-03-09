@@ -8,6 +8,7 @@ from functools import wraps
 from typing import Any, TypeVar
 
 import weave
+from weave.integrations.autogen.config import get_module_patch_configs
 from weave.integrations.patcher import (
     MultiPatcher,
     NoOpPatcher,
@@ -17,8 +18,6 @@ from weave.integrations.patcher import (
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
 from weave.trace.op_protocol import Op, OpKind, ProcessedInputs
-
-from .config import get_module_patch_configs
 
 logger = logging.getLogger(__name__)
 
