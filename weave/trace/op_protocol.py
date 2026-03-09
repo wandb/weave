@@ -114,6 +114,12 @@ class Op(Protocol[P, R]):
     # for very long running ops that require in-progress tracking.
     eager_call_start: bool
 
+    # Whether to create a trace span when argument binding fails (e.g. wrong kwargs).
+    # When True, a span is created with the raw inputs and an `input_binding_error`
+    # marker in the weave attributes, so failed call attempts are visible in traces.
+    # Useful for tool-calling ops where LLMs may pass incorrect parameters.
+    trace_on_input_error: bool
+
 
 @dataclass
 class ProcessedInputs:
