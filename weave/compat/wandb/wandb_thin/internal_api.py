@@ -37,6 +37,7 @@ class Api:
             headers=headers,
             cookies=cookies,
             auth=auth,
+            verify=env.ssl_verify(),
         )
         # Warning: we do not use the recommended context manager pattern, because we're
         # using connector_owner to tell the session not to close our connection pool.
@@ -223,7 +224,7 @@ class ApiAsync:
     def __init__(self) -> None:
         import aiohttp
 
-        self.connector = aiohttp.TCPConnector(limit=50)
+        self.connector = aiohttp.TCPConnector(limit=50, ssl=env.ssl_verify())
 
     async def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
         import aiohttp

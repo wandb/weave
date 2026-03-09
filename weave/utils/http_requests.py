@@ -177,12 +177,21 @@ def _get_http_timeout() -> float:
     return http_timeout()
 
 
+def _get_ssl_verify() -> bool:
+    """Get SSL verification setting."""
+    # Import here to avoid circular imports
+    from weave.trace.env import ssl_verify
+
+    return ssl_verify()
+
+
 client = httpx.Client(
     # Use HTTPX's default transport so env proxy handling (including NO_PROXY)
     # works natively.
     event_hooks={"request": [_log_request], "response": [_log_response]},
     timeout=_get_http_timeout(),
     limits=CLIENT_LIMITS,
+    verify=_get_ssl_verify(),
 )
 
 
