@@ -335,6 +335,7 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
         self._internal_project_id: str | None = None
+        self._ext_to_int_project_map: dict[str, str] = {}
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
@@ -1960,13 +1961,16 @@ class WeaveClient:
         For local servers (SQLite), the external ID is the internal ID.
         Returns None if resolution fails (fallback to external refs).
         """
+        ext_id = self._project_id()
         if hasattr(self.server, "projects_info"):
             try:
                 results = self.server.projects_info(
-                    ProjectsInfoReq(project_ids=[self._project_id()])
+                    ProjectsInfoReq(project_ids=[ext_id])
                 )
                 if results:
-                    return results[0].internal_project_id
+                    internal_id = results[0].internal_project_id
+                    self._ext_to_int_project_map[ext_id] = internal_id
+                    return internal_id
             except Exception:
                 logger.debug(
                     "Failed to resolve internal project ID, falling back to external refs",
@@ -1974,7 +1978,25 @@ class WeaveClient:
                 )
             return None
         # For SQLite and other local servers, use the external project ID
-        return self._project_id()
+        self._ext_to_int_project_map[ext_id] = ext_id
+        return ext_id
+
+    def _resolve_ext_to_int_project_id(self, ext_project_id: str) -> str | None:
+        """Resolve an external project ID to internal, with caching."""
+        if ext_project_id in self._ext_to_int_project_map:
+            return self._ext_to_int_project_map[ext_project_id]
+        if hasattr(self.server, "projects_info"):
+            try:
+                results = self.server.projects_info(
+                    ProjectsInfoReq(project_ids=[ext_project_id])
+                )
+                if results:
+                    internal_id = results[0].internal_project_id
+                    self._ext_to_int_project_map[ext_project_id] = internal_id
+                    return internal_id
+            except Exception:
+                pass
+        return None
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:

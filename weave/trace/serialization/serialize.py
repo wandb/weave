@@ -34,15 +34,26 @@ _WEAVE_INTERNAL_REF_PREFIX = f"{WEAVE_INTERNAL_SCHEME}:///"
 
 
 def _convert_ext_ref_string(
-    ref_str: str, project_id: str, internal_project_id: str
+    ref_str: str,
+    project_id: str,
+    internal_project_id: str,
+    client: WeaveClient | None = None,
 ) -> str:
-    """Convert an external ref URI string to internal format if it belongs to the current project."""
+    """Convert an external ref URI string to internal format.
+
+    Same-project refs use the pre-resolved internal_project_id.
+    Cross-project refs are resolved lazily via client._resolve_ext_to_int_project_id.
+    """
     rest = ref_str[len(_WEAVE_REF_PREFIX) :]
     parts = rest.split("/", 2)
     if len(parts) == 3:
         entity_project = f"{parts[0]}/{parts[1]}"
         if entity_project == project_id:
             return f"{_WEAVE_INTERNAL_REF_PREFIX}{internal_project_id}/{parts[2]}"
+        if client is not None:
+            resolved = client._resolve_ext_to_int_project_id(entity_project)
+            if resolved is not None:
+                return f"{_WEAVE_INTERNAL_REF_PREFIX}{resolved}/{parts[2]}"
     return ref_str
 
 
@@ -117,7 +128,7 @@ def to_json(
             and internal_project_id is not None
             and obj.startswith(_WEAVE_REF_PREFIX)
         ):
-            return _convert_ext_ref_string(obj, project_id, internal_project_id)
+            return _convert_ext_ref_string(obj, project_id, internal_project_id, client)
         return obj
 
     # Add explicit handling for WeaveScorerResult models
@@ -148,6 +159,12 @@ def to_json(
             }
         return fallback_encode(obj)
     result = _build_result_from_encoded(encoded, project_id, client)
+    if internal_project_id is not None:
+        load_op = result.get("load_op")
+        if isinstance(load_op, str) and load_op.startswith(_WEAVE_REF_PREFIX):
+            result["load_op"] = _convert_ext_ref_string(
+                load_op, project_id, internal_project_id, client
+            )
     return result
 
 
