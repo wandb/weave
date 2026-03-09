@@ -334,7 +334,6 @@ class WeaveClient:
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
-        self._internal_project_id: str | None = None
         self._ext_to_int_project_map: dict[str, str] = {}
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
@@ -363,9 +362,9 @@ class WeaveClient:
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
-        # Resolve internal project ID after all attributes are initialized,
+        # Pre-cache internal project ID after all attributes are initialized,
         # since the server call may trigger auto-flush in test environments.
-        self._internal_project_id = self._resolve_internal_project_id()
+        self._resolve_ext_to_int_project_id(self._project_id())
 
     ################ High Level Convenience Methods ################
 
@@ -1713,34 +1712,47 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
-        # Serialize and compute digest client-side for immediate ref construction
+        internal_project_id = self._internal_project_id
         json_val = to_json(
             val,
             self._project_id(),
             self,
-            internal_project_id=self._internal_project_id,
+            internal_project_id=internal_project_id,
         )
-        digest = compute_object_digest(json_val)
+
+        if internal_project_id is not None:
+            # Fast path: compute digest client-side, fire-and-forget
+            digest = compute_object_digest(json_val)
+
+            def send_obj_create() -> ObjCreateRes:
+                req = ObjCreateReq(
+                    obj=ObjSchemaForInsert(
+                        project_id=self.entity + "/" + self.project,
+                        object_id=name,
+                        val=json_val,
+                        expected_digest=digest,
+                    )
+                )
+                return self.server.obj_create(req)
+
+            self.future_executor.defer(send_obj_create)
+        else:
+            # Fallback: wait for server to compute digest
+            req = ObjCreateReq(
+                obj=ObjSchemaForInsert(
+                    project_id=self.entity + "/" + self.project,
+                    object_id=name,
+                    val=json_val,
+                )
+            )
+            response = self.server.obj_create(req)
+            digest = response.digest
 
         ref: Ref
         if is_op(orig_val):
             ref = OpRef(self.entity, self.project, name, digest)
         else:
             ref = ObjectRef(self.entity, self.project, name, digest)
-
-        # Fire-and-forget: send to server with expected_digest for validation
-        def send_obj_create() -> ObjCreateRes:
-            req = ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
-                    expected_digest=digest,
-                )
-            )
-            return self.server.obj_create(req)
-
-        self.future_executor.defer(send_obj_create)
 
         # Attach the ref to the object
         try:
@@ -1805,10 +1817,11 @@ class WeaveClient:
         table_ref = TableRef(self.entity, self.project, table_digest, row_digests)
 
         # Fire-and-forget: send to server
+        can_validate = self._internal_project_id is not None
         if not chunking_config.use_chunking:
             self.future_executor.defer(
                 lambda: self._send_table_create(
-                    json_rows, expected_digest=table_digest
+                    json_rows, expected_digest=table_digest if can_validate else None
                 )
             )
         elif chunking_config.use_parallel_chunks:
@@ -1954,35 +1967,18 @@ class WeaveClient:
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
 
-    def _resolve_internal_project_id(self) -> str | None:
-        """Resolve the internal project ID for constructing internal refs.
+    @property
+    def _internal_project_id(self) -> str | None:
+        """The internal project ID for the current project, resolved lazily."""
+        return self._resolve_ext_to_int_project_id(self._project_id())
+
+    def _resolve_ext_to_int_project_id(self, ext_project_id: str) -> str | None:
+        """Resolve an external project ID to internal, with caching.
 
         For remote servers, calls the projects_info endpoint.
         For local servers (SQLite), the external ID is the internal ID.
         Returns None if resolution fails (fallback to external refs).
         """
-        ext_id = self._project_id()
-        if hasattr(self.server, "projects_info"):
-            try:
-                results = self.server.projects_info(
-                    ProjectsInfoReq(project_ids=[ext_id])
-                )
-                if results:
-                    internal_id = results[0].internal_project_id
-                    self._ext_to_int_project_map[ext_id] = internal_id
-                    return internal_id
-            except Exception:
-                logger.debug(
-                    "Failed to resolve internal project ID, falling back to external refs",
-                    exc_info=True,
-                )
-            return None
-        # For SQLite and other local servers, use the external project ID
-        self._ext_to_int_project_map[ext_id] = ext_id
-        return ext_id
-
-    def _resolve_ext_to_int_project_id(self, ext_project_id: str) -> str | None:
-        """Resolve an external project ID to internal, with caching."""
         if ext_project_id in self._ext_to_int_project_map:
             return self._ext_to_int_project_map[ext_project_id]
         if hasattr(self.server, "projects_info"):
@@ -1995,8 +1991,15 @@ class WeaveClient:
                     self._ext_to_int_project_map[ext_project_id] = internal_id
                     return internal_id
             except Exception:
-                pass
-        return None
+                logger.debug(
+                    "Failed to resolve internal project ID for %s",
+                    ext_project_id,
+                    exc_info=True,
+                )
+            return None
+        # No adapter (e.g. direct SQLite) — external ID is internal ID
+        self._ext_to_int_project_map[ext_project_id] = ext_project_id
+        return ext_project_id
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
