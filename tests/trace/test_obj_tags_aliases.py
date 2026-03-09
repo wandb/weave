@@ -1927,3 +1927,296 @@ def test_get_by_alias_string(client: WeaveClient):
 
     obj = weave.get("get_alias_obj:pinned")
     assert obj["v"] == 0
+
+
+def test_resolve_nonexistent_alias_raises(client: WeaveClient):
+    """weave.ref('name:nonexistent').get() should raise NotFoundError."""
+    weave.publish({"v": 0}, name="resolve_noexist_alias")
+
+    with pytest.raises(NotFoundError):
+        weave.ref("resolve_noexist_alias:nonexistent").get()
+
+
+def test_resolve_alias_returns_correct_ref_digest(client: WeaveClient):
+    """The ref returned from .get() should have the real content digest, not the alias."""
+    ref_v0 = weave.publish({"v": 0}, name="resolve_digest_check")
+    client.set_alias(ref_v0, "check-me")
+
+    obj = weave.ref("resolve_digest_check:check-me").get()
+    resolved_ref = obj.ref
+    assert resolved_ref.digest == ref_v0.digest
+    assert resolved_ref.digest != "check-me"
+
+
+def test_resolve_multiple_aliases_same_version(client: WeaveClient):
+    """Multiple aliases on the same version should all resolve to it."""
+    ref = weave.publish({"v": 0}, name="resolve_multi_alias")
+    client.set_alias(ref, ["alpha", "beta", "gamma"])
+
+    for alias in ["alpha", "beta", "gamma"]:
+        obj = weave.ref(f"resolve_multi_alias:{alias}").get()
+        assert obj["v"] == 0
+
+
+# --- Tags lifecycle and persistence ---
+
+
+def test_tags_survive_ref_get_roundtrip(client: WeaveClient):
+    """Tags should be queryable after resolving via weave.ref().get()."""
+    ref = weave.publish({"data": "tagged"}, name="tags_roundtrip_obj")
+    weave.add_tags(ref, ["important", "reviewed"])
+
+    # Get the object via ref, then check tags on the original ref
+    weave.ref("tags_roundtrip_obj:latest").get()
+    assert weave.get_tags(ref) == ["important", "reviewed"]
+
+
+def test_tags_independent_across_objects(client: WeaveClient):
+    """Tags on one object should not affect another object."""
+    ref_a = weave.publish({"obj": "a"}, name="tags_indep_a")
+    ref_b = weave.publish({"obj": "b"}, name="tags_indep_b")
+
+    weave.add_tags(ref_a, ["only-on-a"])
+
+    assert weave.get_tags(ref_a) == ["only-on-a"]
+    assert weave.get_tags(ref_b) == []
+
+
+def test_tags_on_multiple_versions(client: WeaveClient):
+    """Each version can have its own independent tags."""
+    ref_v0 = weave.publish({"v": 0}, name="tags_multi_ver")
+    ref_v1 = weave.publish({"v": 1}, name="tags_multi_ver")
+    ref_v2 = weave.publish({"v": 2}, name="tags_multi_ver")
+
+    weave.add_tags(ref_v0, ["old"])
+    weave.add_tags(ref_v1, ["stable", "reviewed"])
+    # v2 has no tags
+
+    assert weave.get_tags(ref_v0) == ["old"]
+    assert weave.get_tags(ref_v1) == ["reviewed", "stable"]
+    assert weave.get_tags(ref_v2) == []
+
+
+def test_tags_bulk_add_and_remove(client: WeaveClient):
+    """Adding and removing multiple tags in one call should work."""
+    ref = weave.publish({"data": "test"}, name="tags_bulk_obj")
+
+    weave.add_tags(ref, ["a", "b", "c", "d", "e"])
+    assert weave.get_tags(ref) == ["a", "b", "c", "d", "e"]
+
+    weave.remove_tags(ref, ["b", "d"])
+    assert weave.get_tags(ref) == ["a", "c", "e"]
+
+
+def test_tags_add_empty_list(client: WeaveClient):
+    """Adding an empty tag list should be a no-op."""
+    ref = weave.publish({"data": "test"}, name="tags_empty_add")
+
+    weave.add_tags(ref, [])
+    assert weave.get_tags(ref) == []
+
+
+def test_tags_remove_empty_list(client: WeaveClient):
+    """Removing an empty tag list should be a no-op."""
+    ref = weave.publish({"data": "test"}, name="tags_empty_rm")
+    weave.add_tags(ref, ["keep"])
+
+    weave.remove_tags(ref, [])
+    assert weave.get_tags(ref) == ["keep"]
+
+
+def test_tags_returned_sorted(client: WeaveClient):
+    """get_tags should return tags in sorted order."""
+    ref = weave.publish({"data": "test"}, name="tags_sorted_obj")
+
+    weave.add_tags(ref, ["zulu", "alpha", "mike"])
+    tags = weave.get_tags(ref)
+    assert tags == sorted(tags)
+
+
+def test_tags_with_publish_then_add_more(client: WeaveClient):
+    """Tags from publish() and add_tags() should combine."""
+    ref = weave.publish(
+        {"data": "test"}, name="tags_combine_obj", tags=["from-publish"]
+    )
+    weave.add_tags(ref, ["from-add"])
+
+    tags = weave.get_tags(ref)
+    assert "from-publish" in tags
+    assert "from-add" in tags
+
+
+def test_list_tags_across_objects(client: WeaveClient):
+    """list_tags should return tags from all objects in the project."""
+    ref_a = weave.publish({"obj": "a"}, name="list_tags_cross_a")
+    ref_b = weave.publish({"obj": "b"}, name="list_tags_cross_b")
+
+    weave.add_tags(ref_a, ["tag-on-a"])
+    weave.add_tags(ref_b, ["tag-on-b"])
+
+    all_tags = weave.list_tags()
+    assert "tag-on-a" in all_tags
+    assert "tag-on-b" in all_tags
+
+
+def test_list_tags_deduplicates(client: WeaveClient):
+    """list_tags should return each tag only once even if on multiple objects."""
+    ref_a = weave.publish({"obj": "a"}, name="list_tags_dedup_a")
+    ref_b = weave.publish({"obj": "b"}, name="list_tags_dedup_b")
+
+    weave.add_tags(ref_a, ["shared-tag"])
+    weave.add_tags(ref_b, ["shared-tag"])
+
+    all_tags = weave.list_tags()
+    assert all_tags.count("shared-tag") == 1
+
+
+# --- Aliases complete lifecycle ---
+
+
+def test_aliases_on_multiple_versions(client: WeaveClient):
+    """Different versions of the same object can have different aliases."""
+    ref_v0 = weave.publish({"v": 0}, name="alias_multi_ver")
+    ref_v1 = weave.publish({"v": 1}, name="alias_multi_ver")
+
+    weave.set_alias(ref_v0, "old-stable")
+    weave.set_alias(ref_v1, "current")
+
+    assert "old-stable" in weave.get_aliases(ref_v0)
+    assert "current" not in weave.get_aliases(ref_v0)
+    assert "current" in weave.get_aliases(ref_v1)
+    assert "old-stable" not in weave.get_aliases(ref_v1)
+
+
+def test_aliases_independent_across_objects(client: WeaveClient):
+    """Same alias name on different objects should be independent."""
+    ref_a = weave.publish({"obj": "a"}, name="alias_indep_a")
+    ref_b = weave.publish({"obj": "b"}, name="alias_indep_b")
+
+    weave.set_alias(ref_a, "prod")
+    weave.set_alias(ref_b, "prod")
+
+    # Both should have "prod"
+    assert "prod" in weave.get_aliases(ref_a)
+    assert "prod" in weave.get_aliases(ref_b)
+
+    # Removing from one shouldn't affect the other
+    weave.remove_alias(ref_a, "prod")
+    assert "prod" not in weave.get_aliases(ref_a)
+    assert "prod" in weave.get_aliases(ref_b)
+
+
+def test_alias_latest_is_virtual(client: WeaveClient):
+    """'latest' alias should appear on the newest version."""
+    ref_v0 = weave.publish({"v": 0}, name="alias_latest_virtual")
+    assert "latest" in weave.get_aliases(ref_v0)
+
+    ref_v1 = weave.publish({"v": 1}, name="alias_latest_virtual")
+    assert "latest" in weave.get_aliases(ref_v1)
+
+
+def test_list_aliases_across_objects(client: WeaveClient):
+    """list_aliases should return aliases from all objects in the project."""
+    ref_a = weave.publish({"obj": "a"}, name="list_alias_cross_a")
+    ref_b = weave.publish({"obj": "b"}, name="list_alias_cross_b")
+
+    weave.set_alias(ref_a, "alias-on-a")
+    weave.set_alias(ref_b, "alias-on-b")
+
+    all_aliases = weave.list_aliases()
+    assert "alias-on-a" in all_aliases
+    assert "alias-on-b" in all_aliases
+
+
+def test_list_aliases_deduplicates(client: WeaveClient):
+    """list_aliases returns distinct aliases even if the same name is used across objects."""
+    ref_a = weave.publish({"obj": "a"}, name="list_alias_dedup_a")
+    ref_b = weave.publish({"obj": "b"}, name="list_alias_dedup_b")
+
+    weave.set_alias(ref_a, "shared-alias")
+    weave.set_alias(ref_b, "shared-alias")
+
+    all_aliases = weave.list_aliases()
+    assert "shared-alias" in all_aliases
+    assert all_aliases.count("shared-alias") == 1  # distinct
+
+
+def test_remove_alias_then_resolve_raises(client: WeaveClient):
+    """After removing an alias, resolving it should fail."""
+    ref = weave.publish({"data": "test"}, name="rm_alias_resolve")
+    client.set_alias(ref, "temporary")
+
+    # Resolves before removal
+    assert weave.ref("rm_alias_resolve:temporary").get()["data"] == "test"
+
+    # Remove and verify it no longer resolves
+    client.remove_alias(ref, "temporary")
+    with pytest.raises(NotFoundError):
+        weave.ref("rm_alias_resolve:temporary").get()
+
+
+# --- Combined tags + aliases end-to-end ---
+
+
+def test_tags_and_aliases_full_lifecycle(client: WeaveClient):
+    """Full lifecycle: publish, tag, alias, resolve, reassign, remove."""
+    # Publish two versions
+    ref_v0 = weave.publish({"v": 0}, name="full_lifecycle_obj")
+    ref_v1 = weave.publish({"v": 1}, name="full_lifecycle_obj")
+
+    # Tag both
+    weave.add_tags(ref_v0, ["deprecated"])
+    weave.add_tags(ref_v1, ["stable", "reviewed"])
+
+    # Alias v1 as production
+    weave.set_alias(ref_v1, "production")
+
+    # Resolve alias
+    obj = weave.ref("full_lifecycle_obj:production").get()
+    assert obj["v"] == 1
+
+    # Check tags/aliases
+    assert weave.get_tags(ref_v0) == ["deprecated"]
+    assert weave.get_tags(ref_v1) == ["reviewed", "stable"]
+    assert "production" in weave.get_aliases(ref_v1)
+
+    # Reassign alias to v0
+    weave.set_alias(ref_v0, "production")
+    obj = weave.ref("full_lifecycle_obj:production").get()
+    assert obj["v"] == 0
+    assert "production" not in weave.get_aliases(ref_v1)
+
+    # Remove tags
+    weave.remove_tags(ref_v0, ["deprecated"])
+    assert weave.get_tags(ref_v0) == []
+
+    # Remove alias
+    weave.remove_alias(ref_v0, "production")
+    with pytest.raises(NotFoundError):
+        weave.ref("full_lifecycle_obj:production").get()
+
+    # list_tags/list_aliases reflect current state
+    all_tags = weave.list_tags()
+    assert "deprecated" not in all_tags
+    assert "stable" in all_tags
+    assert "reviewed" in all_tags
+
+
+def test_publish_with_tags_and_aliases_then_resolve(client: WeaveClient):
+    """Tags and aliases set at publish time should work with ref resolution."""
+    weave.publish({"v": 0}, name="pub_resolve_obj")
+    weave.publish(
+        {"v": 1},
+        name="pub_resolve_obj",
+        tags=["release-candidate"],
+        aliases=["rc"],
+    )
+    weave.publish({"v": 2}, name="pub_resolve_obj")
+
+    # Resolve the alias set at publish time
+    obj = weave.ref("pub_resolve_obj:rc").get()
+    assert obj["v"] == 1
+
+    # Latest should be v2
+    obj_latest = weave.ref("pub_resolve_obj:latest").get()
+    assert obj_latest["v"] == 2
