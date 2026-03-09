@@ -69,9 +69,7 @@ def process_otel_spans_to_calls(
 
 
 def resolve_and_prepare_new_otel_ops(
-    calls: list[
-        tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
-    ],
+    calls: list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]],
     project_id: str,
     wb_user_id: str | None,
     existing_ops: dict[str, str],
@@ -129,9 +127,7 @@ def resolve_and_prepare_new_otel_ops(
 
 def apply_created_ops_to_calls(
     obj_id_idx_map: dict[str, list[int]],
-    calls: list[
-        tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
-    ],
+    calls: list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]],
     create_results: list[tsi.ObjCreateRes],
     project_id: str,
 ) -> list[tuple[str, str]]:

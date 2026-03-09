@@ -497,9 +497,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         res = self.obj_create_batch(obj_creation_batch)
 
-        new_ops = apply_created_ops_to_calls(
-            obj_id_idx_map, calls, res, req.project_id
-        )
+        new_ops = apply_created_ops_to_calls(obj_id_idx_map, calls, res, req.project_id)
         for op_name, op_ref_uri in new_ops:
             self._cache_op_ref(req.project_id, op_name, op_ref_uri)
 
