@@ -45,34 +45,31 @@ def test_wf_scoring_worker_check_cancellation():
 
 
 @pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_debounced_scoring_max_sampling_rate():
+def test_wf_scoring_worker_debounced_scoring_max_sampling_rate(monkeypatch):
     """Max sampling rate defaults to 0.0, parses floats, clamps to [0, 1], invalid -> 0.0."""
     key = "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_SAMPLING_RATE"
-    try:
-        if key in os.environ:
-            del os.environ[key]
-        assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
+    monkeypatch.delenv(key, raising=False)
 
-        os.environ[key] = "0"
-        assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
-        os.environ[key] = "0.5"
-        assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.5
-        os.environ[key] = "1"
-        assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 1.0
-        os.environ[key] = "1.0"
-        assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 1.0
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
 
-        os.environ[key] = "-0.1"
-        assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
-        os.environ[key] = "1.5"
-        assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 1.0
+    monkeypatch.setenv(key, "0")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
+    monkeypatch.setenv(key, "0.5")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.5
+    monkeypatch.setenv(key, "1")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 1.0
+    monkeypatch.setenv(key, "1.0")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 1.0
 
-        os.environ[key] = "invalid"
-        assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
-        os.environ[key] = ""
-        assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
-    finally:
-        os.environ.pop(key, None)
+    monkeypatch.setenv(key, "-0.1")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
+    monkeypatch.setenv(key, "1.5")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 1.0
+
+    monkeypatch.setenv(key, "invalid")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
+    monkeypatch.setenv(key, "")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
 
 
 @pytest.mark.disable_logging_error_check
