@@ -2435,3 +2435,268 @@ def test_alias_resolution_scoped_to_project(client: WeaveClient):
                 digest="prod",
             )
         )
+
+
+# --- Cascade cleanup on object deletion ---
+
+
+def test_tags_cleaned_up_on_delete_specific_version(client: WeaveClient):
+    """Deleting a specific version removes its tags."""
+    object_id, digest = _publish_obj(client, "tag_del_ver")
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            tags=["reviewed", "staging"],
+        )
+    )
+
+    # Verify tags exist
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert set(res.objs[0].tags) == {"reviewed", "staging"}
+
+    # Delete the version
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digests=[digest],
+        )
+    )
+
+    # Tags should be gone from list_tags (no orphans)
+    tags_res = client.server.tags_list(
+        tsi.TagsListReq(project_id=client._project_id())
+    )
+    assert "reviewed" not in tags_res.tags
+    assert "staging" not in tags_res.tags
+
+
+def test_aliases_cleaned_up_on_delete_specific_version(client: WeaveClient):
+    """Deleting a specific version removes its aliases."""
+    object_id, digest = _publish_obj(client, "alias_del_ver")
+
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest,
+            aliases=["production"],
+        )
+    )
+
+    # Verify alias exists
+    aliases_res = client.server.aliases_list(
+        tsi.AliasesListReq(project_id=client._project_id())
+    )
+    assert "production" in aliases_res.aliases
+
+    # Delete the version
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digests=[digest],
+        )
+    )
+
+    # Alias should be gone from list_aliases
+    aliases_res = client.server.aliases_list(
+        tsi.AliasesListReq(project_id=client._project_id())
+    )
+    assert "production" not in aliases_res.aliases
+
+    # Alias resolution should fail
+    with pytest.raises(NotFoundError):
+        client.server.obj_read(
+            tsi.ObjReadReq(
+                project_id=client._project_id(),
+                object_id=object_id,
+                digest="production",
+            )
+        )
+
+
+def test_tags_cleaned_up_on_delete_all_versions(client: WeaveClient):
+    """Deleting all versions removes all tags."""
+    # Publish two versions
+    object_id, digest0 = _publish_obj(client, "tag_del_all")
+    _, digest1 = _publish_obj(client, "tag_del_all", val={"data": "v2"})
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest0,
+            tags=["v0-tag"],
+        )
+    )
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest1,
+            tags=["v1-tag"],
+        )
+    )
+
+    # Delete all versions (no digests specified)
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+        )
+    )
+
+    # Both tags should be gone
+    tags_res = client.server.tags_list(
+        tsi.TagsListReq(project_id=client._project_id())
+    )
+    assert "v0-tag" not in tags_res.tags
+    assert "v1-tag" not in tags_res.tags
+
+
+def test_aliases_cleaned_up_on_delete_all_versions(client: WeaveClient):
+    """Deleting all versions removes all aliases."""
+    object_id, digest0 = _publish_obj(client, "alias_del_all")
+    _, digest1 = _publish_obj(client, "alias_del_all", val={"data": "v2"})
+
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest0,
+            aliases=["v0-alias"],
+        )
+    )
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest1,
+            aliases=["v1-alias"],
+        )
+    )
+
+    # Delete all versions
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+        )
+    )
+
+    # Both aliases should be gone
+    aliases_res = client.server.aliases_list(
+        tsi.AliasesListReq(project_id=client._project_id())
+    )
+    assert "v0-alias" not in aliases_res.aliases
+    assert "v1-alias" not in aliases_res.aliases
+
+
+def test_tags_survive_on_undeleted_version(client: WeaveClient):
+    """Deleting v0 should not affect tags on v1."""
+    object_id, digest0 = _publish_obj(client, "tag_survive")
+    _, digest1 = _publish_obj(client, "tag_survive", val={"data": "v2"})
+
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest0,
+            tags=["doomed"],
+        )
+    )
+    client.server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest1,
+            tags=["survivor"],
+        )
+    )
+
+    # Delete only v0
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digests=[digest0],
+        )
+    )
+
+    # v1's tag should survive
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert len(res.objs) == 1
+    assert res.objs[0].tags == ["survivor"]
+
+    # v0's tag should be gone
+    tags_res = client.server.tags_list(
+        tsi.TagsListReq(project_id=client._project_id())
+    )
+    assert "doomed" not in tags_res.tags
+    assert "survivor" in tags_res.tags
+
+
+def test_aliases_survive_on_undeleted_version(client: WeaveClient):
+    """Deleting v0 should not affect aliases on v1."""
+    object_id, digest0 = _publish_obj(client, "alias_survive")
+    _, digest1 = _publish_obj(client, "alias_survive", val={"data": "v2"})
+
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest0,
+            aliases=["doomed-alias"],
+        )
+    )
+    client.server.obj_set_aliases(
+        tsi.ObjSetAliasesReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digest=digest1,
+            aliases=["survivor-alias"],
+        )
+    )
+
+    # Delete only v0
+    client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client._project_id(),
+            object_id=object_id,
+            digests=[digest0],
+        )
+    )
+
+    # v1's alias should survive
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
+            include_tags_and_aliases=True,
+        )
+    )
+    assert len(res.objs) == 1
+    assert "survivor-alias" in res.objs[0].aliases
+
+    # v0's alias should be gone
+    aliases_res = client.server.aliases_list(
+        tsi.AliasesListReq(project_id=client._project_id())
+    )
+    assert "doomed-alias" not in aliases_res.aliases
+    assert "survivor-alias" in aliases_res.aliases

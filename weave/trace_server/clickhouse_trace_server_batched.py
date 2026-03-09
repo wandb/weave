@@ -1846,6 +1846,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert("object_versions", data=data, column_names=column_names)
         num_deleted = len(delete_insertables)
 
+        # Cascade: soft-delete tags and aliases for deleted digests
+        deleted_digests = {obj.digest for obj in delete_insertables}
+        tags_map = self._get_tags_for_objects(req.project_id, [req.object_id])
+        for (obj_id, digest), tags in tags_map.items():
+            if digest in deleted_digests:
+                self._insert_tags(
+                    req.project_id,
+                    obj_id,
+                    digest,
+                    tags,
+                    deleted_at=now,
+                )
+
+        aliases_map = self._get_aliases_for_objects(req.project_id, [req.object_id])
+        for (obj_id, digest), aliases in aliases_map.items():
+            if digest in deleted_digests:
+                self._insert_aliases(
+                    req.project_id,
+                    obj_id,
+                    aliases,
+                    digest,
+                    deleted_at=now,
+                )
+
         return tsi.ObjDeleteRes(num_deleted=num_deleted)
 
     # --- Tags & Aliases ---

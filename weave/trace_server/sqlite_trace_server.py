@@ -1183,6 +1183,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
             cursor.execute(delete_query, delete_parameters)
+            # Cascade: clean up tags and aliases for deleted digests
+            digest_placeholders = ",".join("?" * len(found_digests))
+            cursor.execute(
+                f"DELETE FROM tags WHERE project_id = ? AND object_id = ? AND digest IN ({digest_placeholders})",
+                [req.project_id, req.object_id] + list(found_digests),
+            )
+            cursor.execute(
+                f"DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND digest IN ({digest_placeholders})",
+                [req.project_id, req.object_id] + list(found_digests),
+            )
             conn.commit()
 
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
