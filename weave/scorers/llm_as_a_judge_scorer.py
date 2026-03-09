@@ -40,15 +40,6 @@ class LLMAsAJudgeScorer(Scorer):
             "media_scoring_json_paths", "audio_input_scoring_json_paths"
         ),
     )
-    # Optionally inject extra fields in score_args
-    inject_exception: bool = Field(
-        default=False,
-        description="Whether `call.exception` should be automatically added to `score_args`.",
-    )
-    inject_source_code_on_exception: bool = Field(
-        default=False,
-        description="Whether the source code for the op should be automatically added to `score_args` (when `call.exception` is set).",
-    )
 
     @field_validator("scoring_prompt", mode="before")
     @classmethod
@@ -75,8 +66,3 @@ class LLMAsAJudgeScorer(Scorer):
             scoring_prompt = self.scoring_prompt.format(output=output, **kwargs)
             model_input = [{"role": "user", "content": scoring_prompt}]
         return self.model.predict(model_input)
-
-
-@register_object
-class ClassifierScorer(LLMAsAJudgeScorer):
-    """A classifier LLM scorer that tags calls (displayed as pills in the UI)."""

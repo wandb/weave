@@ -65,22 +65,6 @@ class Monitor(Object):
     scorers: list[Scorer]
     op_names: list[str] = Field(default_factory=list)
     query: Query | None = None
-    merge_scorers: bool = Field(
-        default=False,
-        description="If True, scorers are merged and treated as a single scorer.",
-    )
-    merged_scorers_prompt_header: str | None = Field(
-        default=None,
-        description="Text prepended before the merged classifier prompts.",
-    )
-    merged_scorers_prompt_footer: str | None = Field(
-        default=None,
-        description="Text appended after the merged classifier prompts.",
-    )
-    merged_scorers_prompt_section_header: str = Field(
-        default="{display_name}",
-        description="Text to prepend before each merged scorer prompt (use `{display_name}` to access the scorer's name).",
-    )
     is_traced: bool = Field(
         default=True,
         description="Trace this monitor's scorers and any downstream LLM calls.",
@@ -113,3 +97,21 @@ class Monitor(Object):
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
         return cls.model_validate(obj.unwrap())
+
+
+@register_object
+class ClassifierMonitor(Monitor):
+    """A monitor that merges multiple scorers into a single classifier.
+
+    Classifier monitors combine prompts from multiple LLMAsAJudgeScorers
+    targeting the same model into a single scoring call.
+    """
+
+    prompt_header: str | None = Field(
+        default=None,
+        description="Text prepended before the merged classifier prompts.",
+    )
+    prompt_footer: str | None = Field(
+        default=None,
+        description="Text appended after the merged classifier prompts.",
+    )
