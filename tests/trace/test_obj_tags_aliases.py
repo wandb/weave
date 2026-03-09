@@ -2220,3 +2220,218 @@ def test_publish_with_tags_and_aliases_then_resolve(client: WeaveClient):
     # Latest should be v2
     obj_latest = weave.ref("pub_resolve_obj:latest").get()
     assert obj_latest["v"] == 2
+
+
+# --- Cross-project isolation ---
+
+
+def _create_obj_in_project(server, project_id: str, name: str, val: dict | None = None):
+    """Create an object directly via the server in a specific project."""
+    res = server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=project_id,
+                object_id=name,
+                val=val or {"data": "test"},
+            )
+        )
+    )
+    return name, res.digest
+
+
+def test_tags_do_not_leak_across_projects(client: WeaveClient):
+    """Tags in project A should not be visible in project B."""
+    server = client.server
+    proj_a = "test-entity/proj-tags-a"
+    proj_b = "test-entity/proj-tags-b"
+
+    obj_name = "shared_obj_name"
+    _, digest_a = _create_obj_in_project(server, proj_a, obj_name)
+    _, digest_b = _create_obj_in_project(server, proj_b, obj_name)
+
+    # Tag object in project A
+    server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=proj_a,
+            object_id=obj_name,
+            digest=digest_a,
+            tags=["proj-a-only"],
+        )
+    )
+
+    # Query tags in project A — should have the tag
+    res_a = server.obj_read(
+        tsi.ObjReadReq(
+            project_id=proj_a,
+            object_id=obj_name,
+            digest=digest_a,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "proj-a-only" in (res_a.obj.tags or [])
+
+    # Query tags in project B — should NOT have the tag
+    res_b = server.obj_read(
+        tsi.ObjReadReq(
+            project_id=proj_b,
+            object_id=obj_name,
+            digest=digest_b,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert res_b.obj.tags is None or "proj-a-only" not in res_b.obj.tags
+
+
+def test_aliases_do_not_leak_across_projects(client: WeaveClient):
+    """Aliases in project A should not be visible in project B."""
+    server = client.server
+    proj_a = "test-entity/proj-alias-a"
+    proj_b = "test-entity/proj-alias-b"
+
+    obj_name = "shared_obj_name"
+    _, digest_a = _create_obj_in_project(server, proj_a, obj_name)
+    _, digest_b = _create_obj_in_project(server, proj_b, obj_name)
+
+    # Set alias in project A
+    server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=proj_a,
+            object_id=obj_name,
+            digest=digest_a,
+            alias="production",
+        )
+    )
+
+    # Query aliases in project A — should have the alias
+    res_a = server.obj_read(
+        tsi.ObjReadReq(
+            project_id=proj_a,
+            object_id=obj_name,
+            digest=digest_a,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "production" in (res_a.obj.aliases or [])
+
+    # Query aliases in project B — should NOT have the alias
+    res_b = server.obj_read(
+        tsi.ObjReadReq(
+            project_id=proj_b,
+            object_id=obj_name,
+            digest=digest_b,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert res_b.obj.aliases is None or "production" not in res_b.obj.aliases
+
+
+def test_list_tags_scoped_to_project(client: WeaveClient):
+    """list_tags should only return tags from the specified project."""
+    server = client.server
+    proj_a = "test-entity/proj-list-tags-a"
+    proj_b = "test-entity/proj-list-tags-b"
+
+    _, digest_a = _create_obj_in_project(server, proj_a, "obj_a")
+    _, digest_b = _create_obj_in_project(server, proj_b, "obj_b")
+
+    server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=proj_a,
+            object_id="obj_a",
+            digest=digest_a,
+            tags=["only-in-a"],
+        )
+    )
+    server.obj_add_tags(
+        tsi.ObjAddTagsReq(
+            project_id=proj_b,
+            object_id="obj_b",
+            digest=digest_b,
+            tags=["only-in-b"],
+        )
+    )
+
+    tags_a = server.tags_list(tsi.TagsListReq(project_id=proj_a))
+    tags_b = server.tags_list(tsi.TagsListReq(project_id=proj_b))
+
+    assert "only-in-a" in tags_a.tags
+    assert "only-in-b" not in tags_a.tags
+    assert "only-in-b" in tags_b.tags
+    assert "only-in-a" not in tags_b.tags
+
+
+def test_list_aliases_scoped_to_project(client: WeaveClient):
+    """list_aliases should only return aliases from the specified project."""
+    server = client.server
+    proj_a = "test-entity/proj-list-aliases-a"
+    proj_b = "test-entity/proj-list-aliases-b"
+
+    _, digest_a = _create_obj_in_project(server, proj_a, "obj_a")
+    _, digest_b = _create_obj_in_project(server, proj_b, "obj_b")
+
+    server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=proj_a,
+            object_id="obj_a",
+            digest=digest_a,
+            alias="alias-in-a",
+        )
+    )
+    server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=proj_b,
+            object_id="obj_b",
+            digest=digest_b,
+            alias="alias-in-b",
+        )
+    )
+
+    aliases_a = server.aliases_list(tsi.AliasesListReq(project_id=proj_a))
+    aliases_b = server.aliases_list(tsi.AliasesListReq(project_id=proj_b))
+
+    assert "alias-in-a" in aliases_a.aliases
+    assert "alias-in-b" not in aliases_a.aliases
+    assert "alias-in-b" in aliases_b.aliases
+    assert "alias-in-a" not in aliases_b.aliases
+
+
+def test_alias_resolution_scoped_to_project(client: WeaveClient):
+    """Resolving an alias should only find it within the correct project."""
+    server = client.server
+    proj_a = "test-entity/proj-resolve-a"
+    proj_b = "test-entity/proj-resolve-b"
+
+    obj_name = "shared_name"
+    _, digest_a = _create_obj_in_project(server, proj_a, obj_name, {"proj": "a"})
+    _create_obj_in_project(server, proj_b, obj_name, {"proj": "b"})
+
+    # Set alias only in project A
+    server.obj_set_alias(
+        tsi.ObjSetAliasReq(
+            project_id=proj_a,
+            object_id=obj_name,
+            digest=digest_a,
+            alias="prod",
+        )
+    )
+
+    # Resolve in project A — should succeed
+    res_a = server.obj_read(
+        tsi.ObjReadReq(
+            project_id=proj_a,
+            object_id=obj_name,
+            digest="prod",
+            include_tags_and_aliases=True,
+        )
+    )
+    assert res_a.obj.val == {"proj": "a"}
+
+    # Resolve in project B — should fail (alias doesn't exist there)
+    with pytest.raises(NotFoundError):
+        server.obj_read(
+            tsi.ObjReadReq(
+                project_id=proj_b,
+                object_id=obj_name,
+                digest="prod",
+            )
+        )
