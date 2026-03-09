@@ -14,7 +14,7 @@ from typing_extensions import Self
 
 from weave.integrations.openai_realtime.audio_buffer import AudioBufferManager
 from weave.integrations.openai_realtime.encoding import pcm_to_wav
-from weave.trace.context.call_context import set_thread_id
+from weave.trace.context.call_context import get_thread_id, set_thread_id
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 from weave.type_wrappers.Content import Content
@@ -672,8 +672,14 @@ class StateExporter(BaseModel):
                 inputs["metadata"]["metrics"] = input_metrics_array
 
         # Latency = TTFT: started_at=response.created, ended_at=first content
-        if conv_id:
-            with set_thread_id(conv_id):
+        # Use user-set thread_id if present, otherwise fall back to conv_id
+        user_thread_id = get_thread_id()
+        if user_thread_id is not None and user_thread_id != "":
+            thread_id = user_thread_id
+        else:
+            thread_id = conv_id
+        if thread_id is not None and conv_id != "":
+            with set_thread_id(thread_id):
                 call = client.create_call(
                     "realtime.response",
                     inputs=inputs,
