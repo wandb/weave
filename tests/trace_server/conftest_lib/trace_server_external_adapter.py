@@ -81,9 +81,11 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
         return self._user_map.int_to_ext(user_id, b64(user_id))
 
 
-class TestOnlyUserInjectingExternalTraceServer(
+class UserInjectingExternalTraceServer(
     external_to_internal_trace_server_adapter.ExternalTraceServer
 ):
+    # Tests-only adapter that injects a fixed user id into external-facing requests.
+
     def __init__(
         self,
         internal_trace_server: tsi.TraceServerInterface,
@@ -156,13 +158,29 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().score_delete(req)
 
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        req.wb_user_id = self._user_id
+        return super().obj_add_tags(req)
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        req.wb_user_id = self._user_id
+        return super().obj_remove_tags(req)
+
+    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+        req.wb_user_id = self._user_id
+        return super().obj_set_alias(req)
+
+    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+        req.wb_user_id = self._user_id
+        return super().obj_remove_alias(req)
+
 
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface,
     user_id: str = "test_user",
     id_converter: external_to_internal_trace_server_adapter.IdConverter | None = None,
-) -> TestOnlyUserInjectingExternalTraceServer:
-    return TestOnlyUserInjectingExternalTraceServer(
+) -> UserInjectingExternalTraceServer:
+    return UserInjectingExternalTraceServer(
         trace_server,
         id_converter or DummyIdConverter(),
         user_id,

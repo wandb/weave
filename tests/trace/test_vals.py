@@ -3,11 +3,11 @@ from unittest.mock import patch
 import pytest
 
 import weave
-from weave.trace.refs import ObjectRef
-from weave.trace_server.refs_internal import (
+from weave.shared.refs_internal import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
 )
+from weave.trace.refs import ObjectRef
 
 
 def test_dict_refs(client):

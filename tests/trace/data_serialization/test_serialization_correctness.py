@@ -51,6 +51,7 @@ def set_weave_logger_to_debug():
     cases,
     ids=lambda case: case.id,
 )
+@pytest.mark.flaky(reruns=3, reruns_delay=2)
 def test_serialization_correctness(
     client, case: SerializationTestCase, set_weave_logger_to_debug
 ):

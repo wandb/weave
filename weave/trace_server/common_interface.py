@@ -37,6 +37,7 @@ class AnnotationQueueItemsFilter(BaseModel):
     Supports equality filtering on call metadata fields and IN filtering on annotation state.
     """
 
+    id: str | None = Field(default=None, description="Filter by exact queue item ID")
     call_id: str | None = Field(default=None, description="Filter by exact call ID")
     call_op_name: str | None = Field(
         default=None, description="Filter by exact operation name"

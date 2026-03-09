@@ -80,6 +80,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
@@ -94,7 +96,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: trace-no-server
           name: trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
           fail_ci_if_error: false
@@ -186,6 +188,8 @@ jobs:
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
       - name: Install SQLite dev package
         run: sudo apt update && sudo apt install -y libsqlite3-dev
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
@@ -202,14 +206,14 @@ jobs:
           WB_SERVER_HOST: http://wandbservice
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          # Use dummy API keys when secrets aren't available (e.g., Dependabot PRs)
+          # Use format-valid dummy API keys when secrets aren't available (e.g., Dependabot PRs)
           # Tests use VCR recordings so real keys aren't needed
           WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'DUMMY_API_KEY' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
@@ -223,14 +227,14 @@ jobs:
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           DD_TRACE_ENABLED: false
-          OPENAI_API_KEY: dummyapikey
+          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: trace-tests
           name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
           fail_ci_if_error: false
@@ -283,7 +287,7 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: windows-trace-no-server
           name: windows-trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
           fail_ci_if_error: false
@@ -349,21 +353,21 @@ jobs:
           WB_SERVER_HOST: http://localhost
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          # Use dummy API keys when secrets aren't available (e.g., Dependabot PRs)
+          # Use format-valid dummy API keys when secrets aren't available (e.g., Dependabot PRs)
           # Tests use VCR recordings so real keys aren't needed
           WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'DUMMY_API_KEY' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "trace_server" --trace-server=sqlite
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./tests/coverage.xml
+          files: ./coverage.xml
           flags: windows-trace-tests
           name: windows-trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
           fail_ci_if_error: false

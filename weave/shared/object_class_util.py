@@ -2,12 +2,7 @@ from typing import Any, TypedDict
 
 from pydantic import BaseModel
 
-from weave.trace_server.client_server_common.pydantic_util import (
-    pydantic_asdict_one_level,
-)
-from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
-    BUILTIN_OBJECT_REGISTRY,
-)
+from weave.shared.pydantic_util import pydantic_asdict_one_level
 
 """
 There are two standard base object classes: BaseObject and Object
@@ -26,29 +21,39 @@ class GetObjectClassesResult(TypedDict):
 
 
 def get_object_classes(val: Any) -> GetObjectClassesResult | None:
-    if (
-        isinstance(val, dict)
-        and "_bases" in val
-        and isinstance(val["_bases"], list)
-        and len(val["_bases"]) >= 2
-        and val["_bases"][-1] == "BaseModel"
-        and val["_bases"][-2] in base_object_class_names
+    if not (
+        isinstance(val, dict) and "_bases" in val and isinstance(val["_bases"], list)
     ):
-        object_class = val["_class_name"]
-        base_object_class = object_class
-        if len(val["_bases"]) > 2:
-            base_object_class = val["_bases"][-3]
-        return GetObjectClassesResult(
-            object_class=object_class,
-            base_object_class=base_object_class,
-        )
-    return None
+        return None
+
+    bases = val["_bases"]
+    if len(bases) < 2:
+        return None
+    if bases[-1] != "BaseModel" or bases[-2] not in base_object_class_names:
+        return None
+
+    object_class = val["_class_name"]
+    base_object_class = object_class
+    if len(bases) > 2:
+        base_object_class = bases[-3]
+    return GetObjectClassesResult(
+        object_class=object_class,
+        base_object_class=base_object_class,
+    )
 
 
 class ProcessIncomingObjectResult(TypedDict):
     val: Any
     base_object_class: str | None
     leaf_object_class: str | None
+
+
+def _get_builtin_object_registry() -> dict[str, type[BaseModel]]:
+    # Circular import avoidance: importing this eagerly during `import weave`
+    # can recurse through builtin object class modules before weave is initialized.
+    from weave.trace.base_objects import BUILTIN_OBJECT_REGISTRY
+
+    return BUILTIN_OBJECT_REGISTRY
 
 
 def process_incoming_object_val(
@@ -101,7 +106,7 @@ def process_incoming_object_val(
     # and set the correct bases information. This is an important case: the user is asking us to ensure that they payload is valid and
     # stored correctly. We need to validate the payload and write the correct bases information.
     if req_builtin_object_class is not None:
-        if builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(
+        if builtin_object_class := _get_builtin_object_registry().get(
             req_builtin_object_class
         ):
             # TODO: in the next iteration of this code path, this is where we need to actually publish the object

@@ -1,5 +1,6 @@
 import dataclasses
 import random
+import sys
 from typing import Any
 
 import pydantic
@@ -12,6 +13,8 @@ from weave import Evaluation, Model
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
 from weave.trace_server import trace_server_interface as tsi
+
+_LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
 
 def flatten_calls(
@@ -55,7 +58,7 @@ def normalize_scorers_in_flattened(
 
 
 def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
+    return ref.rsplit("/", maxsplit=1)[-1].split(":", maxsplit=1)[0]
 
 
 class MyModel(Model):
@@ -535,7 +538,7 @@ async def test_evaluation_data_topology(client):
         "nested": {"bool_avg": 0.5},
         "reason": "This is a custom test reason",
     }
-    model_latency = {"mean": pytest.approx(0, abs=1)}
+    model_latency = {"mean": pytest.approx(0, abs=_LATENCY_TOL)}
     predict_usage_summary = {
         "usage": {
             "gpt-4o-2024-05-13": {
@@ -733,7 +736,7 @@ async def test_eval_is_robust_to_missing_values(client):
     assert res == {
         "output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
-        "model_latency": {"mean": pytest.approx(0, abs=2)},
+        "model_latency": {"mean": pytest.approx(0, abs=max(2, _LATENCY_TOL))},
     }
 
 

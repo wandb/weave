@@ -43,7 +43,7 @@ class ParamBuilder:
         prefix: str | None = None,
         database_type: DatabaseType = "clickhouse",
     ):
-        global param_builder_count
+        global param_builder_count  # noqa: PLW0603
         param_builder_count += 1
         self._params: dict[str, typing.Any] = {}
         self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
@@ -187,13 +187,15 @@ class Table:
     def tuple_to_row(self, tup: tuple, fields: list[str]) -> Row:
         d = {}
         for i, field in enumerate(fields):
-            if field.endswith("_dump"):
-                field = field[:-5]
+            normalized_field = field[:-5] if field.endswith("_dump") else field
             value = tup[i]
-            if field in self.col_types and self.col_types[field] == "json":
-                d[field] = json.loads(value)
+            if (
+                normalized_field in self.col_types
+                and self.col_types[normalized_field] == "json"
+            ):
+                d[normalized_field] = json.loads(value)
             else:
-                d[field] = value
+                d[normalized_field] = value
         return d
 
     def tuples_to_rows(self, tuples: list[tuple], fields: list[str]) -> Rows:
@@ -288,12 +290,12 @@ class Select:
     def order_by(self, order_by: list[SortBy] | None) -> "Select":
         if order_by:
             for o in order_by:
-                assert o.direction in (
+                assert o.direction in {
                     "ASC",
                     "DESC",
                     "asc",
                     "desc",
-                ), f"Invalid order_by direction: {o.direction}"
+                }, f"Invalid order_by direction: {o.direction}"
         self._order_by = order_by
         return self
 
@@ -487,7 +489,7 @@ class Insert:
 
 
 def combine_conditions(conditions: list[str], operator: str) -> str:
-    if operator not in ("AND", "OR"):
+    if operator not in {"AND", "OR"}:
         raise ValueError(f"Invalid operator: {operator}")
     conditions = [c for c in conditions if c is not None and c != ""]
     if not conditions:
@@ -682,10 +684,18 @@ def _process_query_to_conditions(
             lhs_part = process_operand(operation.gt_[0])
             rhs_part = process_operand(operation.gt_[1])
             cond = f"({lhs_part} > {rhs_part})"
+        elif isinstance(operation, tsi_query.LtOperation):
+            lhs_part = process_operand(operation.lt_[0])
+            rhs_part = process_operand(operation.lt_[1])
+            cond = f"({lhs_part} < {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
             lhs_part = process_operand(operation.gte_[0])
             rhs_part = process_operand(operation.gte_[1])
             cond = f"({lhs_part} >= {rhs_part})"
+        elif isinstance(operation, tsi_query.LteOperation):
+            lhs_part = process_operand(operation.lte_[0])
+            rhs_part = process_operand(operation.lte_[1])
+            cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
             lhs_part = process_operand(operation.in_[0])
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
@@ -739,7 +749,9 @@ def _process_query_to_conditions(
                 tsi_query.NotOperation,
                 tsi_query.EqOperation,
                 tsi_query.GtOperation,
+                tsi_query.LtOperation,
                 tsi_query.GteOperation,
+                tsi_query.LteOperation,
                 tsi_query.InOperation,
                 tsi_query.ContainsOperation,
             ),

@@ -1,8 +1,8 @@
 # Sqlite Trace Server
 
 import datetime
-import hashlib
 import json
+import logging
 import sqlite3
 import threading
 from collections.abc import Iterator
@@ -10,12 +10,22 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, cast
 
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest,
-)
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
+from weave.shared import refs_internal as ri
+from weave.shared.digest import (
+    compute_file_digest,
+    compute_object_digest_result,
+    compute_row_digest,
+    compute_table_digest,
+)
+from weave.shared.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    assert_non_null_wb_user_id,
+    extract_refs_from_values,
+)
 from weave.trace_server import constants, object_creation_utils
-from weave.trace_server import refs_internal as ri
+from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
@@ -35,7 +45,6 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.methods.evaluation_status import evaluation_status
-from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import quote_json_path
@@ -43,21 +52,17 @@ from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
     determine_call_status,
+    digest_is_content_hash,
     digest_is_version_like,
     empty_str_to_none,
     get_nested_key,
+    get_prediction_inputs,
     hydrate_calls_with_feedback,
     make_derived_summary_fields,
     make_feedback_query_req,
     op_name_matches,
+    scorer_read_res_from_obj,
     set_nested_key,
-)
-from weave.trace_server.trace_server_interface_util import (
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-    assert_non_null_wb_user_id,
-    bytes_digest,
-    extract_refs_from_values,
-    str_digest,
 )
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
@@ -134,6 +139,9 @@ def close_conn_cursor(db_path: str | None = None) -> None:
         _conn_cursor.set(None)
 
 
+logger = logging.getLogger(__name__)
+
+
 class SqliteTraceServer(tsi.FullTraceServerInterface):
     def __init__(
         self,
@@ -154,6 +162,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         cursor.execute("DROP TABLE IF EXISTS objects")
         cursor.execute("DROP TABLE IF EXISTS tables")
         cursor.execute("DROP TABLE IF EXISTS table_rows")
+        cursor.execute("DROP TABLE IF EXISTS tags")
+        cursor.execute("DROP TABLE IF EXISTS aliases")
 
     def setup_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -231,6 +241,30 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 digest TEXT,
                 val BLOB,
                 primary key (project_id, digest)
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tags (
+                project_id TEXT NOT NULL,
+                object_id TEXT NOT NULL,
+                digest TEXT NOT NULL,
+                tag TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (project_id, object_id, digest, tag)
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS aliases (
+                project_id TEXT NOT NULL,
+                object_id TEXT NOT NULL,
+                alias TEXT NOT NULL,
+                digest TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (project_id, object_id, alias)
             )
             """
         )
@@ -419,6 +453,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if filter.wb_user_ids:
                 in_expr = ", ".join(f"'{x}'" for x in filter.wb_user_ids)
                 conds += [f"wb_user_id IN ({in_expr})"]
+            if filter.thread_ids is not None:
+                assert_parameter_length_less_than_max(
+                    "thread_ids", len(filter.thread_ids)
+                )
+                in_expr = ", ".join(f"'{x}'" for x in filter.thread_ids)
+                conds += [f"thread_id IN ({in_expr})"]
 
         if req.query:
             # This is the mongo-style query
@@ -456,10 +496,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     lhs_part = process_operand(operation.gt_[0])
                     rhs_part = process_operand(operation.gt_[1])
                     cond = f"({lhs_part} > {rhs_part})"
+                elif isinstance(operation, tsi_query.LtOperation):
+                    lhs_part = process_operand(operation.lt_[0])
+                    rhs_part = process_operand(operation.lt_[1])
+                    cond = f"({lhs_part} < {rhs_part})"
                 elif isinstance(operation, tsi_query.GteOperation):
                     lhs_part = process_operand(operation.gte_[0])
                     rhs_part = process_operand(operation.gte_[1])
                     cond = f"({lhs_part} >= {rhs_part})"
+                elif isinstance(operation, tsi_query.LteOperation):
+                    lhs_part = process_operand(operation.lte_[0])
+                    rhs_part = process_operand(operation.lte_[1])
+                    cond = f"({lhs_part} <= {rhs_part})"
                 elif isinstance(operation, tsi_query.InOperation):
                     lhs_part = process_operand(operation.in_[0])
                     rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
@@ -506,7 +554,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         tsi_query.NotOperation,
                         tsi_query.EqOperation,
                         tsi_query.GtOperation,
+                        tsi_query.LtOperation,
                         tsi_query.GteOperation,
+                        tsi_query.LteOperation,
                         tsi_query.InOperation,
                         tsi_query.ContainsOperation,
                     ),
@@ -523,7 +573,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         select_columns = [
             key
             for key in tsi.CallSchema.model_fields.keys()
-            if key not in ["storage_size_bytes", "total_storage_size_bytes"]
+            if key not in {"storage_size_bytes", "total_storage_size_bytes"}
         ]
         if req.columns:
             # TODO(gst): allow json fields to be selected
@@ -578,36 +628,54 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         # Match the batch server:
         if req.sort_by is None:
-            order_by = [("started_at", "asc")]
+            order_by = [("started_at", "asc"), ("id", "asc")]
+            order_by = [("started_at", "asc"), ("id", "asc")]
         elif len(req.sort_by) == 0:
             order_by = None
         else:
             order_by = [(s.field, s.direction) for s in req.sort_by]
+            # Add id as secondary sort for consistency if not already present
+            if not any(field == "id" for field, _ in order_by):
+                last_sort = req.sort_by[-1]
+                # When sorting by started_at, match the id direction for perf
+                if last_sort.field == "started_at":
+                    order_by.append(("id", last_sort.direction))
+                else:
+                    order_by.append(("id", "desc"))
+            # Add id as secondary sort for consistency if not already present
+            if not any(field == "id" for field, _ in order_by):
+                last_sort = req.sort_by[-1]
+                # When sorting by started_at, match the id direction for perf
+                if last_sort.field == "started_at":
+                    order_by.append(("id", last_sort.direction))
+                else:
+                    order_by.append(("id", "desc"))
 
         if order_by is not None:
             order_parts = []
             for field, direction in order_by:
+                sort_field = field
                 json_path: str | None = None
-                if field.startswith("inputs"):
-                    field = "inputs" + field[len("inputs") :]
-                    if field.startswith("inputs."):
-                        json_path = field[len("inputs.") :]
-                        field = "inputs"
-                elif field.startswith("output"):
-                    field = "output" + field[len("output") :]
-                    if field.startswith("output."):
-                        json_path = field[len("output.") :]
-                        field = "output"
-                elif field.startswith("attributes"):
-                    field = "attributes" + field[len("attributes") :]
-                    if field.startswith("attributes."):
-                        json_path = field[len("attributes.") :]
-                        field = "attributes"
-                elif field.startswith("summary"):
+                if sort_field.startswith("inputs"):
+                    sort_field = "inputs" + sort_field[len("inputs") :]
+                    if sort_field.startswith("inputs."):
+                        json_path = sort_field[len("inputs.") :]
+                        sort_field = "inputs"
+                elif sort_field.startswith("output"):
+                    sort_field = "output" + sort_field[len("output") :]
+                    if sort_field.startswith("output."):
+                        json_path = sort_field[len("output.") :]
+                        sort_field = "output"
+                elif sort_field.startswith("attributes"):
+                    sort_field = "attributes" + sort_field[len("attributes") :]
+                    if sort_field.startswith("attributes."):
+                        json_path = sort_field[len("attributes.") :]
+                        sort_field = "attributes"
+                elif sort_field.startswith("summary"):
                     # Handle special summary fields that are calculated rather than stored directly
-                    if field == "summary.weave.status":
+                    if sort_field == "summary.weave.status":
                         # Create a CASE expression to properly determine the status
-                        field = """
+                        sort_field = """
                             CASE
                                 WHEN exception IS NOT NULL THEN 'error'
                                 WHEN ended_at IS NULL THEN 'running'
@@ -616,9 +684,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                             END
                         """
                         json_path = None
-                    elif field == "summary.weave.latency_ms":
+                    elif sort_field == "summary.weave.latency_ms":
                         # Calculate latency directly using julianday for millisecond precision
-                        field = """
+                        sort_field = """
                             CASE
                                 WHEN ended_at IS NOT NULL THEN
                                     CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS FLOAT)
@@ -626,12 +694,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                             END
                         """
                         json_path = None
-                    elif field == "summary.weave.trace_name":
+                    elif sort_field == "summary.weave.trace_name":
                         # Handle trace_name field similar to the ClickHouse implementation
                         # If display_name is present, use that
                         # Otherwise, check if op_name is an object reference and extract the name
                         # If not, just use op_name directly
-                        field = """
+                        sort_field = """
                             CASE
                                 WHEN display_name IS NOT NULL AND display_name != '' THEN display_name
                                 WHEN op_name IS NOT NULL AND op_name LIKE 'weave-trace-internal:///%' THEN
@@ -645,20 +713,22 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         """
                         json_path = None
                     else:
-                        field = "summary" + field[len("summary") :]
-                        if field.startswith("summary."):
-                            json_path = field[len("summary.") :]
-                            field = "summary"
+                        sort_field = "summary" + sort_field[len("summary") :]
+                        if sort_field.startswith("summary."):
+                            json_path = sort_field[len("summary.") :]
+                            sort_field = "summary"
 
-                assert direction in [
+                assert direction in {
                     "ASC",
                     "DESC",
                     "asc",
                     "desc",
-                ], f"Invalid order_by direction: {direction}"
+                }, f"Invalid order_by direction: {direction}"
                 if json_path:
-                    field = f"json_extract({field}, '{quote_json_path(json_path)}')"
-                order_parts.append(f"{field} {direction}")
+                    sort_field = (
+                        f"json_extract({sort_field}, '{quote_json_path(json_path)}')"
+                    )
+                order_parts.append(f"{sort_field} {direction}")
 
             order_by_part = ", ".join(order_parts)
             query += f" ORDER BY {order_by_part}"
@@ -844,12 +914,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
 
-        processed_result = process_incoming_object_val(
-            req.obj.val, req.obj.builtin_object_class
+        digest_result = compute_object_digest_result(
+            req.obj.val,
+            req.obj.builtin_object_class,
         )
-        processed_val = processed_result["val"]
-        json_val = json.dumps(processed_val)
-        digest = str_digest(json_val)
+        processed_val = digest_result.processed_val
+        json_val = digest_result.json_val
+        digest = digest_result.digest
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
             req.obj.object_id,
@@ -900,8 +971,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     object_id,
                     datetime.datetime.now().isoformat(),
                     get_kind(processed_val),
-                    processed_result["base_object_class"],
-                    processed_result["leaf_object_class"],
+                    digest_result.base_object_class,
+                    digest_result.leaf_object_class,
                     json.dumps([]),
                     json_val,
                     digest,
@@ -962,8 +1033,15 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 return f"digest = '{digest}'"
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        digest = req.digest
+        resolved_digest = self._maybe_resolve_alias(
+            req.project_id, req.object_id, digest
+        )
+        if resolved_digest is not None:
+            digest = resolved_digest
+
         conds = [f"object_id = '{req.object_id}'"]
-        digest_condition = self._make_digest_condition(req.digest)
+        digest_condition = self._make_digest_condition(digest)
         conds.append(digest_condition)
         objs = self._select_objs_query(
             req.project_id,
@@ -978,6 +1056,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 f"{req.object_id}:v{objs[0].version_index} was deleted at {objs[0].deleted_at}",
                 deleted_at=objs[0].deleted_at,
             )
+        if req.include_tags_and_aliases:
+            self._enrich_objs_with_tags_and_aliases(req.project_id, objs)
         return tsi.ObjReadRes(obj=objs[0])
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
@@ -1011,6 +1091,32 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 placeholders = ",".join(["?" for _ in req.filter.leaf_object_classes])
                 conds.append(f"leaf_object_class IN ({placeholders})")
                 parameters["leaf_object_classes"] = req.filter.leaf_object_classes
+            if req.filter.tags:
+                tag_placeholders = ",".join(["?" for _ in req.filter.tags])
+                conds.append(
+                    f"(project_id, object_id, digest) IN "
+                    f"(SELECT project_id, object_id, digest FROM tags "
+                    f"WHERE project_id = ? AND tag IN ({tag_placeholders}))"
+                )
+                parameters["filter_tags"] = [req.project_id] + list(req.filter.tags)
+            if req.filter.aliases:
+                non_latest = [a for a in req.filter.aliases if a != "latest"]
+                has_latest = "latest" in req.filter.aliases
+                alias_subquery = (
+                    "(project_id, object_id, digest) IN "
+                    "(SELECT project_id, object_id, digest FROM aliases "
+                    "WHERE project_id = ? AND alias IN ("
+                    + ",".join(["?" for _ in non_latest])
+                    + "))"
+                )
+                if non_latest and has_latest:
+                    conds.append(f"(is_latest = 1 OR {alias_subquery})")
+                    parameters["filter_aliases"] = [req.project_id] + non_latest
+                elif has_latest:
+                    conds.append("is_latest = 1")
+                else:
+                    conds.append(alias_subquery)
+                    parameters["filter_aliases"] = [req.project_id] + non_latest
 
         objs = self._select_objs_query(
             req.project_id,
@@ -1021,6 +1127,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             offset=req.offset,
             sort_by=req.sort_by,
         )
+
+        if req.include_tags_and_aliases:
+            self._enrich_objs_with_tags_and_aliases(req.project_id, objs)
 
         return tsi.ObjQueryRes(objs=objs)
 
@@ -1078,6 +1187,88 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
 
+    def _ensure_obj_version_exists(
+        self,
+        cursor: sqlite3.Cursor,
+        project_id: str,
+        object_id: str,
+        digest: str,
+    ) -> None:
+        cursor.execute(
+            "SELECT 1 FROM objects WHERE project_id = ? AND object_id = ? AND digest = ? AND deleted_at IS NULL LIMIT 1",
+            (project_id, object_id, digest),
+        )
+        if cursor.fetchone() is None:
+            raise NotFoundError(f"Object version {object_id}:{digest} not found")
+
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute("BEGIN TRANSACTION")
+            self._ensure_obj_version_exists(
+                cursor, req.project_id, req.object_id, req.digest
+            )
+            for tag in req.tags:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO tags (project_id, object_id, digest, tag) VALUES (?, ?, ?, ?)",
+                    (req.project_id, req.object_id, req.digest, tag),
+                )
+            conn.commit()
+        return tsi.ObjAddTagsRes()
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        placeholders = ",".join(["?" for _ in req.tags])
+        with self.lock:
+            cursor.execute(
+                f"DELETE FROM tags WHERE project_id = ? AND object_id = ? AND digest = ? AND tag IN ({placeholders})",
+                [req.project_id, req.object_id, req.digest] + list(req.tags),
+            )
+            conn.commit()
+        return tsi.ObjRemoveTagsRes()
+
+    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute("BEGIN TRANSACTION")
+            self._ensure_obj_version_exists(
+                cursor, req.project_id, req.object_id, req.digest
+            )
+            cursor.execute(
+                "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
+                (req.project_id, req.object_id, req.alias, req.digest),
+            )
+            conn.commit()
+        return tsi.ObjSetAliasRes()
+
+    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            cursor.execute(
+                "DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias = ?",
+                (req.project_id, req.object_id, req.alias),
+            )
+            conn.commit()
+        return tsi.ObjRemoveAliasRes()
+
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
+            "SELECT DISTINCT tag FROM tags WHERE project_id = ? ORDER BY tag",
+            (req.project_id,),
+        )
+        tags = [row[0] for row in cursor.fetchall()]
+        return tsi.TagsListRes(tags=tags)
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
+            "SELECT DISTINCT alias FROM aliases WHERE project_id = ? ORDER BY alias",
+            (req.project_id,),
+        )
+        aliases = [row[0] for row in cursor.fetchall()]
+        return tsi.AliasesListRes(aliases=aliases)
+
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         insert_rows = []
@@ -1085,7 +1276,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if not isinstance(r, dict):
                 raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(r)
-            row_digest = str_digest(row_json)
+            row_digest = compute_row_digest(r)
             insert_rows.append((req.table.project_id, row_digest, row_json))
         with self.lock:
             cursor.executemany(
@@ -1095,10 +1286,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
             row_digests = [r[1] for r in insert_rows]
 
-            table_hasher = hashlib.sha256()
-            for row_digest in row_digests:
-                table_hasher.update(row_digest.encode())
-            digest = table_hasher.hexdigest()
+            digest = compute_table_digest(row_digests)
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
@@ -1115,10 +1303,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
 
         # Calculate table digest from row digests
-        table_hasher = hashlib.sha256()
-        for row_digest in req.row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = compute_table_digest(req.row_digests)
 
         with self.lock:
             cursor.execute(
@@ -1154,7 +1339,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if not isinstance(row_data, dict):
                 raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
-            row_digest = str_digest(row_json)
+            row_digest = compute_row_digest(row_data)
             if row_digest not in known_digests:
                 new_rows_needed_to_insert.append((req.project_id, row_digest, row_json))
                 known_digests.add(row_digest)
@@ -1190,10 +1375,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 new_rows_needed_to_insert,
             )
 
-            table_hasher = hashlib.sha256()
-            for row_digest in final_row_digests:
-                table_hasher.update(row_digest.encode())
-            digest = table_hasher.hexdigest()
+            digest = compute_table_digest(final_row_digests)
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
@@ -1512,7 +1694,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
-        digest = bytes_digest(req.content)
+        digest = compute_file_digest(req.content)
         with self.lock:
             cursor.execute(
                 "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)",
@@ -1574,31 +1756,25 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         # Currently, this will only be called from the weave file, so we return an empty dict for now
         return tsi.ImageGenerationCreateRes(response={})
 
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
-        if not isinstance(req.traces, ExportTraceServiceRequest):
-            raise TypeError(
-                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
-            )
-
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         calls: list[dict[str, object]] = []
         rejected_spans = 0
         error_messages: list[str] = []
-        for proto_resource_spans in req.traces.resource_spans:
+        for processed_span in req.processed_spans:
+            # Extract wb_run_id from the processed span
+            wb_run_id = processed_span.run_id
+
+            if not isinstance(processed_span.resource_spans, ResourceSpans):
+                raise TypeError(
+                    f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
+                )
+
+            proto_resource_spans = processed_span.resource_spans
             resource = Resource.from_proto(proto_resource_spans.resource)
             for proto_scope_spans in proto_resource_spans.scope_spans:
                 for proto_span in proto_scope_spans.spans:
                     try:
                         span = Span.from_proto(proto_span, resource)
-                        start_call, end_call = span.to_call(req.project_id)
-                        calls.extend(
-                            [
-                                {
-                                    "mode": "start",
-                                    "req": tsi.CallStartReq(start=start_call),
-                                },
-                                {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
-                            ]
-                        )
                     except AttributePathConflictError as e:
                         rejected_spans += 1
                         try:
@@ -1613,10 +1789,26 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                             f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
                         )
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        continue
+
+                    start_call, end_call = span.to_call(
+                        req.project_id,
+                        wb_user_id=req.wb_user_id,
+                        wb_run_id=wb_run_id,
+                    )
+                    calls.extend(
+                        [
+                            {
+                                "mode": "start",
+                                "req": tsi.CallStartReq(start=start_call),
+                            },
+                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
+                        ]
+                    )
         res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         # Return spec-compliant response; include partial_success if needed
         if rejected_spans > 0:
-            return tsi.OtelExportRes(
+            return tsi.OTelExportRes(
                 partial_success=tsi.ExportTracePartialSuccess(
                     rejected_spans=rejected_spans,
                     error_message=(
@@ -1625,7 +1817,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     ),
                 )
             )
-        return tsi.OtelExportRes()
+        return tsi.OTelExportRes()
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         raise NotImplementedError(
@@ -1721,6 +1913,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Annotation queues not supported in SQLite."""
         raise NotImplementedError("Annotation queues are not supported in SQLite")
 
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
     def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq
     ) -> tsi.AnnotationQueueAddCallsRes:
@@ -1766,6 +1970,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
+
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        raise NotImplementedError("Calls scoring is not supported in SQLite")
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         """Create an op object by delegating to obj_create.
@@ -2119,22 +2326,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             digest=req.digest,
         )
         result = self.obj_read(obj_req)
-        val = result.obj.val
-
-        # Extract name and description from val data
-        name = val.get("name", result.obj.object_id)
-        description = val.get("description")
-
-        # Create the response with all required fields
-        return tsi.ScorerReadRes(
-            object_id=result.obj.object_id,
-            digest=result.obj.digest,
-            version_index=result.obj.version_index,
-            created_at=result.obj.created_at,
-            name=name,
-            description=description,
-            score_op=val.get("score", ""),
-        )
+        return scorer_read_res_from_obj(result.obj)
 
     def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
         """List scorer objects by delegating to objs_query with Scorer filtering."""
@@ -2147,27 +2339,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         result = self.objs_query(obj_query_req)
 
         for obj in result.objs:
-            # Extract name, description, and score_op from val data
-            name = obj.object_id  # fallback to object_id
-            description = None
-            score_op = ""
-
-            if hasattr(obj, "val") and obj.val:
-                val = obj.val
-                if isinstance(val, dict):
-                    name = val.get("name", obj.object_id)
-                    description = val.get("description")
-                    score_op = val.get("score", "")
-
-            yield tsi.ScorerReadRes(
-                object_id=obj.object_id,
-                digest=obj.digest,
-                version_index=obj.version_index,
-                created_at=obj.created_at,
-                name=name,
-                description=description,
-                score_op=score_op,
-            )
+            yield scorer_read_res_from_obj(obj)
 
     def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
         """Delete scorer objects by delegating to obj_delete."""
@@ -3025,7 +3197,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.PredictionReadRes(
             prediction_id=call.id,
             model=attributes.get(constants.PREDICTION_MODEL_ATTR_KEY, ""),
-            inputs=call.inputs.get("inputs") if call.inputs else {},
+            inputs=get_prediction_inputs(call.inputs),
             output=call.output,
             evaluation_run_id=evaluation_run_id,
             wb_user_id=call.wb_user_id,
@@ -3109,7 +3281,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             yield tsi.PredictionReadRes(
                 prediction_id=call.id,
                 model=attributes.get(constants.PREDICTION_MODEL_ATTR_KEY, ""),
-                inputs=call.inputs.get("inputs") if call.inputs else {},
+                inputs=get_prediction_inputs(call.inputs),
                 output=call.output,
                 evaluation_run_id=evaluation_run_id,
                 wb_user_id=call.wb_user_id,
@@ -3554,6 +3726,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self.calls_delete(calls_delete_req)
         return tsi.ScoreDeleteRes(num_deleted=len(req.score_ids))
 
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Return grouped prediction/trial/score data for evaluation results."""
+        return eval_helpers.eval_results_query(self, req)
+
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
@@ -3570,6 +3748,99 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.TableRowSchema(
             digest=query_result[0], val=json.loads(query_result[1])
         )
+
+    def _get_tags_for_objects(
+        self,
+        project_id: str,
+        object_ids: list[str],
+    ) -> dict[tuple[str, str], list[str]]:
+        """Fetch tags for a list of object_ids."""
+        if not object_ids:
+            return {}
+        conn, cursor = get_conn_cursor(self.db_path)
+        placeholders = ",".join("?" * len(object_ids))
+        cursor.execute(
+            f"SELECT object_id, digest, tag FROM tags WHERE project_id = ? AND object_id IN ({placeholders}) ORDER BY object_id, digest, tag",
+            [project_id] + list(object_ids),
+        )
+        result: dict[tuple[str, str], list[str]] = {}
+        for row in cursor.fetchall():
+            key = (row[0], row[1])
+            result.setdefault(key, []).append(row[2])
+        return result
+
+    def _get_aliases_for_objects(
+        self,
+        project_id: str,
+        object_ids: list[str],
+    ) -> dict[tuple[str, str], list[str]]:
+        """Fetch aliases for a list of object_ids.
+        Returns a dict mapping (object_id, digest) -> list of alias strings.
+        """
+        if not object_ids:
+            return {}
+        conn, cursor = get_conn_cursor(self.db_path)
+        placeholders = ",".join(["?"] * len(object_ids))
+        cursor.execute(
+            f"SELECT object_id, digest, alias FROM aliases WHERE project_id = ? AND object_id IN ({placeholders})",
+            [project_id] + list(object_ids),
+        )
+        result: dict[tuple[str, str], list[str]] = {}
+        for row in cursor.fetchall():
+            key = (row[0], row[1])
+            result.setdefault(key, []).append(row[2])
+        return result
+
+    def _enrich_objs_with_tags_and_aliases(
+        self,
+        project_id: str,
+        objs: list[tsi.ObjSchema],
+    ) -> None:
+        """In-place enrichment of ObjSchema list with tags and aliases."""
+        if not objs:
+            return
+        object_ids = list({obj.object_id for obj in objs})
+
+        tags_map = self._get_tags_for_objects(project_id, object_ids)
+        aliases_map = self._get_aliases_for_objects(project_id, object_ids)
+
+        for obj in objs:
+            key = (obj.object_id, obj.digest)
+            obj.tags = sorted(tags_map.get(key, []))
+            aliases = aliases_map.get(key, [])
+            if obj.is_latest == 1 and "latest" not in aliases:
+                aliases = ["latest"] + aliases
+            obj.aliases = aliases
+
+    def _maybe_resolve_alias(
+        self,
+        project_id: str,
+        object_id: str,
+        digest: str,
+    ) -> str | None:
+        """If digest looks like an alias name, resolve it to the actual digest.
+        Returns None if not an alias.
+        """
+        # Return None for digests that are not alias names, so the caller
+        # falls through to normal digest-based lookup.  "latest" and version
+        # patterns (v0, v1, …) are handled by the existing obj_read logic;
+        # content hashes are real digests that don't need resolution.
+        if digest == "latest":
+            return None
+        (is_version, _) = digest_is_version_like(digest)
+        if is_version:
+            return None
+        if digest_is_content_hash(digest):
+            return None
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
+            "SELECT digest FROM aliases WHERE project_id = ? AND object_id = ? AND alias = ? LIMIT 1",
+            (project_id, object_id, digest),
+        )
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        return None
 
     def _select_objs_query(
         self,

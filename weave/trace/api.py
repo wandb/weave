@@ -13,8 +13,7 @@ from weave import type_handlers  # noqa: F401
 from weave.trace import urls, weave_client, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
-from weave.trace.context import call_context
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
 from weave.trace.display.term import configure_logger, update_logger_level
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
@@ -95,9 +94,9 @@ def init(
 
     parse_and_apply_settings(settings)
 
-    global _global_postprocess_inputs
-    global _global_postprocess_output
-    global _global_attributes
+    global _global_postprocess_inputs  # noqa: PLW0603
+    global _global_postprocess_output  # noqa: PLW0603
+    global _global_attributes  # noqa: PLW0603
 
     _global_postprocess_inputs = global_postprocess_inputs
     _global_postprocess_output = global_postprocess_output
@@ -389,10 +388,12 @@ def finish() -> None:
     Following finish, calls of weave.op decorated functions will no longer be logged. You will need to run weave.init() again to resume logging.
 
     """
+    # Capture client before teardown so we can still flush outstanding work.
+    wc = weave_client_context.get_weave_client()
     weave_init.finish()
 
     # Flush any remaining calls
-    if wc := weave_client_context.get_weave_client():
+    if wc is not None:
         wc.finish()
 
 

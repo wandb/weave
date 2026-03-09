@@ -1,6 +1,6 @@
 import logging
 
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
     InvalidRequest,

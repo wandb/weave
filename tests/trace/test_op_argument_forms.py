@@ -450,23 +450,6 @@ def test_no_args(client):
     assert res.calls[0].inputs == {}
 
 
-def test_args_empty(client):
-    @weave.op
-    def my_op() -> int:
-        return 1
-
-    my_op()
-
-    res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client._project_id(),
-        )
-    )
-
-    assert res.calls[0].op_name == my_op.ref.uri()
-    assert res.calls[0].inputs == {}
-
-
 def test_args_concrete(client):
     @weave.op
     def my_op(val):

@@ -75,12 +75,11 @@ def _accumulator(acc: Any | None, value: Any) -> Any:
             return acc + value
         elif isinstance(acc, list):
             return acc + [value]
+    elif isinstance(acc, list):
+        acc.append(value)
+        return acc
     else:
-        if isinstance(acc, list):
-            acc.append(value)
-            return acc
-        else:
-            return [acc, value]
+        return [acc, value]
 
 
 def _should_use_accumulator(fn: Callable[..., Any]) -> bool:
@@ -565,7 +564,7 @@ def get_autogen_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _autogen_patcher
+    global _autogen_patcher  # noqa: PLW0603
     if _autogen_patcher is not None:
         return _autogen_patcher
 

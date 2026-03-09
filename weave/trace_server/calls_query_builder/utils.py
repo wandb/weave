@@ -1,4 +1,5 @@
 import contextlib
+import datetime
 import logging
 from collections.abc import Generator
 
@@ -8,9 +9,33 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder, clickhouse_cast, quote_json_path_parts
 
 
+def safe_alias(field_name: str) -> str:
+    """Backtick-quote field names containing dots for use as SQL aliases."""
+    return f"`{field_name}`" if "." in field_name else field_name
+
+
 def param_slot(param_name: str, param_type: str) -> str:
     """Helper function to create a parameter slot for a clickhouse query."""
     return f"{{{param_name}:{param_type}}}"
+
+
+def timestamp_to_datetime_str(timestamp: int | float) -> str:
+    """Convert a unix timestamp to a ClickHouse-compatible datetime string.
+
+    Args:
+        timestamp (int | float): Unix timestamp in seconds.
+
+    Returns:
+        str: Datetime string in the format ``YYYY-MM-DD HH:MM:SS.ffffff``,
+            matching the precision of ClickHouse ``DateTime64(6)`` columns.
+
+    Examples:
+        >>> timestamp_to_datetime_str(1709251200)
+        '2024-03-01 00:00:00.000000'
+    """
+    return datetime.datetime.fromtimestamp(
+        timestamp, tz=datetime.timezone.utc
+    ).strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
 def safely_format_sql(

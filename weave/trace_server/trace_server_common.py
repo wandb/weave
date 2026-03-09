@@ -4,7 +4,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Iterator
 from typing import Any, Literal, cast
 
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 
 CallStatus = Literal["running", "completed", "failed"]
@@ -105,13 +105,12 @@ def make_derived_summary_fields(
 
     if display_name:
         weave_summary["display_name"] = display_name
+    elif ri.string_will_be_interpreted_as_ref(op_name):
+        op = ri.parse_internal_uri(op_name)
+        if isinstance(op, ri.InternalObjectRef):
+            weave_summary["trace_name"] = op.name
     else:
-        if ri.string_will_be_interpreted_as_ref(op_name):
-            op = ri.parse_internal_uri(op_name)
-            if isinstance(op, ri.InternalObjectRef):
-                weave_summary["trace_name"] = op.name
-        else:
-            weave_summary["trace_name"] = op_name
+        weave_summary["trace_name"] = op_name
 
     summary["weave"] = weave_summary
     return cast(tsi.SummaryMap, summary)
@@ -215,6 +214,34 @@ def digest_is_version_like(digest: str) -> tuple[bool, int]:
         return (False, -1)
 
 
+def digest_is_content_hash(digest: str) -> bool:
+    """Check if a digest looks like a content-addressed hash.
+
+    Recognizes two formats:
+    - Weave digest: 43-char modified base64url (A-Za-z0-9XY), from bytes_digest()
+    - Hex SHA-256: 64 hex characters
+
+    Examples:
+    >>> digest_is_content_hash("oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8")
+    True
+    >>> digest_is_content_hash("a" * 64)
+    True
+    >>> digest_is_content_hash("production")
+    False
+    """
+    # Weave digest: 43-char modified base64url
+    if len(digest) == 43 and digest.isalnum():
+        return True
+    # Hex SHA-256: 64 hex chars
+    if len(digest) == 64:
+        try:
+            int(digest, 16)
+        except ValueError:
+            return False
+        return True
+    return False
+
+
 MAX_FILTER_LENGTH = 1000
 
 
@@ -267,3 +294,30 @@ def op_name_matches(op_name: str | None, expected_name: str) -> bool:
 
     # Fallback to direct string comparison for non-URI op names
     return op_name == expected_name
+
+
+def scorer_read_res_from_obj(obj: tsi.ObjSchema) -> tsi.ScorerReadRes:
+    """Build a ScorerReadRes from an ObjSchema, with safe fallbacks."""
+    name = obj.object_id
+    description = None
+    score_op = ""
+
+    if hasattr(obj, "val") and obj.val and isinstance(obj.val, dict):
+        name = obj.val.get("name", obj.object_id)
+        description = obj.val.get("description")
+        score_op = obj.val.get("score", "")
+
+    return tsi.ScorerReadRes(
+        object_id=obj.object_id,
+        digest=obj.digest,
+        version_index=obj.version_index,
+        created_at=obj.created_at,
+        name=name,
+        description=description,
+        score_op=score_op,
+    )
+
+
+def get_prediction_inputs(call_inputs: dict[str, Any] | None) -> dict[str, Any]:
+    """Extract prediction inputs from a call's inputs dict, defaulting to {} if missing or None."""
+    return (call_inputs or {}).get("inputs") or {}

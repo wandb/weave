@@ -20,7 +20,7 @@ def get_instructor_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _instructor_patcher
+    global _instructor_patcher  # noqa: PLW0603
     if _instructor_patcher is not None:
         return _instructor_patcher
 

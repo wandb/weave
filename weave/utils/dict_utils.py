@@ -106,8 +106,8 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
             result[k] = sum(values)
 
     # Then recursively sum each collection of nested dictionaries
-    for k in nested_dicts.keys():
-        result[k] = sum_dict_leaves(nested_dicts[k])
+    for k, nested_values in nested_dicts.items():
+        result[k] = sum_dict_leaves(nested_values)
 
     return convert_defaultdict_to_dict(result)
 
@@ -169,16 +169,17 @@ def flatten_attributes(
                     new_key == attr for attr in json_attributes
                 )
 
-                if (
-                    isinstance(value, dict) or isinstance(value, list)
-                ) and not should_stringify_as_json:
+                if isinstance(value, (dict, list)) and not should_stringify_as_json:
                     # Recursively flatten nested dictionaries or lists
                     _flatten(value, f"{new_key}.")
                 else:
+                    serialized_value = value
                     # If the value matches a JSON attribute, stringify it
-                    if should_stringify_as_json and not isinstance(value, str):
-                        value = json.dumps(value)
-                    result[new_key] = value
+                    if should_stringify_as_json and not isinstance(
+                        serialized_value, str
+                    ):
+                        serialized_value = json.dumps(serialized_value)
+                    result[new_key] = serialized_value
         elif isinstance(obj, list):
             # Handle lists by using numeric indices as keys
             for i, item in enumerate(obj):
@@ -189,16 +190,17 @@ def flatten_attributes(
                     new_key == attr for attr in json_attributes
                 )
 
-                if (
-                    isinstance(item, dict) or isinstance(item, list)
-                ) and not should_stringify_as_json:
+                if isinstance(item, (dict, list)) and not should_stringify_as_json:
                     # Recursively flatten nested dictionaries or lists
                     _flatten(item, f"{new_key}.")
                 else:
+                    serialized_item = item
                     # If the item matches a JSON attribute, stringify it
-                    if should_stringify_as_json and not isinstance(item, str):
-                        item = json.dumps(item)
-                    result[new_key] = item
+                    if should_stringify_as_json and not isinstance(
+                        serialized_item, str
+                    ):
+                        serialized_item = json.dumps(serialized_item)
+                    result[new_key] = serialized_item
 
     _flatten(data)
     return result

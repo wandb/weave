@@ -294,10 +294,10 @@ def filters_to_query(filters: Filters | None) -> tsi.Query | None:
 def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:
     first = operand.eq_[0]
     second = operand.eq_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in (
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
         "double",
         "int",
-    ):
+    }:
         first = first.convert_.input
     if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
         second, tsi_query.LiteralOperation
@@ -339,10 +339,10 @@ def operand_to_filter_contains(operand: tsi_query.ContainsOperation) -> Filter:
 def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
     first = operand.gt_[0]
     second = operand.gt_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in (
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
         "double",
         "int",
-    ):
+    }:
         first = first.convert_.input
     if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
         second, tsi_query.LiteralOperation
@@ -363,10 +363,10 @@ def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
 def operand_to_filter_gte(operand: tsi_query.GteOperation) -> Filter:
     first = operand.gte_[0]
     second = operand.gte_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in (
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
         "double",
         "int",
-    ):
+    }:
         first = first.convert_.input
     if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
         second, tsi_query.LiteralOperation
@@ -439,12 +439,15 @@ def query_to_filters(query: tsi.Query | None) -> Filters | None:
             return None
         return [operand_to_filter(o) for o in operands]
 
-    if (
-        isinstance(query.expr_, tsi_query.EqOperation)
-        or isinstance(query.expr_, tsi_query.GtOperation)
-        or isinstance(query.expr_, tsi_query.GteOperation)
-        or isinstance(query.expr_, tsi_query.NotOperation)
-        or isinstance(query.expr_, tsi_query.ContainsOperation)
+    if isinstance(
+        query.expr_,
+        (
+            tsi_query.EqOperation,
+            tsi_query.GtOperation,
+            tsi_query.GteOperation,
+            tsi_query.NotOperation,
+            tsi_query.ContainsOperation,
+        ),
     ):
         return [operand_to_filter(query.expr_)]
 
@@ -760,7 +763,7 @@ class SavedView:
             return f"{weave_root}/{self.view_type}?view={self.ref.name}"
         return None
 
-    def _repr_pretty_(self, p: Any, cycle: bool) -> None:
+    def _repr_pretty_(self, p: Any, cycle: bool) -> None:  # noqa: PLW3201
         """Show a nicely formatted table in ipython."""
         if cycle:
             p.text("SavedView(...)")

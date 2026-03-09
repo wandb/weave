@@ -3,7 +3,7 @@ from typing import TypeVar, cast
 
 from pydantic import BaseModel
 
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server.errors import InvalidExternalRef
 
 A = TypeVar("A")

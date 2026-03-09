@@ -203,44 +203,6 @@ async def test_async_generator_with_custom_accumulator(client):
     assert calls[0].output == [0, 1, 2]
 
 
-@weave.op(accumulator=list_accumulator)
-def gen_with_decorator_accumulator(x: int) -> Generator[int, None, None]:
-    yield from range(x)
-
-
-def test_generator_with_decorator_accumulator(client):
-    # Call the generator with the accumulator from the decorator
-    res = gen_with_decorator_accumulator(3)
-
-    # The generator still works as expected
-    assert list(res) == [0, 1, 2]
-
-    # Get the call and check its output
-    calls = client.get_calls()
-    assert len(calls) == 1
-    assert calls[0].output == [0, 1, 2]
-
-
-@weave.op(accumulator=async_list_accumulator)
-async def async_gen_with_decorator_accumulator(x: int) -> AsyncGenerator[int, None]:
-    for i in range(x):
-        yield i
-
-
-@pytest.mark.asyncio
-async def test_async_generator_with_decorator_accumulator(client):
-    # Call the generator with the accumulator from the decorator
-    res = async_gen_with_decorator_accumulator(3)
-
-    # The generator still works as expected
-    assert [item async for item in res] == [0, 1, 2]
-
-    # Get the call and check its output
-    calls = client.get_calls()
-    assert len(calls) == 1
-    assert calls[0].output == [0, 1, 2]
-
-
 def test_nested_generator_multiple_iterations(client):
     """Test that nested generators work correctly when called multiple times.
 

@@ -222,6 +222,23 @@ class GtOperation(BaseModel):
     gt_: tuple["Operand", "Operand"] = Field(alias="$gt")
 
 
+# https://www.mongodb.com/docs/manual/reference/operator/aggregation/lt/
+class LtOperation(BaseModel):
+    """Less than comparison.
+
+    Example:
+        ```
+        {
+            "$lt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
+        }
+        ```
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    lt_: tuple["Operand", "Operand"] = Field(alias="$lt")
+
+
 # https://www.mongodb.com/docs/manual/reference/aggregation/gte/
 class GteOperation(BaseModel):
     """Greater than or equal comparison.
@@ -237,6 +254,23 @@ class GteOperation(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     gte_: tuple["Operand", "Operand"] = Field(alias="$gte")
+
+
+# https://www.mongodb.com/docs/manual/reference/operator/aggregation/lte/
+class LteOperation(BaseModel):
+    """Less than or equal comparison.
+
+    Example:
+        ```
+        {
+            "$lte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
+        }
+        ```
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    lte_: tuple["Operand", "Operand"] = Field(alias="$lte")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/in/
@@ -307,7 +341,9 @@ Operation = (
     | NotOperation
     | EqOperation
     | GtOperation
+    | LtOperation
     | GteOperation
+    | LteOperation
     | InOperation
     | ContainsOperation
 )
@@ -321,7 +357,9 @@ OrOperation.model_rebuild()
 NotOperation.model_rebuild()
 EqOperation.model_rebuild()
 GtOperation.model_rebuild()
+LtOperation.model_rebuild()
 GteOperation.model_rebuild()
+LteOperation.model_rebuild()
 InOperation.model_rebuild()
 ContainsOperation.model_rebuild()
 

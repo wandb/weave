@@ -2,8 +2,15 @@ import logging
 import socket
 from typing import Any
 
-from confluent_kafka import Consumer as ConfluentKafkaConsumer
-from confluent_kafka import Producer as ConfluentKafkaProducer
+from confluent_kafka import (
+    Consumer as ConfluentKafkaConsumer,
+)
+from confluent_kafka import (
+    Producer as ConfluentKafkaProducer,
+)
+from confluent_kafka import (
+    TopicPartition,
+)
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.datadog import set_root_span_dd_tags
@@ -17,6 +24,7 @@ from weave.trace_server.environment import (
 )
 
 CALL_ENDED_TOPIC = "weave.call_ended"
+SCORE_CALLS_TOPIC = "weave.score_calls"
 
 DEFAULT_MAX_BUFFER_SIZE = 10000
 
@@ -122,7 +130,59 @@ class KafkaProducer(ConfluentKafkaProducer):
         )
 
         if flush_immediately:
-            self.flush()
+            # Use a short non-blocking flush instead of an unbounded flush().
+            # The producer is a process-level singleton shared across all request
+            # threads, so flush() (no timeout) blocks until ALL in-flight messages
+            # from every concurrent request are acknowledged — causing a convoy
+            # effect under load.  flush(0) triggers a delivery attempt for queued
+            # messages and returns immediately.
+            self.flush(0)
+
+    SCORE_CALLS_CHUNK_SIZE = 100
+
+    def produce_score_calls(
+        self, req: tsi.CallsScoreReq, flush_immediately: bool = True
+    ) -> None:
+        """Produce score_calls messages to Kafka, chunked to avoid consumer timeouts.
+
+        Large call_ids lists are split into chunks of SCORE_CALLS_CHUNK_SIZE
+        so that each Kafka message can be processed within the consumer's
+        max.poll.interval.ms.
+
+        Args:
+            req: The CallsScoreReq containing project_id, call_ids, scorer_refs, and wb_user_id
+            flush_immediately: Whether to flush the producer immediately (default True)
+        """
+        # len(self) returns the number of messages currently queued in the producer buffer
+        buffer_size = len(self)
+
+        if buffer_size >= self.max_buffer_size:
+            logger.error(
+                "Kafka producer buffer full, dropping score_calls message",
+                extra={
+                    "buffer_size": buffer_size,
+                    "max_buffer_size": self.max_buffer_size,
+                    "project_id": req.project_id,
+                    "call_ids_count": len(req.call_ids),
+                },
+            )
+            set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
+            return
+
+        publish_key = None
+        if kafka_partition_by_project_id():
+            publish_key = req.project_id
+
+        for i in range(0, len(req.call_ids), self.SCORE_CALLS_CHUNK_SIZE):
+            chunk = req.call_ids[i : i + self.SCORE_CALLS_CHUNK_SIZE]
+            self.produce(
+                topic=SCORE_CALLS_TOPIC,
+                value=req.model_copy(update={"call_ids": chunk}).model_dump_json(),
+                key=publish_key,
+            )
+
+        if flush_immediately:
+            self.flush(0)
 
 
 class KafkaConsumer(ConfluentKafkaConsumer):
@@ -146,11 +206,63 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             "group.id": group_id,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
+            # Connection health: detect dead sockets in 10s instead of the
+            # 60s default.  Without this, a dropped connection blocks heartbeats
+            # for up to a minute, which can exceed the session timeout and
+            # trigger an unnecessary consumer-group rebalance.
+            "socket.timeout.ms": 10_000,
+            # Session / heartbeat: keep session.timeout high enough to ride out
+            # transient coordinator slowness (commit backlogs, broker GC pauses)
+            # without falsely declaring the consumer dead.  The key invariant is
+            #   socket.timeout.ms  <  session.timeout.ms
+            # so dead-socket detection fires before the session expires.
+            "session.timeout.ms": 45_000,
+            "heartbeat.interval.ms": 3_000,
+            # Reconnection: back off quickly but cap at 5s so we rejoin the
+            # group fast after a transient failure.
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 5_000,
+            # TODO: Re-enable once prod Bufstream supports Kafka >= 2.4.0 protocol.
+            # "partition.assignment.strategy": "cooperative-sticky",  # KIP-429, requires >= 2.4.0
+            # "group.instance.id": socket.gethostname(),  # KIP-345, requires >= 2.3.0
             **_make_auth_config(),
             **additional_kafka_config,
         }
 
         return cls(config)
+
+    def commit_batch_async(self, messages: list[Any]) -> None:
+        """Commit the highest offset per partition in a single async call.
+
+        Replaces N synchronous per-message commits with one non-blocking call,
+        which keeps the coordinator connection free for heartbeats.
+
+        Args:
+            messages: Raw confluent-kafka Message objects to commit.
+        """
+        if not messages:
+            return
+
+        # Keep only the highest offset per (topic, partition).
+        max_offsets: dict[tuple[str, int], int] = {}
+        for msg in messages:
+            key = (msg.topic(), msg.partition())
+            offset = msg.offset()
+            if key not in max_offsets or offset > max_offsets[key]:
+                max_offsets[key] = offset
+
+        # commit position = next offset the consumer should read
+        offsets = [
+            TopicPartition(topic, partition, offset + 1)
+            for (topic, partition), offset in max_offsets.items()
+        ]
+
+        try:
+            self.commit(offsets=offsets, asynchronous=True)
+        except Exception:
+            # Async commit failure is non-fatal: the messages will be
+            # redelivered on the next rebalance and reprocessed.
+            logger.warning("Async batch commit failed", exc_info=True)
 
 
 def _make_broker_host() -> str:

@@ -121,8 +121,10 @@ ATTRIBUTE_KEYS = {
     # Span kind - identifies the type of operation
     "kind": [
         "weave.span.kind",  # Weave-specific
-        "traceloop.span.kind",  # Traceloop
-        "openinference.span.kind",  # OpenInference
+        # See: https://www.traceloop.com/docs/openllmetry/contributing/semantic-conventions#llm-frameworks
+        "traceloop.span.kind",  # Traceloop - workflow, task, agent, tool.
+        # See: https://arize-ai.github.io/openinference/spec/semantic_conventions.html
+        "openinference.span.kind",  # OpenInference - LLM, EMBEDDING, CHAIN, RETRIEVER, RERANKER, TOOL, AGENT, GUARDRAIL, EVALUATOR, PROMPT
     ],
     # Model name/identifier
     "model": ["gen_ai.response.model", "llm.model_name", "ai.model.id"],

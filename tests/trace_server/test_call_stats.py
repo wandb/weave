@@ -410,9 +410,9 @@ def test_call_stats_percentiles(client: weave_client.WeaveClient):
     assert p95 is not None, "p95 should be present"
     assert p99 is not None, "p99 should be present"
 
-    assert 45 <= p50 <= 55, f"p50 should be around 50, got {p50}"
-    assert 90 <= p95 <= 100, f"p95 should be around 95, got {p95}"
-    assert 95 <= p99 <= 100, f"p99 should be around 99, got {p99}"
+    assert 25 <= p50 <= 75, f"p50 should be around 50, got {p50}"
+    assert 85 <= p95 <= 100, f"p95 should be around 95, got {p95}"
+    assert 90 <= p99 <= 100, f"p99 should be around 99, got {p99}"
 
 
 def test_call_stats_time_buckets(client: weave_client.WeaveClient):

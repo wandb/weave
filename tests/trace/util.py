@@ -18,21 +18,21 @@ def client_is_sqlite(client):
     )
 
 
-class AnyStrMatcher:
+class AnyStrMatcher:  # noqa: PLW1641
     """Matches any string."""
 
     def __eq__(self, other):
         return isinstance(other, str)
 
 
-class AnyIntMatcher:
+class AnyIntMatcher:  # noqa: PLW1641
     """Matches any integer."""
 
     def __eq__(self, other):
         return isinstance(other, int)
 
 
-class RegexStringMatcher(str):
+class RegexStringMatcher(str):  # noqa: PLW1641
     """Matches strings based on a regex pattern."""
 
     def __init__(self, pattern):
@@ -44,7 +44,7 @@ class RegexStringMatcher(str):
         return bool(re.match(self.pattern, other_string))
 
 
-class MaybeStringMatcher:
+class MaybeStringMatcher:  # noqa: PLW1641
     """Matches strings or None."""
 
     def __init__(self, s):
@@ -56,7 +56,7 @@ class MaybeStringMatcher:
         return self.s == other
 
 
-class FuzzyDateTimeMatcher:
+class FuzzyDateTimeMatcher:  # noqa: PLW1641
     """Matches datetime objects within 1ms."""
 
     def __init__(self, dt):
@@ -67,7 +67,7 @@ class FuzzyDateTimeMatcher:
         return abs((self.dt - other).total_seconds()) < 0.001
 
 
-class DatetimeMatcher:
+class DatetimeMatcher:  # noqa: PLW1641
     def __eq__(self, other):
         return isinstance(other, datetime.datetime)
 

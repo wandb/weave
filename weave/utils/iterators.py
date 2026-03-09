@@ -33,7 +33,7 @@ def first(iterable: Iterable[T]) -> T:
     return next(iter(iterable))
 
 
-class ThreadSafeLazyList(Sequence[T]):
+class ThreadSafeLazyList(Sequence[T]):  # noqa: PLW1641
     """Provides a thread-safe, iterable sequence by caching results in memory.
 
     This class is thread-safe and supports multiple iterations over the same data and

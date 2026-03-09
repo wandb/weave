@@ -4,7 +4,10 @@ from collections.abc import Callable
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel
+
 import weave
+from weave import Content
 from weave.trace.autopatch import OpSettings
 from weave.trace.call import Call
 from weave.trace.op import _add_accumulator
@@ -17,6 +20,24 @@ SKIP_TRACING_FUNCTIONS = [
     "google.genai.models.Models.count_tokens",
     "google.genai.models.AsyncModels.count_tokens",
 ]
+
+
+def _traverse_and_replace_blobs(obj: Any) -> Any:
+    if isinstance(obj, BaseModel):
+        return _traverse_and_replace_blobs(obj.model_dump())
+    elif isinstance(obj, dict):
+        if obj.get("data") is not None and obj.get("mime_type") is not None:
+            data = bytes(obj.get("data", ""))
+            mimetype = obj.get("mime_type", "")
+            if len(data) > 0 and len(mimetype) > 0:
+                return Content.from_bytes(data, mimetype=mimetype)
+        return {k: _traverse_and_replace_blobs(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_traverse_and_replace_blobs(v) for v in obj]
+    elif isinstance(obj, tuple):
+        return tuple(_traverse_and_replace_blobs(v) for v in obj)
+
+    return obj
 
 
 def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -42,6 +63,9 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     # be displayed in the Weave UI
     if "self" in inputs:
         inputs["self"] = dictify(inputs["self"])
+
+    inputs = _traverse_and_replace_blobs(inputs)
+
     return inputs
 
 
@@ -56,7 +80,7 @@ def google_genai_gemini_on_finish(
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if output:
-        call.output = dictify(output)
+        call.output = _traverse_and_replace_blobs(dictify(output))
         if hasattr(output, "usage_metadata"):
             usage_data = {
                 "prompt_tokens": output.usage_metadata.prompt_token_count,

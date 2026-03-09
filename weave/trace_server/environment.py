@@ -13,7 +13,7 @@ def kafka_broker_host() -> str:
 
 def kafka_broker_port() -> int:
     """The port of the kafka broker."""
-    return int(os.environ.get("KAFKA_BROKER_PORT", 9092))
+    return int(os.environ.get("KAFKA_BROKER_PORT", "9092"))
 
 
 def kafka_client_user() -> str | None:
@@ -59,12 +59,12 @@ def wf_enable_online_eval() -> bool:
 
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", 100))
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", "100"))
 
 
 def wf_scoring_worker_batch_timeout() -> int:
     """The timeout for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", 5))
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", "5"))
 
 
 def wf_scoring_worker_check_cancellation() -> bool:
@@ -98,7 +98,7 @@ def wf_clickhouse_host() -> str:
 
 def wf_clickhouse_port() -> int:
     """The port of the clickhouse server."""
-    return int(os.environ.get("WF_CLICKHOUSE_PORT", 8123))
+    return int(os.environ.get("WF_CLICKHOUSE_PORT", "8123"))
 
 
 def wf_clickhouse_user() -> str:
@@ -139,6 +139,26 @@ def wf_clickhouse_use_distributed_tables() -> bool:
     )
 
 
+VALID_CALLS_SHARD_KEYS = frozenset({"trace_id", "id", "project_id"})
+
+
+def wf_clickhouse_calls_shard_key() -> str:
+    """The column used as shard key for calls_complete in distributed mode.
+
+    Valid values: "trace_id" (default), "id", "project_id".
+
+    Raises:
+        ValueError: If the configured shard key is not one of the valid values.
+    """
+    key = os.environ.get("WF_CLICKHOUSE_CALLS_SHARD_KEY", "trace_id")
+    if key not in VALID_CALLS_SHARD_KEYS:
+        raise ValueError(
+            f"Invalid WF_CLICKHOUSE_CALLS_SHARD_KEY: {key!r}. "
+            f"Must be one of: {', '.join(sorted(VALID_CALLS_SHARD_KEYS))}"
+        )
+    return key
+
+
 def wf_clickhouse_max_memory_usage() -> int | None:
     """The maximum memory usage for the clickhouse server."""
     mem = os.environ.get("WF_CLICKHOUSE_MAX_MEMORY_USAGE")
@@ -163,6 +183,47 @@ def wf_clickhouse_max_execution_time() -> int | None:
             f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not valid"
         )
         return None
+
+
+def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
+    """The minimum async insert busy timeout in milliseconds for ClickHouse.
+
+    When async_insert_use_adaptive_busy_timeout is enabled, this sets the lower
+    bound and initial value for the adaptive flush interval. Lower values flush
+    sooner under low load.
+    """
+    env_key = "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS"
+    val = os.environ.get(env_key)
+    if val is None:
+        return 100
+    try:
+        return int(val)
+    except ValueError:
+        logger.exception(
+            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '{val}' is not valid"
+        )
+        return 100
+
+
+def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
+    """The maximum async insert busy timeout in milliseconds for ClickHouse.
+
+    When async_insert_use_adaptive_busy_timeout is enabled, this sets the upper
+    bound for how long ClickHouse will wait before flushing the async insert
+    buffer. The adaptive algorithm starts at async_insert_busy_timeout_min_ms
+    and adjusts up to this value based on load.
+    """
+    env_key = "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS"
+    val = os.environ.get(env_key)
+    if val is None:
+        return 1000
+    try:
+        return int(val)
+    except ValueError:
+        logger.exception(
+            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '{val}' is not valid"
+        )
+        return 1000
 
 
 # BYOB Settings

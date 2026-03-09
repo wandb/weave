@@ -1,0 +1,34 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-err999"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Something went wrong while processing."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 800,
+    "duration_api_ms": 600,
+    "is_error": true,
+    "num_turns": 1,
+    "session_id": "s-err999",
+    "total_cost_usd": 0.001,
+    "usage": {
+      "input_tokens": 20,
+      "output_tokens": 10
+    },
+    "result": "Error: something went wrong"
+  }
+]

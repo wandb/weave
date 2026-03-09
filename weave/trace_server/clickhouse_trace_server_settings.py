@@ -52,23 +52,37 @@ CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
     # Valid values here are 'allow' or 'global', with 'global' slightly outperforming in testing
     "distributed_product_mode": "global",
+    "allow_experimental_lightweight_update": 1,
+}
+
+# The new ClickHouse query analyzer (v24+) has a bug serializing SortingStep
+# for non-Full sorting modes on distributed tables, which causes error 48
+# ("Serialization of SortingStep is implemented only for Full sorting").
+# Cost queries create partial-sort pipeline steps that break across shards.
+# Disabling this setting fixes the issue. Fixed in CH version 25.12.x
+CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS: dict[str, Any] = {
+    "collect_hash_table_stats_during_joins": 0,
 }
 
 # ClickHouse async insert settings
 # These settings are used when async_insert is enabled for high-throughput scenarios
 # Reference: https://clickhouse.com/docs/en/optimize/asynchronous-inserts
-CLICKHOUSE_ASYNC_INSERT_SETTINGS = {
+CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, Any] = {
     "async_insert": 1,
     # Wait for async insert to complete to ensure errors are caught
     "wait_for_async_insert": 1,
-    # Use adaptive busy timeout for better performance under varying loads
+    # Adaptive timeout: starts at min_ms and scales up to max_ms under load,
+    # avoiding long waits on small/infrequent inserts while batching efficiently
+    # under high throughput.
     "async_insert_use_adaptive_busy_timeout": 1,
+    # Minimum flush interval — flush quickly when load is low.
+    # Controlled via WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS env var.
+    "async_insert_busy_timeout_min_ms": wf_env.wf_clickhouse_async_insert_busy_timeout_min_ms(),
+    # Maximum flush interval — ceiling for the adaptive algorithm.
+    # Controlled via WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS env var.
+    "async_insert_busy_timeout_max_ms": wf_env.wf_clickhouse_async_insert_busy_timeout_max_ms(),
     # Max data size before flushing (10 MB), this is the default
     "async_insert_max_data_size": 10_485_760,
-    # Max number of queries to batch together, this is the default
-    "async_insert_max_query_number": 450,
-    # Max time between buffer flushes
-    "async_insert_busy_timeout_ms": 1000,
 }
 
 

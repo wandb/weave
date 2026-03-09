@@ -57,6 +57,14 @@
   - Note: For materialized views that were modified via ALTER TABLE MODIFY QUERY,
     you must drop the `_local` version explicitly (e.g., `DROP VIEW view_name_local`)
 
+**INSERT INTO:**
+  - Skipped entirely (backfill not supported for distributed tables; handle per-shard)
+
+**RENAME TABLE:**
+  - Renames `table_name_local` to `new_name_local` ON CLUSTER
+  - Drops old distributed table `table_name` ON CLUSTER
+  - Creates new distributed table `new_name` ON CLUSTER pointing to `new_name_local`
+
 **MATERIALIZE commands:**
   - Skipped entirely (not supported by distributed tables)
 """
@@ -74,6 +82,7 @@ from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
+from weave.trace_server.environment import wf_clickhouse_calls_shard_key
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +93,12 @@ DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 
 # Constants for table naming conventions
 VIEW_SUFFIX = "_view"
+
+# Tables that use ID-based sharding (sipHash64(field)) instead of random sharding
+# in distributed mode. Maps table name to the field used for sharding.
+# calls_complete: shard key is configurable via WF_CLICKHOUSE_CALLS_SHARD_KEY env var
+# Valid values: "trace_id" (default), "id", "project_id"
+ID_SHARDED_TABLES: dict[str, str] = {"calls_complete": wf_clickhouse_calls_shard_key()}
 
 
 @dataclass(frozen=True)
@@ -187,9 +202,13 @@ class BaseClickHouseTraceServerMigrator(ABC):
         if status["curr_version"] == 0:
             db_sql = self._create_db_sql(target_db)
             self.ch_client.command(db_sql)
-        for target_version, migration_file in migrations_to_apply:
-            self._apply_migration(target_db, target_version, migration_file)
-        self._run_post_migration_hook(target_db, status["curr_version"], target_version)
+        applied_target_version = target_version
+        for migration_target_version, migration_file in migrations_to_apply:
+            self._apply_migration(target_db, migration_target_version, migration_file)
+            applied_target_version = migration_target_version
+        self._run_post_migration_hook(
+            target_db, status["curr_version"], applied_target_version
+        )
 
     def _run_post_migration_hook(
         self, target_db: str, current_version: int, target_version: int | None
@@ -268,8 +287,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
                     )
                 migration_map[version]["down"] = file
 
-            if version > max_version:
-                max_version = version
+            max_version = max(max_version, version)
 
         if len(migration_map) == 0:
             raise MigrationError("No migrations found")
@@ -334,7 +352,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_file_path = os.path.join(self.migration_dir, migration_file)
 
-        with open(migration_file_path) as f:
+        with open(migration_file_path, encoding="utf-8") as f:
             migration_sql = f.read()
 
         # Mark migration as partially applied
@@ -496,9 +514,11 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
 
         def replace_engine(match: re.Match[str]) -> str:
             engine_prefix = match.group(1) or ""
+            engine_args = match.group(2) or ""
             if engine_prefix.lower().startswith("replicated"):
                 return match.group(0)
-            return f"ENGINE = Replicated{engine_prefix}MergeTree"
+            engine_args = match.group(2) or ""
+            return f"ENGINE = Replicated{engine_prefix}MergeTree{engine_args}"
 
         return SQLPatterns.MERGETREE_ENGINE.sub(replace_engine, sql_query)
 
@@ -510,30 +530,51 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         # ALTER TABLE
         if SQLPatterns.ALTER_TABLE_STMT.search(sql_query):
             return SQLPatterns.ALTER_TABLE_NAME_PATTERN.sub(
-                lambda m: f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}",
+                lambda m: (
+                    f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}"
+                ),
                 sql_query,
             )
 
         # CREATE TABLE
         if SQLPatterns.CREATE_TABLE_STMT.search(sql_query):
             return SQLPatterns.CREATE_TABLE_NAME_PATTERN.sub(
-                lambda m: f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}",
+                lambda m: (
+                    f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}"
+                ),
+                sql_query,
+            )
+
+        # DROP TABLE
+        if SQLPatterns.DROP_TABLE_STMT.search(sql_query):
+            return SQLPatterns.DROP_TABLE_NAME_PATTERN.sub(
+                lambda m: (
+                    f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}"
+                ),
                 sql_query,
             )
 
         # DROP VIEW
         if SQLPatterns.DROP_VIEW_STMT.search(sql_query):
             return SQLPatterns.DROP_VIEW_NAME_PATTERN.sub(
-                lambda m: f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}",
+                lambda m: (
+                    f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}"
+                ),
                 sql_query,
             )
 
         # CREATE VIEW / CREATE MATERIALIZED VIEW
         if SQLPatterns.CREATE_VIEW_STMT.search(sql_query):
             return SQLPatterns.CREATE_VIEW_NAME_PATTERN.sub(
-                lambda m: f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}",
+                lambda m: (
+                    f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}"
+                ),
                 sql_query,
             )
+
+        # RENAME TABLE
+        if SQLPatterns.RENAME_TABLE_STMT.search(sql_query):
+            return f"{sql_query.rstrip()} ON CLUSTER {self.replicated_cluster}"
 
         return sql_query
 
@@ -609,19 +650,34 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
 
         curr_db = self.ch_client.database
         self.ch_client.database = target_db
+        command_for_match = SQLPatterns.LINE_COMMENT.sub("", command)
 
         # Skip MATERIALIZE commands (not supported by distributed tables)
-        if SQLPatterns.MATERIALIZE.search(command):
+        if SQLPatterns.MATERIALIZE.search(command_for_match):
             logger.warning(
                 f"Skipping MATERIALIZE command (not supported in distributed mode): {command}"
             )
             self.ch_client.database = curr_db
             return
 
+        # Skip INSERT commands (backfill not supported in distributed mode)
+        if SQLPatterns.INSERT_STMT.search(command_for_match):
+            logger.warning(
+                f"Skipping INSERT command (not supported in distributed mode): {command[:100]}..."
+            )
+            self.ch_client.database = curr_db
+            return
+
+        # Handle RENAME TABLE (local rename + drop/recreate distributed table)
+        if SQLPatterns.RENAME_TABLE_STMT.search(command_for_match):
+            self._execute_distributed_rename(command)
+            self.ch_client.database = curr_db
+            return
+
         # Handle CREATE/DROP VIEW (no local/distributed split, just add ON CLUSTER)
         if SQLPatterns.CREATE_VIEW_STMT.search(
-            command
-        ) or SQLPatterns.DROP_VIEW_STMT.search(command):
+            command_for_match
+        ) or SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
             formatted_command = self._format_replicated_sql(command)
             formatted_command = self._add_on_cluster_clause(formatted_command)
             self.ch_client.command(formatted_command)
@@ -632,7 +688,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         formatted_command = self._format_replicated_sql_distributed(command, target_db)
 
         # Handle ALTER TABLE
-        if SQLPatterns.ALTER_TABLE_STMT.search(formatted_command):
+        if SQLPatterns.ALTER_TABLE_STMT.search(command_for_match):
             self._execute_distributed_alter(formatted_command)
         else:
             # Handle CREATE TABLE and other DDL
@@ -645,8 +701,17 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
 
         def replace_engine(match: re.Match[str]) -> str:
             engine_prefix = match.group(1) or ""
+            engine_args = match.group(2) or ""
             if engine_prefix.lower().startswith("replicated"):
                 return match.group(0)
+
+            # Extract original engine args (e.g. "created_at" from ReplacingMergeTree(created_at))
+            engine_args = match.group(2)
+            extra_args = ""
+            if engine_args:
+                inner = engine_args.strip("()")
+                if inner:
+                    extra_args = f", {inner}"
 
             # Extract table name for path
             table_match = SQLPatterns.CREATE_TABLE.search(sql_query)
@@ -654,11 +719,24 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                 table_name = table_match.group(1)
                 if "." in table_name:
                     table_name = table_name.split(".")[-1]
-                # Use _local suffix in the path for distributed tables
                 local_table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
-                return f"ENGINE = Replicated{engine_prefix}MergeTree('/clickhouse/tables/{{shard}}/{target_db}/{local_table_name}', '{{replica}}')"
 
-            return f"ENGINE = Replicated{engine_prefix}MergeTree"
+                # Merge original engine args (e.g. created_at from
+                # ReplacingMergeTree(created_at)) with the ZK path params.
+                extra_args = ""
+                if engine_args and engine_args != "()":
+                    inner = engine_args[1:-1].strip()
+                    if inner:
+                        extra_args = f", {inner}"
+
+                return (
+                    f"ENGINE = Replicated{engine_prefix}MergeTree("
+                    f"'/clickhouse/tables/{{shard}}/{target_db}/{local_table_name}', "
+                    f"'{{replica}}'{extra_args})"
+                )
+
+            engine_args_str = engine_args or ""
+            return f"ENGINE = Replicated{engine_prefix}MergeTree{engine_args_str}"
 
         return SQLPatterns.MERGETREE_ENGINE.sub(replace_engine, sql_query)
 
@@ -730,6 +808,34 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         local_command = self._add_on_cluster_clause(local_command)
         self.ch_client.command(local_command)
 
+    def _execute_distributed_rename(self, command: str) -> None:
+        """Handle RENAME TABLE in distributed mode.
+
+        Distributed tables bake the local table reference into the engine
+        definition at CREATE time, so a plain RENAME is insufficient. Instead:
+        1. Rename the local (Replicated*MergeTree) table ON CLUSTER.
+        2. Drop the old distributed table ON CLUSTER.
+        3. Create a new distributed table pointing to the renamed local table,
+           picking up the correct sharding key from ID_SHARDED_TABLES.
+        """
+        match = SQLPatterns.RENAME_TABLE.search(command)
+        if not match:
+            raise MigrationError(f"Could not parse RENAME TABLE: {command}")
+
+        old_name = match.group(1)
+        new_name = match.group(2)
+
+        old_local = self._add_local_suffix(old_name)
+        new_local = self._add_local_suffix(new_name)
+
+        self.ch_client.command(
+            f"RENAME TABLE {old_local} TO {new_local} ON CLUSTER {self.replicated_cluster}"
+        )
+        self.ch_client.command(
+            f"DROP TABLE IF EXISTS {old_name} ON CLUSTER {self.replicated_cluster}"
+        )
+        self.ch_client.command(self._create_distributed_table_sql(new_name))
+
     def _execute_distributed_ddl(self, command: str) -> None:
         """Execute DDL in distributed mode (CREATE TABLE, CREATE/DROP VIEW)."""
         formatted_command = self._add_on_cluster_clause(command)
@@ -781,12 +887,21 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         )
 
     def _create_distributed_table_sql(self, table_name: str) -> str:
-        """Generate SQL to create a distributed table."""
+        """Generate SQL to create a distributed table.
+
+        For tables in ID_SHARDED_TABLES, uses sipHash64(field) as the sharding key
+        to ensure all data for a specific ID goes to the same shard, enabling
+        efficient point lookups. Other tables use rand() for even distribution.
+        """
         local_table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
+        if shard_field := ID_SHARDED_TABLES.get(table_name):
+            sharding_key = f"sipHash64({shard_field})"
+        else:
+            sharding_key = "rand()"
         return f"""
         CREATE TABLE IF NOT EXISTS {table_name} ON CLUSTER {self.replicated_cluster}
         AS {local_table_name}
-        ENGINE = Distributed({self.replicated_cluster}, currentDatabase(), {local_table_name}, rand())
+        ENGINE = Distributed({self.replicated_cluster}, currentDatabase(), {local_table_name}, {sharding_key})
     """
 
     @staticmethod
@@ -825,7 +940,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         def add_suffix(match: re.Match[str]) -> str:
             table_name = match.group(2)
             if not table_name.endswith(ch_settings.LOCAL_TABLE_SUFFIX):
-                table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
+                table_name += ch_settings.LOCAL_TABLE_SUFFIX
             return f"{match.group(1)}{table_name}{match.group(3)}"
 
         return SQLPatterns.ALTER_TABLE_NAME_PATTERN.sub(add_suffix, sql_query)
@@ -858,7 +973,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         def add_suffix_to_from(match: re.Match[str]) -> str:
             table_name = match.group(1) if match.group(1) else match.group(2)
             if not table_name.endswith(ch_settings.LOCAL_TABLE_SUFFIX):
-                table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
+                table_name += ch_settings.LOCAL_TABLE_SUFFIX
             return f"FROM {table_name}"
 
         # Collect table names from FROM clauses before renaming
@@ -990,20 +1105,25 @@ class SQLPatterns:
     SAFE_IDENTIFIER: Pattern = re.compile(r"^[a-zA-Z0-9_\.]+$")
 
     # Engine patterns
+    # Group 1: engine prefix (e.g. "Replacing", "Aggregating")
+    # Group 2: engine arguments including parens (e.g. "(created_at)" or "()")
     MERGETREE_ENGINE: Pattern = re.compile(
-        r"ENGINE\s*=\s*(\w+)?MergeTree\b(\(\))?", re.IGNORECASE
+        r"ENGINE\s*=\s*(\w+)?MergeTree\b(\([^)]*\))?", re.IGNORECASE
     )
 
     # DDL statement patterns
     ALTER_TABLE_STMT: Pattern = re.compile(r"\bALTER\s+TABLE\b", re.IGNORECASE)
     CREATE_TABLE_STMT: Pattern = re.compile(r"\bCREATE\s+TABLE\b", re.IGNORECASE)
+    DROP_TABLE_STMT: Pattern = re.compile(r"\bDROP\s+TABLE\b", re.IGNORECASE)
     DROP_VIEW_STMT: Pattern = re.compile(r"\bDROP\s+VIEW\b", re.IGNORECASE)
+    RENAME_TABLE_STMT: Pattern = re.compile(r"\bRENAME\s+TABLE\b", re.IGNORECASE)
     CREATE_VIEW_STMT: Pattern = re.compile(
         r"\bCREATE\s+(?:MATERIALIZED\s+)?VIEW\b", re.IGNORECASE
     )
     DROP_TABLE_OR_VIEW: Pattern = re.compile(
         r"\bDROP\s+(TABLE|VIEW)\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_.]+)", re.IGNORECASE
     )
+    LINE_COMMENT: Pattern = re.compile(r"(?m)^\s*--.*$")
 
     # ON CLUSTER pattern
     ON_CLUSTER: Pattern = re.compile(r"\bON\s+CLUSTER\b", re.IGNORECASE)
@@ -1012,6 +1132,7 @@ class SQLPatterns:
     # Distributed mode patterns
     MODIFY_QUERY: Pattern = re.compile(r"\bMODIFY\s+QUERY\b", re.IGNORECASE)
     MATERIALIZE: Pattern = re.compile(r"\bMATERIALIZE\b", re.IGNORECASE)
+    INSERT_STMT: Pattern = re.compile(r"\bINSERT\s+INTO\b", re.IGNORECASE)
     LOCAL_ONLY_OPS: Pattern = re.compile(
         r"\b(ADD|DROP)\s+INDEX\b|\b(DELETE|UPDATE)\b", re.IGNORECASE
     )
@@ -1022,6 +1143,14 @@ class SQLPatterns:
     )
     CREATE_TABLE_NAME_PATTERN: Pattern = re.compile(
         r"(\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s*\()",
+        re.IGNORECASE,
+    )
+    DROP_TABLE_NAME_PATTERN: Pattern = re.compile(
+        r"(\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s|$)",
+        re.IGNORECASE,
+    )
+    RENAME_TABLE: Pattern = re.compile(
+        r"RENAME\s+TABLE\s+([a-zA-Z0-9_.]+)\s+TO\s+([a-zA-Z0-9_.]+)",
         re.IGNORECASE,
     )
     DROP_VIEW_NAME_PATTERN: Pattern = re.compile(

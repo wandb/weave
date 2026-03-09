@@ -155,11 +155,17 @@ def test_dataset_caching(client):
 
 def test_dataset_select(client):
     original_rows = [{"id": i, "val": i * 2} for i in range(10)]
-    ds = weave.Dataset(rows=original_rows)
+    ds = weave.Dataset(
+        name="dataset-select-test",
+        description="Dataset select metadata propagation test",
+        rows=original_rows,
+    )
 
     # Select first 3 using range
     selected_ds_range = ds.select(range(3))
     assert len(selected_ds_range) == 3
+    assert selected_ds_range.name == ds.name
+    assert selected_ds_range.description == ds.description
     assert list(selected_ds_range) == [
         {"id": 0, "val": 0},
         {"id": 1, "val": 2},

@@ -1,11 +1,10 @@
-import logging
+import asyncio
 from dataclasses import dataclass
 
 import numpy as np
 from pydantic import Field
 
 import weave
-from weave.object.obj import deprecated_field
 
 
 def test_weaveflow_op_wandb(client):
@@ -64,7 +63,6 @@ def test_async_ops(client):
         return v
 
     called = async_op_add5(10)
-    import asyncio
 
     result = asyncio.run(called)
     assert result == 15
@@ -191,38 +189,3 @@ def test_weave_op_mutates_and_returns_same_object(client):
     thing.append_tool(lambda: 2)
     assert len(thing.tools) == 2
     assert thing.tools is thing.tools
-
-
-def test_deprecated_field_warning(caplog):
-    caplog.set_level(logging.WARNING)
-
-    class TestObj(weave.Object):
-        new_field: int = Field(..., alias="old_field")
-
-        @deprecated_field("new_field")
-        def old_field(self): ...
-
-    # Using new field is the same, but you can access the old field name
-    obj = TestObj(new_field=1)
-    assert obj.new_field == obj.old_field == 1
-
-    obj.new_field = 2
-    assert obj.new_field == obj.old_field == 2
-
-    # You can also instantiate with the old field name, but using it will show warnings
-    obj = TestObj(old_field=1)
-    with caplog.at_level(logging.WARNING):
-        v = obj.old_field
-
-    assert v == 1 == obj.new_field
-    assert "Use `new_field` instead of `old_field`" in caplog.text
-
-    caplog.clear()
-
-    with caplog.at_level(logging.WARNING):
-        obj.old_field = 2
-
-    assert obj.new_field == obj.old_field == 2
-    assert "Use `new_field` instead of `old_field`" in caplog.text
-
-    caplog.clear()

@@ -48,13 +48,13 @@ media_cases = [
         exp_json={
             "_type": "CustomWeaveType",
             "weave_type": {"type": "datetime.datetime"},
-            "load_op": "weave:///shawn/test-project/op/load_datetime.datetime:I5VxfLU7vHlucXe4FZJfpByq3ZURgFCB4AGRAbzJBiM",
+            "load_op": "weave:///shawn/test-project/op/load_datetime.datetime:N6xx3axeMF8B1vX0mYxLghiiXVJyQLwewF19MzMnsLo",
             "val": "2025-01-01T00:00:00+00:00",
         },
         exp_objects=[
             {
                 "object_id": "load_datetime.datetime",
-                "digest": "I5VxfLU7vHlucXe4FZJfpByq3ZURgFCB4AGRAbzJBiM",
+                "digest": "N6xx3axeMF8B1vX0mYxLghiiXVJyQLwewF19MzMnsLo",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -83,12 +83,12 @@ media_cases = [
                 if sys.platform == "win32"
                 else "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ"
             },
-            "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:G57ZLLyjNmBYuUiKcaFR2epBPvaTocSrl2I2ZjXKRMo",
+            "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:e1nS8rg9KiOooLOkLsYf4NAIYGwv7xxeBZ7tZE9wmL0",
         },
         exp_objects=[
             {
                 "object_id": "load_PIL.Image.Image",
-                "digest": "G57ZLLyjNmBYuUiKcaFR2epBPvaTocSrl2I2ZjXKRMo",
+                "digest": "e1nS8rg9KiOooLOkLsYf4NAIYGwv7xxeBZ7tZE9wmL0",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -125,12 +125,12 @@ media_cases = [
                 "_metadata.json": "k3eN5qEgVIyMLbUc8sQrx1LRU0gxf7l6dD9LIoSoa0M",
                 "audio.wav": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
             },
-            "load_op": "weave:///shawn/test-project/op/load_weave.type_handlers.Audio.audio.Audio:TLsINgRZoZmdVCOnipG3ZxtONX2GwnXndow1Z2iuWbs",
+            "load_op": "weave:///shawn/test-project/op/load_weave.type_handlers.Audio.audio.Audio:oyxZlZEsOQd7LSH9GYEMeQVenamIlRTTuxpn3SHdmZA",
         },
         exp_objects=[
             {
                 "object_id": "load_weave.type_handlers.Audio.audio.Audio",
-                "digest": "TLsINgRZoZmdVCOnipG3ZxtONX2GwnXndow1Z2iuWbs",
+                "digest": "oyxZlZEsOQd7LSH9GYEMeQVenamIlRTTuxpn3SHdmZA",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -172,19 +172,19 @@ media_cases = [
                 "weave_type": {"type": "rich.markdown.Markdown"},
                 "files": {"markup.md": "LtyYaEfiCbQBbhQabchxbTIHNQ9BaWk4LUMVOb8pLko"},
                 "val": {"code_theme": "monokai"},
-                "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:MPwIZFHQYXdmosmxQXRt2G3MbawPv70hA7t5sBsRQy4",
+                "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:x9qlkXYPcUQYqPOsi5zRreneU043i3SzZoOnIgHfTlc",
             },
             "file": {
                 "_type": "CustomWeaveType",
                 "weave_type": {"type": "rich.markdown.Markdown"},
                 "val": {"markup": "# Hello, world!", "code_theme": "monokai"},
-                "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:MPwIZFHQYXdmosmxQXRt2G3MbawPv70hA7t5sBsRQy4",
+                "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:x9qlkXYPcUQYqPOsi5zRreneU043i3SzZoOnIgHfTlc",
             },
         },
         exp_objects=[
             {
                 "object_id": "load_rich.markdown.Markdown",
-                "digest": "MPwIZFHQYXdmosmxQXRt2G3MbawPv70hA7t5sBsRQy4",
+                "digest": "x9qlkXYPcUQYqPOsi5zRreneU043i3SzZoOnIgHfTlc",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -202,8 +202,10 @@ media_cases = [
                 "exp_content": b'import weave\nfrom typing import Any\nfrom rich.markdown import Markdown\n\n@weave.op\ndef load(artifact: "MemTraceFilesArtifact", name: str, val: Any) -> Markdown:\n    """Load markdown from file and metadata."""\n    if "markup" in val:\n        markup = val["markup"]\n    else:\n        with artifact.open("markup.md", binary=False) as f:\n            markup = f.read()\n\n    kwargs = {}\n    if val and isinstance(val, dict) and "code_theme" in val:\n        kwargs["code_theme"] = val["code_theme"]\n\n    return Markdown(markup=markup, **kwargs)\n',
             },
         ],
-        equality_check=lambda a, b: markdown_equality_check(a["inline"], b["inline"])
-        and markdown_equality_check(a["file"], b["file"]),
+        equality_check=lambda a, b: (
+            markdown_equality_check(a["inline"], b["inline"])
+            and markdown_equality_check(a["file"], b["file"])
+        ),
         python_version_code_capture=(3, 13),
     ),
     # Video
@@ -216,12 +218,12 @@ media_cases = [
             "_type": "CustomWeaveType",
             "weave_type": {"type": "moviepy.video.VideoClip.VideoClip"},
             "files": {"video.mp4": "Aoxws9QUryX0YiZ8ScTAyi4YzX2SO5QHTsLsYABBMjc"},
-            "load_op": "weave:///shawn/test-project/op/load_moviepy.video.VideoClip.VideoClip:57nRXE8OTSrJCh4wBQDAu8LWHiaKrPXXGqcSiMuX33s",
+            "load_op": "weave:///shawn/test-project/op/load_moviepy.video.VideoClip.VideoClip:U98jwwiRmyszYRAYU2kZoLEqhrb9k41gkc2ZhCDOisY",
         },
         exp_objects=[
             {
                 "object_id": "load_moviepy.video.VideoClip.VideoClip",
-                "digest": "57nRXE8OTSrJCh4wBQDAu8LWHiaKrPXXGqcSiMuX33s",
+                "digest": "U98jwwiRmyszYRAYU2kZoLEqhrb9k41gkc2ZhCDOisY",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -239,8 +241,9 @@ media_cases = [
                 "exp_content": VIDEO_BYTES,
             },
         ],
-        equality_check=lambda a, b: a.duration
-        == b.duration,  # could do better, but this is a good start
+        equality_check=lambda a, b: (
+            a.duration == b.duration
+        ),  # could do better, but this is a good start
         python_version_code_capture=(3, 13),
     ),
     # Content
@@ -259,12 +262,12 @@ media_cases = [
                 if sys.platform == "win32"
                 else "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
             },
-            "load_op": "weave:///shawn/test-project/op/load_weave.type_wrappers.Content.content.Content:rYNtROqXAlmInL2FMfYyc5E9lnGKYboE1rX3POB6okw",
+            "load_op": "weave:///shawn/test-project/op/load_weave.type_wrappers.Content.content.Content:SuzOIS69NdH6zLs4fsVxbYFkcYpXPPb7G8Y0VmdkISw",
         },
         exp_objects=[
             {
                 "object_id": "load_weave.type_wrappers.Content.content.Content",
-                "digest": "rYNtROqXAlmInL2FMfYyc5E9lnGKYboE1rX3POB6okw",
+                "digest": "SuzOIS69NdH6zLs4fsVxbYFkcYpXPPb7G8Y0VmdkISw",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -302,14 +305,14 @@ media_cases = [
         is_legacy=True,
         exp_json={
             "_type": "CustomWeaveType",
-            "load_op": "weave:///shawn/test-project/op/load_datetime.datetime:qfWIlyPcNsevFkkBtJ50m3oU37XyuIxfAh4nLmTWyGY",
+            "load_op": "weave:///shawn/test-project/op/load_datetime.datetime:JQgNoNgWXquwGbw9iXYLUdujBhjS58FGsqKfuRgBbXo",
             "val": "2025-01-01T00:00:00+00:00",
             "weave_type": {"type": "datetime.datetime"},
         },
         exp_objects=[
             {
                 "object_id": "load_datetime.datetime",
-                "digest": "qfWIlyPcNsevFkkBtJ50m3oU37XyuIxfAh4nLmTWyGY",
+                "digest": "JQgNoNgWXquwGbw9iXYLUdujBhjS58FGsqKfuRgBbXo",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -333,12 +336,12 @@ media_cases = [
             "_type": "CustomWeaveType",
             "weave_type": {"type": "PIL.Image.Image"},
             "files": {"image.png": "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ"},
-            "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:G57ZLLyjNmBYuUiKcaFR2epBPvaTocSrl2I2ZjXKRMo",
+            "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:e1nS8rg9KiOooLOkLsYf4NAIYGwv7xxeBZ7tZE9wmL0",
         },
         exp_objects=[
             {
                 "object_id": "load_PIL.Image.Image",
-                "digest": "G57ZLLyjNmBYuUiKcaFR2epBPvaTocSrl2I2ZjXKRMo",
+                "digest": "e1nS8rg9KiOooLOkLsYf4NAIYGwv7xxeBZ7tZE9wmL0",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -370,12 +373,12 @@ media_cases = [
                 "_metadata.json": "k3eN5qEgVIyMLbUc8sQrx1LRU0gxf7l6dD9LIoSoa0M",
                 "audio.wav": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
             },
-            "load_op": "weave:///shawn/test-project/op/load_weave.type_handlers.Audio.audio.Audio:2XCXiwP2vl1CaxrsqvkIeD3IXl5cykwIMDYbeGGtL5Q",
+            "load_op": "weave:///shawn/test-project/op/load_weave.type_handlers.Audio.audio.Audio:x5B1vY3lwSWBGHOKXia4WDQh3YaWeUeGQRjTe20cYPI",
         },
         exp_objects=[
             {
                 "object_id": "load_weave.type_handlers.Audio.audio.Audio",
-                "digest": "2XCXiwP2vl1CaxrsqvkIeD3IXl5cykwIMDYbeGGtL5Q",
+                "digest": "x5B1vY3lwSWBGHOKXia4WDQh3YaWeUeGQRjTe20cYPI",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -407,14 +410,14 @@ media_cases = [
         is_legacy=True,
         exp_json={
             "_type": "CustomWeaveType",
-            "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:K3Qbb0xXBuNKikOU3DYFUmeaEGVQZejAFbn5f1Ypuuo",
+            "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:W0mPNKoCoDkVCs6u3tBDl6YsoZEhYPzkSuSBSIXhnQo",
             "val": {"code_theme": "monokai", "markup": "# Hello, world!"},
             "weave_type": {"type": "rich.markdown.Markdown"},
         },
         exp_objects=[
             {
                 "object_id": "load_rich.markdown.Markdown",
-                "digest": "K3Qbb0xXBuNKikOU3DYFUmeaEGVQZejAFbn5f1Ypuuo",
+                "digest": "W0mPNKoCoDkVCs6u3tBDl6YsoZEhYPzkSuSBSIXhnQo",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -440,12 +443,12 @@ media_cases = [
             "_type": "CustomWeaveType",
             "weave_type": {"type": "moviepy.video.VideoClip.VideoClip"},
             "files": {"video.mp4": "Aoxws9QUryX0YiZ8ScTAyi4YzX2SO5QHTsLsYABBMjc"},
-            "load_op": "weave:///shawn/test-project/op/load_moviepy.video.VideoClip.VideoClip:l4uZahNcY9eftBBCimXVY6L0n4ZsRf0FVxT89LPuXrQ",
+            "load_op": "weave:///shawn/test-project/op/load_moviepy.video.VideoClip.VideoClip:xYyQ9VmHD1TaOqfb1UGsGHtoI01b3dZQ4QZPRbq4pl4",
         },
         exp_objects=[
             {
                 "object_id": "load_moviepy.video.VideoClip.VideoClip",
-                "digest": "l4uZahNcY9eftBBCimXVY6L0n4ZsRf0FVxT89LPuXrQ",
+                "digest": "xYyQ9VmHD1TaOqfb1UGsGHtoI01b3dZQ4QZPRbq4pl4",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -463,8 +466,9 @@ media_cases = [
                 "exp_content": VIDEO_BYTES,
             },
         ],
-        equality_check=lambda a, b: a.duration
-        == b.duration,  # could do better, but this is a good start
+        equality_check=lambda a, b: (
+            a.duration == b.duration
+        ),  # could do better, but this is a good start
         python_version_code_capture=(3, 13),
     ),
     SerializationTestCase(
@@ -481,12 +485,12 @@ media_cases = [
                 if sys.platform == "win32"
                 else "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
             },
-            "load_op": "weave:///shawn/test-project/op/load_weave.type_wrappers.Content.content.Content:mn7j2psDgjs1WbT1TUcqm8uOmy57vXx2q55DE6Mzxok",
+            "load_op": "weave:///shawn/test-project/op/load_weave.type_wrappers.Content.content.Content:jKs5CuwiyYGA4BenXYBijazlvmH04EyzP3JxskFLvUk",
         },
         exp_objects=[
             {
                 "object_id": "load_weave.type_wrappers.Content.content.Content",
-                "digest": "mn7j2psDgjs1WbT1TUcqm8uOmy57vXx2q55DE6Mzxok",
+                "digest": "jKs5CuwiyYGA4BenXYBijazlvmH04EyzP3JxskFLvUk",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},

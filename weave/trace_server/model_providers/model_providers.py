@@ -7,6 +7,7 @@ import httpx
 
 model_providers_url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 MODEL_PROVIDER_INFO_FILE = "model_providers.json"
+HTTP_TIMEOUT = 30.0
 
 # This is a symlink to the catalog file in the frontend to avoid further ground truth dilution.
 HOSTED_MODEL_INFO_FILE = "modelsFinal.json"
@@ -26,7 +27,14 @@ PROVIDER_TO_API_KEY_NAME_MAP = {
     "openai": "OPENAI_API_KEY",
     "mistral": "MISTRAL_API_KEY",
     "xai": "XAI_API_KEY",
+    "vertex_ai": "VERTEXAI_JSON_CREDENTIALS",
+    "vertex_ai-language-models": "VERTEXAI_JSON_CREDENTIALS",
+    "fireworks_ai": "FIREWORKS_API_KEY",
 }
+
+# Provider names that use Vertex credentials (same as keys in PROVIDER_TO_API_KEY_NAME_MAP).
+# Used for credential handling in completion paths.
+VERTEX_PROVIDER_NAMES: tuple[str, ...] = ("vertex_ai", "vertex_ai-language-models")
 
 
 class LLMModelProviderInfo(TypedDict, total=False):
@@ -46,7 +54,7 @@ def read_model_to_provider_info_map(
 ) -> dict[str, LLMModelProviderInfo]:
     full_path = os.path.join(os.path.dirname(__file__), file_name)
     try:
-        with open(full_path) as f:
+        with open(full_path, encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logger.exception(
@@ -104,7 +112,7 @@ def read_model_id_to_details_map(
 ) -> dict[str, LLMModelDetails]:
     full_path = os.path.join(os.path.dirname(__file__), file_name)
     try:
-        with open(full_path) as f:
+        with open(full_path, encoding="utf-8") as f:
             loaded = json.load(f)
             return {model["id"]: model for model in loaded["models"]}
     except Exception as e:
@@ -122,7 +130,7 @@ def main(
 
     # Start with information about CoreWeave hosted models
     full_path_hosted = os.path.join(os.path.dirname(__file__), HOSTED_MODEL_INFO_FILE)
-    with open(full_path_hosted) as f:
+    with open(full_path_hosted, encoding="utf-8") as f:
         hosted_models = json.load(f)
     for model in hosted_models["models"]:
         provider = model["provider"]
@@ -149,10 +157,10 @@ def main(
 
     # Next add in information from the LiteLLM model provider info file
     try:
-        with httpx.Client() as client:
+        with httpx.Client(timeout=HTTP_TIMEOUT) as client:
             req = client.get(model_providers_url)
             req.raise_for_status()
-    except httpx.RequestError as e:
+    except httpx.HTTPError as e:
         print("Failed to fetch models:", e)
         return {}
 
@@ -181,7 +189,7 @@ def main(
             providers[k] = litellm_info
     full_path_output = os.path.join(os.path.dirname(__file__), file_name)
     os.makedirs(os.path.dirname(full_path_output), exist_ok=True)
-    with open(full_path_output, "w") as f:
+    with open(full_path_output, "w", encoding="utf-8") as f:
         json.dump(providers, f, indent=2)
     print(
         f"Updated model to model provider info file at: {full_path_output}. {len(providers)} models updated."
