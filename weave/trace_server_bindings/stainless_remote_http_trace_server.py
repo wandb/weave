@@ -730,7 +730,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             raise NotImplementedError(
                 "Tag operations are not yet supported by the Stainless SDK. "
                 "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            )
+            ) from None
 
     def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
         try:
@@ -741,7 +741,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             raise NotImplementedError(
                 "Tag operations are not yet supported by the Stainless SDK. "
                 "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            )
+            ) from None
 
     def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         try:
@@ -752,7 +752,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             raise NotImplementedError(
                 "Alias operations are not yet supported by the Stainless SDK. "
                 "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            )
+            ) from None
 
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
         try:
@@ -763,7 +763,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             raise NotImplementedError(
                 "Alias operations are not yet supported by the Stainless SDK. "
                 "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            )
+            ) from None
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
         try:
@@ -774,7 +774,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             raise NotImplementedError(
                 "Tag operations are not yet supported by the Stainless SDK. "
                 "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            )
+            ) from None
 
     def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
         try:
@@ -785,7 +785,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             raise NotImplementedError(
                 "Alias operations are not yet supported by the Stainless SDK. "
                 "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            )
+            ) from None
 
     # Table API
     @validate_call

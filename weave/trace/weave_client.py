@@ -1304,7 +1304,7 @@ class WeaveClient:
             List of all tag strings in the project.
         """
         res = self.server.tags_list(TagsListReq(project_id=self._project_id()))
-        return sorted(res.tags)
+        return res.tags
 
     @trace_sentry.global_trace_sentry.watch()
     def list_aliases(self) -> list[str]:
@@ -1314,7 +1314,7 @@ class WeaveClient:
             List of all alias strings in the project.
         """
         res = self.server.aliases_list(AliasesListReq(project_id=self._project_id()))
-        return sorted(res.aliases)
+        return res.aliases
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
