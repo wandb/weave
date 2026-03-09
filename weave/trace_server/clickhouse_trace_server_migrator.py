@@ -202,9 +202,13 @@ class BaseClickHouseTraceServerMigrator(ABC):
         if status["curr_version"] == 0:
             db_sql = self._create_db_sql(target_db)
             self.ch_client.command(db_sql)
-        for target_version, migration_file in migrations_to_apply:
-            self._apply_migration(target_db, target_version, migration_file)
-        self._run_post_migration_hook(target_db, status["curr_version"], target_version)
+        applied_target_version = target_version
+        for migration_target_version, migration_file in migrations_to_apply:
+            self._apply_migration(target_db, migration_target_version, migration_file)
+            applied_target_version = migration_target_version
+        self._run_post_migration_hook(
+            target_db, status["curr_version"], applied_target_version
+        )
 
     def _run_post_migration_hook(
         self, target_db: str, current_version: int, target_version: int | None
@@ -283,8 +287,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
                     )
                 migration_map[version]["down"] = file
 
-            if version > max_version:
-                max_version = version
+            max_version = max(max_version, version)
 
         if len(migration_map) == 0:
             raise MigrationError("No migrations found")
@@ -937,7 +940,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         def add_suffix(match: re.Match[str]) -> str:
             table_name = match.group(2)
             if not table_name.endswith(ch_settings.LOCAL_TABLE_SUFFIX):
-                table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
+                table_name += ch_settings.LOCAL_TABLE_SUFFIX
             return f"{match.group(1)}{table_name}{match.group(3)}"
 
         return SQLPatterns.ALTER_TABLE_NAME_PATTERN.sub(add_suffix, sql_query)
@@ -970,7 +973,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         def add_suffix_to_from(match: re.Match[str]) -> str:
             table_name = match.group(1) if match.group(1) else match.group(2)
             if not table_name.endswith(ch_settings.LOCAL_TABLE_SUFFIX):
-                table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
+                table_name += ch_settings.LOCAL_TABLE_SUFFIX
             return f"FROM {table_name}"
 
         # Collect table names from FROM clauses before renaming

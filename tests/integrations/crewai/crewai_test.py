@@ -3,15 +3,14 @@ from collections.abc import Generator
 
 import pytest
 
-import weave.integrations.crewai.crewai_sdk as crewai_sdk
 import weave.integrations.litellm.litellm as litellm_sdk
-import weave.integrations.openai.openai_sdk as openai_sdk
-from weave.integrations.crewai import get_crewai_patcher
+from weave.integrations.crewai import crewai_sdk, get_crewai_patcher
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
 from weave.integrations.litellm.litellm import get_litellm_patcher
+from weave.integrations.openai import openai_sdk
 from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter

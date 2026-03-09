@@ -429,7 +429,7 @@ def _create_like_pattern_for_value(value: str | int | float | bool) -> str:
     """
     if isinstance(value, str):
         # Boolean string literals are not wrapped in quotes in JSON payloads
-        if value in ("true", "false"):
+        if value in {"true", "false"}:
             return f"%{value}%"
         else:
             return f'%"{value}"%'
@@ -691,7 +691,7 @@ def _create_datetime_optimization_sql(
     # - "<" / "<=": add buffer to be more permissive
     # For NOT context, invert the buffer direction to keep the filter permissive.
     buffer_seconds = int(DATETIME_BUFFER_TIME_SECONDS)
-    if op_str in ("<", "<="):
+    if op_str in {"<", "<="}:
         buffer_sign = 1
     else:
         buffer_sign = -1

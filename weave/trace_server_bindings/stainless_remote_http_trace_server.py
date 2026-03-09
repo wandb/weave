@@ -422,6 +422,16 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return ServerInfoRes.model_validate(response.model_dump())
 
     @validate_call
+    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
+        self._update_client_headers()
+        response = self._stainless_client.services.projects_info(
+            project_ids=req.project_ids,
+        )
+        return [
+            tsi.ProjectsInfoRes.model_validate(item.model_dump()) for item in response
+        ]
+
+    @validate_call
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Export OTEL traces.
 
