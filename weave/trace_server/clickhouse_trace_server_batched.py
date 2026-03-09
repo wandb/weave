@@ -5761,7 +5761,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         req.inputs.messages = initial_messages
         call_id = generate_id()
-        trace_id = generate_id()
+        trace_id = req.trace_id or generate_id()
+        parent_id = req.parent_id
 
         # Build summary with usage info if available
         summary: tsi.SummaryInsertMap = {}
@@ -5777,6 +5778,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 id=call_id,
                 trace_id=trace_id,
+                parent_id=parent_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=start_time,
                 ended_at=end_time,
@@ -5799,6 +5801,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 id=call_id,
                 trace_id=trace_id,
+                parent_id=parent_id,
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=start_time,
@@ -5924,6 +5927,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             start = tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
+                trace_id=req.trace_id,
+                parent_id=req.parent_id,
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=datetime.datetime.now(),
