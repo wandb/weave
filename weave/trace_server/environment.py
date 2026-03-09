@@ -88,11 +88,11 @@ def wf_scoring_worker_kafka_consumer_group_id_override() -> str | None:
     return os.environ.get("SCORING_WORKER_KAFKA_CONSUMER_GROUP_ID")
 
 
-def wf_scoring_worker_debounced_scoring_sampling_rate() -> float:
-    """Sampling rate for debounced scoring (delay > 0). 0.0 = disable, 1.0 = full."""
+def wf_scoring_worker_debounced_scoring_max_sampling_rate() -> float:
+    """Max sampling rate cap for debounced scoring (delay > 0). 0.0 = disable, 1.0 = no cap beyond monitor rate."""
     default = 0.0
     raw = os.environ.get(
-        "WF_SCORING_WORKER_DEBOUNCED_SCORING_SAMPLING_RATE", str(default)
+        "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_SAMPLING_RATE", str(default)
     )
     try:
         rate = float(raw)
