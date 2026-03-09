@@ -114,6 +114,7 @@ from weave.trace_server.datadog import (
 )
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
+    DigestMismatchError,
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
@@ -1613,6 +1614,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         processed_val = digest_result.processed_val
         json_val = digest_result.json_val
         digest = digest_result.digest
+        if req.obj.expected_digest is not None and req.obj.expected_digest != digest:
+            raise DigestMismatchError(
+                f"Client digest {req.obj.expected_digest} != server digest {digest}"
+            )
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
@@ -2085,6 +2090,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         row_digests = [r[1] for r in insert_rows]
 
         digest = compute_table_digest(row_digests)
+        if (
+            req.table.expected_digest is not None
+            and req.table.expected_digest != digest
+        ):
+            raise DigestMismatchError(
+                f"Client table digest {req.table.expected_digest} != server digest {digest}"
+            )
 
         self._insert(
             "tables",
@@ -5248,6 +5260,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = compute_file_digest(req.content)
+        if req.expected_digest is not None and req.expected_digest != digest:
+            raise DigestMismatchError(
+                f"Client file digest {req.expected_digest} != server digest {digest}"
+            )
 
         # During a batch, _file_batch accumulates chunks. If we already have
         # chunks for this (project_id, digest), the content is identical and

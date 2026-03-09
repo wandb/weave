@@ -8,8 +8,15 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict
 from pydantic import BaseModel
 
 from weave.shared.digest import bytes_digest
+from weave.shared.refs_internal import (
+    WEAVE_INTERNAL_SCHEME,
+    WEAVE_SCHEME,
+    InternalObjectRef,
+    InternalOpRef,
+    InternalTableRef,
+)
 from weave.trace.object_record import ObjectRecord
-from weave.trace.refs import ObjectRef, Ref, TableRef
+from weave.trace.refs import ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
 from weave.trace_server.trace_server_interface import (
@@ -21,6 +28,22 @@ from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
+
+_WEAVE_REF_PREFIX = f"{WEAVE_SCHEME}:///"
+_WEAVE_INTERNAL_REF_PREFIX = f"{WEAVE_INTERNAL_SCHEME}:///"
+
+
+def _convert_ext_ref_string(
+    ref_str: str, project_id: str, internal_project_id: str
+) -> str:
+    """Convert an external ref URI string to internal format if it belongs to the current project."""
+    rest = ref_str[len(_WEAVE_REF_PREFIX) :]
+    parts = rest.split("/", 2)
+    if len(parts) == 3:
+        entity_project = f"{parts[0]}/{parts[1]}"
+        if entity_project == project_id:
+            return f"{_WEAVE_INTERNAL_REF_PREFIX}{internal_project_id}/{parts[2]}"
+    return ref_str
 
 
 def is_pydantic_model_class(obj: Any) -> bool:
@@ -37,11 +60,27 @@ def is_pydantic_model_class(obj: Any) -> bool:
 
 
 def to_json(
-    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
+    obj: Any,
+    project_id: str,
+    client: WeaveClient,
+    use_dictify: bool = False,
+    internal_project_id: str | None = None,
 ) -> Any:
     if isinstance(obj, TableRef):
+        if internal_project_id is not None:
+            return InternalTableRef(
+                project_id=internal_project_id, digest=obj.digest
+            ).uri()
         return obj.uri()
     elif isinstance(obj, ObjectRef):
+        if internal_project_id is not None:
+            cls = InternalOpRef if isinstance(obj, OpRef) else InternalObjectRef
+            return cls(
+                project_id=internal_project_id,
+                name=obj.name,
+                version=obj.digest,
+                extra=list(obj.extra),
+            ).uri()
         return obj.uri()
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
@@ -58,21 +97,27 @@ def to_json(
                 else:
                     logging.warning(f"Unexpected null ref in object record: {obj}")
                     continue
-            res[k] = to_json(v, project_id, client, use_dictify)
+            res[k] = to_json(v, project_id, client, use_dictify, internal_project_id)
         return res
     elif isinstance_namedtuple(obj):
         return {
-            k: to_json(v, project_id, client, use_dictify)
+            k: to_json(v, project_id, client, use_dictify, internal_project_id)
             for k, v in obj._asdict().items()
         }
     elif isinstance(obj, (list, tuple)):
-        return [to_json(v, project_id, client, use_dictify) for v in obj]
+        return [to_json(v, project_id, client, use_dictify, internal_project_id) for v in obj]
     elif isinstance(obj, dict):
-        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
+        return {k: to_json(v, project_id, client, use_dictify, internal_project_id) for k, v in obj.items()}
     elif is_pydantic_model_class(obj):
         return obj.model_json_schema()
 
     if isinstance(obj, (int, float, str, bool)) or obj is None:
+        if (
+            isinstance(obj, str)
+            and internal_project_id is not None
+            and obj.startswith(_WEAVE_REF_PREFIX)
+        ):
+            return _convert_ext_ref_string(obj, project_id, internal_project_id)
         return obj
 
     # Add explicit handling for WeaveScorerResult models
@@ -80,7 +125,7 @@ def to_json(
 
     if isinstance(obj, WeaveScorerResult):
         return {
-            k: to_json(v, project_id, client, use_dictify)
+            k: to_json(v, project_id, client, use_dictify, internal_project_id)
             for k, v in obj.model_dump().items()
         }
 
@@ -98,7 +143,7 @@ def to_json(
         # However, even if dictify is false, i still want to try to convert to dict
         elif as_dict := try_to_dict(obj):
             return {
-                k: to_json(v, project_id, client, use_dictify)
+                k: to_json(v, project_id, client, use_dictify, internal_project_id)
                 for k, v in as_dict.items()
             }
         return fallback_encode(obj)

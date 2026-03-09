@@ -29,6 +29,7 @@ from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
+    DigestMismatchError,
     InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
@@ -921,6 +922,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         processed_val = digest_result.processed_val
         json_val = digest_result.json_val
         digest = digest_result.digest
+        if req.obj.expected_digest is not None and req.obj.expected_digest != digest:
+            raise DigestMismatchError(
+                f"Client digest {req.obj.expected_digest} != server digest {digest}"
+            )
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
             req.obj.object_id,
@@ -1287,6 +1292,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             row_digests = [r[1] for r in insert_rows]
 
             digest = compute_table_digest(row_digests)
+            if (
+                req.table.expected_digest is not None
+                and req.table.expected_digest != digest
+            ):
+                raise DigestMismatchError(
+                    f"Client table digest {req.table.expected_digest} != server digest {digest}"
+                )
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
@@ -1695,6 +1707,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         digest = compute_file_digest(req.content)
+        if req.expected_digest is not None and req.expected_digest != digest:
+            raise DigestMismatchError(
+                f"Client file digest {req.expected_digest} != server digest {digest}"
+            )
         with self.lock:
             cursor.execute(
                 "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)",

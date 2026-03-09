@@ -83,6 +83,7 @@ class CachingMiddlewareTraceServer(
         {
             "get_call_processor",
             "get_feedback_processor",
+            "projects_info",
         }
     )
 
