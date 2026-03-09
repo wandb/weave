@@ -199,7 +199,9 @@ class StateExporter(BaseModel):
     response_done_at: dict[str, datetime.datetime] = Field(default_factory=dict)
 
     # Per-item timing: item_id -> {event_name: datetime}
-    item_timestamps: dict[str, dict[str, datetime.datetime]] = Field(default_factory=dict)
+    item_timestamps: dict[str, dict[str, datetime.datetime]] = Field(
+        default_factory=dict
+    )
 
     # Cached output metrics per item_id so they can be carried forward as input metrics
     item_output_metrics: dict[str, dict[str, Any]] = Field(default_factory=dict)
@@ -241,7 +243,9 @@ class StateExporter(BaseModel):
             item_id, {"audio_start_ms": None, "audio_end_ms": None}
         )
         markers["audio_end_ms"] = msg.get("audio_end_ms")
-        self.item_timestamps.setdefault(item_id, {})["speech_stopped"] = datetime.datetime.now(tz=datetime.timezone.utc)
+        self.item_timestamps.setdefault(item_id, {})["speech_stopped"] = (
+            datetime.datetime.now(tz=datetime.timezone.utc)
+        )
 
     def handle_speech_started(self, msg: dict) -> None:
         item_id = msg.get("item_id", "")
@@ -249,7 +253,9 @@ class StateExporter(BaseModel):
             "audio_start_ms": msg.get("audio_start_ms"),
             "audio_end_ms": None,
         }
-        self.item_timestamps.setdefault(item_id, {})["speech_started"] = datetime.datetime.now(tz=datetime.timezone.utc)
+        self.item_timestamps.setdefault(item_id, {})["speech_started"] = (
+            datetime.datetime.now(tz=datetime.timezone.utc)
+        )
 
     def handle_item_created(self, msg: dict) -> None:
         item = msg.get("item") or {}
@@ -262,7 +268,9 @@ class StateExporter(BaseModel):
             self.items[item_id] = item
             self.last_input_item_id = item_id
         if item.get("type") == "function_call" and item_id:
-            self.item_timestamps.setdefault(item_id, {})["started"] = datetime.datetime.now(tz=datetime.timezone.utc)
+            self.item_timestamps.setdefault(item_id, {})["started"] = (
+                datetime.datetime.now(tz=datetime.timezone.utc)
+            )
 
     def handle_item_done(self, msg: dict) -> None:
         """Handle conversation.item.done — update item data without touching ordering.
@@ -276,7 +284,9 @@ class StateExporter(BaseModel):
         if item_id:
             self.items[item_id] = item
         if item.get("type") == "function_call" and item_id:
-            self.item_timestamps.setdefault(item_id, {})["completed"] = datetime.datetime.now(tz=datetime.timezone.utc)
+            self.item_timestamps.setdefault(item_id, {})["completed"] = (
+                datetime.datetime.now(tz=datetime.timezone.utc)
+            )
 
     def handle_item_deleted(self, msg: dict) -> None:
         item_id = msg.get("item_id")
@@ -345,7 +355,9 @@ class StateExporter(BaseModel):
     def handle_response_audio_delta(self, msg: dict) -> None:
         item_id = msg.get("item_id")
         if item_id and "first_token" not in self.item_timestamps.get(item_id, {}):
-            self.item_timestamps.setdefault(item_id, {})["first_token"] = datetime.datetime.now(tz=datetime.timezone.utc)
+            self.item_timestamps.setdefault(item_id, {})["first_token"] = (
+                datetime.datetime.now(tz=datetime.timezone.utc)
+            )
 
         delta = msg.get("delta")
         if delta:
@@ -360,12 +372,16 @@ class StateExporter(BaseModel):
     def handle_response_text_delta(self, msg: dict) -> None:
         item_id = msg.get("item_id")
         if item_id and "first_token" not in self.item_timestamps.get(item_id, {}):
-            self.item_timestamps.setdefault(item_id, {})["first_token"] = datetime.datetime.now(tz=datetime.timezone.utc)
+            self.item_timestamps.setdefault(item_id, {})["first_token"] = (
+                datetime.datetime.now(tz=datetime.timezone.utc)
+            )
 
     def handle_function_call_arguments_delta(self, msg: dict) -> None:
         item_id = msg.get("item_id")
         if item_id and "first_token" not in self.item_timestamps.get(item_id, {}):
-            self.item_timestamps.setdefault(item_id, {})["first_token"] = datetime.datetime.now(tz=datetime.timezone.utc)
+            self.item_timestamps.setdefault(item_id, {})["first_token"] = (
+                datetime.datetime.now(tz=datetime.timezone.utc)
+            )
 
     def _response_with_audio(self, resp: dict) -> dict[str, Any]:
         """This function takes in the final response message.
@@ -639,15 +655,9 @@ class StateExporter(BaseModel):
 
         # Pop all pre-recorded timestamps for this response
         created_at = (
-            self.response_created_at.pop(response_id, None)
-            if response_id
-            else None
+            self.response_created_at.pop(response_id, None) if response_id else None
         )
-        done_at = (
-            self.response_done_at.pop(response_id, None)
-            if response_id
-            else None
-        )
+        done_at = self.response_done_at.pop(response_id, None) if response_id else None
 
         # Inject metrics into inputs.metadata.metrics array (indexed by message)
         input_messages = inputs.get("messages", [])
@@ -882,7 +892,11 @@ class StateExporter(BaseModel):
                 # Remove the head and continue to next (if it's immediately ready)
                 with self.fifo_lock:
                     rid = _get_from_dict(_get_from_dict(msg, "response", {}), "id")
-                    if rid and self.completion_queue and self.completion_queue[0] == rid:
+                    if (
+                        rid
+                        and self.completion_queue
+                        and self.completion_queue[0] == rid
+                    ):
                         self.completion_queue.pop(0)
                     if rid:
                         self.pending_completions.pop(rid, None)
