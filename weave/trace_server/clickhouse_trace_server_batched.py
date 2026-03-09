@@ -22,7 +22,6 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -159,8 +158,12 @@ from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
-from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
-from weave.trace_server.opentelemetry.python_spans import Resource, Span
+from weave.trace_server.opentelemetry.trace_server_helpers import (
+    apply_created_ops_to_calls,
+    build_otel_export_response,
+    process_otel_spans_to_calls,
+    resolve_and_prepare_new_otel_ops,
+)
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
@@ -475,128 +478,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         with self._op_ref_cache_lock:
             self._op_ref_cache[project_id, op_name] = uri
 
-    def _create_or_get_placeholder_ops_digest(
-        self, project_id: str, create: bool
-    ) -> str:
-        if not create:
-            return compute_file_digest(
-                (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
-            )
-
-        source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
-        source_file_req = tsi.FileCreateReq(
-            project_id=project_id,
-            name=object_creation_utils.OP_SOURCE_FILE_NAME,
-            content=source_code.encode("utf-8"),
-        )
-        return self.file_create(source_file_req).digest
-
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
-        calls: list[
-            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
-        ] = []
-        rejected_spans = 0
-        error_messages: list[str] = []
-        for processed_span in req.processed_spans:
-            # Extract wb_run_id from the processed span
-            wb_run_id = processed_span.run_id
-
-            if not isinstance(processed_span.resource_spans, ResourceSpans):
-                raise TypeError(
-                    f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
-                )
-
-            proto_resource_spans = processed_span.resource_spans
-            resource = Resource.from_proto(proto_resource_spans.resource)
-            for proto_scope_spans in proto_resource_spans.scope_spans:
-                for proto_span in proto_scope_spans.spans:
-                    try:
-                        span = Span.from_proto(proto_span, resource)
-                    except AttributePathConflictError as e:
-                        # Record and skip malformed spans so we can partially accept the batch
-                        rejected_spans += 1
-                        # Use data available on the proto span for context
-                        try:
-                            trace_id = proto_span.trace_id.hex()
-                            span_id = proto_span.span_id.hex()
-                            name = getattr(proto_span, "name", "")
-                        except Exception:
-                            trace_id = ""
-                            span_id = ""
-                            name = ""
-                        span_ident = (
-                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
-                        )
-                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
-                        continue
-
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
-                        )
-                    )
-
-        set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
-
-        obj_id_idx_map = defaultdict(list)
-        for idx, (start_call, _) in enumerate(calls):
-            op_name = object_creation_utils.make_safe_name(start_call.op_name)
-            obj_id_idx_map[op_name].append(idx)
+        calls, rejected_spans, error_messages = process_otel_spans_to_calls(req)
 
         existing_ops = self._get_existing_ops_from_spans(
-            seen_ids=set(obj_id_idx_map.keys()),
+            seen_ids={
+                object_creation_utils.make_safe_name(start.op_name)
+                for start, _ in calls
+            },
             project_id=req.project_id,
             limit=len(calls),
         )
 
-        for op_name, op_ref_uri in existing_ops.items():
-            # Modify each of the matched start calls in place
-            for idx in obj_id_idx_map[op_name]:
-                calls[idx][0].op_name = op_ref_uri
-            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
-            obj_id_idx_map.pop(op_name)
-
-        # We know that OTel will always use the placeholder source.
-        # We can instead just reuse the existing file if we know it is present
-        # and create it just once if we are not sure.
-        if len(existing_ops) == 0:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=True
-            )
-        else:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=False
-            )
-        obj_creation_batch = []
-        for op_obj_id in obj_id_idx_map.keys():
-            op_val = object_creation_utils.build_op_val(digest)
-            obj_creation_batch.append(
-                tsi.ObjSchemaForInsert(
-                    project_id=req.project_id,
-                    object_id=op_obj_id,
-                    val=op_val,
-                    wb_user_id=req.wb_user_id,
-                )
-            )
+        obj_creation_batch, obj_id_idx_map = resolve_and_prepare_new_otel_ops(
+            calls, req.project_id, req.wb_user_id, existing_ops, self
+        )
         res = self.obj_create_batch(obj_creation_batch)
 
-        for result in res:
-            if result.object_id is None:
-                raise RuntimeError("Otel Export - Expected object_id but got None")
-
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=result.object_id,
-                version=result.digest,
-            ).uri
-            for idx in obj_id_idx_map[result.object_id]:
-                calls[idx][0].op_name = op_ref_uri
-            # Cache newly created ops so subsequent batches skip the CH query
-            self._cache_op_ref(req.project_id, result.object_id, op_ref_uri)
+        new_ops = apply_created_ops_to_calls(
+            obj_id_idx_map, calls, res, req.project_id
+        )
+        for op_name, op_ref_uri in new_ops:
+            self._cache_op_ref(req.project_id, op_name, op_ref_uri)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
@@ -643,18 +548,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cb()
         self._flush_kafka_producer()
 
-        if rejected_spans > 0:
-            # Join the first 20 errors and return them delimited by ';'
-            joined_errors = "; ".join(error_messages[:20]) + (
-                "; ..." if len(error_messages) > 20 else ""
-            )
-            return tsi.OTelExportRes(
-                partial_success=tsi.ExportTracePartialSuccess(
-                    rejected_spans=rejected_spans,
-                    error_message=joined_errors,
-                )
-            )
-        return tsi.OTelExportRes()
+        return build_otel_export_response(rejected_spans, error_messages)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
