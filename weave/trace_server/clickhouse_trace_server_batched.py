@@ -2420,6 +2420,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
         pb = ParamBuilder()
 
         # Extract filter values
@@ -2441,6 +2444,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             sortable_datetime_after=after_datetime,
             sortable_datetime_before=before_datetime,
             thread_ids=thread_ids,
+            read_table=read_table,
         )
 
         # Stream the results using _query_stream
