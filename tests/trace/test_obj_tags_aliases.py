@@ -1861,3 +1861,69 @@ def test_weave_list_aliases(client: WeaveClient):
 
     aliases = weave.list_aliases()
     assert "global-alias" in aliases
+
+
+# --- Resolve by alias via weave.ref() / weave.get() ---
+
+
+def test_resolve_by_latest_alias(client: WeaveClient):
+    """weave.ref('name:latest') should resolve to the latest version."""
+    weave.publish({"v": 0}, name="resolve_latest_obj")
+    weave.publish({"v": 1}, name="resolve_latest_obj")
+
+    obj = weave.ref("resolve_latest_obj:latest").get()
+    assert obj["v"] == 1
+
+
+def test_resolve_by_custom_alias(client: WeaveClient):
+    """weave.ref('name:production') should resolve to the aliased version."""
+    ref_v0 = weave.publish({"v": 0}, name="resolve_custom_obj")
+    weave.publish({"v": 1}, name="resolve_custom_obj")
+
+    client.set_alias(ref_v0, "production")
+
+    obj = weave.ref("resolve_custom_obj:production").get()
+    assert obj["v"] == 0
+
+
+def test_resolve_by_alias_after_reassignment(client: WeaveClient):
+    """After reassigning an alias, weave.ref should resolve to the new version."""
+    ref_v0 = weave.publish({"v": 0}, name="resolve_reassign_obj")
+    ref_v1 = weave.publish({"v": 1}, name="resolve_reassign_obj")
+
+    client.set_alias(ref_v0, "staging")
+    assert weave.ref("resolve_reassign_obj:staging").get()["v"] == 0
+
+    # Reassign alias to v1
+    client.set_alias(ref_v1, "staging")
+    assert weave.ref("resolve_reassign_obj:staging").get()["v"] == 1
+
+
+def test_resolve_by_alias_set_at_publish(client: WeaveClient):
+    """Aliases set via weave.publish() should be resolvable via weave.ref()."""
+    weave.publish({"v": 0}, name="resolve_pub_alias_obj")
+    weave.publish({"v": 1}, name="resolve_pub_alias_obj", aliases=["stable"])
+    weave.publish({"v": 2}, name="resolve_pub_alias_obj")
+
+    obj = weave.ref("resolve_pub_alias_obj:stable").get()
+    assert obj["v"] == 1
+
+
+def test_resolve_implicit_latest(client: WeaveClient):
+    """weave.ref('name') without version should default to latest."""
+    weave.publish({"v": 0}, name="resolve_implicit_obj")
+    weave.publish({"v": 1}, name="resolve_implicit_obj")
+
+    obj = weave.ref("resolve_implicit_obj").get()
+    assert obj["v"] == 1
+
+
+def test_get_by_alias_string(client: WeaveClient):
+    """weave.get('name:alias') should resolve and return the object."""
+    ref_v0 = weave.publish({"v": 0}, name="get_alias_obj")
+    weave.publish({"v": 1}, name="get_alias_obj")
+
+    client.set_alias(ref_v0, "pinned")
+
+    obj = weave.get("get_alias_obj:pinned")
+    assert obj["v"] == 0
