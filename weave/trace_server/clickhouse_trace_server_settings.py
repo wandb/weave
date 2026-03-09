@@ -55,6 +55,15 @@ CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "allow_experimental_lightweight_update": 1,
 }
 
+# The new ClickHouse query analyzer (v24+) has a bug serializing SortingStep
+# for non-Full sorting modes on distributed tables, which causes error 48
+# ("Serialization of SortingStep is implemented only for Full sorting").
+# Cost queries create partial-sort pipeline steps that break across shards.
+# Disabling this setting fixes the issue. Fixed in CH version 25.12.x
+CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS: dict[str, Any] = {
+    "collect_hash_table_stats_during_joins": 0,
+}
+
 # ClickHouse async insert settings
 # These settings are used when async_insert is enabled for high-throughput scenarios
 # Reference: https://clickhouse.com/docs/en/optimize/asynchronous-inserts

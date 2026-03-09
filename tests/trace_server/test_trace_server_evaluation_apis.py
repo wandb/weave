@@ -25,6 +25,8 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server.workers.evaluate_model_worker import evaluate_model_worker
 from weave.utils.project_id import from_project_id, to_project_id
 
+_LATENCY_TOL = 10 if sys.platform == "win32" else 1
+
 
 @pytest.mark.asyncio
 async def test_evaluation_status(client):
@@ -84,7 +86,7 @@ async def test_evaluation_status(client):
         output={
             "output": {"mean": 3.0},
             "scorer": {"mean": 1.0},
-            "model_latency": {"mean": pytest.approx(0, abs=1)},
+            "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
         }
     )
 
@@ -374,9 +376,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         assert eval_call.summary["weave"]["status"] == TraceStatus.DESCENDANT_ERROR
         assert eval_call.output == {
             "LLMAsAJudgeScorer": None,
-            "model_latency": {"mean": pytest.approx(0, abs=2)}
-            if sys.platform != "win32"
-            else {"mean": pytest.approx(0, abs=10)},
+            "model_latency": {"mean": pytest.approx(0, abs=max(2, _LATENCY_TOL))},
         }
     else:
         assert eval_call.summary["status_counts"] == {
@@ -387,5 +387,5 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         assert eval_call.output == {
             "output": {"score": {"mean": 9.0}},
             "LLMAsAJudgeScorer": {"score": {"mean": 9.0}},
-            "model_latency": {"mean": pytest.approx(0, abs=1)},
+            "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
         }

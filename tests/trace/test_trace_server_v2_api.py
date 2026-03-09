@@ -1237,6 +1237,57 @@ class ReadPredictionModel(weave.Model):
         assert read_res.inputs == {"question": "What is 2+2?"}
         assert read_res.output == "4"
 
+    def test_prediction_read_with_none_inputs(self, client):
+        """Test reading a prediction where the underlying call has None inputs.
+
+        Regression test: prediction_read should return {} instead of crashing
+        with a Pydantic validation error when call.inputs["inputs"] is None.
+        """
+        project_id = client._project_id()
+
+        prediction_id = generate_id()
+
+        # Create a call directly with inputs=None to simulate the broken state
+        start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=prediction_id,
+                trace_id=prediction_id,
+                op_name="weave:///test/test/op/predict:abc123",
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={
+                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                        constants.PREDICTION_ATTR_KEY: True,
+                        constants.PREDICTION_MODEL_ATTR_KEY: "weave:///test/object/MyModel:v1",
+                    }
+                },
+                inputs={"inputs": None},
+            )
+        )
+        client.server.call_start(start_req)
+
+        end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=prediction_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output="some output",
+                summary={},
+            )
+        )
+        client.server.call_end(end_req)
+
+        # Read the prediction - should not raise ValidationError
+        read_req = tsi.PredictionReadReq(
+            project_id=project_id,
+            prediction_id=prediction_id,
+        )
+        read_res = client.server.prediction_read(read_req)
+
+        assert read_res.prediction_id == prediction_id
+        assert read_res.inputs == {}
+        assert read_res.output == "some output"
+
     def test_prediction_list(self, client):
         """Test listing predictions via V2 API."""
         project_id = client._project_id()

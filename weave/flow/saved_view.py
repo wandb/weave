@@ -294,10 +294,10 @@ def filters_to_query(filters: Filters | None) -> tsi.Query | None:
 def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:
     first = operand.eq_[0]
     second = operand.eq_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in (
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
         "double",
         "int",
-    ):
+    }:
         first = first.convert_.input
     if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
         second, tsi_query.LiteralOperation
@@ -339,10 +339,10 @@ def operand_to_filter_contains(operand: tsi_query.ContainsOperation) -> Filter:
 def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
     first = operand.gt_[0]
     second = operand.gt_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in (
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
         "double",
         "int",
-    ):
+    }:
         first = first.convert_.input
     if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
         second, tsi_query.LiteralOperation
@@ -363,10 +363,10 @@ def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
 def operand_to_filter_gte(operand: tsi_query.GteOperation) -> Filter:
     first = operand.gte_[0]
     second = operand.gte_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in (
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
         "double",
         "int",
-    ):
+    }:
         first = first.convert_.input
     if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
         second, tsi_query.LiteralOperation

@@ -1,0 +1,77 @@
+name: publish-typescript-sdk-npm
+
+# This workflow publishes the Weave TypeScript SDK package to npm.
+# It runs package validation checks before publishing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      npm_tag:
+        description: "npm dist-tag to publish under"
+        required: true
+        type: choice
+        options:
+          - latest
+          - next
+        default: latest
+
+jobs:
+  publish-typescript-sdk:
+    name: Publish TypeScript SDK to npm
+    runs-on: ubuntu-8core
+    timeout-minutes: 15
+    environment:
+      name: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+          run_install: false
+
+      - id: package_meta
+        run: |
+          PACKAGE_NAME=$(node -p "require('./sdks/node/package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./sdks/node/package.json').version")
+          echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "package_version=${PACKAGE_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version is not already published
+        env:
+          PACKAGE_NAME: ${{ steps.package_meta.outputs.package_name }}
+          PACKAGE_VERSION: ${{ steps.package_meta.outputs.package_version }}
+        run: |
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version > /dev/null 2>&1; then
+            echo "Version ${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on npm."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        working-directory: sdks/node
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        working-directory: sdks/node
+        run: pnpm test
+
+      - name: Run prettier check
+        working-directory: sdks/node
+        run: pnpm run prettier-check
+
+      - name: Publish to npm
+        working-directory: sdks/node
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish --access public --tag "${{ inputs.npm_tag }}"

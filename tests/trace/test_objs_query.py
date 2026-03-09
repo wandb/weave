@@ -33,7 +33,7 @@ def test_objs_query_filter_object_ids(client: WeaveClient):
         )
     )
     assert len(res.objs) == 20
-    assert all(obj.object_id in ["obj_0", "obj_1"] for obj in res.objs)
+    assert all(obj.object_id in {"obj_0", "obj_1"} for obj in res.objs)
 
 
 def test_objs_query_filter_is_op(client: WeaveClient):
@@ -200,7 +200,7 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
         )
     )
     assert len(res.objs) == 3
-    assert all(obj.val["i"] in [1, 2, 3] for obj in res.objs)
+    assert all(obj.val["i"] in {1, 2, 3} for obj in res.objs)
 
     res = client.server.obj_delete(
         tsi.ObjDeleteReq(
@@ -219,7 +219,7 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
         )
     )
     assert len(res.objs) == 2
-    assert all(obj.val["i"] in [2, 3] for obj in res.objs)
+    assert all(obj.val["i"] in {2, 3} for obj in res.objs)
 
     # Delete the remaining objects
     res = client.server.obj_delete(
@@ -322,7 +322,7 @@ def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
         )
     )
     assert len(res.objs) == 3
-    assert all(obj.val["i"] in [4, 5, 6] for obj in res.objs)
+    assert all(obj.val["i"] in {4, 5, 6} for obj in res.objs)
 
 
 def test_publish_model_query_no_ref(client: WeaveClient):
