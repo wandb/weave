@@ -117,6 +117,8 @@ async def test_evaluation_performance(client: WeaveClient):
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
+        "projects_info",
+        "projects_info",
     ]
     assert log == gold_log
 
@@ -142,6 +144,7 @@ async def test_evaluation_performance(client: WeaveClient):
             "ensure_project_exists": 1,
             "get_call_processor": 2,
             "get_feedback_processor": 2,
+            "projects_info": 2,
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops

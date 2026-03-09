@@ -24,6 +24,21 @@ from typing import Any
 from weave.shared.object_class_util import process_incoming_object_val
 
 
+def _ref_safe_json_default(obj: Any) -> str:
+    """JSON default handler that converts Ref objects to their URI strings.
+
+    When the client computes digests, to_json should have already converted
+    ObjectRef instances to URI strings. However, in edge cases (e.g. mutated
+    WeaveObjects with sub-attribute refs), ObjectRef instances may survive
+    into the val dict. This handler ensures json.dumps succeeds and produces
+    the same output the server would see (where refs are always strings).
+    """
+    # Use duck typing to avoid circular imports (weave.shared <- weave.trace.refs)
+    if hasattr(obj, "uri") and callable(obj.uri):
+        return obj.uri()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
 def bytes_digest(json_val: bytes) -> str:
     hasher = hashlib.sha256()
     hasher.update(json_val)
@@ -54,7 +69,7 @@ def compute_object_digest_result(
     processed_result = process_incoming_object_val(val, builtin_object_class)
     processed_val = processed_result["val"]
     # Keep object digests stable regardless of dictionary insertion order.
-    json_val = json.dumps(processed_val, sort_keys=True)
+    json_val = json.dumps(processed_val, sort_keys=True, default=_ref_safe_json_default)
     digest = str_digest(json_val)
     return ObjectDigestResult(
         processed_val=processed_val,
@@ -73,7 +88,7 @@ def compute_object_digest(val: Any, builtin_object_class: str | None = None) -> 
 def compute_row_digest(row: dict[str, Any]) -> str:
     """Compute a single row digest exactly as table_create does server-side."""
     # Keep table row digests stable regardless of dictionary insertion order.
-    row_json = json.dumps(row, sort_keys=True)
+    row_json = json.dumps(row, sort_keys=True, default=_ref_safe_json_default)
     return str_digest(row_json)
 
 

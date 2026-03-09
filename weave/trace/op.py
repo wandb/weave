@@ -458,11 +458,19 @@ def _call_sync_func(
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
     # If the parent was traced (sampled in), the child will be too.
+    stack_depth = len(call_context.get_call_stack())
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
         raise e
     except Exception as e:
+        # If create_call partially succeeded and pushed a call to the stack
+        # (e.g. push_call ran but a post-call flush raised), pop it to prevent
+        # call stack leaks.
+        if len(call_context.get_call_stack()) > stack_depth:
+            current = call_context.get_current_call()
+            if current:
+                call_context.pop_call(current.id)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -585,11 +593,19 @@ async def _call_async_func(
     _set_python_function_type_on_weave_dict(__weave, "async_function")
 
     # Proceed with tracing
+    stack_depth = len(call_context.get_call_stack())
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
         raise e
     except Exception as e:
+        # If create_call partially succeeded and pushed a call to the stack
+        # (e.g. push_call ran but a post-call flush raised), pop it to prevent
+        # call stack leaks.
+        if len(call_context.get_call_stack()) > stack_depth:
+            current = call_context.get_current_call()
+            if current:
+                call_context.pop_call(current.id)
         if get_raise_on_captured_errors():
             raise
         log_once(
