@@ -140,8 +140,6 @@ class Sentry:
         if client is not None:
             client.flush()
 
-        return None
-
     @_safe_noop
     def start_session(self) -> None:
         """Start a new session."""
@@ -201,7 +199,7 @@ class Sentry:
             if tags is not None:
                 for tag in tags:
                     val = tags.get(tag, None)
-                    if val not in (None, ""):
+                    if val not in {None, ""}:
                         scope.set_tag(tag, val)
                     if tag == "user":
                         scope.user = val

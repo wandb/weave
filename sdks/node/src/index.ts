@@ -11,6 +11,7 @@ export {EvaluationLogger, ScoreLogger} from './evaluationLogger';
 export {CallSchema, CallsFilter} from './generated/traceServerApi';
 export {
   wrapOpenAI,
+  wrapGoogleGenAI,
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
 } from './integrations';

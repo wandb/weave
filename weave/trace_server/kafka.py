@@ -130,7 +130,13 @@ class KafkaProducer(ConfluentKafkaProducer):
         )
 
         if flush_immediately:
-            self.flush()
+            # Use a short non-blocking flush instead of an unbounded flush().
+            # The producer is a process-level singleton shared across all request
+            # threads, so flush() (no timeout) blocks until ALL in-flight messages
+            # from every concurrent request are acknowledged — causing a convoy
+            # effect under load.  flush(0) triggers a delivery attempt for queued
+            # messages and returns immediately.
+            self.flush(0)
 
     SCORE_CALLS_CHUNK_SIZE = 100
 
@@ -176,7 +182,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             )
 
         if flush_immediately:
-            self.flush()
+            self.flush(0)
 
 
 class KafkaConsumer(ConfluentKafkaConsumer):

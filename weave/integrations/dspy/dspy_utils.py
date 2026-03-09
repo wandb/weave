@@ -21,11 +21,11 @@ MAX_STR_LEN = 1000
 
 
 def pop_history(dictifed_inputs: dict[str, Any]) -> None:
-    if os.getenv("WEAVE_DSPY_HIDE_HISTORY", "false").lower() in (
+    if os.getenv("WEAVE_DSPY_HIDE_HISTORY", "false").lower() in {
         "true",
         "1",
         "yes",
-    ):
+    }:
         dictifed_inputs.pop("history", None)
 
 

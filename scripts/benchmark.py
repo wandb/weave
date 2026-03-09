@@ -251,7 +251,7 @@ def run_benchmark(
                     default="q",
                 )
 
-                if choice.lower() in ["q", "quit", "exit"]:
+                if choice.lower() in {"q", "quit", "exit"}:
                     console.print("[dim]👋 Goodbye![/dim]")
                     raise typer.Exit(0)
 

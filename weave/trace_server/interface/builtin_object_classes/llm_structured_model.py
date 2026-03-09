@@ -17,7 +17,7 @@ ResponseFormat = Literal["json_object", "json_schema", "text"]
 
 
 def is_response_format(value: Any) -> bool:
-    return isinstance(value, str) and value in ["json_object", "text"]
+    return isinstance(value, str) and value in {"json_object", "text"}
 
 
 class Message(BaseModel):
@@ -322,7 +322,7 @@ def parse_params_to_litellm_params(
             final_params["n"] = value
         elif key == "messages_template":
             pass
-        elif key == "functions" or key == "stop":
+        elif key in {"functions", "stop"}:
             if isinstance(value, list) and len(value) > 0:
                 final_params[key] = value
         else:

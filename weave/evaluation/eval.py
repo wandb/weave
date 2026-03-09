@@ -367,7 +367,7 @@ class Evaluation(Object):
             )
             summary_call = list(descendents)[-1]
             scorer_names = {
-                k for k in summary_call.output if k not in ["output", "model_latency"]
+                k for k in summary_call.output if k not in {"output", "model_latency"}
             }
             score_calls = [
                 call

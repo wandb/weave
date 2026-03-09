@@ -337,7 +337,7 @@ class WeaveAiohttpWebsocketConnection:
     async def receive(self, *args: Any, **kwargs: Any) -> Any:
         msg = await self.original_ws.receive(*args, **kwargs)
         if not (
-            msg.type in (WSMsgType.TEXT, WSMsgType.BINARY) if WSMsgType else (1, 2)
+            msg.type in {WSMsgType.TEXT, WSMsgType.BINARY} if WSMsgType else (1, 2)
         ):
             return msg
         # Forward outgoing user messages to conversation manager

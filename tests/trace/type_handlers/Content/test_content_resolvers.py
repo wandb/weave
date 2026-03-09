@@ -563,7 +563,7 @@ class TestContentIntegration:
 
     def test_from_path_wav(self, resolver_backend, wav_file):
         c = Content.from_path(wav_file)
-        assert c.mimetype in ("audio/x-wav", "audio/wav")
+        assert c.mimetype in {"audio/x-wav", "audio/wav"}
         assert c.extension == ".wav"
 
     def test_from_bytes_with_extension(self, resolver_backend, png_bytes):

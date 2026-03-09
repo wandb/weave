@@ -154,10 +154,10 @@ def replace_base64_with_content_objects(
                     # The uncovered scenario is if a user has encoded a plaintext document as Base64
                     # We don't handle text content objects in a special way on the clients, so this is acceptable.
                     content: Content[Any] = Content.from_base64(val)
-                    if content.mimetype not in (
+                    if content.mimetype not in {
                         "text/plain",
                         "application/octet-stream",
-                    ):
+                    }:
                         return store_content_object(
                             content,
                             project_id,

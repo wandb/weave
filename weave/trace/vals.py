@@ -264,7 +264,7 @@ class WeaveObject(Traceable):  # noqa: PLW1641
         return result
 
     def __setattr__(self, __name: str, __value: Any) -> None:
-        if __name in [
+        if __name in {
             "_val",
             "ref",
             "server",
@@ -272,7 +272,7 @@ class WeaveObject(Traceable):  # noqa: PLW1641
             "mutations",
             "_is_dirty",
             "parent",
-        ]:
+        }:
             return object.__setattr__(self, __name, __value)
         else:
             self._mark_dirty()
@@ -916,7 +916,6 @@ def make_trace_obj(
         # 2. Users can compare them pythonically (e.g. `x is None` vs. `x == None`)
 
         pass
-    else:
-        if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
-            box_val.ref = new_ref
+    elif hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
+        box_val.ref = new_ref
     return box_val
