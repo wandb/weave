@@ -7,6 +7,7 @@ from weave.trace_server.environment import (
     kafka_producer_max_buffer_size,
     wf_clickhouse_calls_shard_key,
     wf_scoring_worker_check_cancellation,
+    wf_scoring_worker_debounced_scoring_sampling_rate,
     wf_scoring_worker_kafka_consumer_group_id_override,
 )
 
@@ -41,6 +42,37 @@ def test_wf_scoring_worker_check_cancellation():
     os.environ["SCORING_WORKER_CHECK_CANCELLATION"] = "invalid"
     assert wf_scoring_worker_check_cancellation() is False
     del os.environ["SCORING_WORKER_CHECK_CANCELLATION"]
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_debounced_scoring_sampling_rate():
+    """Sampling rate defaults to 0.0, parses floats, clamps to [0, 1], invalid -> 0.0."""
+    key = "WF_SCORING_WORKER_DEBOUNCED_SCORING_SAMPLING_RATE"
+    try:
+        if key in os.environ:
+            del os.environ[key]
+        assert wf_scoring_worker_debounced_scoring_sampling_rate() == 0.0
+
+        os.environ[key] = "0"
+        assert wf_scoring_worker_debounced_scoring_sampling_rate() == 0.0
+        os.environ[key] = "0.5"
+        assert wf_scoring_worker_debounced_scoring_sampling_rate() == 0.5
+        os.environ[key] = "1"
+        assert wf_scoring_worker_debounced_scoring_sampling_rate() == 1.0
+        os.environ[key] = "1.0"
+        assert wf_scoring_worker_debounced_scoring_sampling_rate() == 1.0
+
+        os.environ[key] = "-0.1"
+        assert wf_scoring_worker_debounced_scoring_sampling_rate() == 0.0
+        os.environ[key] = "1.5"
+        assert wf_scoring_worker_debounced_scoring_sampling_rate() == 1.0
+
+        os.environ[key] = "invalid"
+        assert wf_scoring_worker_debounced_scoring_sampling_rate() == 0.0
+        os.environ[key] = ""
+        assert wf_scoring_worker_debounced_scoring_sampling_rate() == 0.0
+    finally:
+        os.environ.pop(key, None)
 
 
 @pytest.mark.disable_logging_error_check
