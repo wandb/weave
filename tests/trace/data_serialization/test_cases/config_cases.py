@@ -138,6 +138,11 @@ config_cases = [
                 "_class_name": "Query",
                 "_bases": ["BaseModel"],
             },
+            "merge_scorers": False,
+            "merged_scorers_prompt_header": None,
+            "merged_scorers_prompt_footer": None,
+            "merged_scorers_prompt_section_header": "{display_name}",
+            "is_traced": True,
             "active": False,
             "scorer_debounce_config": {
                 "aggregation_field": "trace_id",
