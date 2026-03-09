@@ -306,11 +306,11 @@ class CachingMiddlewareTraceServer(
             self._safe_cache_delete_prefix(cache_key_prefix)
         return self._next_trace_server.obj_delete(req)
 
-    def _invalidate_obj_read_cache_version(self, project_id: str, object_id: str, digest: str) -> None:
+    def _invalidate_obj_read_cache_version(
+        self, project_id: str, object_id: str, digest: str
+    ) -> None:
         """Invalidate obj_read cache entries for a specific object version."""
-        cache_key_partial = (
-            f'{{"project_id": "{project_id}", "object_id": "{object_id}", "digest": "{digest}"'
-        )
+        cache_key_partial = f'{{"project_id": "{project_id}", "object_id": "{object_id}", "digest": "{digest}"'
         self._safe_cache_delete_prefix(f"obj_read_{cache_key_partial}")
 
     def _invalidate_obj_read_cache_all(self, project_id: str, object_id: str) -> None:
@@ -321,11 +321,15 @@ class CachingMiddlewareTraceServer(
         self._safe_cache_delete_prefix(f"obj_read_{cache_key_partial}")
 
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
-        self._invalidate_obj_read_cache_version(req.project_id, req.object_id, req.digest)
+        self._invalidate_obj_read_cache_version(
+            req.project_id, req.object_id, req.digest
+        )
         return self._next_trace_server.obj_add_tags(req)
 
     def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
-        self._invalidate_obj_read_cache_version(req.project_id, req.object_id, req.digest)
+        self._invalidate_obj_read_cache_version(
+            req.project_id, req.object_id, req.digest
+        )
         return self._next_trace_server.obj_remove_tags(req)
 
     def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
