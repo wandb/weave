@@ -336,27 +336,31 @@ class CachingMiddlewareTraceServer(
         )
 
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        res = self._next_trace_server.obj_add_tags(req)
         self._invalidate_obj_read_cache_version(
             req.project_id, req.object_id, req.digest
         )
-        return self._next_trace_server.obj_add_tags(req)
+        return res
 
     def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        res = self._next_trace_server.obj_remove_tags(req)
         self._invalidate_obj_read_cache_version(
             req.project_id, req.object_id, req.digest
         )
-        return self._next_trace_server.obj_remove_tags(req)
+        return res
 
     def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         # Alias assignment may move the alias from another version, so
         # invalidate all versions of this object.
+        res = self._next_trace_server.obj_set_aliases(req)
         self._invalidate_obj_read_cache_all(req.project_id, req.object_id)
-        return self._next_trace_server.obj_set_aliases(req)
+        return res
 
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
         # Alias removal doesn't include digest; invalidate all versions for this object
+        res = self._next_trace_server.obj_remove_alias(req)
         self._invalidate_obj_read_cache_all(req.project_id, req.object_id)
-        return self._next_trace_server.obj_remove_alias(req)
+        return res
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         if not digest_is_cacheable(req.digest):
