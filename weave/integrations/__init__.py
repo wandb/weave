@@ -4,6 +4,7 @@ __all__ = [
     "patch_anthropic",
     "patch_autogen",
     "patch_cerebras",
+    "patch_claude_agent_sdk",
     "patch_cohere",
     "patch_crewai",
     "patch_dspy",

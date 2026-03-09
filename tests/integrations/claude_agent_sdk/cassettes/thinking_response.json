@@ -1,0 +1,47 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-think789"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "Let me think about this carefully...",
+          "signature": "sig_abc123"
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "After careful consideration, the answer is 42."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 2000,
+    "duration_api_ms": 1500,
+    "is_error": false,
+    "num_turns": 1,
+    "session_id": "s-think789",
+    "total_cost_usd": 0.005,
+    "usage": {
+      "input_tokens": 50,
+      "output_tokens": 30
+    },
+    "result": "After careful consideration, the answer is 42."
+  }
+]

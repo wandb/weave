@@ -172,6 +172,7 @@ def get_ch_trace_server(
             # Clean up any existing worker-specific databases
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
+            ch_server._database_ensured = False
 
             # Patch _run_migrations to use worker-specific management database
             def patched_run_migrations():

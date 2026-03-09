@@ -562,15 +562,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         return ServerInfoRes.model_validate(r.json())
 
     @validate_call
-    def project_ids_external_to_internal(
-        self, req: tsi.ProjectIdsExternalToInternalReq
-    ) -> tsi.ProjectIdsExternalToInternalRes:
-        return self._generic_request(
-            "/project_ids/external_to_internal",
-            req,
-            tsi.ProjectIdsExternalToInternalReq,
-            tsi.ProjectIdsExternalToInternalRes,
-        )
+    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
+        r = self._post_request_executor("/service/projects_info", req)
+        handle_response_error(r, "/service/projects_info")
+        return [tsi.ProjectsInfoRes.model_validate(item) for item in r.json()]
 
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # TODO: Add docs link (DOCS-1390)

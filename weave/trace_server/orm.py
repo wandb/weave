@@ -290,12 +290,12 @@ class Select:
     def order_by(self, order_by: list[SortBy] | None) -> "Select":
         if order_by:
             for o in order_by:
-                assert o.direction in (
+                assert o.direction in {
                     "ASC",
                     "DESC",
                     "asc",
                     "desc",
-                ), f"Invalid order_by direction: {o.direction}"
+                }, f"Invalid order_by direction: {o.direction}"
         self._order_by = order_by
         return self
 
@@ -489,7 +489,7 @@ class Insert:
 
 
 def combine_conditions(conditions: list[str], operator: str) -> str:
-    if operator not in ("AND", "OR"):
+    if operator not in {"AND", "OR"}:
         raise ValueError(f"Invalid operator: {operator}")
     conditions = [c for c in conditions if c is not None and c != ""]
     if not conditions:

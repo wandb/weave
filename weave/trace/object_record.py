@@ -27,11 +27,10 @@ class ObjectRecord:  # noqa: PLW1641
         if isinstance(other, ObjectRecord):
             if self._class_name != other._class_name:
                 return False
-        else:
-            if other.__class__.__name__ != self._class_name:
-                return False
+        elif other.__class__.__name__ != self._class_name:
+            return False
         for k, v in self.__dict__.items():
-            if k == "_class_name" or k == "_bases":
+            if k in {"_class_name", "_bases"}:
                 continue
             if getattr(other, k) != v:
                 return False
@@ -48,14 +47,14 @@ class ObjectRecord:  # noqa: PLW1641
             k: v
             for k, v in self.__dict__.items()
             if k
-            not in [
+            not in {
                 "_class_name",
                 "_bases",
                 "map_values",
                 "unwrap",
                 "__repr__",
                 "__eq__",
-            ]
+            }
         }
         return unwrap(unwrapped_one_level)
 

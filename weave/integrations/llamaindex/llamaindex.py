@@ -428,7 +428,7 @@ if not _import_failed:
                     # For streaming LLMCompletion and LLMChat events, pre-create the InProgress call
                     # so that OpenAI autopatch inherits it as parent
                     if (
-                        base_event_name in ["LLMCompletion", "LLMChat"]
+                        base_event_name in {"LLMCompletion", "LLMChat"}
                     ) and event.span_id in _accumulators:
                         progress_op_name = (
                             f"llama_index.event.{base_event_name}InProgress"

@@ -45,11 +45,25 @@ def vertexai_accumulator(
 
     candidates = []
     for i, value_candidate in enumerate(value.candidates):
-        accumulated_texts = []
+        parts = []
         for j, value_part in enumerate(value_candidate.content.parts):
-            accumulated_text = acc.candidates[i].content.parts[j].text + value_part.text
-            accumulated_texts.append(accumulated_text)
-        parts = [gapic_content_types.Part(text=text) for text in accumulated_texts]
+            # Some parts (e.g. function_call) don't have text and raise
+            # AttributeError when accessed.  Pass them through as-is.
+            try:
+                value_text = value_part.text
+            except AttributeError:
+                parts.append(value_part._raw_part)
+                continue
+
+            acc_text = ""
+            if j < len(acc.candidates[i].content.parts):
+                try:
+                    acc_text = acc.candidates[i].content.parts[j].text
+                except AttributeError:
+                    pass
+
+            parts.append(gapic_content_types.Part(text=acc_text + value_text))
+
         content = gapic_content_types.Content(
             role=value_candidate.content.role, parts=parts
         )
