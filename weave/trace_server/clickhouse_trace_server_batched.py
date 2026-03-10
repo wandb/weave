@@ -11,11 +11,12 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
 from re import sub
-from typing import Any, Self, cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
+from typing_extensions import Self
 from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
