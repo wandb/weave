@@ -400,8 +400,11 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
             weave.trace.settings.parse_and_apply_settings(
                 weave.trace.settings.UserSettings()
             )
+            # Only close the caching layer, not the underlying trace_server.
+            # The trace_server is shared across multiple clients within this
+            # fixture and will be cleaned up by its own fixture teardown.
             try:
-                client.server.close()
+                client.server._cache.close()
             except Exception:
                 pass
 

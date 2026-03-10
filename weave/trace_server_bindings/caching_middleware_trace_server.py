@@ -119,6 +119,8 @@ class CachingMiddlewareTraceServer(
     def close(self) -> None:
         """Explicitly close cache resources (preferred over __del__)."""
         self._cache.close()
+        if hasattr(self._next_trace_server, "close"):
+            self._next_trace_server.close()
 
     @classmethod
     def from_env(cls, next_trace_server: TraceServerClientInterface) -> Self:

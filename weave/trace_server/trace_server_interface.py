@@ -497,6 +497,13 @@ class CompletionsCreateReq(BaseModelStrict):
     track_llm_call: bool | None = Field(
         True, description="Whether to track this LLM call in the trace server"
     )
+    trace_id: str | None = Field(
+        None,
+        description="Trace ID to use for the LLM call (for nesting under a parent)",
+    )
+    parent_id: str | None = Field(
+        None, description="Parent call ID to nest this LLM call under"
+    )
 
 
 class CompletionsCreateRes(BaseModel):

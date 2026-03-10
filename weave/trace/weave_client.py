@@ -660,8 +660,8 @@ class WeaveClient:
         display_name: str | Callable[[Call], str] | None = None,
         *,
         use_stack: bool = True,
-        started_at: datetime.datetime | None = None,
         _call_id_override: str | None = None,
+        started_at: datetime.datetime | None = None,
     ) -> Call:
         """Create, log, and push a call onto the runtime stack.
 
@@ -672,7 +672,7 @@ class WeaveClient:
             display_name: The display name for the call. Defaults to None.
             attributes: The attributes for the call. Defaults to None.
             use_stack: Whether to push the call onto the runtime stack. Defaults to True.
-            started_at: Optional override for the call start time. Defaults to now.
+            started_at: Override the call start time. If None, uses current time.
 
         Returns:
             The created Call object.
@@ -882,6 +882,7 @@ class WeaveClient:
         exception: BaseException | None = None,
         *,
         op: Op | None = None,
+        ended_at: datetime.datetime | None = None,
     ) -> None:
         """Finalize a call and persist its results.
 
@@ -898,7 +899,8 @@ class WeaveClient:
 
         from weave.trace.api import _global_postprocess_output
 
-        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        if ended_at is None:
+            ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
 
