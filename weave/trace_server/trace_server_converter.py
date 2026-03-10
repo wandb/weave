@@ -74,9 +74,7 @@ def universal_ext_to_int_ref_converter(
                     allowed_internal_project_ids is None
                     or ref_project_id not in allowed_internal_project_ids
                 ):
-                    raise InvalidExternalRef(
-                        "Encountered unexpected ref format."
-                    )
+                    raise InvalidExternalRef("Encountered unexpected ref format.")
                 return obj
         return obj
 
