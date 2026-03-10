@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
 from re import sub
-from typing import Any, cast
+from typing import Any, Self, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -341,7 +341,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @classmethod
     def from_env(
         cls, use_async_insert: bool = False, **kwargs: Any
-    ) -> "ClickHouseTraceServer":
+    ) -> Self:
         return cls(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
