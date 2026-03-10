@@ -754,7 +754,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
             ) from None
 
-    def obj_remove_aliases(self, req: tsi.ObjRemoveAliasesReq) -> tsi.ObjRemoveAliasesRes:
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
         try:
             return self._stainless_request(
                 req,

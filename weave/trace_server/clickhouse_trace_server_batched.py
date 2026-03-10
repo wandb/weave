@@ -1973,7 +1973,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.ObjSetAliasesRes()
 
-    def obj_remove_aliases(self, req: tsi.ObjRemoveAliasesReq) -> tsi.ObjRemoveAliasesRes:
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
         assert req.wb_user_id, "wb_user_id is required for obj_remove_aliases"
         self._insert_aliases(
             req.project_id,

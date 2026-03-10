@@ -1252,7 +1252,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conn.commit()
         return tsi.ObjSetAliasesRes()
 
-    def obj_remove_aliases(self, req: tsi.ObjRemoveAliasesReq) -> tsi.ObjRemoveAliasesRes:
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             placeholders = ",".join("?" for _ in req.aliases)

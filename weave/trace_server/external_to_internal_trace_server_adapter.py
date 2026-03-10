@@ -280,7 +280,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.obj_set_aliases(req)
 
-    def obj_remove_aliases(self, req: tsi.ObjRemoveAliasesReq) -> tsi.ObjRemoveAliasesRes:
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.obj_remove_aliases(req)
 
