@@ -271,8 +271,8 @@ def log_warning(message: str) -> None:
         message: The warning message to log and report.
     """
     logger.warning(message)
-    if SENTRY_AVAILABLE:
-        sentry_sdk.capture_message(message, level="warning")
+    if SENTRY_AVAILABLE and global_trace_sentry.hub is not None:
+        global_trace_sentry.hub.capture_message(message, level="warning")
 
 
 def log_error(message: str) -> None:
@@ -282,8 +282,8 @@ def log_error(message: str) -> None:
         message: The error message to log and report.
     """
     logger.exception(message)
-    if SENTRY_AVAILABLE:
-        sentry_sdk.capture_message(message, level="error")
+    if SENTRY_AVAILABLE and global_trace_sentry.hub is not None:
+        global_trace_sentry.hub.capture_message(message, level="error")
 
 
-__all__ = ("SENTRY_AVAILABLE", "Sentry", "log_error", "log_warning", "sentry_sdk")
+__all__ = ("SENTRY_AVAILABLE", "Sentry", "global_trace_sentry", "log_error", "log_warning")
