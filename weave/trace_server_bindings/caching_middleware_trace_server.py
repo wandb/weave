@@ -358,11 +358,11 @@ class CachingMiddlewareTraceServer(
         self._invalidate_obj_read_cache_all(project_id, object_id)
         return res
 
-    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+    def obj_remove_aliases(self, req: tsi.ObjRemoveAliasesReq) -> tsi.ObjRemoveAliasesRes:
         # Capture fields before forwarding — downstream adapters may mutate req.
         # Alias removal doesn't include digest; invalidate all versions for this object.
         project_id, object_id = req.project_id, req.object_id
-        res = self._next_trace_server.obj_remove_alias(req)
+        res = self._next_trace_server.obj_remove_aliases(req)
         self._invalidate_obj_read_cache_all(project_id, object_id)
         return res
 

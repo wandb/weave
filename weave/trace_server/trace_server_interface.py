@@ -810,14 +810,21 @@ class ObjSetAliasesRes(BaseModel):
     pass
 
 
-class ObjRemoveAliasReq(BaseModelStrict):
+class ObjRemoveAliasesReq(BaseModelStrict):
     project_id: str
     object_id: str
-    alias: str
+    aliases: list[str]
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
+    @model_validator(mode="after")
+    def validate_aliases(self) -> "ObjRemoveAliasesReq":
+        self.aliases = list(dict.fromkeys(self.aliases))
+        for alias in self.aliases:
+            validate_alias_name(alias)
+        return self
 
-class ObjRemoveAliasRes(BaseModel):
+
+class ObjRemoveAliasesRes(BaseModel):
     pass
 
 
@@ -2630,7 +2637,7 @@ class TraceServerInterface(Protocol):
     def obj_add_tags(self, req: ObjAddTagsReq) -> ObjAddTagsRes: ...
     def obj_remove_tags(self, req: ObjRemoveTagsReq) -> ObjRemoveTagsRes: ...
     def obj_set_aliases(self, req: ObjSetAliasesReq) -> ObjSetAliasesRes: ...
-    def obj_remove_alias(self, req: ObjRemoveAliasReq) -> ObjRemoveAliasRes: ...
+    def obj_remove_aliases(self, req: ObjRemoveAliasesReq) -> ObjRemoveAliasesRes: ...
     def tags_list(self, req: TagsListReq) -> TagsListRes: ...
     def aliases_list(self, req: AliasesListReq) -> AliasesListRes: ...
 

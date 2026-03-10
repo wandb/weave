@@ -122,7 +122,7 @@ from weave.trace_server.trace_server_interface import (
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
-    ObjRemoveAliasReq,
+    ObjRemoveAliasesReq,
     ObjRemoveTagsReq,
     ObjSchema,
     ObjSchemaForInsert,
@@ -1275,20 +1275,23 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    def remove_alias(self, obj_ref: ObjectRef | str, alias: str) -> None:
-        """Remove an alias from an object.
+    def remove_aliases(self, obj_ref: ObjectRef | str, alias: str | list[str]) -> None:
+        """Remove one or more aliases from an object.
 
         Args:
             obj_ref: Reference to the object, either an ObjectRef
                 or a weave:/// URI string (digest is not used since aliases are object-scoped).
-            alias: The alias name to remove.
+            alias: An alias name or list of alias names to remove.
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
-        self.server.obj_remove_alias(
-            ObjRemoveAliasReq(
+        aliases = [alias] if isinstance(alias, str) else alias
+        if not aliases:
+            return
+        self.server.obj_remove_aliases(
+            ObjRemoveAliasesReq(
                 project_id=self._project_id(),
                 object_id=obj_ref.name,
-                alias=alias,
+                aliases=aliases,
             )
         )
 

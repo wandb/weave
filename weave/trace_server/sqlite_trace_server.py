@@ -1252,15 +1252,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conn.commit()
         return tsi.ObjSetAliasesRes()
 
-    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+    def obj_remove_aliases(self, req: tsi.ObjRemoveAliasesReq) -> tsi.ObjRemoveAliasesRes:
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
+            placeholders = ",".join("?" for _ in req.aliases)
             cursor.execute(
-                "DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias = ?",
-                (req.project_id, req.object_id, req.alias),
+                f"DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias IN ({placeholders})",
+                (req.project_id, req.object_id, *req.aliases),
             )
             conn.commit()
-        return tsi.ObjRemoveAliasRes()
+        return tsi.ObjRemoveAliasesRes()
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
         conn, cursor = get_conn_cursor(self.db_path)

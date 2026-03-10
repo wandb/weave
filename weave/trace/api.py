@@ -246,16 +246,16 @@ def set_aliases(obj_ref: ObjectRef | str, alias: str | list[str]) -> None:
     client.set_aliases(obj_ref, alias)
 
 
-def remove_alias(obj_ref: ObjectRef | str, alias: str) -> None:
-    """Remove an alias from an object.
+def remove_aliases(obj_ref: ObjectRef | str, alias: str | list[str]) -> None:
+    """Remove one or more aliases from an object.
 
     Args:
         obj_ref: Reference to the object, either an ObjectRef
             or a weave:/// URI string.
-        alias: The alias name to remove.
+        alias: An alias name or list of alias names to remove.
     """
     client = weave_client_context.require_weave_client()
-    client.remove_alias(obj_ref, alias)
+    client.remove_aliases(obj_ref, alias)
 
 
 def get_aliases(obj_ref: ObjectRef | str) -> list[str]:
@@ -531,7 +531,7 @@ __all__ = [
     "op",
     "publish",
     "ref",
-    "remove_alias",
+    "remove_aliases",
     "remove_tags",
     "require_current_call",
     "set_aliases",

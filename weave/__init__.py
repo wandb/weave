@@ -76,7 +76,7 @@ __all__ = [
     "op",
     "publish",
     "ref",
-    "remove_alias",
+    "remove_aliases",
     "remove_tags",
     "require_current_call",
     "set_aliases",

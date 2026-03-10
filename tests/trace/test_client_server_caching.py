@@ -641,8 +641,8 @@ def test_cache_invalidation_on_set_alias(client):
     assert "prod" in res2.obj.aliases
 
 
-def test_cache_invalidation_on_remove_alias(client):
-    """obj_read cache should be invalidated when an alias is removed."""
+def test_cache_invalidation_on_remove_aliases(client):
+    """obj_read cache should be invalidated when aliases are removed."""
     caching_server: CachingMiddlewareTraceServer = client.server.server
     ref = weave.publish({"data": "test"}, name="cache_inv_rm_alias")
     client.set_aliases(ref, "staging")
@@ -661,7 +661,7 @@ def test_cache_invalidation_on_remove_alias(client):
     assert caching_server.get_cache_recorder()["misses"] == 1
 
     # Remove alias — should invalidate cache
-    client.remove_alias(ref, "staging")
+    client.remove_aliases(ref, "staging")
 
     # Next read should miss
     caching_server.reset_cache_recorder()

@@ -1973,17 +1973,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.ObjSetAliasesRes()
 
-    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
-        assert req.wb_user_id, "wb_user_id is required for obj_remove_alias"
+    def obj_remove_aliases(self, req: tsi.ObjRemoveAliasesReq) -> tsi.ObjRemoveAliasesRes:
+        assert req.wb_user_id, "wb_user_id is required for obj_remove_aliases"
         self._insert_aliases(
             req.project_id,
             req.object_id,
-            [req.alias],
+            req.aliases,
             digest="",  # doesn't matter; dedup key is (project_id, object_id, alias)
             wb_user_id=req.wb_user_id,
             deleted_at=datetime.datetime.now(datetime.timezone.utc),
         )
-        return tsi.ObjRemoveAliasRes()
+        return tsi.ObjRemoveAliasesRes()
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
         query, parameters = make_list_tags_query(req.project_id)

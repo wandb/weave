@@ -170,9 +170,9 @@ class UserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().obj_set_aliases(req)
 
-    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+    def obj_remove_aliases(self, req: tsi.ObjRemoveAliasesReq) -> tsi.ObjRemoveAliasesRes:
         req.wb_user_id = self._user_id
-        return super().obj_remove_alias(req)
+        return super().obj_remove_aliases(req)
 
 
 def externalize_trace_server(

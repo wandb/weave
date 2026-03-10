@@ -237,11 +237,11 @@ def test_remove_alias(client: WeaveClient):
             aliases=["temp-alias"],
         )
     )
-    client.server.obj_remove_alias(
-        tsi.ObjRemoveAliasReq(
+    client.server.obj_remove_aliases(
+        tsi.ObjRemoveAliasesReq(
             project_id=client._project_id(),
             object_id=object_id,
-            alias="temp-alias",
+            aliases=["temp-alias"],
         )
     )
 
@@ -259,11 +259,11 @@ def test_remove_alias_nonexistent(client: WeaveClient):
     object_id, _ = _publish_obj(client, "alias_nonexist_obj")
 
     # Should succeed silently
-    client.server.obj_remove_alias(
-        tsi.ObjRemoveAliasReq(
+    client.server.obj_remove_aliases(
+        tsi.ObjRemoveAliasesReq(
             project_id=client._project_id(),
             object_id=object_id,
-            alias="no-such-alias",
+            aliases=["no-such-alias"],
         )
     )
 
@@ -832,7 +832,7 @@ def test_multiple_aliases_on_object(client: WeaveClient):
     assert "stable" not in (res.objs[1].aliases or [])
 
 
-# --- SDK client methods (WeaveClient.add_tags, remove_tags, set_aliases, remove_alias) ---
+# --- SDK client methods (WeaveClient.add_tags, remove_tags, set_aliases, remove_aliases) ---
 
 
 def test_sdk_add_tags(client: WeaveClient):
@@ -869,11 +869,11 @@ def test_sdk_set_aliases(client: WeaveClient):
     assert "production" in client.get_aliases(ref)
 
 
-def test_sdk_remove_alias(client: WeaveClient):
+def test_sdk_remove_aliases(client: WeaveClient):
     ref = weave.publish({"data": "test"}, name="sdk_rm_alias_obj")
 
     client.set_aliases(ref, "staging")
-    client.remove_alias(ref, "staging")
+    client.remove_aliases(ref, "staging")
 
     assert "staging" not in client.get_aliases(ref)
 
@@ -952,7 +952,7 @@ def test_sdk_remove_nonexistent_alias(client: WeaveClient):
     """Removing an alias that was never set should succeed silently."""
     ref = weave.publish({"data": "test"}, name="sdk_rm_noexist_alias")
 
-    client.remove_alias(ref, "never-set")
+    client.remove_aliases(ref, "never-set")
 
 
 def test_sdk_multiple_tags_and_aliases(client: WeaveClient):
@@ -1017,12 +1017,12 @@ def test_sdk_set_aliases_with_uri_string(client: WeaveClient):
 
 
 def test_sdk_remove_alias_with_uri_string(client: WeaveClient):
-    """remove_alias should accept a weave:/// URI string."""
+    """remove_aliases should accept a weave:/// URI string."""
     ref = weave.publish({"data": "test"}, name="sdk_uri_rm_alias_obj")
     uri = ref.uri()
 
     client.set_aliases(ref, "staging")
-    client.remove_alias(uri, "staging")
+    client.remove_aliases(uri, "staging")
 
     assert "staging" not in client.get_aliases(ref)
 
@@ -1099,7 +1099,7 @@ def test_sdk_list_aliases_excludes_removed(client: WeaveClient):
 
     client.set_aliases(ref, "keep-alias")
     client.set_aliases(ref, "remove-alias")
-    client.remove_alias(ref, "remove-alias")
+    client.remove_aliases(ref, "remove-alias")
 
     aliases = client.list_aliases()
     assert "keep-alias" in aliases
@@ -1358,11 +1358,11 @@ def test_aliases_list_excludes_removed(client: WeaveClient):
             aliases=["remove-alias"],
         )
     )
-    client.server.obj_remove_alias(
-        tsi.ObjRemoveAliasReq(
+    client.server.obj_remove_aliases(
+        tsi.ObjRemoveAliasesReq(
             project_id=client._project_id(),
             object_id=oid,
-            alias="remove-alias",
+            aliases=["remove-alias"],
         )
     )
 
@@ -1918,12 +1918,12 @@ def test_weave_set_aliases_list(client: WeaveClient):
     assert "alias-b" in aliases
 
 
-def test_weave_remove_alias(client: WeaveClient):
-    """weave.remove_alias() top-level function should work."""
+def test_weave_remove_aliases(client: WeaveClient):
+    """weave.remove_aliases() top-level function should work."""
     ref = weave.publish({"data": "test"}, name="tl_rm_alias_obj")
 
     weave.set_aliases(ref, "ephemeral")
-    weave.remove_alias(ref, "ephemeral")
+    weave.remove_aliases(ref, "ephemeral")
 
     assert "ephemeral" not in weave.get_aliases(ref)
 
@@ -2186,7 +2186,7 @@ def test_aliases_independent_across_objects(client: WeaveClient):
     assert "prod" in weave.get_aliases(ref_b)
 
     # Removing from one shouldn't affect the other
-    weave.remove_alias(ref_a, "prod")
+    weave.remove_aliases(ref_a, "prod")
     assert "prod" not in weave.get_aliases(ref_a)
     assert "prod" in weave.get_aliases(ref_b)
 
@@ -2226,7 +2226,7 @@ def test_list_aliases_deduplicates(client: WeaveClient):
     assert all_aliases.count("shared-alias") == 1  # distinct
 
 
-def test_remove_alias_then_resolve_raises(client: WeaveClient):
+def test_remove_aliases_then_resolve_raises(client: WeaveClient):
     """After removing an alias, resolving it should fail."""
     ref = weave.publish({"data": "test"}, name="rm_alias_resolve")
     client.set_aliases(ref, "temporary")
@@ -2235,7 +2235,7 @@ def test_remove_alias_then_resolve_raises(client: WeaveClient):
     assert weave.ref("rm_alias_resolve:temporary").get()["data"] == "test"
 
     # Remove and verify it no longer resolves
-    client.remove_alias(ref, "temporary")
+    client.remove_aliases(ref, "temporary")
     with pytest.raises(NotFoundError):
         weave.ref("rm_alias_resolve:temporary").get()
 
@@ -2276,7 +2276,7 @@ def test_tags_and_aliases_full_lifecycle(client: WeaveClient):
     assert weave.get_tags(ref_v0) == []
 
     # Remove alias
-    weave.remove_alias(ref_v0, "production")
+    weave.remove_aliases(ref_v0, "production")
     with pytest.raises(NotFoundError):
         weave.ref("full_lifecycle_obj:production").get()
 
