@@ -330,7 +330,7 @@ class WeaveClient:
         ensure_project_exists: bool = True,
     ):
         self.entity = entity
-        self.project = project
+        self._project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
@@ -344,7 +344,7 @@ class WeaveClient:
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
             # Set Client project name with updated project name
-            self.project = resp.project_name
+            self._project = resp.project_name
 
         self._server_call_processor: AsyncBatchProcessor | CallBatchProcessor | None = (
             None
@@ -366,6 +366,19 @@ class WeaveClient:
         # Pre-cache internal project ID after all attributes are initialized,
         # since the server call may trigger auto-flush in test environments.
         self._resolve_ext_to_int_project_id(self._project_id())
+
+    @property
+    def project(self) -> str:
+        return self._project
+
+    @project.setter
+    def project(self, value: str) -> None:
+        self._project = value
+        # Eagerly resolve internal project ID when project changes,
+        # so we don't block on synchronous server calls later
+        # (e.g. inside a paused/blocking server context).
+        if hasattr(self, "_ext_to_int_project_map"):
+            self._resolve_ext_to_int_project_id(self._project_id())
 
     ################ High Level Convenience Methods ################
 
@@ -842,7 +855,7 @@ class WeaveClient:
             # to send this call's start immediately (for long-running ops like evals)
             # Ugly that we have to reach down to the processor level here, but otherwise
             # we need to change the interface itself.
-            call_processor = _get_call_processor(self.server)
+            call_processor = self._server_call_processor
             if call_processor is not None:
                 eager = op.eager_call_start
                 call_processor.enqueue_start(
@@ -1981,7 +1994,7 @@ class WeaveClient:
         # return None immediately to avoid blocking on synchronous server calls.
         if self._has_projects_info is False:
             return None
-        if hasattr(self.server, "projects_info"):
+        if self._has_projects_info is True or hasattr(self.server, "projects_info"):
             try:
                 results = self.server.projects_info(
                     ProjectsInfoReq(project_ids=[ext_project_id])
