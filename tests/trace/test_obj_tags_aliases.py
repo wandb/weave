@@ -2558,9 +2558,7 @@ def test_tags_cleaned_up_on_delete_specific_version(client: WeaveClient):
     )
 
     # Tags should be gone from list_tags (no orphans)
-    tags_res = client.server.tags_list(
-        tsi.TagsListReq(project_id=client._project_id())
-    )
+    tags_res = client.server.tags_list(tsi.TagsListReq(project_id=client._project_id()))
     assert "reviewed" not in tags_res.tags
     assert "staging" not in tags_res.tags
 
@@ -2642,9 +2640,7 @@ def test_tags_cleaned_up_on_delete_all_versions(client: WeaveClient):
     )
 
     # Both tags should be gone
-    tags_res = client.server.tags_list(
-        tsi.TagsListReq(project_id=client._project_id())
-    )
+    tags_res = client.server.tags_list(tsi.TagsListReq(project_id=client._project_id()))
     assert "v0-tag" not in tags_res.tags
     assert "v1-tag" not in tags_res.tags
 
@@ -2730,9 +2726,7 @@ def test_tags_survive_on_undeleted_version(client: WeaveClient):
     assert res.objs[0].tags == ["survivor"]
 
     # v0's tag should be gone
-    tags_res = client.server.tags_list(
-        tsi.TagsListReq(project_id=client._project_id())
-    )
+    tags_res = client.server.tags_list(tsi.TagsListReq(project_id=client._project_id()))
     assert "doomed" not in tags_res.tags
     assert "survivor" in tags_res.tags
 

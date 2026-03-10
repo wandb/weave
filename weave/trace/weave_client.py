@@ -1253,9 +1253,7 @@ class WeaveClient:
         return res.obj.tags or []
 
     @trace_sentry.global_trace_sentry.watch()
-    def set_aliases(
-        self, obj_ref: ObjectRef | str, alias: str | list[str]
-    ) -> None:
+    def set_aliases(self, obj_ref: ObjectRef | str, alias: str | list[str]) -> None:
         """Set one or more aliases for an object version.
 
         Args:

@@ -336,30 +336,34 @@ class CachingMiddlewareTraceServer(
         )
 
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        # Capture fields before forwarding — downstream adapters may mutate req
+        project_id, object_id, digest = req.project_id, req.object_id, req.digest
         res = self._next_trace_server.obj_add_tags(req)
-        self._invalidate_obj_read_cache_version(
-            req.project_id, req.object_id, req.digest
-        )
+        self._invalidate_obj_read_cache_version(project_id, object_id, digest)
         return res
 
     def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        # Capture fields before forwarding — downstream adapters may mutate req
+        project_id, object_id, digest = req.project_id, req.object_id, req.digest
         res = self._next_trace_server.obj_remove_tags(req)
-        self._invalidate_obj_read_cache_version(
-            req.project_id, req.object_id, req.digest
-        )
+        self._invalidate_obj_read_cache_version(project_id, object_id, digest)
         return res
 
     def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+        # Capture fields before forwarding — downstream adapters may mutate req.
         # Alias assignment may move the alias from another version, so
         # invalidate all versions of this object.
+        project_id, object_id = req.project_id, req.object_id
         res = self._next_trace_server.obj_set_aliases(req)
-        self._invalidate_obj_read_cache_all(req.project_id, req.object_id)
+        self._invalidate_obj_read_cache_all(project_id, object_id)
         return res
 
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
-        # Alias removal doesn't include digest; invalidate all versions for this object
+        # Capture fields before forwarding — downstream adapters may mutate req.
+        # Alias removal doesn't include digest; invalidate all versions for this object.
+        project_id, object_id = req.project_id, req.object_id
         res = self._next_trace_server.obj_remove_alias(req)
-        self._invalidate_obj_read_cache_all(req.project_id, req.object_id)
+        self._invalidate_obj_read_cache_all(project_id, object_id)
         return res
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
