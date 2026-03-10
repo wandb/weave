@@ -164,7 +164,7 @@ presidio = [
 modal = ["modal", "python-dotenv"]
 mcp = ["mcp[cli]>=1.6.0,<1.10.0; python_version >= '3.10'"]
 vertexai = [
-  "vertexai>=1.70.0; platform_python_implementation != 'PyPy' and python_version < '3.13'",
+  "vertexai>=1.70.0; platform_python_implementation != 'PyPy'",
   "shapely<=2.0.6; platform_python_implementation != 'PyPy'",
 ] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
@@ -172,6 +172,7 @@ verdict = [
   "verdict>=0.2.3; platform_python_implementation != 'PyPy' and python_version < '3.13'",
 ]
 autogen = ["autogen-agentchat>=0.5.7; python_version >= '3.10'"]
+claude_agent_sdk = ["claude-agent-sdk>=0.1.0"]
 verifiers = ["verifiers>=0.1.3.post0,<0.1.4; python_version >= '3.11'"]
 
 
@@ -216,6 +217,7 @@ markers = [
   "skip_clickhouse_client: marks tests as requiring clickhouse client to be skipped",
   "trace_server: alias for `trace_server` fixture used for CI dispatching. Do not use directly in code.",
   "disable_logging_error_check: means that the test expects logging errors (and the default assertion for no logging errors will fail)",
+  "timeout: marks tests with a timeout in seconds (via pytest-timeout)",
   "remote_only: marks tests that only run with --remote-http-trace-server=remote",
   "stainless_only: marks tests that only run with --remote-http-trace-server=stainless",
 ]
@@ -264,6 +266,7 @@ select = [
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
   "PLC",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "PLE",     # https://docs.astral.sh/ruff/rules/#pylint-ple
+  "PLR",     # https://docs.astral.sh/ruff/rules/#pylint-plr
   "PLW",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
@@ -298,6 +301,18 @@ ignore = [
   "PLC2701", # https://docs.astral.sh/ruff/rules/import-private-name/
   # Keep explicit empty-string checks for readability in tests and parsing paths.
   "PLC1901", # https://docs.astral.sh/ruff/rules/compare-to-empty-string/
+  # Initial PLR rollout: defer broad structural and magic-number checks for a
+  # dedicated cleanup pass to keep lint actionable.
+  "PLR0904", # https://docs.astral.sh/ruff/rules/too-many-public-methods/
+  "PLR0911", # https://docs.astral.sh/ruff/rules/too-many-return-statements/
+  "PLR0912", # https://docs.astral.sh/ruff/rules/too-many-branches/
+  "PLR0913", # https://docs.astral.sh/ruff/rules/too-many-arguments/
+  "PLR0914", # https://docs.astral.sh/ruff/rules/too-many-locals/
+  "PLR0915", # https://docs.astral.sh/ruff/rules/too-many-statements/
+  "PLR0917", # https://docs.astral.sh/ruff/rules/too-many-positional-arguments/
+  "PLR1702", # https://docs.astral.sh/ruff/rules/too-many-nested-blocks/
+  "PLR2004", # https://docs.astral.sh/ruff/rules/magic-value-comparison/
+  "PLR6301", # https://docs.astral.sh/ruff/rules/no-self-use/
 ]
 
 [tool.ruff.lint.isort]
@@ -349,7 +364,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.31-dev0"
+current_version = "0.52.32-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -444,6 +459,7 @@ test = [
   "pytest-cov>=5.0.0",
   "pytest-xdist>=3.1.0",
   "pytest-rerunfailures>=14.0",
+  "pytest-timeout>=2.3.1",
   "pytest-shard==0.1.2",
   "clickhouse_connect==0.11.0",
   "fastapi>=0.110.0",

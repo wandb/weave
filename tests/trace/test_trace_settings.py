@@ -102,6 +102,25 @@ def test_publish_when_disabled_uses_class_name(client, monkeypatch):
     assert ref.name == "MyClass"
 
 
+def test_publish_when_disabled_ignores_tags_aliases(client, monkeypatch):
+    """Tags and aliases should be silently ignored when weave is disabled."""
+    monkeypatch.setenv("WEAVE_DISABLED", "true")
+
+    with mock.patch(
+        "weave.trace.api.weave_client_context.require_weave_client"
+    ) as mock_require_client:
+        ref = weave.publish(
+            {"data": "test"},
+            name="disabled_obj",
+            tags=["prod"],
+            aliases=["v1"],
+        )
+        mock_require_client.assert_not_called()
+
+    assert ref.entity == "DISABLED"
+    assert ref.digest == "DISABLED"
+
+
 def test_print_call_link_setting(client_creator):
     with client_creator(settings=UserSettings(print_call_link=False)) as client:
         callbacks = [flushing_callback(client)]

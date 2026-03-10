@@ -280,6 +280,8 @@ class ObjSchema(BaseModel):
 
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
     size_bytes: int | None = None
+    tags: list[str] | None = None
+    aliases: list[str] | None = None
 
 
 class ObjSchemaForInsert(BaseModel):
@@ -486,6 +488,13 @@ class CompletionsCreateReq(BaseModelStrict):
     track_llm_call: bool | None = Field(
         True, description="Whether to track this LLM call in the trace server"
     )
+    trace_id: str | None = Field(
+        None,
+        description="Trace ID to use for the LLM call (for nesting under a parent)",
+    )
+    parent_id: str | None = Field(
+        None, description="Parent call ID to nest this LLM call under"
+    )
 
 
 class CompletionsCreateRes(BaseModel):
@@ -648,6 +657,10 @@ class ObjReadReq(BaseModelStrict):
         description="If true, the `val` column is not read from the database and is empty."
         "All other fields are returned.",
     )
+    include_tags_and_aliases: bool | None = Field(
+        default=False,
+        description="If true, tags and aliases are fetched and included in the response.",
+    )
 
 
 class ObjReadRes(BaseModel):
@@ -685,6 +698,14 @@ class ObjectVersionFilter(BaseModelStrict):
         description="If True, return only the latest version of each object. `False` and `None` will return all versions",
         examples=[True, False],
     )
+    tags: list[str] | None = Field(
+        default=None,
+        description="Filter object versions that have any of the specified tags",
+    )
+    aliases: list[str] | None = Field(
+        default=None,
+        description="Filter objects that have any of the specified aliases",
+    )
 
 
 class ObjQueryReq(BaseModelStrict):
@@ -720,6 +741,10 @@ class ObjQueryReq(BaseModelStrict):
         default=False,
         description="If true, the `size_bytes` column is returned.",
     )
+    include_tags_and_aliases: bool | None = Field(
+        default=False,
+        description="If true, tags and aliases are fetched and included in the response.",
+    )
 
 
 class ObjDeleteReq(BaseModelStrict):
@@ -733,6 +758,99 @@ class ObjDeleteReq(BaseModelStrict):
 
 class ObjDeleteRes(BaseModel):
     num_deleted: int
+
+
+# --- Tag and Alias types ---
+# Validation logic lives in weave.trace_server.validation
+from weave.trace_server.validation import validate_alias_name, validate_tag_name
+
+
+class ObjAddTagsReq(BaseModelStrict):
+    project_id: str
+    object_id: str
+    digest: str
+    tags: list[str]
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    @model_validator(mode="after")
+    def validate_tags(self) -> "ObjAddTagsReq":
+        # Deduplicate — order doesn't matter for a batch add, but
+        # dict.fromkeys preserves insertion order (stable for tests).
+        self.tags = list(dict.fromkeys(self.tags))
+        for tag in self.tags:
+            validate_tag_name(tag)
+        return self
+
+
+class ObjAddTagsRes(BaseModel):
+    pass
+
+
+class ObjRemoveTagsReq(BaseModelStrict):
+    project_id: str
+    object_id: str
+    digest: str
+    tags: list[str]
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ObjRemoveTagsRes(BaseModel):
+    pass
+
+
+class ObjSetAliasesReq(BaseModelStrict):
+    project_id: str
+    object_id: str
+    digest: str
+    aliases: list[str]
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    @model_validator(mode="after")
+    def validate_aliases(self) -> "ObjSetAliasesReq":
+        self.aliases = list(dict.fromkeys(self.aliases))
+        for alias in self.aliases:
+            validate_alias_name(alias)
+        return self
+
+
+class ObjSetAliasesRes(BaseModel):
+    pass
+
+
+class ObjRemoveAliasesReq(BaseModelStrict):
+    project_id: str
+    object_id: str
+    aliases: list[str]
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    @model_validator(mode="after")
+    def validate_aliases(self) -> "ObjRemoveAliasesReq":
+        self.aliases = list(dict.fromkeys(self.aliases))
+        for alias in self.aliases:
+            validate_alias_name(alias)
+        return self
+
+
+class ObjRemoveAliasesRes(BaseModel):
+    pass
+
+
+class TagsListReq(BaseModelStrict):
+    project_id: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class TagsListRes(BaseModel):
+    tags: list[str]
+
+
+class AliasesListReq(BaseModelStrict):
+    project_id: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AliasesListRes(BaseModel):
+    aliases: list[str]
 
 
 class ObjQueryRes(BaseModel):
@@ -1107,18 +1225,19 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
-class ProjectIdsExternalToInternalReq(BaseModelStrict):
+class ProjectsInfoReq(BaseModelStrict):
     project_ids: list[str] = Field(
-        description="External project IDs to resolve, each in 'entity/project' format.",
+        description="External project IDs in 'entity/project' format.",
         examples=[["entity-a/project-a", "entity-b/project-b"]],
     )
 
 
-class ProjectIdsExternalToInternalRes(BaseModel):
-    project_id_map: dict[str, str] = Field(
-        default_factory=dict,
-        description="Mapping of external project ID to internal project ID.",
-        examples=[{"entity-a/project-a": "internal-project-a"}],
+class ProjectsInfoRes(BaseModel):
+    external_project_id: str = Field(
+        description="External project ID in 'entity/project' format.",
+    )
+    internal_project_id: str = Field(
+        description="Internal project ID.",
     )
 
 
@@ -2493,10 +2612,6 @@ class TraceServerInterface(Protocol):
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
 
-    def project_ids_external_to_internal(
-        self, req: ProjectIdsExternalToInternalReq
-    ) -> ProjectIdsExternalToInternalRes: ...
-
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
@@ -2524,6 +2639,14 @@ class TraceServerInterface(Protocol):
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
     def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes: ...
+
+    # Tag and Alias API
+    def obj_add_tags(self, req: ObjAddTagsReq) -> ObjAddTagsRes: ...
+    def obj_remove_tags(self, req: ObjRemoveTagsReq) -> ObjRemoveTagsRes: ...
+    def obj_set_aliases(self, req: ObjSetAliasesReq) -> ObjSetAliasesRes: ...
+    def obj_remove_aliases(self, req: ObjRemoveAliasesReq) -> ObjRemoveAliasesRes: ...
+    def tags_list(self, req: TagsListReq) -> TagsListRes: ...
+    def aliases_list(self, req: AliasesListReq) -> AliasesListRes: ...
 
     # Table API
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...

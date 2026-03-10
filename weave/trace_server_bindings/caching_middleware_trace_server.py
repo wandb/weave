@@ -118,6 +118,8 @@ class CachingMiddlewareTraceServer(
     def close(self) -> None:
         """Explicitly close cache resources (preferred over __del__)."""
         self._cache.close()
+        if hasattr(self._next_trace_server, "close"):
+            self._next_trace_server.close()
 
     @classmethod
     def from_env(cls, next_trace_server: TraceServerClientInterface) -> Self:
@@ -289,22 +291,84 @@ class CachingMiddlewareTraceServer(
         )
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        cache_key_partial = (
-            f'{{"project_id": "{req.project_id}", "object_id": "{req.object_id}"'
-        )
+        obj_fields: dict[str, Any] = {
+            "project_id": req.project_id,
+            "object_id": req.object_id,
+        }
         if req.digests:
             for digest in req.digests:
-                cache_key_partial_digest = f'{cache_key_partial}, "digest": "{digest}"'
-                cache_key_prefix = f"obj_read_{cache_key_partial_digest}"
-                self._safe_cache_delete_prefix(cache_key_prefix)
-                cache_key_prefix = f'obj_create_{{"obj": {cache_key_partial_digest}'
-                self._safe_cache_delete_prefix(cache_key_prefix)
+                self._safe_cache_delete_prefix(
+                    _build_invalidation_prefix(
+                        "obj_read", {**obj_fields, "digest": digest}
+                    )
+                )
         else:
-            cache_key_prefix = f"obj_read_{cache_key_partial}"
-            self._safe_cache_delete_prefix(cache_key_prefix)
-            cache_key_prefix = f'obj_create_{{"obj": {cache_key_partial}'
-            self._safe_cache_delete_prefix(cache_key_prefix)
+            self._safe_cache_delete_prefix(
+                _build_invalidation_prefix("obj_read", obj_fields)
+            )
+        # ObjCreateReq.obj (ObjSchemaForInsert) has no digest field,
+        # so always invalidate by project_id + object_id.
+        self._safe_cache_delete_prefix(
+            _build_invalidation_prefix("obj_create", {"obj": obj_fields})
+        )
         return self._next_trace_server.obj_delete(req)
+
+    def _invalidate_obj_read_cache_version(
+        self, project_id: str, object_id: str, digest: str
+    ) -> None:
+        """Invalidate obj_read cache entries for a specific object version."""
+        self._safe_cache_delete_prefix(
+            _build_invalidation_prefix(
+                "obj_read",
+                {
+                    "project_id": project_id,
+                    "object_id": object_id,
+                    "digest": digest,
+                },
+            )
+        )
+
+    def _invalidate_obj_read_cache_all(self, project_id: str, object_id: str) -> None:
+        """Invalidate obj_read cache entries for all versions of an object."""
+        self._safe_cache_delete_prefix(
+            _build_invalidation_prefix(
+                "obj_read",
+                {"project_id": project_id, "object_id": object_id},
+            )
+        )
+
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        # Capture fields before forwarding — downstream adapters may mutate req
+        project_id, object_id, digest = req.project_id, req.object_id, req.digest
+        res = self._next_trace_server.obj_add_tags(req)
+        self._invalidate_obj_read_cache_version(project_id, object_id, digest)
+        return res
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        # Capture fields before forwarding — downstream adapters may mutate req
+        project_id, object_id, digest = req.project_id, req.object_id, req.digest
+        res = self._next_trace_server.obj_remove_tags(req)
+        self._invalidate_obj_read_cache_version(project_id, object_id, digest)
+        return res
+
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+        # Capture fields before forwarding — downstream adapters may mutate req.
+        # Alias assignment may move the alias from another version, so
+        # invalidate all versions of this object.
+        project_id, object_id = req.project_id, req.object_id
+        res = self._next_trace_server.obj_set_aliases(req)
+        self._invalidate_obj_read_cache_all(project_id, object_id)
+        return res
+
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
+        # Capture fields before forwarding — downstream adapters may mutate req.
+        # Alias removal doesn't include digest; invalidate all versions for this object.
+        project_id, object_id = req.project_id, req.object_id
+        res = self._next_trace_server.obj_remove_aliases(req)
+        self._invalidate_obj_read_cache_all(project_id, object_id)
+        return res
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         if not digest_is_cacheable(req.digest):
@@ -423,6 +487,22 @@ class CachingMiddlewareTraceServer(
         return self._with_cache_pydantic(
             self._next_trace_server.dataset_read, req, tsi.DatasetReadRes
         )
+
+
+def _build_invalidation_prefix(namespace: str, match_fields: dict[str, Any]) -> str:
+    """Build a cache key prefix for invalidation.
+
+    Uses json.dumps with the same settings as pydantic_bytes_safe_dump to ensure
+    consistent serialization. Trailing closing braces are stripped so the result
+    acts as a prefix match against full cache keys.
+
+    Args:
+        namespace: The cache namespace (e.g. "obj_read", "obj_create").
+        match_fields: Dict of leading fields to match, in Pydantic model
+            declaration order. For nested models, use nested dicts.
+    """
+    serialized = json.dumps(match_fields, ensure_ascii=False)
+    return f"{namespace}_{serialized.rstrip('}')}"
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:

@@ -386,7 +386,7 @@ _context_vars = {
 
 
 def _str2bool_truthy(v: str) -> bool:
-    return v.lower() in ("yes", "true", "1", "on")
+    return v.lower() in {"yes", "true", "1", "on"}
 
 
 def _should(name: str) -> bool:

@@ -25,7 +25,7 @@ _lc_nvidia_patcher: MultiPatcher | None = None
 def nvidia_accumulator(acc: Any | None, value: Any) -> Any:
     if acc is None:
         acc = ChatGenerationChunk(message=AIMessageChunk(content=""))
-    acc = acc + value
+    acc += value
 
     # Need to do this since the __add__ impl for the streaming response is wrong
     # We will get the actual usage in the final chunk so this will be eventually consistent
