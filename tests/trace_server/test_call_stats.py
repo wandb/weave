@@ -26,6 +26,10 @@ from weave.trace_server.trace_server_interface import (
     UsageMetricSpec,
 )
 
+# Fixed base time used by all tests: 2025-01-15 12:00:00 UTC.
+# Chosen to sit well inside an hour boundary so data never straddles buckets.
+_BASE_TIME = datetime.datetime(2025, 1, 15, 12, 0, 0, tzinfo=datetime.timezone.utc)
+
 
 def skip_if_sqlite(client: weave_client.WeaveClient):
     """Skip test if running against SQLite (call_stats not implemented)."""
@@ -58,7 +62,7 @@ def create_call_with_usage(
     project_id = client._project_id()
 
     if started_at is None:
-        started_at = datetime.datetime.now(datetime.timezone.utc)
+        started_at = _BASE_TIME
 
     ended_at = started_at + datetime.timedelta(seconds=1)
 
@@ -100,8 +104,7 @@ def test_call_stats_usage_sum_aggregation(client: weave_client.WeaveClient):
     model_name = "gpt-4o-test"
     op_name = f"weave:///{project_id}/op/test_op:abc123"
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(minutes=30)
+    start_time = _BASE_TIME
 
     usage_data = [
         {
@@ -138,7 +141,7 @@ def test_call_stats_usage_sum_aggregation(client: weave_client.WeaveClient):
         CallStatsReq(
             project_id=project_id,
             start=start_time - datetime.timedelta(minutes=1),
-            end=now + datetime.timedelta(minutes=1),
+            end=start_time + datetime.timedelta(hours=1),
             granularity=3600,
             usage_metrics=[
                 UsageMetricSpec(
@@ -172,14 +175,14 @@ def test_call_stats_usage_sum_aggregation(client: weave_client.WeaveClient):
 
 def test_call_stats_date_range_limit_validation():
     """Reject CallStatsReq with a date range exceeding 31 days."""
-    now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(days=32)
+    end_time = _BASE_TIME
+    start_time = end_time - datetime.timedelta(days=32)
 
     with pytest.raises(ValidationError):
         tsi.CallStatsReq(
             project_id="entity/project",
             start=start_time,
-            end=now,
+            end=end_time,
             granularity=3600,
             usage_metrics=[tsi.UsageMetricSpec(metric="total_tokens")],
         )
@@ -192,8 +195,7 @@ def test_call_stats_multiple_models(client: weave_client.WeaveClient):
     project_id = client._project_id()
     op_name = f"weave:///{project_id}/op/multi_model_op:def456"
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(minutes=30)
+    start_time = _BASE_TIME
 
     model_usage = {
         "gpt-4o": {
@@ -230,7 +232,7 @@ def test_call_stats_multiple_models(client: weave_client.WeaveClient):
         CallStatsReq(
             project_id=project_id,
             start=start_time - datetime.timedelta(minutes=1),
-            end=now + datetime.timedelta(minutes=1),
+            end=start_time + datetime.timedelta(hours=1),
             granularity=3600,
             usage_metrics=[
                 UsageMetricSpec(
@@ -259,8 +261,7 @@ def test_call_stats_all_aggregation_types(client: weave_client.WeaveClient):
     model_name = "gpt-4o-agg-test"
     op_name = f"weave:///{project_id}/op/agg_test_op:ghi789"
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(minutes=30)
+    start_time = _BASE_TIME
 
     token_values = [10, 20, 30, 40, 50]
 
@@ -284,7 +285,7 @@ def test_call_stats_all_aggregation_types(client: weave_client.WeaveClient):
         CallStatsReq(
             project_id=project_id,
             start=start_time - datetime.timedelta(minutes=1),
-            end=now + datetime.timedelta(minutes=1),
+            end=start_time + datetime.timedelta(hours=1),
             granularity=3600,
             usage_metrics=[
                 UsageMetricSpec(
@@ -360,8 +361,8 @@ def test_call_stats_percentiles(client: weave_client.WeaveClient):
     model_name = "gpt-4o-pct-test"
     op_name = f"weave:///{project_id}/op/pct_test_op:jkl012"
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(minutes=30)
+    # All 100 calls span ~100 seconds starting at 12:10:00, well within one hour bucket
+    start_time = _BASE_TIME + datetime.timedelta(minutes=10)
 
     token_values = list(range(1, 101))
 
@@ -385,7 +386,7 @@ def test_call_stats_percentiles(client: weave_client.WeaveClient):
         CallStatsReq(
             project_id=project_id,
             start=start_time - datetime.timedelta(minutes=1),
-            end=now + datetime.timedelta(minutes=1),
+            end=start_time + datetime.timedelta(minutes=30),
             granularity=3600,
             usage_metrics=[
                 UsageMetricSpec(
@@ -400,6 +401,9 @@ def test_call_stats_percentiles(client: weave_client.WeaveClient):
     model_buckets = [b for b in result.usage_buckets if b.get("model") == model_name]
     assert len(model_buckets) > 0, f"Expected buckets for model {model_name}"
 
+    assert len(model_buckets) == 1, (
+        f"Expected 1 bucket (all data in same hour), got {len(model_buckets)}"
+    )
     bucket = model_buckets[0]
 
     p50 = bucket.get("p50_input_tokens")
@@ -423,9 +427,9 @@ def test_call_stats_time_buckets(client: weave_client.WeaveClient):
     model_name = "gpt-4o-bucket-test"
     op_name = f"weave:///{project_id}/op/bucket_test_op:mno345"
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    hour_ago = now - datetime.timedelta(hours=1)
-    two_hours_ago = now - datetime.timedelta(hours=2)
+    # Place calls in two distinct hour-aligned buckets
+    bucket1_start = _BASE_TIME  # 12:00 UTC
+    bucket2_start = _BASE_TIME + datetime.timedelta(hours=1)  # 13:00 UTC
 
     bucket1_usage = [
         {"prompt_tokens": 100, "total_tokens": 100, "requests": 1},
@@ -436,7 +440,7 @@ def test_call_stats_time_buckets(client: weave_client.WeaveClient):
     ]
 
     for i, usage in enumerate(bucket1_usage):
-        call_time = two_hours_ago + datetime.timedelta(minutes=i * 5)
+        call_time = bucket1_start + datetime.timedelta(minutes=i * 5)
         create_call_with_usage(
             client,
             op_name,
@@ -445,7 +449,7 @@ def test_call_stats_time_buckets(client: weave_client.WeaveClient):
         )
 
     for i, usage in enumerate(bucket2_usage):
-        call_time = hour_ago + datetime.timedelta(minutes=i * 5)
+        call_time = bucket2_start + datetime.timedelta(minutes=i * 5)
         create_call_with_usage(
             client,
             op_name,
@@ -457,8 +461,8 @@ def test_call_stats_time_buckets(client: weave_client.WeaveClient):
     result = client.server.call_stats(
         CallStatsReq(
             project_id=project_id,
-            start=two_hours_ago - datetime.timedelta(minutes=5),
-            end=now + datetime.timedelta(minutes=5),
+            start=bucket1_start - datetime.timedelta(minutes=5),
+            end=bucket2_start + datetime.timedelta(hours=1),
             granularity=3600,
             usage_metrics=[
                 UsageMetricSpec(
@@ -491,8 +495,7 @@ def test_call_stats_op_names_filter(client: weave_client.WeaveClient):
     project_id = client._project_id()
     model_name = "gpt-4o-filter-test"
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(minutes=30)
+    start_time = _BASE_TIME
 
     op1 = f"weave:///{project_id}/op/openai.chat:v1"
     op2 = f"weave:///{project_id}/op/anthropic.messages:v1"
@@ -516,7 +519,7 @@ def test_call_stats_op_names_filter(client: weave_client.WeaveClient):
         CallStatsReq(
             project_id=project_id,
             start=start_time - datetime.timedelta(minutes=1),
-            end=now + datetime.timedelta(minutes=1),
+            end=start_time + datetime.timedelta(hours=1),
             granularity=3600,
             usage_metrics=[
                 UsageMetricSpec(
@@ -540,8 +543,7 @@ def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
     project_id = client._project_id()
     model_name = "gpt-4o-roots-test"
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(minutes=30)
+    start_time = _BASE_TIME
 
     # Create a root call
     root_call_id = str(uuid.uuid4())
@@ -609,7 +611,7 @@ def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
         CallStatsReq(
             project_id=project_id,
             start=start_time - datetime.timedelta(minutes=1),
-            end=now + datetime.timedelta(minutes=1),
+            end=start_time + datetime.timedelta(hours=1),
             granularity=3600,
             usage_metrics=[
                 UsageMetricSpec(
@@ -633,8 +635,7 @@ def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
     project_id = client._project_id()
     model_name = "gpt-4o-trace-filter-test"
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(minutes=30)
+    start_time = _BASE_TIME
 
     # Create two traces
     trace_id_1 = str(uuid.uuid4())
@@ -702,7 +703,7 @@ def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
         CallStatsReq(
             project_id=project_id,
             start=start_time - datetime.timedelta(minutes=1),
-            end=now + datetime.timedelta(minutes=1),
+            end=start_time + datetime.timedelta(hours=1),
             granularity=3600,
             usage_metrics=[
                 UsageMetricSpec(
@@ -726,8 +727,7 @@ def test_call_stats_call_metrics(client: weave_client.WeaveClient):
     project_id = client._project_id()
     op_name = f"weave:///{project_id}/op/call_metrics_test:xyz123"
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(minutes=30)
+    start_time = _BASE_TIME
 
     call_id_1 = str(uuid.uuid4())
     call_id_2 = str(uuid.uuid4())
@@ -823,7 +823,7 @@ def test_call_stats_call_metrics(client: weave_client.WeaveClient):
         CallStatsReq(
             project_id=project_id,
             start=start_time - datetime.timedelta(minutes=1),
-            end=now + datetime.timedelta(minutes=1),
+            end=start_time + datetime.timedelta(hours=1),
             granularity=3600,
             call_metrics=[
                 CallMetricSpec(
@@ -861,12 +861,12 @@ def test_call_stats_date_range_limit_query_layer(client: weave_client.WeaveClien
     """Ensure call_stats rejects max date range during request handling."""
     skip_if_sqlite(client)
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(days=32)
+    end_time = _BASE_TIME
+    start_time = end_time - datetime.timedelta(days=32)
     req = tsi.CallStatsReq.model_construct(
         project_id=client._project_id(),
         start=start_time,
-        end=now,
+        end=end_time,
         granularity=3600,
         usage_metrics=[tsi.UsageMetricSpec(metric="total_tokens")],
         timezone="UTC",

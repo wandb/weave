@@ -34,7 +34,7 @@ def test_simple_verdict_pipeline(client: WeaveClient) -> None:
 
     # Create a simple pipeline with a JudgeUnit
     pipeline = Pipeline(name="TestPipeline")
-    pipeline = pipeline >> JudgeUnit().prompt("Rate this text: {source.text}")
+    pipeline >>= JudgeUnit().prompt("Rate this text: {source.text}")
 
     # Create test data
     test_data = Schema.of(text="This is a test message")
@@ -145,7 +145,7 @@ def test_verdict_custom_unit_tracing(client: WeaveClient) -> None:
 
     # Create pipeline with custom unit
     pipeline = Pipeline(name="CustomUnitPipeline")
-    pipeline = pipeline >> CustomTestUnit()
+    pipeline >>= CustomTestUnit()
 
     # Create test data
     test_data = Schema.of(input="custom unit test")
@@ -191,7 +191,7 @@ def test_verdict_block_tracing(client: WeaveClient) -> None:
     block = Block() >> judge1 >> judge2
 
     pipeline = Pipeline(name="BlockTestPipeline")
-    pipeline = pipeline >> block
+    pipeline >>= block
 
     # Create test data
     test_data = Schema.of(text="This is a test for block tracing")
@@ -235,7 +235,7 @@ def test_verdict_dataset_execution_tracing(client: WeaveClient) -> None:
 
     # Create a simple pipeline
     pipeline = Pipeline(name="DatasetTestPipeline")
-    pipeline = pipeline >> JudgeUnit().prompt("Rate this: {source.text}")
+    pipeline >>= JudgeUnit().prompt("Rate this: {source.text}")
 
     # Create test dataset
     test_dataset = Dataset.from_list(
@@ -283,7 +283,7 @@ def test_verdict_layer_configurations_tracing(client: WeaveClient) -> None:
 
     # Test chain configuration (sequential execution)
     pipeline = Pipeline(name="ChainTestPipeline")
-    pipeline = pipeline >> Layer(
+    pipeline >>= Layer(
         [
             JudgeUnit(name="ChainJudge1").prompt("Rate: {source.text}"),
             JudgeUnit(name="ChainJudge2").prompt("Refine: {previous.score}"),
@@ -340,7 +340,7 @@ def test_verdict_complex_pipeline_tracing(client: WeaveClient) -> None:
     complex_block = Block() >> judge_layer >> verifier >> aggregator
 
     pipeline = Pipeline(name="ComplexPipeline")
-    pipeline = pipeline >> complex_block
+    pipeline >>= complex_block
 
     # Create test data
     test_data = Schema.of(text="Complex pipeline test message")
@@ -396,7 +396,7 @@ def test_verdict_error_handling_tracing(client: WeaveClient) -> None:
             raise ValueError("Test error for tracing")
 
     pipeline = Pipeline(name="ErrorTestPipeline")
-    pipeline = pipeline >> ErrorUnit()
+    pipeline >>= ErrorUnit()
 
     test_data = Schema.of(input="error test")
 
@@ -438,7 +438,7 @@ def test_verdict_tracer_inheritance(client: WeaveClient) -> None:
 
     # Create pipeline with multiple tracers (including console tracer)
     pipeline = Pipeline(name="TracerInheritancePipeline")
-    pipeline = pipeline >> JudgeUnit().prompt("Rate this: {source.text}")
+    pipeline >>= JudgeUnit().prompt("Rate this: {source.text}")
 
     # Create test data
     test_data = Schema.of(text="Tracer inheritance test")

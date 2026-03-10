@@ -1,0 +1,75 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-multi789"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01READ",
+          "name": "Read",
+          "input": {
+            "path": "/tmp/a.py"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_02BASH",
+          "name": "Bash",
+          "input": {
+            "command": "pwd"
+          }
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "user",
+    "message": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01READ",
+          "content": "print('hello')"
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_02BASH",
+          "content": "/tmp"
+        }
+      ]
+    }
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Done checking both files."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 4000,
+    "duration_api_ms": 3200,
+    "is_error": false,
+    "num_turns": 1,
+    "session_id": "s-multi789",
+    "total_cost_usd": 0.012,
+    "usage": {
+      "input_tokens": 200,
+      "output_tokens": 100
+    },
+    "result": "Done checking both files."
+  }
+]

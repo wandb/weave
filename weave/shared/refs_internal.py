@@ -51,12 +51,12 @@ def validate_extra(extra: list[str]) -> None:
     for i, e in enumerate(extra):
         if i % 2 == 0:
             # Here we are in the edge name position
-            if e not in (
+            if e not in {
                 DICT_KEY_EDGE_NAME,
                 LIST_INDEX_EDGE_NAME,
                 OBJECT_ATTR_EDGE_NAME,
                 TABLE_ROW_ID_EDGE_NAME,
-            ):
+            }:
                 raise InvalidInternalRef(
                     f"Invalid extra edge name at index {i}: {extra}"
                 )

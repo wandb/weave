@@ -55,6 +55,7 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
 from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
+    safe_alias,
     safely_format_sql,
     timestamp_to_datetime_str,
 )
@@ -130,10 +131,13 @@ class QueryBuilderField(BaseModel):
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
-        return f"{self.as_sql(pb, table_alias)} AS {self.field}"
+        return f"{self.as_sql(pb, table_alias)} AS {safe_alias(self.field)}"
 
 
 class CallsMergedField(QueryBuilderField):
+    def is_feedback_field(self) -> bool:
+        return False
+
     def is_heavy(self) -> bool:
         return False
 
@@ -146,7 +150,7 @@ class CallsMergedField(QueryBuilderField):
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
-        return f"{self._resolve_field_sql(pb, table_alias, use_agg_fn)} AS {self.field}"
+        return f"{self._resolve_field_sql(pb, table_alias, use_agg_fn)} AS {safe_alias(self.field)}"
 
     def null_check_sql(
         self,
@@ -223,9 +227,7 @@ class CallsMergedDynamicField(CallsMergedAggField):
             )
         # Use the parent (CallsMergedAggField) as_sql to get the aggregate
         # expression without the JSON extraction that our own as_sql adds.
-        return (
-            f"{super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)} AS {self.field}"
-        )
+        return f"{super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)} AS {safe_alias(self.field)}"
 
     def with_path(self, path: list[str]) -> "CallsMergedDynamicField":
         extra_path = [*(self.extra_path or [])]
@@ -273,7 +275,7 @@ class CallsMergedSummaryField(CallsMergedField):
         read_table: "ReadTable" = ReadTable.CALLS_MERGED,
         **kwargs: Any,
     ) -> str:
-        return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn, read_table=read_table)} AS {self.field}"
+        return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn, read_table=read_table)} AS {safe_alias(self.field)}"
 
     def is_heavy(self) -> bool:
         # These are computed from non-heavy fields (status uses exception and ended_at)
@@ -285,6 +287,9 @@ class CallsMergedSummaryField(CallsMergedField):
 class CallsMergedFeedbackPayloadField(CallsMergedField):
     feedback_type: str
     extra_path: list[str]
+
+    def is_feedback_field(self) -> bool:
+        return True
 
     @classmethod
     def from_path(cls, path: str) -> Self:
@@ -450,7 +455,7 @@ class AggregatedDataSizeField(CallsMergedField):
                 ELSE NULL
             END
             """
-        return f"{conditional_field} AS {self.field}"
+        return f"{conditional_field} AS {safe_alias(self.field)}"
 
 
 class QueryBuilderDynamicField(QueryBuilderField):
@@ -860,7 +865,7 @@ class CallsQuery(BaseModel):
         if field in DISALLOWED_FILTERING_FIELDS:
             raise ValueError(f"Field {field} is not allowed in ORDER BY")
         direction = direction.upper()
-        if direction not in ("ASC", "DESC"):
+        if direction not in {"ASC", "DESC"}:
             raise ValueError(f"Direction {direction} is not allowed")
         direction = cast(Literal["ASC", "DESC"], direction)
         self.order_fields.append(
@@ -1148,15 +1153,15 @@ class CallsQuery(BaseModel):
                         field_obj,
                         (CallsMergedDynamicField, QueryBuilderDynamicField),
                     ):
+                        # Add the base field, not the dynamic path.
                         base_field = get_field_by_name(field_obj.field)
                         if base_field not in select_query.select_fields:
                             select_query.select_fields.append(base_field)
-                    else:
-                        if field_obj not in select_query.select_fields:
-                            assert isinstance(field_obj, CallsMergedField), (
-                                "Field must be a CallsMergedField"
-                            )
-                            select_query.select_fields.append(field_obj)
+                    elif field_obj not in select_query.select_fields:
+                        assert isinstance(field_obj, CallsMergedField), (
+                            "Field must be a CallsMergedField"
+                        )
+                        select_query.select_fields.append(field_obj)
 
             filtered_calls_sql = filter_query._as_sql_base_format(
                 pb,
@@ -1271,11 +1276,10 @@ class CallsQuery(BaseModel):
                 and is_object_ref_operand(condition.operand, expand_columns)
             ):
                 non_object_ref_conditions.append(condition)
-            else:
-                if condition._consumed_fields is not None:
-                    object_ref_fields_consumed.update(
-                        f.field for f in condition._consumed_fields
-                    )
+            elif condition._consumed_fields is not None:
+                object_ref_fields_consumed.update(
+                    f.field for f in condition._consumed_fields
+                )
 
         optimization_conditions = process_query_to_optimization_sql(
             non_object_ref_conditions, pb, table_alias, self.read_table

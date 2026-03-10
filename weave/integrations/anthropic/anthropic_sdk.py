@@ -140,7 +140,7 @@ def anthropic_stream_accumulator(
 class AnthropicIteratorWrapper(_IteratorWrapper):
     def __getattr__(self, name: str) -> Any:
         """Delegate all other attributes to the wrapped iterator."""
-        if name in [
+        if name in {
             "_iterator_or_ctx_manager",
             "_on_yield",
             "_on_error",
@@ -148,7 +148,7 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
             "_on_finished_called",
             "_call_on_error_once",
             "text_stream",
-        ]:
+        }:
             return object.__getattribute__(self, name)
         return getattr(self._iterator_or_ctx_manager, name)
 

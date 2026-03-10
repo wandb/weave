@@ -37,6 +37,10 @@ class Scorer(Object):
         super().model_post_init(__context)
         _validate_scorer_signature(self)
 
+    @property
+    def display_name(self) -> str:
+        return self.name or self.__class__.__name__
+
     @op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
@@ -305,7 +309,7 @@ def prepare_scorer_op_args(
 
         # Build arguments dictionary using column mapping
         for arg in score_arg_names:
-            if arg in ("output", "model_output", "kwargs"):
+            if arg in {"output", "model_output", "kwargs"}:
                 continue
             if arg in example:
                 score_args[arg] = example[arg]
