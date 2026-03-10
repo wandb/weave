@@ -1201,6 +1201,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
             cursor.execute(delete_query, delete_parameters)
+            # Cascade: clean up tags and aliases for deleted digests
+            digest_placeholders = ",".join("?" * len(found_digests))
+            cursor.execute(
+                f"DELETE FROM tags WHERE project_id = ? AND object_id = ? AND digest IN ({digest_placeholders})",
+                [req.project_id, req.object_id] + list(found_digests),
+            )
+            cursor.execute(
+                f"DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND digest IN ({digest_placeholders})",
+                [req.project_id, req.object_id] + list(found_digests),
+            )
             conn.commit()
 
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
@@ -1245,29 +1255,33 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conn.commit()
         return tsi.ObjRemoveTagsRes()
 
-    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
             self._ensure_obj_version_exists(
                 cursor, req.project_id, req.object_id, req.digest
             )
-            cursor.execute(
-                "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
-                (req.project_id, req.object_id, req.alias, req.digest),
-            )
+            for alias in req.aliases:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
+                    (req.project_id, req.object_id, alias, req.digest),
+                )
             conn.commit()
-        return tsi.ObjSetAliasRes()
+        return tsi.ObjSetAliasesRes()
 
-    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
+            placeholders = ",".join("?" for _ in req.aliases)
             cursor.execute(
-                "DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias = ?",
-                (req.project_id, req.object_id, req.alias),
+                f"DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias IN ({placeholders})",
+                (req.project_id, req.object_id, *req.aliases),
             )
             conn.commit()
-        return tsi.ObjRemoveAliasRes()
+        return tsi.ObjRemoveAliasesRes()
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
         conn, cursor = get_conn_cursor(self.db_path)
