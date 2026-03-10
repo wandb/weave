@@ -7468,33 +7468,6 @@ def _setup_completion_model_info(
             return_type=custom_provider_info.return_type,
             vertex_credentials=None,
         )
-    elif "/" in model_name:
-        provider_prefix = model_name.split("/", 1)[0].lower()
-        if provider_prefix not in FORGE_SKIP_PREFIXES:
-            secret_fetcher = _secret_fetcher_context.get()
-            if secret_fetcher is not None:
-                forge_api_key = (
-                    secret_fetcher.fetch(FORGE_API_KEY_NAME)
-                    .get("secrets", {})
-                    .get(FORGE_API_KEY_NAME)
-                )
-            else:
-                forge_api_key = None
-            if forge_api_key:
-                if req.inputs.extra_headers:
-                    extra_headers = req.inputs.extra_headers
-                    req.inputs.extra_headers = None
-                req.inputs.model = _normalize_forge_model_name(model_name)
-                return CompletionModelInfo(
-                    model_name=model_name,
-                    api_key=forge_api_key,
-                    provider="custom",
-                    base_url=os.getenv(FORGE_API_BASE_ENV)
-                    or FORGE_DEFAULT_BASE_URL,
-                    extra_headers=extra_headers,
-                    return_type="openai",
-                    vertex_credentials=None,
-                )
     elif model_info:
         secret_name = model_info.get("api_key_name")
         if not secret_name:
@@ -7521,6 +7494,35 @@ def _setup_completion_model_info(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
+
+    elif "/" in model_name:
+        provider_prefix = model_name.split("/", 1)[0].lower()
+        if provider_prefix not in FORGE_SKIP_PREFIXES:
+            secret_fetcher = _secret_fetcher_context.get()
+            if secret_fetcher is not None:
+                forge_api_key = (
+                    secret_fetcher.fetch(FORGE_API_KEY_NAME)
+                    .get("secrets", {})
+                    .get(FORGE_API_KEY_NAME)
+                )
+            else:
+                forge_api_key = None
+            if forge_api_key:
+                extra_headers = {}
+                if req.inputs.extra_headers:
+                    extra_headers = req.inputs.extra_headers
+                    req.inputs.extra_headers = None
+                req.inputs.model = _normalize_forge_model_name(model_name)
+                return CompletionModelInfo(
+                    model_name=model_name,
+                    api_key=forge_api_key,
+                    provider="custom",
+                    base_url=os.getenv(FORGE_API_BASE_ENV)
+                    or FORGE_DEFAULT_BASE_URL,
+                    extra_headers=extra_headers,
+                    return_type="openai",
+                    vertex_credentials=None,
+                )
 
     return CompletionModelInfo(
         model_name=model_name,
