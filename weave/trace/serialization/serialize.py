@@ -94,7 +94,7 @@ def to_json(
             ).uri()
         return obj.uri()
     elif isinstance(obj, ObjectRecord):
-        res = {"_type": obj._class_name}
+        res = {"_type": to_json(obj._class_name, project_id, client, use_dictify, internal_project_id)}
         for k, v in obj.__dict__.items():
             if k == "ref":
                 # Refs are pointers to remote objects and should not be part of
@@ -159,6 +159,12 @@ def to_json(
             }
         return fallback_encode(obj)
     result = _build_result_from_encoded(encoded, project_id, client)
+    # Recursively process the "val" field to convert any remaining ObjectRef
+    # instances (e.g. from WeaveObject sub-attribute refs in mutated objects).
+    if "val" in result:
+        result["val"] = to_json(
+            result["val"], project_id, client, use_dictify, internal_project_id
+        )
     if internal_project_id is not None:
         load_op = result.get("load_op")
         if isinstance(load_op, str) and load_op.startswith(_WEAVE_REF_PREFIX):
