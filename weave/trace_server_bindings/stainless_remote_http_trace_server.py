@@ -757,7 +757,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
         try:
             return self._stainless_request(
-                req, tsi.ObjRemoveAliasRes, self._stainless_client.objects.aliases.remove
+                req,
+                tsi.ObjRemoveAliasRes,
+                self._stainless_client.objects.aliases.remove,
             )
         except AttributeError:
             raise NotImplementedError(
