@@ -18,7 +18,9 @@ class InvalidInternalRef(ValueError):
 
 
 def universal_ext_to_int_ref_converter(
-    obj: A, convert_ext_to_int_project_id: Callable[[str], str]
+    obj: A,
+    convert_ext_to_int_project_id: Callable[[str], str],
+    allowed_internal_project_ids: set[str] | None = None,
 ) -> A:
     """Takes any object and recursively replaces all external references with
     internal references. The external references are expected to be in the
@@ -57,14 +59,23 @@ def universal_ext_to_int_ref_converter(
             if obj.startswith(weave_prefix):
                 return cast(B, replace_ref(obj))
             elif obj.startswith(weave_internal_prefix):
-                # Internal refs are accepted when the client has computed
-                # digests locally and constructed the ref itself.  Validate
-                # format to prevent malformed refs from being stored.
+                # Internal refs are only accepted when the client has computed
+                # digests locally and the ref's project matches the request's
+                # own project.  Without this check, a malicious client could
+                # embed refs to arbitrary private projects.
                 rest = obj[len(weave_internal_prefix) :]
                 parts = rest.split("/", 2)
                 if len(parts) < 2:
                     raise InvalidExternalRef(
                         "Invalid internal ref format: missing project_id or kind."
+                    )
+                ref_project_id = parts[0]
+                if (
+                    allowed_internal_project_ids is None
+                    or ref_project_id not in allowed_internal_project_ids
+                ):
+                    raise InvalidExternalRef(
+                        "Encountered unexpected ref format."
                     )
                 return obj
         return obj

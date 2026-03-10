@@ -65,9 +65,17 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def __getattr__(self, name: str) -> typing.Any:
         return getattr(self._internal_trace_server, name)
 
-    def _ref_apply(self, method: Callable[[A], B], req: A) -> B:
+    def _ref_apply(
+        self,
+        method: Callable[[A], B],
+        req: A,
+        *,
+        allowed_internal_project_ids: set[str] | None = None,
+    ) -> B:
         req_conv = universal_ext_to_int_ref_converter(
-            req, self._idc.ext_to_int_project_id
+            req,
+            self._idc.ext_to_int_project_id,
+            allowed_internal_project_ids=allowed_internal_project_ids,
         )
         res = method(req_conv)
         res_conv = universal_int_to_ext_ref_converter(
@@ -137,16 +145,26 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._ref_apply(self._internal_trace_server.otel_export, req)
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
+        internal_pid = self._idc.ext_to_int_project_id(req.start.project_id)
+        req.start.project_id = internal_pid
         if req.start.wb_run_id is not None:
             req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
         if req.start.wb_user_id is not None:
             req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.call_start, req)
+        return self._ref_apply(
+            self._internal_trace_server.call_start,
+            req,
+            allowed_internal_project_ids={internal_pid},
+        )
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
-        return self._ref_apply(self._internal_trace_server.call_end, req)
+        internal_pid = self._idc.ext_to_int_project_id(req.end.project_id)
+        req.end.project_id = internal_pid
+        return self._ref_apply(
+            self._internal_trace_server.call_end,
+            req,
+            allowed_internal_project_ids={internal_pid},
+        )
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         original_project_id = req.project_id
@@ -249,10 +267,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._ref_apply(self._internal_trace_server.call_update, req)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        req.obj.project_id = self._idc.ext_to_int_project_id(req.obj.project_id)
+        internal_pid = self._idc.ext_to_int_project_id(req.obj.project_id)
+        req.obj.project_id = internal_pid
         if req.obj.wb_user_id is not None:
             req.obj.wb_user_id = self._idc.ext_to_int_user_id(req.obj.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.obj_create, req)
+        return self._ref_apply(
+            self._internal_trace_server.obj_create,
+            req,
+            allowed_internal_project_ids={internal_pid},
+        )
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         original_project_id = req.project_id
@@ -305,8 +328,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._internal_trace_server.aliases_list(req)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
-        return self._ref_apply(self._internal_trace_server.table_create, req)
+        internal_pid = self._idc.ext_to_int_project_id(req.table.project_id)
+        req.table.project_id = internal_pid
+        return self._ref_apply(
+            self._internal_trace_server.table_create,
+            req,
+            allowed_internal_project_ids={internal_pid},
+        )
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
