@@ -196,33 +196,36 @@ def publish(
     return ref
 
 
-def add_tags(obj_ref: ObjectRef, tags: list[str]) -> None:
+def add_tags(obj_ref: ObjectRef | str, tags: list[str]) -> None:
     """Add tags to an object version.
 
     Args:
-        obj_ref: Reference to the object version (returned by `weave.publish()`).
+        obj_ref: Reference to the object version, either an ObjectRef
+            (returned by `weave.publish()`) or a weave:/// URI string.
         tags: List of tag strings to add.
     """
     client = weave_client_context.require_weave_client()
     client.add_tags(obj_ref, tags)
 
 
-def remove_tags(obj_ref: ObjectRef, tags: list[str]) -> None:
+def remove_tags(obj_ref: ObjectRef | str, tags: list[str]) -> None:
     """Remove tags from an object version.
 
     Args:
-        obj_ref: Reference to the object version.
+        obj_ref: Reference to the object version, either an ObjectRef
+            or a weave:/// URI string.
         tags: List of tag strings to remove.
     """
     client = weave_client_context.require_weave_client()
     client.remove_tags(obj_ref, tags)
 
 
-def get_tags(obj_ref: ObjectRef) -> list[str]:
+def get_tags(obj_ref: ObjectRef | str) -> list[str]:
     """Get tags for an object version.
 
     Args:
-        obj_ref: Reference to the object version.
+        obj_ref: Reference to the object version, either an ObjectRef
+            or a weave:/// URI string.
 
     Returns:
         List of tag strings.
@@ -231,33 +234,36 @@ def get_tags(obj_ref: ObjectRef) -> list[str]:
     return client.get_tags(obj_ref)
 
 
-def set_aliases(obj_ref: ObjectRef, alias: str | list[str]) -> None:
+def set_aliases(obj_ref: ObjectRef | str, alias: str | list[str]) -> None:
     """Set one or more aliases for an object version.
 
     Args:
-        obj_ref: Reference to the object version.
+        obj_ref: Reference to the object version, either an ObjectRef
+            or a weave:/// URI string.
         alias: An alias name or list of alias names to set (e.g., "production").
     """
     client = weave_client_context.require_weave_client()
     client.set_aliases(obj_ref, alias)
 
 
-def remove_alias(obj_ref: ObjectRef, alias: str) -> None:
+def remove_alias(obj_ref: ObjectRef | str, alias: str) -> None:
     """Remove an alias from an object.
 
     Args:
-        obj_ref: Reference to the object.
+        obj_ref: Reference to the object, either an ObjectRef
+            or a weave:/// URI string.
         alias: The alias name to remove.
     """
     client = weave_client_context.require_weave_client()
     client.remove_alias(obj_ref, alias)
 
 
-def get_aliases(obj_ref: ObjectRef) -> list[str]:
+def get_aliases(obj_ref: ObjectRef | str) -> list[str]:
     """Get aliases for an object version.
 
     Args:
-        obj_ref: Reference to the object version.
+        obj_ref: Reference to the object version, either an ObjectRef
+            or a weave:/// URI string.
 
     Returns:
         List of alias strings.

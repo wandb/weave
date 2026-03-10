@@ -972,6 +972,91 @@ def test_sdk_multiple_tags_and_aliases(client: WeaveClient):
     assert "latest" in aliases
 
 
+# --- SDK client methods with weave:/// URI strings ---
+
+
+def test_sdk_add_tags_with_uri_string(client: WeaveClient):
+    """add_tags should accept a weave:/// URI string instead of ObjectRef."""
+    ref = weave.publish({"data": "test"}, name="sdk_uri_add_tags_obj")
+    uri = ref.uri()
+
+    client.add_tags(uri, ["from-uri"])
+
+    assert client.get_tags(ref) == ["from-uri"]
+
+
+def test_sdk_remove_tags_with_uri_string(client: WeaveClient):
+    """remove_tags should accept a weave:/// URI string."""
+    ref = weave.publish({"data": "test"}, name="sdk_uri_rm_tags_obj")
+    uri = ref.uri()
+
+    client.add_tags(ref, ["keep", "remove"])
+    client.remove_tags(uri, ["remove"])
+
+    assert client.get_tags(ref) == ["keep"]
+
+
+def test_sdk_get_tags_with_uri_string(client: WeaveClient):
+    """get_tags should accept a weave:/// URI string."""
+    ref = weave.publish({"data": "test"}, name="sdk_uri_get_tags_obj")
+    uri = ref.uri()
+
+    client.add_tags(ref, ["t1", "t2"])
+
+    assert client.get_tags(uri) == ["t1", "t2"]
+
+
+def test_sdk_set_aliases_with_uri_string(client: WeaveClient):
+    """set_aliases should accept a weave:/// URI string."""
+    ref = weave.publish({"data": "test"}, name="sdk_uri_set_alias_obj")
+    uri = ref.uri()
+
+    client.set_aliases(uri, "production")
+
+    assert "production" in client.get_aliases(ref)
+
+
+def test_sdk_remove_alias_with_uri_string(client: WeaveClient):
+    """remove_alias should accept a weave:/// URI string."""
+    ref = weave.publish({"data": "test"}, name="sdk_uri_rm_alias_obj")
+    uri = ref.uri()
+
+    client.set_aliases(ref, "staging")
+    client.remove_alias(uri, "staging")
+
+    assert "staging" not in client.get_aliases(ref)
+
+
+def test_sdk_get_aliases_with_uri_string(client: WeaveClient):
+    """get_aliases should accept a weave:/// URI string."""
+    ref = weave.publish({"data": "test"}, name="sdk_uri_get_alias_obj")
+    uri = ref.uri()
+
+    client.set_aliases(ref, "canary")
+
+    aliases = client.get_aliases(uri)
+    assert "canary" in aliases
+    assert "latest" in aliases
+
+
+def test_sdk_tags_mixed_ref_and_uri(client: WeaveClient):
+    """add_tags via URI, get_tags via ObjectRef should work."""
+    ref = weave.publish({"data": "test"}, name="sdk_uri_mixed_tags_obj")
+    uri = ref.uri()
+
+    client.add_tags(uri, ["mixed-tag"])
+    assert "mixed-tag" in client.get_tags(ref)
+
+
+def test_sdk_aliases_mixed_ref_and_uri(client: WeaveClient):
+    """set_aliases via URI, get_aliases via ObjectRef should work."""
+    ref = weave.publish({"data": "test"}, name="sdk_uri_mixed_alias_obj")
+    uri = ref.uri()
+
+    client.set_aliases(uri, "mixed-alias")
+    assert "mixed-alias" in client.get_aliases(ref)
+
+
 def test_sdk_add_tags_error_nonexistent_object(client: WeaveClient):
     """Adding tags to a non-existent object should raise NotFoundError."""
     fake_ref = ObjectRef(
