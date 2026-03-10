@@ -272,6 +272,20 @@ def get_aliases(obj_ref: ObjectRef | str) -> list[str]:
     return client.get_aliases(obj_ref)
 
 
+def get_tags_and_aliases(obj_ref: ObjectRef | str) -> tuple[list[str], list[str]]:
+    """Get both tags and aliases for an object version in a single call.
+
+    Args:
+        obj_ref: Reference to the object version, either an ObjectRef
+            or a weave:/// URI string.
+
+    Returns:
+        A tuple of (tags, aliases). Each is a list of strings.
+    """
+    client = weave_client_context.require_weave_client()
+    return client.get_tags_and_aliases(obj_ref)
+
+
 def list_tags() -> list[str]:
     """List all distinct tags in the project.
 
@@ -525,6 +539,7 @@ __all__ = [
     "get_client",
     "get_current_call",
     "get_tags",
+    "get_tags_and_aliases",
     "init",
     "list_aliases",
     "list_tags",

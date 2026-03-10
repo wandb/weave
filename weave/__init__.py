@@ -69,6 +69,7 @@ __all__ = [
     "get_aliases",
     "get_current_call",
     "get_tags",
+    "get_tags_and_aliases",
     "init",
     "list_aliases",
     "list_tags",
