@@ -540,6 +540,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         )
                     )
 
+        set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
+
         obj_id_idx_map = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
             op_name = object_creation_utils.make_safe_name(start_call.op_name)
@@ -719,11 +721,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
 
-    # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        """Creates a new call."""
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
+        set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
 
         req = process_call_req_to_content(req, self)
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start)
@@ -800,6 +803,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             CallsUpsertCompleteRes: Empty response on success.
         """
+        set_current_span_dd_tags(
+            {"weave_trace_server.insert_call_count": len(req.batch)}
+        )
+
         with self.call_batch():
             for complete_call in req.batch:
                 processed_complete_call = process_complete_call_to_content(
@@ -6637,7 +6644,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             final_batch.append(stripped_item)
 
-        ddtrace.tracer.current_span().set_tags(
+        set_current_span_dd_tags(
             {
                 "clickhouse_trace_server_batched._strip_large_values.stripped_count": str(
                     stripped_count
