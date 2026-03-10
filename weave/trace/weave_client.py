@@ -334,7 +334,8 @@ class WeaveClient:
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
-        self._ext_to_int_project_map: dict[str, str] = {}
+        self._ext_to_int_project_map: dict[str, str | None] = {}
+        self._has_projects_info: bool | None = None
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
@@ -1722,33 +1723,26 @@ class WeaveClient:
             internal_project_id=internal_project_id,
         )
 
-        if internal_project_id is not None:
-            # Fast path: compute digest client-side, fire-and-forget
-            digest = compute_object_digest(json_val)
+        # Compute digest client-side using same normalization as the server.
+        digest = compute_object_digest(json_val)
 
-            def send_obj_create() -> ObjCreateRes:
-                req = ObjCreateReq(
-                    obj=ObjSchemaForInsert(
-                        project_id=self.entity + "/" + self.project,
-                        object_id=name,
-                        val=json_val,
-                        expected_digest=digest,
-                    )
-                )
-                return self.server.obj_create(req)
+        # Fire-and-forget: defer obj_create to avoid blocking.
+        # Only set expected_digest when internal project IDs are available
+        # (remote server), allowing the server to validate the digest.
+        can_validate = internal_project_id is not None
 
-            self.future_executor.defer(send_obj_create)
-        else:
-            # Fallback: wait for server to compute digest
+        def send_obj_create() -> ObjCreateRes:
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
                     object_id=name,
                     val=json_val,
+                    expected_digest=digest if can_validate else None,
                 )
             )
-            response = self.server.obj_create(req)
-            digest = response.digest
+            return self.server.obj_create(req)
+
+        self.future_executor.defer(send_obj_create)
 
         ref: Ref
         if is_op(orig_val):
@@ -1978,17 +1972,22 @@ class WeaveClient:
         """Resolve an external project ID to internal, with caching.
 
         For remote servers, calls the projects_info endpoint.
-        For local servers (SQLite), the external ID is the internal ID.
+        For local servers (SQLite), returns None (no internal ID mapping).
         Returns None if resolution fails (fallback to external refs).
         """
         if ext_project_id in self._ext_to_int_project_map:
             return self._ext_to_int_project_map[ext_project_id]
+        # If we already know the server doesn't support project resolution,
+        # return None immediately to avoid blocking on synchronous server calls.
+        if self._has_projects_info is False:
+            return None
         if hasattr(self.server, "projects_info"):
             try:
                 results = self.server.projects_info(
                     ProjectsInfoReq(project_ids=[ext_project_id])
                 )
-                if results:
+                if results and results[0].internal_project_id:
+                    self._has_projects_info = True
                     internal_id = results[0].internal_project_id
                     self._ext_to_int_project_map[ext_project_id] = internal_id
                     return internal_id
@@ -1998,10 +1997,10 @@ class WeaveClient:
                     ext_project_id,
                     exc_info=True,
                 )
-            return None
-        # No adapter (e.g. direct SQLite) — external ID is internal ID
-        self._ext_to_int_project_map[ext_project_id] = ext_project_id
-        return ext_project_id
+                return None
+        # Server doesn't support project ID resolution (e.g. SQLite stub).
+        self._has_projects_info = False
+        return None
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
