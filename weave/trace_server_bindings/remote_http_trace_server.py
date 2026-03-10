@@ -139,6 +139,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             **kwargs,
         )
 
+    def put(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
+        headers = self._build_dynamic_request_headers()
+
+        return http_requests.put(
+            self.trace_server_url + url,
+            *args,
+            headers={**headers, **kwargs.pop("headers", {})},
+            **kwargs,
+        )
+
     def delete(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
         headers = self._build_dynamic_request_headers()
 
@@ -497,6 +507,20 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, url)
         return r
 
+    def _put_request_executor(
+        self,
+        url: str,
+        req: BaseModel,
+        stream: bool = False,
+    ) -> httpx.Response:
+        r = self.put(
+            url,
+            data=req.model_dump_json(by_alias=True).encode("utf-8"),
+            stream=stream,
+        )
+        handle_response_error(r, url)
+        return r
+
     @with_retry
     def _delete_request_executor(
         self,
@@ -519,6 +543,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     ) -> BaseModel:
         if method == "POST":
             r = self._post_request_executor(url, req)
+        elif method == "PUT":
+            r = self._put_request_executor(url, req)
         elif method == "GET":
             r = self._get_request_executor(url, params)
         elif method == "DELETE":
@@ -672,35 +698,67 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        body = his.ObjTagsBody(project_id=req.project_id, tags=req.tags)
         return self._generic_request(
-            "/obj/tags/add", req, tsi.ObjAddTagsReq, tsi.ObjAddTagsRes
+            f"/objs/{req.object_id}/versions/{req.digest}/tags",
+            body,
+            his.ObjTagsBody,
+            tsi.ObjAddTagsRes,
+            method="PUT",
         )
 
     def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        body = his.ObjTagsBody(project_id=req.project_id, tags=req.tags)
         return self._generic_request(
-            "/obj/tags/remove", req, tsi.ObjRemoveTagsReq, tsi.ObjRemoveTagsRes
+            f"/objs/{req.object_id}/versions/{req.digest}/tags/remove",
+            body,
+            his.ObjTagsBody,
+            tsi.ObjRemoveTagsRes,
         )
 
     def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+        body = his.ObjSetAliasesBody(
+            project_id=req.project_id, digest=req.digest, aliases=req.aliases
+        )
         return self._generic_request(
-            "/obj/alias/set", req, tsi.ObjSetAliasesReq, tsi.ObjSetAliasesRes
+            f"/objs/{req.object_id}/aliases",
+            body,
+            his.ObjSetAliasesBody,
+            tsi.ObjSetAliasesRes,
+            method="PUT",
         )
 
     def obj_remove_aliases(
         self, req: tsi.ObjRemoveAliasesReq
     ) -> tsi.ObjRemoveAliasesRes:
+        body = his.ObjRemoveAliasesBody(
+            project_id=req.project_id, aliases=req.aliases
+        )
         return self._generic_request(
-            "/obj/alias/remove", req, tsi.ObjRemoveAliasesReq, tsi.ObjRemoveAliasesRes
+            f"/objs/{req.object_id}/aliases/remove",
+            body,
+            his.ObjRemoveAliasesBody,
+            tsi.ObjRemoveAliasesRes,
         )
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
         return self._generic_request(
-            "/obj/tags/list", req, tsi.TagsListReq, tsi.TagsListRes
+            "/tags",
+            req,
+            tsi.TagsListReq,
+            tsi.TagsListRes,
+            method="GET",
+            params={"project_id": req.project_id},
         )
 
     def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
         return self._generic_request(
-            "/obj/aliases/list", req, tsi.AliasesListReq, tsi.AliasesListRes
+            "/aliases",
+            req,
+            tsi.AliasesListReq,
+            tsi.AliasesListRes,
+            method="GET",
+            params={"project_id": req.project_id},
         )
 
     @validate_call
