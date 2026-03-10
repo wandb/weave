@@ -1241,8 +1241,16 @@ class WeaveClient:
             List of tag strings. Returns empty list if the object version
             has no tags.
         """
-        tags, _ = self.get_tags_and_aliases(obj_ref)
-        return tags
+        obj_ref = self._resolve_obj_ref(obj_ref)
+        res = self.server.obj_read(
+            ObjReadReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                include_tags_and_aliases=True,
+            )
+        )
+        return res.obj.tags or []
 
     @trace_sentry.global_trace_sentry.watch()
     def get_tags_and_aliases(
@@ -1324,8 +1332,16 @@ class WeaveClient:
             List of alias strings. Includes the virtual "latest" alias
             if the object version is the latest.
         """
-        _, aliases = self.get_tags_and_aliases(obj_ref)
-        return aliases
+        obj_ref = self._resolve_obj_ref(obj_ref)
+        res = self.server.obj_read(
+            ObjReadReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                include_tags_and_aliases=True,
+            )
+        )
+        return res.obj.aliases or []
 
     @trace_sentry.global_trace_sentry.watch()
     def list_tags(self) -> list[str]:
