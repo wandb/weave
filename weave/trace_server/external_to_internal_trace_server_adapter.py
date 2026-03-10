@@ -82,16 +82,25 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                     return pid
         return None
 
+    def _verify_internal_project_id(self, project_id: str) -> bool:
+        """Check if the current user has access to the given internal project.
+
+        Used to verify cross-project internal refs that the client converted.
+        Returns True if the project is accessible, False otherwise.
+        """
+        return self._idc.int_to_ext_project_id(project_id) is not None
+
     def _ref_apply(self, method: Callable[[A], B], req: A) -> B:
         # Auto-detect the request's internal project_id so that client-computed
-        # internal refs for the SAME project are accepted, while refs to other
-        # projects are rejected (security: prevents cross-project ref injection).
+        # internal refs for the SAME project are accepted.  Cross-project
+        # internal refs are verified via int_to_ext_project_id (checks access).
         pid = self._extract_internal_project_id(req)
         allowed = {pid} if pid else None
         req_conv = universal_ext_to_int_ref_converter(
             req,
             self._idc.ext_to_int_project_id,
             allowed_internal_project_ids=allowed,
+            verify_internal_project_id=self._verify_internal_project_id,
         )
         res = method(req_conv)
         res_conv = universal_int_to_ext_ref_converter(
@@ -109,6 +118,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req,
             self._idc.ext_to_int_project_id,
             allowed_internal_project_ids=allowed,
+            verify_internal_project_id=self._verify_internal_project_id,
         )
         res = method(req_conv)
 
@@ -490,7 +500,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> typing.Iterator[dict[str, typing.Any]]:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         # Convert any refs in the request (e.g., prompt) to internal format
-        req = universal_ext_to_int_ref_converter(req, self._idc.ext_to_int_project_id)
+        req = universal_ext_to_int_ref_converter(
+            req,
+            self._idc.ext_to_int_project_id,
+            allowed_internal_project_ids={req.project_id},
+            verify_internal_project_id=self._verify_internal_project_id,
+        )
         # The streamed chunks contain no project-scoped references, so we can
         # forward directly without additional ref conversion.
         return self._internal_trace_server.completions_create_stream(req)
