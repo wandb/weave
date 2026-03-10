@@ -6,10 +6,20 @@ on the server (fallback path) for various object and table shapes.
 
 from __future__ import annotations
 
+import pytest
+
 import weave
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+
+
+@pytest.fixture(autouse=True)
+def _reset_settings():
+    """Reset settings to defaults after each test to avoid leaking state."""
+    yield
+    parse_and_apply_settings(UserSettings())
+
 
 # ---------------------------------------------------------------------------
 # Helpers
