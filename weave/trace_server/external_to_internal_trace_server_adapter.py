@@ -65,17 +65,33 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def __getattr__(self, name: str) -> typing.Any:
         return getattr(self._internal_trace_server, name)
 
-    def _ref_apply(
-        self,
-        method: Callable[[A], B],
-        req: A,
-        *,
-        allowed_internal_project_ids: set[str] | None = None,
-    ) -> B:
+    @staticmethod
+    def _extract_internal_project_id(req: typing.Any) -> str | None:
+        """Extract the (already-converted) internal project_id from a request.
+
+        Every ExternalTraceServer method converts the request's project_id to
+        internal before calling _ref_apply, so this field is always present.
+        """
+        for attr in ("project_id", "obj", "start", "end", "table"):
+            sub = getattr(req, attr, None)
+            if isinstance(sub, str):
+                return sub
+            if sub is not None:
+                pid = getattr(sub, "project_id", None)
+                if isinstance(pid, str):
+                    return pid
+        return None
+
+    def _ref_apply(self, method: Callable[[A], B], req: A) -> B:
+        # Auto-detect the request's internal project_id so that client-computed
+        # internal refs for the SAME project are accepted, while refs to other
+        # projects are rejected (security: prevents cross-project ref injection).
+        pid = self._extract_internal_project_id(req)
+        allowed = {pid} if pid else None
         req_conv = universal_ext_to_int_ref_converter(
             req,
             self._idc.ext_to_int_project_id,
-            allowed_internal_project_ids=allowed_internal_project_ids,
+            allowed_internal_project_ids=allowed,
         )
         res = method(req_conv)
         res_conv = universal_int_to_ext_ref_converter(
@@ -87,8 +103,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         self, method: Callable[[A], Iterator[B]], req: A
     ) -> Iterator[B]:
         """Stream results while converting internal refs to external refs."""
+        pid = self._extract_internal_project_id(req)
+        allowed = {pid} if pid else None
         req_conv = universal_ext_to_int_ref_converter(
-            req, self._idc.ext_to_int_project_id
+            req,
+            self._idc.ext_to_int_project_id,
+            allowed_internal_project_ids=allowed,
         )
         res = method(req_conv)
 
@@ -145,26 +165,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._ref_apply(self._internal_trace_server.otel_export, req)
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        internal_pid = self._idc.ext_to_int_project_id(req.start.project_id)
-        req.start.project_id = internal_pid
+        req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
         if req.start.wb_run_id is not None:
             req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
         if req.start.wb_user_id is not None:
             req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
-        return self._ref_apply(
-            self._internal_trace_server.call_start,
-            req,
-            allowed_internal_project_ids={internal_pid},
-        )
+        return self._ref_apply(self._internal_trace_server.call_start, req)
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        internal_pid = self._idc.ext_to_int_project_id(req.end.project_id)
-        req.end.project_id = internal_pid
-        return self._ref_apply(
-            self._internal_trace_server.call_end,
-            req,
-            allowed_internal_project_ids={internal_pid},
-        )
+        req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
+        return self._ref_apply(self._internal_trace_server.call_end, req)
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         original_project_id = req.project_id
@@ -267,15 +277,10 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._ref_apply(self._internal_trace_server.call_update, req)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        internal_pid = self._idc.ext_to_int_project_id(req.obj.project_id)
-        req.obj.project_id = internal_pid
+        req.obj.project_id = self._idc.ext_to_int_project_id(req.obj.project_id)
         if req.obj.wb_user_id is not None:
             req.obj.wb_user_id = self._idc.ext_to_int_user_id(req.obj.wb_user_id)
-        return self._ref_apply(
-            self._internal_trace_server.obj_create,
-            req,
-            allowed_internal_project_ids={internal_pid},
-        )
+        return self._ref_apply(self._internal_trace_server.obj_create, req)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         original_project_id = req.project_id
@@ -328,13 +333,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._internal_trace_server.aliases_list(req)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        internal_pid = self._idc.ext_to_int_project_id(req.table.project_id)
-        req.table.project_id = internal_pid
-        return self._ref_apply(
-            self._internal_trace_server.table_create,
-            req,
-            allowed_internal_project_ids={internal_pid},
-        )
+        req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
+        return self._ref_apply(self._internal_trace_server.table_create, req)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
