@@ -92,9 +92,7 @@ def universal_ext_to_int_ref_converter(
                     and verify_internal_project_id(ref_project_id)
                 ):
                     return obj
-                raise InvalidExternalRef(
-                    "Encountered unexpected internal ref format."
-                )
+                raise InvalidExternalRef("Encountered unexpected internal ref format.")
         return obj
 
     return _map_values(obj, mapper)
