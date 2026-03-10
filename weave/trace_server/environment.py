@@ -360,4 +360,4 @@ def inference_service_base_url() -> str:
 
 def redis_url() -> str | None:
     """Redis connection URL (e.g., redis://127.0.0.1:6379)."""
-    return os.environ.get("REDIS_URL")
+    return os.environ.get("WEAVE_REDIS_URL")
