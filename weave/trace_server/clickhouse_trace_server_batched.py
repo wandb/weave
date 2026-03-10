@@ -342,9 +342,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def from_env(
         cls, use_async_insert: bool = False, **kwargs: Any
     ) -> "ClickHouseTraceServer":
-        # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
-        # that type checking is applied to the constructor.
-        return ClickHouseTraceServer(
+        return cls(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
             user=wf_env.wf_clickhouse_user(),

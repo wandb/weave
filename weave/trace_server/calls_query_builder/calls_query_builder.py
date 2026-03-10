@@ -307,17 +307,17 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         extra_path = split_escaped_field_path(path)
         feedback_type = feedback_type[1:-1]
         if extra_path[0] == "payload":
-            return CallsMergedFeedbackPayloadField(
+            return cls(
                 field="payload_dump",
                 feedback_type=feedback_type,
                 extra_path=extra_path[1:],
             )
         elif extra_path[0] == "runnable_ref":
-            return CallsMergedFeedbackPayloadField(
+            return cls(
                 field="runnable_ref", feedback_type=feedback_type, extra_path=[]
             )
         elif extra_path[0] == "trigger_ref":
-            return CallsMergedFeedbackPayloadField(
+            return cls(
                 field="trigger_ref", feedback_type=feedback_type, extra_path=[]
             )
         raise InvalidFieldError(f"Invalid feedback path: {path}")
