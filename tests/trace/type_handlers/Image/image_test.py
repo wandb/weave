@@ -250,3 +250,35 @@ def test_images_in_load_of_dataset(client):
             assert gotten_row["img"].tobytes() == local_row["img"].tobytes()
         finally:
             gotten_row["img"].close()
+
+
+def test_images_in_dataset_without_client(client):
+    """Regression test for WB-21596: datasets with images should be iterable
+    without an active global client (e.g. after ref.get() auto-init cleanup).
+    """
+    from weave.trace.context.weave_client_context import (
+        get_weave_client,
+        set_weave_client_global,
+    )
+
+    n_rows = 3
+    rows = [{"img": make_random_image()} for _ in range(n_rows)]
+    dataset = weave.Dataset(rows=rows)
+    ref = weave.publish(dataset)
+
+    # Get the dataset while client exists (rows are lazy, not yet materialized)
+    gotten_dataset = ref.get()
+
+    # Simulate ref.get() auto-init cleanup: remove the global client
+    saved_client = get_weave_client()
+    set_weave_client_global(None)
+
+    try:
+        # Iterating rows should work without a global client
+        for gotten_row, local_row in zip(gotten_dataset, rows, strict=False):
+            assert isinstance(gotten_row["img"], Image.Image)
+            assert gotten_row["img"].size == local_row["img"].size
+            gotten_row["img"].close()
+    finally:
+        # Restore client for fixture teardown
+        set_weave_client_global(saved_client)
