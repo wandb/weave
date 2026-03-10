@@ -8,6 +8,7 @@
  *   ├── Realtime Session Update      (on session.updated)
  *   ├── Generation                   (on turn_started → turn_done)
  *   │   └── Audio Out                (on audio → audio_done)
+ *   ├── Tool Call: <name>            (on agent_tool_start → agent_tool_end)
  *   └── ...
  *
  * Session lifecycle (session.created / session.updated) is sourced from
@@ -99,6 +100,9 @@ export class WeaveRealtimeTracingAdapter {
   private audioCallId: string | null = null;
   private audioResponseId: string | null = null;
 
+  // In-flight tool calls: toolCallId → Weave callId
+  private toolCalls = new Map<string, string>();
+
   constructor(private readonly session: RealtimeSessionLike) {
     this.attachListeners();
   }
@@ -115,6 +119,9 @@ export class WeaveRealtimeTracingAdapter {
     this.session.transport.on('audio_done', this.onAudioDone);
     // Disconnect detection
     this.session.transport.on('connection_change', this.onConnectionChange);
+    // Tool calls
+    this.session.on('agent_tool_start', this.onToolStart);
+    this.session.on('agent_tool_end', this.onToolEnd);
   }
 
   /**
@@ -128,10 +135,15 @@ export class WeaveRealtimeTracingAdapter {
     this.session.transport.off('audio', this.onAudio);
     this.session.transport.off('audio_done', this.onAudioDone);
     this.session.transport.off('connection_change', this.onConnectionChange);
+    this.session.off('agent_tool_start', this.onToolStart);
+    this.session.off('agent_tool_end', this.onToolEnd);
     // Close any calls left open
     this.closeAudioCall({});
     for (const [responseId] of this.generationCalls) {
       this.closeGenerationCall(responseId, {status: 'detached'});
+    }
+    for (const [toolCallId] of this.toolCalls) {
+      this.closeToolCall(toolCallId, {status: 'detached'});
     }
     this.closeSessionCall();
   }
@@ -212,8 +224,51 @@ export class WeaveRealtimeTracingAdapter {
       for (const [responseId] of this.generationCalls) {
         this.closeGenerationCall(responseId, {status: 'disconnected'});
       }
+      for (const [toolCallId] of this.toolCalls) {
+        this.closeToolCall(toolCallId, {status: 'disconnected'});
+      }
       this.closeSessionCall();
     }
+  };
+
+  /**
+   * Emitted by the session when the agent begins executing a tool call.
+   * Shape: (context, agent, tool, details) where details.toolCall.callId is the correlation key.
+   */
+  private onToolStart = (
+    _ctx: any,
+    _agent: any,
+    tool: any,
+    details: any
+  ): void => {
+    const callId: string | undefined = details?.toolCall?.callId;
+    const toolName: string | undefined = tool?.name;
+    if (!callId || !toolName) return;
+
+    let inputs: Record<string, any> = {};
+    try {
+      inputs = JSON.parse(details.toolCall.arguments ?? '{}');
+    } catch {
+      inputs = {arguments: details.toolCall.arguments};
+    }
+
+    this.openToolCall(callId, toolName, inputs);
+  };
+
+  /**
+   * Emitted by the session when a tool call completes.
+   * Shape: (context, agent, tool, result, details) where result is the string output.
+   */
+  private onToolEnd = (
+    _ctx: any,
+    _agent: any,
+    _tool: any,
+    result: string,
+    details: any
+  ): void => {
+    const callId: string | undefined = details?.toolCall?.callId;
+    if (!callId) return;
+    this.closeToolCall(callId, {result});
   };
 
   // ---- Weave call helpers ----
@@ -378,6 +433,48 @@ export class WeaveRealtimeTracingAdapter {
 
     this.audioCallId = null;
     this.audioResponseId = null;
+  }
+
+  private openToolCall(
+    toolCallId: string,
+    toolName: string,
+    inputs: Record<string, any>
+  ) {
+    const client = getGlobalClient();
+    if (!client || !this.sessionCallId || !this.sessionTraceId) return;
+    if (this.toolCalls.has(toolCallId)) return;
+
+    const callId = uuidv7();
+
+    client.saveCallStart({
+      project_id: client.projectId,
+      id: callId,
+      op_name: `realtime.tool.${toolName}`,
+      display_name: toolName,
+      trace_id: this.sessionTraceId,
+      parent_id: this.sessionCallId,
+      started_at: new Date().toISOString(),
+      inputs,
+      attributes: {kind: 'tool'},
+    });
+
+    this.toolCalls.set(toolCallId, callId);
+  }
+
+  private closeToolCall(toolCallId: string, output: Record<string, any>) {
+    const client = getGlobalClient();
+    const callId = this.toolCalls.get(toolCallId);
+    if (!client || !callId) return;
+
+    client.saveCallEnd({
+      project_id: client.projectId,
+      id: callId,
+      ended_at: new Date().toISOString(),
+      output,
+      summary: {},
+    });
+
+    this.toolCalls.delete(toolCallId);
   }
 }
 
