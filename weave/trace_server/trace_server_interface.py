@@ -293,6 +293,11 @@ class ObjSchemaForInsert(BaseModel):
     set_base_object_class: str | None = Field(
         exclude=True, default=None, deprecated=True
     )
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed digest for server-side validation. "
+        "If provided, the server will verify it matches the server-computed digest.",
+    )
 
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
@@ -305,6 +310,10 @@ class ObjSchemaForInsert(BaseModel):
 class TableSchemaForInsert(BaseModel):
     project_id: str
     rows: list[dict[str, Any]]
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed table digest for server-side validation.",
+    )
 
 
 class ProcessedResourceSpans(BaseModel):
@@ -1182,6 +1191,10 @@ class FileCreateReq(BaseModelStrict):
     project_id: str
     name: str
     content: bytes
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed file digest for server-side validation.",
+    )
 
 
 class FileCreateRes(BaseModel):

@@ -21,6 +21,11 @@ from httpx import HTTPStatusError as HTTPError
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
+from weave.shared.digest import (
+    compute_object_digest,
+    compute_row_digest,
+    compute_table_digest,
+)
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -76,6 +81,7 @@ from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
     should_capture_system_info,
+    should_enable_client_side_digests,
     should_print_call_link,
     should_redact_pii,
     should_use_parallel_table_upload,
@@ -122,6 +128,7 @@ from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     ObjSchema,
     ObjSchemaForInsert,
+    ProjectsInfoReq,
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
@@ -242,7 +249,17 @@ def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, ObjectRecord):
         # Here, we expect ref to be empty since it would have short circuited
         # above with `_get_direct_ref`
-        return _remove_empty_ref(obj.map_values(map_to_refs))
+        #
+        # Preserve _class_name as a plain string before mapping.  When the
+        # record comes from a deserialized WeaveObject, _class_name may be a
+        # BoxedStr (str subclass with an attached sub-ref).  map_to_refs would
+        # replace it with an ObjectRef, losing the original string value that
+        # to_json needs for the "_type" key.
+        saved_class_name = str(obj._class_name)
+        result = _remove_empty_ref(obj.map_values(map_to_refs))
+        if not isinstance(result._class_name, str):
+            result.__dict__["_class_name"] = saved_class_name
+        return result
     elif isinstance(obj, pydantic.BaseModel):
         # Check if this object has a custom serializer registered
         from weave.trace.serialization.serializer import get_serializer_for_obj
@@ -328,6 +345,9 @@ class WeaveClient:
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
+        self._cached_internal_project_id: str | None = None
+        self._cached_internal_project_id_for: str | None = None
+        self._ext_to_int_project_map: dict[str, str] = {}
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
@@ -354,6 +374,22 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+        # Eagerly resolve internal project ID for the initial project.
+        # _internal_project_id is a property that re-resolves when project changes.
+        self._cached_internal_project_id = self._resolve_internal_project_id()
+        self._cached_internal_project_id_for = self._project_id()
+        if self._cached_internal_project_id is not None:
+            logger.debug(
+                "Client digest: initialized with internal_project_id=%s for %s (fast path enabled)",
+                self._cached_internal_project_id,
+                self._cached_internal_project_id_for,
+            )
+        else:
+            logger.debug(
+                "Client digest: internal_project_id is None for %s (using fallback path)",
+                self._cached_internal_project_id_for,
+            )
 
     ################ High Level Convenience Methods ################
 
@@ -795,7 +831,11 @@ class WeaveClient:
                 maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
             inputs_json = to_json(
-                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
+                maybe_redacted_inputs_with_refs,
+                project_id,
+                self,
+                use_dictify=False,
+                internal_project_id=self._internal_project_id,
             )
             call_start_req = CallStartReq(
                 start=StartedCallSchemaForInsert(
@@ -975,7 +1015,11 @@ class WeaveClient:
                 maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
             output_json = to_json(
-                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+                maybe_redacted_output_as_refs,
+                project_id,
+                self,
+                use_dictify=False,
+                internal_project_id=self._internal_project_id,
             )
 
             # Capture wb_run_step_end at call end time
@@ -1498,7 +1542,12 @@ class WeaveClient:
 
         # Prepare the result payload - we purposely do not map to refs here
         # because we prefer to have the raw data.
-        results_json = to_json(output, self._project_id(), self)
+        results_json = to_json(
+            output,
+            self._project_id(),
+            self,
+            internal_project_id=self._internal_project_id,
+        )
 
         # # Prepare the supervision payload
 
@@ -1688,29 +1737,75 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
-        def send_obj_create() -> ObjCreateRes:
-            # `to_json` is mostly fast, except for CustomWeaveTypes
-            # which incur network costs to serialize the payload
-            json_val = to_json(val, self._project_id(), self)
-            req = ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
-                )
-            )
-            return self.server.obj_create(req)
-
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
-
         ref: Ref
-        if is_op(orig_val):
-            ref = OpRef(self.entity, self.project, name, digest_future)
+        if self._internal_project_id is not None:
+            # Fast path: compute digest client-side for immediate ref construction
+            logger.debug(
+                "Client digest: FAST PATH for obj %r (internal_project_id=%s)",
+                name,
+                self._internal_project_id,
+            )
+            json_val = to_json(
+                val,
+                self._project_id(),
+                self,
+                internal_project_id=self._internal_project_id,
+            )
+            digest = compute_object_digest(json_val)
+
+            if is_op(orig_val):
+                ref = OpRef(self.entity, self.project, name, digest)
+            else:
+                ref = ObjectRef(self.entity, self.project, name, digest)
+            logger.debug(
+                "Client digest: obj %r -> digest=%s, ref=%s",
+                name,
+                digest,
+                ref.uri(),
+            )
+
+            # Fire-and-forget: send to server with expected_digest for validation
+            def send_obj_create() -> ObjCreateRes:
+                req = ObjCreateReq(
+                    obj=ObjSchemaForInsert(
+                        project_id=self.entity + "/" + self.project,
+                        object_id=name,
+                        val=json_val,
+                        expected_digest=digest,
+                    )
+                )
+                return self.server.obj_create(req)
+
+            self.future_executor.defer(send_obj_create)
         else:
-            ref = ObjectRef(self.entity, self.project, name, digest_future)
+            # Fallback: defer serialization, get digest from server
+            logger.debug(
+                "Client digest: FALLBACK PATH for obj %r (internal_project_id is None)",
+                name,
+            )
+
+            def send_obj_create_deferred() -> ObjCreateRes:
+                json_val = to_json(val, self._project_id(), self)
+                req = ObjCreateReq(
+                    obj=ObjSchemaForInsert(
+                        project_id=self.entity + "/" + self.project,
+                        object_id=name,
+                        val=json_val,
+                    )
+                )
+                return self.server.obj_create(req)
+
+            res_future: Future[ObjCreateRes] = self.future_executor.defer(
+                send_obj_create_deferred
+            )
+            digest_future: Future[str] = self.future_executor.then(
+                [res_future], lambda res: res[0].digest
+            )
+
+            if is_op(orig_val):
+                ref = OpRef(self.entity, self.project, name, digest_future)
+            else:
+                ref = ObjectRef(self.entity, self.project, name, digest_future)
 
         # Attach the ref to the object
         try:
@@ -1732,10 +1827,16 @@ class WeaveClient:
 
         return self._save_object_basic(op, name)
 
-    def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
-        json_rows = to_json(rows, self._project_id(), self)
+    def _send_table_create(
+        self, json_rows: list[Any], expected_digest: str | None = None
+    ) -> TableCreateRes:
+        """Send pre-serialized rows to the server for table creation."""
         req = TableCreateReq(
-            table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
+            table=TableSchemaForInsert(
+                project_id=self._project_id(),
+                rows=json_rows,
+                expected_digest=expected_digest,
+            )
         )
         return self.server.table_create(req)
 
@@ -1752,28 +1853,67 @@ class WeaveClient:
             return table.table_ref
 
         chunking_config = self._should_use_chunking(table)
-        if not chunking_config.use_chunking:
-            # Simple case: defer the entire serialization and upload
-            res_future: Future[TableCreateRes] = self.future_executor.defer(
-                lambda: self._send_table_create(list(table.rows))
+
+        if self._internal_project_id is not None:
+            # Fast path: serialize and compute digests client-side
+            logger.debug(
+                "Client digest: FAST PATH for table (internal_project_id=%s)",
+                self._internal_project_id,
             )
-        elif chunking_config.use_parallel_chunks:
-            # Need to chunk up, use parallelism
-            res_future = self._create_table_with_parallel_chunks(table)
+            rows = list(table.rows)
+            json_rows = to_json(
+                rows,
+                self._project_id(),
+                self,
+                internal_project_id=self._internal_project_id,
+            )
+            row_digests = [compute_row_digest(row) for row in json_rows]
+            table_digest = compute_table_digest(row_digests)
+
+            table_ref = TableRef(self.entity, self.project, table_digest, row_digests)
+            logger.debug(
+                "Client digest: table -> digest=%s, %d rows",
+                table_digest,
+                len(row_digests),
+            )
+
+            # Fire-and-forget: send to server
+            if not chunking_config.use_chunking:
+                self.future_executor.defer(
+                    lambda: self._send_table_create(
+                        json_rows, expected_digest=table_digest
+                    )
+                )
+            elif chunking_config.use_parallel_chunks:
+                self._send_table_parallel_chunks(json_rows, row_digests)
+            else:
+                self._send_table_incremental_updates(json_rows)
         else:
-            # Legacy method for large tables and old servers
-            res_future = self._create_table_with_incremental_updates(table)
+            # Fallback: defer serialization, get digest from server
+            logger.debug(
+                "Client digest: FALLBACK PATH for table (internal_project_id is None)"
+            )
+            if not chunking_config.use_chunking:
+                res_future: Future[TableCreateRes] = self.future_executor.defer(
+                    lambda: self._send_table_create(
+                        to_json(list(table.rows), self._project_id(), self)
+                    )
+                )
+            elif chunking_config.use_parallel_chunks:
+                res_future = self._create_table_with_parallel_chunks(table)
+            else:
+                res_future = self._create_table_with_incremental_updates(table)
 
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
-        row_digests_future: Future[list[str]] = self.future_executor.then(
-            [res_future], lambda res: res[0].row_digests
-        )
+            digest_future: Future[str] = self.future_executor.then(
+                [res_future], lambda res: res[0].digest
+            )
+            row_digests_future: Future[list[str]] = self.future_executor.then(
+                [res_future], lambda res: res[0].row_digests
+            )
 
-        table_ref = TableRef(
-            self.entity, self.project, digest_future, row_digests_future
-        )
+            table_ref = TableRef(
+                self.entity, self.project, digest_future, row_digests_future
+            )
 
         table.ref = table_ref
 
@@ -1823,17 +1963,16 @@ class WeaveClient:
             use_chunking=use_chunking, use_parallel_chunks=use_parallel_chunks
         )
 
-    def _create_table_with_parallel_chunks(
-        self, table: Table | WeaveTable
-    ) -> Future[TableCreateRes]:
-        """Execute the actual parallel chunk upload."""
-        # Create chunks from raw table data (not serialized yet)
+    def _send_table_parallel_chunks(
+        self, json_rows: list[Any], row_digests: list[str]
+    ) -> None:
+        """Send pre-serialized rows to server using parallel chunks (fire-and-forget)."""
         chunk_manager = TableChunkManager()
-        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+        json_chunks: list[list[Any]] = chunk_manager.create_chunks(json_rows)
 
-        # Create chunks in parallel using future_executor - defer serialization
+        # Send each chunk in parallel
         chunk_futures = []
-        for raw_chunk in raw_chunks:
+        for json_chunk in json_chunks:
 
             def make_chunk_task(chunk: list[Any]) -> Callable[[], TableCreateRes]:
                 def chunk_task() -> TableCreateRes:
@@ -1841,10 +1980,75 @@ class WeaveClient:
 
                 return chunk_task
 
+            chunk_future = self.future_executor.defer(make_chunk_task(json_chunk))
+            chunk_futures.append(chunk_future)
+
+        # After all chunks are uploaded, combine using table_create_from_digests
+        def combine_chunks(chunk_results: list[TableCreateRes]) -> None:
+            create_req = TableCreateFromDigestsReq(
+                project_id=self._project_id(), row_digests=row_digests
+            )
+            self.server.table_create_from_digests(create_req)
+
+        self.future_executor.then(chunk_futures, combine_chunks)
+
+    def _send_table_incremental_updates(self, json_rows: list[Any]) -> None:
+        """Send pre-serialized rows to server using incremental updates (fire-and-forget)."""
+        chunk_manager = TableChunkManager()
+        json_chunks: list[list[Any]] = chunk_manager.create_chunks(json_rows)
+        if not json_chunks:
+            self.future_executor.defer(lambda: self._send_table_create([]))
+            return
+
+        first_chunk = json_chunks[0]
+
+        def create_first_chunk() -> TableCreateRes:
+            return self._send_table_create(first_chunk)
+
+        base_future = self.future_executor.defer(create_first_chunk)
+
+        if len(json_chunks) <= 1:
+            return
+
+        # Chain the incremental updates sequentially
+        def process_remaining_chunks(
+            base_results: list[TableCreateRes],
+        ) -> None:
+            current_digest = base_results[0].digest
+
+            for json_chunk in json_chunks[1:]:
+                payloads = [TableAppendSpecPayload(row=row) for row in json_chunk]
+                update_req = TableUpdateReq(
+                    project_id=self._project_id(),
+                    base_digest=current_digest,
+                    updates=[TableAppendSpec(append=payload) for payload in payloads],
+                )
+                update_result = self.server.table_update(update_req)
+                current_digest = update_result.digest
+
+        self.future_executor.then([base_future], process_remaining_chunks)
+
+    def _create_table_with_parallel_chunks(
+        self, table: Table | WeaveTable
+    ) -> Future[TableCreateRes]:
+        """Fallback: parallel chunk upload returning a Future with the final result."""
+        chunk_manager = TableChunkManager()
+        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+
+        chunk_futures = []
+        for raw_chunk in raw_chunks:
+
+            def make_chunk_task(chunk: list[Any]) -> Callable[[], TableCreateRes]:
+                def chunk_task() -> TableCreateRes:
+                    return self._send_table_create(
+                        to_json(chunk, self._project_id(), self)
+                    )
+
+                return chunk_task
+
             chunk_future = self.future_executor.defer(make_chunk_task(raw_chunk))
             chunk_futures.append(chunk_future)
 
-        # Chain the operations using future_executor.then
         def combine_chunks_and_create_table(
             chunk_results: list[TableCreateRes],
         ) -> TableCreateRes:
@@ -1852,7 +2056,6 @@ class WeaveClient:
             for chunk_result in chunk_results:
                 all_row_digests.extend(chunk_result.row_digests)
 
-            # Create final table from digests
             create_req = TableCreateFromDigestsReq(
                 project_id=self._project_id(), row_digests=all_row_digests
             )
@@ -1863,20 +2066,17 @@ class WeaveClient:
                 row_digests=all_row_digests,
             )
 
-        # Return a future that will complete when all chunks are done and combined
         return self.future_executor.then(chunk_futures, combine_chunks_and_create_table)
 
     def _create_table_with_incremental_updates(
         self, table: Table | WeaveTable
     ) -> Future[TableCreateRes]:
-        """Create table using incremental table_update pattern (fallback)."""
-        # Create chunks from raw table data (not serialized yet)
+        """Fallback: incremental table_update pattern returning a Future."""
         chunk_manager = TableChunkManager()
         raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
         if not raw_chunks:
             return self.future_executor.defer(lambda: self._send_table_create([]))
 
-        # Create first chunk as the base table - defer serialization
         first_raw_chunk = raw_chunks[0]
 
         def create_first_chunk() -> TableCreateRes:
@@ -1885,7 +2085,6 @@ class WeaveClient:
 
         base_future = self.future_executor.defer(create_first_chunk)
 
-        # Chain the incremental updates sequentially
         def process_remaining_chunks(
             base_results: list[TableCreateRes],
         ) -> TableCreateRes:
@@ -1893,9 +2092,7 @@ class WeaveClient:
             current_digest = base_result.digest
             all_row_digests = list(base_result.row_digests)
 
-            # Process remaining chunks sequentially (each depends on previous)
             for raw_chunk in raw_chunks[1:]:
-                # Serialize each chunk separately to avoid recursion
                 serialized_chunk = to_json(raw_chunk, self._project_id(), self)
                 payloads = [TableAppendSpecPayload(row=row) for row in serialized_chunk]
                 update_req = TableUpdateReq(
@@ -1912,7 +2109,6 @@ class WeaveClient:
                 row_digests=all_row_digests,
             )
 
-        # Chain the sequential processing after the base table is created
         return self.future_executor.then([base_future], process_remaining_chunks)
 
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
@@ -1939,6 +2135,74 @@ class WeaveClient:
 
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
+
+    @property
+    def _internal_project_id(self) -> str | None:
+        """Return the internal project ID for the current project.
+
+        Re-resolves lazily when the active project changes (e.g., tests
+        set ``client.project`` between operations).
+
+        Returns None (forcing fallback path) when client_side_digests is disabled.
+        """
+        if not should_enable_client_side_digests():
+            return None
+        current = self._project_id()
+        if current != self._cached_internal_project_id_for:
+            logger.debug(
+                "Client digest: re-resolving internal project ID (project changed from %s to %s)",
+                self._cached_internal_project_id_for,
+                current,
+            )
+            self._cached_internal_project_id = self._resolve_internal_project_id()
+            self._cached_internal_project_id_for = current
+        return self._cached_internal_project_id
+
+    def _resolve_internal_project_id(self) -> str | None:
+        """Resolve the internal project ID for constructing internal refs.
+
+        For remote servers, calls the projects_info endpoint.
+        For local servers (SQLite), the external ID is the internal ID.
+        Returns None if resolution fails (fallback to external refs).
+        """
+        ext_id = self._project_id()
+        if hasattr(self.server, "projects_info"):
+            try:
+                results = self.server.projects_info(
+                    ProjectsInfoReq(project_ids=[ext_id])
+                )
+                if results:
+                    internal_id = results[0].internal_project_id
+                    self._ext_to_int_project_map[ext_id] = internal_id
+                    return internal_id
+            except Exception:
+                logger.debug(
+                    "Failed to resolve internal project ID, falling back to external refs",
+                    exc_info=True,
+                )
+        # When projects_info is unavailable (e.g., bare SQLite or
+        # RemoteHTTPTraceServer before the endpoint is deployed), we
+        # cannot construct internal refs.  Return None so the client
+        # falls back to external refs and skips client-side digest
+        # validation (the server will still compute the digest).
+        return None
+
+    def _resolve_ext_to_int_project_id(self, ext_project_id: str) -> str | None:
+        """Resolve an external project ID to internal, with caching."""
+        if ext_project_id in self._ext_to_int_project_map:
+            return self._ext_to_int_project_map[ext_project_id]
+        if hasattr(self.server, "projects_info"):
+            try:
+                results = self.server.projects_info(
+                    ProjectsInfoReq(project_ids=[ext_project_id])
+                )
+                if results:
+                    internal_id = results[0].internal_project_id
+                    self._ext_to_int_project_map[ext_project_id] = internal_id
+                    return internal_id
+            except Exception:
+                pass
+        return None
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
@@ -2344,8 +2608,10 @@ def _get_call_processor(server: Any) -> Any:
 
     Returns None for direct backend servers (used in tests).
     """
-    if hasattr(server, "call_processor"):
-        return server.call_processor
-    if hasattr(server, "_next_trace_server"):
-        return _get_call_processor(server._next_trace_server)
+    processor = getattr(server, "call_processor", None)
+    if processor is not None and hasattr(processor, "enqueue_start"):
+        return processor
+    next_server = getattr(server, "_next_trace_server", None)
+    if next_server is not None:
+        return _get_call_processor(next_server)
     return None

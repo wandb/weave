@@ -8,8 +8,15 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict
 from pydantic import BaseModel
 
 from weave.shared.digest import bytes_digest
+from weave.shared.refs_internal import (
+    WEAVE_INTERNAL_SCHEME,
+    WEAVE_SCHEME,
+    InternalObjectRef,
+    InternalOpRef,
+    InternalTableRef,
+)
 from weave.trace.object_record import ObjectRecord
-from weave.trace.refs import ObjectRef, Ref, TableRef
+from weave.trace.refs import ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
 from weave.trace_server.trace_server_interface import (
@@ -21,6 +28,33 @@ from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
+
+_WEAVE_REF_PREFIX = f"{WEAVE_SCHEME}:///"
+_WEAVE_INTERNAL_REF_PREFIX = f"{WEAVE_INTERNAL_SCHEME}:///"
+
+
+def _convert_ext_ref_string(
+    ref_str: str,
+    project_id: str,
+    internal_project_id: str,
+    client: WeaveClient | None = None,
+) -> str:
+    """Convert an external ref URI string to internal format.
+
+    Same-project refs use the pre-resolved internal_project_id.
+    Cross-project refs are resolved lazily via client._resolve_ext_to_int_project_id.
+    """
+    rest = ref_str[len(_WEAVE_REF_PREFIX) :]
+    parts = rest.split("/", 2)
+    if len(parts) == 3:
+        entity_project = f"{parts[0]}/{parts[1]}"
+        if entity_project == project_id:
+            return f"{_WEAVE_INTERNAL_REF_PREFIX}{internal_project_id}/{parts[2]}"
+        if client is not None:
+            resolved = client._resolve_ext_to_int_project_id(entity_project)
+            if resolved is not None:
+                return f"{_WEAVE_INTERNAL_REF_PREFIX}{resolved}/{parts[2]}"
+    return ref_str
 
 
 def is_pydantic_model_class(obj: Any) -> bool:
@@ -37,11 +71,27 @@ def is_pydantic_model_class(obj: Any) -> bool:
 
 
 def to_json(
-    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
+    obj: Any,
+    project_id: str,
+    client: WeaveClient,
+    use_dictify: bool = False,
+    internal_project_id: str | None = None,
 ) -> Any:
     if isinstance(obj, TableRef):
+        if internal_project_id is not None:
+            return InternalTableRef(
+                project_id=internal_project_id, digest=obj.digest
+            ).uri()
         return obj.uri()
     elif isinstance(obj, ObjectRef):
+        if internal_project_id is not None:
+            cls = InternalOpRef if isinstance(obj, OpRef) else InternalObjectRef
+            return cls(
+                project_id=internal_project_id,
+                name=obj.name,
+                version=obj.digest,
+                extra=list(obj.extra),
+            ).uri()
         return obj.uri()
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
@@ -58,21 +108,33 @@ def to_json(
                 else:
                     logging.warning(f"Unexpected null ref in object record: {obj}")
                     continue
-            res[k] = to_json(v, project_id, client, use_dictify)
+            res[k] = to_json(v, project_id, client, use_dictify, internal_project_id)
         return res
     elif isinstance_namedtuple(obj):
         return {
-            k: to_json(v, project_id, client, use_dictify)
+            k: to_json(v, project_id, client, use_dictify, internal_project_id)
             for k, v in obj._asdict().items()
         }
     elif isinstance(obj, (list, tuple)):
-        return [to_json(v, project_id, client, use_dictify) for v in obj]
+        return [
+            to_json(v, project_id, client, use_dictify, internal_project_id)
+            for v in obj
+        ]
     elif isinstance(obj, dict):
-        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
+        return {
+            k: to_json(v, project_id, client, use_dictify, internal_project_id)
+            for k, v in obj.items()
+        }
     elif is_pydantic_model_class(obj):
         return obj.model_json_schema()
 
     if isinstance(obj, (int, float, str, bool)) or obj is None:
+        if (
+            isinstance(obj, str)
+            and internal_project_id is not None
+            and obj.startswith(_WEAVE_REF_PREFIX)
+        ):
+            return _convert_ext_ref_string(obj, project_id, internal_project_id, client)
         return obj
 
     # Add explicit handling for WeaveScorerResult models
@@ -80,7 +142,7 @@ def to_json(
 
     if isinstance(obj, WeaveScorerResult):
         return {
-            k: to_json(v, project_id, client, use_dictify)
+            k: to_json(v, project_id, client, use_dictify, internal_project_id)
             for k, v in obj.model_dump().items()
         }
 
@@ -98,11 +160,17 @@ def to_json(
         # However, even if dictify is false, i still want to try to convert to dict
         elif as_dict := try_to_dict(obj):
             return {
-                k: to_json(v, project_id, client, use_dictify)
+                k: to_json(v, project_id, client, use_dictify, internal_project_id)
                 for k, v in as_dict.items()
             }
         return fallback_encode(obj)
     result = _build_result_from_encoded(encoded, project_id, client)
+    if internal_project_id is not None:
+        load_op = result.get("load_op")
+        if isinstance(load_op, str) and load_op.startswith(_WEAVE_REF_PREFIX):
+            result["load_op"] = _convert_ext_ref_string(
+                load_op, project_id, internal_project_id, client
+            )
     return result
 
 
@@ -124,13 +192,18 @@ def _build_result_from_encoded(
         # to_json procedure is not blocked on network requests.
         # Technically it is possible that the file creation request
         # fails.
-        client._send_file_create(
-            FileCreateReq(project_id=project_id, name=name, content=val)
-        )
         contents_as_bytes = val
         if isinstance(contents_as_bytes, str):
             contents_as_bytes = contents_as_bytes.encode("utf-8")
         digest = bytes_digest(contents_as_bytes)
+        client._send_file_create(
+            FileCreateReq(
+                project_id=project_id,
+                name=name,
+                content=val,
+                expected_digest=digest,
+            )
+        )
         file_digests[name] = digest
 
     result: EncodedCustomObjDictWithFilesAsDigests = {

@@ -227,6 +227,20 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_CALLS_COMPLETE`
     """
 
+    enable_client_side_digests: bool = True
+    """
+    Toggles client-side digest computation for objects and tables.
+
+    If True (default), the client computes digests locally and constructs refs
+    immediately, then sends data to the server with an expected_digest for
+    validation. This avoids blocking on server round-trips.
+
+    If False, the client defers digest computation to the server (legacy behavior).
+    Use this if the server does not yet support internal refs or expected_digest.
+
+    Can be overridden with the environment variable `WEAVE_ENABLE_CLIENT_SIDE_DIGESTS`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -364,6 +378,11 @@ def should_use_stainless_server() -> bool:
 def should_use_calls_complete() -> bool:
     """Returns whether the calls_complete write path should be used."""
     return _should("use_calls_complete")
+
+
+def should_enable_client_side_digests() -> bool:
+    """Returns whether client-side digest computation should be used."""
+    return _should("enable_client_side_digests")
 
 
 def parse_and_apply_settings(

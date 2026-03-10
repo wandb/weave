@@ -109,6 +109,11 @@ async def test_evaluation_performance(client: WeaveClient):
     client.project = "test_evaluation_performance"
     evaluation, predict = build_evaluation()
 
+    # Warm the _internal_project_id cache for the new project so that the
+    # paused_client block (which holds a non-reentrant lock on the server)
+    # does not deadlock when create_call lazily resolves the project id.
+    _ = client._internal_project_id
+
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
     gold_log = [
@@ -117,6 +122,11 @@ async def test_evaluation_performance(client: WeaveClient):
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
+        "projects_info",
+        "projects_info",
+        # Re-resolution of _internal_project_id after project change
+        "projects_info",
+        "projects_info",
     ]
     assert log == gold_log
 
@@ -142,6 +152,7 @@ async def test_evaluation_performance(client: WeaveClient):
             "ensure_project_exists": 1,
             "get_call_processor": 2,
             "get_feedback_processor": 2,
+            "projects_info": 4,  # 2 from init (hasattr + call), 2 from cache re-resolution after project change
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops
@@ -194,8 +205,14 @@ async def test_evaluation_resilience(
     # For some reason with high parallelism, some logs are not captured,
     # so instead of exact counts, we just check that the number of unique
     # logs is <= the expected number of logs.
+    # With ThrowingServer, _internal_project_id resolves to None (projects_info
+    # throws), so the client uses the fallback path.  In the fallback path,
+    # obj_create failures propagate through Future-based digest chains, causing
+    # send_start_call to fail at op_def_ref.uri() with an obj_create error
+    # rather than a call_start error.  Similarly, feedback_create may not be
+    # reached.  We therefore expect 4 error types.
     assert len(ag_res) == 4
-    assert ag_res["Job failed during flush: ('FAILURE - call_end"] <= 14
-    assert ag_res["Job failed during flush: ('FAILURE - obj_create"] <= 6
-    assert ag_res["Job failed during flush: ('FAILURE - file_create"] <= 6
-    assert ag_res["Job failed during flush: ('FAILURE - table_create"] <= 1
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - call_end"] <= 14
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - obj_create"] <= 9
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - file_create"] <= 10
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - table_create"] <= 2

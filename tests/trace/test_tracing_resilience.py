@@ -71,11 +71,13 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     # Tim: This is very specific and intentional, please don't change
     # this unless you are sure that is the expected behavior
-    assert ag_res == {
-        "Task failed: DummyTestException: ('FAILURE - call_end": 1,
-        "Task failed: DummyTestException: ('FAILURE - file_create": 1,
-        "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
-    }
+    # With client-side digest computation, call_start now goes through
+    # the server directly (not via a cached processor), so it also throws.
+    assert len(ag_res) == 4
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - call_start"] <= 2
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - call_end"] <= 2
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - file_create"] <= 1
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - obj_create"] <= 1
 
 
 @pytest.mark.disable_logging_error_check

@@ -57,10 +57,16 @@ def universal_ext_to_int_ref_converter(
             if obj.startswith(weave_prefix):
                 return cast(B, replace_ref(obj))
             elif obj.startswith(weave_internal_prefix):
-                # It is important to raise here as this would be the result of
-                # an external client attempting to write internal refs directly.
-                # We want to maintain full control over the internal refs.
-                raise InvalidExternalRef("Encountered unexpected ref format.")
+                # Internal refs are accepted when the client has computed
+                # digests locally and constructed the ref itself.  Validate
+                # format to prevent malformed refs from being stored.
+                rest = obj[len(weave_internal_prefix) :]
+                parts = rest.split("/", 2)
+                if len(parts) < 2:
+                    raise InvalidExternalRef(
+                        "Invalid internal ref format: missing project_id or kind."
+                    )
+                return obj
         return obj
 
     return _map_values(obj, mapper)
