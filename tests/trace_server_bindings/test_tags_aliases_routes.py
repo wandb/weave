@@ -40,7 +40,7 @@ def _mock_response(json_data: dict | None = None) -> MagicMock:
 
 
 class TestObjAddTags:
-    def test_sends_put_to_correct_url(self, server):
+    def test_sends_correct_request(self, server):
         mock_resp = _mock_response()
         with patch.object(server, "put", return_value=mock_resp) as mock_put:
             server.obj_add_tags(
@@ -56,18 +56,6 @@ class TestObjAddTags:
             call_url = mock_put.call_args[0][0]
             assert call_url == "/objs/my-obj/versions/abc123/tags"
 
-    def test_sends_correct_body(self, server):
-        mock_resp = _mock_response()
-        with patch.object(server, "put", return_value=mock_resp) as mock_put:
-            server.obj_add_tags(
-                tsi.ObjAddTagsReq(
-                    project_id="entity/project",
-                    object_id="my-obj",
-                    digest="abc123",
-                    tags=["production", "reviewed"],
-                )
-            )
-
             sent_data = mock_put.call_args[1]["data"]
             body = json.loads(sent_data)
             assert body["project_id"] == "entity/project"
@@ -78,7 +66,7 @@ class TestObjAddTags:
 
 
 class TestObjRemoveTags:
-    def test_sends_post_to_correct_url(self, server):
+    def test_sends_correct_request(self, server):
         mock_resp = _mock_response()
         with patch.object(server, "post", return_value=mock_resp) as mock_post:
             server.obj_remove_tags(
@@ -94,18 +82,6 @@ class TestObjRemoveTags:
             call_url = mock_post.call_args[0][0]
             assert call_url == "/objs/my-obj/versions/abc123/tags/remove"
 
-    def test_sends_correct_body(self, server):
-        mock_resp = _mock_response()
-        with patch.object(server, "post", return_value=mock_resp) as mock_post:
-            server.obj_remove_tags(
-                tsi.ObjRemoveTagsReq(
-                    project_id="entity/project",
-                    object_id="my-obj",
-                    digest="abc123",
-                    tags=["staging"],
-                )
-            )
-
             sent_data = mock_post.call_args[1]["data"]
             body = json.loads(sent_data)
             assert body["project_id"] == "entity/project"
@@ -115,7 +91,7 @@ class TestObjRemoveTags:
 
 
 class TestObjSetAliases:
-    def test_sends_put_to_correct_url(self, server):
+    def test_sends_correct_request(self, server):
         mock_resp = _mock_response()
         with patch.object(server, "put", return_value=mock_resp) as mock_put:
             server.obj_set_aliases(
@@ -131,18 +107,6 @@ class TestObjSetAliases:
             call_url = mock_put.call_args[0][0]
             assert call_url == "/objs/my-obj/aliases"
 
-    def test_sends_correct_body(self, server):
-        mock_resp = _mock_response()
-        with patch.object(server, "put", return_value=mock_resp) as mock_put:
-            server.obj_set_aliases(
-                tsi.ObjSetAliasesReq(
-                    project_id="entity/project",
-                    object_id="my-obj",
-                    digest="abc123",
-                    aliases=["staging", "candidate"],
-                )
-            )
-
             sent_data = mock_put.call_args[1]["data"]
             body = json.loads(sent_data)
             assert body["project_id"] == "entity/project"
@@ -152,7 +116,7 @@ class TestObjSetAliases:
 
 
 class TestObjRemoveAliases:
-    def test_sends_post_to_correct_url(self, server):
+    def test_sends_correct_request(self, server):
         mock_resp = _mock_response()
         with patch.object(server, "post", return_value=mock_resp) as mock_post:
             server.obj_remove_aliases(
@@ -166,17 +130,6 @@ class TestObjRemoveAliases:
             mock_post.assert_called_once()
             call_url = mock_post.call_args[0][0]
             assert call_url == "/objs/my-obj/aliases/remove"
-
-    def test_sends_correct_body(self, server):
-        mock_resp = _mock_response()
-        with patch.object(server, "post", return_value=mock_resp) as mock_post:
-            server.obj_remove_aliases(
-                tsi.ObjRemoveAliasesReq(
-                    project_id="entity/project",
-                    object_id="my-obj",
-                    aliases=["staging"],
-                )
-            )
 
             sent_data = mock_post.call_args[1]["data"]
             body = json.loads(sent_data)
