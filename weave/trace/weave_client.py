@@ -2026,7 +2026,7 @@ class WeaveClient:
                 )
                 return self.server.obj_create(req)
 
-            res_future: Future[ObjCreateRes] = self.future_executor.defer(
+            res_future = self.future_executor.defer(
                 send_obj_create_deferred
             )
             digest_future: Future[str] = self.future_executor.then(
@@ -2159,14 +2159,15 @@ class WeaveClient:
                         json_rows, expected_digest=table_digest
                     )
 
-                res_future: Future[TableCreateRes] = self.future_executor.defer(
+                table_res_future: Future[TableCreateRes] = self.future_executor.defer(
                     send_table_create
                 )
-                res_future.add_done_callback(
-                    lambda fut, _uri=ref_uri: self._on_fire_and_forget_validation_done(
-                        fut, ref_uri=_uri
-                    )
-                )
+                def _on_table_done(
+                    fut: Future[TableCreateRes], _uri: str = ref_uri,
+                ) -> None:
+                    self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
+
+                table_res_future.add_done_callback(_on_table_done)
             elif chunking_config.use_parallel_chunks:
                 self._send_table_parallel_chunks(
                     json_rows,
@@ -2190,7 +2191,7 @@ class WeaveClient:
                 def serialize_and_send() -> TableCreateRes:
                     return self._serialize_and_send_table_create(rows)
 
-                res_future: Future[TableCreateRes] = self.future_executor.defer(
+                res_future = self.future_executor.defer(
                     serialize_and_send
                 )
             elif chunking_config.use_parallel_chunks:
@@ -2293,11 +2294,13 @@ class WeaveClient:
 
         combine_future = self.future_executor.then(chunk_futures, combine_chunks)
         if ref_uri is not None:
-            combine_future.add_done_callback(
-                lambda fut, _uri=ref_uri: self._on_fire_and_forget_validation_done(
-                    fut, ref_uri=_uri
-                )
-            )
+
+            def _on_combine_done(
+                fut: Future[None], _uri: str = ref_uri,
+            ) -> None:
+                self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
+
+            combine_future.add_done_callback(_on_combine_done)
 
     def _send_table_incremental_updates(
         self, json_rows: list[Any], *, ref_uri: str | None = None
@@ -2318,11 +2321,13 @@ class WeaveClient:
 
         if len(json_chunks) <= 1:
             if ref_uri is not None:
-                base_future.add_done_callback(
-                    lambda fut, _uri=ref_uri: self._on_fire_and_forget_validation_done(
-                        fut, ref_uri=_uri
-                    )
-                )
+
+                def _on_base_done(
+                    fut: Future[TableCreateRes], _uri: str = ref_uri,
+                ) -> None:
+                    self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
+
+                base_future.add_done_callback(_on_base_done)
             return
 
         # Chain the incremental updates sequentially
@@ -2345,11 +2350,13 @@ class WeaveClient:
             [base_future], process_remaining_chunks
         )
         if ref_uri is not None:
-            chain_future.add_done_callback(
-                lambda fut, _uri=ref_uri: self._on_fire_and_forget_validation_done(
-                    fut, ref_uri=_uri
-                )
-            )
+
+            def _on_chain_done(
+                fut: Future[None], _uri: str = ref_uri,
+            ) -> None:
+                self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
+
+            chain_future.add_done_callback(_on_chain_done)
 
     def _create_table_with_parallel_chunks(
         self, table: Table | WeaveTable
