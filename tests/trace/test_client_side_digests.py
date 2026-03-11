@@ -503,9 +503,7 @@ def test_to_json_converts_same_project_ref_to_internal_uri(
     assert internal_id is not None
 
     ref = ObjectRef(client.entity, client.project, "myobj", "abc123")
-    result = to_json(
-        ref, client._project_id(), client, internal_project_id=internal_id
-    )
+    result = to_json(ref, client._project_id(), client, internal_project_id=internal_id)
 
     assert result == f"weave-trace-internal:///{internal_id}/object/myobj:abc123"
 
