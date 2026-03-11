@@ -2001,7 +2001,7 @@ class WeaveClient:
                 self._inflight_obj_saves[save_key] = res_future
 
             def _on_obj_save_done(
-                fut: Future[ObjCreateRes], _uri: str = ref_uri, _key: tuple = save_key
+                fut: Future[ObjCreateRes], _uri: str | None = ref_uri, _key: tuple = save_key
             ) -> None:
                 with self._inflight_obj_saves_lock:
                     self._inflight_obj_saves.pop(_key, None)
@@ -2163,7 +2163,7 @@ class WeaveClient:
                     send_table_create
                 )
                 def _on_table_done(
-                    fut: Future[TableCreateRes], _uri: str = ref_uri,
+                    fut: Future[TableCreateRes], _uri: str | None = ref_uri,
                 ) -> None:
                     self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
 
@@ -2296,7 +2296,7 @@ class WeaveClient:
         if ref_uri is not None:
 
             def _on_combine_done(
-                fut: Future[None], _uri: str = ref_uri,
+                fut: Future[None], _uri: str | None = ref_uri,
             ) -> None:
                 self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
 
@@ -2323,7 +2323,7 @@ class WeaveClient:
             if ref_uri is not None:
 
                 def _on_base_done(
-                    fut: Future[TableCreateRes], _uri: str = ref_uri,
+                    fut: Future[TableCreateRes], _uri: str | None = ref_uri,
                 ) -> None:
                     self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
 
@@ -2352,7 +2352,7 @@ class WeaveClient:
         if ref_uri is not None:
 
             def _on_chain_done(
-                fut: Future[None], _uri: str = ref_uri,
+                fut: Future[None], _uri: str | None = ref_uri,
             ) -> None:
                 self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
 
