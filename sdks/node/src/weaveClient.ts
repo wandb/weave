@@ -604,6 +604,23 @@ export class WeaveClient {
   }
 
   /**
+   * Upload raw audio bytes to the Weave content store and return the
+   * `CustomWeaveType` placeholder that can be embedded in a call output.
+   *
+   * Use this when building call outputs manually (e.g. via `saveCallEnd`)
+   * where the automatic serialization pipeline from `finishCall` is not used.
+   *
+   * @param data     Raw audio bytes (WAV for best browser compatibility)
+   * @param audioType File format — currently only 'wav' is supported
+   */
+  public async serializeAudio(
+    data: Buffer,
+    audioType: AudioType = DEFAULT_AUDIO_TYPE
+  ): Promise<any> {
+    return this.serializedAudio(data, audioType);
+  }
+
+  /**
    * Get the serialized value of a Weave value, by recursively
    * resolving any __savedRef promises to their uri().
    *
