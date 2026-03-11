@@ -115,8 +115,6 @@ def _expected_client_init_log(
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
-        "projects_info",
-        "projects_info",
     ]
     if include_project_reresolution and enable_client_side_digests:
         log.extend(["projects_info", "projects_info"])
@@ -129,7 +127,6 @@ def _expected_evaluation_counts(enable_client_side_digests: bool) -> Counter[str
             "ensure_project_exists": 1,
             "get_call_processor": 2,
             "get_feedback_processor": 2,
-            "projects_info": 2,  # eager lookup during client construction
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops
@@ -139,7 +136,7 @@ def _expected_evaluation_counts(enable_client_side_digests: bool) -> Counter[str
         }
     )
     if enable_client_side_digests:
-        expected["projects_info"] = 4  # plus re-resolution after project change
+        expected["projects_info"] = 2  # lazy resolution after project change
     return expected
 
 

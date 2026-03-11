@@ -343,6 +343,8 @@ class WeaveClient:
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
+        # Lazily resolve internal project ID on first access via the
+        # _internal_project_id property to avoid adding startup latency.
         self._cached_internal_project_id: str | None = None
         self._cached_internal_project_id_for: str | None = None
         # Event is set when digests should be disabled; unset (default) = enabled.
@@ -379,11 +381,6 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
-
-        # Lazily resolve internal project ID on first access via the
-        # _internal_project_id property to avoid adding startup latency.
-        self._cached_internal_project_id: str | None = None
-        self._cached_internal_project_id_for: str | None = None
 
     ################ High Level Convenience Methods ################
 

@@ -50,8 +50,6 @@ def _expected_client_init_log() -> list[str]:
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
-        "projects_info",
-        "projects_info",
     ]
 
 
@@ -112,7 +110,15 @@ def test_published_dataset_laziness(client_creator, enable_client_side_digests):
 
         ref = weave.publish(dataset)
         log = client.server.attribute_access_log
-        assert _top_level_logs(log) == ["table_create", "obj_create"]
+        # When client-side digests are enabled, the first operation that
+        # needs _internal_project_id triggers a lazy projects_info call.
+        expected_publish_log = ["table_create", "obj_create"]
+        if enable_client_side_digests:
+            expected_publish_log = [
+                "projects_info",
+                "projects_info",
+            ] + expected_publish_log
+        assert _top_level_logs(log) == expected_publish_log
         client.server.attribute_access_log = []
 
         dataset = ref.get()

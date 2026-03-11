@@ -31,8 +31,6 @@ def _expected_client_init_log() -> list[str]:
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
-        "projects_info",
-        "projects_info",
     ]
 
 
@@ -413,16 +411,19 @@ def test_evaluate_table_lazy_iter(
         def score_simple(input, output):
             return input == output
 
-        # Client construction always does one eager projects_info lookup. The
-        # digest setting only changes later re-resolution behavior.
+        # Client construction does not eagerly call projects_info; the
+        # internal project ID is resolved lazily on first use.
+        # When client-side digests are enabled, publish triggers
+        # the first lazy projects_info resolution.
+        expected_pre_eval_log = [
+            *_expected_client_init_log(),
+        ]
+        if enable_client_side_digests:
+            expected_pre_eval_log.extend(["projects_info", "projects_info"])
+        expected_pre_eval_log.extend(["table_create", "obj_create", "obj_read"])
         assert [
             l for l in client.server.attribute_access_log if not l.startswith("_")
-        ] == [
-            *_expected_client_init_log(),
-            "table_create",
-            "obj_create",
-            "obj_read",
-        ]
+        ] == expected_pre_eval_log
         client.server.attribute_access_log = []
 
         evaluation = Evaluation(
