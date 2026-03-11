@@ -4,4 +4,4 @@ export {
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
 } from './openai.agent';
-export {instrumentRealtimeSession} from './openai.realtime.agent';
+export {patchRealtimeSession} from './openai.realtime.agent';
