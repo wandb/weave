@@ -6,6 +6,7 @@
  *
  *   Realtime Session
  *   ├── Realtime Session Update      (on session.updated)
+ *   ├── User Message                 (on history_added, role=user, input_text)
  *   ├── Generation                   (on turn_started → turn_done)
  *   │   └── Audio Out                (on audio → audio_done)
  *   ├── Tool Call: <name>            (on agent_tool_start → agent_tool_end)
@@ -147,6 +148,8 @@ export class WeaveRealtimeTracingAdapter {
     this.session.transport.on('audio_done', this.onAudioDone);
     // Disconnect detection
     this.session.transport.on('connection_change', this.onConnectionChange);
+    // User text messages added to conversation history
+    this.session.on('history_added', this.onHistoryAdded);
     // Tool calls
     this.session.on('agent_tool_start', this.onToolStart);
     this.session.on('agent_tool_end', this.onToolEnd);
@@ -163,6 +166,7 @@ export class WeaveRealtimeTracingAdapter {
     this.session.transport.off('audio', this.onAudio);
     this.session.transport.off('audio_done', this.onAudioDone);
     this.session.transport.off('connection_change', this.onConnectionChange);
+    this.session.off('history_added', this.onHistoryAdded);
     this.session.off('agent_tool_start', this.onToolStart);
     this.session.off('agent_tool_end', this.onToolEnd);
     // Close any calls left open
@@ -268,6 +272,24 @@ export class WeaveRealtimeTracingAdapter {
   };
 
   /**
+   * Emitted when a new item is added to the conversation history.
+   * Only captures user text messages (role=user, input_text content).
+   * Voice items (input_audio) are skipped — they arrive with no transcript yet.
+   */
+  private onHistoryAdded = (item: any): void => {
+    if (item?.type !== 'message' || item?.role !== 'user') return;
+
+    const text = (item.content ?? [])
+      .filter((c: any) => c.type === 'input_text')
+      .map((c: any) => c.text)
+      .join('\n');
+
+    if (!text) return;
+
+    this.recordUserMessage(text);
+  };
+
+  /**
    * Emitted by the session when the agent begins executing a tool call.
    * Shape: (context, agent, tool, details) where details.toolCall.callId is the correlation key.
    */
@@ -349,6 +371,34 @@ export class WeaveRealtimeTracingAdapter {
     this.sessionCallId = null;
     this.sessionTraceId = null;
     this.sessionStarted = false;
+  }
+
+  private recordUserMessage(text: string) {
+    const client = getGlobalClient();
+    if (!client || !this.sessionCallId || !this.sessionTraceId) return;
+
+    const callId = uuidv7();
+    const now = new Date().toISOString();
+
+    client.saveCallStart({
+      project_id: client.projectId,
+      id: callId,
+      op_name: 'realtime.user_message',
+      display_name: 'User Message',
+      trace_id: this.sessionTraceId,
+      parent_id: this.sessionCallId,
+      started_at: now,
+      inputs: {text},
+      attributes: {kind: 'agent'},
+    });
+
+    client.saveCallEnd({
+      project_id: client.projectId,
+      id: callId,
+      ended_at: now,
+      output: {},
+      summary: {},
+    });
   }
 
   private recordSessionUpdate(sessionData: Record<string, any>) {
