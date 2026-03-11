@@ -31,6 +31,7 @@
 import {getGlobalClient} from '../clientApi';
 import {uuidv7} from 'uuidv7';
 import type {RealtimeSessionLike} from './openai.realtime.agent.types';
+import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 
 // ============================================================================
 // Helpers
@@ -699,40 +700,9 @@ export class WeaveRealtimeTracingAdapter {
 // Public API
 // ============================================================================
 
-/**
- * Patch the `RealtimeSession` class from `@openai/agents-realtime` so that every
- * new instance is automatically traced by Weave — no per-session instrumentation needed.
- *
- * Call this **once** at app startup, before any `RealtimeSession` is constructed.
- *
- * How it works:
- * - Replaces `exports.RealtimeSession` with a Proxy whose `construct` trap attaches a
- *   `WeaveRealtimeTracingAdapter` to each new instance via a private Symbol.
- * - `RealtimeSession.prototype.sendAudio` is wrapped in the IIFE body (before the Proxy
- *   is created) so the wrapper captures the same Symbol and forwards PCM chunks to the
- *   per-instance adapter stored on `this`.
- *
- * @example
- * ```typescript
- * import { patchRealtimeSession } from 'weave';
- * patchRealtimeSession();
- * // Every new RealtimeSession(...) is now auto-instrumented
- * ```
- */
 let realtimeSessionPatched = false;
 
-export function patchRealtimeSession(): void {
-  if (realtimeSessionPatched) return;
-  realtimeSessionPatched = true;
-
-  let realtimeExports: any;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    realtimeExports = require('@openai/agents/realtime');
-  } catch {
-    // @openai/agents-realtime is not installed — skip patching
-    return;
-  }
+function patchRealtimeSessionCommon(realtimeExports: any): void {
   const OriginalSession = realtimeExports?.RealtimeSession;
   if (!OriginalSession) return;
 
@@ -777,4 +747,64 @@ export function patchRealtimeSession(): void {
     enumerable: true,
     configurable: true,
   });
+}
+
+function patchRealtimeExports(exports: any) {
+  if (!realtimeSessionPatched) {
+    realtimeSessionPatched = true;
+    patchRealtimeSessionCommon(exports);
+  }
+  return exports;
+}
+
+/**
+ * Register module loader hooks so `@openai/agents-realtime` is automatically patched
+ * when imported. Called once at Weave module load time via `hooks.ts`.
+ */
+export function instrumentOpenAIRealtimeAgent(): void {
+  addCJSInstrumentation({
+    moduleName: '@openai/agents-realtime',
+    subPath: 'dist/index.js',
+    version: '>= 0.4.12',
+    hook: patchRealtimeExports,
+  });
+  addESMInstrumentation({
+    moduleName: '@openai/agents-realtime',
+    version: '>= 0.4.12',
+    hook: patchRealtimeExports,
+  });
+}
+
+/**
+ * Manually patch the `RealtimeSession` class from `@openai/agents-realtime` so that
+ * every new instance is automatically traced by Weave.
+ *
+ * **Note: You typically don't need to call this function!** `@openai/agents-realtime` is
+ * automatically instrumented via module loader hooks when you import Weave. This function
+ * is provided for edge cases where automatic instrumentation doesn't work (e.g. dynamic
+ * imports, bundlers that bypass hooks).
+ *
+ * Call this **once** at app startup, before any `RealtimeSession` is constructed.
+ * The function is idempotent — safe to call multiple times.
+ *
+ * @example
+ * ```typescript
+ * import { patchRealtimeSession } from 'weave';
+ * patchRealtimeSession();
+ * // Every new RealtimeSession(...) is now auto-instrumented
+ * ```
+ */
+export function patchRealtimeSession(): void {
+  if (realtimeSessionPatched) return;
+  realtimeSessionPatched = true;
+
+  let realtimeExports: any;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    realtimeExports = require('@openai/agents-realtime');
+  } catch {
+    // @openai/agents-realtime is not installed — skip patching
+    return;
+  }
+  patchRealtimeSessionCommon(realtimeExports);
 }
