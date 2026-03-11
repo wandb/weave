@@ -652,7 +652,7 @@ def test_evaluation_invalid_model_name_fixable(model_name):
 
 @pytest.mark.parametrize("model_name", [""])
 def test_evaluation_invalid_model_name_not_fixable(model_name):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="name cannot be empty"):
         weave.EvaluationLogger(model=model_name)
 
 

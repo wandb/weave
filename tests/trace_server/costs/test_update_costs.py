@@ -4,6 +4,7 @@ from datetime import datetime
 from unittest.mock import ANY, MagicMock, mock_open, patch
 
 import httpx
+import pytest
 
 from weave.trace_server.costs.update_costs import (
     COST_FILE,
@@ -20,7 +21,7 @@ class TestUpdateCosts(unittest.TestCase):
         """Test get_current_costs when the costs file does not exist."""
         mock_exists.return_value = False
         costs = get_current_costs()
-        self.assertEqual(costs, {})
+        assert costs == {}
 
     @patch("os.path.exists")
     @patch(
@@ -42,14 +43,14 @@ class TestUpdateCosts(unittest.TestCase):
                 }
             ]
         }
-        self.assertEqual(costs, expected_costs)
+        assert costs == expected_costs
 
     @patch("os.path.exists")
     @patch("builtins.open", new_callable=mock_open, read_data="invalid json")
     def test_get_current_costs_invalid_json(self, mock_file, mock_exists):
         """Test get_current_costs when the costs file contains invalid JSON."""
         mock_exists.return_value = True
-        with self.assertRaises(json.JSONDecodeError):
+        with pytest.raises(json.JSONDecodeError):
             get_current_costs()
 
     @patch("httpx.Client.get")
@@ -67,17 +68,17 @@ class TestUpdateCosts(unittest.TestCase):
         mock_get.return_value = mock_response
         costs = fetch_new_costs()
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.assertIn("model1", costs)
-        self.assertEqual(costs["model1"]["input"], 0.01)
-        self.assertEqual(costs["model1"]["output"], 0.02)
-        self.assertEqual(costs["model1"]["provider"], "test_provider")
-        self.assertEqual(costs["model1"]["created_at"], current_time)
+        assert "model1" in costs
+        assert costs["model1"]["input"] == 0.01
+        assert costs["model1"]["output"] == 0.02
+        assert costs["model1"]["provider"] == "test_provider"
+        assert costs["model1"]["created_at"] == current_time
 
     @patch("httpx.Client.get")
     def test_fetch_new_costs_request_exception(self, mock_get):
         """Test fetch_new_costs when a RequestException occurs."""
         mock_get.side_effect = httpx.RequestError("Test exception")
-        with self.assertRaises(httpx.RequestError):
+        with pytest.raises(httpx.RequestError):
             fetch_new_costs()
 
     @patch("httpx.Client.get")
@@ -87,7 +88,7 @@ class TestUpdateCosts(unittest.TestCase):
         mock_response.raise_for_status.return_value = None
         mock_response.json.side_effect = json.JSONDecodeError("Test", "doc", 0)
         mock_get.return_value = mock_response
-        with self.assertRaises(json.JSONDecodeError):
+        with pytest.raises(json.JSONDecodeError):
             fetch_new_costs()
 
     def test_sum_costs(self):
@@ -117,7 +118,7 @@ class TestUpdateCosts(unittest.TestCase):
             ],
         }
         total = sum_costs(data)
-        self.assertEqual(total, 3)
+        assert total == 3
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.path.exists")
@@ -164,7 +165,7 @@ class TestUpdateCosts(unittest.TestCase):
         mock_file.assert_called_with(ANY, "w")
         args, kwargs = mock_file.call_args
         opened_file_path = args[0]
-        self.assertTrue(opened_file_path.endswith(COST_FILE))
+        assert opened_file_path.endswith(COST_FILE)
         handle = mock_file()
         handle.write.assert_called()
         written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)
@@ -187,7 +188,7 @@ class TestUpdateCosts(unittest.TestCase):
                 }
             ],
         }
-        self.assertEqual(written_costs, expected_costs)
+        assert written_costs == expected_costs
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.path.exists")
@@ -228,7 +229,7 @@ class TestUpdateCosts(unittest.TestCase):
         mock_file.assert_called_with(ANY, "w")
         args, kwargs = mock_file.call_args
         opened_file_path = args[0]
-        self.assertTrue(opened_file_path.endswith(COST_FILE))
+        assert opened_file_path.endswith(COST_FILE)
         handle = mock_file()
         handle.write.assert_called()
         written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)
@@ -249,7 +250,7 @@ class TestUpdateCosts(unittest.TestCase):
                 },
             ]
         }
-        self.assertEqual(written_costs, expected_costs)
+        assert written_costs == expected_costs
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.path.exists")
@@ -302,7 +303,7 @@ class TestUpdateCosts(unittest.TestCase):
         mock_file.assert_called_with(ANY, "w")
         args, kwargs = mock_file.call_args
         opened_file_path = args[0]
-        self.assertTrue(opened_file_path.endswith(COST_FILE))
+        assert opened_file_path.endswith(COST_FILE)
         handle = mock_file()
         handle.write.assert_called()
         written_data = "".join(args[0] for args, kwargs in handle.write.call_args_list)
@@ -329,7 +330,7 @@ class TestUpdateCosts(unittest.TestCase):
                 },
             ]
         }
-        self.assertEqual(written_costs, expected_costs)
+        assert written_costs == expected_costs
 
 
 if __name__ == "__main__":

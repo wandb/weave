@@ -561,13 +561,13 @@ def test_get_calls_len(client):
     calls = client.get_calls(offset=10, limit=10)
     assert len(calls) == 0
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="limit must be greater than 0"):
         client.get_calls(limit=-1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="limit must be greater than 0"):
         client.get_calls(limit=0)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="offset must be greater than or equal to 0"):
         client.get_calls(offset=-1)
 
 
@@ -745,7 +745,7 @@ def test_delete_calls(client):
     assert len(calls) == 1
     assert calls[0].id == call_2_id
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="validation error"):
         client.delete_calls([1111111111111111])
 
     client.delete_calls([call_2_id])

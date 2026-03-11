@@ -218,7 +218,7 @@ class TestBedrockGuardrailScorer:
         with patch("boto3.client") as mock_boto3_client:
             mock_boto3_client.side_effect = Exception("Failed to initialize client")
 
-            with pytest.raises(Exception) as excinfo:
+            with pytest.raises(Exception, match="Failed to initialize Bedrock runtime client") as excinfo:
                 BedrockGuardrailScorer(
                     guardrail_id="test-guardrail-id",
                     guardrail_version="DRAFT",
@@ -253,7 +253,7 @@ class TestBedrockGuardrailScorer:
         # Set the client to None to simulate uninitialized client
         scorer._bedrock_runtime = None
 
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ValueError, match="Bedrock runtime client is not initialized") as excinfo:
             scorer.score(output="Test content")
 
         assert "Bedrock runtime client is not initialized" in str(excinfo.value)

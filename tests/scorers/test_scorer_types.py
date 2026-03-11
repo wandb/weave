@@ -92,7 +92,7 @@ async def test_device_immutability(rolling_window_scorer):
     assert rolling_window_scorer.device is not None
 
     # Check that device cannot be changed after initialization
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(ValueError, match="Field is frozen") as exc_info:
         rolling_window_scorer.device = "cuda"
 
     assert "Field is frozen" in str(exc_info.value)

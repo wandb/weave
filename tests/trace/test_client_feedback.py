@@ -182,20 +182,20 @@ def test_feedback_apis(client):
     assert res.result[0]["count(*)"] == 3
 
     # Purging with a different shaped query raises
-    with pytest.raises(InvalidRequest):
-        req = tsi.FeedbackPurgeReq(
-            project_id=project_id,
-            query=Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "feedback_type"},
-                            {"$literal": "wandb.reaction.1"},
-                        ],
-                    }
+    req = tsi.FeedbackPurgeReq(
+        project_id=project_id,
+        query=Query(
+            **{
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "feedback_type"},
+                        {"$literal": "wandb.reaction.1"},
+                    ],
                 }
-            ),
-        )
+            }
+        ),
+    )
+    with pytest.raises(InvalidRequest):
         client.server.feedback_purge(req)
 
 

@@ -42,7 +42,7 @@ def test_add_row_validation():
     grid = Grid()
     grid.add_column("name")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="does not match number of columns"):
         grid.add_row(["Alice", 30])  # Too many values
 
 

@@ -2589,56 +2589,56 @@ def test_filter_length_validation():
     cq.hardcoded_filter = HardCodedFilter(
         filter={"op_names": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"input_refs": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"output_refs": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"parent_ids": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"trace_ids": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"call_ids": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(pb)
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(filter={"thread_ids": ["thread_123"] * 1001})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123"] * 1001})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(filter={"wb_run_ids": ["wb_run_123"] * 1001})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(pb)
 
     # Test with too many conditions
@@ -2660,67 +2660,67 @@ def test_disallowed_fields():
     cq = CallsQuery(project_id="test/project")
     # allowed order field
     cq.add_order("id", "ASC")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not allowed in ORDER BY"):
         cq.add_order("storage_size_bytes", "ASC")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not allowed in ORDER BY"):
         cq.add_order("total_storage_size_bytes", "DESC")
     # with bogus direction
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not allowed"):
         cq.add_order("storage_size_bytes", "ASCDESC")
     # now try filtering with disallowed
-    with pytest.raises(ValueError):
-        cq.add_condition(
-            tsi_query.GtOperation.model_validate(
-                {
-                    "$gt": [
-                        {"$getField": "storage_size_bytes"},
-                        {"$literal": 1},
-                    ]
-                }
-            )
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "storage_size_bytes"},
+                    {"$literal": 1},
+                ]
+            }
         )
+    )
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(ParamBuilder())
 
     cq = CallsQuery(project_id="test/project")  # reset
-    with pytest.raises(ValueError):
-        cq.add_condition(
-            tsi_query.GteOperation.model_validate(
-                {
-                    "$gte": [
-                        {"$getField": "total_storage_size_bytes"},
-                        {"$literal": 1},
-                    ]
-                }
-            )
+    cq.add_condition(
+        tsi_query.GteOperation.model_validate(
+            {
+                "$gte": [
+                    {"$getField": "total_storage_size_bytes"},
+                    {"$literal": 1},
+                ]
+            }
         )
+    )
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(ParamBuilder())
 
     cq = CallsQuery(project_id="test/project")  # reset
-    with pytest.raises(ValueError):
-        cq.add_condition(
-            tsi_query.LtOperation.model_validate(
-                {
-                    "$lt": [
-                        {"$getField": "storage_size_bytes"},
-                        {"$literal": 1},
-                    ]
-                }
-            )
+    cq.add_condition(
+        tsi_query.LtOperation.model_validate(
+            {
+                "$lt": [
+                    {"$getField": "storage_size_bytes"},
+                    {"$literal": 1},
+                ]
+            }
         )
+    )
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(ParamBuilder())
 
     cq = CallsQuery(project_id="test/project")  # reset
-    with pytest.raises(ValueError):
-        cq.add_condition(
-            tsi_query.LteOperation.model_validate(
-                {
-                    "$lte": [
-                        {"$getField": "total_storage_size_bytes"},
-                        {"$literal": 1},
-                    ]
-                }
-            )
+    cq.add_condition(
+        tsi_query.LteOperation.model_validate(
+            {
+                "$lte": [
+                    {"$getField": "total_storage_size_bytes"},
+                    {"$literal": 1},
+                ]
+            }
         )
+    )
+    with pytest.raises(ValueError, match="Missing select columns"):
         cq.as_sql(ParamBuilder())
 
 

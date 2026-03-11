@@ -36,7 +36,7 @@ def test_parambuilder_sqlite():
 
 
 def test_combine_conditions():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid operator"):
         combine_conditions([], "NOT")
 
     assert combine_conditions([], "AND") == ""
@@ -57,7 +57,7 @@ def test_transform_external_field_to_internal_field():
     json_columns = ["payload"]
 
     # Transforming a column that doesn't exist should raise
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown field"):
         _transform_external_field_to_internal_field("foo", all_columns, json_columns)
 
     result = _transform_external_field_to_internal_field(

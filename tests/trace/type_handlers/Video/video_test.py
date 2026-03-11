@@ -47,7 +47,7 @@ def test_save_clip(tmp_path: Path, test_video: VideoClip, extension: str):
 def test_save_invalid_clip(tmp_path: Path, test_video: VideoClip, filename: str):
     fp = str(tmp_path / filename)
     # Write video should throw exception if it recieves invalid format
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unsupported video format"):
         write_video(fp, test_video)
 
 

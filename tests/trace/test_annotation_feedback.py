@@ -494,17 +494,17 @@ def test_annotation_feedback_sdk(client):
     assert feedback[0].annotation_ref == ref.uri()
 
     # no annotation_ref
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="reserved for annotation feedback"):
         calls[0].feedback.add("wandb.annotation.number_rating", {"value": 3})
 
     # empty annotation_ref
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="reserved for annotation feedback"):
         calls[0].feedback.add(
             "wandb.annotation.number_rating", {"value": 3}, annotation_ref=""
         )
 
     # invalid annotation_ref
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="feedback_type must conform to the format"):
         calls[0].feedback.add("number_rating", {"value": 3}, annotation_ref="ssss")
 
     # no wandb.annotation prefix
