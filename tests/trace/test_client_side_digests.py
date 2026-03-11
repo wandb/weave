@@ -33,6 +33,14 @@ def _reset_settings():
     parse_and_apply_settings(UserSettings())
 
 
+@pytest.fixture()
+def fast_path(client: WeaveClient):
+    """Enable the client-side digest fast path for a test."""
+    _enable_fast_path(client)
+    yield
+    _disable_fast_path(client)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -138,11 +146,10 @@ def test_nested_object_digest_matches_across_paths(client: WeaveClient):
 @pytest.mark.parametrize("kind", ["object", "op", "table"])
 def test_cross_project_ref_matches_string_ref_serialization(
     client: WeaveClient,
+    fast_path: None,
     kind: str,
 ) -> None:
     """Each cross-project ref kind should match its URI string form."""
-    _enable_fast_path(client)
-
     current_internal_project_id = client._internal_project_id
     assert current_internal_project_id is not None
 
@@ -180,10 +187,9 @@ def test_cross_project_ref_matches_string_ref_serialization(
 
 def test_nested_cross_project_refs_preserve_individual_projects(
     client: WeaveClient,
+    fast_path: None,
 ) -> None:
     """Nested payloads should preserve per-ref project mapping during recursion."""
-    _enable_fast_path(client)
-
     current_internal_project_id = client._internal_project_id
     assert current_internal_project_id is not None
 
@@ -240,10 +246,8 @@ def test_nested_cross_project_refs_preserve_individual_projects(
 # ---------------------------------------------------------------------------
 
 
-def test_object_round_trip_fast_path(client: WeaveClient):
+def test_object_round_trip_fast_path(client: WeaveClient, fast_path: None):
     """Object published via fast path can be read back with correct data."""
-    _enable_fast_path(client)
-
     obj = {"key": "value", "number": 42, "list": [1, 2, 3]}
     ref = weave.publish(obj, name="round_trip_obj")
     client._flush()
@@ -254,10 +258,8 @@ def test_object_round_trip_fast_path(client: WeaveClient):
     assert got["list"] == [1, 2, 3]
 
 
-def test_dataset_round_trip_fast_path(client: WeaveClient):
+def test_dataset_round_trip_fast_path(client: WeaveClient, fast_path: None):
     """Dataset published via fast path can be read back with correct rows."""
-    _enable_fast_path(client)
-
     rows = [{"a": i, "b": i * 2} for i in range(5)]
     ds = weave.Dataset(name="round_trip_ds", rows=rows)
     ref = weave.publish(ds)
@@ -271,10 +273,8 @@ def test_dataset_round_trip_fast_path(client: WeaveClient):
         assert row["b"] == i * 2
 
 
-def test_typed_cross_project_ref_round_trip_fast_path(client: WeaveClient):
+def test_typed_cross_project_ref_round_trip_fast_path(client: WeaveClient, fast_path: None):
     """A typed cross-project ref should keep its original project on read-back."""
-    _enable_fast_path(client)
-
     original_project = client.project
 
     client.project = "other-project"
@@ -348,11 +348,9 @@ def test_server_rejects_wrong_table_expected_digest(client: WeaveClient):
 
 @pytest.mark.disable_logging_error_check
 def test_digest_mismatch_warning_disables_fast_path_for_session(
-    client: WeaveClient, monkeypatch, caplog
+    client: WeaveClient, fast_path: None, monkeypatch, caplog
 ) -> None:
     """A fast-path digest mismatch should warn and force later saves to fallback."""
-    _enable_fast_path(client)
-
     original_obj_create = client.server.server.obj_create
     seen_expected_digests: list[str | None] = []
     injected_mismatch = False
@@ -457,10 +455,8 @@ def test_object_with_ref_digest_matches(client: WeaveClient):
     assert digest_fast == digest_fallback
 
 
-def test_custom_weave_type_round_trip_fast_path(client: WeaveClient):
+def test_custom_weave_type_round_trip_fast_path(client: WeaveClient, fast_path: None):
     """A CustomWeaveType (PIL Image) published via fast path can be read back."""
-    _enable_fast_path(client)
-
     img = Image.new("RGB", (32, 32), color=(255, 0, 0))
     ref = weave.publish(img, name="fast_path_image")
     client._flush()
@@ -491,14 +487,13 @@ def test_custom_weave_type_digest_matches_across_paths(client: WeaveClient):
 
 def test_to_json_converts_same_project_ref_to_internal_uri(
     client: WeaveClient,
+    fast_path: None,
 ) -> None:
     """to_json with internal_project_id converts same-project ObjectRef to internal URI.
 
     Requirement: When client-side digests are enabled, refs in the same project
     must be serialized using internal URIs so the server can validate them.
     """
-    _enable_fast_path(client)
-
     internal_id = client._internal_project_id
     assert internal_id is not None
 
@@ -523,14 +518,13 @@ def test_to_json_without_internal_id_keeps_external_uri(
 
 def test_to_json_converts_ref_uri_strings_with_internal_id(
     client: WeaveClient,
+    fast_path: None,
 ) -> None:
     """Raw weave:/// URI strings are also converted when internal_project_id is set.
 
     Requirement: Both typed Ref objects and raw URI strings must be converted
     consistently, since either may appear in serialized payloads.
     """
-    _enable_fast_path(client)
-
     internal_id = client._internal_project_id
     assert internal_id is not None
 
@@ -547,14 +541,14 @@ def test_to_json_converts_ref_uri_strings_with_internal_id(
 # ---------------------------------------------------------------------------
 
 
-def test_fast_path_sends_expected_digest(client: WeaveClient, monkeypatch) -> None:
+def test_fast_path_sends_expected_digest(
+    client: WeaveClient, fast_path: None, monkeypatch
+) -> None:
     """When client-side digests are enabled, obj_create receives expected_digest.
 
     Requirement: The fast path must send the client-computed digest to the
     server for validation. This is the core contract of the feature.
     """
-    _enable_fast_path(client)
-
     captured_digests: list[str | None] = []
     original_obj_create = client.server.server.obj_create
 
@@ -620,15 +614,15 @@ def test_env_var_enables_client_side_digests(monkeypatch) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_table_fast_path_produces_valid_row_digests(client: WeaveClient) -> None:
+def test_table_fast_path_produces_valid_row_digests(
+    client: WeaveClient, fast_path: None
+) -> None:
     """Table created via fast path returns row_digests from the server.
 
     Requirement: The server must return row_digests that match what
     compute_row_digest produces for each row, ensuring the client and
     server agree on per-row identity.
     """
-    _enable_fast_path(client)
-
     rows = [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}, {"a": 3, "b": "z"}]
     row_digests = [compute_row_digest(r) for r in rows]
     table_digest = compute_table_digest(row_digests)
@@ -702,6 +696,7 @@ def test_op_digest_matches_across_paths(client: WeaveClient) -> None:
 
 def test_fast_path_ref_get_succeeds_without_explicit_flush(
     client: WeaveClient,
+    fast_path: None,
 ) -> None:
     """A fast-path ref can be .get()'d without calling _flush() first.
 
@@ -709,8 +704,6 @@ def test_fast_path_ref_get_succeeds_without_explicit_flush(
     When the user calls ref.get(), the inflight save must complete
     transparently so the data is available.
     """
-    _enable_fast_path(client)
-
     obj = {"immediate": "access", "count": 99}
     ref = weave.publish(obj, name="inflight-get-test")
 
@@ -778,7 +771,9 @@ def test_server_accepts_correct_table_expected_digest(client: WeaveClient) -> No
 # ---------------------------------------------------------------------------
 
 
-def test_inflight_save_does_not_lose_second_future(client: WeaveClient) -> None:
+def test_inflight_save_does_not_lose_second_future(
+    client: WeaveClient, fast_path: None
+) -> None:
     """Regression: _wait_for_inflight_save must not pop a newer future for the same key.
 
     If two saves produce the same (project, name, digest) key, the callback on
@@ -786,8 +781,6 @@ def test_inflight_save_does_not_lose_second_future(client: WeaveClient) -> None:
     that waits on the first future must NOT pop the key, because by then the
     dict may hold the *second* future.
     """
-    _enable_fast_path(client)
-
     obj = {"stable": "value"}
 
     # First save — produces a ref and enqueues a future.
@@ -809,13 +802,11 @@ def test_inflight_save_does_not_lose_second_future(client: WeaveClient) -> None:
 
 
 def test_fast_path_closure_captures_project_eagerly(
-    client: WeaveClient, monkeypatch
+    client: WeaveClient, fast_path: None, monkeypatch
 ) -> None:
     """Regression: the deferred send_obj_create must use the project_id captured
     at save time, not whatever self.project is when the closure eventually runs.
     """
-    _enable_fast_path(client)
-
     original_project = client.project
 
     # Intercept obj_create to record the project_id used.
@@ -848,13 +839,11 @@ def test_fast_path_closure_captures_project_eagerly(
 
 @pytest.mark.disable_logging_error_check
 def test_concurrent_digest_mismatch_disables_once(
-    client: WeaveClient, monkeypatch, caplog
+    client: WeaveClient, fast_path: None, monkeypatch, caplog
 ) -> None:
     """Regression: multiple concurrent mismatches should disable the fast path
     exactly once, and subsequent saves should all use the fallback path.
     """
-    _enable_fast_path(client)
-
     original_obj_create = client.server.server.obj_create
     call_count_lock = threading.Lock()
     call_count = 0
