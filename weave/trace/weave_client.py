@@ -356,7 +356,9 @@ class WeaveClient:
         self._cached_internal_project_id: str | None = None
         self._cached_internal_project_id_for: str | None = None
         self._client_side_digests_enabled = should_enable_client_side_digests()
-        self._client_side_digests_disabled_for_session = False
+        # Event is set when digests should be disabled; unset (default) = enabled.
+        # Using an Event instead of a bare bool is thread-safe without the GIL.
+        self._client_side_digests_disabled_event = threading.Event()
         self._ext_to_int_project_map: dict[str, str] = {}
         # Track in-flight object saves so get()/save() can wait for them.
         # Key: (project_id, object_id, digest), Value: Future from obj_create.
@@ -2074,9 +2076,9 @@ class WeaveClient:
     def _disable_client_side_digests_after_validation_error(
         self, exc: BaseException, ref_uri: str
     ) -> None:
-        if self._client_side_digests_disabled_for_session:
+        if self._client_side_digests_disabled_event.is_set():
             return
-        self._client_side_digests_disabled_for_session = True
+        self._client_side_digests_disabled_event.set()
         self._cached_internal_project_id = None
         self._cached_internal_project_id_for = None
         logger.warning(
@@ -2464,7 +2466,7 @@ class WeaveClient:
 
         Returns None (forcing fallback path) when client_side_digests is disabled.
         """
-        if self._client_side_digests_disabled_for_session:
+        if self._client_side_digests_disabled_event.is_set():
             return None
         if not self._client_side_digests_enabled:
             return None
