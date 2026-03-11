@@ -679,7 +679,7 @@ async def test_eval_supports_non_op_funcs(client):
 
     evaluation = make_test_eval()
 
-    with pytest.raises(ValueError, match="Unknown model type"):
+    with pytest.raises(ValueError, match="requires a `Model` or `Op` instance"):
         res = await evaluation.evaluate(function_model)
 
     # In the future, if we want to auto-opify, then uncomment the following assertions:
@@ -914,13 +914,13 @@ async def test_evaluation_with_wrong_column_map():
     # Create the scorer with column_map missing a column
     dummy_scorer = DummyScorer(column_map={"foo": "col1"})
     evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
-    with pytest.raises(ValueError, match="is not found in the dataset columns and is not mapped"):
+    with pytest.raises(ValueError, match="is not in the `score` methods' argument names"):
         await evaluation.predict_and_score(model_function, dataset[0])
 
     # Create the scorer with wrong argument name
     dummy_scorer = DummyScorer(column_map={"jeez": "col1"})
     evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
-    with pytest.raises(ValueError, match="is not found in the dataset columns and is not mapped"):
+    with pytest.raises(ValueError, match="is not in the `score` methods' argument names"):
         await evaluation.predict_and_score(model_function, dataset[0])
 
 
