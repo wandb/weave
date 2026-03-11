@@ -355,7 +355,6 @@ class WeaveClient:
         self._wandb_run_context: WandbRunContext | None = None
         self._cached_internal_project_id: str | None = None
         self._cached_internal_project_id_for: str | None = None
-        self._client_side_digests_enabled = should_enable_client_side_digests()
         # Event is set when digests should be disabled; unset (default) = enabled.
         # Using an Event instead of a bare bool is thread-safe without the GIL.
         self._client_side_digests_disabled_event = threading.Event()
@@ -2072,7 +2071,6 @@ class WeaveClient:
     def _invalidate_project_cache(self) -> None:
         """Force re-resolution of the internal project ID on next access."""
         self._cached_internal_project_id_for = None
-        self._client_side_digests_enabled = should_enable_client_side_digests()
 
     def _disable_client_side_digests_after_validation_error(
         self, exc: BaseException, ref_uri: str
@@ -2469,7 +2467,7 @@ class WeaveClient:
         """
         if self._client_side_digests_disabled_event.is_set():
             return None
-        if not self._client_side_digests_enabled:
+        if not should_enable_client_side_digests():
             return None
         current = self._project_id()
         if current != self._cached_internal_project_id_for:
