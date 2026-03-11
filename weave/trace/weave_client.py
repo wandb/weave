@@ -355,6 +355,7 @@ class WeaveClient:
         self._wandb_run_context: WandbRunContext | None = None
         self._cached_internal_project_id: str | None = None
         self._cached_internal_project_id_for: str | None = None
+        self._client_side_digests_enabled = should_enable_client_side_digests()
         self._client_side_digests_disabled_for_session = False
         self._ext_to_int_project_map: dict[str, str] = {}
         # Track in-flight object saves so get()/save() can wait for them.
@@ -2465,7 +2466,7 @@ class WeaveClient:
         """
         if self._client_side_digests_disabled_for_session:
             return None
-        if not should_enable_client_side_digests():
+        if not self._client_side_digests_enabled:
             return None
         current = self._project_id()
         if current != self._cached_internal_project_id_for:
