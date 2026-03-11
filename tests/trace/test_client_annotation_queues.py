@@ -1980,7 +1980,8 @@ def test_annotator_queue_items_progress_update_in_progress_from_completed(client
         wb_user_id="test_annotator",
     )
     with pytest.raises(
-        Exception, match="Cannot transition to 'in_progress' when a record already exists"
+        Exception,
+        match="Cannot transition to 'in_progress' when a record already exists",
     ):
         client.server.annotator_queue_items_progress_update(update_req2)
 

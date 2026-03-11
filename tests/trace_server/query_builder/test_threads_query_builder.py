@@ -614,15 +614,21 @@ def test_validate_and_map_sort_field():
     )
 
     # Test invalid fields - call IDs should not be sortable since they're just identifiers
-    with pytest.raises(ValueError, match="Unsupported sort field: first_turn_id") as exc_info:
+    with pytest.raises(
+        ValueError, match="Unsupported sort field: first_turn_id"
+    ) as exc_info:
         _validate_and_map_sort_field("first_turn_id")
     assert "Unsupported sort field: first_turn_id" in str(exc_info.value)
 
-    with pytest.raises(ValueError, match="Unsupported sort field: last_turn_id") as exc_info:
+    with pytest.raises(
+        ValueError, match="Unsupported sort field: last_turn_id"
+    ) as exc_info:
         _validate_and_map_sort_field("last_turn_id")
     assert "Unsupported sort field: last_turn_id" in str(exc_info.value)
 
-    with pytest.raises(ValueError, match="Unsupported sort field: invalid_field") as exc_info:
+    with pytest.raises(
+        ValueError, match="Unsupported sort field: invalid_field"
+    ) as exc_info:
         _validate_and_map_sort_field("invalid_field")
     assert "Unsupported sort field: invalid_field" in str(exc_info.value)
     assert (

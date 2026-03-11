@@ -179,7 +179,9 @@ class TestGetCustomProviderInfo(unittest.TestCase):
                     obj_read_func=self.mock_obj_read_func,
                 )
 
-            assert "No secret fetcher found" in str(context.value), "Expected error message about missing secret fetcher not found"
+            assert "No secret fetcher found" in str(context.value), (
+                "Expected error message about missing secret fetcher not found"
+            )
         finally:
             _secret_fetcher_context.reset(token)
 
@@ -202,7 +204,9 @@ class TestGetCustomProviderInfo(unittest.TestCase):
                     obj_read_func=self.mock_obj_read_func,
                 )
 
-            assert "Failed to fetch provider model information" in str(context.value), "Expected error message about failed provider fetch not found"
+            assert "Failed to fetch provider model information" in str(context.value), (
+                "Expected error message about failed provider fetch not found"
+            )
         finally:
             _secret_fetcher_context.reset(token)
 
@@ -234,7 +238,9 @@ class TestGetCustomProviderInfo(unittest.TestCase):
                     obj_read_func=self.mock_obj_read_func,
                 )
 
-            assert "Could not find Provider" in str(context.value), "Expected error message about incorrect provider type not found"
+            assert "Could not find Provider" in str(context.value), (
+                "Expected error message about incorrect provider type not found"
+            )
         finally:
             _secret_fetcher_context.reset(token)
 
@@ -266,7 +272,9 @@ class TestGetCustomProviderInfo(unittest.TestCase):
                     obj_read_func=self.mock_obj_read_func,
                 )
 
-            assert "Could not find Provider" in str(context.value), "Expected error message about incorrect provider model type not found"
+            assert "Could not find Provider" in str(context.value), (
+                "Expected error message about incorrect provider model type not found"
+            )
         finally:
             _secret_fetcher_context.reset(token)
 
@@ -594,7 +602,9 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             # Verify litellm was called with correct parameters
             mock_litellm.assert_called_once()
             call_args = mock_litellm.call_args[1]
-            assert (call_args.get("api_base") or call_args.get("base_url")) == "https://api.custom.com"
+            assert (
+                call_args.get("api_base") or call_args.get("base_url")
+            ) == "https://api.custom.com"
             assert call_args["extra_headers"] == {"X-Custom": "value"}
 
     def test_missing_api_key(self):
