@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 import weave
 from weave import Dataset, Evaluation, Model
+from weave.trace.settings import UserSettings
 
 _LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
@@ -21,6 +22,18 @@ expected_eval_result = {
     "score": {"true_count": 1, "true_fraction": 0.5},
     "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
 }
+
+
+def _expected_client_init_log() -> list[str]:
+    return [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+        "get_feedback_processor",
+        "get_feedback_processor",
+        "projects_info",
+        "projects_info",
+    ]
 
 
 class EvalModel(Model):
@@ -369,63 +382,74 @@ def test_evaluation_from_weaveobject_missing_evaluation_name(client):
     assert result == expected_eval_result
 
 
-def test_evaluate_table_lazy_iter(client, monkeypatch):
+@pytest.mark.parametrize(
+    "enable_client_side_digests",
+    [
+        pytest.param(False, id="client_side_digests_off"),
+        pytest.param(True, id="client_side_digests_on"),
+    ],
+)
+def test_evaluate_table_lazy_iter(
+    client_creator, monkeypatch, enable_client_side_digests
+):
     """The intention of this test is to show that an evaluation harness
     lazily fetches rows from a table rather than eagerly fetching all
     rows up front.
     """
-    monkeypatch.setattr(weave.trace.vals, "REMOTE_ITER_PAGE_SIZE", 4)
+    with client_creator(
+        settings=UserSettings(enable_client_side_digests=enable_client_side_digests)
+    ) as client:
+        monkeypatch.setattr(weave.trace.vals, "REMOTE_ITER_PAGE_SIZE", 4)
 
-    dataset = Dataset(rows=[{"input": i} for i in range(10)])
-    ref = weave.publish(dataset)
-    dataset = ref.get()
+        dataset = Dataset(rows=[{"input": i} for i in range(10)])
+        ref = weave.publish(dataset)
+        dataset = ref.get()
 
-    @weave.op
-    async def model_predict(input) -> int:
-        return input * 1
+        @weave.op
+        async def model_predict(input) -> int:
+            return input * 1
 
-    @weave.op
-    def score_simple(input, output):
-        return input == output
+        @weave.op
+        def score_simple(input, output):
+            return input == output
 
-    log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == [
-        "ensure_project_exists",
-        "get_call_processor",
-        "get_call_processor",
-        "get_feedback_processor",
-        "get_feedback_processor",
-        "table_create",
-        "obj_create",
-        "obj_read",
-    ]
-    client.server.attribute_access_log = []
+        # Client construction always does one eager projects_info lookup. The
+        # digest setting only changes later re-resolution behavior.
+        assert [
+            l for l in client.server.attribute_access_log if not l.startswith("_")
+        ] == [
+            *_expected_client_init_log(),
+            "table_create",
+            "obj_create",
+            "obj_read",
+        ]
+        client.server.attribute_access_log = []
 
-    evaluation = Evaluation(
-        dataset=dataset,
-        scorers=[score_simple],
-    )
-    log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == []
+        evaluation = Evaluation(
+            dataset=dataset,
+            scorers=[score_simple],
+        )
+        log = client.server.attribute_access_log
+        assert [l for l in log if not l.startswith("_")] == []
 
-    # Make sure we have deterministic results
-    with patch.dict(os.environ, {"WEAVE_PARALLELISM": "1"}):
-        result = asyncio.run(evaluation.evaluate(model_predict))
-        assert result["output"] == {"mean": 4.5}
-        assert result["score_simple"] == {"true_count": 10, "true_fraction": 1.0}
+        # Make sure we have deterministic results
+        with patch.dict(os.environ, {"WEAVE_PARALLELISM": "1"}):
+            result = asyncio.run(evaluation.evaluate(model_predict))
+            assert result["output"] == {"mean": 4.5}
+            assert result["score_simple"] == {"true_count": 10, "true_fraction": 1.0}
 
-    log = client.server.attribute_access_log
-    log = [l for l in log if not l.startswith("_")]
+        log = client.server.attribute_access_log
+        log = [l for l in log if not l.startswith("_")]
 
-    # Make sure that the length was figured out deterministically
-    assert "table_query_stats" in log
+        # Make sure that the length was figured out deterministically
+        assert "table_query_stats" in log
 
-    counts_split_by_table_query = [0]
-    for log_entry in log:
-        if log_entry == "table_query":
-            counts_split_by_table_query.append(0)
-        else:
-            counts_split_by_table_query[-1] += 1
+        counts_split_by_table_query = [0]
+        for log_entry in log:
+            if log_entry == "table_query":
+                counts_split_by_table_query.append(0)
+            else:
+                counts_split_by_table_query[-1] += 1
 
     # Note: these exact numbers might change if we change the way eval traces work.
     # However, the key part is that we have basically X + 2 splits, with the middle X

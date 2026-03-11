@@ -65,6 +65,7 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
+from weave.trace_server_bindings.http_utils import _ENDPOINT_CACHE
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
@@ -1536,6 +1537,9 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         server=remote_client,
         ensure_project_exists=False,
     )
+
+    # Clear the endpoint cache so the existence check is recorded
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
 
     # Create a Table object and save it to trigger chunking logic
     table_obj = weave_client.Table(rows)

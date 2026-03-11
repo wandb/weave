@@ -18,7 +18,10 @@ class InvalidInternalRef(ValueError):
 
 
 def universal_ext_to_int_ref_converter(
-    obj: A, convert_ext_to_int_project_id: Callable[[str], str]
+    obj: A,
+    convert_ext_to_int_project_id: Callable[[str], str],
+    allowed_internal_project_ids: set[str] | None = None,
+    verify_internal_project_id: Callable[[str], bool] | None = None,
 ) -> A:
     """Takes any object and recursively replaces all external references with
     internal references. The external references are expected to be in the
@@ -29,6 +32,13 @@ def universal_ext_to_int_ref_converter(
         obj: The object to convert.
         convert_ext_to_int_project_id: A function that takes an external
             project ID and returns the internal project ID.
+        allowed_internal_project_ids: If set, only internal refs whose
+            project_id is in this set are accepted without further checks.
+            Typically the request's own project.
+        verify_internal_project_id: Optional callback that returns True if
+            the current user has access to the given internal project_id.
+            Used to verify cross-project internal refs that were converted
+            by the client.
 
     Returns:
         The object with all external references replaced with internal
@@ -55,12 +65,34 @@ def universal_ext_to_int_ref_converter(
     def mapper(obj: B) -> B:
         if isinstance(obj, str):
             if obj.startswith(weave_prefix):
-                return cast(B, replace_ref(obj))
+                result = replace_ref(obj)
+                return cast(B, result)
             elif obj.startswith(weave_internal_prefix):
-                # It is important to raise here as this would be the result of
-                # an external client attempting to write internal refs directly.
-                # We want to maintain full control over the internal refs.
-                raise InvalidExternalRef("Encountered unexpected ref format.")
+                # Internal refs are only accepted when:
+                # 1. The ref's project matches the request's own project
+                #    (client computed digests locally), OR
+                # 2. The verify callback confirms the user has access to the
+                #    referenced project (client converted a cross-project ref).
+                # Without this check, a malicious client could embed refs to
+                # arbitrary private projects.
+                rest = obj[len(weave_internal_prefix) :]
+                parts = rest.split("/", 2)
+                if len(parts) < 2:
+                    raise InvalidExternalRef(
+                        "Invalid internal ref format: missing project_id or kind."
+                    )
+                ref_project_id = parts[0]
+                if (
+                    allowed_internal_project_ids is not None
+                    and ref_project_id in allowed_internal_project_ids
+                ):
+                    return obj
+                if (
+                    verify_internal_project_id is not None
+                    and verify_internal_project_id(ref_project_id)
+                ):
+                    return obj
+                raise InvalidExternalRef("Encountered unexpected internal ref format.")
         return obj
 
     return _map_values(obj, mapper)

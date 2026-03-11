@@ -1,3 +1,4 @@
+import uuid
 from collections import Counter
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -10,6 +11,7 @@ import pytest
 import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context.tests_context import raise_on_captured_errors
+from weave.trace.settings import UserSettings
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
@@ -104,44 +106,30 @@ def build_evaluation():
     return evaluation, predict
 
 
-@pytest.mark.asyncio
-async def test_evaluation_performance(client: WeaveClient):
-    client.project = "test_evaluation_performance"
-    evaluation, predict = build_evaluation()
-
-    log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
-
-    gold_log = [
+def _expected_client_init_log(
+    enable_client_side_digests: bool, *, include_project_reresolution: bool = False
+) -> list[str]:
+    log = [
         "ensure_project_exists",
         "get_call_processor",
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
+        "projects_info",
+        "projects_info",
     ]
-    assert log == gold_log
+    if include_project_reresolution and enable_client_side_digests:
+        log.extend(["projects_info", "projects_info"])
+    return log
 
-    with paused_client(client) as paused_client_instance:
-        res = await evaluation.evaluate(predict)
-        assert res["score"]["true_count"] == 1
-        log = [
-            l
-            for l in paused_client_instance.server.attribute_access_log
-            if not l.startswith("_")
-        ]
-        assert log == gold_log
 
-    log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
-
-    counts = Counter(log)
-
-    # Tim: This is very specific and intentiaion, please don't change
-    # this unless you are sure that is the expected behavior
-    assert (
-        counts
-        == {
+def _expected_evaluation_counts(enable_client_side_digests: bool) -> Counter[str]:
+    expected = Counter(
+        {
             "ensure_project_exists": 1,
             "get_call_processor": 2,
             "get_feedback_processor": 2,
+            "projects_info": 2,  # eager lookup during client construction
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops
@@ -150,14 +138,67 @@ async def test_evaluation_performance(client: WeaveClient):
             "feedback_create": 4,  # 4 predict feedbacks
         }
     )
+    if enable_client_side_digests:
+        expected["projects_info"] = 4  # plus re-resolution after project change
+    return expected
 
-    calls = client.get_calls()
-    objects = client._objects()
 
-    assert (
-        len(list(calls)) == 14
-    )  # eval, summary, 4 predict_and_score, 4 predicts, 4 scores
-    assert len(list(objects)) == 3  # model, dataset, evaluation
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "enable_client_side_digests",
+    [
+        pytest.param(False, id="client_side_digests_off"),
+        pytest.param(True, id="client_side_digests_on"),
+    ],
+)
+async def test_evaluation_performance(client_creator, enable_client_side_digests):
+    with client_creator(
+        settings=UserSettings(enable_client_side_digests=enable_client_side_digests)
+    ) as client:
+        mode = "on" if enable_client_side_digests else "off"
+        # This test asserts exact create counts, so it needs a fresh project
+        # namespace instead of reusing objects from prior suite runs.
+        client.project = f"test_evaluation_performance_{mode}_{uuid.uuid4().hex[:8]}"
+        evaluation, predict = build_evaluation()
+
+        # Warm the _internal_project_id cache for the new project so that the
+        # paused_client block (which holds a non-reentrant lock on the server)
+        # does not deadlock when create_call lazily resolves the project id.
+        _ = client._internal_project_id
+
+        log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
+
+        gold_log = _expected_client_init_log(
+            enable_client_side_digests,
+            include_project_reresolution=True,
+        )
+        assert log == gold_log
+
+        with paused_client(client) as paused_client_instance:
+            res = await evaluation.evaluate(predict)
+            assert res["score"]["true_count"] == 1
+            log = [
+                l
+                for l in paused_client_instance.server.attribute_access_log
+                if not l.startswith("_")
+            ]
+            assert log == gold_log
+
+        log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
+
+        counts = Counter(log)
+
+        # Tim: This is very specific and intentional, please don't change
+        # this unless you are sure that is the expected behavior.
+        assert counts == _expected_evaluation_counts(enable_client_side_digests)
+
+        calls = client.get_calls()
+        objects = client._objects()
+
+        assert (
+            len(list(calls)) == 14
+        )  # eval, summary, 4 predict_and_score, 4 predicts, 4 scores
+        assert len(list(objects)) == 3  # model, dataset, evaluation
 
 
 @pytest.mark.asyncio
@@ -194,8 +235,14 @@ async def test_evaluation_resilience(
     # For some reason with high parallelism, some logs are not captured,
     # so instead of exact counts, we just check that the number of unique
     # logs is <= the expected number of logs.
+    # With ThrowingServer, _internal_project_id resolves to None (projects_info
+    # throws), so the client uses the fallback path.  In the fallback path,
+    # obj_create failures propagate through Future-based digest chains, causing
+    # send_start_call to fail at op_def_ref.uri() with an obj_create error
+    # rather than a call_start error.  Similarly, feedback_create may not be
+    # reached.  We therefore expect 4 error types.
     assert len(ag_res) == 4
-    assert ag_res["Job failed during flush: ('FAILURE - call_end"] <= 14
-    assert ag_res["Job failed during flush: ('FAILURE - obj_create"] <= 6
-    assert ag_res["Job failed during flush: ('FAILURE - file_create"] <= 6
-    assert ag_res["Job failed during flush: ('FAILURE - table_create"] <= 1
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - call_end"] <= 14
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - obj_create"] <= 9
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - file_create"] <= 10
+    assert ag_res["Task failed: DummyTestException: ('FAILURE - table_create"] <= 2

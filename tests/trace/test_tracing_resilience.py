@@ -14,6 +14,7 @@ from tests.trace.util import DummyTestException
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.op import _add_accumulator
+from weave.trace.settings import UserSettings, parse_and_apply_settings
 
 
 def assert_no_current_call():
@@ -47,7 +48,40 @@ def test_resilience_to_user_code_errors(client):
 
 
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_server_errors(client_with_throwing_server, log_collector):
+@pytest.mark.parametrize(
+    ("enable_client_side_digests", "expected_errors"),
+    [
+        pytest.param(
+            False,
+            {
+                "Task failed: DummyTestException: ('FAILURE - call_end": 1,
+                "Task failed: DummyTestException: ('FAILURE - file_create": 1,
+                "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
+            },
+            id="client_side_digests_off",
+        ),
+        pytest.param(
+            True,
+            {
+                "Task failed: DummyTestException: ('FAILURE - call_start": 2,
+                "Task failed: DummyTestException: ('FAILURE - call_end": 1,
+                "Task failed: DummyTestException: ('FAILURE - file_create": 1,
+                "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
+            },
+            id="client_side_digests_on",
+        ),
+    ],
+)
+def test_resilience_to_server_errors(
+    client_with_throwing_server,
+    log_collector,
+    enable_client_side_digests,
+    expected_errors,
+):
+    parse_and_apply_settings(
+        UserSettings(enable_client_side_digests=enable_client_side_digests)
+    )
+
     def do_test():
         @weave.op
         def simple_op():
@@ -55,27 +89,28 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
 
         return simple_op()
 
-    # The user's exception should be raised - even if we're capturing errors
-    with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
-            do_test()
+    try:
+        # The user's exception should be raised - even if we're capturing errors
+        with raise_on_captured_errors(True):
+            with pytest.raises(DummyTestException):
+                do_test()
 
-    # We should gracefully handle the error and return a value
-    res = do_test()
-    assert res == "hello"
+        # We should gracefully handle the error and return a value
+        res = do_test()
+        assert res == "hello"
 
-    assert_no_current_call()
-    client_with_throwing_server.flush()
+        assert_no_current_call()
+        client_with_throwing_server.flush()
 
-    logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
-    # Tim: This is very specific and intentional, please don't change
-    # this unless you are sure that is the expected behavior
-    assert ag_res == {
-        "Task failed: DummyTestException: ('FAILURE - call_end": 1,
-        "Task failed: DummyTestException: ('FAILURE - file_create": 1,
-        "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
-    }
+        logs = log_collector.get_error_logs()
+        ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
+        # Tim: This is very specific and intentional, please don't change
+        # this unless you are sure that is the expected behavior.
+        # The enabled and disabled digest paths fail in different places, so we
+        # assert the exact log categories for both modes.
+        assert ag_res == Counter(expected_errors)
+    finally:
+        parse_and_apply_settings(UserSettings())
 
 
 @pytest.mark.disable_logging_error_check
