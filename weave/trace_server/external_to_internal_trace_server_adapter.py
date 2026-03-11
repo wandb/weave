@@ -87,6 +87,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
         Used to verify cross-project internal refs that the client converted.
         Returns True if the project is accessible, False otherwise.
+
+        NOTE: int_to_ext_project_id checks *read* access. A user with
+        read-only access to Project B can therefore embed refs to B inside
+        objects they *write* to Project A. If the access model requires
+        write access to referenced projects, this should be tightened.
         """
         return self._idc.int_to_ext_project_id(project_id) is not None
 
