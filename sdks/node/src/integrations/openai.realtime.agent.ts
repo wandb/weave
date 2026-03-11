@@ -6,6 +6,8 @@
  *
  *   Realtime Session
  *   ├── Realtime Session Update      (on session.updated)
+ *   ├── User Message                 (on history_added, role=user, input_text)
+ *   ├── User Voice Input             (on history_added → history_updated, role=user, input_audio)
  *   ├── Generation                   (on turn_started → turn_done)
  *   │   └── Audio Out                (on audio → audio_done)
  *   ├── Tool Call: <name>            (on agent_tool_start → agent_tool_end)
@@ -17,23 +19,49 @@
  * (`turn_started`, `turn_done`, `audio`, `audio_done`) which are emitted by
  * the transport directly and carry pre-parsed, structured payloads.
  *
- * Usage (manual):
+ * Usage:
  * ```typescript
- * import { instrumentRealtimeSession } from 'weave';
+ * import { patchRealtimeSession } from 'weave';
  *
- * const session = new RealtimeSession(agent);
- * instrumentRealtimeSession(session);   // attach before connect
- * await session.connect({ apiKey });
+ * patchRealtimeSession(); // call once at app startup
+ * // Every new RealtimeSession(...) is now auto-instrumented
  * ```
  */
 
 import {getGlobalClient} from '../clientApi';
 import {uuidv7} from 'uuidv7';
 import type {RealtimeSessionLike} from './openai.realtime.agent.types';
+import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Wrap raw PCM16 mono audio into a WAV container.
+ * The OpenAI Realtime API streams 24 kHz, 16-bit, mono PCM.
+ */
+function pcmToWav(pcm: Buffer): Buffer {
+  const channels = 1;
+  const sampleRate = 24000;
+  const bitDepth = 16;
+  const wav = Buffer.alloc(44 + pcm.length);
+  wav.write('RIFF', 0);
+  wav.writeUInt32LE(36 + pcm.length, 4);
+  wav.write('WAVE', 8);
+  wav.write('fmt ', 12);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20); // PCM
+  wav.writeUInt16LE(channels, 22);
+  wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(sampleRate * channels * (bitDepth / 8), 28);
+  wav.writeUInt16LE(channels * (bitDepth / 8), 32);
+  wav.writeUInt16LE(bitDepth, 34);
+  wav.write('data', 36);
+  wav.writeUInt32LE(pcm.length, 40);
+  wav.set(pcm, 44); // Uint8Array.set — accepts ArrayLike<number>, no Buffer-copy type issues
+  return wav;
+}
 
 /**
  * Normalises a raw usage object (which may use camelCase or snake_case keys)
@@ -81,8 +109,6 @@ function normalizeUsage(u: Record<string, any>): Record<string, number> {
 /**
  * Attaches to a RealtimeSession and emits Weave calls for the session
  * lifecycle, each model generation turn, and audio output segments.
- *
- * Instantiate via `instrumentRealtimeSession(session)` rather than directly.
  */
 export class WeaveRealtimeTracingAdapter {
   // Session-level Weave call
@@ -99,6 +125,15 @@ export class WeaveRealtimeTracingAdapter {
   // Current Audio Out call and which responseId it belongs to
   private audioCallId: string | null = null;
   private audioResponseId: string | null = null;
+  // Accumulated PCM chunks per responseId — assembled into WAV on close
+  private audioChunks = new Map<string, Buffer[]>();
+
+  // In-flight voice input calls: itemId → Weave callId
+  private voiceInputCalls = new Map<string, string>();
+  // Accumulated user PCM chunks before input_audio_buffer.committed
+  private pendingAudioChunks: Buffer[] = [];
+  // Per-item user audio chunks after committed: itemId → chunks
+  private audioInputChunks = new Map<string, Buffer[]>();
 
   // In-flight tool calls: toolCallId → Weave callId
   private toolCalls = new Map<string, string>();
@@ -119,6 +154,9 @@ export class WeaveRealtimeTracingAdapter {
     this.session.transport.on('audio_done', this.onAudioDone);
     // Disconnect detection
     this.session.transport.on('connection_change', this.onConnectionChange);
+    // User text messages and voice turns
+    this.session.on('history_added', this.onHistoryAdded);
+    this.session.on('history_updated', this.onHistoryUpdated);
     // Tool calls
     this.session.on('agent_tool_start', this.onToolStart);
     this.session.on('agent_tool_end', this.onToolEnd);
@@ -135,10 +173,18 @@ export class WeaveRealtimeTracingAdapter {
     this.session.transport.off('audio', this.onAudio);
     this.session.transport.off('audio_done', this.onAudioDone);
     this.session.transport.off('connection_change', this.onConnectionChange);
+    this.session.off('history_added', this.onHistoryAdded);
+    this.session.off('history_updated', this.onHistoryUpdated);
     this.session.off('agent_tool_start', this.onToolStart);
     this.session.off('agent_tool_end', this.onToolEnd);
     // Close any calls left open
+    this.audioChunks.clear();
     this.closeAudioCall({});
+    this.pendingAudioChunks = [];
+    this.audioInputChunks.clear();
+    for (const [itemId] of this.voiceInputCalls) {
+      this.closeVoiceInputCall(itemId, null);
+    }
     for (const [responseId] of this.generationCalls) {
       this.closeGenerationCall(responseId, {status: 'detached'});
     }
@@ -166,6 +212,18 @@ export class WeaveRealtimeTracingAdapter {
         break;
       case 'session.updated':
         this.recordSessionUpdate(event.session ?? {});
+        break;
+      case 'input_audio_buffer.committed': {
+        const itemId: string | undefined = event.item_id;
+        if (itemId && this.pendingAudioChunks.length > 0) {
+          this.audioInputChunks.set(itemId, this.pendingAudioChunks.splice(0));
+        } else {
+          this.pendingAudioChunks = [];
+        }
+        break;
+      }
+      case 'input_audio_buffer.cleared':
+        this.pendingAudioChunks = [];
         break;
     }
   };
@@ -204,7 +262,13 @@ export class WeaveRealtimeTracingAdapter {
    */
   private onAudio = (event: any): void => {
     const responseId: string | undefined = event?.responseId;
-    if (responseId && this.audioCallId === null) {
+    if (!responseId) return;
+    // Accumulate raw PCM chunks
+    const chunks = this.audioChunks.get(responseId) ?? [];
+    chunks.push(Buffer.from(event.data as ArrayBuffer));
+    this.audioChunks.set(responseId, chunks);
+    // Open the Audio Out call on the first chunk
+    if (this.audioCallId === null) {
       this.openAudioCall(responseId);
     }
   };
@@ -220,14 +284,63 @@ export class WeaveRealtimeTracingAdapter {
   private onConnectionChange = (status: string): void => {
     if (status === 'disconnected') {
       // Close Audio Out and all open Generation calls (e.g. abrupt disconnect)
+      this.audioChunks.clear();
       this.closeAudioCall({});
+      this.pendingAudioChunks = [];
+      this.audioInputChunks.clear();
       for (const [responseId] of this.generationCalls) {
         this.closeGenerationCall(responseId, {status: 'disconnected'});
+      }
+      for (const [itemId] of this.voiceInputCalls) {
+        this.closeVoiceInputCall(itemId, null);
       }
       for (const [toolCallId] of this.toolCalls) {
         this.closeToolCall(toolCallId, {status: 'disconnected'});
       }
       this.closeSessionCall();
+    }
+  };
+
+  /**
+   * Emitted when a new item is added to the conversation history.
+   * - input_text items: record an instantaneous User Message call.
+   * - input_audio items: open a User Voice Input call (closed by onHistoryUpdated
+   *   once the transcript arrives).
+   */
+  private onHistoryAdded = (item: any): void => {
+    if (item?.type !== 'message' || item?.role !== 'user') return;
+
+    const content: any[] = item.content ?? [];
+    const hasText = content.some((c: any) => c.type === 'input_text');
+    const hasAudio = content.some((c: any) => c.type === 'input_audio');
+
+    if (hasText) {
+      const text = content
+        .filter((c: any) => c.type === 'input_text')
+        .map((c: any) => c.text)
+        .join('\n');
+      this.recordUserMessage(text);
+    } else if (hasAudio && item.itemId) {
+      this.openVoiceInputCall(item.itemId);
+    }
+  };
+
+  /**
+   * Emitted when any item in the conversation history is updated.
+   * Closes open User Voice Input calls once their transcript is finalized
+   * (item status reaches 'completed').
+   */
+  private onHistoryUpdated = (history: any[]): void => {
+    for (const item of history) {
+      if (!this.voiceInputCalls.has(item.itemId)) continue;
+      if (item.status !== 'completed') continue;
+
+      const transcript = (item.content ?? [])
+        .filter((c: any) => c.type === 'input_audio')
+        .map((c: any) => c.transcript ?? '')
+        .join('\n');
+
+      this.closeVoiceInputCall(item.itemId, transcript || null);
     }
   };
 
@@ -313,6 +426,92 @@ export class WeaveRealtimeTracingAdapter {
     this.sessionCallId = null;
     this.sessionTraceId = null;
     this.sessionStarted = false;
+  }
+
+  private recordUserMessage(text: string) {
+    const client = getGlobalClient();
+    if (!client || !this.sessionCallId || !this.sessionTraceId) return;
+
+    const callId = uuidv7();
+    const now = new Date().toISOString();
+
+    client.saveCallStart({
+      project_id: client.projectId,
+      id: callId,
+      op_name: 'realtime.user_message',
+      display_name: 'User Message',
+      trace_id: this.sessionTraceId,
+      parent_id: this.sessionCallId,
+      started_at: now,
+      inputs: {text},
+      attributes: {kind: 'agent'},
+    });
+
+    client.saveCallEnd({
+      project_id: client.projectId,
+      id: callId,
+      ended_at: now,
+      output: {},
+      summary: {},
+    });
+  }
+
+  private openVoiceInputCall(itemId: string) {
+    const client = getGlobalClient();
+    if (!client || !this.sessionCallId || !this.sessionTraceId) return;
+    if (this.voiceInputCalls.has(itemId)) return;
+
+    const callId = uuidv7();
+
+    client.saveCallStart({
+      project_id: client.projectId,
+      id: callId,
+      op_name: 'realtime.voice_input',
+      display_name: 'User Voice Input',
+      trace_id: this.sessionTraceId,
+      parent_id: this.sessionCallId,
+      started_at: new Date().toISOString(),
+      inputs: {},
+      attributes: {kind: 'agent'},
+    });
+
+    this.voiceInputCalls.set(itemId, callId);
+  }
+
+  /** Called by the `patchRealtimeSession` sendAudio wrapper to accumulate input PCM. */
+  public pushAudioChunk(audio: ArrayBuffer): void {
+    this.pendingAudioChunks.push(Buffer.from(audio));
+  }
+
+  private closeVoiceInputCall(itemId: string, transcript: string | null) {
+    const client = getGlobalClient();
+    const callId = this.voiceInputCalls.get(itemId);
+    if (!client || !callId) return;
+
+    const endedAt = new Date().toISOString();
+    this.voiceInputCalls.delete(itemId);
+    const chunks = this.audioInputChunks.get(itemId);
+    this.audioInputChunks.delete(itemId);
+
+    (async () => {
+      const output: Record<string, any> = {};
+      if (transcript !== null) output.transcript = transcript;
+      if (chunks && chunks.length > 0) {
+        try {
+          const pcm = Buffer.concat(chunks as unknown as Uint8Array[]);
+          output.audio = await client.serializeAudio(pcmToWav(pcm));
+        } catch {
+          // fall through with transcript only
+        }
+      }
+      client.saveCallEnd({
+        project_id: client.projectId,
+        id: callId,
+        ended_at: endedAt,
+        output,
+        summary: {},
+      });
+    })();
   }
 
   private recordSessionUpdate(sessionData: Record<string, any>) {
@@ -423,16 +622,35 @@ export class WeaveRealtimeTracingAdapter {
     const client = getGlobalClient();
     if (!client || !this.audioCallId) return;
 
-    client.saveCallEnd({
-      project_id: client.projectId,
-      id: this.audioCallId,
-      ended_at: new Date().toISOString(),
-      output,
-      summary: {},
-    });
-
+    // Snapshot and clear state immediately so re-entrant calls are safe
+    const callId = this.audioCallId;
+    const responseId = this.audioResponseId;
+    const endedAt = new Date().toISOString();
     this.audioCallId = null;
     this.audioResponseId = null;
+
+    const chunks = responseId ? this.audioChunks.get(responseId) : undefined;
+    if (responseId) this.audioChunks.delete(responseId);
+
+    (async () => {
+      let finalOutput = output;
+      if (chunks && chunks.length > 0) {
+        try {
+          const pcm = Buffer.concat(chunks as unknown as Uint8Array[]);
+          const audioRef = await client.serializeAudio(pcmToWav(pcm));
+          finalOutput = {...output, audio: audioRef};
+        } catch {
+          // fall through with original output
+        }
+      }
+      client.saveCallEnd({
+        project_id: client.projectId,
+        id: callId,
+        ended_at: endedAt,
+        output: finalOutput,
+        summary: {},
+      });
+    })();
   }
 
   private openToolCall(
@@ -482,23 +700,111 @@ export class WeaveRealtimeTracingAdapter {
 // Public API
 // ============================================================================
 
+let realtimeSessionPatched = false;
+
+function patchRealtimeSessionCommon(realtimeExports: any): void {
+  const OriginalSession = realtimeExports?.RealtimeSession;
+  if (!OriginalSession) return;
+
+  const PatchedSession = new Proxy(
+    OriginalSession,
+    (() => {
+      // Private symbol — stores the per-instance adapter directly on the session object.
+      // Lives in the IIFE closure so both the construct trap and the sendAudio wrapper share it.
+      const ADAPTER = Symbol('weave.realtimeAdapter');
+
+      // Patch sendAudio once, here in the IIFE body, so the wrapper captures ADAPTER.
+      const origSendAudio = OriginalSession.prototype.sendAudio as (
+        audio: ArrayBuffer,
+        opts?: {commit?: boolean}
+      ) => void;
+      OriginalSession.prototype.sendAudio = function (
+        this: any,
+        audio: ArrayBuffer,
+        opts?: {commit?: boolean}
+      ) {
+        (
+          this[ADAPTER] as WeaveRealtimeTracingAdapter | undefined
+        )?.pushAudioChunk(audio);
+        return origSendAudio.apply(this, [audio, opts]);
+      };
+
+      return {
+        construct(target: any, args: any[], newTarget: any) {
+          const instance = Reflect.construct(target, args, newTarget) as any;
+          instance[ADAPTER] = new WeaveRealtimeTracingAdapter(
+            instance as RealtimeSessionLike
+          );
+          return instance;
+        },
+      };
+    })()
+  );
+
+  Object.defineProperty(realtimeExports, 'RealtimeSession', {
+    value: PatchedSession,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
+function patchRealtimeExports(exports: any) {
+  if (!realtimeSessionPatched) {
+    realtimeSessionPatched = true;
+    patchRealtimeSessionCommon(exports);
+  }
+  return exports;
+}
+
 /**
- * Attach Weave tracing to a RealtimeSession instance.
+ * Register module loader hooks so `@openai/agents-realtime` is automatically patched
+ * when imported. Called once at Weave module load time via `hooks.ts`.
+ */
+export function instrumentOpenAIRealtimeAgent(): void {
+  addCJSInstrumentation({
+    moduleName: '@openai/agents-realtime',
+    subPath: 'dist/index.js',
+    version: '>= 0.4.12',
+    hook: patchRealtimeExports,
+  });
+  addESMInstrumentation({
+    moduleName: '@openai/agents-realtime',
+    version: '>= 0.4.12',
+    hook: patchRealtimeExports,
+  });
+}
+
+/**
+ * Manually patch the `RealtimeSession` class from `@openai/agents-realtime` so that
+ * every new instance is automatically traced by Weave.
  *
- * Call this immediately after creating the session, before `session.connect()`.
- * Returns the adapter so you can call `.detach()` if needed.
+ * **Note: You typically don't need to call this function!** `@openai/agents-realtime` is
+ * automatically instrumented via module loader hooks when you import Weave. This function
+ * is provided for edge cases where automatic instrumentation doesn't work (e.g. dynamic
+ * imports, bundlers that bypass hooks).
+ *
+ * Call this **once** at app startup, before any `RealtimeSession` is constructed.
+ * The function is idempotent — safe to call multiple times.
  *
  * @example
  * ```typescript
- * import { instrumentRealtimeSession } from 'weave';
- *
- * const session = new RealtimeSession(agent);
- * instrumentRealtimeSession(session);
- * await session.connect({ apiKey: process.env.OPENAI_API_KEY });
+ * import { patchRealtimeSession } from 'weave';
+ * patchRealtimeSession();
+ * // Every new RealtimeSession(...) is now auto-instrumented
  * ```
  */
-export function instrumentRealtimeSession(
-  session: any
-): WeaveRealtimeTracingAdapter {
-  return new WeaveRealtimeTracingAdapter(session as RealtimeSessionLike);
+export function patchRealtimeSession(): void {
+  if (realtimeSessionPatched) return;
+  realtimeSessionPatched = true;
+
+  let realtimeExports: any;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    realtimeExports = require('@openai/agents-realtime');
+  } catch {
+    // @openai/agents-realtime is not installed — skip patching
+    return;
+  }
+  patchRealtimeSessionCommon(realtimeExports);
 }
