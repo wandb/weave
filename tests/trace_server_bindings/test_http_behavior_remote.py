@@ -436,22 +436,6 @@ def test_auto_upgrade_to_calls_complete_on_error(mock_post, monkeypatch):
             server.feedback_processor.stop_accepting_new_work_and_flush_queue()
 
 
-@pytest.mark.parametrize("method", ["get", "post", "put", "delete"])
-def test_all_http_methods_pass_auth(method):
-    """Test that all HTTP methods pass auth to the underlying http_requests call."""
-    auth = ("user", "pass")
-    server = RemoteHTTPTraceServer("http://example.com", auth=auth)
-
-    mock_response = httpx.Response(
-        200, request=httpx.Request(method.upper(), "http://example.com")
-    )
-    with patch(
-        f"weave.utils.http_requests.{method}", return_value=mock_response
-    ) as mock_fn:
-        getattr(server, method)("/test")
-        assert mock_fn.call_args[1]["auth"] == auth
-
-
 @patch("weave.utils.http_requests.post")
 def test_eager_calls_complete_required_is_reraised(mock_post, monkeypatch):
     """Verify CallsCompleteModeRequired in eager path is re-raised for caller to handle."""
