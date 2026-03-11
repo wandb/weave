@@ -2394,6 +2394,7 @@ class WeaveClient:
                 row_digests=all_row_digests,
             )
 
+        # Wait for all chunks, then combine their digests into a single table
         return self.future_executor.then(chunk_futures, combine_chunks_and_create_table)
 
     def _create_table_with_incremental_updates(
