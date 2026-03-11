@@ -1,7 +1,10 @@
 import abc
+import logging
 import typing
 from collections.abc import Callable, Iterator
 from typing import TypeVar
+
+logger = logging.getLogger(__name__)
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
@@ -80,6 +83,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 pid = getattr(sub, "project_id", None)
                 if isinstance(pid, str):
                     return pid
+        logger.warning(
+            "Could not extract internal project_id from %s; "
+            "cross-project internal refs will use the expensive verify path.",
+            type(req).__name__,
+        )
         return None
 
     def _verify_internal_project_id(self, project_id: str) -> bool:
