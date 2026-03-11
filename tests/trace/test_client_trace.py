@@ -2781,6 +2781,26 @@ def test_call_query_stream_trace_name_column_with_costs(client):
     assert calls[0].summary.get("weave", {}).get("costs") is not None
     assert "my_traced_op" in calls[0].summary["weave"]["trace_name"]
 
+    # Also test sorting by trace_name with costs (regression: sorting by
+    # summary.weave.trace_name with include_costs on calls_complete failed
+    # with UNKNOWN_IDENTIFIER because the computed column wasn't in the
+    # all_calls CTE SELECT).
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                columns=["id"],
+                include_costs=True,
+                sort_by=[
+                    tsi.SortBy(field="summary.weave.trace_name", direction="desc")
+                ],
+            )
+        )
+    )
+    assert len(calls) == 1
+    assert calls[0].summary is not None
+    assert calls[0].summary.get("weave", {}).get("costs") is not None
+
 
 def test_read_call_start_with_cost(client):
     if client_is_sqlite(client):
@@ -6424,6 +6444,56 @@ def test_calls_query_sort_by_agg_field_with_costs(client):
     )
     assert len(calls) == 2
     assert calls[0].id == call_b.id  # "beta" sorts before "alpha" desc
+    assert calls[1].id == call_a.id
+
+
+def test_calls_query_sort_by_trace_name_with_costs(client):
+    """Test sorting by summary.weave.trace_name with costs enabled.
+
+    Regression test: on calls_complete, sorting by summary.weave.trace_name
+    with include_costs=True failed with UNKNOWN_IDENTIFIER because the
+    computed trace_name column wasn't included in the all_calls CTE SELECT.
+    """
+
+    @weave.op
+    def alpha_op(x: int) -> int:
+        return x
+
+    @weave.op
+    def beta_op(x: int) -> int:
+        return x
+
+    _, call_a = alpha_op.call(1)
+    _, call_b = beta_op.call(2)
+
+    filter = tsi.CallsFilter(call_ids=[call_a.id, call_b.id])
+
+    # Sort by trace_name ascending with costs
+    sort_by = [{"field": "summary.weave.trace_name", "direction": "asc"}]
+    calls = list(
+        client.get_calls(
+            sort_by=sort_by,
+            columns=["id"],
+            filter=filter,
+            include_costs=True,
+        )
+    )
+    assert len(calls) == 2
+    assert calls[0].id == call_a.id  # "alpha_op" sorts before "beta_op"
+    assert calls[1].id == call_b.id
+
+    # Sort descending
+    sort_by = [{"field": "summary.weave.trace_name", "direction": "desc"}]
+    calls = list(
+        client.get_calls(
+            sort_by=sort_by,
+            columns=["id"],
+            filter=filter,
+            include_costs=True,
+        )
+    )
+    assert len(calls) == 2
+    assert calls[0].id == call_b.id  # "beta_op" sorts before "alpha_op" desc
     assert calls[1].id == call_a.id
 
 
