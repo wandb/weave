@@ -445,8 +445,8 @@ class WeaveClient:
                 fut.result()
             except Exception:
                 pass  # Errors are handled by the validation callback
-            with self._inflight_obj_saves_lock:
-                self._inflight_obj_saves.pop(key, None)
+            # Note: cleanup is handled by _on_obj_save_done callback.
+            # Popping here would race with a new save for the same key.
 
     @trace_sentry.global_trace_sentry.watch()
     def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
