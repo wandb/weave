@@ -257,17 +257,7 @@ def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, ObjectRecord):
         # Here, we expect ref to be empty since it would have short circuited
         # above with `_get_direct_ref`
-        #
-        # Preserve _class_name as a plain string before mapping.  When the
-        # record comes from a deserialized WeaveObject, _class_name may be a
-        # BoxedStr (str subclass with an attached sub-ref).  map_to_refs would
-        # replace it with an ObjectRef, losing the original string value that
-        # to_json needs for the "_type" key.
-        saved_class_name = str(obj._class_name)
-        result = _remove_empty_ref(obj.map_values(map_to_refs))
-        if not isinstance(result._class_name, str):
-            result.__dict__["_class_name"] = saved_class_name
-        return result
+        return _remove_empty_ref(obj.map_values(map_to_refs))
     elif isinstance(obj, pydantic.BaseModel):
         # Check if this object has a custom serializer registered
         from weave.trace.serialization.serializer import get_serializer_for_obj
@@ -390,21 +380,10 @@ class WeaveClient:
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
-        # Eagerly resolve internal project ID for the initial project.
-        # _internal_project_id is a property that re-resolves when project changes.
-        self._cached_internal_project_id = self._resolve_internal_project_id()
-        self._cached_internal_project_id_for = self._project_id()
-        if self._cached_internal_project_id is not None:
-            logger.debug(
-                "Client digest: initialized with internal_project_id=%s for %s (fast path enabled)",
-                self._cached_internal_project_id,
-                self._cached_internal_project_id_for,
-            )
-        else:
-            logger.debug(
-                "Client digest: internal_project_id is None for %s (using fallback path)",
-                self._cached_internal_project_id_for,
-            )
+        # Lazily resolve internal project ID on first access via the
+        # _internal_project_id property to avoid adding startup latency.
+        self._cached_internal_project_id: str | None = None
+        self._cached_internal_project_id_for: str | None = None
 
     ################ High Level Convenience Methods ################
 
