@@ -1972,11 +1972,17 @@ class WeaveClient:
                 ref.uri(),
             )
 
+            # Capture entity/project now so the deferred closure doesn't read
+            # stale values if self.entity or self.project are reassigned later.
+            project_id = self.entity + "/" + self.project
+
             # Fire-and-forget: send to server with expected_digest for validation
-            def send_obj_create() -> ObjCreateRes:
+            def send_obj_create(
+                _project_id: str = project_id,
+            ) -> ObjCreateRes:
                 req = ObjCreateReq(
                     obj=ObjSchemaForInsert(
-                        project_id=self.entity + "/" + self.project,
+                        project_id=_project_id,
                         object_id=name,
                         val=json_val,
                         expected_digest=digest,
@@ -1988,7 +1994,7 @@ class WeaveClient:
                 send_obj_create
             )
             ref_uri = ref.uri()
-            save_key = (self.entity + "/" + self.project, name, digest)
+            save_key = (project_id, name, digest)
             with self._inflight_obj_saves_lock:
                 self._inflight_obj_saves[save_key] = res_future
 
