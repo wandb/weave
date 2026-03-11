@@ -7,8 +7,10 @@ on the server (fallback path) for various object and table shapes.
 from __future__ import annotations
 
 import logging
+import threading
 
 import pytest
+from PIL import Image
 
 import weave
 from weave.trace.refs import ObjectRef, OpRef, TableRef
@@ -358,7 +360,7 @@ def test_digest_mismatch_warning_disables_fast_path_for_session(
     client._flush()
 
     assert seen_expected_digests == [first_ref.digest]
-    assert client._client_side_digests_disabled_for_session is True
+    assert client._client_side_digests_disabled_event.is_set()
     assert client._internal_project_id is None
     assert any(
         "disabling fast path for this session" in record.getMessage()
@@ -439,3 +441,155 @@ def test_object_with_ref_digest_matches(client: WeaveClient):
     )
 
     assert digest_fast == digest_fallback
+
+
+def test_custom_weave_type_round_trip_fast_path(client: WeaveClient):
+    """A CustomWeaveType (PIL Image) published via fast path can be read back."""
+    parse_and_apply_settings(UserSettings(enable_client_side_digests=True))
+    client._invalidate_project_cache()
+
+    img = Image.new("RGB", (32, 32), color=(255, 0, 0))
+    ref = weave.publish(img, name="fast_path_image")
+    client._flush()
+
+    got = ref.get()
+    assert isinstance(got, Image.Image)
+    assert got.size == (32, 32)
+    assert got.getpixel((0, 0)) == (255, 0, 0)
+
+
+def test_custom_weave_type_digest_matches_across_paths(client: WeaveClient):
+    """A CustomWeaveType (PIL Image) produces the same digest on both paths."""
+    img_fast = Image.new("RGB", (16, 16), color=(0, 128, 255))
+    digest_fast = _publish_with_digests(client, img_fast, "img_fast", enable=True)
+
+    img_fallback = Image.new("RGB", (16, 16), color=(0, 128, 255))
+    digest_fallback = _publish_with_digests(
+        client, img_fallback, "img_fallback", enable=False
+    )
+
+    assert digest_fast == digest_fallback
+
+
+# ---------------------------------------------------------------------------
+# Regression tests for concurrency / closure fixes
+# ---------------------------------------------------------------------------
+
+
+def test_inflight_save_does_not_lose_second_future(client: WeaveClient) -> None:
+    """Regression: _wait_for_inflight_save must not pop a newer future for the same key.
+
+    If two saves produce the same (project, name, digest) key, the callback on
+    the first future is the only thing that should remove the entry.  A get()
+    that waits on the first future must NOT pop the key, because by then the
+    dict may hold the *second* future.
+    """
+    parse_and_apply_settings(UserSettings(enable_client_side_digests=True))
+    client._invalidate_project_cache()
+
+    obj = {"stable": "value"}
+
+    # First save — produces a ref and enqueues a future.
+    ref1 = client._save_object(obj, "same_key_obj")
+    client._flush()
+
+    # Second save of the identical object — same key in _inflight_obj_saves.
+    ref2 = client._save_object(obj, "same_key_obj")
+    assert ref1.digest == ref2.digest, "Same content should yield the same digest"
+
+    # get() calls _wait_for_inflight_save internally.  Before the fix, this
+    # would pop the second future's entry.
+    got = client.get(ref2)
+    assert got is not None
+
+    # The object should be fully readable — no stale future left behind.
+    got2 = client.get(ref1)
+    assert got2 is not None
+
+
+def test_fast_path_closure_captures_project_eagerly(
+    client: WeaveClient, monkeypatch
+) -> None:
+    """Regression: the deferred send_obj_create must use the project_id captured
+    at save time, not whatever self.project is when the closure eventually runs.
+    """
+    parse_and_apply_settings(UserSettings(enable_client_side_digests=True))
+    client._invalidate_project_cache()
+
+    original_project = client.project
+
+    # Intercept obj_create to record the project_id used.
+    captured_project_ids: list[str] = []
+    original_obj_create = client.server.obj_create
+
+    def recording_obj_create(req: tsi.ObjCreateReq):
+        captured_project_ids.append(req.obj.project_id)
+        return original_obj_create(req)
+
+    monkeypatch.setattr(client.server, "obj_create", recording_obj_create)
+
+    # Save an object while project is "A".
+    ref = client._save_object({"data": 1}, "capture_test")
+
+    # Mutate project BEFORE the deferred closure has a chance to run.
+    # (In practice the executor may not have started yet.)
+    client.project = "mutated-project"
+
+    # Flush forces the deferred closure to execute.
+    client._flush()
+
+    # Restore for cleanup.
+    client.project = original_project
+
+    # The request must have used the original project, not "mutated-project".
+    assert len(captured_project_ids) == 1
+    assert captured_project_ids[0] == f"{client.entity}/{original_project}"
+
+
+@pytest.mark.disable_logging_error_check
+def test_concurrent_digest_mismatch_disables_once(
+    client: WeaveClient, monkeypatch, caplog
+) -> None:
+    """Regression: multiple concurrent mismatches should disable the fast path
+    exactly once, and subsequent saves should all use the fallback path.
+    """
+    parse_and_apply_settings(UserSettings(enable_client_side_digests=True))
+    client._invalidate_project_cache()
+
+    original_obj_create = client.server.server.obj_create
+    call_count_lock = threading.Lock()
+    call_count = 0
+
+    def always_mismatch(req: tsi.ObjCreateReq):
+        nonlocal call_count
+        with call_count_lock:
+            call_count += 1
+        if req.obj.expected_digest is not None:
+            raise DigestMismatchError("forced mismatch")
+        return original_obj_create(req)
+
+    monkeypatch.setattr(client.server.server, "obj_create", always_mismatch)
+    caplog.set_level(logging.WARNING, logger="weave.trace.weave_client")
+
+    # Fire off a save that will trigger the mismatch.
+    weave.publish({"trigger": True}, name="concurrent-mismatch-1")
+    client._flush()
+
+    assert client._client_side_digests_disabled_event.is_set()
+
+    # A second save should use the fallback path (expected_digest=None)
+    # and succeed without raising.
+    ref2 = weave.publish({"after": True}, name="concurrent-mismatch-2")
+    client._flush()
+
+    # Verify the second save went through the fallback path.
+    got = ref2.get()
+    assert got["after"] is True
+
+    # The warning should appear exactly once.
+    mismatch_warnings = [
+        r
+        for r in caplog.records
+        if "disabling fast path for this session" in r.getMessage()
+    ]
+    assert len(mismatch_warnings) == 1
