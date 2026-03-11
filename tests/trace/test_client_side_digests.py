@@ -17,8 +17,8 @@ from weave.trace.refs import ObjectRef, OpRef, TableRef
 from weave.trace.serialization.serialize import to_json
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.errors import DigestMismatchError
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import DigestMismatchError
 
 
 @pytest.fixture(autouse=True)
