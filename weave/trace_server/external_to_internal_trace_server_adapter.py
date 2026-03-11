@@ -90,30 +90,34 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         )
         return None
 
-    def _verify_internal_project_id(self, project_id: str) -> bool:
-        """Check if the current user has access to the given internal project.
+    def _make_project_verifier(self, req: typing.Any) -> Callable[[str], bool]:
+        """Build a verifier that accepts internal project IDs for a request.
 
-        Used to verify cross-project internal refs that the client converted.
-        Returns True if the project is accessible, False otherwise.
-
-        NOTE: int_to_ext_project_id checks *read* access. A user with
-        read-only access to Project B can therefore embed refs to B inside
-        objects they *write* to Project A. If the access model requires
-        write access to referenced projects, this should be tightened.
+        The returned callback accepts the request's own project_id via a fast
+        set lookup, and falls back to an access check (int_to_ext_project_id)
+        for cross-project refs.
         """
-        return self._idc.int_to_ext_project_id(project_id) is not None
+        pid = self._extract_internal_project_id(req)
+        allowed: set[str] = {pid} if pid else set()
+
+        def verify(project_id: str) -> bool:
+            if project_id in allowed:
+                return True
+            # Cross-project ref: check that the user has access.
+            # NOTE: int_to_ext_project_id checks *read* access. A user with
+            # read-only access to Project B can therefore embed refs to B
+            # inside objects they *write* to Project A. If the access model
+            # requires write access to referenced projects, this should be
+            # tightened.
+            return self._idc.int_to_ext_project_id(project_id) is not None
+
+        return verify
 
     def _ref_apply(self, method: Callable[[A], B], req: A) -> B:
-        # Auto-detect the request's internal project_id so that client-computed
-        # internal refs for the SAME project are accepted.  Cross-project
-        # internal refs are verified via int_to_ext_project_id (checks access).
-        pid = self._extract_internal_project_id(req)
-        allowed = {pid} if pid else None
         req_conv = universal_ext_to_int_ref_converter(
             req,
             self._idc.ext_to_int_project_id,
-            allowed_internal_project_ids=allowed,
-            verify_internal_project_id=self._verify_internal_project_id,
+            verify_internal_project_id=self._make_project_verifier(req),
         )
         res = method(req_conv)
         res_conv = universal_int_to_ext_ref_converter(
@@ -125,13 +129,10 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         self, method: Callable[[A], Iterator[B]], req: A
     ) -> Iterator[B]:
         """Stream results while converting internal refs to external refs."""
-        pid = self._extract_internal_project_id(req)
-        allowed = {pid} if pid else None
         req_conv = universal_ext_to_int_ref_converter(
             req,
             self._idc.ext_to_int_project_id,
-            allowed_internal_project_ids=allowed,
-            verify_internal_project_id=self._verify_internal_project_id,
+            verify_internal_project_id=self._make_project_verifier(req),
         )
         res = method(req_conv)
 
@@ -516,8 +517,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req = universal_ext_to_int_ref_converter(
             req,
             self._idc.ext_to_int_project_id,
-            allowed_internal_project_ids={req.project_id},
-            verify_internal_project_id=self._verify_internal_project_id,
+            verify_internal_project_id=self._make_project_verifier(req),
         )
         # The streamed chunks contain no project-scoped references, so we can
         # forward directly without additional ref conversion.
