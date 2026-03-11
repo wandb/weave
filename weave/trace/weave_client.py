@@ -2072,6 +2072,7 @@ class WeaveClient:
     def _invalidate_project_cache(self) -> None:
         """Force re-resolution of the internal project ID on next access."""
         self._cached_internal_project_id_for = None
+        self._client_side_digests_enabled = should_enable_client_side_digests()
 
     def _disable_client_side_digests_after_validation_error(
         self, exc: BaseException, ref_uri: str
