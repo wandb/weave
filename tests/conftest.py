@@ -2,7 +2,6 @@ import contextlib
 import json
 import logging
 import os
-import typing
 from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -325,7 +324,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 def create_client(
     request,
     trace_server,
-    global_attributes: dict[str, typing.Any] | None = None,
+    global_attributes: dict[str, Any] | None = None,
 ) -> weave_client.WeaveClient:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "prod":
@@ -386,7 +385,7 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
 
     @contextlib.contextmanager
     def client(
-        global_attributes: dict[str, typing.Any] | None = None,
+        global_attributes: dict[str, Any] | None = None,
         settings: weave.trace.settings.UserSettings | None = None,
     ):
         if settings is not None:

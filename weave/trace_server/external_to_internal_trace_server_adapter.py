@@ -1,7 +1,6 @@
 import abc
-import typing
 from collections.abc import Callable, Iterator
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
@@ -62,7 +61,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         self._internal_trace_server = internal_trace_server
         self._idc = id_converter
 
-    def __getattr__(self, name: str) -> typing.Any:
+    def __getattr__(self, name: str) -> Any:
         return getattr(self._internal_trace_server, name)
 
     def _ref_apply(self, method: Callable[[A], B], req: A) -> B:
@@ -449,7 +448,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     # Streaming completions – simply proxy through after converting project ID.
     def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
-    ) -> typing.Iterator[dict[str, typing.Any]]:
+    ) -> Iterator[dict[str, Any]]:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         # Convert any refs in the request (e.g., prompt) to internal format
         req = universal_ext_to_int_ref_converter(req, self._idc.ext_to_int_project_id)
