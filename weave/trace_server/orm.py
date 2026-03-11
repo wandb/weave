@@ -86,13 +86,7 @@ class ParamBuilder:
 
 
 Value: TypeAlias = (
-    str
-    | float
-    | datetime.datetime
-    | list[str]
-    | list[float]
-    | dict[str, Any]
-    | None
+    str | float | datetime.datetime | list[str] | list[float] | dict[str, Any] | None
 )
 Row: TypeAlias = dict[str, Value]
 Rows: TypeAlias = list[Row]
