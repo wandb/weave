@@ -3,7 +3,6 @@ import pytest
 import weave
 from tests.trace.test_evaluate import Dataset
 from weave.trace.context.tests_context import raise_on_captured_errors
-from weave.trace.settings import UserSettings
 
 
 def test_basic_dataset_lifecycle(client):
@@ -53,100 +52,82 @@ def _expected_client_init_log() -> list[str]:
     ]
 
 
-@pytest.mark.parametrize(
-    "enable_client_side_digests",
-    [
-        pytest.param(False, id="client_side_digests_off"),
-        pytest.param(True, id="client_side_digests_on"),
-    ],
-)
-def test_dataset_laziness(client_creator, enable_client_side_digests):
+def test_dataset_laziness(digest_params_client):
     """The intention of this test is to show that local construction of
     a dataset does not trigger any remote operations.
     """
-    with client_creator(
-        settings=UserSettings(enable_client_side_digests=enable_client_side_digests)
-    ) as client:
-        dataset = Dataset(rows=[{"input": i} for i in range(300)])
-        log = client.server.attribute_access_log
-        assert _top_level_logs(log) == _expected_client_init_log()
-        client.server.attribute_access_log = []
+    client, _enable_client_side_digests = digest_params_client
+    dataset = Dataset(rows=[{"input": i} for i in range(300)])
+    log = client.server.attribute_access_log
+    assert _top_level_logs(log) == _expected_client_init_log()
+    client.server.attribute_access_log = []
 
-        length = len(dataset)
+    length = len(dataset)
+    log = client.server.attribute_access_log
+    assert _top_level_logs(log) == []
+
+    length2 = len(dataset)
+    log = client.server.attribute_access_log
+    assert _top_level_logs(log) == []
+
+    assert length == length2
+
+    for _row in dataset:
         log = client.server.attribute_access_log
         assert _top_level_logs(log) == []
 
-        length2 = len(dataset)
-        log = client.server.attribute_access_log
-        assert _top_level_logs(log) == []
 
-        assert length == length2
-
-        for _row in dataset:
-            log = client.server.attribute_access_log
-            assert _top_level_logs(log) == []
-
-
-@pytest.mark.parametrize(
-    "enable_client_side_digests",
-    [
-        pytest.param(False, id="client_side_digests_off"),
-        pytest.param(True, id="client_side_digests_on"),
-    ],
-)
-def test_published_dataset_laziness(client_creator, enable_client_side_digests):
+def test_published_dataset_laziness(digest_params_client):
     """The intention of this test is to show that publishing a dataset,
     then iterating through the "gotten" version of the dataset has
     minimal remote operations - and importantly delays the fetching
     of the rows until they are actually needed.
     """
-    with client_creator(
-        settings=UserSettings(enable_client_side_digests=enable_client_side_digests)
-    ) as client:
-        dataset = Dataset(rows=[{"input": i} for i in range(300)])
+    client, enable_client_side_digests = digest_params_client
+    dataset = Dataset(rows=[{"input": i} for i in range(300)])
+    log = client.server.attribute_access_log
+    assert _top_level_logs(log) == _expected_client_init_log()
+    client.server.attribute_access_log = []
+
+    ref = weave.publish(dataset)
+    log = client.server.attribute_access_log
+    # publish creates a table and an object.
+    expected_publish_log = ["table_create", "obj_create"]
+    # When client-side digests are enabled, the first operation that
+    # needs _internal_project_id triggers lazy projects_info resolution.
+    if enable_client_side_digests:
+        expected_publish_log = ["projects_info"] + expected_publish_log
+    assert _top_level_logs(log) == expected_publish_log
+    client.server.attribute_access_log = []
+
+    # Getting a published dataset reads the object metadata.
+    dataset = ref.get()
+    log = client.server.attribute_access_log
+    assert _top_level_logs(log) == ["obj_read"]
+    client.server.attribute_access_log = []
+
+    # First len() call fetches table stats; subsequent calls are cached.
+    length = len(dataset)
+    log = client.server.attribute_access_log
+    assert _top_level_logs(log) == ["table_query_stats"]
+    client.server.attribute_access_log = []
+
+    length2 = len(dataset)
+    log = client.server.attribute_access_log
+    assert _top_level_logs(log) == []
+
+    assert length == length2
+
+    for i, _row in enumerate(dataset):
         log = client.server.attribute_access_log
-        assert _top_level_logs(log) == _expected_client_init_log()
-        client.server.attribute_access_log = []
-
-        ref = weave.publish(dataset)
-        log = client.server.attribute_access_log
-        # publish creates a table and an object.
-        expected_publish_log = ["table_create", "obj_create"]
-        # When client-side digests are enabled, the first operation that
-        # needs _internal_project_id triggers lazy projects_info resolution.
-        if enable_client_side_digests:
-            expected_publish_log = ["projects_info"] + expected_publish_log
-        assert _top_level_logs(log) == expected_publish_log
-        client.server.attribute_access_log = []
-
-        # Getting a published dataset reads the object metadata.
-        dataset = ref.get()
-        log = client.server.attribute_access_log
-        assert _top_level_logs(log) == ["obj_read"]
-        client.server.attribute_access_log = []
-
-        # First len() call fetches table stats; subsequent calls are cached.
-        length = len(dataset)
-        log = client.server.attribute_access_log
-        assert _top_level_logs(log) == ["table_query_stats"]
-        client.server.attribute_access_log = []
-
-        length2 = len(dataset)
-        log = client.server.attribute_access_log
-        assert _top_level_logs(log) == []
-
-        assert length == length2
-
-        for i, _row in enumerate(dataset):
-            log = client.server.attribute_access_log
-            # This is the critical part of the test - ensuring that
-            # the rows are only fetched when they are actually needed.
-            #
-            # In a future improvement, we might eagerly fetch the next
-            # page of results, which would result in this assertion changing
-            # in that there would always be one more "table_query" than
-            # the number of pages.
-            assert _top_level_logs(log) == ["table_query"] * ((i // 100) + 1)
+        # This is the critical part of the test - ensuring that
+        # the rows are only fetched when they are actually needed.
+        #
+        # In a future improvement, we might eagerly fetch the next
+        # page of results, which would result in this assertion changing
+        # in that there would always be one more "table_query" than
+        # the number of pages.
+        assert _top_level_logs(log) == ["table_query"] * ((i // 100) + 1)
 
 
 def test_dataset_from_calls(client):

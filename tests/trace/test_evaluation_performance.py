@@ -11,7 +11,6 @@ import pytest
 import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context.tests_context import raise_on_captured_errors
-from weave.trace.settings import UserSettings
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
@@ -143,61 +142,52 @@ def _expected_evaluation_counts(enable_client_side_digests: bool) -> Counter[str
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "enable_client_side_digests",
-    [
-        pytest.param(False, id="client_side_digests_off"),
-        pytest.param(True, id="client_side_digests_on"),
-    ],
-)
-async def test_evaluation_performance(client_creator, enable_client_side_digests):
-    with client_creator(
-        settings=UserSettings(enable_client_side_digests=enable_client_side_digests)
-    ) as client:
-        mode = "on" if enable_client_side_digests else "off"
-        # This test asserts exact create counts, so it needs a fresh project
-        # namespace instead of reusing objects from prior suite runs.
-        client.project = f"test_evaluation_performance_{mode}_{uuid.uuid4().hex[:8]}"
-        evaluation, predict = build_evaluation()
+async def test_evaluation_performance(digest_params_client):
+    client, enable_client_side_digests = digest_params_client
+    mode = "on" if enable_client_side_digests else "off"
+    # This test asserts exact create counts, so it needs a fresh project
+    # namespace instead of reusing objects from prior suite runs.
+    client.project = f"test_evaluation_performance_{mode}_{uuid.uuid4().hex[:8]}"
+    evaluation, predict = build_evaluation()
 
-        # Warm the _internal_project_id cache for the new project so that the
-        # paused_client block (which holds a non-reentrant lock on the server)
-        # does not deadlock when create_call lazily resolves the project id.
-        _ = client._internal_project_id
+    # Warm the _internal_project_id cache for the new project so that the
+    # paused_client block (which holds a non-reentrant lock on the server)
+    # does not deadlock when create_call lazily resolves the project id.
+    _ = client._internal_project_id
 
-        log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
+    log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
-        gold_log = _expected_client_init_log(
-            enable_client_side_digests,
-            include_project_reresolution=True,
-        )
+    gold_log = _expected_client_init_log(
+        enable_client_side_digests,
+        include_project_reresolution=True,
+    )
+    assert log == gold_log
+
+    with paused_client(client) as paused_client_instance:
+        res = await evaluation.evaluate(predict)
+        assert res["score"]["true_count"] == 1
+        log = [
+            l
+            for l in paused_client_instance.server.attribute_access_log
+            if not l.startswith("_")
+        ]
         assert log == gold_log
 
-        with paused_client(client) as paused_client_instance:
-            res = await evaluation.evaluate(predict)
-            assert res["score"]["true_count"] == 1
-            log = [
-                l
-                for l in paused_client_instance.server.attribute_access_log
-                if not l.startswith("_")
-            ]
-            assert log == gold_log
+    log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
-        log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
+    counts = Counter(log)
 
-        counts = Counter(log)
+    # Tim: This is very specific and intentional, please don't change
+    # this unless you are sure that is the expected behavior.
+    assert counts == _expected_evaluation_counts(enable_client_side_digests)
 
-        # Tim: This is very specific and intentional, please don't change
-        # this unless you are sure that is the expected behavior.
-        assert counts == _expected_evaluation_counts(enable_client_side_digests)
+    calls = client.get_calls()
+    objects = client._objects()
 
-        calls = client.get_calls()
-        objects = client._objects()
-
-        assert (
-            len(list(calls)) == 14
-        )  # eval, summary, 4 predict_and_score, 4 predicts, 4 scores
-        assert len(list(objects)) == 3  # model, dataset, evaluation
+    assert (
+        len(list(calls)) == 14
+    )  # eval, summary, 4 predict_and_score, 4 predicts, 4 scores
+    assert len(list(objects)) == 3  # model, dataset, evaluation
 
 
 @pytest.mark.asyncio

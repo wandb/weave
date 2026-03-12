@@ -6,6 +6,21 @@ import pytest
 
 from tests.trace.test_utils import FailingSaveType, failing_load, failing_save
 from weave.trace.serialization import serializer
+from weave.trace.settings import UserSettings
+
+
+@pytest.fixture(
+    params=[
+        pytest.param(False, id="client_side_digests_off"),
+        pytest.param(True, id="client_side_digests_on"),
+    ],
+)
+def digest_params_client(client_creator, request):
+    """Yield (client, enable_client_side_digests) for both digest modes."""
+    with client_creator(
+        settings=UserSettings(enable_client_side_digests=request.param)
+    ) as client:
+        yield client, request.param
 
 
 @pytest.fixture
