@@ -9,11 +9,13 @@ from __future__ import annotations
 import logging
 import threading
 
+import httpx
 import pytest
 from PIL import Image
 
 import weave
 from weave.shared.digest import compute_row_digest, compute_table_digest
+from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.refs import ObjectRef, OpRef, TableRef
 from weave.trace.serialization.serialize import to_json
 from weave.trace.settings import (
@@ -40,7 +42,6 @@ def fast_path(client: WeaveClient):
     Teardown is handled by the autouse ``_reset_settings`` fixture.
     """
     _configure_digests(client, enable=True)
-    yield
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +363,49 @@ def test_digest_mismatch_warning_disables_fast_path_for_session(
     )
 
     weave.publish({"second": True}, name="digest-mismatch-second")
+    client._flush()
+
+    assert seen_expected_digests == [first_ref.digest, None]
+
+
+@pytest.mark.disable_logging_error_check
+def test_http_422_warning_disables_fast_path_for_session(
+    client: WeaveClient, fast_path: None, monkeypatch, caplog
+) -> None:
+    """A fast-path 422 should also disable later digest-bearing requests."""
+    original_obj_create = client.server.server.obj_create
+    seen_expected_digests: list[str | None] = []
+    request = httpx.Request("POST", "https://example.invalid/obj/create")
+    response = httpx.Response(422, request=request)
+    injected_422 = False
+
+    def obj_create_with_422(req: tsi.ObjCreateReq):
+        nonlocal injected_422
+        seen_expected_digests.append(req.obj.expected_digest)
+        if not injected_422 and req.obj.expected_digest is not None:
+            injected_422 = True
+            raise httpx.HTTPStatusError(
+                "unprocessable", request=request, response=response
+            )
+        return original_obj_create(req)
+
+    monkeypatch.setattr(client.server.server, "obj_create", obj_create_with_422)
+    caplog.set_level(logging.WARNING, logger="weave.trace.weave_client")
+
+    first_ref = weave.publish({"first": True}, name="http-422-first")
+    client._flush()
+
+    assert seen_expected_digests == [first_ref.digest]
+    assert client._client_side_digests_disabled_event.is_set()
+    assert client._internal_project_id is None
+    assert any(
+        "disabling fast path for this session" in record.getMessage()
+        and first_ref.uri() in record.getMessage()
+        for record in caplog.records
+        if record.name == "weave.trace.weave_client"
+    )
+
+    weave.publish({"second": True}, name="http-422-second")
     client._flush()
 
     assert seen_expected_digests == [first_ref.digest, None]
@@ -781,6 +825,78 @@ def test_fast_path_closure_captures_project_eagerly(
     assert captured_project_ids[0] == f"{client.entity}/{original_project}"
 
 
+def test_table_fast_path_captures_project_eagerly(
+    client: WeaveClient, fast_path: None, monkeypatch
+) -> None:
+    """Regression: deferred table writes must use the project captured at save time."""
+    original_project = client.project
+    original_executor = client.future_executor
+    client.set_autoflush(False)
+    client.future_executor = FutureExecutor(max_workers=1)
+    block = threading.Event()
+
+    captured_table_project_ids: list[str] = []
+    captured_obj_project_ids: list[str] = []
+    original_send_table_create = client._send_table_create
+    original_obj_create = client.server.server.obj_create
+
+    def recording_send_table_create(
+        json_rows: list[dict],
+        expected_digest: str | None = None,
+        *,
+        project_id: str | None = None,
+    ):
+        if project_id is None:
+            project_id = client._project_id()
+        captured_table_project_ids.append(project_id)
+        return original_send_table_create(
+            json_rows,
+            expected_digest=expected_digest,
+            project_id=project_id,
+        )
+
+    def recording_obj_create(req: tsi.ObjCreateReq):
+        captured_obj_project_ids.append(req.obj.project_id)
+        return original_obj_create(req)
+
+    monkeypatch.setattr(client, "_send_table_create", recording_send_table_create)
+    monkeypatch.setattr(client.server.server, "obj_create", recording_obj_create)
+
+    try:
+        client.future_executor.defer(block.wait)
+
+        ds = weave.Dataset(name="capture_table_project", rows=[{"x": 1}, {"x": 2}])
+        client._save_object(ds, "capture_table_project")
+        assert ds.rows.table_ref is not None
+
+        client.project = "mutated-project"
+        block.set()
+        client._flush()
+
+        assert captured_obj_project_ids == [f"{client.entity}/{original_project}"]
+        assert captured_table_project_ids == [f"{client.entity}/{original_project}"]
+
+        original_rows = client.server.table_query(
+            tsi.TableQueryReq(
+                project_id=f"{client.entity}/{original_project}",
+                digest=ds.rows.table_ref.digest,
+            )
+        ).rows
+        mutated_rows = client.server.table_query(
+            tsi.TableQueryReq(
+                project_id=f"{client.entity}/mutated-project",
+                digest=ds.rows.table_ref.digest,
+            )
+        ).rows
+
+        assert [row.val for row in original_rows] == [{"x": 1}, {"x": 2}]
+        assert mutated_rows == []
+    finally:
+        client.project = original_project
+        client.future_executor = original_executor
+        client.set_autoflush(True)
+
+
 @pytest.mark.disable_logging_error_check
 def test_chunked_table_fast_path_detects_row_digest_desync(
     client: WeaveClient, fast_path: None, monkeypatch
@@ -807,13 +923,21 @@ def test_chunked_table_fast_path_detects_row_digest_desync(
     # simulating a corruption where digests desync from their rows.
     original_send = client._send_table_parallel_chunks
 
-    def corrupted_send(json_rows, row_digests, *, expected_digest=None, ref_uri=None):
+    def corrupted_send(
+        json_rows,
+        row_digests,
+        *,
+        expected_digest=None,
+        ref_uri=None,
+        project_id,
+    ):
         corrupted = list(reversed(row_digests))
         return original_send(
             json_rows,
             corrupted,
             expected_digest=expected_digest,
             ref_uri=ref_uri,
+            project_id=project_id,
         )
 
     monkeypatch.setattr(client, "_send_table_parallel_chunks", corrupted_send)
