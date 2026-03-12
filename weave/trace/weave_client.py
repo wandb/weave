@@ -1970,11 +1970,15 @@ class WeaveClient:
                 name,
             )
 
+            # Eagerly capture project_id to avoid stale reads if
+            # self.entity / self.project are reassigned before deferred execution.
+            project_id = self._project_id()
+
             def send_obj_create_deferred() -> ObjCreateRes:
-                json_val = to_json(val, self._project_id(), self)
+                json_val = to_json(val, project_id, self)
                 req = ObjCreateReq(
                     obj=ObjSchemaForInsert(
-                        project_id=self.entity + "/" + self.project,
+                        project_id=project_id,
                         object_id=name,
                         val=json_val,
                     )
