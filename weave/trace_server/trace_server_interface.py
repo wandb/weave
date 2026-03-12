@@ -23,6 +23,14 @@ from weave.trace_server.common_interface import (
 )
 from weave.trace_server.interface.query import Query
 
+# Re-exported from service_interface for backwards compatibility.
+# New code should import from weave.trace_server.service_interface directly.
+from weave.trace_server.service_interface import (  # noqa: F401
+    EnsureProjectExistsRes,
+    ProjectsInfoReq,
+    ProjectsInfoRes,
+)
+
 
 class ExtraKeysTypedDict(TypedDict):
     pass
@@ -1219,15 +1227,6 @@ class FileContentReadRes(BaseModel):
 
 class FilesStatsRes(BaseModel):
     total_size_bytes: int
-
-
-# Re-exported from service_interface for backwards compatibility.
-# New code should import from weave.trace_server.service_interface directly.
-from weave.trace_server.service_interface import (  # noqa: F401
-    EnsureProjectExistsRes,
-    ProjectsInfoReq,
-    ProjectsInfoRes,
-)
 
 
 class CostCreateInput(BaseModelStrict):
