@@ -39,14 +39,19 @@ def fast_path(client: WeaveClient):
 
     Teardown is handled by the autouse ``_reset_settings`` fixture.
     """
-    parse_and_apply_settings(UserSettings(enable_client_side_digests=True))
-    client._invalidate_project_cache()
+    _configure_digests(client, enable=True)
     yield
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _configure_digests(client: WeaveClient, *, enable: bool) -> None:
+    """Apply digest settings and invalidate the project cache."""
+    parse_and_apply_settings(UserSettings(enable_client_side_digests=enable))
+    client._invalidate_project_cache()
 
 
 def _publish_with_digests(
@@ -60,8 +65,7 @@ def _publish_with_digests(
 
     Toggles client-side digests on/off via settings before publishing.
     """
-    parse_and_apply_settings(UserSettings(enable_client_side_digests=enable))
-    client._invalidate_project_cache()
+    _configure_digests(client, enable=enable)
     ref = weave.publish(obj, name=name)
     client._flush()
     return ref.digest
