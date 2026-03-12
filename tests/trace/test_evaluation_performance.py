@@ -119,7 +119,7 @@ def _expected_client_init_log(
     # When client-side digests are enabled, the first operation that
     # needs _internal_project_id triggers lazy projects_info resolution.
     if include_project_reresolution and enable_client_side_digests:
-        log.extend(["projects_info", "projects_info"])
+        log.extend(["projects_info"])
     return log
 
 

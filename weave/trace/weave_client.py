@@ -2458,9 +2458,11 @@ class WeaveClient:
         """
         if ext_project_id in self._ext_to_int_project_map:
             return self._ext_to_int_project_map[ext_project_id]
-        if hasattr(self.server, "projects_info"):
+        # Use getattr once to avoid a double attribute access (hasattr + call).
+        projects_info_fn = getattr(self.server, "projects_info", None)
+        if projects_info_fn is not None:
             try:
-                results = self.server.projects_info(
+                results = projects_info_fn(
                     ProjectsInfoReq(project_ids=[ext_project_id])
                 )
                 if results:

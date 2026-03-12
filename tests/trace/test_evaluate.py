@@ -419,7 +419,7 @@ def test_evaluate_table_lazy_iter(
         # When client-side digests are enabled, publish triggers lazy
         # resolution of the internal project ID via projects_info.
         if enable_client_side_digests:
-            expected_pre_eval_log.extend(["projects_info", "projects_info"])
+            expected_pre_eval_log.extend(["projects_info"])
         # publish creates a table + object; getting the dataset reads it back.
         expected_pre_eval_log.extend(["table_create", "obj_create", "obj_read"])
         assert [
