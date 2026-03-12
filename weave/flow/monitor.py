@@ -10,7 +10,7 @@ from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
 
-# Shared type for debounce aggregation; used by ScorerDebounceConfig and scoring worker.
+DebounceAggregationField = Literal["trace_id", "thread_id"]
 DebounceAggregationMethod = Literal["last_message", "all_messages"]
 
 
@@ -18,7 +18,7 @@ class ScorerDebounceConfig(TypedDict):
     """Configuration for debounced scoring on a monitor."""
 
     # Specifies which field is used to find candidates for debouncing
-    aggregation_field: Literal["trace_id", "thread_id"]
+    aggregation_field: DebounceAggregationField
 
     # How to aggregate messages for scoring: last message only or all messages in the window.
     # Defaults to last_message when not present.
