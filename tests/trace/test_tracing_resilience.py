@@ -47,9 +47,18 @@ def test_resilience_to_user_code_errors(client):
     assert_no_current_call()
 
 
+@pytest.fixture
+def _apply_digest_settings(request):
+    parse_and_apply_settings(
+        UserSettings(enable_client_side_digests=request.param)
+    )
+    yield
+    parse_and_apply_settings(UserSettings())
+
+
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize(
-    ("enable_client_side_digests", "expected_errors"),
+    ("_apply_digest_settings", "expected_errors"),
     [
         pytest.param(
             False,
@@ -71,18 +80,14 @@ def test_resilience_to_user_code_errors(client):
             id="client_side_digests_on",
         ),
     ],
+    indirect=["_apply_digest_settings"],
 )
 def test_resilience_to_server_errors(
     client_with_throwing_server,
     log_collector,
-    enable_client_side_digests,
     expected_errors,
-    request,
+    _apply_digest_settings,
 ):
-    parse_and_apply_settings(
-        UserSettings(enable_client_side_digests=enable_client_side_digests)
-    )
-    request.addfinalizer(lambda: parse_and_apply_settings(UserSettings()))
 
     def do_test():
         @weave.op
