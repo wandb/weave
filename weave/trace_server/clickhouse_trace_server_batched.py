@@ -483,6 +483,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         assert_non_null_wb_user_id(req)
         calls, rejected_spans, error_messages = process_otel_spans_to_calls(req)
 
+        set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
+
         existing_ops = self._get_existing_ops_from_spans(
             seen_ids={
                 object_creation_utils.make_safe_name(start.op_name)

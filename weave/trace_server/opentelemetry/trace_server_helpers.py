@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import NamedTuple
 
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
@@ -9,22 +10,25 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 
+CallPair = tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+
+
+class OtelSpanProcessingResult(NamedTuple):
+    calls: list[CallPair]
+    rejected_spans: int
+    error_messages: list[str]
+
+
+class OtelOpResolutionResult(NamedTuple):
+    obj_creation_batch: list[tsi.ObjSchemaForInsert]
+    obj_id_idx_map: dict[str, list[int]]
+
 
 def process_otel_spans_to_calls(
     req: tsi.OTelExportReq,
-) -> tuple[
-    list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]],
-    int,
-    list[str],
-]:
-    """Convert OTel proto spans to Weave call tuples.
-
-    Returns:
-        Tuple of (calls, rejected_spans_count, error_messages).
-    """
-    calls: list[
-        tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
-    ] = []
+) -> OtelSpanProcessingResult:
+    """Convert OTel proto spans to Weave call tuples."""
+    calls: list[CallPair] = []
     rejected_spans = 0
     error_messages: list[str] = []
     for processed_span in req.processed_spans:
@@ -65,16 +69,16 @@ def process_otel_spans_to_calls(
                     )
                 )
 
-    return calls, rejected_spans, error_messages
+    return OtelSpanProcessingResult(calls, rejected_spans, error_messages)
 
 
 def resolve_and_prepare_new_otel_ops(
-    calls: list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]],
+    calls: list[CallPair],
     project_id: str,
     wb_user_id: str | None,
     existing_ops: dict[str, str],
     trace_server: tsi.TraceServerInterface,
-) -> tuple[list[tsi.ObjSchemaForInsert], dict[str, list[int]]]:
+) -> OtelOpResolutionResult:
     """Resolve existing ops and prepare batch for new op creation.
 
     Applies existing op refs to calls in-place, creates the placeholder ops
@@ -88,8 +92,8 @@ def resolve_and_prepare_new_otel_ops(
         trace_server: Trace server instance for file_create.
 
     Returns:
-        Tuple of (obj_creation_batch, obj_id_idx_map) where obj_id_idx_map
-        contains only the new (not yet created) op names.
+        OtelOpResolutionResult with obj_creation_batch for new ops to create,
+        and obj_id_idx_map containing only the new (not yet created) op names.
     """
     obj_id_idx_map: dict[str, list[int]] = defaultdict(list)
     for idx, (start_call, _) in enumerate(calls):
@@ -122,12 +126,12 @@ def resolve_and_prepare_new_otel_ops(
             )
         )
 
-    return obj_creation_batch, obj_id_idx_map
+    return OtelOpResolutionResult(obj_creation_batch, obj_id_idx_map)
 
 
 def apply_created_ops_to_calls(
     obj_id_idx_map: dict[str, list[int]],
-    calls: list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]],
+    calls: list[CallPair],
     create_results: list[tsi.ObjCreateRes],
     project_id: str,
 ) -> list[tuple[str, str]]:
