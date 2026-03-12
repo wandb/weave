@@ -2458,23 +2458,20 @@ class WeaveClient:
         """
         if ext_project_id in self._ext_to_int_project_map:
             return self._ext_to_int_project_map[ext_project_id]
-        # Use getattr once to avoid a double attribute access (hasattr + call).
-        projects_info_fn = getattr(self.server, "projects_info", None)
-        if projects_info_fn is not None:
-            try:
-                results = projects_info_fn(
-                    ProjectsInfoReq(project_ids=[ext_project_id])
-                )
-                if results:
-                    internal_id = results[0].internal_project_id
-                    self._ext_to_int_project_map[ext_project_id] = internal_id
-                    return internal_id
-            except Exception:
-                logger.debug(
-                    "Failed to resolve internal project ID for %s, falling back to external refs",
-                    ext_project_id,
-                    exc_info=True,
-                )
+        try:
+            results = self.server.projects_info(
+                ProjectsInfoReq(project_ids=[ext_project_id])
+            )
+            if results:
+                internal_id = results[0].internal_project_id
+                self._ext_to_int_project_map[ext_project_id] = internal_id
+                return internal_id
+        except Exception:
+            logger.debug(
+                "Failed to resolve internal project ID for %s, falling back to external refs",
+                ext_project_id,
+                exc_info=True,
+            )
         return None
 
     @trace_sentry.global_trace_sentry.watch()
