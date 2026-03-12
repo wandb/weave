@@ -145,6 +145,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         return http_requests.put(
             self.trace_server_url + url,
             *args,
+            auth=self._auth,
             headers={**headers, **kwargs.pop("headers", {})},
             **kwargs,
         )
