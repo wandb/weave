@@ -846,64 +846,6 @@ def test_chunked_table_fast_path_detects_row_digest_desync(
 
 
 @pytest.mark.disable_logging_error_check
-def test_republish_same_object_after_digest_mismatch_clears_stale_refs(
-    client: WeaveClient, fast_path: None, monkeypatch, caplog
-) -> None:
-    """After a digest mismatch disables the fast path, re-publishing the same
-    ref-carrying object must clear stale refs and re-save correctly.
-
-    Without the fix in _save_nested_objects, the stale ObjectRef on the Dataset
-    causes an early return, skipping the inner Table re-save.  The re-published
-    Dataset then references a Table that was never stored on the server,
-    breaking the read-back.
-    """
-    original_table_create = client.server.server.table_create
-    original_obj_create = client.server.server.obj_create
-
-    # Reject ALL fast-path requests (those with expected_digest) to simulate
-    # a complete mismatch.  Fallback requests (no expected_digest) pass through.
-    def reject_expected_digest_table(req: tsi.TableCreateReq):
-        if req.table.expected_digest is not None:
-            raise DigestMismatchError("table mismatch")
-        return original_table_create(req)
-
-    def reject_expected_digest_obj(req: tsi.ObjCreateReq):
-        if req.obj.expected_digest is not None:
-            raise DigestMismatchError("obj mismatch")
-        return original_obj_create(req)
-
-    monkeypatch.setattr(
-        client.server.server, "table_create", reject_expected_digest_table
-    )
-    monkeypatch.setattr(client.server.server, "obj_create", reject_expected_digest_obj)
-    caplog.set_level(logging.WARNING, logger="weave.trace.weave_client")
-
-    rows = [{"input": i, "output": i * 2} for i in range(5)]
-    ds = weave.Dataset(name="stale_ref_ds", rows=rows)
-
-    # First publish: fast path creates refs, server rejects all
-    # expected_digests.  Both table and object fail to save.
-    weave.publish(ds, name="stale_ref_ds")
-    client._flush()
-
-    assert client._client_side_digests_disabled_event.is_set()
-
-    # Re-publish the SAME Python object.  The fix in _save_nested_objects
-    # detects the stale same-project ref and removes it, allowing the inner
-    # Table to be re-saved via the fallback path.
-    second_ref = weave.publish(ds, name="stale_ref_ds")
-    client._flush()
-
-    # The re-published data should be fully readable.
-    got = second_ref.get()
-    got_rows = list(got.rows)
-    assert len(got_rows) == 5
-    for i, row in enumerate(got_rows):
-        assert row["input"] == i
-        assert row["output"] == i * 2
-
-
-@pytest.mark.disable_logging_error_check
 def test_concurrent_digest_mismatch_disables_once(
     client: WeaveClient, fast_path: None, monkeypatch, caplog
 ) -> None:

@@ -1805,17 +1805,7 @@ class WeaveClient:
         #  - if the ref is to a different project, remove it
         #  - if the ref is to the current project, do nothing
         if (ref := get_ref(obj)) is not None:
-            # When the fast path has been disabled due to a digest mismatch,
-            # same-project refs may be stale (pointing to data the server
-            # rejected).  Remove them so nested objects are re-saved safely
-            # via the fallback path.  This is conservative: it may re-save
-            # objects that were already valid, but saves are idempotent.
-            if (
-                self._client_side_digests_disabled_event.is_set()
-                and getattr(ref, "project", None) == self.project
-            ):
-                remove_ref(obj)
-            elif ALLOW_MIXED_PROJECT_REFS:
+            if ALLOW_MIXED_PROJECT_REFS:
                 return
             # Check if existing ref is to current project, if not,
             # remove the ref and recreate it in the current project
