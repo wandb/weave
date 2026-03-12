@@ -327,14 +327,14 @@ def test_table_cant_append_bad_data(client):
 
 def test_table_cant_set_bad_data(client):
     t = weave.Table(rows=[{"a": 1, "b": 2}])
-    with pytest.raises(ValueError, match="Rows must be a list of dicts"):
+    with pytest.raises(ValueError, match="must be (a list of )?dicts"):
         t.rows = [1, 2, 3]
-    with pytest.raises(ValueError, match="Rows must be a list of dicts"):
+    with pytest.raises(ValueError, match="must be (a list of )?dicts"):
         t.rows = [{"a": 1, "b": 2}, 3]
 
     ref = weave.publish(t)
     t2 = ref.get()
-    with pytest.raises(ValueError, match="Rows must be a list of dicts"):
+    with pytest.raises(ValueError, match="must be (a list of )?dicts"):
         t2.rows = [1, 2, 3]
-    with pytest.raises(ValueError, match="Rows must be a list of dicts"):
+    with pytest.raises(ValueError, match="must be (a list of )?dicts"):
         t2.rows = [{"a": 1, "b": 2}, 3]

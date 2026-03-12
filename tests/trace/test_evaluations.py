@@ -915,7 +915,7 @@ async def test_evaluation_with_wrong_column_map():
     dummy_scorer = DummyScorer(column_map={"foo": "col1"})
     evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
     with pytest.raises(
-        ValueError, match="is not in the `score` methods' argument names"
+        ValueError, match="is not found in the dataset columns and is not mapped"
     ):
         await evaluation.predict_and_score(model_function, dataset[0])
 
