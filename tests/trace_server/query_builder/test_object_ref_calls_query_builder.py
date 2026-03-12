@@ -507,48 +507,55 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
              AND JSON_VALUE(val_dump, {pb_6:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     digest),
+             input_matching_ids AS
+          (SELECT calls_merged.id
+           FROM calls_merged
+           PREWHERE calls_merged.project_id = {pb_0:String}
+           WHERE (calls_merged.parent_id IS NULL)
+             AND (lower(calls_merged.inputs_dump) LIKE {pb_7:String})
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)),
              filtered_calls AS
           (SELECT calls_merged.id AS id
            FROM calls_merged
            PREWHERE calls_merged.project_id = {pb_0:String}
-           WHERE (calls_merged.parent_id IS NULL)
-             AND ((lower(calls_merged.inputs_dump) LIKE {pb_10:String}
-                  OR calls_merged.inputs_dump IS NULL))
+           WHERE (calls_merged.id IN input_matching_ids)
+             AND (calls_merged.parent_id IS NULL)
              AND (length(calls_merged.input_refs) > 0
                   OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), '') IN
               (SELECT ref
                FROM obj_filter_0)
-             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), ''), '/([^/]+)$', 1) IN
               (SELECT ref
                FROM obj_filter_0)))
-           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), '') IN
                (SELECT ref
                 FROM obj_filter_0)
-             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), ''), '/([^/]+)$', 1) IN
                (SELECT ref
                 FROM obj_filter_0)))
-           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), '') IN
                (SELECT ref
                 FROM obj_filter_1)
-             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), ''), '/([^/]+)$', 1) IN
                (SELECT ref
                 FROM obj_filter_1)))
-           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), '') IN
                  (SELECT ref
                   FROM obj_filter_2)
-               OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+               OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), ''), '/([^/]+)$', 1) IN
                  (SELECT ref
                   FROM obj_filter_2)))
-           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), '') IN
                (SELECT ref
                 FROM obj_filter_3)
-             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), ''), '/([^/]+)$', 1) IN
                (SELECT ref
                 FROM obj_filter_3)))
-           AND (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), ''), {pb_9:String}) > 0)
+           AND (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_9:String}), 'null'), ''), {pb_10:String}) > 0)
            AND ((any(calls_merged.deleted_at) IS NULL))
            AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
         SELECT calls_merged.id AS id
@@ -566,10 +573,10 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
             "pb_4": '$."max_tokens"',
             "pb_5": 100,
             "pb_6": '$."max_tokens"."size"',
-            "pb_7": '$."model"',
-            "pb_8": '$."param"."message"',
-            "pb_9": "completed",
-            "pb_10": '%"%completed%"%',
+            "pb_7": '%"%completed%"%',
+            "pb_8": '$."model"',
+            "pb_9": '$."param"."message"',
+            "pb_10": "completed",
         },
     )
 
