@@ -24,10 +24,6 @@ from weave.utils.sanitize import REDACTED_VALUE, should_redact
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
-_WEAVE_REF_PREFIX = f"{WEAVE_SCHEME}:///"
-_WEAVE_INTERNAL_REF_PREFIX = f"{WEAVE_INTERNAL_SCHEME}:///"
-
-
 def _convert_ext_ref_string(
     ref_str: str,
     project_id: str,
@@ -39,16 +35,16 @@ def _convert_ext_ref_string(
     Same-project refs use the pre-resolved internal_project_id.
     Cross-project refs are resolved lazily via client._resolve_ext_to_int_project_id.
     """
-    rest = ref_str[len(_WEAVE_REF_PREFIX) :]
+    rest = ref_str[len(f"{WEAVE_SCHEME}:///") :]
     parts = rest.split("/", 2)
     if len(parts) == 3:
         entity_project = f"{parts[0]}/{parts[1]}"
         if entity_project == project_id:
-            return f"{_WEAVE_INTERNAL_REF_PREFIX}{internal_project_id}/{parts[2]}"
+            return f"{WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{parts[2]}"
         if client is not None:
             resolved = client._resolve_ext_to_int_project_id(entity_project)
             if resolved is not None:
-                return f"{_WEAVE_INTERNAL_REF_PREFIX}{resolved}/{parts[2]}"
+                return f"{WEAVE_INTERNAL_SCHEME}:///{resolved}/{parts[2]}"
     return ref_str
 
 
@@ -121,7 +117,7 @@ def to_json(
         if (
             isinstance(obj, str)
             and internal_project_id is not None
-            and obj.startswith(_WEAVE_REF_PREFIX)
+            and obj.startswith(f"{WEAVE_SCHEME}:///")
         ):
             return _convert_ext_ref_string(obj, project_id, internal_project_id, client)
         return obj
@@ -156,7 +152,7 @@ def to_json(
     result = _build_result_from_encoded(encoded, project_id, client)
     if internal_project_id is not None:
         load_op = result.get("load_op")
-        if isinstance(load_op, str) and load_op.startswith(_WEAVE_REF_PREFIX):
+        if isinstance(load_op, str) and load_op.startswith(f"{WEAVE_SCHEME}:///"):
             result["load_op"] = _convert_ext_ref_string(
                 load_op, project_id, internal_project_id, client
             )
