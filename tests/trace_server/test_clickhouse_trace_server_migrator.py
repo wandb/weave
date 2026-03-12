@@ -263,13 +263,15 @@ def test_create_db_sql(mock_costs):
     with pytest.raises(MigrationError, match="Invalid database name"):
         cloud_migrator._create_db_sql("test;db")
 
-    # Test replicated mode
+    # Test replicated mode — should use ENGINE = Replicated(...) so DDL is
+    # auto-replicated via ZooKeeper without needing ON CLUSTER per-statement.
     replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
         Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
     sql = replicated_migrator._create_db_sql("test_db")
-    assert (
-        sql.strip() == "CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster"
+    assert sql.strip() == (
+        "CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster"
+        " ENGINE = Replicated('/clickhouse/tables/test_db', '{shard}', '{replica}')"
     )
 
     # Test invalid cluster name

@@ -496,10 +496,35 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         )
 
     def _create_db_sql(self, db_name: str) -> str:
-        """Generate SQL to create a database in replicated mode."""
+        """Generate SQL to create a database in replicated mode.
+
+        Uses ENGINE = Replicated(...) so that DDL within the database is
+        automatically replicated via ZooKeeper, without needing ON CLUSTER
+        on every subsequent CREATE TABLE / ALTER TABLE statement.
+
+        If the database already exists (IF NOT EXISTS), this is a no-op
+        regardless of the existing engine. Databases created by older weave
+        versions already use Replicated; databases created by the intermediate
+        code (19052e896c..HEAD~) may be Atomic. Both are handled: the
+        auto-detection in _add_on_cluster_clause skips ON CLUSTER for
+        Replicated databases and keeps it for Atomic ones.
+        """
         if not self._is_safe_identifier(db_name):
             raise MigrationError(f"Invalid database name: {db_name}")
-        return f"CREATE DATABASE IF NOT EXISTS {db_name} ON CLUSTER {self.replicated_cluster}"
+
+        replicated_path = self.replicated_path.replace("{db}", db_name)
+        if not all(
+            self._is_safe_identifier(part)
+            for part in replicated_path.split("/")
+            if part
+        ):
+            raise MigrationError(f"Invalid replicated path: {replicated_path}")
+
+        return (
+            f"CREATE DATABASE IF NOT EXISTS {db_name}"
+            f" ON CLUSTER {self.replicated_cluster}"
+            f" ENGINE = Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
+        )
 
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in replicated mode."""
