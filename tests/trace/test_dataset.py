@@ -103,13 +103,11 @@ def test_published_dataset_laziness(digest_params_client):
     assert _top_level_logs(log) == expected_publish_log
     client.server.attribute_access_log = []
 
-    # Getting a published dataset reads the object metadata.
     dataset = ref.get()
     log = client.server.attribute_access_log
     assert _top_level_logs(log) == ["obj_read"]
     client.server.attribute_access_log = []
 
-    # First len() call fetches table stats; subsequent calls are cached.
     length = len(dataset)
     log = client.server.attribute_access_log
     assert _top_level_logs(log) == ["table_query_stats"]

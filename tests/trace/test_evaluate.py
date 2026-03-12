@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 import weave
 from weave import Dataset, Evaluation, Model
+
 _LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
