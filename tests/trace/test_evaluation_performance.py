@@ -112,7 +112,6 @@ async def test_evaluation_performance(client: WeaveClient):
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
     gold_log = [
-        "ensure_project_exists",
         "get_call_processor",
         "get_call_processor",
         "get_feedback_processor",
@@ -139,7 +138,6 @@ async def test_evaluation_performance(client: WeaveClient):
     assert (
         counts
         == {
-            "ensure_project_exists": 1,
             "get_call_processor": 2,
             "get_feedback_processor": 2,
             "table_create": 2,  # dataset and score results
