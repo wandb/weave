@@ -1924,18 +1924,19 @@ class WeaveClient:
         name = sanitize_object_name(name)
 
         ref: Ref
-        if self._internal_project_id is not None:
+        internal_project_id = self._internal_project_id
+        if internal_project_id is not None:
             # Fast path: compute digest client-side for immediate ref construction
             logger.debug(
                 "Client digest: FAST PATH for obj %r (internal_project_id=%s)",
                 name,
-                self._internal_project_id,
+                internal_project_id,
             )
             json_val = to_json(
                 val,
                 self._project_id(),
                 self,
-                internal_project_id=self._internal_project_id,
+                internal_project_id=internal_project_id,
             )
             digest = compute_object_digest(json_val)
 
@@ -1977,7 +1978,9 @@ class WeaveClient:
                 self._inflight_obj_saves[save_key] = res_future
 
             def _on_obj_save_done(
-                fut: Future[ObjCreateRes], _uri: str | None = ref_uri, _key: tuple = save_key
+                fut: Future[ObjCreateRes],
+                _uri: str | None = ref_uri,
+                _key: tuple = save_key,
             ) -> None:
                 with self._inflight_obj_saves_lock:
                     self._inflight_obj_saves.pop(_key, None)
@@ -2002,9 +2005,7 @@ class WeaveClient:
                 )
                 return self.server.obj_create(req)
 
-            res_future = self.future_executor.defer(
-                send_obj_create_deferred
-            )
+            res_future = self.future_executor.defer(send_obj_create_deferred)
             digest_future: Future[str] = self.future_executor.then(
                 [res_future], lambda res: res[0].digest
             )
@@ -2103,18 +2104,19 @@ class WeaveClient:
 
         chunking_config = self._should_use_chunking(table)
 
-        if self._internal_project_id is not None:
+        internal_project_id = self._internal_project_id
+        if internal_project_id is not None:
             # Fast path: serialize and compute digests client-side
             logger.debug(
                 "Client digest: FAST PATH for table (internal_project_id=%s)",
-                self._internal_project_id,
+                internal_project_id,
             )
             rows = list(table.rows)
             json_rows = to_json(
                 rows,
                 self._project_id(),
                 self,
-                internal_project_id=self._internal_project_id,
+                internal_project_id=internal_project_id,
             )
             row_digests = [compute_row_digest(row) for row in json_rows]
             table_digest = compute_table_digest(row_digests)
@@ -2138,8 +2140,10 @@ class WeaveClient:
                 table_res_future: Future[TableCreateRes] = self.future_executor.defer(
                     send_table_create
                 )
+
                 def _on_table_done(
-                    fut: Future[TableCreateRes], _uri: str | None = ref_uri,
+                    fut: Future[TableCreateRes],
+                    _uri: str | None = ref_uri,
                 ) -> None:
                     self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
 
@@ -2167,9 +2171,7 @@ class WeaveClient:
                 def serialize_and_send() -> TableCreateRes:
                     return self._serialize_and_send_table_create(rows)
 
-                res_future = self.future_executor.defer(
-                    serialize_and_send
-                )
+                res_future = self.future_executor.defer(serialize_and_send)
             elif chunking_config.use_parallel_chunks:
                 res_future = self._create_table_with_parallel_chunks(table)
             else:
@@ -2272,7 +2274,8 @@ class WeaveClient:
         if ref_uri is not None:
 
             def _on_combine_done(
-                fut: Future[None], _uri: str | None = ref_uri,
+                fut: Future[None],
+                _uri: str | None = ref_uri,
             ) -> None:
                 self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
 
@@ -2299,7 +2302,8 @@ class WeaveClient:
             if ref_uri is not None:
 
                 def _on_base_done(
-                    fut: Future[TableCreateRes], _uri: str | None = ref_uri,
+                    fut: Future[TableCreateRes],
+                    _uri: str | None = ref_uri,
                 ) -> None:
                     self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
 
@@ -2328,7 +2332,8 @@ class WeaveClient:
         if ref_uri is not None:
 
             def _on_chain_done(
-                fut: Future[None], _uri: str | None = ref_uri,
+                fut: Future[None],
+                _uri: str | None = ref_uri,
             ) -> None:
                 self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
 

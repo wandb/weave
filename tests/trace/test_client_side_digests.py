@@ -33,7 +33,7 @@ def _reset_settings():
     parse_and_apply_settings(UserSettings())
 
 
-@pytest.fixture()
+@pytest.fixture
 def fast_path(client: WeaveClient):
     """Enable the client-side digest fast path for a test."""
     _enable_fast_path(client)
@@ -273,7 +273,9 @@ def test_dataset_round_trip_fast_path(client: WeaveClient, fast_path: None):
         assert row["b"] == i * 2
 
 
-def test_typed_cross_project_ref_round_trip_fast_path(client: WeaveClient, fast_path: None):
+def test_typed_cross_project_ref_round_trip_fast_path(
+    client: WeaveClient, fast_path: None
+):
     """A typed cross-project ref should keep its original project on read-back."""
     original_project = client.project
 
