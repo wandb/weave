@@ -464,7 +464,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         project_id=project_id,
                         name=obj.object_id,
                         version=obj.digest,
-                    ).uri()
+                    ).uri
                     self._op_ref_cache[project_id, obj.object_id] = uri
                     resolved[obj.object_id] = uri
 
@@ -592,7 +592,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 name=result.object_id,
                 version=result.digest,
-            ).uri()
+            ).uri
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
             # Cache newly created ops so subsequent batches skip the CH query
@@ -1453,8 +1453,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 # Filter out non-unique refs
                 unique_ref_map = {}
                 for ref in refs_to_resolve.values():
-                    if ref.uri() not in unique_ref_map:
-                        unique_ref_map[ref.uri()] = ref
+                    if ref.uri not in unique_ref_map:
+                        unique_ref_map[ref.uri] = ref
 
                 # Fetch values only for the unique refs
                 vals = self._refs_read_batch_within_project(
@@ -1464,15 +1464,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 # update the ref map with the fetched values
                 ref_val_map = {}
                 for ref, val in zip(unique_ref_map.values(), vals, strict=False):
-                    ref_val_map[ref.uri()] = val
+                    ref_val_map[ref.uri] = val
 
                 # Replace the refs with values and add ref key
                 for (i, col), ref in refs_to_resolve.items():
                     # Look up the value using the ref's URI
-                    val = ref_val_map.get(ref.uri())
+                    val = ref_val_map.get(ref.uri)
                     if val is not None:
                         if isinstance(val, dict) and "_ref" not in val:
-                            val["_ref"] = ref.uri()
+                            val["_ref"] = ref.uri
                         set_nested_key(calls[i], col, val)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
@@ -3370,7 +3370,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         table_ref = ri.InternalTableRef(
             project_id=req.project_id,
             digest=table_res.digest,
-        ).uri()
+        ).uri
 
         # Create the dataset object
         dataset_val = object_creation_utils.build_dataset_val(
@@ -3545,7 +3545,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=scorer_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
         return tsi.ScorerCreateRes(
             digest=obj_result.digest,
             object_id=scorer_id,
@@ -3665,7 +3665,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=evaluation_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
         return tsi.EvaluationCreateRes(
             digest=obj_result.digest,
             object_id=evaluation_id,
@@ -3811,7 +3811,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=object_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.ModelCreateRes(
             digest=obj_result.digest,
@@ -3972,7 +3972,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 id=evaluation_run_id,
                 trace_id=evaluation_run_id,
-                op_name=op_ref.uri(),
+                op_name=op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes={
                     constants.WEAVE_ATTRIBUTES_NAMESPACE: {
@@ -4304,7 +4304,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     id=predict_and_score_id,
                     trace_id=trace_id,
                     parent_id=req.evaluation_run_id,
-                    op_name=predict_and_score_op_ref.uri(),
+                    op_name=predict_and_score_op_ref.uri,
                     started_at=datetime.datetime.now(datetime.timezone.utc),
                     attributes={
                         constants.WEAVE_ATTRIBUTES_NAMESPACE: {
@@ -4375,7 +4375,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 id=prediction_id,
                 trace_id=trace_id,
                 parent_id=parent_id,
-                op_name=predict_op_ref.uri(),
+                op_name=predict_op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes=prediction_attributes,
                 inputs={
@@ -4773,7 +4773,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 id=score_id,
                 trace_id=trace_id,
                 parent_id=parent_id,
-                op_name=score_op_ref.uri(),
+                op_name=score_op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes=score_attributes,
                 inputs={
@@ -4814,7 +4814,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         feedback_req = tsi.FeedbackCreateReq(
             project_id=req.project_id,
-            weave_ref=prediction_call_ref.uri(),
+            weave_ref=prediction_call_ref.uri,
             feedback_type=f"{RUNNABLE_FEEDBACK_TYPE_PREFIX}.{scorer_name}",
             payload={"output": req.value},
             runnable_ref=req.scorer,
@@ -5026,7 +5026,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         final_result_cache: dict[str, Any] = {}
 
         def make_ref_cache_key(ref: ri.InternalObjectRef) -> str:
-            return ref.uri()
+            return ref.uri
 
         for project, project_refs in refs_by_project_id.items():
             project_results = self._refs_read_batch_within_project(

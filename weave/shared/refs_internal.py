@@ -15,18 +15,18 @@ class _CallableStr(str):
     """A str subclass that can be called, returning itself as a plain str.
 
     This enables backwards compatibility: both ``ref.uri`` (property access)
-    and ``ref.uri()`` (legacy method call) work.
+    and ``ref.uri`` (legacy method call) work.
     """
 
     def __call__(self) -> str:
         return str(self)
 
 
-class callable_property:
+class CallableProperty:
     """Descriptor that behaves like ``@property`` but returns a `_CallableStr`.
 
     This makes the attribute usable both as a property (``ref.uri``) and as a
-    method call (``ref.uri()``) for backwards compatibility.
+    method call (``ref.uri``) for backwards compatibility.
     """
 
     def __init__(self, func: Any) -> None:
@@ -40,6 +40,7 @@ class callable_property:
         if obj is None:
             return self
         return _CallableStr(self.func(obj))
+
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
@@ -125,7 +126,7 @@ class InternalTableRef:
         validate_no_slashes(self.project_id, "project_id")
         validate_no_slashes(self.digest, "digest")
 
-    @callable_property
+    @CallableProperty
     def uri(self) -> str:
         return f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/table/{self.digest}"
 
@@ -145,7 +146,7 @@ class InternalObjectRef:
         validate_no_slashes(self.name, "name")
         validate_no_colons(self.name, "name")
 
-    @callable_property
+    @CallableProperty
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/object/{self.name}:{self.version}"
         if self.extra:
@@ -155,7 +156,7 @@ class InternalObjectRef:
 
 @dataclass(frozen=True)
 class InternalOpRef(InternalObjectRef):
-    @callable_property
+    @CallableProperty
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/op/{self.name}:{self.version}"
         if self.extra:
@@ -176,7 +177,7 @@ class InternalCallRef:
         # we do, we need to add edge names to the known list
         validate_extra(self.extra)
 
-    @callable_property
+    @CallableProperty
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/call/{self.id}"
         if self.extra:
@@ -193,7 +194,7 @@ class InternalArtifactRef:
         # not validating no slashes in project_id because we aren't converting to internal project_id
         validate_no_slashes(self.id, "id")
 
-    @callable_property
+    @CallableProperty
     def uri(self) -> str:
         u = f"{ARTIFACT_REF_SCHEME}:///{self.project_id}/{self.id}"
         return u

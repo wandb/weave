@@ -202,7 +202,7 @@ def test_serialization_correctness(
         else:
             published_obj = weave.publish(runtime_object)
         digest = published_obj.digest
-        gotten_obj = weave.get(published_obj.uri())
+        gotten_obj = weave.get(published_obj.uri)
         assert case.equality_check(gotten_obj, runtime_object)
 
         # Verify the correct JSON is stored in the database.

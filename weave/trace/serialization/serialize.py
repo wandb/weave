@@ -40,9 +40,9 @@ def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
     if isinstance(obj, TableRef):
-        return obj.uri()
+        return obj.uri
     elif isinstance(obj, ObjectRef):
-        return obj.uri()
+        return obj.uri
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():
