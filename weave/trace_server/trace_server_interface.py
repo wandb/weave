@@ -1221,24 +1221,13 @@ class FilesStatsRes(BaseModel):
     total_size_bytes: int
 
 
-class EnsureProjectExistsRes(BaseModel):
-    project_name: str
-
-
-class ProjectsInfoReq(BaseModelStrict):
-    project_ids: list[str] = Field(
-        description="External project IDs in 'entity/project' format.",
-        examples=[["entity-a/project-a", "entity-b/project-b"]],
-    )
-
-
-class ProjectsInfoRes(BaseModel):
-    external_project_id: str = Field(
-        description="External project ID in 'entity/project' format.",
-    )
-    internal_project_id: str = Field(
-        description="Internal project ID.",
-    )
+# Re-exported from service_interface for backwards compatibility.
+# New code should import from weave.trace_server.service_interface directly.
+from weave.trace_server.service_interface import (  # noqa: F401
+    EnsureProjectExistsRes,
+    ProjectsInfoReq,
+    ProjectsInfoRes,
+)
 
 
 class CostCreateInput(BaseModelStrict):
