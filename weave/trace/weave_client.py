@@ -138,11 +138,11 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TableUpdateReq,
     TagsListReq,
-    TraceServerInterface,
     TraceStatus,
 )
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     ROW_COUNT_CHUNKING_THRESHOLD,
@@ -298,7 +298,7 @@ MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
-    server: TraceServerInterface
+    server: TraceServerClientInterface
 
     # Main future executor, handling deferred tasks for the client
     future_executor: FutureExecutor
@@ -326,7 +326,7 @@ class WeaveClient:
         self,
         entity: str,
         project: str,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         ensure_project_exists: bool = True,
     ):
         self.entity = entity

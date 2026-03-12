@@ -104,11 +104,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 res.close()
 
     # Standard API Below:
-    def ensure_project_exists(
-        self, entity: str, project: str
-    ) -> tsi.EnsureProjectExistsRes:
-        return self._internal_trace_server.ensure_project_exists(entity, project)
-
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # Convert project_id at request level
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)

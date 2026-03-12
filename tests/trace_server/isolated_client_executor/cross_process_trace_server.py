@@ -260,14 +260,6 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         except Exception as e:
             logger.exception("Error sending stop signal")
 
-    # TraceServerInterface method implementations
-    def ensure_project_exists(
-        self, entity: str, project: str
-    ) -> tsi.EnsureProjectExistsRes:
-        """Ensure project exists."""
-        # This method has a different signature, so we need to create a payload
-        raise NotImplementedError("ensure_project_exists is not implemented")
-
     # Regular method implementations (reduced duplication)
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Export OTEL traces."""

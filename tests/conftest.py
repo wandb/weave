@@ -340,8 +340,14 @@ def create_client(
     # Keeping off for now until it is the default behavior.
     # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
     caching_server = CachingMiddlewareTraceServer.from_env(server)
+    # ensure_project_exists=False because local backends (SQLite) don't
+    # implement ServiceInterface — project creation is a remote-only concern.
+    # In tests we assume the project already exists.
     client = TestOnlyFlushingWeaveClient(
-        TEST_ENTITY, "test-project", make_server_recorder(caching_server)
+        TEST_ENTITY,
+        "test-project",
+        make_server_recorder(caching_server),
+        ensure_project_exists=False,
     )
     weave_client_context.set_weave_client_global(client)
     if global_attributes is not None:
