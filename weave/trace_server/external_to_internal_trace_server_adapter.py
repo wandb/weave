@@ -570,7 +570,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.AnnotationQueueAddCallsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(
-            self._internal_trace_server.annotation_queue_add_calls, req
+            self._internal_trace_server.annotation_queue_add_calls, req, req.project_id
         )
 
     def annotation_queue_items_query(
@@ -578,7 +578,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.AnnotationQueueItemsQueryRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(
-            self._internal_trace_server.annotation_queue_items_query, req
+            self._internal_trace_server.annotation_queue_items_query, req, req.project_id
         )
 
     def annotation_queues_stats(
@@ -594,7 +594,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(
-            self._internal_trace_server.annotator_queue_items_progress_update, req
+            self._internal_trace_server.annotator_queue_items_progress_update, req, req.project_id
         )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
