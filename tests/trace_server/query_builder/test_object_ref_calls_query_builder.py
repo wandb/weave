@@ -31,7 +31,7 @@ def test_object_ref_filter_simple() -> None:
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     object_id,
                     digest
@@ -42,7 +42,7 @@ def test_object_ref_filter_simple() -> None:
                   digest as ref
            FROM table_rows
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     digest),
              filtered_calls AS
@@ -102,7 +102,7 @@ def test_object_ref_filter_lt() -> None:
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) < {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) < {pb_2:Int64}
            GROUP BY project_id,
                     object_id,
                     digest
@@ -113,7 +113,7 @@ def test_object_ref_filter_lt() -> None:
                   digest as ref
            FROM table_rows
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) < {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) < {pb_2:Int64}
            GROUP BY project_id,
                     digest),
              filtered_calls AS
@@ -296,7 +296,7 @@ def test_multiple_object_ref_filters() -> None:
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     object_id,
                     digest
@@ -307,7 +307,7 @@ def test_multiple_object_ref_filters() -> None:
                   digest as ref
            FROM table_rows
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     digest),
             obj_filter_1 AS
@@ -315,7 +315,7 @@ def test_multiple_object_ref_filters() -> None:
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
-             AND toFloat64OrNull(JSON_VALUE(val_dump, {pb_1:String})) > {pb_3:UInt64}
+             AND toFloat64OrNull(JSON_VALUE(val_dump, {pb_1:String})) > {pb_3:Int64}
            GROUP BY project_id,
                     object_id,
                     digest
@@ -326,7 +326,7 @@ def test_multiple_object_ref_filters() -> None:
                   digest as ref
            FROM table_rows
            WHERE project_id = {pb_0:String}
-             AND toFloat64OrNull(JSON_VALUE(val_dump, {pb_1:String})) > {pb_3:UInt64}
+             AND toFloat64OrNull(JSON_VALUE(val_dump, {pb_1:String})) > {pb_3:Int64}
            GROUP BY project_id,
                     digest),
              filtered_calls AS
@@ -436,7 +436,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     object_id,
                     digest
@@ -447,7 +447,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                   digest as ref
            FROM table_rows
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     digest),
              obj_filter_1 AS
@@ -455,7 +455,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_3:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_3:Int64}
            GROUP BY project_id,
                     object_id,
                     digest
@@ -466,7 +466,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                   digest as ref
            FROM table_rows
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_3:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_3:Int64}
            GROUP BY project_id,
                     digest),
              obj_filter_2 AS
@@ -474,7 +474,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_4:String}) = {pb_5:UInt64}
+             AND JSON_VALUE(val_dump, {pb_4:String}) = {pb_5:Int64}
            GROUP BY project_id,
                     object_id,
                     digest
@@ -485,7 +485,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                   digest as ref
            FROM table_rows
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_4:String}) = {pb_5:UInt64}
+             AND JSON_VALUE(val_dump, {pb_4:String}) = {pb_5:Int64}
            GROUP BY project_id,
                     digest),
              obj_filter_3 AS
@@ -493,7 +493,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_6:String}) = {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_6:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     object_id,
                     digest
@@ -504,7 +504,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                   digest as ref
            FROM table_rows
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_6:String}) = {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_6:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     digest),
              filtered_calls AS
@@ -1000,7 +1000,7 @@ def test_object_ref_filter_calls_complete() -> None:
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     object_id,
                     digest
@@ -1011,7 +1011,7 @@ def test_object_ref_filter_calls_complete() -> None:
                   digest as ref
            FROM table_rows
            WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:Int64}
            GROUP BY project_id,
                     digest),
              filtered_calls AS

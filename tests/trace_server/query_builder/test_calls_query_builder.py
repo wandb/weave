@@ -1060,7 +1060,7 @@ def test_calls_query_with_complex_heavy_filters() -> None:
             HAVING (
                 ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
                 AND
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') > {pb_3:UInt64}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') > {pb_3:Int64}))
                 AND (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_4:String}), 'null'), '') = {pb_5:String})
                   OR positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}), 'null'), ''), {pb_7:String}) > 0))
                 AND
@@ -1462,7 +1462,7 @@ def test_calls_query_with_unoptimizable_or_condition() -> None:
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((
             (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String})
-            OR (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') > {pb_3:UInt64})))
+            OR (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') > {pb_3:Int64})))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
@@ -1579,7 +1579,7 @@ def test_query_with_summary_weave_latency_ms_filter() -> None:
         HAVING (((CASE
               WHEN any(calls_merged.ended_at) IS NULL THEN NULL
               ELSE (toUnixTimestamp64Milli(any(calls_merged.ended_at)) - toUnixTimestamp64Milli(any(calls_merged.started_at)))
-          END > {pb_0:UInt64}))
+          END > {pb_0:Int64}))
         AND ((any(calls_merged.deleted_at) IS NULL))
         AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
@@ -2091,7 +2091,7 @@ def test_datetime_optimization_invalid_field() -> None:
         PREWHERE calls_merged.project_id = {pb_2:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((any(calls_merged.wb_user_id) > {pb_0:UInt64}))
+            ((any(calls_merged.wb_user_id) > {pb_0:Int64}))
             AND ((any(calls_merged.started_at) > {pb_1:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
@@ -2336,7 +2336,7 @@ def test_trace_roots_only_filter_with_condition():
         PREWHERE calls_merged.project_id = {pb_1:String}
         WHERE (calls_merged.parent_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (((any(calls_merged.wb_user_id) = {pb_0:UInt64}))
+        HAVING (((any(calls_merged.wb_user_id) = {pb_0:Int64}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
@@ -2842,7 +2842,7 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
                 OR calls_merged.output_dump IS NULL))
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
-        HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_0:String}), 'null'), '') = {pb_1:UInt64}))
+        HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_0:String}), 'null'), '') = {pb_1:Int64}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
@@ -2961,7 +2961,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
                 AND (calls_complete.trace_id = {pb_4:String}
                     OR calls_complete.trace_id IS NULL)
             AND (
-                ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:UInt64}))
+                ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:Int64}))
                 AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
             )
             ORDER BY CASE
@@ -3668,7 +3668,7 @@ def test_latency_ms_filter_calls_complete_uses_sentinel_for_ended_at() -> None:
           AND (((CASE
               WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN NULL
               ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
-          END > {pb_1:UInt64}))
+          END > {pb_1:Int64}))
        AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
         """,
         {

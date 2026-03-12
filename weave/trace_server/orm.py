@@ -505,7 +505,7 @@ def python_value_to_ch_type(value: typing.Any) -> str:
     elif isinstance(value, bool):
         return "Bool"
     elif isinstance(value, int):
-        return "UInt64"
+        return "Int64"
     elif isinstance(value, float):
         return "Float64"
     elif isinstance(value, datetime.datetime):

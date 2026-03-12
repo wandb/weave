@@ -752,11 +752,11 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     """Test that $contains works with numeric literals on JSON fields.
 
     This test reproduces the ClickHouse error:
-    Illegal type UInt64 of argument of function position
+    Illegal type Int64 of argument of function position
 
     The issue occurs when using $contains with a numeric literal on a JSON field.
     The query builder should convert the numeric literal to a string for the
-    position function, not cast it to UInt64.
+    position function, not cast it to an integer type.
     """
     project_id = client._project_id()
     call_ref_uri = f"weave:///{project_id}/call/call_id_456"
@@ -772,11 +772,11 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
 
     # Query for feedback where dataset_id contains the numeric literal 94
     # This should work but currently fails with:
-    # "Illegal type UInt64 of argument of function position"
+    # "Illegal type Int64 of argument of function position"
     if not client_is_sqlite(client):
         with pytest.raises(
             DatabaseError,
-            match="Illegal type UInt64 of argument of function position",
+            match="Illegal type Int64 of argument of function position",
         ):
             client.server.feedback_query(
                 FeedbackQueryReq(
