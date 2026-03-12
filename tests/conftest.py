@@ -171,14 +171,11 @@ class ThrowingServer(tsi.TraceServerInterface):
 @pytest.fixture
 def client_with_throwing_server(client):
     # Pre-cache the internal project ID while the real server is still
-    # available.  With lazy resolution the property is not populated during
+    # available.  With lazy resolution the map is not populated during
     # __init__, so without this step any test that enables client-side
     # digests after the server swap would fail to resolve the ID (the
     # ThrowingServer does not expose projects_info).
-    resolved = client._resolve_internal_project_id()
-    if resolved is not None:
-        client._cached_internal_project_id = resolved
-        client._cached_internal_project_id_for = client._project_id()
+    client._resolve_ext_to_int_project_id(client._project_id())
 
     curr_server = client.server
     client.server = ThrowingServer()

@@ -86,7 +86,7 @@ class UserInjectingExternalTraceServer(
 ):
     # Tests-only adapter that injects a fixed user id into external-facing requests.
     # Also exposes projects_info (a TraceServerClientInterface method) so that
-    # WeaveClient._resolve_internal_project_id can resolve internal project IDs
+    # WeaveClient._resolve_ext_to_int_project_id can resolve internal project IDs
     # in the test environment via hasattr duck-typing.
 
     def __init__(

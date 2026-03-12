@@ -343,14 +343,14 @@ class WeaveClient:
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
-        # Lazily resolve internal project ID on first access via the
-        # _internal_project_id property to avoid adding startup latency.
-        self._cached_internal_project_id: str | None = None
-        self._cached_internal_project_id_for: str | None = None
         # Event is set when digests should be disabled; unset (default) = enabled.
         # Using an Event instead of a bare bool is thread-safe without the GIL.
         self._client_side_digests_disabled_event = threading.Event()
-        self._ext_to_int_project_map: dict[str, str] = {}
+        # Cache mapping external project IDs to their resolved internal IDs.
+        # Used both for the current project (client-side digests) and for
+        # cross-project refs during serialization.  None values indicate a
+        # resolution attempt that failed (avoids re-resolving on every access).
+        self._ext_to_int_project_map: dict[str, str | None] = {}
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
@@ -2023,7 +2023,7 @@ class WeaveClient:
 
     def _invalidate_project_cache(self) -> None:
         """Force re-resolution of the internal project ID on next access."""
-        self._cached_internal_project_id_for = None
+        self._ext_to_int_project_map.pop(self._project_id(), None)
 
     def _disable_client_side_digests_after_validation_error(
         self, exc: BaseException, ref_uri: str
@@ -2031,8 +2031,7 @@ class WeaveClient:
         if self._client_side_digests_disabled_event.is_set():
             return
         self._client_side_digests_disabled_event.set()
-        self._cached_internal_project_id = None
-        self._cached_internal_project_id_for = None
+        self._ext_to_int_project_map.clear()
         logger.warning(
             "Client digest: server validation failed for %s; disabling fast path for this session",
             ref_uri,
@@ -2435,47 +2434,24 @@ class WeaveClient:
         if not should_enable_client_side_digests():
             return None
         current = self._project_id()
-        if current != self._cached_internal_project_id_for:
+        if current not in self._ext_to_int_project_map:
             logger.debug(
-                "Client digest: re-resolving internal project ID (project changed from %s to %s)",
-                self._cached_internal_project_id_for,
+                "Client digest: resolving internal project ID for %s",
                 current,
             )
-            self._cached_internal_project_id = self._resolve_internal_project_id()
-            self._cached_internal_project_id_for = current
-        return self._cached_internal_project_id
-
-    def _resolve_internal_project_id(self) -> str | None:
-        """Resolve the internal project ID for constructing internal refs.
-
-        For remote servers, calls the projects_info endpoint.
-        For local servers (SQLite), the external ID is the internal ID.
-        Returns None if resolution fails (fallback to external refs).
-        """
-        ext_id = self._project_id()
-        if hasattr(self.server, "projects_info"):
-            try:
-                results = self.server.projects_info(
-                    ProjectsInfoReq(project_ids=[ext_id])
-                )
-                if results:
-                    internal_id = results[0].internal_project_id
-                    self._ext_to_int_project_map[ext_id] = internal_id
-                    return internal_id
-            except Exception:
-                logger.debug(
-                    "Failed to resolve internal project ID, falling back to external refs",
-                    exc_info=True,
-                )
-        # When projects_info is unavailable (e.g., bare SQLite or
-        # RemoteHTTPTraceServer before the endpoint is deployed), we
-        # cannot construct internal refs.  Return None so the client
-        # falls back to external refs and skips client-side digest
-        # validation (the server will still compute the digest).
-        return None
+            self._ext_to_int_project_map[current] = (
+                self._resolve_ext_to_int_project_id(current)
+            )
+        return self._ext_to_int_project_map[current]
 
     def _resolve_ext_to_int_project_id(self, ext_project_id: str) -> str | None:
-        """Resolve an external project ID to internal, with caching."""
+        """Resolve an external project ID to internal, with caching.
+
+        Returns None when projects_info is unavailable (e.g., bare SQLite or
+        RemoteHTTPTraceServer before the endpoint is deployed).  The caller
+        falls back to external refs and skips client-side digest validation
+        (the server will still compute the digest).
+        """
         if ext_project_id in self._ext_to_int_project_map:
             return self._ext_to_int_project_map[ext_project_id]
         if hasattr(self.server, "projects_info"):
@@ -2488,7 +2464,11 @@ class WeaveClient:
                     self._ext_to_int_project_map[ext_project_id] = internal_id
                     return internal_id
             except Exception:
-                pass
+                logger.debug(
+                    "Failed to resolve internal project ID for %s, falling back to external refs",
+                    ext_project_id,
+                    exc_info=True,
+                )
         return None
 
     @trace_sentry.global_trace_sentry.watch()
