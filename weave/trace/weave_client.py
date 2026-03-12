@@ -2439,8 +2439,8 @@ class WeaveClient:
                 "Client digest: resolving internal project ID for %s",
                 current,
             )
-            self._ext_to_int_project_map[current] = (
-                self._resolve_ext_to_int_project_id(current)
+            self._ext_to_int_project_map[current] = self._resolve_ext_to_int_project_id(
+                current
             )
         return self._ext_to_int_project_map[current]
 
