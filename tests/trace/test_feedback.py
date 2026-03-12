@@ -90,7 +90,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
     payload = {"value": 1}
 
     ref = weave.publish(AnnotationSpec(name=column_name, field_schema=int))
-    annotation_ref = ref.uri()
+    annotation_ref = ref.uri
 
     # Case 1: Errors with no name in type (dangle or char len 0)
     with pytest.raises(InvalidRequest):
@@ -411,7 +411,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 sort_by=[
                     SortBy(
                         field=field,
@@ -430,7 +430,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 sort_by=[
                     SortBy(
                         field=field,
@@ -478,7 +478,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 query={
                     "$expr": {
                         "$eq": [
@@ -498,7 +498,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 query={
                     "$expr": {
                         "$gt": [
@@ -532,7 +532,7 @@ async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
-            filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+            filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
             # Filter down to just correct matches
             query={
                 "$expr": {
