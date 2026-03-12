@@ -383,7 +383,8 @@ def test_evaluate_table_lazy_iter(digest_params_client, monkeypatch):
     lazily fetches rows from a table rather than eagerly fetching all
     rows up front.
     """
-    client, enable_client_side_digests = digest_params_client
+    client = digest_params_client.client
+    enable_client_side_digests = digest_params_client.enable_client_side_digests
     monkeypatch.setattr(weave.trace.vals, "REMOTE_ITER_PAGE_SIZE", 4)
 
     dataset = Dataset(rows=[{"input": i} for i in range(10)])

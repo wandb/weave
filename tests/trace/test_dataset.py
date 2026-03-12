@@ -56,7 +56,7 @@ def test_dataset_laziness(digest_params_client):
     """The intention of this test is to show that local construction of
     a dataset does not trigger any remote operations.
     """
-    client, _enable_client_side_digests = digest_params_client
+    client = digest_params_client.client
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
     assert _top_level_logs(log) == _expected_client_init_log()
@@ -83,7 +83,8 @@ def test_published_dataset_laziness(digest_params_client):
     minimal remote operations - and importantly delays the fetching
     of the rows until they are actually needed.
     """
-    client, enable_client_side_digests = digest_params_client
+    client = digest_params_client.client
+    enable_client_side_digests = digest_params_client.enable_client_side_digests
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
     assert _top_level_logs(log) == _expected_client_init_log()

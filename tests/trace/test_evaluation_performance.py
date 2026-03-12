@@ -143,7 +143,8 @@ def _expected_evaluation_counts(enable_client_side_digests: bool) -> Counter[str
 
 @pytest.mark.asyncio
 async def test_evaluation_performance(digest_params_client):
-    client, enable_client_side_digests = digest_params_client
+    client = digest_params_client.client
+    enable_client_side_digests = digest_params_client.enable_client_side_digests
     mode = "on" if enable_client_side_digests else "off"
     # This test asserts exact create counts, so it needs a fresh project
     # namespace instead of reusing objects from prior suite runs.
