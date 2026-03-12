@@ -39,13 +39,21 @@ class StatsQueryTimeBounds:
 
 
 @dataclass(frozen=True)
-class StatsQueryBuildResult:
+class SqlQueryResult:
+    """Base result for parameterized SQL queries."""
+
     sql: str
     columns: list[str]
     parameters: dict[str, Any]
-    granularity_seconds: int
-    start: datetime.datetime
-    end: datetime.datetime
+
+
+@dataclass(frozen=True)
+class StatsQueryBuildResult(SqlQueryResult):
+    """Query result with time-bucketed granularity metadata."""
+
+    granularity_seconds: int = 0
+    start: datetime.datetime = datetime.datetime.min
+    end: datetime.datetime = datetime.datetime.min
 
 
 def auto_select_granularity_seconds(delta: datetime.timedelta) -> int:
@@ -142,6 +150,10 @@ def aggregation_selects_for_metric(
             results.append((f"maxOrNull({col})", f"max_{metric}"))
         elif agg == AggregationType.COUNT:
             results.append((f"countOrNull({col})", f"count_{metric}"))
+        elif agg == AggregationType.COUNT_TRUE:
+            results.append((f"countIf({col} = 1)", f"count_true_{metric}"))
+        elif agg == AggregationType.COUNT_FALSE:
+            results.append((f"countIf({col} = 0)", f"count_false_{metric}"))
         else:
             raise ValueError(f"Unsupported aggregation type: {agg}")
 
