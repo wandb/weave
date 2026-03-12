@@ -35,27 +35,18 @@ def _reset_settings():
 
 @pytest.fixture
 def fast_path(client: WeaveClient):
-    """Enable the client-side digest fast path for a test."""
-    _enable_fast_path(client)
+    """Enable the client-side digest fast path for a test.
+
+    Teardown is handled by the autouse ``_reset_settings`` fixture.
+    """
+    parse_and_apply_settings(UserSettings(enable_client_side_digests=True))
+    client._invalidate_project_cache()
     yield
-    _disable_fast_path(client)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _enable_fast_path(client: WeaveClient) -> None:
-    """Enable client-side digests on an already-created client."""
-    parse_and_apply_settings(UserSettings(enable_client_side_digests=True))
-    client._invalidate_project_cache()
-
-
-def _disable_fast_path(client: WeaveClient) -> None:
-    """Disable client-side digests on an already-created client."""
-    parse_and_apply_settings(UserSettings(enable_client_side_digests=False))
-    client._invalidate_project_cache()
 
 
 def _publish_with_digests(
@@ -69,10 +60,8 @@ def _publish_with_digests(
 
     Toggles client-side digests on/off via settings before publishing.
     """
-    if enable:
-        _enable_fast_path(client)
-    else:
-        _disable_fast_path(client)
+    parse_and_apply_settings(UserSettings(enable_client_side_digests=enable))
+    client._invalidate_project_cache()
     ref = weave.publish(obj, name=name)
     client._flush()
     return ref.digest
@@ -425,7 +414,6 @@ def test_large_dataset_digest_matches(client: WeaveClient):
 def test_object_with_ref_digest_matches(client: WeaveClient):
     """Object containing a ref to another object gets the same digest on both paths."""
     # First publish a nested object (use fallback to avoid path dependency)
-    _disable_fast_path(client)
     inner = {"inner_key": "inner_value"}
     inner_ref = weave.publish(inner, name="inner_obj")
     client._flush()
@@ -559,8 +547,6 @@ def test_fallback_path_sends_no_expected_digest(
     Requirement: The fallback path must not send expected_digest, deferring
     digest computation entirely to the server.
     """
-    _disable_fast_path(client)
-
     captured_digests: list[str | None] = []
     original_obj_create = client.server.server.obj_create
 
