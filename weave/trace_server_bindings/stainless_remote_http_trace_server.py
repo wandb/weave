@@ -15,6 +15,7 @@ from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
@@ -26,7 +27,6 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
-    ServerInfoRes,
     StartBatchItem,
 )
 from weave.utils.project_id import from_project_id
