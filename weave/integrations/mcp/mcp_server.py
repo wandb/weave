@@ -69,7 +69,7 @@ def get_mcp_server_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _mcp_server_patcher
+    global _mcp_server_patcher  # noqa: PLW0603
     if _mcp_server_patcher is not None:
         return _mcp_server_patcher
 
@@ -160,11 +160,11 @@ def get_mcp_server_patcher(
     ]
 
     # Only add list_* operations if opted in via environment variable
-    trace_list_operations = os.environ.get("MCP_TRACE_LIST_OPERATIONS", "").lower() in (
+    trace_list_operations = os.environ.get("MCP_TRACE_LIST_OPERATIONS", "").lower() in {
         "true",
         "1",
         "yes",
-    )
+    }
     if trace_list_operations:
         patchers.extend(
             [

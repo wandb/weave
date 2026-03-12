@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
+from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
@@ -49,6 +50,7 @@ from weave.trace_server import (
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
+from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
@@ -87,6 +89,7 @@ from weave.trace_server.clickhouse_schema import (
     ALL_FILE_CHUNK_INSERT_COLUMNS,
     ALL_OBJ_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
+    AliasCHInsertable,
     CallCHInsertable,
     CallCompleteCHInsertable,
     CallDeleteCHInsertable,
@@ -98,6 +101,7 @@ from weave.trace_server.clickhouse_schema import (
     ObjDeleteCHInsertable,
     ObjRefListType,
     SelectableCHObjSchema,
+    TagCHInsertable,
 )
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter
 from weave.trace_server.constants import (
@@ -174,6 +178,14 @@ from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_queues_query,
     make_queues_stats_query,
 )
+from weave.trace_server.query_builder.obj_tags_query_builder import (
+    make_get_aliases_query,
+    make_get_tags_query,
+    make_list_aliases_query,
+    make_list_tags_query,
+    make_obj_version_exists_query,
+    make_resolve_alias_query,
+)
 from weave.trace_server.query_builder.objects_query_builder import (
     ObjectMetadataQueryBuilder,
     format_metadata_objects_from_query_result,
@@ -195,6 +207,7 @@ from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
     build_model_prices_query,
+    get_cost_result_columns,
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
@@ -259,24 +272,33 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
+        self._op_ref_cache: TTLCache[tuple[str, str], str] = TTLCache(
+            maxsize=50_000, ttl=86_400
+        )
+        self._op_ref_cache_lock = threading.Lock()
+        self._database_ensured = False
 
     def __del__(self) -> None:
-        """Flush the Kafka producer on cleanup to avoid dropping in-flight messages."""
-        if (
-            not self._call_batch
-            and not self._calls_complete_batch
-            and not self._file_batch
-        ):
-            return
+        """Flush batches and the Kafka producer on cleanup."""
+        if self._call_batch or self._calls_complete_batch or self._file_batch:
+            try:
+                self._flush_all_batches_in_order()
+            except Exception:
+                pass
+            finally:
+                self._file_batch = []
+                self._call_batch = []
+                self._calls_complete_batch = []
+                self._flush_immediately = True
+
+        # Always drain remaining kafka messages at shutdown.
         try:
-            self._flush_all_batches_in_order()
+            producer = self.kafka_producer
+            if producer is not None:
+                # 10 second timeout for flushing remaining messages
+                producer.flush(timeout=10)
         except Exception:
             pass
-        finally:
-            self._file_batch = []
-            self._call_batch = []
-            self._calls_complete_batch = []
-            self._flush_immediately = True
 
     @property
     def _flush_immediately(self) -> bool:
@@ -401,21 +423,57 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
-    ) -> list[tsi.ObjSchema]:
-        obj_version_filter = tsi.ObjectVersionFilter(
-            object_ids=list(seen_ids),
-            latest_only=True,
-            is_op=True,
-        )
+    ) -> dict[str, str]:
+        """Look up existing op ref URIs, using an in-memory TTL cache to skip repeated CH queries.
 
-        return self.objs_query(
-            tsi.ObjQueryReq(
-                project_id=project_id,
-                filter=obj_version_filter,
-                metadata_only=True,
-                limit=limit,
-            ),
-        ).objs
+        Returns a dict of op_name -> op_ref_uri for all ops that already exist
+        (either from cache or from CH).
+        """
+        resolved: dict[str, str] = {}
+        uncached_ids: set[str] = set()
+
+        # Check cache first
+        with self._op_ref_cache_lock:
+            for op_name in seen_ids:
+                cached_uri = self._op_ref_cache.get((project_id, op_name))
+                if cached_uri is not None:
+                    resolved[op_name] = cached_uri
+                else:
+                    uncached_ids.add(op_name)
+
+        # Query CH only for uncached ops
+        if uncached_ids:
+            obj_version_filter = tsi.ObjectVersionFilter(
+                object_ids=list(uncached_ids),
+                latest_only=True,
+                is_op=True,
+            )
+            ch_results = self.objs_query(
+                tsi.ObjQueryReq(
+                    project_id=project_id,
+                    filter=obj_version_filter,
+                    metadata_only=True,
+                    limit=limit,
+                ),
+            ).objs
+
+            # Populate cache and resolved dict with CH results
+            with self._op_ref_cache_lock:
+                for obj in ch_results:
+                    uri = ri.InternalOpRef(
+                        project_id=project_id,
+                        name=obj.object_id,
+                        version=obj.digest,
+                    ).uri
+                    self._op_ref_cache[project_id, obj.object_id] = uri
+                    resolved[obj.object_id] = uri
+
+        return resolved
+
+    def _cache_op_ref(self, project_id: str, op_name: str, uri: str) -> None:
+        """Cache a resolved op ref URI."""
+        with self._op_ref_cache_lock:
+            self._op_ref_cache[project_id, op_name] = uri
 
     def _create_or_get_placeholder_ops_digest(
         self, project_id: str, create: bool
@@ -482,20 +540,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         )
                     )
 
+        set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
+
         obj_id_idx_map = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
             op_name = object_creation_utils.make_safe_name(start_call.op_name)
             obj_id_idx_map[op_name].append(idx)
 
-        existing_objects = self._get_existing_ops_from_spans(
+        existing_ops = self._get_existing_ops_from_spans(
             seen_ids=set(obj_id_idx_map.keys()),
             project_id=req.project_id,
             limit=len(calls),
         )
+
+        for op_name, op_ref_uri in existing_ops.items():
+            # Modify each of the matched start calls in place
+            for idx in obj_id_idx_map[op_name]:
+                calls[idx][0].op_name = op_ref_uri
+            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
+            obj_id_idx_map.pop(op_name)
+
         # We know that OTel will always use the placeholder source.
         # We can instead just reuse the existing file if we know it is present
         # and create it just once if we are not sure.
-        if len(existing_objects) == 0:
+        if len(existing_ops) == 0:
             digest = self._create_or_get_placeholder_ops_digest(
                 project_id=req.project_id, create=True
             )
@@ -503,20 +571,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest = self._create_or_get_placeholder_ops_digest(
                 project_id=req.project_id, create=False
             )
-
-        for obj in existing_objects:
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=obj.object_id,
-                version=obj.digest,
-            ).uri()
-
-            # Modify each of the matched start calls in place
-            for idx in obj_id_idx_map[obj.object_id]:
-                calls[idx][0].op_name = op_ref_uri
-            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
-            obj_id_idx_map.pop(obj.object_id)
-
         obj_creation_batch = []
         for op_obj_id in obj_id_idx_map.keys():
             op_val = object_creation_utils.build_op_val(digest)
@@ -538,9 +592,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 name=result.object_id,
                 version=result.digest,
-            ).uri()
+            ).uri
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
+            # Cache newly created ops so subsequent batches skip the CH query
+            self._cache_op_ref(req.project_id, result.object_id, op_ref_uri)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
@@ -568,7 +624,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 for start, end in calls
             ]
-            self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
+            self._insert_call_complete_batch(rows)
         else:
             rows = []
             for start, end in calls:
@@ -580,7 +636,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 rows.append(
                     _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
                 )
-            self._insert_call_batch(rows, settings=None, do_sync_insert=True)
+            self._insert_call_batch(rows)
 
         # Run callbacks and flush
         for cb in event_callbacks:
@@ -604,7 +660,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _flush_kafka_producer(self) -> None:
         producer = self.kafka_producer
         if producer is not None:
-            producer.flush()
+            # Non-blocking flush to avoid convoy effect — see KafkaProducer.produce_call_end.
+            producer.flush(timeout=0)
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
@@ -664,11 +721,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
 
-    # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        """Creates a new call."""
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
+        set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
 
         req = process_call_req_to_content(req, self)
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start)
@@ -745,20 +803,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             CallsUpsertCompleteRes: Empty response on success.
         """
+        set_current_span_dd_tags(
+            {"weave_trace_server.insert_call_count": len(req.batch)}
+        )
+
         with self.call_batch():
             for complete_call in req.batch:
-                complete_call = process_complete_call_to_content(complete_call, self)
+                processed_complete_call = process_complete_call_to_content(
+                    complete_call, self
+                )
 
                 # Determine write target based on project, this should be the same for all
                 # calls in the batch, subsequent calls just hit the in-memory cache. This
                 # is here for technical correctness, in case we relax project_id target
                 # constraints intra-batch
                 write_target = self.table_routing_resolver.resolve_v2_write_target(
-                    complete_call.project_id,
+                    processed_complete_call.project_id,
                     self.ch_client,
                 )
 
-                ch_call = _complete_call_to_ch_insertable(complete_call)
+                ch_call = _complete_call_to_ch_insertable(processed_complete_call)
                 if write_target == WriteTarget.CALLS_COMPLETE:
                     self._insert_call_complete(ch_call)
                 else:
@@ -766,9 +830,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
                 _maybe_enqueue_minimal_call_end(
                     self.kafka_producer,
-                    complete_call.project_id,
-                    complete_call.id,
-                    complete_call.ended_at,
+                    processed_complete_call.project_id,
+                    processed_complete_call.id,
+                    processed_complete_call.ended_at,
                 )
 
         return tsi.CallsUpsertCompleteRes()
@@ -1278,7 +1342,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
 
-        select_columns = [c.field for c in cq.select_fields]
+        if req.include_costs:
+            # Cost query SELECT adds ORDER BY fields; result columns must match.
+            select_columns = get_cost_result_columns(
+                [c.field for c in cq.select_fields], cq.order_fields
+            )
+        else:
+            select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
         include_feedback = req.include_feedback or False
 
@@ -1383,8 +1453,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 # Filter out non-unique refs
                 unique_ref_map = {}
                 for ref in refs_to_resolve.values():
-                    if ref.uri() not in unique_ref_map:
-                        unique_ref_map[ref.uri()] = ref
+                    if ref.uri not in unique_ref_map:
+                        unique_ref_map[ref.uri] = ref
 
                 # Fetch values only for the unique refs
                 vals = self._refs_read_batch_within_project(
@@ -1394,15 +1464,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 # update the ref map with the fetched values
                 ref_val_map = {}
                 for ref, val in zip(unique_ref_map.values(), vals, strict=False):
-                    ref_val_map[ref.uri()] = val
+                    ref_val_map[ref.uri] = val
 
                 # Replace the refs with values and add ref key
                 for (i, col), ref in refs_to_resolve.items():
                     # Look up the value using the ref's URI
-                    val = ref_val_map.get(ref.uri())
+                    val = ref_val_map.get(ref.uri)
                     if val is not None:
                         if isinstance(val, dict) and "_ref" not in val:
-                            val["_ref"] = ref.uri()
+                            val["_ref"] = ref.uri
                         set_nested_key(calls[i], col, val)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
@@ -1640,8 +1710,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return obj_results
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        # Check if digest is an alias name (not a hash, not version-like, not "latest")
+        digest = req.digest
+        resolved_digest = self._maybe_resolve_alias(
+            req.project_id, req.object_id, digest
+        )
+        if resolved_digest is not None:
+            digest = resolved_digest
+
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_digests_conditions(req.digest)
+        object_query_builder.add_digests_conditions(digest)
         object_query_builder.add_object_ids_condition([req.object_id])
         object_query_builder.set_include_deleted(include_deleted=True)
         metadata_only = req.metadata_only or False
@@ -1657,7 +1735,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 deleted_at=obj.deleted_at,
             )
 
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
+        obj_schema = _ch_obj_to_obj_schema(obj)
+        if req.include_tags_and_aliases:
+            set_root_span_dd_tags({"include_tags_and_aliases": True})
+            self._enrich_objs_with_tags_and_aliases(req.project_id, [obj_schema])
+        return tsi.ObjReadRes(obj=obj_schema)
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -1685,6 +1767,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 object_query_builder.add_leaf_object_classes_condition(
                     req.filter.leaf_object_classes
                 )
+            if req.filter.tags:
+                object_query_builder.add_tags_condition(req.filter.tags)
+            if req.filter.aliases:
+                object_query_builder.add_aliases_condition(req.filter.aliases)
         if req.limit is not None:
             object_query_builder.set_limit(req.limit)
         if req.offset is not None:
@@ -1696,7 +1782,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         object_query_builder.set_include_deleted(include_deleted=False)
         object_query_builder.include_storage_size = req.include_storage_size or False
         objs = self._select_objs_query(object_query_builder, metadata_only)
-        return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
+        obj_schemas = [_ch_obj_to_obj_schema(obj) for obj in objs]
+        if req.include_tags_and_aliases:
+            set_root_span_dd_tags({"include_tags_and_aliases": True})
+            self._enrich_objs_with_tags_and_aliases(req.project_id, obj_schemas)
+        return tsi.ObjQueryRes(objs=obj_schemas)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         """Delete object versions by digest, belonging to given object_id.
@@ -1763,7 +1853,247 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert("object_versions", data=data, column_names=column_names)
         num_deleted = len(delete_insertables)
 
+        # Cascade: soft-delete tags and aliases for deleted digests
+        deleted_digests = {obj.digest for obj in delete_insertables}
+        tags_map = self._get_tags_for_objects(req.project_id, [req.object_id])
+        for (obj_id, digest), tags in tags_map.items():
+            if digest in deleted_digests:
+                self._insert_tags(
+                    req.project_id,
+                    obj_id,
+                    digest,
+                    tags,
+                    deleted_at=now,
+                )
+
+        aliases_map = self._get_aliases_for_objects(req.project_id, [req.object_id])
+        for (obj_id, digest), aliases in aliases_map.items():
+            if digest in deleted_digests:
+                self._insert_aliases(
+                    req.project_id,
+                    obj_id,
+                    aliases,
+                    digest,
+                    deleted_at=now,
+                )
+
         return tsi.ObjDeleteRes(num_deleted=num_deleted)
+
+    # --- Tags & Aliases ---
+
+    def _ensure_obj_version_exists(
+        self, project_id: str, object_id: str, digest: str
+    ) -> None:
+        """Raise NotFoundError if the object version doesn't exist or is deleted."""
+        query, parameters = make_obj_version_exists_query(project_id, object_id, digest)
+        result = self._query(query, parameters)
+        if not result.result_rows:
+            raise NotFoundError(f"Object version {object_id}:{digest} not found")
+
+    def _insert_tags(
+        self,
+        project_id: str,
+        object_id: str,
+        digest: str,
+        tags: list[str],
+        wb_user_id: str = "",
+        deleted_at: datetime.datetime | None = None,
+    ) -> None:
+        rows = []
+        for tag in tags:
+            ch_tag = TagCHInsertable(
+                project_id=project_id,
+                object_id=object_id,
+                digest=digest,
+                tag=tag,
+                wb_user_id=wb_user_id,
+                **({"deleted_at": deleted_at} if deleted_at else {}),
+            )
+            rows.append(list(ch_tag.model_dump().values()))
+        if rows:
+            self._insert(
+                "tags",
+                data=rows,
+                column_names=list(TagCHInsertable.model_fields.keys()),
+            )
+
+    def _insert_aliases(
+        self,
+        project_id: str,
+        object_id: str,
+        aliases: list[str],
+        digest: str,
+        wb_user_id: str = "",
+        deleted_at: datetime.datetime | None = None,
+    ) -> None:
+        rows = []
+        for alias in aliases:
+            ch_alias = AliasCHInsertable(
+                project_id=project_id,
+                object_id=object_id,
+                alias=alias,
+                digest=digest,
+                wb_user_id=wb_user_id,
+                **({"deleted_at": deleted_at} if deleted_at else {}),
+            )
+            rows.append(list(ch_alias.model_dump().values()))
+        if rows:
+            self._insert(
+                "aliases",
+                data=rows,
+                column_names=list(AliasCHInsertable.model_fields.keys()),
+            )
+
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        assert req.wb_user_id, "wb_user_id is required for obj_add_tags"
+        self._ensure_obj_version_exists(req.project_id, req.object_id, req.digest)
+        self._insert_tags(
+            req.project_id,
+            req.object_id,
+            req.digest,
+            req.tags,
+            wb_user_id=req.wb_user_id,
+        )
+        return tsi.ObjAddTagsRes()
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        assert req.wb_user_id, "wb_user_id is required for obj_remove_tags"
+        self._insert_tags(
+            req.project_id,
+            req.object_id,
+            req.digest,
+            req.tags,
+            wb_user_id=req.wb_user_id,
+            deleted_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        return tsi.ObjRemoveTagsRes()
+
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+        assert req.wb_user_id, "wb_user_id is required for obj_set_aliases"
+        self._ensure_obj_version_exists(req.project_id, req.object_id, req.digest)
+        self._insert_aliases(
+            req.project_id,
+            req.object_id,
+            req.aliases,
+            req.digest,
+            wb_user_id=req.wb_user_id,
+        )
+        return tsi.ObjSetAliasesRes()
+
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
+        assert req.wb_user_id, "wb_user_id is required for obj_remove_aliases"
+        self._insert_aliases(
+            req.project_id,
+            req.object_id,
+            req.aliases,
+            digest="",  # doesn't matter; dedup key is (project_id, object_id, alias)
+            wb_user_id=req.wb_user_id,
+            deleted_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        return tsi.ObjRemoveAliasesRes()
+
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        query, parameters = make_list_tags_query(req.project_id)
+        query_result = self._query(query, parameters)
+        tags = [row[0] for row in query_result.result_rows]
+        return tsi.TagsListRes(tags=tags)
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        query, parameters = make_list_aliases_query(req.project_id)
+        query_result = self._query(query, parameters)
+        aliases = [row[0] for row in query_result.result_rows]
+        return tsi.AliasesListRes(aliases=aliases)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._get_tags_for_objects")
+    def _get_tags_for_objects(
+        self,
+        project_id: str,
+        object_ids: list[str],
+    ) -> dict[tuple[str, str], list[str]]:
+        """Fetch tags for a list of object_ids.
+        Returns a dict mapping (object_id, digest) -> list of tag strings.
+        """
+        if not object_ids:
+            return {}
+        query, parameters = make_get_tags_query(project_id, object_ids)
+        query_result = self._query(query, parameters)
+        result: dict[tuple[str, str], list[str]] = {}
+        for row in query_result.result_rows:
+            key = (row[0], row[1])
+            result.setdefault(key, []).append(row[2])
+        return result
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._get_aliases_for_objects"
+    )
+    def _get_aliases_for_objects(
+        self,
+        project_id: str,
+        object_ids: list[str],
+    ) -> dict[tuple[str, str], list[str]]:
+        """Fetch aliases for a list of object_ids.
+        Returns a dict mapping (object_id, digest) -> list of alias strings.
+        """
+        if not object_ids:
+            return {}
+        query, parameters = make_get_aliases_query(project_id, object_ids)
+        query_result = self._query(query, parameters)
+        result: dict[tuple[str, str], list[str]] = {}
+        for row in query_result.result_rows:
+            key = (row[0], row[1])
+            result.setdefault(key, []).append(row[2])
+        return result
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._maybe_resolve_alias")
+    def _maybe_resolve_alias(
+        self,
+        project_id: str,
+        object_id: str,
+        digest: str,
+    ) -> str | None:
+        """If digest looks like an alias name (not a hash, not version-like, not 'latest'),
+        resolve it to the actual digest via the aliases table. Returns None if not an alias.
+        """
+        # Return None for digests that are not alias names, so the caller
+        # falls through to normal digest-based lookup.  "latest" and version
+        # patterns (v0, v1, …) are handled by the existing obj_read logic;
+        # content hashes are real digests that don't need resolution.
+        if digest == "latest":
+            return None
+        (is_version, _) = tsc.digest_is_version_like(digest)
+        if is_version:
+            return None
+        if tsc.digest_is_content_hash(digest):
+            return None
+        query, parameters = make_resolve_alias_query(project_id, object_id, digest)
+        result = self._query(query, parameters)
+        if result.result_rows:
+            return result.result_rows[0][0]
+        return None
+
+    def _enrich_objs_with_tags_and_aliases(
+        self,
+        project_id: str,
+        objs: list[tsi.ObjSchema],
+    ) -> None:
+        """In-place enrichment of ObjSchema list with tags and aliases."""
+        if not objs:
+            return
+        object_ids = list({obj.object_id for obj in objs})
+
+        tags_map = self._get_tags_for_objects(project_id, object_ids)
+        aliases_map = self._get_aliases_for_objects(project_id, object_ids)
+
+        for obj in objs:
+            key = (obj.object_id, obj.digest)
+            obj.tags = sorted(tags_map.get(key, []))
+            aliases = aliases_map.get(key, [])
+            # "latest" is virtual — synthesized from the is_latest window function
+            if obj.is_latest == 1 and "latest" not in aliases:
+                aliases = ["latest"] + aliases
+            obj.aliases = aliases
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
@@ -2127,6 +2457,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
         pb = ParamBuilder()
 
         # Extract filter values
@@ -2148,6 +2481,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             sortable_datetime_after=after_datetime,
             sortable_datetime_before=before_datetime,
             thread_ids=thread_ids,
+            read_table=read_table,
         )
 
         # Stream the results using _query_stream
@@ -2739,7 +3073,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if (
             current_state is not None
             and req.annotation_state != "in_progress"
-            and current_state not in ("in_progress", "unstarted")
+            and current_state not in {"in_progress", "unstarted"}
         ):
             raise ValueError(
                 f"Invalid state transition from '{current_state}' to '{req.annotation_state}'. "
@@ -3036,7 +3370,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         table_ref = ri.InternalTableRef(
             project_id=req.project_id,
             digest=table_res.digest,
-        ).uri()
+        ).uri
 
         # Create the dataset object
         dataset_val = object_creation_utils.build_dataset_val(
@@ -3211,7 +3545,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=scorer_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
         return tsi.ScorerCreateRes(
             digest=obj_result.digest,
             object_id=scorer_id,
@@ -3227,26 +3561,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=req.digest,
         )
         result = self._obj_read_with_retry(obj_req)
-        val = result.obj.val
-
-        # Extract name and description from val data
-        name = val.get("name")
-        description = val.get("description")
-
-        # Create the response with all required fields
-        return tsi.ScorerReadRes(
-            object_id=result.obj.object_id,
-            digest=result.obj.digest,
-            version_index=result.obj.version_index,
-            created_at=result.obj.created_at,
-            name=name,
-            description=description,
-            score_op=val.get("score", ""),
-        )
+        return tsc.scorer_read_res_from_obj(result.obj)
 
     def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
         """List scorer objects by delegating to objs_query with Scorer filtering."""
-        # Query the objects
         scorer_filter = tsi.ObjectVersionFilter(
             base_object_classes=["Scorer"], is_op=False
         )
@@ -3258,28 +3576,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_res = self.objs_query(obj_query_req)
 
-        # Yield back the full ScorerReadRes for each scorer
         for obj in obj_res.objs:
-            name = None
-            description = None
-            score_op = ""
-
-            if hasattr(obj, "val") and obj.val:
-                val = obj.val
-                if isinstance(val, dict):
-                    name = val.get("name")
-                    description = val.get("description")
-                    score_op = val.get("score", "")
-
-            yield tsi.ScorerReadRes(
-                object_id=obj.object_id,
-                digest=obj.digest,
-                version_index=obj.version_index,
-                created_at=obj.created_at,
-                name=name,
-                description=description,
-                score_op=score_op,
-            )
+            yield tsc.scorer_read_res_from_obj(obj)
 
     def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
         """Delete scorer objects by delegating to obj_delete."""
@@ -3367,7 +3665,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=evaluation_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
         return tsi.EvaluationCreateRes(
             digest=obj_result.digest,
             object_id=evaluation_id,
@@ -3513,7 +3811,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=object_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.ModelCreateRes(
             digest=obj_result.digest,
@@ -3674,7 +3972,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 id=evaluation_run_id,
                 trace_id=evaluation_run_id,
-                op_name=op_ref.uri(),
+                op_name=op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes={
                     constants.WEAVE_ATTRIBUTES_NAMESPACE: {
@@ -4006,7 +4304,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     id=predict_and_score_id,
                     trace_id=trace_id,
                     parent_id=req.evaluation_run_id,
-                    op_name=predict_and_score_op_ref.uri(),
+                    op_name=predict_and_score_op_ref.uri,
                     started_at=datetime.datetime.now(datetime.timezone.utc),
                     attributes={
                         constants.WEAVE_ATTRIBUTES_NAMESPACE: {
@@ -4077,7 +4375,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 id=prediction_id,
                 trace_id=trace_id,
                 parent_id=parent_id,
-                op_name=predict_op_ref.uri(),
+                op_name=predict_op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes=prediction_attributes,
                 inputs={
@@ -4147,7 +4445,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.PredictionReadRes(
             prediction_id=call.id,
             model=attributes.get(constants.PREDICTION_MODEL_ATTR_KEY, ""),
-            inputs=call.inputs.get("inputs") if call.inputs else {},
+            inputs=tsc.get_prediction_inputs(call.inputs),
             output=call.output,
             evaluation_run_id=evaluation_run_id,
             wb_user_id=call.wb_user_id,
@@ -4230,7 +4528,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             yield tsi.PredictionReadRes(
                 prediction_id=call.id,
                 model=attributes.get(constants.PREDICTION_MODEL_ATTR_KEY, ""),
-                inputs=call.inputs.get("inputs") if call.inputs else {},
+                inputs=tsc.get_prediction_inputs(call.inputs),
                 output=call.output,
                 evaluation_run_id=evaluation_run_id,
                 wb_user_id=call.wb_user_id,
@@ -4475,7 +4773,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 id=score_id,
                 trace_id=trace_id,
                 parent_id=parent_id,
-                op_name=score_op_ref.uri(),
+                op_name=score_op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes=score_attributes,
                 inputs={
@@ -4516,7 +4814,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         feedback_req = tsi.FeedbackCreateReq(
             project_id=req.project_id,
-            weave_ref=prediction_call_ref.uri(),
+            weave_ref=prediction_call_ref.uri,
             feedback_type=f"{RUNNABLE_FEEDBACK_TYPE_PREFIX}.{scorer_name}",
             payload={"output": req.value},
             runnable_ref=req.scorer,
@@ -4675,6 +4973,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         res = self.calls_delete(calls_delete_req)
         return tsi.ScoreDeleteRes(num_deleted=res.num_deleted)
 
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Return grouped prediction/trial/score data for evaluation results."""
+        return eval_helpers.eval_results_query(self, req)
+
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
     ) -> tsi.ObjReadRes:
@@ -4722,13 +5026,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         final_result_cache: dict[str, Any] = {}
 
         def make_ref_cache_key(ref: ri.InternalObjectRef) -> str:
-            return ref.uri()
+            return ref.uri
 
-        for project in refs_by_project_id:
-            project_refs = refs_by_project_id[project]
+        for project, project_refs in refs_by_project_id.items():
             project_results = self._refs_read_batch_within_project(
                 project,
-                refs_by_project_id[project],
+                project_refs,
                 root_val_cache,
             )
             for ref, result in zip(project_refs, project_results, strict=False):
@@ -4986,6 +5289,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = compute_file_digest(req.content)
+
+        # During a batch, _file_batch accumulates chunks. If we already have
+        # chunks for this (project_id, digest), the content is identical and
+        # we can skip the redundant storage I/O (bucket upload or CH insert).
+        if any(
+            c.project_id == req.project_id and c.digest == digest
+            for c in self._file_batch
+        ):
+            return tsi.FileCreateRes(digest=digest)
+
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 
@@ -5485,7 +5798,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         req.inputs.messages = initial_messages
         call_id = generate_id()
-        trace_id = generate_id()
+        trace_id = req.trace_id or generate_id()
+        parent_id = req.parent_id
 
         # Build summary with usage info if available
         summary: tsi.SummaryInsertMap = {}
@@ -5501,6 +5815,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 id=call_id,
                 trace_id=trace_id,
+                parent_id=parent_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=start_time,
                 ended_at=end_time,
@@ -5523,6 +5838,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 id=call_id,
                 trace_id=trace_id,
+                parent_id=parent_id,
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=start_time,
@@ -5648,6 +5964,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             start = tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
+                trace_id=req.trace_id,
+                parent_id=req.parent_id,
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=datetime.datetime.now(),
@@ -5833,6 +6151,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        """Enqueue scoring jobs for a list of calls.
+
+        Publishes the request to Kafka, where it will be consumed by the
+        call_scoring_worker and applied asynchronously.
+        """
+        if self.kafka_producer is None:
+            raise ValueError("Kafka producer is not set")
+
+        self.kafka_producer.produce_score_calls(req)
+
+        return tsi.CallsScoreRes()
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
@@ -5845,6 +6176,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
 
+    def _ensure_database(self, client: CHClient) -> None:
+        """Run CREATE DATABASE IF NOT EXISTS once per process."""
+        if self._database_ensured:
+            return
+        with self._init_lock:
+            if self._database_ensured:
+                return
+            client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
+            self._database_ensured = True
+
     def _mint_client(self) -> CHClient:
         """Create a new ClickHouse client using the shared pool manager."""
         client = clickhouse_connect.get_client(
@@ -5855,8 +6196,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             secure=self._port == 8443,
             pool_mgr=_CH_POOL_MANAGER,
         )
-        # Safely create the database if it does not exist
-        client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
+        self._ensure_database(client)
         client.database = self._database
         return client
 
@@ -6304,7 +6644,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             final_batch.append(stripped_item)
 
-        ddtrace.tracer.current_span().set_tags(
+        set_current_span_dd_tags(
             {
                 "clickhouse_trace_server_batched._strip_large_values.stripped_count": str(
                     stripped_count
@@ -7169,7 +7509,7 @@ def _setup_completion_model_info(
         credentials_satisfied = is_vertex_provider and vertex_credentials
         if (
             not api_key
-            and provider not in ("bedrock", "bedrock_converse")
+            and provider not in {"bedrock", "bedrock_converse"}
             and not credentials_satisfied
         ):
             raise MissingLLMApiKeyError(

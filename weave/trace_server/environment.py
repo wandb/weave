@@ -13,7 +13,7 @@ def kafka_broker_host() -> str:
 
 def kafka_broker_port() -> int:
     """The port of the kafka broker."""
-    return int(os.environ.get("KAFKA_BROKER_PORT", 9092))
+    return int(os.environ.get("KAFKA_BROKER_PORT", "9092"))
 
 
 def kafka_client_user() -> str | None:
@@ -59,12 +59,12 @@ def wf_enable_online_eval() -> bool:
 
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", 100))
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", "100"))
 
 
 def wf_scoring_worker_batch_timeout() -> int:
     """The timeout for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", 5))
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", "5"))
 
 
 def wf_scoring_worker_check_cancellation() -> bool:
@@ -88,6 +88,32 @@ def wf_scoring_worker_kafka_consumer_group_id_override() -> str | None:
     return os.environ.get("SCORING_WORKER_KAFKA_CONSUMER_GROUP_ID")
 
 
+def wf_scoring_worker_debounced_scoring_max_sampling_rate() -> float:
+    """Max sampling rate cap for debounced scoring (delay > 0). 0.0 = disable, 1.0 = no cap beyond monitor rate."""
+    default = 0.0
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_SAMPLING_RATE", str(default)
+    )
+    try:
+        rate = float(raw)
+    except ValueError:
+        return default
+    return max(0.0, min(1.0, rate))
+
+
+def wf_scoring_worker_debounced_scoring_max_call_history() -> int:
+    """Max number of prior calls to fetch per task when aggregation_method is 'all_messages'. 0 = disabled."""
+    default = 0
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_CALL_HISTORY", str(default)
+    )
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(0, value)
+
+
 # Clickhouse Settings
 
 
@@ -98,7 +124,7 @@ def wf_clickhouse_host() -> str:
 
 def wf_clickhouse_port() -> int:
     """The port of the clickhouse server."""
-    return int(os.environ.get("WF_CLICKHOUSE_PORT", 8123))
+    return int(os.environ.get("WF_CLICKHOUSE_PORT", "8123"))
 
 
 def wf_clickhouse_user() -> str:
@@ -137,6 +163,26 @@ def wf_clickhouse_use_distributed_tables() -> bool:
         os.environ.get("WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES", "false").lower()
         == "true"
     )
+
+
+VALID_CALLS_SHARD_KEYS = frozenset({"trace_id", "id", "project_id"})
+
+
+def wf_clickhouse_calls_shard_key() -> str:
+    """The column used as shard key for calls_complete in distributed mode.
+
+    Valid values: "trace_id" (default), "id", "project_id".
+
+    Raises:
+        ValueError: If the configured shard key is not one of the valid values.
+    """
+    key = os.environ.get("WF_CLICKHOUSE_CALLS_SHARD_KEY", "trace_id")
+    if key not in VALID_CALLS_SHARD_KEYS:
+        raise ValueError(
+            f"Invalid WF_CLICKHOUSE_CALLS_SHARD_KEY: {key!r}. "
+            f"Must be one of: {', '.join(sorted(VALID_CALLS_SHARD_KEYS))}"
+        )
+    return key
 
 
 def wf_clickhouse_max_memory_usage() -> int | None:

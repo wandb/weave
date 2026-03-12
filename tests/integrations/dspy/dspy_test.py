@@ -5,9 +5,8 @@ from typing import Literal
 import dspy
 import pytest
 
-import weave.integrations.dspy.dspy_sdk as dspy_sdk
 import weave.integrations.litellm.litellm as litellm_sdk
-import weave.integrations.openai.openai_sdk as openai_sdk
+from weave.integrations.dspy import dspy_sdk
 from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
 from weave.integrations.integration_utilities import (
     flatten_calls,
@@ -15,6 +14,7 @@ from weave.integrations.integration_utilities import (
     op_name_from_ref,
 )
 from weave.integrations.litellm.litellm import get_litellm_patcher
+from weave.integrations.openai import openai_sdk
 from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter

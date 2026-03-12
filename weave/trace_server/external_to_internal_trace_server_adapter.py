@@ -104,11 +104,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 res.close()
 
     # Standard API Below:
-    def ensure_project_exists(
-        self, entity: str, project: str
-    ) -> tsi.EnsureProjectExistsRes:
-        return self._internal_trace_server.ensure_project_exists(entity, project)
-
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # Convert project_id at request level
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
@@ -266,6 +261,33 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.obj_delete, req)
+
+    # Tag/alias requests contain only plain identifiers (no refs to convert)
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.obj_add_tags(req)
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.obj_remove_tags(req)
+
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.obj_set_aliases(req)
+
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.obj_remove_aliases(req)
+
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.tags_list(req)
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.aliases_list(req)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
@@ -526,6 +548,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_status, req)
 
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        """Translate external IDs to internal IDs before forwarding to the internal server."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.calls_score, req)
+
     # === V2 APIs ===
 
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
@@ -735,6 +764,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.score_delete, req)
 
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Query grouped evaluation results with project ID conversion."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.eval_results_query, req)
+
     # Calls V2 API
     def calls_complete(
         self, req: tsi.CallsUpsertCompleteReq
@@ -742,6 +778,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         """Batch complete calls, converting project_id."""
         for item in req.batch:
             item.project_id = self._idc.ext_to_int_project_id(item.project_id)
+            if item.wb_run_id is not None:
+                item.wb_run_id = self._idc.ext_to_int_run_id(item.wb_run_id)
             if item.wb_user_id is not None:
                 item.wb_user_id = self._idc.ext_to_int_user_id(item.wb_user_id)
         return self._ref_apply(self._internal_trace_server.calls_complete, req)
@@ -749,6 +787,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
         """Start a single call (v2), converting project_id."""
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
+        if req.start.wb_run_id is not None:
+            req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
         if req.start.wb_user_id is not None:
             req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
         return self._ref_apply(self._internal_trace_server.call_start_v2, req)

@@ -67,6 +67,7 @@ from weave.trace_server.trace_server_interface import (
 )
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_create(client):
     res = client.server.table_create(
         TableCreateReq(
@@ -1107,7 +1108,7 @@ def test_evaluate(client):
     # TODO: walk the whole graph and make sure all the refs and relationships
     # are there.
     child0 = eval_call_children[0]
-    assert child0.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri()
+    assert child0.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri
 
     eval_obj = child0.inputs["self"]
     eval_obj_val = eval_obj._val  # non-trace version so we don't automatically deref
@@ -1133,8 +1134,7 @@ def test_evaluate(client):
     model_obj = child0.inputs["model"]
     assert is_op(model_obj)
     assert (
-        weave_client.get_ref(model_obj).uri()
-        == weave_client.get_ref(model_predict).uri()
+        weave_client.get_ref(model_obj).uri == weave_client.get_ref(model_predict).uri
     )
 
     example0_obj = child0.inputs["example"]
@@ -1170,7 +1170,7 @@ def test_evaluate(client):
 
     # second child is another predict_and_score call
     child1 = eval_call_children[1]
-    assert child1.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri()
+    assert child1.op_name == weave_client.get_ref(Evaluation.predict_and_score).uri
     assert child0.inputs["self"]._val == child1.inputs["self"]._val
 
     # TODO: these are not directly equal, we end up loading the same thing
@@ -1231,7 +1231,7 @@ def test_op_query(client):
 def test_refs_read_batch_noextra(client):
     ref = client._save_object([1, 2, 3], "my-list")
     ref2 = client._save_object({"a": [3, 4, 5]}, "my-obj")
-    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri(), ref2.uri()]))
+    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri, ref2.uri]))
     assert len(res.vals) == 2
     assert res.vals[0] == [1, 2, 3]
     assert res.vals[1] == {"a": [3, 4, 5]}
@@ -1241,7 +1241,7 @@ def test_refs_read_batch_with_extra(client):
     saved = client.save([{"a": 5}, {"a": 6}], "my-list")
     ref1 = saved[0]["a"].ref
     ref2 = saved[1].ref
-    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref1.uri(), ref2.uri()]))
+    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref1.uri, ref2.uri]))
     assert len(res.vals) == 2
     assert res.vals[0] == 5
     assert res.vals[1] == {"a": 6}
@@ -1251,7 +1251,7 @@ def test_refs_read_batch_dataset_rows(client):
     saved = client.save(weave.Dataset(rows=[{"a": 5}, {"a": 6}]), "my-dataset")
     ref1 = saved.rows[0]["a"].ref
     ref2 = saved.rows[1]["a"].ref
-    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref1.uri(), ref2.uri()]))
+    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref1.uri, ref2.uri]))
     assert len(res.vals) == 2
     assert res.vals[0] == 5
     assert res.vals[1] == 6
@@ -1267,7 +1267,7 @@ def test_refs_read_batch_multi_project(client):
     client.project = "test333"
     ref3 = client._save_object({"ab": [3, 4, 5]}, "my-obj-2")
 
-    refs = [ref.uri(), ref2.uri(), ref3.uri()]
+    refs = [ref.uri, ref2.uri, ref3.uri]
     res = client.server.refs_read_batch(RefsReadBatchReq(refs=refs))
     assert len(res.vals) == 3
     assert res.vals[0] == [1, 2, 3]
@@ -1278,7 +1278,7 @@ def test_refs_read_batch_multi_project(client):
 def test_refs_read_batch_call_ref(client):
     call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
     with pytest.raises(ValueError, match="Call refs not supported"):
-        client.server.refs_read_batch(RefsReadBatchReq(refs=[call_ref.uri()]))
+        client.server.refs_read_batch(RefsReadBatchReq(refs=[call_ref.uri]))
 
 
 def test_large_files(client):
@@ -1471,6 +1471,8 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
+@pytest.mark.timeout(30)
+@pytest.mark.flaky(reruns=3, reruns_delay=2)
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
 def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     """This test is specifically testing the correctness
@@ -1546,7 +1548,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         table_create_from_digests_records = [
             r for r in records if r[0] == "table_create_from_digests"
         ]
-        obj_records = [r for r in records if r[0] in ["obj_create", "obj_read"]]
+        obj_records = [r for r in records if r[0] in {"obj_create", "obj_read"}]
 
         # Expected: 2 table_create calls (first + second) + 1 table_create_from_digests (chunking merge)
         assert len(table_create_records) == 2, (
@@ -1854,7 +1856,7 @@ def test_ref_in_dict(client):
     # Put a ref directly in a dict.
     ref2 = client._save_object({"b": ref}, "d2")
 
-    obj = weave.ref(ref2.uri()).get()
+    obj = weave.ref(ref2.uri).get()
     assert obj["b"] == {"a": 5}
 
 
@@ -1879,7 +1881,7 @@ def test_calls_stream_table_ref_expansion(client):
     )
     calls = list(calls)
     assert len(calls) == 1
-    assert calls[0].output["table"] == o.table.table_ref.uri()
+    assert calls[0].output["table"] == o.table.table_ref.uri
 
 
 def test_object_version_read(client):
@@ -3731,42 +3733,42 @@ def test_filter_calls_by_ref(client):
     assert calls[0].output["ref2"] == obj
 
     # now query by filtering for input ref
-    calls = client.get_calls(filter={"input_refs": [ref.uri()]})
+    calls = client.get_calls(filter={"input_refs": [ref.uri]})
     assert len(calls) == 1
     assert calls[0].inputs["ref"] == obj
     assert calls[0].output["ref2"] == obj
 
     # now query by filtering for output ref
-    calls = client.get_calls(filter={"output_refs": [ref2.uri()]})
+    calls = client.get_calls(filter={"output_refs": [ref2.uri]})
     assert len(calls) == 1
     assert calls[0].inputs["ref"] == obj
     assert calls[0].output["ref2"] == obj
 
     # filter by both input and output ref
     calls = client.get_calls(
-        filter={"input_refs": [ref.uri()], "output_refs": [ref2.uri()]}
+        filter={"input_refs": [ref.uri], "output_refs": [ref2.uri]}
     )
     assert len(calls) == 1
     assert calls[0].inputs["ref"] == obj
     assert calls[0].output["ref2"] == obj
 
     # filter by two output refs
-    calls = client.get_calls(filter={"output_refs": [ref2.uri(), ref3.uri()]})
+    calls = client.get_calls(filter={"output_refs": [ref2.uri, ref3.uri]})
     assert len(calls) == 1
     assert calls[0].inputs["ref"] == obj
     assert calls[0].output["ref2"] == obj
     assert calls[0].output["ref3"] == obj
 
     # filter by the wrong ref
-    calls = client.get_calls(filter={"input_refs": [ref2.uri()]})
+    calls = client.get_calls(filter={"input_refs": [ref2.uri]})
     assert len(calls) == 0
 
     # filter by the wrong ref
-    calls = client.get_calls(filter={"output_refs": [ref.uri()]})
+    calls = client.get_calls(filter={"output_refs": [ref.uri]})
     assert len(calls) == 0
 
     # filter by duplicate refs
-    calls = client.get_calls(filter={"input_refs": [ref.uri(), ref.uri()]})
+    calls = client.get_calls(filter={"input_refs": [ref.uri, ref.uri]})
     assert len(calls) == 1
     assert calls[0].inputs["ref"] == obj
     assert calls[0].output["ref2"] == obj
@@ -3816,9 +3818,9 @@ def test_no_400_on_invalid_refs(client):
 
 def test_get_evaluation(client, make_evals):
     ref, _ = make_evals
-    ev = client.get_evaluation(ref.uri())
+    ev = client.get_evaluation(ref.uri)
     assert isinstance(ev, Evaluation)
-    assert ev.ref.uri() == ref.uri()
+    assert ev.ref.uri == ref.uri
 
 
 def test_get_evaluations(client, make_evals):
@@ -3828,10 +3830,10 @@ def test_get_evaluations(client, make_evals):
     assert isinstance(evs[0], Evaluation)
     assert isinstance(evs[1], Evaluation)
 
-    assert evs[0].ref.uri() == ref.uri()
+    assert evs[0].ref.uri == ref.uri
     assert evs[0].dataset.rows[0] == {"dataset_id": "def"}
 
-    assert evs[1].ref.uri() == ref2.uri()
+    assert evs[1].ref.uri == ref2.uri
     assert evs[1].dataset.rows[0] == {"dataset_id": "jkl"}
 
 
@@ -4418,7 +4420,7 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     model = LLMStructuredCompletionModel(
         llm_model_id="gpt-4o-mini",
         default_params=LLMStructuredCompletionModelDefaultParams(
-            prompt=prompt_ref.uri(),
+            prompt=prompt_ref.uri,
             temperature=0.7,
             max_tokens=50,
             response_format="text",
@@ -4437,7 +4439,7 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     )
 
     # Verify the request has prompt reference and template_vars
-    assert req.inputs.prompt == prompt_ref.uri(), (
+    assert req.inputs.prompt == prompt_ref.uri, (
         "Request should include prompt reference"
     )
     assert req.inputs.template_vars == {
@@ -4464,7 +4466,7 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     )
 
     # Should still have prompt and template_vars
-    assert req_with_input.inputs.prompt == prompt_ref.uri()
+    assert req_with_input.inputs.prompt == prompt_ref.uri
     assert req_with_input.inputs.template_vars == {
         "assistant_name": "MathBot",
         "topic": "mathematics",

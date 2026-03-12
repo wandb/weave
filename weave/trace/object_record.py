@@ -12,7 +12,7 @@ from weave.shared.pydantic_util import pydantic_asdict_one_level
 from weave.trace.op import is_op
 
 
-class ObjectRecord:
+class ObjectRecord:  # noqa: PLW1641
     _class_name: str
     _bases: list[str]
 
@@ -27,11 +27,10 @@ class ObjectRecord:
         if isinstance(other, ObjectRecord):
             if self._class_name != other._class_name:
                 return False
-        else:
-            if other.__class__.__name__ != self._class_name:
-                return False
+        elif other.__class__.__name__ != self._class_name:
+            return False
         for k, v in self.__dict__.items():
-            if k == "_class_name" or k == "_bases":
+            if k in {"_class_name", "_bases"}:
                 continue
             if getattr(other, k) != v:
                 return False
@@ -48,14 +47,14 @@ class ObjectRecord:
             k: v
             for k, v in self.__dict__.items()
             if k
-            not in [
+            not in {
                 "_class_name",
                 "_bases",
                 "map_values",
                 "unwrap",
                 "__repr__",
                 "__eq__",
-            ]
+            }
         }
         return unwrap(unwrapped_one_level)
 
@@ -67,7 +66,7 @@ def class_all_bases_names(cls: type) -> list[str]:
 
 def pydantic_object_record(obj: BaseModel) -> ObjectRecord:
     attrs = pydantic_asdict_one_level(obj)
-    for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
+    for k, v in getmembers(obj, is_op, lambda e: None):
         attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
@@ -84,7 +83,7 @@ def dataclass_object_record(obj: Any) -> ObjectRecord:
     if not dataclasses.is_dataclass(obj):
         raise ValueError(f"{obj} is not a dataclass")
     attrs = dataclass_asdict_one_level(obj)
-    for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
+    for k, v in getmembers(obj, is_op, lambda e: None):
         attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)  # type: ignore[arg-type]

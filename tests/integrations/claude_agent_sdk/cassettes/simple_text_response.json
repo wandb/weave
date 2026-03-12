@@ -1,0 +1,34 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-abc123"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The answer is 4."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 1200,
+    "duration_api_ms": 900,
+    "is_error": false,
+    "num_turns": 1,
+    "session_id": "s-abc123",
+    "total_cost_usd": 0.003,
+    "usage": {
+      "input_tokens": 25,
+      "output_tokens": 10
+    },
+    "result": "The answer is 4."
+  }
+]

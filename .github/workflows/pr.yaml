@@ -33,6 +33,7 @@ jobs:
             app
             dev
             deps
+            inference
           wip: false
           requireScope: true
           validateSingleCommit: false

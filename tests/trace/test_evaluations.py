@@ -1,5 +1,6 @@
 import dataclasses
 import random
+import sys
 from typing import Any
 
 import pydantic
@@ -12,6 +13,8 @@ from weave import Evaluation, Model
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
 from weave.trace_server import trace_server_interface as tsi
+
+_LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
 
 def flatten_calls(
@@ -55,7 +58,7 @@ def normalize_scorers_in_flattened(
 
 
 def op_name_from_ref(ref: str) -> str:
-    return ref.split("/")[-1].split(":")[0]
+    return ref.rsplit("/", maxsplit=1)[-1].split(":", maxsplit=1)[0]
 
 
 class MyModel(Model):
@@ -535,7 +538,7 @@ async def test_evaluation_data_topology(client):
         "nested": {"bool_avg": 0.5},
         "reason": "This is a custom test reason",
     }
-    model_latency = {"mean": pytest.approx(0, abs=1)}
+    model_latency = {"mean": pytest.approx(0, abs=_LATENCY_TOL)}
     predict_usage_summary = {
         "usage": {
             "gpt-4o-2024-05-13": {
@@ -645,7 +648,7 @@ async def test_eval_supports_model_as_op(client):
     res = await evaluation.evaluate(function_model)
     assert res is not None
 
-    gotten_op = weave.ref(function_model.ref.uri()).get()
+    gotten_op = weave.ref(function_model.ref.uri).get()
     res = await evaluation.evaluate(gotten_op)
     assert res is not None
 
@@ -664,7 +667,7 @@ async def test_eval_supports_model_class(client):
     res = await evaluation.evaluate(model)
     assert res is not None
 
-    gotten_model = weave.ref(model.ref.uri()).get()
+    gotten_model = weave.ref(model.ref.uri).get()
     res = await evaluation.evaluate(gotten_model)
     assert res is not None
 
@@ -733,7 +736,7 @@ async def test_eval_is_robust_to_missing_values(client):
     assert res == {
         "output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
-        "model_latency": {"mean": pytest.approx(0, abs=2)},
+        "model_latency": {"mean": pytest.approx(0, abs=max(2, _LATENCY_TOL))},
     }
 
 
@@ -1009,7 +1012,7 @@ async def test_feedback_is_correctly_linked(client):
         tsi.CallsQueryReq(
             project_id=client._project_id(),
             include_feedback=True,
-            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri()]),
+            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
         )
     )
     assert len(calls.calls) == 1
@@ -1019,14 +1022,14 @@ async def test_feedback_is_correctly_linked(client):
     feedback = feedbacks[0]
     assert feedback["feedback_type"] == "wandb.runnable.score"
     assert feedback["payload"] == {"output": True}
-    assert feedback["runnable_ref"] == get_ref(score).uri()
+    assert feedback["runnable_ref"] == get_ref(score).uri
     assert (
         feedback["call_ref"]
         == CallRef(
             entity=client.entity,
             project=client.project,
             id=next(iter(score.calls())).id,
-        ).uri()
+        ).uri
     )
 
 
@@ -1051,7 +1054,7 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
         tsi.CallsQueryReq(
             project_id=client._project_id(),
             include_feedback=True,
-            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri()]),
+            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
         )
     )
     assert len(calls.calls) == 1
@@ -1061,7 +1064,7 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
     feedback = feedbacks[0]
     assert feedback["feedback_type"] == "wandb.runnable.MyScorer"
     assert feedback["payload"] == {"output": True}
-    assert feedback["runnable_ref"] == get_ref(scorer).uri()
+    assert feedback["runnable_ref"] == get_ref(scorer).uri
 
 
 def test_scorers_with_output_and_model_output_raise_error():
@@ -1117,7 +1120,7 @@ def test_get_evaluate_calls(client, make_evals):
     assert len(evaluate_calls) == 1
 
     call1 = evaluate_calls[0]
-    assert call1.inputs["self"].ref.uri() == ref.uri()
+    assert call1.inputs["self"].ref.uri == ref.uri
     assert call1.inputs["model"].name == "abc"
 
     ev2 = ref2.get()
@@ -1125,7 +1128,7 @@ def test_get_evaluate_calls(client, make_evals):
     assert len(evaluate_calls2) == 1
 
     call2 = evaluate_calls2[0]
-    assert call2.inputs["self"].ref.uri() == ref2.uri()
+    assert call2.inputs["self"].ref.uri == ref2.uri
     assert call2.inputs["model"].name == "ghi"
 
 

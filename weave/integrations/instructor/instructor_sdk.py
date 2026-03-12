@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import importlib
 
+from weave.integrations.instructor.instructor_iterable_utils import (
+    instructor_wrapper_async,
+    instructor_wrapper_sync,
+)
+from weave.integrations.instructor.instructor_partial_utils import (
+    instructor_wrapper_partial,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
-
-from .instructor_iterable_utils import instructor_wrapper_async, instructor_wrapper_sync
-from .instructor_partial_utils import instructor_wrapper_partial
 
 _instructor_patcher: MultiPatcher | None = None
 
@@ -20,7 +24,7 @@ def get_instructor_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _instructor_patcher
+    global _instructor_patcher  # noqa: PLW0603
     if _instructor_patcher is not None:
         return _instructor_patcher
 

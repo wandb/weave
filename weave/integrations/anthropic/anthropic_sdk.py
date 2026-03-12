@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 
@@ -139,7 +140,7 @@ def anthropic_stream_accumulator(
 class AnthropicIteratorWrapper(_IteratorWrapper):
     def __getattr__(self, name: str) -> Any:
         """Delegate all other attributes to the wrapped iterator."""
-        if name in [
+        if name in {
             "_iterator_or_ctx_manager",
             "_on_yield",
             "_on_error",
@@ -147,22 +148,22 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
             "_on_finished_called",
             "_call_on_error_once",
             "text_stream",
-        ]:
+        }:
             return object.__getattribute__(self, name)
         return getattr(self._iterator_or_ctx_manager, name)
 
-    def __stream_text__(self) -> Iterator[str] | AsyncIterator[str]:
+    def __stream_text__(self) -> Iterator[str] | AsyncIterator[str]:  # noqa: PLW3201
         if isinstance(self._iterator_or_ctx_manager, AsyncIterator):
             return self.__async_stream_text__()
         else:
             return self.__sync_stream_text__()
 
-    def __sync_stream_text__(self) -> Iterator[str]:  # type: ignore
+    def __sync_stream_text__(self) -> Iterator[str]:  # type: ignore  # noqa: PLW3201
         for chunk in self:  # type: ignore
             if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
                 yield chunk.delta.text  # type: ignore
 
-    async def __async_stream_text__(self) -> AsyncIterator[str]:  # type: ignore
+    async def __async_stream_text__(self) -> AsyncIterator[str]:  # type: ignore  # noqa: PLW3201
         async for chunk in self:  # type: ignore
             if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
                 yield chunk.delta.text  # type: ignore
@@ -170,6 +171,36 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
     @property
     def text_stream(self) -> Iterator[str] | AsyncIterator[str]:
         return self.__stream_text__()
+
+    def _feed_message_to_accumulator(self, message: Message) -> None:
+        self._on_yield(MessageStopEvent(type="message_stop", message=message))
+        self._call_on_close_once()
+
+    def get_final_message(self) -> Message | Coroutine[Any, Any, Message]:
+        underlying = self._iterator_or_ctx_manager.get_final_message  # type: ignore
+        if asyncio.iscoroutinefunction(underlying):
+
+            async def _async() -> Message:
+                message = await underlying()
+                self._feed_message_to_accumulator(message)
+                return message
+
+            return _async()
+        message = underlying()
+        self._feed_message_to_accumulator(message)
+        return message
+
+    def get_final_text(self) -> str | Coroutine[Any, Any, str]:
+        underlying_text = self._iterator_or_ctx_manager.get_final_text  # type: ignore
+        if asyncio.iscoroutinefunction(underlying_text):
+
+            async def _async() -> str:
+                await self.get_final_message()  # type: ignore[misc]
+                return await underlying_text()
+
+            return _async()
+        self.get_final_message()
+        return underlying_text()
 
 
 def create_stream_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
@@ -195,7 +226,7 @@ def get_anthropic_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _anthropic_patcher
+    global _anthropic_patcher  # noqa: PLW0603
     if _anthropic_patcher is not None:
         return _anthropic_patcher
 

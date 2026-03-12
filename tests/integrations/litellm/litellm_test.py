@@ -20,7 +20,7 @@ from weave.integrations.openai.openai_sdk import get_openai_patcher
 USES_RAW_OPENAI_RESPONSE = version_parse(version("litellm")) > version_parse("1.42.11")
 
 
-class Nearly:
+class Nearly:  # noqa: PLW1641
     def __init__(self, v: float) -> None:
         self.v = v
 
@@ -265,7 +265,7 @@ def test_model_predict(
 
     # Create instances with different models
     claude_translator = TranslatorModel(
-        model="claude-3-5-sonnet-20240620", temperature=0.1
+        model="anthropic/claude-3-5-sonnet-20240620", temperature=0.1
     )
 
     res = claude_translator.predict("There is a bug in my code!", "Spanish")

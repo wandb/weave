@@ -82,9 +82,19 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
         Dict[str, Any]: Dictionary containing filtered HuggingFace model information.
     """
     url = f"https://huggingface.co/api/models/{model_name}"
-    with httpx.Client(timeout=30.0) as client:
-        response = client.get(url)
-        d = response.json()
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.get(url)
+            response.raise_for_status()
+            d = response.json()
+    except httpx.HTTPError as e:
+        print(f"\nFailed to get HuggingFace info for {model_name}: {e}")
+        print("This may be expected for a prerelease model\n")
+        return {
+            "likesHuggingFace": 0,
+            "downloadsHuggingFace": 0,
+            "license": "unknown",
+        }
     filtered = pick_keys(d, HF_KEYS_TO_KEEP)
     license = d.get("cardData", {}).get("license")
     if license:
@@ -93,7 +103,7 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
 
 
 def write_models(file_out: Path, models: dict[str, Any] | list[dict[str, Any]]) -> None:
-    with open(file_out, "w") as f:
+    with open(file_out, "w", encoding="utf-8") as f:
         formatted_json = format_json_compact_arrays(models)
         f.write(formatted_json)
         f.write("\n")
@@ -110,7 +120,7 @@ def main() -> None:
         Augmenting some-model-id
         JSON file written, you may wish to run prettier on it
     """
-    with open(file_in) as f:
+    with open(file_in, encoding="utf-8") as f:
         models = json.load(f)
 
     models_data: list[dict[str, Any]] = []

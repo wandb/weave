@@ -13,8 +13,7 @@ from weave import type_handlers  # noqa: F401
 from weave.trace import urls, weave_client, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
-from weave.trace.context import call_context
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
 from weave.trace.display.term import configure_logger, update_logger_level
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
@@ -95,9 +94,9 @@ def init(
 
     parse_and_apply_settings(settings)
 
-    global _global_postprocess_inputs
-    global _global_postprocess_output
-    global _global_attributes
+    global _global_postprocess_inputs  # noqa: PLW0603
+    global _global_postprocess_output  # noqa: PLW0603
+    global _global_attributes  # noqa: PLW0603
 
     _global_postprocess_inputs = global_postprocess_inputs
     _global_postprocess_output = global_postprocess_output
@@ -115,7 +114,12 @@ def get_client() -> weave_client.WeaveClient | None:
     return weave_client_context.get_weave_client()
 
 
-def publish(obj: Any, name: str | None = None) -> ObjectRef:
+def publish(
+    obj: Any,
+    name: str | None = None,
+    tags: list[str] | None = None,
+    aliases: list[str] | None = None,
+) -> ObjectRef:
     """Save and version a Python object.
 
     Weave creates a new version of the object if the object's name already exists and its content hash does
@@ -124,6 +128,8 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     Args:
         obj: The object to save and version.
         name: The name to save the object under.
+        tags: Optional list of tags to add to the published object version.
+        aliases: Optional list of aliases to set on the published object version.
 
     Returns:
         A Weave Ref to the saved object.
@@ -150,6 +156,10 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     ref = client._save_object(obj, save_name, "latest")
 
     if isinstance(ref, ObjectRef):
+        if tags:
+            client.add_tags(ref, tags)
+        if aliases:
+            client.set_aliases(ref, aliases)
         if isinstance(ref, weave_client.OpRef):
             url = urls.op_version_path(
                 ref.entity,
@@ -174,8 +184,126 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
             )
         # Ensure logger level is up to date before logging
         update_logger_level()
-        logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
+        msg = f"{TRACE_OBJECT_EMOJI} Published to {url}"
+        if tags or aliases:
+            extras = []
+            if tags:
+                extras.append(f"tags: {', '.join(tags)}")
+            if aliases:
+                extras.append(f"aliases: {', '.join(aliases)}")
+            msg += f" ({'; '.join(extras)})"
+        logger.info(msg)
     return ref
+
+
+def add_tags(obj_ref: ObjectRef | str, tags: list[str]) -> None:
+    """Add tags to an object version.
+
+    Args:
+        obj_ref: Reference to the object version, either an ObjectRef
+            (returned by `weave.publish()`) or a weave:/// URI string.
+        tags: List of tag strings to add.
+    """
+    client = weave_client_context.require_weave_client()
+    client.add_tags(obj_ref, tags)
+
+
+def remove_tags(obj_ref: ObjectRef | str, tags: list[str]) -> None:
+    """Remove tags from an object version.
+
+    Args:
+        obj_ref: Reference to the object version, either an ObjectRef
+            or a weave:/// URI string.
+        tags: List of tag strings to remove.
+    """
+    client = weave_client_context.require_weave_client()
+    client.remove_tags(obj_ref, tags)
+
+
+def get_tags(obj_ref: ObjectRef | str) -> list[str]:
+    """Get tags for an object version.
+
+    Args:
+        obj_ref: Reference to the object version, either an ObjectRef
+            or a weave:/// URI string.
+
+    Returns:
+        List of tag strings.
+    """
+    client = weave_client_context.require_weave_client()
+    return client.get_tags(obj_ref)
+
+
+def set_aliases(obj_ref: ObjectRef | str, alias: str | list[str]) -> None:
+    """Set one or more aliases for an object version.
+
+    Args:
+        obj_ref: Reference to the object version, either an ObjectRef
+            or a weave:/// URI string.
+        alias: An alias name or list of alias names to set (e.g., "production").
+    """
+    client = weave_client_context.require_weave_client()
+    client.set_aliases(obj_ref, alias)
+
+
+def remove_aliases(obj_ref: ObjectRef | str, alias: str | list[str]) -> None:
+    """Remove one or more aliases from an object.
+
+    Args:
+        obj_ref: Reference to the object, either an ObjectRef
+            or a weave:/// URI string.
+        alias: An alias name or list of alias names to remove.
+    """
+    client = weave_client_context.require_weave_client()
+    client.remove_aliases(obj_ref, alias)
+
+
+def get_aliases(obj_ref: ObjectRef | str) -> list[str]:
+    """Get aliases for an object version.
+
+    Args:
+        obj_ref: Reference to the object version, either an ObjectRef
+            or a weave:/// URI string.
+
+    Returns:
+        List of alias strings.
+    """
+    client = weave_client_context.require_weave_client()
+    return client.get_aliases(obj_ref)
+
+
+def get_tags_and_aliases(obj_ref: ObjectRef | str) -> tuple[list[str], list[str]]:
+    """Get both tags and aliases for an object version in a single call.
+
+    Args:
+        obj_ref: Reference to the object version, either an ObjectRef
+            or a weave:/// URI string.
+
+    Returns:
+        A tuple of (tags, aliases). Each is a list of strings.
+    """
+    client = weave_client_context.require_weave_client()
+    return client.get_tags_and_aliases(obj_ref)
+
+
+def list_tags() -> list[str]:
+    """List all distinct tags in the project.
+
+    Returns:
+        Sorted list of all tag strings in the project.
+    """
+    client = weave_client_context.require_weave_client()
+    return client.list_tags()
+
+
+def list_aliases() -> list[str]:
+    """List all distinct aliases in the project.
+
+    Returns:
+        Sorted list of all alias strings in the project.
+    """
+    client = weave_client_context.require_weave_client()
+    return client.list_aliases()
 
 
 def ref(location: str) -> ObjectRef:
@@ -402,17 +530,26 @@ __all__ = [
     "ObjectRef",
     "Table",
     "ThreadContext",
+    "add_tags",
     "as_op",
     "attributes",
     "finish",
     "get",
+    "get_aliases",
     "get_client",
     "get_current_call",
+    "get_tags",
+    "get_tags_and_aliases",
     "init",
+    "list_aliases",
+    "list_tags",
     "op",
     "publish",
     "ref",
+    "remove_aliases",
+    "remove_tags",
     "require_current_call",
+    "set_aliases",
     "set_view",
     "thread",
     "weave_client_context",

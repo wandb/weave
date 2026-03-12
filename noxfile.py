@@ -110,6 +110,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "smolagents",
         "mcp",
         "verdict",
+        "claude_agent_sdk",
         "verifiers_test",
         "autogen_tests",
         "trace",
@@ -133,7 +134,7 @@ def tests(session: nox.Session, shard: str):
 
     if shard not in SHARDS_WITHOUT_EXTRAS:
         sync_args.extend(["--extra", shard])
-    elif shard in ("autogen_tests", "verifiers_test", "pandas_test"):
+    elif shard in {"autogen_tests", "verifiers_test", "pandas_test"}:
         sync_args.extend(["--group", shard])
     elif shard == "trace_server":
         # trace_server shard needs both trace_server dependency group and trace_server_tests
@@ -205,7 +206,7 @@ def tests(session: nox.Session, shard: str):
 
     # Each worker gets its own isolated database namespace
     # Only use parallel workers for the trace shard if we have more than 1 CPU core
-    if shard in ("trace", "trace_calls_complete_only"):
+    if shard in {"trace", "trace_calls_complete_only"}:
         cpu_count = os.cpu_count()
         if cpu_count is not None and cpu_count > 1:
             session.posargs.insert(0, f"-n{cpu_count}")
@@ -223,7 +224,7 @@ def tests(session: nox.Session, shard: str):
         "--cov-branch",
     ]
 
-    if shard in ("trace", "trace_calls_complete_only"):
+    if shard in {"trace", "trace_calls_complete_only"}:
         pytest_args.extend(["-m", "trace_server"])
 
     if shard == "trace_no_server":

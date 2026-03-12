@@ -98,6 +98,7 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_runnable_ref_selector,
 )
 from weave.trace_server.trace_server_interface import (
+    AliasesListReq,
     CallEndReq,
     CallsDeleteReq,
     CallsFilter,
@@ -114,14 +115,18 @@ from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
+    ObjAddTagsReq,
     ObjCreateReq,
     ObjCreateRes,
     ObjDeleteReq,
     ObjectVersionFilter,
     ObjQueryReq,
     ObjReadReq,
+    ObjRemoveAliasesReq,
+    ObjRemoveTagsReq,
     ObjSchema,
     ObjSchemaForInsert,
+    ObjSetAliasesReq,
     Query,
     RefsReadBatchReq,
     StartedCallSchemaForInsert,
@@ -132,11 +137,12 @@ from weave.trace_server.trace_server_interface import (
     TableCreateRes,
     TableSchemaForInsert,
     TableUpdateReq,
-    TraceServerInterface,
+    TagsListReq,
     TraceStatus,
 )
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     ROW_COUNT_CHUNKING_THRESHOLD,
@@ -292,7 +298,7 @@ MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
-    server: TraceServerInterface
+    server: TraceServerClientInterface
 
     # Main future executor, handling deferred tasks for the client
     future_executor: FutureExecutor
@@ -320,7 +326,7 @@ class WeaveClient:
         self,
         entity: str,
         project: str,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         ensure_project_exists: bool = True,
     ):
         self.entity = entity
@@ -407,7 +413,7 @@ class WeaveClient:
                         raise ValueError(e.response.content) from None
                 if e.response.status_code == 404:
                     raise ValueError(
-                        f"Unable to find object for ref uri: {ref.uri()}"
+                        f"Unable to find object for ref uri: {ref.uri}"
                     ) from e
             raise
 
@@ -426,16 +432,16 @@ class WeaveClient:
         if ref.extra:
             try:
                 ref_read_res = self.server.refs_read_batch(
-                    RefsReadBatchReq(refs=[ref.uri()])
+                    RefsReadBatchReq(refs=[ref.uri])
                 )
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
                     raise ValueError(
-                        f"Unable to find object for ref uri: {ref.uri()}"
+                        f"Unable to find object for ref uri: {ref.uri}"
                     ) from None
                 raise
             if not ref_read_res.vals:
-                raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                raise ValueError(f"Unable to find object for ref uri: {ref.uri}")
             data = ref_read_res.vals[0]
         else:
             data = read_res.obj.val
@@ -515,11 +521,11 @@ class WeaveClient:
                 _digest=obj.digest,
             )
             try:
-                obj = ref.get()
+                evaluation_obj = ref.get()
             except Exception:
                 logger.exception(f"Failed to convert {obj} to Evaluation")
             else:
-                lst.append(obj)
+                lst.append(evaluation_obj)
         return lst
 
     @trace_sentry.global_trace_sentry.watch()
@@ -650,6 +656,7 @@ class WeaveClient:
         *,
         use_stack: bool = True,
         _call_id_override: str | None = None,
+        started_at: datetime.datetime | None = None,
     ) -> Call:
         """Create, log, and push a call onto the runtime stack.
 
@@ -660,6 +667,7 @@ class WeaveClient:
             display_name: The display name for the call. Defaults to None.
             attributes: The attributes for the call. Defaults to None.
             use_stack: Whether to push the call onto the runtime stack. Defaults to True.
+            started_at: Override the call start time. If None, uses current time.
 
         Returns:
             The created Call object.
@@ -718,7 +726,7 @@ class WeaveClient:
             attributes_dict._set_weave_item("os_version", platform.version())
             attributes_dict._set_weave_item("os_release", platform.release())
 
-        op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
+        op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
 
         # Get thread_id from context
         thread_id = call_context.get_thread_id()
@@ -770,7 +778,8 @@ class WeaveClient:
             current_wb_run_id = None
             current_wb_run_step = None
 
-        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        if started_at is None:
+            started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.started_at = started_at
         project_id = self._project_id()
 
@@ -798,7 +807,7 @@ class WeaveClient:
                 start=StartedCallSchemaForInsert(
                     project_id=project_id,
                     id=call_id,
-                    op_name=op_def_ref.uri(),
+                    op_name=op_def_ref.uri,
                     display_name=call.display_name,
                     trace_id=trace_id,
                     started_at=started_at,
@@ -864,6 +873,7 @@ class WeaveClient:
         exception: BaseException | None = None,
         *,
         op: Op | None = None,
+        ended_at: datetime.datetime | None = None,
     ) -> None:
         """Finalize a call and persist its results.
 
@@ -880,7 +890,8 @@ class WeaveClient:
 
         from weave.trace.api import _global_postprocess_output
 
-        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        if ended_at is None:
+            ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
 
@@ -1173,6 +1184,185 @@ class WeaveClient:
         )
         return result.num_deleted
 
+    @staticmethod
+    def _resolve_obj_ref(obj_ref: ObjectRef | str) -> ObjectRef:
+        """Resolve an ObjectRef or weave:/// URI string to an ObjectRef."""
+        if isinstance(obj_ref, str):
+            return ObjectRef.parse_uri(obj_ref)
+        return obj_ref
+
+    @trace_sentry.global_trace_sentry.watch()
+    def add_tags(self, obj_ref: ObjectRef | str, tags: list[str]) -> None:
+        """Add tags to an object version.
+
+        Args:
+            obj_ref: Reference to the object version, either an ObjectRef
+                or a weave:/// URI string.
+            tags: List of tag strings to add.
+        """
+        obj_ref = self._resolve_obj_ref(obj_ref)
+        self.server.obj_add_tags(
+            ObjAddTagsReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                tags=tags,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def remove_tags(self, obj_ref: ObjectRef | str, tags: list[str]) -> None:
+        """Remove tags from an object version.
+
+        Args:
+            obj_ref: Reference to the object version, either an ObjectRef
+                or a weave:/// URI string.
+            tags: List of tag strings to remove.
+        """
+        obj_ref = self._resolve_obj_ref(obj_ref)
+        self.server.obj_remove_tags(
+            ObjRemoveTagsReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                tags=tags,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_tags(self, obj_ref: ObjectRef | str) -> list[str]:
+        """Get tags for an object version.
+
+        Args:
+            obj_ref: Reference to the object version, either an ObjectRef
+                or a weave:/// URI string.
+
+        Returns:
+            List of tag strings. Returns empty list if the object version
+            has no tags.
+        """
+        obj_ref = self._resolve_obj_ref(obj_ref)
+        res = self.server.obj_read(
+            ObjReadReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                include_tags_and_aliases=True,
+            )
+        )
+        return res.obj.tags or []
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_tags_and_aliases(
+        self, obj_ref: ObjectRef | str
+    ) -> tuple[list[str], list[str]]:
+        """Get both tags and aliases for an object version in a single call.
+
+        Args:
+            obj_ref: Reference to the object version, either an ObjectRef
+                or a weave:/// URI string.
+
+        Returns:
+            A tuple of (tags, aliases). Each is a list of strings.
+            Returns empty lists if the object version has no tags or aliases.
+        """
+        obj_ref = self._resolve_obj_ref(obj_ref)
+        res = self.server.obj_read(
+            ObjReadReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                include_tags_and_aliases=True,
+            )
+        )
+        return (res.obj.tags or [], res.obj.aliases or [])
+
+    @trace_sentry.global_trace_sentry.watch()
+    def set_aliases(self, obj_ref: ObjectRef | str, alias: str | list[str]) -> None:
+        """Set one or more aliases for an object version.
+
+        Args:
+            obj_ref: Reference to the object version, either an ObjectRef
+                or a weave:/// URI string.
+            alias: An alias name or list of alias names to set (e.g., "production").
+        """
+        obj_ref = self._resolve_obj_ref(obj_ref)
+        aliases = [alias] if isinstance(alias, str) else alias
+        if not aliases:
+            return
+        self.server.obj_set_aliases(
+            ObjSetAliasesReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                aliases=aliases,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def remove_aliases(self, obj_ref: ObjectRef | str, alias: str | list[str]) -> None:
+        """Remove one or more aliases from an object.
+
+        Args:
+            obj_ref: Reference to the object, either an ObjectRef
+                or a weave:/// URI string (digest is not used since aliases are object-scoped).
+            alias: An alias name or list of alias names to remove.
+        """
+        obj_ref = self._resolve_obj_ref(obj_ref)
+        aliases = [alias] if isinstance(alias, str) else alias
+        if not aliases:
+            return
+        self.server.obj_remove_aliases(
+            ObjRemoveAliasesReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                aliases=aliases,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_aliases(self, obj_ref: ObjectRef | str) -> list[str]:
+        """Get aliases for an object version.
+
+        Args:
+            obj_ref: Reference to the object version, either an ObjectRef
+                or a weave:/// URI string.
+
+        Returns:
+            List of alias strings. Includes the virtual "latest" alias
+            if the object version is the latest.
+        """
+        obj_ref = self._resolve_obj_ref(obj_ref)
+        res = self.server.obj_read(
+            ObjReadReq(
+                project_id=self._project_id(),
+                object_id=obj_ref.name,
+                digest=obj_ref.digest,
+                include_tags_and_aliases=True,
+            )
+        )
+        return res.obj.aliases or []
+
+    @trace_sentry.global_trace_sentry.watch()
+    def list_tags(self) -> list[str]:
+        """List all distinct tags in the project.
+
+        Returns:
+            List of all tag strings in the project.
+        """
+        res = self.server.tags_list(TagsListReq(project_id=self._project_id()))
+        return res.tags
+
+    @trace_sentry.global_trace_sentry.watch()
+    def list_aliases(self) -> list[str]:
+        """List all distinct aliases in the project.
+
+        Returns:
+            List of all alias strings in the project.
+        """
+        res = self.server.aliases_list(AliasesListReq(project_id=self._project_id()))
+        return res.aliases
+
     @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
         self.server.obj_delete(
@@ -1447,18 +1637,16 @@ class WeaveClient:
             call_ref = get_ref(predict_call)
             if call_ref is None:
                 raise ValueError("Predict call must have a ref")
-            weave_ref_uri = call_ref.uri()
+            weave_ref_uri = call_ref.uri
             scorer_call_ref = get_ref(score_call)
             if scorer_call_ref is None:
                 raise ValueError("Score call must have a ref")
-            scorer_call_ref_uri = scorer_call_ref.uri()
+            scorer_call_ref_uri = scorer_call_ref.uri
 
             # If scorer_object_ref is provided, it is used as the runnable_ref_uri
             # Otherwise, we use the op_name from the score_call. This should happen
             # when there is a Scorer subclass that is the source of the score call.
-            scorer_object_ref_uri = (
-                scorer_object_ref.uri() if scorer_object_ref else None
-            )
+            scorer_object_ref_uri = scorer_object_ref.uri if scorer_object_ref else None
             runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
             score_results = score_call.output
 
@@ -1831,9 +2019,14 @@ class WeaveClient:
         # Create chunks in parallel using future_executor - defer serialization
         chunk_futures = []
         for raw_chunk in raw_chunks:
-            chunk_future = self.future_executor.defer(
-                lambda chunk=raw_chunk: self._send_table_create(chunk)
-            )
+
+            def make_chunk_task(chunk: list[Any]) -> Callable[[], TableCreateRes]:
+                def chunk_task() -> TableCreateRes:
+                    return self._send_table_create(chunk)
+
+                return chunk_task
+
+            chunk_future = self.future_executor.defer(make_chunk_task(raw_chunk))
             chunk_futures.append(chunk_future)
 
         # Chain the operations using future_executor.then
@@ -1937,7 +2130,7 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri()]))
+        return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri]))
 
     @trace_sentry.global_trace_sentry.watch()
     def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
@@ -1981,7 +2174,7 @@ class WeaveClient:
         raise NotImplementedError()
 
     def _ref_uri(self, name: str, version: str, path: str) -> str:
-        return ObjectRef(self.entity, self.project, name, version).uri()
+        return ObjectRef(self.entity, self.project, name, version).uri
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
         cached_res = self.send_file_cache.get(req)

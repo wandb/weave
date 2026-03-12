@@ -1,0 +1,108 @@
+name: bump-typescript-sdk-version
+
+# This workflow bumps the version of the Weave TypeScript SDK package.
+# It updates `sdks/node/package.json`, creates a commit, and pushes it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: "Semver segment to bump"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+jobs:
+  bump-ts-sdk-version:
+    name: Bump TypeScript SDK Version
+    runs-on: ubuntu-8core
+    timeout-minutes: 10
+    environment:
+      name: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.WANDBMACHINE_GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - id: setup_git
+        run: |
+          git config --global user.name 'Weave Build Bot'
+          git config --global user.email weave@wandb.com
+
+      - id: bump_version
+        env:
+          BUMP_TYPE: ${{ inputs.bump_type }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const packageJsonPath = 'sdks/node/package.json';
+          const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+          const currentVersion = packageJson.version;
+
+          const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)$/);
+          if (!match) {
+            throw new Error(
+              `Unsupported version format: "${currentVersion}". Expected X.Y.Z`
+            );
+          }
+
+          let major = Number(match[1]);
+          let minor = Number(match[2]);
+          let patch = Number(match[3]);
+          const bumpType = process.env.BUMP_TYPE;
+
+          if (bumpType === 'major') {
+            major += 1;
+            minor = 0;
+            patch = 0;
+          } else if (bumpType === 'minor') {
+            minor += 1;
+            patch = 0;
+          } else if (bumpType === 'patch') {
+            patch += 1;
+          } else {
+            throw new Error(`Unsupported bump type: "${bumpType}"`);
+          }
+
+          const nextVersion = `${major}.${minor}.${patch}`;
+          packageJson.version = nextVersion;
+          fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+
+          fs.appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            `old_version=${currentVersion}\nnew_version=${nextVersion}\n`
+          );
+
+          console.log(`Bumped TypeScript SDK version: ${currentVersion} -> ${nextVersion}`);
+          NODE
+
+      - id: commit_changes
+        env:
+          NEW_VERSION: ${{ steps.bump_version.outputs.new_version }}
+        run: |
+          if git diff --quiet -- sdks/node/package.json; then
+            echo "No version changes detected."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git add sdks/node/package.json
+          git commit -m "chore(weave): bump TSSDK version to ${NEW_VERSION}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - id: push_changes
+        if: steps.commit_changes.outputs.changed == 'true'
+        run: git push

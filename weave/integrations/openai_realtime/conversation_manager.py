@@ -66,9 +66,13 @@ class ConversationManager:
             # GA event names (output_audio, output_text)
             "response.output_audio.delta": self.state.handle_response_audio_delta,
             "response.output_audio.done": self.state.handle_response_audio_done,
+            "response.output_text.delta": self.state.handle_response_text_delta,
             # Beta compatibility (audio)
             "response.audio.delta": self.state.handle_response_audio_delta,
             "response.audio.done": self.state.handle_response_audio_done,
+            "response.text.delta": self.state.handle_response_text_delta,
+            # Function call streaming
+            "response.function_call_arguments.delta": self.state.handle_function_call_arguments_delta,
         }
 
         self._registry.update(handlers)

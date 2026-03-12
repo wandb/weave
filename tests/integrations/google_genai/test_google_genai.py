@@ -9,8 +9,10 @@ from google.genai.types import GenerateImagesConfig
 from pydantic import BaseModel
 
 from weave.integrations.google_genai.gemini_utils import (
+    _traverse_and_replace_blobs,
     google_genai_gemini_accumulator,
     google_genai_gemini_on_finish,
+    google_genai_gemini_postprocess_inputs,
 )
 from weave.integrations.google_genai.google_genai_sdk import get_google_genai_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
@@ -637,3 +639,192 @@ def test_accumulator_skips_parts_with_none_text():
     # Text should remain unchanged since value part had None text
     assert acc_part.text == "Hello"
     assert result is acc
+
+
+# ── _traverse_and_replace_blobs unit tests ────────────────────────────────────
+
+
+def test_traverse_and_replace_blobs_converts_blob_dict_to_content():
+    """Dict with 'data' bytes and 'mime_type' is converted to a Content object."""
+    from weave import Content
+
+    blob_dict = {"data": b"fake_image_bytes", "mime_type": "image/jpeg"}
+    result = _traverse_and_replace_blobs(blob_dict)
+
+    assert isinstance(result, Content)
+    assert result.mimetype == "image/jpeg"
+
+
+def test_traverse_and_replace_blobs_converts_part_with_inline_data():
+    """types.Part.from_bytes (Pydantic BaseModel) has inline_data converted to Content."""
+    from google.genai import types
+
+    from weave import Content
+
+    part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/jpeg")
+    result = _traverse_and_replace_blobs(part)
+
+    assert isinstance(result, dict)
+    assert isinstance(result["inline_data"], Content)
+    assert result["inline_data"].mimetype == "image/jpeg"
+
+
+def test_traverse_and_replace_blobs_traverses_list_of_parts():
+    """List of Parts with blobs are recursively traversed; text parts unchanged."""
+    from google.genai import types
+
+    from weave import Content
+
+    parts = [
+        types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/jpeg"),
+        types.Part(text="Where was this photo taken?"),
+    ]
+    result = _traverse_and_replace_blobs(parts)
+
+    assert isinstance(result, list)
+    assert isinstance(result[0]["inline_data"], Content)
+    assert result[1]["text"] == "Where was this photo taken?"
+    assert result[1]["inline_data"] is None
+
+
+def test_traverse_and_replace_blobs_traverses_tuple():
+    """Tuples with blobs are traversed and returned as tuples."""
+    from google.genai import types
+
+    from weave import Content
+
+    part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/jpeg")
+    result = _traverse_and_replace_blobs((part,))
+
+    assert isinstance(result, tuple)
+    assert isinstance(result[0]["inline_data"], Content)
+
+
+def test_traverse_and_replace_blobs_skips_empty_bytes():
+    """Dict with empty bytes for 'data' is not converted to Content."""
+    blob_dict = {"data": b"", "mime_type": "image/jpeg"}
+    result = _traverse_and_replace_blobs(blob_dict)
+
+    # Empty data → no Content conversion
+    assert isinstance(result, dict)
+    assert "data" in result
+
+
+def test_traverse_and_replace_blobs_skips_missing_mime_type():
+    """Dict with data but no mime_type is not converted to Content."""
+    blob_dict = {"data": b"fake_bytes"}
+    result = _traverse_and_replace_blobs(blob_dict)
+
+    assert isinstance(result, dict)
+    assert "data" in result
+
+
+def test_traverse_and_replace_blobs_skips_missing_data():
+    """Dict with mime_type but no data is not converted to Content."""
+    blob_dict = {"mime_type": "image/jpeg"}
+    result = _traverse_and_replace_blobs(blob_dict)
+
+    assert isinstance(result, dict)
+    assert "mime_type" in result
+
+
+def test_traverse_and_replace_blobs_leaves_primitives_unchanged():
+    """Primitive values pass through unmodified."""
+    assert _traverse_and_replace_blobs("hello") == "hello"
+    assert _traverse_and_replace_blobs(42) == 42
+    assert _traverse_and_replace_blobs(None) is None
+
+
+def test_traverse_and_replace_blobs_traverses_nested_dict():
+    """Blobs nested inside dicts are replaced recursively."""
+    from weave import Content
+
+    nested = {
+        "outer": {"inner": {"data": b"fake_image_bytes", "mime_type": "image/png"}}
+    }
+    result = _traverse_and_replace_blobs(nested)
+
+    assert isinstance(result["outer"]["inner"], Content)
+    assert result["outer"]["inner"].mimetype == "image/png"
+
+
+# ── postprocess functions unit tests ─────────────────────────────────────────
+
+
+def test_postprocess_inputs_converts_image_bytes_to_content():
+    """Image bytes in 'contents' inputs are converted to Content for Weave UI display."""
+    from google.genai import types
+
+    from weave import Content
+
+    mock_self = Mock()
+    mock_self._model = "gemini-2.0-flash"
+
+    inputs = {
+        "self": mock_self,
+        "contents": [
+            types.Part.from_bytes(data=b"fake_jpeg_bytes", mime_type="image/jpeg"),
+            "Where was this photo taken?",
+        ],
+    }
+
+    result = google_genai_gemini_postprocess_inputs(inputs)
+
+    image_part = result["contents"][0]
+    assert isinstance(image_part, dict)
+    assert isinstance(image_part["inline_data"], Content)
+    assert image_part["inline_data"].mimetype == "image/jpeg"
+    # Plain text string is unchanged
+    assert result["contents"][1] == "Where was this photo taken?"
+
+
+def test_postprocess_inputs_leaves_text_only_contents_unchanged():
+    """Text-only 'contents' are not affected by postprocess_inputs."""
+    mock_self = Mock()
+    mock_self._model = "gemini-2.0-flash"
+
+    inputs = {
+        "self": mock_self,
+        "contents": ["What's the capital of France?"],
+    }
+
+    result = google_genai_gemini_postprocess_inputs(inputs)
+
+    assert result["contents"][0] == "What's the capital of France?"
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
+def test_content_generation_with_image_bytes(client):
+    """Image bytes passed to generate_content are stored as Content in the Weave trace."""
+    from google.genai import types
+
+    from weave import Content
+
+    google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
+    image_bytes = b"\xff\xd8\xff\xe0"  # minimal JPEG header bytes
+
+    google_client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[
+            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+            "Where was this photo taken?",
+        ],
+    )
+
+    call = next(iter(client.get_calls()))
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.genai.models.Models.generate_content"
+
+    # The image bytes in inputs must be converted to Content for Weave UI display
+    contents = call.inputs.get("contents", [])
+    image_part = contents[0]
+    assert isinstance(image_part, dict), "Part should be dict after postprocessing"
+    assert isinstance(image_part["inline_data"], Content), (
+        "Image bytes must be converted to Content so they display in the Weave UI"
+    )
+    assert image_part["inline_data"].mimetype == "image/jpeg"

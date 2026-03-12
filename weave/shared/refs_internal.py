@@ -4,9 +4,43 @@
 # internally, we operate on internal `project_id`s scopes. At rest, and in the database,
 # we store the internal `project_id`. However, over the wire, we use the plain-text. Practically,
 # the trace interface should only ever operate on internal refs.
+from __future__ import annotations
+
 import urllib
 from dataclasses import dataclass, field
 from typing import Any
+
+
+class _CallableStr(str):
+    """A str subclass that can be called, returning itself as a plain str.
+
+    This enables backwards compatibility: both ``ref.uri`` (property access)
+    and ``ref.uri`` (legacy method call) work.
+    """
+
+    def __call__(self) -> str:
+        return str(self)
+
+
+class CallableProperty:
+    """Descriptor that behaves like ``@property`` but returns a `_CallableStr`.
+
+    This makes the attribute usable both as a property (``ref.uri``) and as a
+    method call (``ref.uri``) for backwards compatibility.
+    """
+
+    def __init__(self, func: Any) -> None:
+        self.func = func
+        self.__doc__ = func.__doc__
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self.name = name
+
+    def __get__(self, obj: Any, objtype: type | None = None) -> Any:
+        if obj is None:
+            return self
+        return _CallableStr(self.func(obj))
+
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
@@ -24,6 +58,9 @@ valid_edge_names = (
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
 )
+
+# Path suffix for dataset row refs: /attr/rows/id/<digest>
+DATASET_ROW_REF_PATH_SUFFIX = f"/{OBJECT_ATTR_EDGE_NAME}/rows/{TABLE_ROW_ID_EDGE_NAME}/"
 
 
 class InvalidInternalRef(ValueError):
@@ -48,12 +85,12 @@ def validate_extra(extra: list[str]) -> None:
     for i, e in enumerate(extra):
         if i % 2 == 0:
             # Here we are in the edge name position
-            if e not in (
+            if e not in {
                 DICT_KEY_EDGE_NAME,
                 LIST_INDEX_EDGE_NAME,
                 OBJECT_ATTR_EDGE_NAME,
                 TABLE_ROW_ID_EDGE_NAME,
-            ):
+            }:
                 raise InvalidInternalRef(
                     f"Invalid extra edge name at index {i}: {extra}"
                 )
@@ -89,6 +126,7 @@ class InternalTableRef:
         validate_no_slashes(self.project_id, "project_id")
         validate_no_slashes(self.digest, "digest")
 
+    @CallableProperty
     def uri(self) -> str:
         return f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/table/{self.digest}"
 
@@ -108,6 +146,7 @@ class InternalObjectRef:
         validate_no_slashes(self.name, "name")
         validate_no_colons(self.name, "name")
 
+    @CallableProperty
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/object/{self.name}:{self.version}"
         if self.extra:
@@ -117,6 +156,7 @@ class InternalObjectRef:
 
 @dataclass(frozen=True)
 class InternalOpRef(InternalObjectRef):
+    @CallableProperty
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/op/{self.name}:{self.version}"
         if self.extra:
@@ -137,6 +177,7 @@ class InternalCallRef:
         # we do, we need to add edge names to the known list
         validate_extra(self.extra)
 
+    @CallableProperty
     def uri(self) -> str:
         u = f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/call/{self.id}"
         if self.extra:
@@ -153,6 +194,7 @@ class InternalArtifactRef:
         # not validating no slashes in project_id because we aren't converting to internal project_id
         validate_no_slashes(self.id, "id")
 
+    @CallableProperty
     def uri(self) -> str:
         u = f"{ARTIFACT_REF_SCHEME}:///{self.project_id}/{self.id}"
         return u
@@ -238,3 +280,51 @@ def string_will_be_interpreted_as_ref(s: str) -> bool:
 
 def any_will_be_interpreted_as_ref_str(val: Any) -> bool:
     return isinstance(val, str) and string_will_be_interpreted_as_ref(val)
+
+
+def try_parse_dataset_row_ref(uri: str) -> tuple[str, str] | None:
+    """Parse a ref string as a dataset row ref.
+
+    Only accepts internal-scheme URIs. Returns (internal_uri, row_digest) if
+    the ref is a valid dataset row ref (object ref with extra attr/rows/id/digest),
+    else None.
+
+    Returns:
+        tuple[str, str] | None: (uri, digest) if valid dataset row ref, else None.
+    """
+    if not uri.startswith(f"{WEAVE_INTERNAL_SCHEME}:///"):
+        return None
+    try:
+        parsed = parse_internal_uri(uri)
+    except InvalidInternalRef:
+        return None
+    if not isinstance(parsed, InternalObjectRef):
+        return None
+    extra = parsed.extra
+    if (
+        len(extra) >= 4
+        and extra[-4] == OBJECT_ATTR_EDGE_NAME
+        and extra[-3] == "rows"
+        and extra[-2] == TABLE_ROW_ID_EDGE_NAME
+    ):
+        digest = extra[-1]
+        if "/" not in digest:
+            return (uri, digest)
+    return None
+
+
+def extract_row_digest_from_ref_path(s: str) -> str | None:
+    """Extract row digest from a ref path containing the dataset row suffix.
+
+    Works for full URIs or relative paths. Returns the digest if the path
+    contains DATASET_ROW_REF_PATH_SUFFIX and the digest part has no slashes.
+
+    Returns:
+        str | None: The row digest if valid, else None.
+    """
+    if DATASET_ROW_REF_PATH_SUFFIX not in s:
+        return None
+    prefix, digest = s.split(DATASET_ROW_REF_PATH_SUFFIX, 1)
+    if prefix and digest and "/" not in digest:
+        return digest
+    return None

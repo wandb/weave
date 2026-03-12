@@ -65,7 +65,7 @@ def get_benchmark_description(benchmark_path: Path) -> str:
         str: Description of the benchmark.
     """
     try:
-        with open(benchmark_path) as f:
+        with open(benchmark_path, encoding="utf-8") as f:
             content = f.read()
 
         # Look for the very first docstring at the top of the file
@@ -251,7 +251,7 @@ def run_benchmark(
                     default="q",
                 )
 
-                if choice.lower() in ["q", "quit", "exit"]:
+                if choice.lower() in {"q", "quit", "exit"}:
                     console.print("[dim]👋 Goodbye![/dim]")
                     raise typer.Exit(0)
 

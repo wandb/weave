@@ -84,6 +84,7 @@ from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
+from weave.trace_server.environment import wf_clickhouse_calls_shard_key
 
 logger = logging.getLogger(__name__)
 
@@ -97,9 +98,9 @@ VIEW_SUFFIX = "_view"
 
 # Tables that use ID-based sharding (sipHash64(field)) instead of random sharding
 # in distributed mode. Maps table name to the field used for sharding.
-# This ensures all data for a specific ID goes to the same shard, enabling
-# efficient point lookups.
-ID_SHARDED_TABLES: dict[str, str] = {"calls_complete": "id"}
+# calls_complete: shard key is configurable via WF_CLICKHOUSE_CALLS_SHARD_KEY env var
+# Valid values: "trace_id" (default), "id", "project_id"
+ID_SHARDED_TABLES: dict[str, str] = {"calls_complete": wf_clickhouse_calls_shard_key()}
 
 
 @dataclass(frozen=True)
@@ -225,9 +226,13 @@ class BaseClickHouseTraceServerMigrator(ABC):
         if status["curr_version"] == 0:
             db_sql = self._create_db_sql(target_db)
             self.ch_client.command(db_sql)
-        for target_version, migration_file in migrations_to_apply:
-            self._apply_migration(target_db, target_version, migration_file)
-        self._run_post_migration_hook(target_db, status["curr_version"], target_version)
+        applied_target_version = target_version
+        for migration_target_version, migration_file in migrations_to_apply:
+            self._apply_migration(target_db, migration_target_version, migration_file)
+            applied_target_version = migration_target_version
+        self._run_post_migration_hook(
+            target_db, status["curr_version"], applied_target_version
+        )
 
     def _run_post_migration_hook(
         self, target_db: str, current_version: int, target_version: int | None
@@ -306,8 +311,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
                     )
                 migration_map[version]["down"] = file
 
-            if version > max_version:
-                max_version = version
+            max_version = max(max_version, version)
 
         if len(migration_map) == 0:
             raise MigrationError("No migrations found")
@@ -372,7 +376,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_file_path = os.path.join(self.migration_dir, migration_file)
 
-        with open(migration_file_path) as f:
+        with open(migration_file_path, encoding="utf-8") as f:
             migration_sql = f.read()
 
         # Mark migration as partially applied
@@ -1010,7 +1014,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         def add_suffix(match: re.Match[str]) -> str:
             table_name = match.group(2)
             if not table_name.endswith(ch_settings.LOCAL_TABLE_SUFFIX):
-                table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
+                table_name += ch_settings.LOCAL_TABLE_SUFFIX
             return f"{match.group(1)}{table_name}{match.group(3)}"
 
         return SQLPatterns.ALTER_TABLE_NAME_PATTERN.sub(add_suffix, sql_query)
@@ -1043,7 +1047,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         def add_suffix_to_from(match: re.Match[str]) -> str:
             table_name = match.group(1) if match.group(1) else match.group(2)
             if not table_name.endswith(ch_settings.LOCAL_TABLE_SUFFIX):
-                table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
+                table_name += ch_settings.LOCAL_TABLE_SUFFIX
             return f"FROM {table_name}"
 
         # Collect table names from FROM clauses before renaming

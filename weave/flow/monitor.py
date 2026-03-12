@@ -1,7 +1,7 @@
 from typing import Literal
 
 from pydantic import Field
-from typing_extensions import Self, TypedDict
+from typing_extensions import NotRequired, Self, TypedDict
 
 from weave.flow.casting import Scorer
 from weave.object.obj import Object
@@ -12,13 +12,14 @@ from weave.trace_server.interface.query import Query
 
 
 class ScorerDebounceConfig(TypedDict):
-    """Configuration for debounced scoring on a monitor.
-
-    When present on a Monitor, all fields are required.
-    """
+    """Configuration for debounced scoring on a monitor."""
 
     # Specifies which field is used to find candidates for debouncing
     aggregation_field: Literal["trace_id", "thread_id"]
+
+    # How to aggregate messages for scoring: last message only or all messages in the window.
+    # Defaults to last_message when not present.
+    aggregation_method: NotRequired[Literal["last_message", "all_messages"]]
 
     # Timeframe for the debouncing. Messages received within this timeframe will be debounced.
     timeout_seconds: float
@@ -62,8 +63,12 @@ class Monitor(Object):
 
     sampling_rate: float = Field(ge=0, le=1, default=1)
     scorers: list[Scorer]
-    op_names: list[str]
+    op_names: list[str] = Field(default_factory=list)
     query: Query | None = None
+    is_traced: bool = Field(
+        default=True,
+        description="Trace this monitor's scorers and any downstream LLM calls.",
+    )
     active: bool = False
 
     # Debounced scoring is enabled when this is present, and disabled when it is not.
@@ -92,3 +97,21 @@ class Monitor(Object):
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
         return cls.model_validate(obj.unwrap())
+
+
+@register_object
+class ClassifierMonitor(Monitor):
+    """A monitor that merges multiple scorers into a single classifier.
+
+    Classifier monitors combine prompts from multiple LLMAsAJudgeScorers
+    targeting the same model into a single scoring call.
+    """
+
+    prompt_header: str | None = Field(
+        default=None,
+        description="Text prepended before the merged classifier prompts.",
+    )
+    prompt_footer: str | None = Field(
+        default=None,
+        description="Text appended after the merged classifier prompts.",
+    )

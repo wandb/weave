@@ -19,6 +19,7 @@ from weave.trace.settings import (
 from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -35,7 +36,6 @@ from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
     EntityProjectInfo,
-    ServerInfoRes,
     StartBatchItem,
 )
 from weave.utils import http_requests
@@ -136,6 +136,17 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             *args,
             auth=self._auth,
             headers=headers,
+            **kwargs,
+        )
+
+    def put(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
+        headers = self._build_dynamic_request_headers()
+
+        return http_requests.put(
+            self.trace_server_url + url,
+            *args,
+            auth=self._auth,
+            headers={**headers, **kwargs.pop("headers", {})},
             **kwargs,
         )
 
@@ -497,6 +508,20 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, url)
         return r
 
+    def _put_request_executor(
+        self,
+        url: str,
+        req: BaseModel,
+        stream: bool = False,
+    ) -> httpx.Response:
+        r = self.put(
+            url,
+            data=req.model_dump_json(by_alias=True).encode("utf-8"),
+            stream=stream,
+        )
+        handle_response_error(r, url)
+        return r
+
     @with_retry
     def _delete_request_executor(
         self,
@@ -519,6 +544,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     ) -> BaseModel:
         if method == "POST":
             r = self._post_request_executor(url, req)
+        elif method == "PUT":
+            r = self._put_request_executor(url, req)
         elif method == "GET":
             r = self._get_request_executor(url, params)
         elif method == "DELETE":
@@ -560,6 +587,12 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
         handle_response_error(r, "/server_info")
         return ServerInfoRes.model_validate(r.json())
+
+    @validate_call
+    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
+        r = self._post_request_executor("/service/projects_info", req)
+        handle_response_error(r, "/service/projects_info")
+        return [tsi.ProjectsInfoRes.model_validate(item) for item in r.json()]
 
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # TODO: Add docs link (DOCS-1390)
@@ -663,6 +696,68 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         return self._generic_request(
             "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
+        )
+
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        body = his.ObjTagsBody(project_id=req.project_id, tags=req.tags)
+        return self._generic_request(
+            f"/objs/{req.object_id}/versions/{req.digest}/tags",
+            body,
+            his.ObjTagsBody,
+            tsi.ObjAddTagsRes,
+            method="PUT",
+        )
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        body = his.ObjTagsBody(project_id=req.project_id, tags=req.tags)
+        return self._generic_request(
+            f"/objs/{req.object_id}/versions/{req.digest}/tags/remove",
+            body,
+            his.ObjTagsBody,
+            tsi.ObjRemoveTagsRes,
+        )
+
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+        body = his.ObjSetAliasesBody(
+            project_id=req.project_id, digest=req.digest, aliases=req.aliases
+        )
+        return self._generic_request(
+            f"/objs/{req.object_id}/aliases",
+            body,
+            his.ObjSetAliasesBody,
+            tsi.ObjSetAliasesRes,
+            method="PUT",
+        )
+
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
+        body = his.ObjRemoveAliasesBody(project_id=req.project_id, aliases=req.aliases)
+        return self._generic_request(
+            f"/objs/{req.object_id}/aliases/remove",
+            body,
+            his.ObjRemoveAliasesBody,
+            tsi.ObjRemoveAliasesRes,
+        )
+
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        return self._generic_request(
+            "/tags",
+            req,
+            tsi.TagsListReq,
+            tsi.TagsListRes,
+            method="GET",
+            params={"project_id": req.project_id},
+        )
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        return self._generic_request(
+            "/aliases",
+            req,
+            tsi.AliasesListReq,
+            tsi.AliasesListRes,
+            method="GET",
+            params={"project_id": req.project_id},
         )
 
     @validate_call

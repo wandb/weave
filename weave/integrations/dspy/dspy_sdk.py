@@ -44,7 +44,7 @@ class DSPyPatcher(MultiPatcher):
 
     def _patch_evaluate(self: DSPyPatcher) -> None:
         """Monkey-patch dspy.Evaluate.__call__ to replay results into Weave EvaluationLogger."""
-        global _evaluate_patched
+        global _evaluate_patched  # noqa: PLW0603
 
         if _evaluate_patched:
             return
@@ -233,7 +233,7 @@ def get_dspy_patcher(
     if not settings.enabled:
         return NoOpPatcher()
 
-    global _dspy_patcher
+    global _dspy_patcher  # noqa: PLW0603
     if _dspy_patcher is not None:
         return _dspy_patcher
 

@@ -35,6 +35,36 @@ def make_base_64_content(content: str) -> str:
 string_suffix = "a" * AUTO_CONVERSION_MIN_SIZE
 
 
+def create_file_sized_content(content: str) -> str:
+    """Create base64 content padded to exceed AUTO_CONVERSION_MIN_SIZE.
+
+    This ensures the content is large enough to trigger file-based storage
+    in ClickHouse rather than inline storage.
+    """
+    return make_base_64_content(content + string_suffix)
+
+
+def _make_batch_req_with_contents(project_id: str, contents: list[str]):
+    """Helper to build a CallCreateBatchReq where each call has one base64 input."""
+    return tsi.CallCreateBatchReq(
+        batch=[
+            tsi.CallBatchStartMode(
+                mode="start",
+                req=tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        op_name=f"test_op_{i}",
+                        started_at=datetime.datetime.now(datetime.timezone.utc),
+                        attributes={},
+                        inputs={"input": create_file_sized_content(c)},
+                    )
+                ),
+            )
+            for i, c in enumerate(contents)
+        ]
+    )
+
+
 def test_clickhouse_batching():
     """Test that batched calls are properly sent to ClickHouse with correct parameters."""
     # Create a mock ClickHouse client
@@ -74,8 +104,8 @@ def test_clickhouse_batching():
                             started_at=datetime.datetime.now(datetime.timezone.utc),
                             attributes={},
                             inputs={
-                                "input": make_base_64_content(
-                                    "SOME BASE64 CONTENT - 1" + string_suffix
+                                "input": create_file_sized_content(
+                                    "SOME BASE64 CONTENT - 1"
                                 )
                             },
                         )
@@ -90,8 +120,8 @@ def test_clickhouse_batching():
                             started_at=datetime.datetime.now(datetime.timezone.utc),
                             attributes={},
                             inputs={
-                                "input": make_base_64_content(
-                                    "SOME BASE64 CONTENT - 2" + string_suffix
+                                "input": create_file_sized_content(
+                                    "SOME BASE64 CONTENT - 2"
                                 )
                             },
                         )
@@ -106,8 +136,8 @@ def test_clickhouse_batching():
                             started_at=datetime.datetime.now(datetime.timezone.utc),
                             attributes={},
                             inputs={
-                                "input": make_base_64_content(
-                                    "SOME BASE64 CONTENT - 3" + string_suffix
+                                "input": create_file_sized_content(
+                                    "SOME BASE64 CONTENT - 3"
                                 )
                             },
                         )
@@ -137,6 +167,49 @@ def test_clickhouse_batching():
         assert set(insert_tables) == {"files", "call_parts"}, (
             f"Expected inserts to files and call_parts tables, "
             f"but got inserts to: {insert_tables}"
+        )
+
+
+def test_clickhouse_batching_deduplicates_identical_files():
+    """Duplicate content in the same batch should only produce one file insert."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+    mock_ch_client.query.return_value.result_rows = []
+
+    with patch.object(
+        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        trace_server = ClickHouseTraceServer(host="test_host")
+        project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
+
+        mock_query_result = MagicMock()
+        mock_query_result.result_rows = [[0, 1]]
+        mock_ch_client.query.return_value = mock_query_result
+
+        # 3 calls with the SAME content
+        same_content = "IDENTICAL CONTENT"
+        batch_req = _make_batch_req_with_contents(
+            project_id, [same_content, same_content, same_content]
+        )
+        trace_server.call_start_batch(batch_req)
+
+        insert_tables = [call[0][0] for call in mock_ch_client.insert.call_args_list]
+        assert set(insert_tables) == {"files", "call_parts"}
+
+        # The files insert should contain chunks for only 1 unique file
+        # (content + metadata), not 3 copies.
+        files_insert = next(
+            call
+            for call in mock_ch_client.insert.call_args_list
+            if call[0][0] == "files"
+        )
+        file_rows = files_insert[1]["data"]
+        # Each Content object produces 2 files (content + metadata.json).
+        # With dedup, 3 identical calls should still yield only 2 file rows.
+        assert len(file_rows) == 2, (
+            f"Expected 2 file rows (1 content + 1 metadata) for deduplicated batch, "
+            f"got {len(file_rows)}"
         )
 
 

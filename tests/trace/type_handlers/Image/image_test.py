@@ -49,7 +49,7 @@ def test_image_publish(client: WeaveClient, test_img: Image.Image) -> None:
     ref = get_ref(test_img)
 
     assert ref is not None
-    gotten_img = weave.ref(ref.uri()).get()
+    gotten_img = weave.ref(ref.uri).get()
     try:
         assert test_img.tobytes() == gotten_img.tobytes()
     finally:
@@ -70,7 +70,7 @@ def test_image_as_property(client: WeaveClient, test_img: Image.Image) -> None:
     ref = get_ref(img_wrapper)
     assert ref is not None
 
-    gotten_img_wrapper = weave.ref(ref.uri()).get()
+    gotten_img_wrapper = weave.ref(ref.uri).get()
     try:
         assert gotten_img_wrapper.img.tobytes() == test_img.tobytes()
     finally:
@@ -87,7 +87,7 @@ def test_image_as_dataset_cell(client: WeaveClient, test_img: Image.Image) -> No
     ref = get_ref(dataset)
     assert ref is not None
 
-    gotten_dataset = weave.ref(ref.uri()).get()
+    gotten_dataset = weave.ref(ref.uri).get()
     try:
         assert gotten_dataset.rows[0]["img"].tobytes() == test_img.tobytes()
     finally:
@@ -226,6 +226,7 @@ async def test_many_images_will_consistently_log():
         ["python", "trace/type_handlers/Image/image_saving_script.py"],
         capture_output=True,
         text=True,
+        check=False,
     )
 
     # This should always be True because the future executor won't raise an exception

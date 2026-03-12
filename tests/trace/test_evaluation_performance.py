@@ -31,11 +31,11 @@ class BlockingTraceServer(tsi.TraceServerInterface):
         self.lock.release()
 
     def __getattribute__(self, item: str) -> Any:
-        if item in ("internal_trace_server", "lock", "resume", "pause"):
+        if item in {"internal_trace_server", "lock", "resume", "pause"}:
             return super().__getattribute__(item)
         internal_trace_server = super().__getattribute__("internal_trace_server")
 
-        if item in ("attribute_access_log", "remote_request_bytes_limit"):
+        if item in {"attribute_access_log", "remote_request_bytes_limit"}:
             return getattr(internal_trace_server, item)
 
         def wrapper(*args, **kwargs):
@@ -112,7 +112,6 @@ async def test_evaluation_performance(client: WeaveClient):
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
     gold_log = [
-        "ensure_project_exists",
         "get_call_processor",
         "get_call_processor",
         "get_feedback_processor",
@@ -120,10 +119,14 @@ async def test_evaluation_performance(client: WeaveClient):
     ]
     assert log == gold_log
 
-    with paused_client(client) as client:
+    with paused_client(client) as paused_client_instance:
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
-        log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
+        log = [
+            l
+            for l in paused_client_instance.server.attribute_access_log
+            if not l.startswith("_")
+        ]
         assert log == gold_log
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
@@ -135,7 +138,6 @@ async def test_evaluation_performance(client: WeaveClient):
     assert (
         counts
         == {
-            "ensure_project_exists": 1,
             "get_call_processor": 2,
             "get_feedback_processor": 2,
             "table_create": 2,  # dataset and score results

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import datetime
 import logging
 import threading
 from collections import defaultdict
@@ -13,7 +14,7 @@ from typing_extensions import Self
 
 from weave.integrations.openai_realtime.audio_buffer import AudioBufferManager
 from weave.integrations.openai_realtime.encoding import pcm_to_wav
-from weave.trace.context.call_context import set_thread_id
+from weave.trace.context.call_context import get_thread_id, set_thread_id
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 from weave.type_wrappers.Content import Content
@@ -188,9 +189,22 @@ class StateExporter(BaseModel):
     pending_completions: dict[str, dict[str, Any]] = Field(default_factory=dict)
     fifo_timer: threading.Timer | None = None
     fifo_lock: threading.Lock = Field(default_factory=threading.Lock)
+    _fifo_advancing: bool = False
 
     pending_response: dict | None = None
     pending_create_params: dict | None = None
+
+    # Timing: UTC datetimes recorded at event arrival
+    response_created_at: dict[str, datetime.datetime] = Field(default_factory=dict)
+    response_done_at: dict[str, datetime.datetime] = Field(default_factory=dict)
+
+    # Per-item timing: item_id -> {event_name: datetime}
+    item_timestamps: dict[str, dict[str, datetime.datetime]] = Field(
+        default_factory=dict
+    )
+
+    # Cached output metrics per item_id so they can be carried forward as input metrics
+    item_output_metrics: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     def __init__(self) -> None:
         super().__init__()
@@ -229,6 +243,9 @@ class StateExporter(BaseModel):
             item_id, {"audio_start_ms": None, "audio_end_ms": None}
         )
         markers["audio_end_ms"] = msg.get("audio_end_ms")
+        self.item_timestamps.setdefault(item_id, {})["speech_stopped"] = (
+            datetime.datetime.now(tz=datetime.timezone.utc)
+        )
 
     def handle_speech_started(self, msg: dict) -> None:
         item_id = msg.get("item_id", "")
@@ -236,6 +253,9 @@ class StateExporter(BaseModel):
             "audio_start_ms": msg.get("audio_start_ms"),
             "audio_end_ms": None,
         }
+        self.item_timestamps.setdefault(item_id, {})["speech_started"] = (
+            datetime.datetime.now(tz=datetime.timezone.utc)
+        )
 
     def handle_item_created(self, msg: dict) -> None:
         item = msg.get("item") or {}
@@ -247,6 +267,10 @@ class StateExporter(BaseModel):
                 self.next_by_item[previous_item_id] = item_id
             self.items[item_id] = item
             self.last_input_item_id = item_id
+        if item.get("type") == "function_call" and item_id:
+            self.item_timestamps.setdefault(item_id, {})["started"] = (
+                datetime.datetime.now(tz=datetime.timezone.utc)
+            )
 
     def handle_item_done(self, msg: dict) -> None:
         """Handle conversation.item.done — update item data without touching ordering.
@@ -259,6 +283,10 @@ class StateExporter(BaseModel):
         item_id = item.get("id")
         if item_id:
             self.items[item_id] = item
+        if item.get("type") == "function_call" and item_id:
+            self.item_timestamps.setdefault(item_id, {})["completed"] = (
+                datetime.datetime.now(tz=datetime.timezone.utc)
+            )
 
     def handle_item_deleted(self, msg: dict) -> None:
         item_id = msg.get("item_id")
@@ -297,6 +325,13 @@ class StateExporter(BaseModel):
     def handle_response_created(self, msg: dict) -> None:
         self.pending_response = msg.get("response")
         response = self.pending_response or {}
+        response_id = response.get("id")
+
+        if response_id:
+            self.response_created_at[response_id] = datetime.datetime.now(
+                tz=datetime.timezone.utc
+            )
+
         conv_id = response.get("conversation_id")
         if conv_id and conv_id not in self.conversation_calls:
             from weave.trace.context.weave_client_context import require_weave_client
@@ -305,12 +340,11 @@ class StateExporter(BaseModel):
                 self.session_span.get_root_call() if self.session_span else None
             )
             client = require_weave_client()
-            with set_thread_id(conv_id):
-                conv_call = client.create_call(
-                    op="realtime.conversation",
-                    inputs={"id": conv_id},
-                    parent=session_call,
-                )
+            conv_call = client.create_call(
+                op="realtime.conversation",
+                inputs={"id": conv_id},
+                parent=session_call,
+            )
             self.conversation_calls[conv_id] = conv_call
 
     def handle_input_audio_append(self, msg: dict) -> None:
@@ -319,6 +353,12 @@ class StateExporter(BaseModel):
             self.audio_input_buffer.extend_base64(audio)
 
     def handle_response_audio_delta(self, msg: dict) -> None:
+        item_id = msg.get("item_id")
+        if item_id and "first_token" not in self.item_timestamps.get(item_id, {}):
+            self.item_timestamps.setdefault(item_id, {})["first_token"] = (
+                datetime.datetime.now(tz=datetime.timezone.utc)
+            )
+
         delta = msg.get("delta")
         if delta:
             self.audio_output_buffer.extend_base64(delta)
@@ -328,6 +368,20 @@ class StateExporter(BaseModel):
         if item_id:
             self.response_audio[item_id] = bytes(self.audio_output_buffer.buffer)
         self.audio_output_buffer.clear()
+
+    def handle_response_text_delta(self, msg: dict) -> None:
+        item_id = msg.get("item_id")
+        if item_id and "first_token" not in self.item_timestamps.get(item_id, {}):
+            self.item_timestamps.setdefault(item_id, {})["first_token"] = (
+                datetime.datetime.now(tz=datetime.timezone.utc)
+            )
+
+    def handle_function_call_arguments_delta(self, msg: dict) -> None:
+        item_id = msg.get("item_id")
+        if item_id and "first_token" not in self.item_timestamps.get(item_id, {}):
+            self.item_timestamps.setdefault(item_id, {})["first_token"] = (
+                datetime.datetime.now(tz=datetime.timezone.utc)
+            )
 
     def _response_with_audio(self, resp: dict) -> dict[str, Any]:
         """This function takes in the final response message.
@@ -341,7 +395,7 @@ class StateExporter(BaseModel):
 
         for output_idx, output in enumerate(output_list):
             output_type = output.get("type")
-            if output_type in ("function_call", "function_call_output"):
+            if output_type in {"function_call", "function_call_output"}:
                 continue
 
             content_list = output.get("content", [])
@@ -571,47 +625,146 @@ class StateExporter(BaseModel):
         response = msg.get("response", {})
         conv_id = response.get("conversation_id")
         response_id = response.get("id")
+
         if conv_id and self.conversation_responses.get(conv_id) is not None:
             if response_id:
                 self.conversation_responses[conv_id].append(response_id)
+
         elif conv_id and response_id:
             self.conversation_responses[conv_id] = [response_id]
 
-        with set_thread_id(conv_id):
-            if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
-                response_parent = conv_call
-            elif conv_id:
-                conv_call = client.create_call(
-                    op="realtime.conversation",
-                    inputs={"id": conv_id},
-                    parent=session_call,
-                )
-                self.conversation_calls[conv_id] = conv_call
-                response_parent = conv_call
-            elif session_call:
-                response_parent = session_call
-            else:
-                logger.warning(f"Could not find session for response - {response_id}")
-                # Will not happen in GA but potentially possible in Beta
-                response_parent = None
+        if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
+            response_parent = conv_call
 
+        elif conv_id:
+            conv_call = client.create_call(
+                op="realtime.conversation",
+                inputs={"id": conv_id},
+                parent=session_call,
+            )
+            self.conversation_calls[conv_id] = conv_call
+            response_parent = conv_call
+
+        elif session_call:
+            response_parent = session_call
+
+        else:
+            logger.warning(f"Could not find session for response - {response_id}")
+            # Will not happen in GA but potentially possible in Beta
+            response_parent = None
+
+        # Pop all pre-recorded timestamps for this response
+        created_at = (
+            self.response_created_at.pop(response_id, None) if response_id else None
+        )
+        done_at = self.response_done_at.pop(response_id, None) if response_id else None
+
+        # Inject metrics into inputs.metadata.metrics array (indexed by message)
+        input_messages = inputs.get("messages", [])
+        if input_messages:
+            input_metrics_array: list[dict[str, Any]] = []
+            for input_msg in input_messages:
+                item_id = input_msg.get("id")
+                metrics: dict[str, Any] = {}
+                if item_id and item_id in self.item_timestamps:
+                    ts = self.item_timestamps[item_id]
+                    if "speech_started" in ts:
+                        metrics["speech_started"] = ts["speech_started"].isoformat()
+                    if "speech_stopped" in ts:
+                        metrics["speech_stopped"] = ts["speech_stopped"].isoformat()
+                # Carry forward output metrics from a previous response
+                if item_id and item_id in self.item_output_metrics:
+                    metrics.update(self.item_output_metrics[item_id])
+                input_metrics_array.append(metrics)
+            if any(input_metrics_array):
+                if not isinstance(inputs.get("metadata"), dict):
+                    inputs["metadata"] = {}
+                inputs["metadata"]["metrics"] = input_metrics_array
+
+        # Latency = TTFT: started_at=response.created, ended_at=first content
+        # Use user-set thread_id if present, otherwise fall back to conv_id
+        user_thread_id = get_thread_id()
+        if user_thread_id is not None and user_thread_id != "":
+            thread_id = user_thread_id
+        else:
+            thread_id = conv_id
+        if thread_id is not None and conv_id != "":
+            with set_thread_id(thread_id):
+                call = client.create_call(
+                    "realtime.response",
+                    inputs=inputs,
+                    parent=response_parent,
+                    started_at=created_at,
+                )
+        else:
             call = client.create_call(
-                "realtime.response", inputs=inputs, parent=response_parent
+                "realtime.response",
+                inputs=inputs,
+                parent=response_parent,
+                started_at=created_at,
             )
 
-            output_dict = dict(response)
-            output_list = response.get("output", [])
-            self._extract_audio_content(output_list, output_dict)
+        output_dict = dict(response)
+        output_list = response.get("output", [])
+        self._extract_audio_content(output_list, output_dict)
 
-            summary_usage: dict[str, dict] = {}
-            model = session.get("model", "unknown") if session else "unknown"
-            self._update_usage_summary_for_speech(summary_usage, response, model)
-            self._update_usage_summary_for_transcription(summary_usage, messages)
+        # Inject metrics into output_dict.metadata.metrics array (indexed by output item)
+        first_content_at: datetime.datetime | None = None
+        output_items = output_dict.get("output", [])
+        output_metrics_array: list[dict[str, Any]] = []
+        for output_item in output_items:
+            item_id = output_item.get("id")
+            item_type = output_item.get("type")
+            ts = self.item_timestamps.get(item_id, {}) if item_id else {}
+            metrics = {}
 
-            if summary_usage:
-                call.summary = {"usage": summary_usage}
+            if item_type == "message":
+                if created_at:
+                    metrics["response_created"] = created_at.isoformat()
+                if done_at:
+                    metrics["response_done"] = done_at.isoformat()
+                ft = ts.get("first_token")
+                if ft and created_at:
+                    metrics["time_to_first_token"] = (ft - created_at).total_seconds()
+                if ft and (first_content_at is None or ft < first_content_at):
+                    first_content_at = ft
 
-            client.finish_call(call, output=output_dict)
+            elif item_type == "function_call":
+                started = ts.get("started")
+                completed = ts.get("completed")
+                if started:
+                    metrics["started"] = started.isoformat()
+                if completed:
+                    metrics["completed"] = completed.isoformat()
+                ft = ts.get("first_token")
+                if ft and started:
+                    metrics["time_to_first_token"] = (ft - started).total_seconds()
+                if ft and (first_content_at is None or ft < first_content_at):
+                    first_content_at = ft
+
+            output_metrics_array.append(metrics)
+            # Cache output metrics by item_id for reuse when this item appears as input
+            if metrics and item_id:
+                self.item_output_metrics[item_id] = metrics
+        if any(output_metrics_array):
+            if not isinstance(output_dict.get("metadata"), dict):
+                output_dict["metadata"] = {}
+            output_dict["metadata"]["metrics"] = output_metrics_array
+
+        summary: dict[str, Any] = {}
+
+        summary_usage: dict[str, dict] = {}
+        model = session.get("model", "unknown") if session else "unknown"
+        self._update_usage_summary_for_speech(summary_usage, response, model)
+        self._update_usage_summary_for_transcription(summary_usage, messages)
+
+        if summary_usage:
+            summary["usage"] = summary_usage
+
+        if summary:
+            call.summary = summary
+
+        client.finish_call(call, output=output_dict, ended_at=first_content_at)
 
     def handle_response_done(self, msg: dict) -> None:
         # Update state to the completed version and enqueue for FIFO completion.
@@ -619,6 +772,9 @@ class StateExporter(BaseModel):
         response_id = response.get("id")
         if response_id:
             self.responses[response_id] = response
+            self.response_done_at[response_id] = datetime.datetime.now(
+                tz=datetime.timezone.utc
+            )
         for item in response.get("output", []):
             item_id = item.get("id")
             if item_id:
@@ -696,47 +852,62 @@ class StateExporter(BaseModel):
 
     def _advance_fifo(self) -> None:
         """Attempt to finish the head response if ready; maintain order."""
-        while True:
-            with self.fifo_lock:
-                if not self.completion_queue:
-                    # Nothing pending
-                    self.fifo_timer = None
-                    return
-                head = self.completion_queue[0]
-                ctx = self.pending_completions.get(head)
-                if ctx is None:
-                    # Corrupt entry; drop and continue
-                    self.completion_queue.pop(0)
-                    continue
-
-                ready = self._transcripts_ready_for_ctx(ctx)
-
-            if not ready:
-                # Head not ready; reschedule a check and exit to preserve order
-                self._schedule_fifo_check()
+        with self.fifo_lock:
+            if self._fifo_advancing:
+                # Another thread is already advancing; it will loop and
+                # pick up any newly-ready items, so we can safely return.
                 return
+            self._fifo_advancing = True
 
-            # Finish the head outside the lock to avoid blocking
-            msg = ctx["msg"]
-            self._handle_response_done_inner(
-                msg,
-                ctx.get("session"),
-                ctx.get("pending_create_params"),
-                ctx.get("messages", []),
-            )
+        try:
+            while True:
+                with self.fifo_lock:
+                    if not self.completion_queue:
+                        # Nothing pending
+                        self.fifo_timer = None
+                        return
+                    head = self.completion_queue[0]
+                    ctx = self.pending_completions.get(head)
+                    if ctx is None:
+                        # Corrupt entry; drop and continue
+                        self.completion_queue.pop(0)
+                        continue
 
-            # Remove the head and continue to next (if it's immediately ready)
+                    ready = self._transcripts_ready_for_ctx(ctx)
+
+                if not ready:
+                    # Head not ready; reschedule a check and exit to preserve order
+                    self._schedule_fifo_check()
+                    return
+
+                # Finish the head outside the lock to avoid blocking
+                msg = ctx["msg"]
+                self._handle_response_done_inner(
+                    msg,
+                    ctx.get("session"),
+                    ctx.get("pending_create_params"),
+                    ctx.get("messages", []),
+                )
+
+                # Remove the head and continue to next (if it's immediately ready)
+                with self.fifo_lock:
+                    rid = _get_from_dict(_get_from_dict(msg, "response", {}), "id")
+                    if (
+                        rid
+                        and self.completion_queue
+                        and self.completion_queue[0] == rid
+                    ):
+                        self.completion_queue.pop(0)
+                    if rid:
+                        self.pending_completions.pop(rid, None)
+
+                # Loop to see if the next head is already ready; otherwise schedule check
+                # for later and return.
+                # The loop continues only if the immediate next is also ready now.
+                continue
+        finally:
             with self.fifo_lock:
-                rid = _get_from_dict(_get_from_dict(msg, "response", {}), "id")
-                if rid and self.completion_queue and self.completion_queue[0] == rid:
-                    self.completion_queue.pop(0)
-                if rid:
-                    self.pending_completions.pop(rid, None)
-
-            # Loop to see if the next head is already ready; otherwise schedule check
-            # for later and return.
-            # The loop continues only if the immediate next is also ready now.
-            continue
+                self._fifo_advancing = False
 
     def build_conversation_forward(self, item_id: str | None) -> list[dict]:
         if not item_id:

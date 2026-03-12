@@ -1,4 +1,5 @@
 from weave.trace_server.interface.builtin_object_classes.actions import ActionSpec
+from weave.trace_server.interface.builtin_object_classes.alert_spec import AlertSpec
 from weave.trace_server.interface.builtin_object_classes.annotation_spec import (
     AnnotationSpec,
 )
@@ -43,6 +44,7 @@ register_base_object(TestOnlyNestedBaseObject)
 register_base_object(TestOnlyInheritedBaseObject)
 register_base_object(Leaderboard)
 register_base_object(ActionSpec)
+register_base_object(AlertSpec)
 register_base_object(AnnotationSpec)
 register_base_object(Provider)
 register_base_object(ProviderModel)

@@ -1,4 +1,10 @@
 import {instrumentOpenAI} from '../integrations/openai';
 import {instrumentAnthropic} from './anthropic';
+import {instrumentGoogleGenAI} from './googleGenAI';
+import {instrumentOpenAIAgent} from './openai.agent';
+import {instrumentOpenAIRealtimeAgent} from './openai.realtime.agent';
 instrumentOpenAI();
 instrumentAnthropic();
+instrumentGoogleGenAI();
+instrumentOpenAIAgent();
+instrumentOpenAIRealtimeAgent();

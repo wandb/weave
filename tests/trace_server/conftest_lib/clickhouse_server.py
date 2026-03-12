@@ -126,9 +126,8 @@ def ensure_clickhouse_db_process_running(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=temp_dir,
-                preexec_fn=os.setsid
-                if os.name != "nt"
-                else None,  # Create new process group on Unix
+                # Create new process group on Unix.
+                preexec_fn=(os.setsid if os.name != "nt" else None),  # noqa: PLW1509
             )
             started_process = process
 

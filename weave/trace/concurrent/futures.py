@@ -36,7 +36,9 @@ from collections.abc import Callable
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
 from threading import Lock
-from typing import Any, TypeVar
+from typing import TypeVar
+
+from typing_extensions import ParamSpec
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.util import ContextAwareThreadPoolExecutor
@@ -46,8 +48,10 @@ logger = logging.getLogger(__name__)
 # Constants
 THREAD_NAME_PREFIX = "WeaveThreadPool"
 
+P = ParamSpec("P")
 T = TypeVar("T")
 U = TypeVar("U")
+R = TypeVar("R")
 
 
 class FutureExecutor:
@@ -85,18 +89,18 @@ class FutureExecutor:
         with self._active_futures_lock:
             return len(self._active_futures)
 
-    def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
+    def defer(self, f: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> Future[R]:
         """Defer a function to be executed in a thread pool.
 
         This is useful for long-running or I/O-bound functions where the result is not needed immediately.
 
         Args:
-            f (Callable[..., T]): The function to be executed.
+            f (Callable[P, R]): The function to be executed.
             *args: Positional arguments to pass to the function.
             **kwargs: Keyword arguments to pass to the function.
 
         Returns:
-            Future[T]: A Future object representing the eventual result of the function.
+            Future[R]: A Future object representing the eventual result of the function.
         """
         return self._safe_submit(f, *args, **kwargs)
 
@@ -192,14 +196,14 @@ class FutureExecutor:
         if self._executor:
             self._executor.shutdown(wait=True)
 
-    def _make_deadlock_safe(self, f: Callable[..., T]) -> Callable[..., T]:
+    def _make_deadlock_safe(self, f: Callable[P, R]) -> Callable[P, R]:
         """Allows any function to be called from a thread without deadlocking.
 
         Anytime a function is submitted to the threadpool (e.g., submit or add_done_callback),
         it should be wrapped in this function so that it can be executed in the threadpool.
         """
 
-        def wrapped_f(*args: Any, **kwargs: Any) -> T:
+        def wrapped_f(*args: P.args, **kwargs: P.kwargs) -> R:
             token = self._in_thread_context.set(True)
             try:
                 return f(*args, **kwargs)
@@ -214,7 +218,9 @@ class FutureExecutor:
         """Add a done callback to a future."""
         future.add_done_callback(self._make_deadlock_safe(callback))
 
-    def _safe_submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
+    def _safe_submit(
+        self, f: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+    ) -> Future[R]:
         """Submit a function to the thread pool.
 
         If there is an error submitting to the thread pool,
@@ -239,10 +245,10 @@ class FutureExecutor:
         return future
 
     def _execute_directly(
-        self, f: Callable[..., T], *args: Any, **kwargs: Any
-    ) -> Future[T]:
+        self, f: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+    ) -> Future[R]:
         """Execute a function directly in the current thread."""
-        fut: Future[T] = Future()
+        fut: Future[R] = Future()
         try:
             res = f(*args, **kwargs)
             fut.set_result(res)

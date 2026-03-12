@@ -65,7 +65,7 @@ def test_inline_custom_obj_needs_load_op(client):
     client.flush()
 
     # Temporarily modify KNOWN_TYPES to remove markdown
-    global KNOWN_TYPES
+    global KNOWN_TYPES  # noqa: PLW0603
     original_known_types = KNOWN_TYPES.copy()
     KNOWN_TYPES.remove("rich.markdown.Markdown")
     try:

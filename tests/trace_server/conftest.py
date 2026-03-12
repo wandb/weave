@@ -9,7 +9,7 @@ import pytest
 from tests.trace_server.conftest_lib.clickhouse_server import *
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
-    TestOnlyUserInjectingExternalTraceServer,
+    UserInjectingExternalTraceServer,
     externalize_trace_server,
 )
 from tests.trace_server.workers.evaluate_model_test_worker import (
@@ -129,10 +129,10 @@ def _get_worker_db_suffix(request) -> str:
 def get_ch_trace_server(
     ensure_clickhouse_db,
     request,
-) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
+) -> Callable[[], UserInjectingExternalTraceServer]:
     servers_to_cleanup: list[ClickHouseServerCleanup] = []
 
-    def ch_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
+    def ch_trace_server_inner() -> UserInjectingExternalTraceServer:
         host, port = next(ensure_clickhouse_db())
         db_suffix = _get_worker_db_suffix(request)
 
@@ -172,6 +172,7 @@ def get_ch_trace_server(
             # Clean up any existing worker-specific databases
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
+            ch_server._database_ensured = False
 
             # Patch _run_migrations to use worker-specific management database
             def patched_run_migrations():
@@ -225,10 +226,10 @@ def get_ch_trace_server(
 @pytest.fixture
 def get_sqlite_trace_server(
     request,
-) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
+) -> Callable[[], UserInjectingExternalTraceServer]:
     servers_to_cleanup: list[SqliteTraceServer] = []
 
-    def sqlite_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
+    def sqlite_trace_server_inner() -> UserInjectingExternalTraceServer:
         id_converter = DummyIdConverter()
         # Use worker-specific database for pytest-xdist isolation
         # Each worker gets its own isolated database
@@ -283,7 +284,7 @@ def local_secret_fetcher():
 @pytest.fixture
 def trace_server(
     request, local_secret_fetcher, get_ch_trace_server, get_sqlite_trace_server
-) -> TestOnlyUserInjectingExternalTraceServer:
+) -> UserInjectingExternalTraceServer:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
         return get_ch_trace_server()

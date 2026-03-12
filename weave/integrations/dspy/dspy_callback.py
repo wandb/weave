@@ -10,7 +10,7 @@ from weave.integrations.dspy.dspy_utils import (
     get_op_name_for_callback,
 )
 from weave.trace.call import Call
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import weave_client_context
 
 import_failed = False
 

@@ -148,7 +148,7 @@ def _create_otel_export_req(
 
     processed = tsi.ProcessedResourceSpans(
         entity=TEST_ENTITY,
-        project=project_id.split("/")[-1],
+        project=project_id.rsplit("/", maxsplit=1)[-1],
         run_id=None,
         resource_spans=resource_spans,
     )
@@ -472,3 +472,119 @@ def test_otel_and_calls_complete_api_interoperability(
     # OTel spans get transformed to op refs, API calls keep original name
     assert any("test_span" in name for name in op_names)
     assert "api_op" in op_names
+
+
+# =============================================================================
+# Op Ref Cache Tests
+# =============================================================================
+
+
+def test_otel_op_ref_cached_across_batches(trace_server, clickhouse_trace_server):
+    """Op ref URIs are cached: the same op name across two batches resolves identically."""
+    project_id = f"{TEST_ENTITY}/otel_cache_across_batches"
+
+    # Batch 1: export span with op "foo"
+    span1 = _create_otel_span("foo")
+    req1 = _create_otel_export_req(project_id, [span1])
+    trace_server.otel_export(req1)
+
+    # Batch 2: export another span with op "foo"
+    span2 = _create_otel_span("foo")
+    req2 = _create_otel_export_req(project_id, [span2])
+    trace_server.otel_export(req2)
+
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 2
+    # Both should resolve to the same op ref URI
+    assert calls[0].op_name == calls[1].op_name
+    assert "foo" in calls[0].op_name
+
+
+def test_otel_mixed_cached_and_new_ops(trace_server, clickhouse_trace_server):
+    """A batch with both cached and uncached ops resolves all correctly."""
+    project_id = f"{TEST_ENTITY}/otel_mixed_cache"
+
+    # Batch 1: establish "existing_op" in cache
+    span1 = _create_otel_span("existing_op")
+    req1 = _create_otel_export_req(project_id, [span1])
+    trace_server.otel_export(req1)
+
+    # Batch 2: mix of cached "existing_op" and new "brand_new_op"
+    span2 = _create_otel_span("existing_op")
+    span3 = _create_otel_span("brand_new_op")
+    req2 = _create_otel_export_req(project_id, [span2, span3])
+    trace_server.otel_export(req2)
+
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 3
+
+    op_names = [c.op_name for c in calls]
+    existing_refs = [n for n in op_names if "existing_op" in n]
+    new_refs = [n for n in op_names if "brand_new_op" in n]
+    assert len(existing_refs) == 2
+    assert len(new_refs) == 1
+    # All "existing_op" refs should be identical
+    assert len(set(existing_refs)) == 1
+
+
+def test_otel_same_op_name_different_projects(trace_server, clickhouse_trace_server):
+    """Cache keys are project-scoped: same op name in different projects gets independent URIs."""
+    project_a = f"{TEST_ENTITY}/otel_cache_proj_a"
+    project_b = f"{TEST_ENTITY}/otel_cache_proj_b"
+
+    span_a = _create_otel_span("shared_op")
+    req_a = _create_otel_export_req(project_a, [span_a])
+    trace_server.otel_export(req_a)
+
+    span_b = _create_otel_span("shared_op")
+    req_b = _create_otel_export_req(project_b, [span_b])
+    trace_server.otel_export(req_b)
+
+    calls_a = _fetch_calls_stream(trace_server, project_a)
+    calls_b = _fetch_calls_stream(trace_server, project_b)
+    assert len(calls_a) == 1
+    assert len(calls_b) == 1
+
+    # Both contain "shared_op" but belong to different projects
+    assert "shared_op" in calls_a[0].op_name
+    assert "shared_op" in calls_b[0].op_name
+    # URIs differ because they reference different project_ids
+    assert calls_a[0].op_name != calls_b[0].op_name
+
+
+def test_otel_many_unique_ops_in_batch(trace_server, clickhouse_trace_server):
+    """A single batch with many distinct ops resolves all, and a repeat batch uses cache."""
+    project_id = f"{TEST_ENTITY}/otel_many_ops"
+    op_names = [f"op_{i}" for i in range(20)]
+
+    # Batch 1: 20 distinct ops
+    spans = [_create_otel_span(name) for name in op_names]
+    req1 = _create_otel_export_req(project_id, spans)
+    trace_server.otel_export(req1)
+
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 20
+
+    # Each op should have a unique ref URI
+    refs = {c.op_name for c in calls}
+    assert len(refs) == 20
+
+    # Batch 2: re-export the same 20 ops (all should come from cache)
+    spans2 = [_create_otel_span(name) for name in op_names]
+    req2 = _create_otel_export_req(project_id, spans2)
+    trace_server.otel_export(req2)
+
+    calls_after = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls_after) == 40
+
+    # All refs for the same op name should be identical across batches
+    from collections import defaultdict
+
+    by_op: dict[str, set[str]] = defaultdict(set)
+    for c in calls_after:
+        for name in sorted(op_names, key=len, reverse=True):
+            if f"/op/{name}:" in c.op_name:
+                by_op[name].add(c.op_name)
+                break
+    for name, uri_set in by_op.items():
+        assert len(uri_set) == 1, f"Op {name} has inconsistent refs: {uri_set}"

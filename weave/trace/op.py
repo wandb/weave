@@ -35,8 +35,7 @@ from typing import (
 from typing_extensions import ParamSpec, TypeIs, Unpack
 
 from weave.trace import box, settings
-from weave.trace.context import call_context
-from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import (
     call_attributes,
     get_tracing_enabled,
@@ -1472,7 +1471,7 @@ class _IteratorWrapper(Generic[V]):
         if not self._on_finished_called:
             try:
                 self._on_error(e)
-            except Exception as e:
+            except Exception:
                 # Even if an exception occurs, we need to ensure we clean up the call context
                 current_call = call_context.get_current_call()
                 if current_call is not None:
@@ -1572,14 +1571,14 @@ class _IteratorWrapper(Generic[V]):
 
     def __getattr__(self, name: str) -> Any:
         """Delegate all other attributes to the wrapped iterator."""
-        if name in [
+        if name in {
             "_iterator_or_ctx_manager",
             "_on_yield",
             "_on_error",
             "_on_close",
             "_on_finished_called",
             "_call_on_error_once",
-        ]:
+        }:
             return object.__getattribute__(self, name)
         return getattr(self._iterator_or_ctx_manager, name)
 

@@ -158,18 +158,18 @@ class Traceable:
 
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
-    attribute = object.__getattribute__(self, name)
+    attribute = object.__getattribute__(self, name)  # noqa: PLC2801
 
     # Starting in pydantic 2.10.0, this handling is needed otherwise getattribute will
     # infinitely recurse.
     if name.startswith("__") and name.endswith("__"):
         return attribute
 
-    if name not in object.__getattribute__(self, "model_fields"):
+    if name not in object.__getattribute__(self, "model_fields"):  # noqa: PLC2801
         return attribute
     if name == "ref":
         try:
-            return object.__getattribute__(self, "ref")
+            return object.__getattribute__(self, "ref")  # noqa: PLC2801
         except AttributeError:
             return None
 
@@ -220,7 +220,7 @@ def attribute_access_result(
     )
 
 
-class WeaveObject(Traceable):
+class WeaveObject(Traceable):  # noqa: PLW1641
     def __init__(
         self,
         val: Any,
@@ -264,7 +264,7 @@ class WeaveObject(Traceable):
         return result
 
     def __setattr__(self, __name: str, __value: Any) -> None:
-        if __name in [
+        if __name in {
             "_val",
             "ref",
             "server",
@@ -272,7 +272,7 @@ class WeaveObject(Traceable):
             "mutations",
             "_is_dirty",
             "parent",
-        ]:
+        }:
             return object.__setattr__(self, __name, __value)
         else:
             self._mark_dirty()
@@ -294,7 +294,7 @@ class WeaveObject(Traceable):
         return unwrap(self._val)
 
 
-class WeaveTable(Traceable):
+class WeaveTable(Traceable):  # noqa: PLW1641
     filter: TableRowFilter | None = None
     _known_length: int | None = None
     _rows: Sequence[dict] | None = None
@@ -434,11 +434,13 @@ class WeaveTable(Traceable):
             or self.table_ref._row_digests is None
             or self._prefetched_rows is None
         ):
-            if get_raise_on_captured_errors():
-                raise
-            logger.error(
-                "Expected all row digests and prefetched rows to be set, falling back to remote iteration"
+            msg = (
+                "Expected all row digests and prefetched rows to be set, falling back"
+                " to remote iteration"
             )
+            if get_raise_on_captured_errors():
+                raise ValueError(msg)
+            logger.error(msg)
             yield from self._remote_iter()
             return
 
@@ -448,18 +450,26 @@ class WeaveTable(Traceable):
             row_digest_len = len(self.table_ref._row_digests)
             prefetched_rows_len = len(self._prefetched_rows)
             if row_digest_len != prefetched_rows_len:
-                if get_raise_on_captured_errors():
-                    raise
-                logger.error(
-                    f"Expected length of row digests ({row_digest_len}) to match prefetched rows ({prefetched_rows_len}). Falling back to remote iteration."
+                msg = (
+                    "Expected length of row digests "
+                    f"({row_digest_len}) to match prefetched rows "
+                    f"({prefetched_rows_len}). Falling back to remote iteration."
                 )
+                if get_raise_on_captured_errors():
+                    raise ValueError(msg)
+                logger.error(msg)
                 yield from self._remote_iter()
                 return
 
         for i, _ in enumerate(self._prefetched_rows):
-            next_id_future = wc.future_executor.defer(
-                lambda closure=i: cached_table_ref.row_digests[closure]
-            )
+
+            def make_get_row_digest(idx: int) -> typing.Callable[[], str]:
+                def get_row_digest() -> str:
+                    return cached_table_ref.row_digests[idx]
+
+                return get_row_digest
+
+            next_id_future = wc.future_executor.defer(make_get_row_digest(i))
             new_ref = self.ref.with_item(next_id_future)
             val = self._prefetched_rows[i]
             res = from_json(val, self.table_ref.project_id, self.server)
@@ -523,7 +533,7 @@ class WeaveTable(Traceable):
                     else self._prefetched_rows[page_index * page_size + i]
                 )
 
-                def process_row(val: Any, new_ref: RefWithExtra) -> Any:
+                def process_row(val: Any, new_ref: RefWithExtra | None) -> Any:
                     if not self.table_ref:
                         # Should never happen, we need table_ref to remote_iter
                         return None
@@ -534,9 +544,15 @@ class WeaveTable(Traceable):
                         self.root,
                     )
 
-                future = wc.future_executor.defer(
-                    lambda v=val, r=new_ref: process_row(v, r)
-                )
+                def make_row_task(
+                    v: Any, r: RefWithExtra | None
+                ) -> typing.Callable[[], Any]:
+                    def row_task() -> Any:
+                        return process_row(v, r)
+
+                    return row_task
+
+                future = wc.future_executor.defer(make_row_task(val, new_ref))
                 futures.append(future)
 
             # Yield results as they complete
@@ -582,7 +598,7 @@ class WeaveTable(Traceable):
         return unwrap(list(self.rows))
 
 
-class WeaveList(Traceable, list):
+class WeaveList(Traceable, list):  # noqa: PLW1641
     def __init__(
         self,
         *args: Any,
@@ -661,7 +677,7 @@ class WeaveList(Traceable, list):
         return unwrap(list(self))
 
 
-class WeaveDict(Traceable, dict):
+class WeaveDict(Traceable, dict):  # noqa: PLW1641
     def __init__(
         self,
         *args: Any,
@@ -900,7 +916,6 @@ def make_trace_obj(
         # 2. Users can compare them pythonically (e.g. `x is None` vs. `x == None`)
 
         pass
-    else:
-        if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
-            box_val.ref = new_ref
+    elif hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
+        box_val.ref = new_ref
     return box_val
