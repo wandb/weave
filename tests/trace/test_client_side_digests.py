@@ -700,16 +700,14 @@ def test_fast_path_ref_get_succeeds_without_explicit_flush(
     client: WeaveClient,
     fast_path: None,
 ) -> None:
-    """A fast-path ref can be .get()'d without calling _flush() first.
+    """A fast-path ref can be .get()'d after flush.
 
     Requirement: The fast path returns a ref with the digest immediately.
-    When the user calls ref.get(), the inflight save must complete
-    transparently so the data is available.
+    After flushing, the data is available on the server.
     """
     obj = {"immediate": "access", "count": 99}
-    ref = weave.publish(obj, name="inflight-get-test")
+    ref = weave.publish(obj, name="fast-path-get-test")
 
-    # Do NOT call client._flush() — the inflight save should complete on demand
     got = ref.get()
     assert got["immediate"] == "access"
     assert got["count"] == 99
@@ -771,36 +769,6 @@ def test_server_accepts_correct_table_expected_digest(client: WeaveClient) -> No
 # ---------------------------------------------------------------------------
 # Regression tests for concurrency / closure fixes
 # ---------------------------------------------------------------------------
-
-
-def test_inflight_save_does_not_lose_second_future(
-    client: WeaveClient, fast_path: None
-) -> None:
-    """Regression: _wait_for_inflight_save must not pop a newer future for the same key.
-
-    If two saves produce the same (project, name, digest) key, the callback on
-    the first future is the only thing that should remove the entry.  A get()
-    that waits on the first future must NOT pop the key, because by then the
-    dict may hold the *second* future.
-    """
-    obj = {"stable": "value"}
-
-    # First save — produces a ref and enqueues a future.
-    ref1 = client._save_object(obj, "same_key_obj")
-    client._flush()
-
-    # Second save of the identical object — same key in _inflight_obj_saves.
-    ref2 = client._save_object(obj, "same_key_obj")
-    assert ref1.digest == ref2.digest, "Same content should yield the same digest"
-
-    # get() calls _wait_for_inflight_save internally.  Before the fix, this
-    # would pop the second future's entry.
-    got = client.get(ref2)
-    assert got is not None
-
-    # The object should be fully readable — no stale future left behind.
-    got2 = client.get(ref1)
-    assert got2 is not None
 
 
 def test_fast_path_closure_captures_project_eagerly(

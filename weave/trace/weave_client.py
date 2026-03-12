@@ -351,10 +351,6 @@ class WeaveClient:
         # Using an Event instead of a bare bool is thread-safe without the GIL.
         self._client_side_digests_disabled_event = threading.Event()
         self._ext_to_int_project_map: dict[str, str] = {}
-        # Track in-flight object saves so get()/save() can wait for them.
-        # Key: (project_id, object_id, digest), Value: Future from obj_create.
-        self._inflight_obj_saves: dict[tuple[str, str, str], Future[ObjCreateRes]] = {}
-        self._inflight_obj_saves_lock = threading.Lock()
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
@@ -413,22 +409,8 @@ class WeaveClient:
             raise TypeError(f"Expected ObjectRef, got {ref}")
         return self.get(ref)
 
-    def _wait_for_inflight_save(self, ref: ObjectRef) -> None:
-        """Block until any in-flight obj_create for this ref completes."""
-        key = (to_project_id(ref.entity, ref.project), ref.name, ref.digest)
-        with self._inflight_obj_saves_lock:
-            fut = self._inflight_obj_saves.get(key)
-        if fut is not None:
-            try:
-                fut.result()
-            except Exception:
-                pass  # Errors are handled by the validation callback
-            # Note: cleanup is handled by _on_obj_save_done callback.
-            # Popping here would race with a new save for the same key.
-
     @trace_sentry.global_trace_sentry.watch()
     def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
-        self._wait_for_inflight_save(ref)
         project_id = to_project_id(ref.entity, ref.project)
         try:
             read_res = self.server.obj_read(
@@ -1973,17 +1955,11 @@ class WeaveClient:
                 send_obj_create
             )
             ref_uri = ref.uri()
-            save_key = (project_id, name, digest)
-            with self._inflight_obj_saves_lock:
-                self._inflight_obj_saves[save_key] = res_future
 
             def _on_obj_save_done(
                 fut: Future[ObjCreateRes],
                 _uri: str | None = ref_uri,
-                _key: tuple = save_key,
             ) -> None:
-                with self._inflight_obj_saves_lock:
-                    self._inflight_obj_saves.pop(_key, None)
                 self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
 
             res_future.add_done_callback(_on_obj_save_done)
