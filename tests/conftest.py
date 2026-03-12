@@ -20,10 +20,10 @@ from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import http_utils
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
-from weave.trace_server_bindings import http_utils
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 # Force testing to never report wandb sentry events
