@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 from typing import Protocol
 
 from pydantic import BaseModel
 
 from weave.trace_server.trace_server_interface import (
-    FullTraceServerInterface,
+    EnsureProjectExistsRes,
+    ProjectsInfoReq,
+    ProjectsInfoRes,
 )
 
 
@@ -12,18 +16,16 @@ class ServerInfoRes(BaseModel):
     trace_server_version: str | None = None
 
 
-class TraceService(Protocol):
-    """This protocol defines the interface definition for a trace service.
+class ServiceInterface(Protocol):
+    """Protocol for service-level operations that are orthogonal to the
+    storage backend (ClickHouse/SQLite).
 
-    TraceService wraps a TraceServerInterface and additionally provides methods
-    that are generic across all interfaces, e.g. getting the server info or
-    server health.
-
-    The intent is to provide a simple interface for weave clients to interact
-    with the trace server.
+    These methods handle concerns like project management and server metadata
+    that don't vary by tracing backend.
     """
 
-    trace_server_interface: FullTraceServerInterface
-
     def server_info(self) -> ServerInfoRes: ...
-    def read_root(self) -> dict[str, str]: ...
+    def ensure_project_exists(
+        self, entity: str, project: str
+    ) -> EnsureProjectExistsRes: ...
+    def projects_info(self, req: ProjectsInfoReq) -> list[ProjectsInfoRes]: ...

@@ -3,6 +3,9 @@ from typing import Literal
 from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.trace_service import (
+    ServerInfoRes as ServerInfoRes,  # noqa: PLC0414
+)
 
 
 class StartBatchItem(BaseModel):
@@ -24,11 +27,6 @@ class CompleteBatchItem(BaseModel):
 
 class Batch(BaseModel):
     batch: list[StartBatchItem | EndBatchItem]
-
-
-class ServerInfoRes(BaseModel):
-    min_required_weave_python_version: str
-    trace_server_version: str | None = None
 
 
 class EntityProjectInfo(BaseModel):

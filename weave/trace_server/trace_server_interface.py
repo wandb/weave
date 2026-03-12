@@ -2607,11 +2607,6 @@ class EvalResultsSummaryRes(BaseModel):
 
 
 class TraceServerInterface(Protocol):
-    def ensure_project_exists(
-        self, entity: str, project: str
-    ) -> EnsureProjectExistsRes:
-        return EnsureProjectExistsRes(project_name=project)
-
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
