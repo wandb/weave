@@ -49,9 +49,7 @@ def test_resilience_to_user_code_errors(client):
 
 @pytest.fixture
 def _apply_digest_settings(request):
-    parse_and_apply_settings(
-        UserSettings(enable_client_side_digests=request.param)
-    )
+    parse_and_apply_settings(UserSettings(enable_client_side_digests=request.param))
     yield
     parse_and_apply_settings(UserSettings())
 
@@ -88,7 +86,6 @@ def test_resilience_to_server_errors(
     expected_errors,
     _apply_digest_settings,
 ):
-
     def do_test():
         @weave.op
         def simple_op():

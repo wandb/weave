@@ -29,7 +29,9 @@ def digest_params_client(client_creator, request) -> DigestParamsClient:
     with client_creator(
         settings=UserSettings(enable_client_side_digests=request.param)
     ) as client:
-        yield DigestParamsClient(client=client, enable_client_side_digests=request.param)
+        yield DigestParamsClient(
+            client=client, enable_client_side_digests=request.param
+        )
 
 
 @pytest.fixture
