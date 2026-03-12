@@ -3,9 +3,6 @@ from typing import Literal
 from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.trace_service import (
-    ServerInfoRes as ServerInfoRes,  # noqa: PLC0414
-)
 
 
 class StartBatchItem(BaseModel):
