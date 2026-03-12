@@ -115,10 +115,7 @@ def test_published_dataset_laziness(client_creator, enable_client_side_digests):
         # When client-side digests are enabled, the first operation that
         # needs _internal_project_id triggers lazy projects_info resolution.
         if enable_client_side_digests:
-            expected_publish_log = [
-                "projects_info",
-                "projects_info",
-            ] + expected_publish_log
+            expected_publish_log = ["projects_info"] + expected_publish_log
         assert _top_level_logs(log) == expected_publish_log
         client.server.attribute_access_log = []
 

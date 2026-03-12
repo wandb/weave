@@ -138,7 +138,7 @@ def _expected_evaluation_counts(enable_client_side_digests: bool) -> Counter[str
         }
     )
     if enable_client_side_digests:
-        expected["projects_info"] = 2  # lazy resolution after project change
+        expected["projects_info"] = 1  # lazy resolution after project change
     return expected
 
 
