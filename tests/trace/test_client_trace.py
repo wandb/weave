@@ -1524,6 +1524,24 @@ def test_trace_call_filter(client):
                 ]
             },
         ),
+        # Negative integer literal - all 10 numeric rows (0-9) are >= -1
+        (
+            10
+            + (
+                1 if is_sqlite else 0
+            ),  # SQLite casting transforms strings to 0, instead of NULL
+            {
+                "$gte": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.prim"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": -1},
+                ]
+            },
+        ),
     ]:
         print(f"TEST CASE [{count}]", query)
         inner_res = get_client_trace_server(client).calls_query(
