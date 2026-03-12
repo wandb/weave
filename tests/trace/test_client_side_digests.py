@@ -314,17 +314,8 @@ def test_server_rejects_wrong_expected_digest(client: WeaveClient):
         )
     )
 
-    try:
+    with pytest.raises(Exception, match=r"(?i)digest|409|mismatch"):
         client.server.obj_create(req)
-        raise AssertionError("Expected DigestMismatchError")
-    except (DigestMismatchError, Exception) as e:
-        # When going through HTTP, this comes back as an HTTP error (409)
-        # When going through direct server, it's DigestMismatchError
-        assert (
-            "digest" in str(e).lower()
-            or "409" in str(e)
-            or "mismatch" in str(e).lower()
-        )
 
 
 def test_server_rejects_wrong_table_expected_digest(client: WeaveClient):
@@ -337,15 +328,8 @@ def test_server_rejects_wrong_table_expected_digest(client: WeaveClient):
         )
     )
 
-    try:
+    with pytest.raises(Exception, match=r"(?i)digest|409|mismatch"):
         client.server.table_create(req)
-        raise AssertionError("Expected DigestMismatchError")
-    except (DigestMismatchError, Exception) as e:
-        assert (
-            "digest" in str(e).lower()
-            or "409" in str(e)
-            or "mismatch" in str(e).lower()
-        )
 
 
 @pytest.mark.disable_logging_error_check
