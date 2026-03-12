@@ -293,24 +293,31 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
     assert_sql(
         cq,
         """
-        WITH filtered_calls AS (
+        WITH input_matching_ids AS (
+            SELECT calls_merged.id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.inputs_dump LIKE {pb_0:String}
+                   AND calls_merged.inputs_dump LIKE {pb_1:String})
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+        ),
+        filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_9:String}
-            WHERE ((calls_merged.op_name IN {pb_5:Array(String)})
-                    OR (calls_merged.op_name IS NULL))
-                AND (calls_merged.trace_id = {pb_6:String}
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.id IN input_matching_ids)
+                AND ((calls_merged.op_name IN {pb_8:Array(String)})
+                        OR (calls_merged.op_name IS NULL))
+                AND (calls_merged.trace_id = {pb_9:String}
                     OR calls_merged.trace_id IS NULL)
-                AND ((calls_merged.inputs_dump LIKE {pb_7:String} OR calls_merged.inputs_dump IS NULL)
-                    AND (calls_merged.inputs_dump LIKE {pb_8:String} OR calls_merged.inputs_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                                    ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
-                    AND
-                    ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') = {pb_3:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}), 'null'), '') = {pb_4:String}))
                 AND
-                ((any(calls_merged.wb_user_id) = {pb_4:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}), 'null'), '') = {pb_6:String}))
+                AND
+                ((any(calls_merged.wb_user_id) = {pb_7:String}))
                 AND
                 ((any(calls_merged.deleted_at) IS NULL))
                 AND
@@ -323,22 +330,22 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_9:String}
+        PREWHERE calls_merged.project_id = {pb_2:String}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
         """,
         {
-            "pb_0": '$."param"."val"',
-            "pb_1": "hello",
-            "pb_2": '$."param"."bool"',
-            "pb_3": "true",
-            "pb_4": "my_user_id",
-            "pb_5": ["a", "b"],
-            "pb_6": "111111111111",
-            "pb_7": '%"hello"%',
-            "pb_8": "%true%",
-            "pb_9": "project",
+            "pb_0": '%"hello"%',
+            "pb_1": "%true%",
+            "pb_2": "project",
+            "pb_3": '$."param"."val"',
+            "pb_4": "hello",
+            "pb_5": '$."param"."bool"',
+            "pb_6": "true",
+            "pb_7": "my_user_id",
+            "pb_8": ["a", "b"],
+            "pb_9": "111111111111",
         },
     )
 
@@ -727,16 +734,23 @@ def test_calls_query_with_predicate_filters() -> None:
     assert_sql(
         cq,
         """
-        WITH filtered_calls AS (
+        WITH input_matching_ids AS (
+            SELECT calls_merged.id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE (calls_merged.inputs_dump LIKE {pb_0:String})
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+        ),
+        filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_4:String}
-            WHERE ((calls_merged.inputs_dump LIKE {pb_3:String} OR calls_merged.inputs_dump IS NULL))
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE (calls_merged.id IN input_matching_ids)
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
-                AND ((any(calls_merged.wb_user_id) = {pb_2:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') = {pb_3:String}))
+                AND ((any(calls_merged.wb_user_id) = {pb_4:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
             )
@@ -745,16 +759,16 @@ def test_calls_query_with_predicate_filters() -> None:
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_4:String}
+        PREWHERE calls_merged.project_id = {pb_1:String}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
-            "pb_0": '$."param"."val"',
-            "pb_1": "hello",
-            "pb_2": "my_user_id",
-            "pb_3": '%"hello"%',
-            "pb_4": "project",
+            "pb_0": '%"hello"%',
+            "pb_1": "project",
+            "pb_2": '$."param"."val"',
+            "pb_3": "hello",
+            "pb_4": "my_user_id",
         },
     )
 
@@ -897,20 +911,27 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
     assert_sql(
         cq,
         """
-        WITH filtered_calls AS (
+        WITH input_matching_ids AS (
+            SELECT calls_merged.id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.inputs_dump LIKE {pb_0:String}
+                   AND calls_merged.output_dump LIKE {pb_1:String})
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+        ),
+        filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_7:String}
-            WHERE ((calls_merged.inputs_dump LIKE {pb_5:String} OR calls_merged.inputs_dump IS NULL)
-                    AND (calls_merged.output_dump LIKE {pb_6:String} OR calls_merged.output_dump IS NULL))
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.id IN input_matching_ids)
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}), 'null'), '') = {pb_4:String}))
                 AND
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}), 'null'), '') = {pb_3:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_5:String}), 'null'), '') = {pb_6:String}))
                 AND
-                ((any(calls_merged.wb_user_id) = {pb_4:String}))
+                ((any(calls_merged.wb_user_id) = {pb_7:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
             )
@@ -920,19 +941,19 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_7:String}
+        PREWHERE calls_merged.project_id = {pb_2:String}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
-            "pb_0": '$."param"."val"',
-            "pb_1": "hello",
-            "pb_2": '$."result"',
-            "pb_3": "success",
-            "pb_4": "my_user_id",
-            "pb_5": '%"hello"%',
-            "pb_6": '%"success"%',
-            "pb_7": "project",
+            "pb_0": '%"hello"%',
+            "pb_1": '%"success"%',
+            "pb_2": "project",
+            "pb_3": '$."param"."val"',
+            "pb_4": "hello",
+            "pb_5": '$."result"',
+            "pb_6": "success",
+            "pb_7": "my_user_id",
         },
     )
 
@@ -1047,24 +1068,30 @@ def test_calls_query_with_complex_heavy_filters() -> None:
     assert_sql(
         cq,
         """
-        WITH filtered_calls AS (
+        WITH input_matching_ids AS (
+            SELECT calls_merged.id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_3:String}
+            WHERE (calls_merged.inputs_dump LIKE {pb_0:String}
+                   AND (calls_merged.output_dump LIKE {pb_1:String}
+                        OR lower(calls_merged.inputs_dump) LIKE {pb_2:String}))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+        ),
+        filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_12:String}
-            WHERE (
-                (calls_merged.inputs_dump LIKE {pb_9:String} OR calls_merged.inputs_dump IS NULL)
-                AND ((calls_merged.output_dump LIKE {pb_10:String} OR calls_merged.output_dump IS NULL)
-                    OR (lower(calls_merged.inputs_dump) LIKE {pb_11:String} OR calls_merged.inputs_dump IS NULL)))
+            PREWHERE calls_merged.project_id = {pb_3:String}
+            WHERE (calls_merged.id IN input_matching_ids)
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') = {pb_5:String}))
                 AND
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') > {pb_3:Int64}))
-                AND (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_4:String}), 'null'), '') = {pb_5:String})
-                  OR positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}), 'null'), ''), {pb_7:String}) > 0))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}), 'null'), '') > {pb_7:UInt64}))
+                AND (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_8:String}), 'null'), '') = {pb_9:String})
+                  OR positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_10:String}), 'null'), ''), {pb_11:String}) > 0))
                 AND
-                ((any(calls_merged.wb_user_id) = {pb_8:String}))
+                ((any(calls_merged.wb_user_id) = {pb_12:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
             )
@@ -1074,24 +1101,24 @@ def test_calls_query_with_complex_heavy_filters() -> None:
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_12:String}
+        PREWHERE calls_merged.project_id = {pb_3:String}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
-            "pb_0": '$."param"."val"',
-            "pb_1": "hello",
-            "pb_2": '$."param"."count"',
-            "pb_3": 5,
-            "pb_4": '$."result"."status"',
-            "pb_5": "success",
-            "pb_6": '$."param"."message"',
-            "pb_7": "completed",
-            "pb_8": "my_user_id",
-            "pb_9": '%"hello"%',
-            "pb_10": '%"success"%',
-            "pb_11": '%"%completed%"%',
-            "pb_12": "project",
+            "pb_0": '%"hello"%',
+            "pb_1": '%"success"%',
+            "pb_2": '%"%completed%"%',
+            "pb_3": "project",
+            "pb_4": '$."param"."val"',
+            "pb_5": "hello",
+            "pb_6": '$."param"."count"',
+            "pb_7": 5,
+            "pb_8": '$."result"."status"',
+            "pb_9": "success",
+            "pb_10": '$."param"."message"',
+            "pb_11": "completed",
+            "pb_12": "my_user_id",
         },
     )
 
@@ -1387,24 +1414,31 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
     assert_sql(
         cq,
         """
-        WITH filtered_calls AS (
+        WITH input_matching_ids AS (
+            SELECT calls_merged.id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_4:String}
+            WHERE (calls_merged.attributes_dump LIKE {pb_0:String}
+                   AND lower(calls_merged.inputs_dump) LIKE {pb_1:String}
+                   AND (calls_merged.attributes_dump LIKE {pb_2:String}
+                        OR calls_merged.attributes_dump LIKE {pb_3:String}))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+        ),
+        filtered_calls AS (
             SELECT
                 calls_merged.id AS id
             FROM calls_merged
-            PREWHERE calls_merged.project_id = {pb_12:String}
-            WHERE ((calls_merged.op_name IN {pb_7:Array(String)})
-                    OR (calls_merged.op_name IS NULL))
-                AND ((calls_merged.attributes_dump LIKE {pb_8:String} OR calls_merged.attributes_dump IS NULL)
-                    AND (lower(calls_merged.inputs_dump) LIKE {pb_9:String} OR calls_merged.inputs_dump IS NULL)
-                    AND ((calls_merged.attributes_dump LIKE {pb_10:String} OR calls_merged.attributes_dump LIKE {pb_11:String})
-                        OR calls_merged.attributes_dump IS NULL))
+            PREWHERE calls_merged.project_id = {pb_4:String}
+            WHERE (calls_merged.id IN input_matching_ids)
+                AND ((calls_merged.op_name IN {pb_12:Array(String)})
+                        OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_5:String}), 'null'), '') = {pb_6:String}))
                 AND
-                (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), ''), {pb_3:String}) > 0)
+                (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), {pb_8:String}) > 0)
                 AND
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_4:String}), 'null'), '') IN ({pb_5:String},{pb_6:String})))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_9:String}), 'null'), '') IN ({pb_10:String},{pb_11:String})))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
             )
@@ -1414,24 +1448,24 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             any(calls_merged.attributes_dump) AS attributes_dump,
             any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_12:String}
+        PREWHERE calls_merged.project_id = {pb_4:String}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
-            "pb_0": '$."model"',
-            "pb_1": "gpt-4",
-            "pb_2": '$."prompt"',
-            "pb_3": "weather",
-            "pb_4": '$."temperature"',
-            "pb_5": "0.7",
-            "pb_6": "0.8",
-            "pb_7": ["llm/openai", "llm/anthropic"],
-            "pb_8": '%"gpt-4"%',
-            "pb_9": '%"%weather%"%',
-            "pb_10": '%"0.7"%',
-            "pb_11": '%"0.8"%',
-            "pb_12": "project",
+            "pb_0": '%"gpt-4"%',
+            "pb_1": '%"%weather%"%',
+            "pb_2": '%"0.7"%',
+            "pb_3": '%"0.8"%',
+            "pb_4": "project",
+            "pb_5": '$."model"',
+            "pb_6": "gpt-4",
+            "pb_7": '$."prompt"',
+            "pb_8": "weather",
+            "pb_9": '$."temperature"',
+            "pb_10": "0.7",
+            "pb_11": "0.8",
+            "pb_12": ["llm/openai", "llm/anthropic"],
         },
     )
 
@@ -2306,38 +2340,45 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
     assert_sql(
         cq,
         """
-        WITH filtered_calls AS
+        WITH input_matching_ids AS
+            (SELECT calls_merged.id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.sortable_datetime > {pb_1:String})
+                AND (calls_merged.inputs_dump LIKE {pb_0:String})
+            GROUP BY (calls_merged.project_id,
+                        calls_merged.id)),
+        filtered_calls AS
             (SELECT calls_merged.id AS id
             FROM calls_merged
-                            LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_8:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_8:String}, '/call/', calls_merged.id))
-            PREWHERE calls_merged.project_id = {pb_8:String}
-            WHERE (calls_merged.sortable_datetime > {pb_7:String})
-                AND ((calls_merged.inputs_dump LIKE {pb_6:String}
-                    OR calls_merged.inputs_dump IS NULL))
+                            LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_2:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_2:String}, '/call/', calls_merged.id))
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE (calls_merged.id IN input_matching_ids)
+                AND (calls_merged.sortable_datetime > {pb_1:String})
             GROUP BY (calls_merged.project_id,
                         calls_merged.id)
-            HAVING (((coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_1:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_2:String}), 'null'), '')))
-                AND ((any(calls_merged.started_at) > {pb_3:String}))
-                AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') = {pb_5:String}))
+            HAVING (((coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_3:String}), {pb_4:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_3:String}), {pb_5:String}), 'null'), '')))
+                AND ((any(calls_merged.started_at) > {pb_6:String}))
+                AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') = {pb_8:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_8:String}
+        PREWHERE calls_merged.project_id = {pb_2:String}
         WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
         """,
         {
-            "pb_0": "wandb.runnable.my_op",
-            "pb_1": '$."output"."expected"',
-            "pb_2": '$."output"."found"',
-            "pb_3": "2024-03-01 00:00:00.000000",
-            "pb_4": '$."message"',
-            "pb_5": "hello",
-            "pb_6": '%"hello"%',
-            "pb_7": "2024-02-29 23:55:00.000000",
-            "pb_8": "project",
+            "pb_0": '%"hello"%',
+            "pb_1": "2024-02-29 23:55:00.000000",
+            "pb_2": "project",
+            "pb_3": "wandb.runnable.my_op",
+            "pb_4": '$."output"."expected"',
+            "pb_5": '$."output"."found"',
+            "pb_6": "2024-03-01 00:00:00.000000",
+            "pb_7": '$."message"',
+            "pb_8": "hello",
         },
     )
 
