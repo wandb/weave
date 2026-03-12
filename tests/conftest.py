@@ -23,6 +23,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings import http_utils
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 # Force testing to never report wandb sentry events
@@ -422,6 +423,12 @@ def network_proxy_client(client):
     We probably will want to flesh this out more in the future, but this is a
     starting point.
     """
+    # Clear the endpoint existence cache to prevent cross-test contamination.
+    # Without this, the probe call to check_endpoint_exists may be skipped
+    # if a prior test already cached the endpoint, causing flaky assertions
+    # on the expected number of recorded calls.
+    http_utils._ENDPOINT_CACHE.clear()
+
     app = FastAPI()
 
     records = []
