@@ -138,11 +138,11 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TableUpdateReq,
     TagsListReq,
-    TraceServerInterface,
     TraceStatus,
 )
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     ROW_COUNT_CHUNKING_THRESHOLD,
@@ -298,7 +298,7 @@ MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
-    server: TraceServerInterface
+    server: TraceServerClientInterface
 
     # Main future executor, handling deferred tasks for the client
     future_executor: FutureExecutor
@@ -326,7 +326,7 @@ class WeaveClient:
         self,
         entity: str,
         project: str,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         ensure_project_exists: bool = True,
     ):
         self.entity = entity
@@ -413,7 +413,7 @@ class WeaveClient:
                         raise ValueError(e.response.content) from None
                 if e.response.status_code == 404:
                     raise ValueError(
-                        f"Unable to find object for ref uri: {ref.uri()}"
+                        f"Unable to find object for ref uri: {ref.uri}"
                     ) from e
             raise
 
@@ -432,16 +432,16 @@ class WeaveClient:
         if ref.extra:
             try:
                 ref_read_res = self.server.refs_read_batch(
-                    RefsReadBatchReq(refs=[ref.uri()])
+                    RefsReadBatchReq(refs=[ref.uri])
                 )
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
                     raise ValueError(
-                        f"Unable to find object for ref uri: {ref.uri()}"
+                        f"Unable to find object for ref uri: {ref.uri}"
                     ) from None
                 raise
             if not ref_read_res.vals:
-                raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                raise ValueError(f"Unable to find object for ref uri: {ref.uri}")
             data = ref_read_res.vals[0]
         else:
             data = read_res.obj.val
@@ -726,7 +726,7 @@ class WeaveClient:
             attributes_dict._set_weave_item("os_version", platform.version())
             attributes_dict._set_weave_item("os_release", platform.release())
 
-        op_name_future = self.future_executor.defer(op_def_ref.uri)
+        op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
 
         # Get thread_id from context
         thread_id = call_context.get_thread_id()
@@ -807,7 +807,7 @@ class WeaveClient:
                 start=StartedCallSchemaForInsert(
                     project_id=project_id,
                     id=call_id,
-                    op_name=op_def_ref.uri(),
+                    op_name=op_def_ref.uri,
                     display_name=call.display_name,
                     trace_id=trace_id,
                     started_at=started_at,
@@ -1637,18 +1637,16 @@ class WeaveClient:
             call_ref = get_ref(predict_call)
             if call_ref is None:
                 raise ValueError("Predict call must have a ref")
-            weave_ref_uri = call_ref.uri()
+            weave_ref_uri = call_ref.uri
             scorer_call_ref = get_ref(score_call)
             if scorer_call_ref is None:
                 raise ValueError("Score call must have a ref")
-            scorer_call_ref_uri = scorer_call_ref.uri()
+            scorer_call_ref_uri = scorer_call_ref.uri
 
             # If scorer_object_ref is provided, it is used as the runnable_ref_uri
             # Otherwise, we use the op_name from the score_call. This should happen
             # when there is a Scorer subclass that is the source of the score call.
-            scorer_object_ref_uri = (
-                scorer_object_ref.uri() if scorer_object_ref else None
-            )
+            scorer_object_ref_uri = scorer_object_ref.uri if scorer_object_ref else None
             runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
             score_results = score_call.output
 
@@ -2132,7 +2130,7 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri()]))
+        return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri]))
 
     @trace_sentry.global_trace_sentry.watch()
     def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
@@ -2176,7 +2174,7 @@ class WeaveClient:
         raise NotImplementedError()
 
     def _ref_uri(self, name: str, version: str, path: str) -> str:
-        return ObjectRef(self.entity, self.project, name, version).uri()
+        return ObjectRef(self.entity, self.project, name, version).uri
 
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
         cached_res = self.send_file_cache.get(req)

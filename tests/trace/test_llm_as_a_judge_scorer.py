@@ -27,7 +27,7 @@ def test_publish_and_load_scorer_with_prompt_ref(client):
         ]
     )
     prompt_ref = weave.publish(prompt)
-    prompt_uri = str(prompt_ref.uri())
+    prompt_uri = str(prompt_ref.uri)
 
     # Create scorer with prompt URI string
     scorer = LLMAsAJudgeScorer(
@@ -43,7 +43,7 @@ def test_publish_and_load_scorer_with_prompt_ref(client):
 
     # Publish and retrieve - ref should be resolved
     scorer_ref = weave.publish(scorer)
-    loaded_scorer = weave.get(scorer_ref.uri())
+    loaded_scorer = weave.get(scorer_ref.uri)
 
     assert isinstance(loaded_scorer, LLMAsAJudgeScorer)
     assert isinstance(loaded_scorer.scoring_prompt, MessagesPrompt)

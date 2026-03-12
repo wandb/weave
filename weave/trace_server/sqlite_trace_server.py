@@ -2167,7 +2167,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         table_ref = ri.InternalTableRef(
             project_id=req.project_id,
             digest=table_res.digest,
-        ).uri()
+        ).uri
 
         # Create the dataset object
         dataset_val = object_creation_utils.build_dataset_val(
@@ -2335,7 +2335,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=scorer_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.ScorerCreateRes(
             digest=obj_result.digest,
@@ -2453,7 +2453,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=evaluation_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.EvaluationCreateRes(
             digest=obj_result.digest,
@@ -2603,7 +2603,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=object_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.ModelCreateRes(
             digest=obj_result.digest,
@@ -3082,7 +3082,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     id=predict_and_score_id,
                     trace_id=trace_id,
                     parent_id=req.evaluation_run_id,
-                    op_name=predict_and_score_op_ref.uri(),
+                    op_name=predict_and_score_op_ref.uri,
                     started_at=datetime.datetime.now(datetime.timezone.utc),
                     attributes={
                         constants.WEAVE_ATTRIBUTES_NAMESPACE: {
@@ -3153,7 +3153,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 id=prediction_id,
                 trace_id=trace_id,
                 parent_id=parent_id,
-                op_name=predict_op_ref.uri(),
+                op_name=predict_op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes=prediction_attributes,
                 inputs={
@@ -3549,7 +3549,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 id=score_id,
                 trace_id=trace_id,
                 parent_id=parent_id,
-                op_name=score_op_ref.uri(),
+                op_name=score_op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes=score_attributes,
                 inputs={
@@ -3590,7 +3590,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         feedback_req = tsi.FeedbackCreateReq(
             project_id=req.project_id,
-            weave_ref=prediction_call_ref.uri(),
+            weave_ref=prediction_call_ref.uri,
             feedback_type=f"{RUNNABLE_FEEDBACK_TYPE_PREFIX}.{scorer_name}",
             payload={"output": req.value},
             runnable_ref=req.scorer,

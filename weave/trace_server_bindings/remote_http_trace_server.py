@@ -19,6 +19,7 @@ from weave.trace.settings import (
 from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -35,7 +36,6 @@ from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
     EntityProjectInfo,
-    ServerInfoRes,
     StartBatchItem,
 )
 from weave.utils import http_requests
@@ -145,6 +145,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         return http_requests.put(
             self.trace_server_url + url,
             *args,
+            auth=self._auth,
             headers={**headers, **kwargs.pop("headers", {})},
             **kwargs,
         )

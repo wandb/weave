@@ -19,7 +19,7 @@ def test_leaderboard_empty(client):
         description="""This is an empty leaderboard""",
         columns=[
             leaderboard.LeaderboardColumn(
-                evaluation_object_ref=get_ref(evaluation_obj_1).uri(),
+                evaluation_object_ref=get_ref(evaluation_obj_1).uri,
                 scorer_name="test_scorer_name",
                 summary_metric_path="test_summary_metric_path",
             )
@@ -110,7 +110,7 @@ async def test_leaderboard_with_results(client):
         description="""This is a simple leaderboard""",
         columns=[
             leaderboard.LeaderboardColumn(
-                evaluation_object_ref=get_ref(evaluation_obj_1).uri(),
+                evaluation_object_ref=get_ref(evaluation_obj_1).uri,
                 scorer_name="my_scorer",
                 summary_metric_path="true_fraction",
             )
@@ -124,7 +124,7 @@ async def test_leaderboard_with_results(client):
 
     results = leaderboard.get_leaderboard_results(spec, client)
     assert len(results) == 1
-    assert results[0].model_ref == get_ref(simple_model).uri()
+    assert results[0].model_ref == get_ref(simple_model).uri
     assert results[0].column_scores[0].scores[0].value == 1.0
 
     spec = leaderboard.Leaderboard(
@@ -149,18 +149,18 @@ This leaderboard has multiple columns
 """,
         columns=[
             leaderboard.LeaderboardColumn(
-                evaluation_object_ref=get_ref(evaluation_obj_2).uri(),
+                evaluation_object_ref=get_ref(evaluation_obj_2).uri,
                 scorer_name="my_scorer",
                 summary_metric_path="true_count",
             ),
             leaderboard.LeaderboardColumn(
-                evaluation_object_ref=get_ref(evaluation_obj_2).uri(),
+                evaluation_object_ref=get_ref(evaluation_obj_2).uri,
                 scorer_name="my_scorer",
                 should_minimize=True,
                 summary_metric_path="true_fraction",
             ),
             leaderboard.LeaderboardColumn(
-                evaluation_object_ref=get_ref(evaluation_obj_1).uri(),
+                evaluation_object_ref=get_ref(evaluation_obj_1).uri,
                 scorer_name="my_scorer",
                 summary_metric_path="true_fraction",
             ),
@@ -174,17 +174,17 @@ This leaderboard has multiple columns
 
     results = leaderboard.get_leaderboard_results(spec, client)
     assert len(results) == 3
-    assert results[0].model_ref == get_ref(simple_model).uri()
+    assert results[0].model_ref == get_ref(simple_model).uri
     assert len(results[0].column_scores) == 3
     assert results[0].column_scores[0].scores[0].value == 2.0
     assert results[0].column_scores[1].scores[0].value == 1.0
     assert results[0].column_scores[1].scores[0].value == 1.0
-    assert results[1].model_ref == get_ref(static_model).uri()
+    assert results[1].model_ref == get_ref(static_model).uri
     assert len(results[1].column_scores) == 3
     assert results[1].column_scores[0].scores[0].value == 1.0
     assert results[1].column_scores[1].scores[0].value == 0.5
     assert len(results[1].column_scores[2].scores) == 0
-    assert results[2].model_ref == get_ref(bad_model).uri()
+    assert results[2].model_ref == get_ref(bad_model).uri
     assert len(results[1].column_scores) == 3
     assert results[2].column_scores[0].scores[0].value == 0
     assert results[2].column_scores[1].scores[0].value == 0
