@@ -112,9 +112,9 @@ from weave.trace_server.datadog import (
     set_current_span_dd_tags,
     set_root_span_dd_tags,
 )
+from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
-    DigestMismatchError,
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
@@ -1621,23 +1621,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         processed_val = digest_result.processed_val
         json_val = digest_result.json_val
         digest = digest_result.digest
-        if req.obj.expected_digest is not None:
-            if req.obj.expected_digest != digest:
-                raise DigestMismatchError(
-                    f"Client digest {req.obj.expected_digest} != server digest {digest}"
-                )
-            logger.debug(
-                "Server digest: obj %r FAST PATH verified (client=%s, server=%s)",
-                req.obj.object_id,
-                req.obj.expected_digest,
-                digest,
-            )
-        else:
-            logger.debug(
-                "Server digest: obj %r FALLBACK PATH (no expected_digest, server=%s)",
-                req.obj.object_id,
-                digest,
-            )
+        validate_expected_digest(
+            expected=req.obj.expected_digest,
+            actual=digest,
+            label=f"obj {req.obj.object_id!r}",
+        )
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
@@ -2134,23 +2122,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         row_digests = [r[1] for r in insert_rows]
 
         digest = compute_table_digest(row_digests)
-        if req.table.expected_digest is not None:
-            if req.table.expected_digest != digest:
-                raise DigestMismatchError(
-                    f"Client table digest {req.table.expected_digest} != server digest {digest}"
-                )
-            logger.debug(
-                "Server digest: table FAST PATH verified (client=%s, server=%s, %d rows)",
-                req.table.expected_digest,
-                digest,
-                len(row_digests),
-            )
-        else:
-            logger.debug(
-                "Server digest: table FALLBACK PATH (no expected_digest, server=%s, %d rows)",
-                digest,
-                len(row_digests),
-            )
+        validate_expected_digest(
+            expected=req.table.expected_digest,
+            actual=digest,
+            label=f"table ({len(row_digests)} rows)",
+        )
 
         self._insert(
             "table_rows",
@@ -2255,10 +2231,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Create a table by specifying row digests, instead actual rows."""
         # Calculate table digest from row digests
         digest = compute_table_digest(req.row_digests)
-        if req.expected_digest is not None and req.expected_digest != digest:
-            raise DigestMismatchError(
-                f"Client table digest {req.expected_digest} != server digest {digest}"
-            )
+        validate_expected_digest(
+            expected=req.expected_digest,
+            actual=digest,
+            label=f"table ({len(req.row_digests)} rows)",
+        )
 
         # Insert into tables table
         self._insert(
@@ -5328,10 +5305,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = compute_file_digest(req.content)
-        if req.expected_digest is not None and req.expected_digest != digest:
-            raise DigestMismatchError(
-                f"Client file digest {req.expected_digest} != server digest {digest}"
-            )
+        validate_expected_digest(
+            expected=req.expected_digest, actual=digest, label="file"
+        )
 
         # During a batch, _file_batch accumulates chunks. If we already have
         # chunks for this (project_id, digest), the content is identical and
