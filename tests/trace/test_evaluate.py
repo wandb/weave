@@ -415,11 +415,12 @@ def test_evaluate_table_lazy_iter(
         # internal project ID is resolved lazily on first use.
         # When client-side digests are enabled, publish triggers
         # the first lazy projects_info resolution.
-        expected_pre_eval_log = [
-            *_expected_client_init_log(),
-        ]
+        expected_pre_eval_log = _expected_client_init_log()
+        # When client-side digests are enabled, publish triggers lazy
+        # resolution of the internal project ID via projects_info.
         if enable_client_side_digests:
             expected_pre_eval_log.extend(["projects_info", "projects_info"])
+        # publish creates a table + object; getting the dataset reads it back.
         expected_pre_eval_log.extend(["table_create", "obj_create", "obj_read"])
         assert [
             l for l in client.server.attribute_access_log if not l.startswith("_")

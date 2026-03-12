@@ -110,9 +110,10 @@ def test_published_dataset_laziness(client_creator, enable_client_side_digests):
 
         ref = weave.publish(dataset)
         log = client.server.attribute_access_log
-        # When client-side digests are enabled, the first operation that
-        # needs _internal_project_id triggers a lazy projects_info call.
+        # publish creates a table and an object.
         expected_publish_log = ["table_create", "obj_create"]
+        # When client-side digests are enabled, the first operation that
+        # needs _internal_project_id triggers lazy projects_info resolution.
         if enable_client_side_digests:
             expected_publish_log = [
                 "projects_info",
@@ -121,11 +122,13 @@ def test_published_dataset_laziness(client_creator, enable_client_side_digests):
         assert _top_level_logs(log) == expected_publish_log
         client.server.attribute_access_log = []
 
+        # Getting a published dataset reads the object metadata.
         dataset = ref.get()
         log = client.server.attribute_access_log
         assert _top_level_logs(log) == ["obj_read"]
         client.server.attribute_access_log = []
 
+        # First len() call fetches table stats; subsequent calls are cached.
         length = len(dataset)
         log = client.server.attribute_access_log
         assert _top_level_logs(log) == ["table_query_stats"]
