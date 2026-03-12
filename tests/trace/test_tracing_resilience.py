@@ -77,10 +77,12 @@ def test_resilience_to_server_errors(
     log_collector,
     enable_client_side_digests,
     expected_errors,
+    request,
 ):
     parse_and_apply_settings(
         UserSettings(enable_client_side_digests=enable_client_side_digests)
     )
+    request.addfinalizer(lambda: parse_and_apply_settings(UserSettings()))
 
     def do_test():
         @weave.op
@@ -89,28 +91,25 @@ def test_resilience_to_server_errors(
 
         return simple_op()
 
-    try:
-        # The user's exception should be raised - even if we're capturing errors
-        with raise_on_captured_errors(True):
-            with pytest.raises(DummyTestException):
-                do_test()
+    # The user's exception should be raised - even if we're capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            do_test()
 
-        # We should gracefully handle the error and return a value
-        res = do_test()
-        assert res == "hello"
+    # We should gracefully handle the error and return a value
+    res = do_test()
+    assert res == "hello"
 
-        assert_no_current_call()
-        client_with_throwing_server.flush()
+    assert_no_current_call()
+    client_with_throwing_server.flush()
 
-        logs = log_collector.get_error_logs()
-        ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
-        # Tim: This is very specific and intentional, please don't change
-        # this unless you are sure that is the expected behavior.
-        # The enabled and disabled digest paths fail in different places, so we
-        # assert the exact log categories for both modes.
-        assert ag_res == Counter(expected_errors)
-    finally:
-        parse_and_apply_settings(UserSettings())
+    logs = log_collector.get_error_logs()
+    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
+    # Tim: This is very specific and intentional, please don't change
+    # this unless you are sure that is the expected behavior.
+    # The enabled and disabled digest paths fail in different places, so we
+    # assert the exact log categories for both modes.
+    assert ag_res == Counter(expected_errors)
 
 
 @pytest.mark.disable_logging_error_check
