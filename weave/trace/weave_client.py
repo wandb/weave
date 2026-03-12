@@ -2054,12 +2054,12 @@ class WeaveClient:
         )
 
     def _on_fire_and_forget_validation_done(
-        self, future: Future[Any], *, ref_uri: str
+        self, future: Future[Any], *, ref_uri: str | None
     ) -> None:
         try:
             future.result()
         except Exception as exc:
-            if self._is_digest_validation_error(exc):
+            if ref_uri is not None and self._is_digest_validation_error(exc):
                 self._disable_client_side_digests_after_validation_error(exc, ref_uri)
 
     def _send_table_create(
@@ -2469,6 +2469,8 @@ class WeaveClient:
         """
         if ext_project_id in self._ext_to_int_project_map:
             return self._ext_to_int_project_map[ext_project_id]
+        if not hasattr(self.server, "projects_info"):
+            return None
         try:
             results = self.server.projects_info(
                 ProjectsInfoReq(project_ids=[ext_project_id])
