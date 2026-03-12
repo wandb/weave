@@ -22,16 +22,6 @@ expected_eval_result = {
 }
 
 
-def _expected_client_init_log() -> list[str]:
-    return [
-        "ensure_project_exists",
-        "get_call_processor",
-        "get_call_processor",
-        "get_feedback_processor",
-        "get_feedback_processor",
-    ]
-
-
 class EvalModel(Model):
     @weave.op
     async def predict(self, input) -> str:
@@ -403,7 +393,13 @@ def test_evaluate_table_lazy_iter(digest_params_client, monkeypatch):
     # internal project ID is resolved lazily on first use.
     # When client-side digests are enabled, publish triggers
     # the first lazy projects_info resolution.
-    expected_pre_eval_log = _expected_client_init_log()
+    expected_pre_eval_log = [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+        "get_feedback_processor",
+        "get_feedback_processor",
+    ]
     # When client-side digests are enabled, publish triggers lazy
     # resolution of the internal project ID via projects_info.
     if enable_client_side_digests:
