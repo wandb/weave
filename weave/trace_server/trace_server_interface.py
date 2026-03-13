@@ -23,6 +23,14 @@ from weave.trace_server.common_interface import (
 )
 from weave.trace_server.interface.query import Query
 
+# Re-exported from service_interface for backwards compatibility.
+# New code should import from weave.trace_server.service_interface directly.
+from weave.trace_server.service_interface import (  # noqa: F401
+    EnsureProjectExistsRes,
+    ProjectsInfoReq,
+    ProjectsInfoRes,
+)
+
 
 class ExtraKeysTypedDict(TypedDict):
     pass
@@ -293,6 +301,11 @@ class ObjSchemaForInsert(BaseModel):
     set_base_object_class: str | None = Field(
         exclude=True, default=None, deprecated=True
     )
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed digest for server-side validation. "
+        "If provided, the server will verify it matches the server-computed digest.",
+    )
 
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
@@ -305,6 +318,10 @@ class ObjSchemaForInsert(BaseModel):
 class TableSchemaForInsert(BaseModel):
     project_id: str
     rows: list[dict[str, Any]]
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed table digest for server-side validation.",
+    )
 
 
 class ProcessedResourceSpans(BaseModel):
@@ -487,6 +504,13 @@ class CompletionsCreateReq(BaseModelStrict):
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
     track_llm_call: bool | None = Field(
         True, description="Whether to track this LLM call in the trace server"
+    )
+    trace_id: str | None = Field(
+        None,
+        description="Trace ID to use for the LLM call (for nesting under a parent)",
+    )
+    parent_id: str | None = Field(
+        None, description="Parent call ID to nest this LLM call under"
     )
 
 
@@ -791,31 +815,40 @@ class ObjRemoveTagsRes(BaseModel):
     pass
 
 
-class ObjSetAliasReq(BaseModelStrict):
+class ObjSetAliasesReq(BaseModelStrict):
     project_id: str
     object_id: str
     digest: str
-    alias: str
+    aliases: list[str]
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
     @model_validator(mode="after")
-    def validate_alias(self) -> "ObjSetAliasReq":
-        validate_alias_name(self.alias)
+    def validate_aliases(self) -> "ObjSetAliasesReq":
+        self.aliases = list(dict.fromkeys(self.aliases))
+        for alias in self.aliases:
+            validate_alias_name(alias)
         return self
 
 
-class ObjSetAliasRes(BaseModel):
+class ObjSetAliasesRes(BaseModel):
     pass
 
 
-class ObjRemoveAliasReq(BaseModelStrict):
+class ObjRemoveAliasesReq(BaseModelStrict):
     project_id: str
     object_id: str
-    alias: str
+    aliases: list[str]
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
+    @model_validator(mode="after")
+    def validate_aliases(self) -> "ObjRemoveAliasesReq":
+        self.aliases = list(dict.fromkeys(self.aliases))
+        for alias in self.aliases:
+            validate_alias_name(alias)
+        return self
 
-class ObjRemoveAliasRes(BaseModel):
+
+class ObjRemoveAliasesRes(BaseModel):
     pass
 
 
@@ -848,6 +881,10 @@ class TableCreateReq(BaseModelStrict):
 class TableCreateFromDigestsReq(BaseModelStrict):
     project_id: str
     row_digests: list[str]
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed table digest for server-side validation.",
+    )
 
 
 class TableCreateFromDigestsRes(BaseModel):
@@ -1182,6 +1219,10 @@ class FileCreateReq(BaseModelStrict):
     project_id: str
     name: str
     content: bytes
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed file digest for server-side validation.",
+    )
 
 
 class FileCreateRes(BaseModel):
@@ -1203,26 +1244,6 @@ class FileContentReadRes(BaseModel):
 
 class FilesStatsRes(BaseModel):
     total_size_bytes: int
-
-
-class EnsureProjectExistsRes(BaseModel):
-    project_name: str
-
-
-class ProjectsInfoReq(BaseModelStrict):
-    project_ids: list[str] = Field(
-        description="External project IDs in 'entity/project' format.",
-        examples=[["entity-a/project-a", "entity-b/project-b"]],
-    )
-
-
-class ProjectsInfoRes(BaseModel):
-    external_project_id: str = Field(
-        description="External project ID in 'entity/project' format.",
-    )
-    internal_project_id: str = Field(
-        description="Internal project ID.",
-    )
 
 
 class CostCreateInput(BaseModelStrict):
@@ -2591,11 +2612,6 @@ class EvalResultsSummaryRes(BaseModel):
 
 
 class TraceServerInterface(Protocol):
-    def ensure_project_exists(
-        self, entity: str, project: str
-    ) -> EnsureProjectExistsRes:
-        return EnsureProjectExistsRes(project_name=project)
-
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
@@ -2627,8 +2643,8 @@ class TraceServerInterface(Protocol):
     # Tag and Alias API
     def obj_add_tags(self, req: ObjAddTagsReq) -> ObjAddTagsRes: ...
     def obj_remove_tags(self, req: ObjRemoveTagsReq) -> ObjRemoveTagsRes: ...
-    def obj_set_alias(self, req: ObjSetAliasReq) -> ObjSetAliasRes: ...
-    def obj_remove_alias(self, req: ObjRemoveAliasReq) -> ObjRemoveAliasRes: ...
+    def obj_set_aliases(self, req: ObjSetAliasesReq) -> ObjSetAliasesRes: ...
+    def obj_remove_aliases(self, req: ObjRemoveAliasesReq) -> ObjRemoveAliasesRes: ...
     def tags_list(self, req: TagsListReq) -> TagsListRes: ...
     def aliases_list(self, req: AliasesListReq) -> AliasesListRes: ...
 

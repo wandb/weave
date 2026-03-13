@@ -43,8 +43,8 @@ def test_publish_and_load_evaluation(client):
     published_eval_ref = weave.publish(evaluation)
     published_model_ref = weave.publish(model)
 
-    gotten_eval = weave.get(published_eval_ref.uri())
-    gotten_model = weave.get(published_model_ref.uri())
+    gotten_eval = weave.get(published_eval_ref.uri)
+    gotten_model = weave.get(published_model_ref.uri)
     assert isinstance(gotten_model, LLMStructuredCompletionModel)
 
     assert isinstance(gotten_eval, weave.Evaluation)

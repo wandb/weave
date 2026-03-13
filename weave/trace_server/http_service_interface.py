@@ -77,3 +77,25 @@ class AnnotationQueueItemProgressUpdateBody(BaseModelStrict):
         examples=["in_progress", "completed", "skipped"],
         description="New state: 'in_progress', 'completed', or 'skipped'",
     )
+
+
+class ObjTagsBody(BaseModelStrict):
+    """Request body for adding/removing tags (object_id and digest come from path)."""
+
+    project_id: str = Field(examples=["entity/project"])
+    tags: list[str] = Field(examples=[["production", "reviewed"]])
+
+
+class ObjSetAliasesBody(BaseModelStrict):
+    """Request body for setting aliases (object_id comes from path)."""
+
+    project_id: str = Field(examples=["entity/project"])
+    digest: str = Field(examples=["abc123def"])
+    aliases: list[str] = Field(examples=[["staging", "v1-candidate"]])
+
+
+class ObjRemoveAliasesBody(BaseModelStrict):
+    """Request body for removing aliases (object_id comes from path)."""
+
+    project_id: str = Field(examples=["entity/project"])
+    aliases: list[str] = Field(examples=[["staging"]])

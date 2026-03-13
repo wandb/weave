@@ -219,6 +219,23 @@ def post(
     return client.post(url, data=data, json=json, **kwargs)
 
 
+def put(
+    url: str,
+    data: dict[str, Any] | str | bytes | None = None,
+    json: dict[str, Any] | None = None,
+    *,
+    stream: bool = False,
+    **kwargs: Any,
+) -> Response:
+    """Send a PUT request with optional logging."""
+    if stream:
+        # Extract auth since build_request doesn't accept it
+        auth = kwargs.pop("auth", None)
+        request = client.build_request("PUT", url, data=data, json=json, **kwargs)
+        return client.send(request, auth=auth, stream=True)
+    return client.put(url, data=data, json=json, **kwargs)
+
+
 def delete(
     url: str,
     params: dict[str, Any] | None = None,

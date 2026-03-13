@@ -130,7 +130,7 @@ class Call:
             except ValueError:
                 raise ValueError(f"Invalid project_id: {self.project_id}") from None
             weave_ref = CallRef(entity, project, self.id)
-            self._feedback = RefFeedbackQuery(weave_ref.uri())
+            self._feedback = RefFeedbackQuery(weave_ref.uri)
         return self._feedback
 
     @property

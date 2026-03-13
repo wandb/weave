@@ -2,10 +2,9 @@ import dataclasses
 import inspect
 import logging
 import operator
-import typing
-from collections.abc import Generator, Iterator, Sequence
+from collections.abc import Callable, Generator, Iterator, Sequence
 from copy import deepcopy
-from typing import Any, Literal, Optional, SupportsIndex
+from typing import Any, Literal, Optional, SupportsIndex, cast
 
 from pydantic import BaseModel
 
@@ -80,17 +79,17 @@ def make_mutation(
     if operation == "setitem":
         if len(args) != 2 or not isinstance(args[0], str):
             raise ValueError("setitem mutation requires 2 args")
-        args = typing.cast(tuple[str, Any], args)
+        args = cast(tuple[str, Any], args)
         return MutationSetitem(path, operation, args)
     elif operation == "setattr":
         if len(args) != 2 or not isinstance(args[0], str):
             raise ValueError("setattr mutation requires 2 args")
-        args = typing.cast(tuple[str, Any], args)
+        args = cast(tuple[str, Any], args)
         return MutationSetattr(path, operation, args)
     elif operation == "append":
         if len(args) != 1:
             raise ValueError("append mutation requires 1 arg")
-        args = typing.cast(tuple[Any], args)
+        args = cast(tuple[Any], args)
         return MutationAppend(path, operation, args)
     else:
         raise ValueError(f"Unknown operation: {operation}")
@@ -349,7 +348,7 @@ class WeaveTable(Traceable):  # noqa: PLW1641
         if not isinstance(self.rows, list):
             self._rows = list(iter(self.rows))
             self._known_length = len(self._rows)
-        return typing.cast(list[dict], self.rows)
+        return cast(list[dict], self.rows)
 
     def set_prefetched_rows(self, prefetched_rows: list[dict]) -> None:
         """Sets the rows to a local cache of rows that can be used to
@@ -459,7 +458,7 @@ class WeaveTable(Traceable):  # noqa: PLW1641
 
         for i, _ in enumerate(self._prefetched_rows):
 
-            def make_get_row_digest(idx: int) -> typing.Callable[[], str]:
+            def make_get_row_digest(idx: int) -> Callable[[], str]:
                 def get_row_digest() -> str:
                     return cached_table_ref.row_digests[idx]
 
@@ -545,10 +544,7 @@ class WeaveTable(Traceable):  # noqa: PLW1641
                     )
 
                 if wc is not None:
-
-                    def make_row_task(
-                        v: Any, r: RefWithExtra | None
-                    ) -> typing.Callable[[], Any]:
+                    def make_row_task(v: Any, r: RefWithExtra | None) -> Callable[[], Any]:
                         def row_task() -> Any:
                             return process_row(v, r)
 

@@ -17,7 +17,7 @@ def test_publish_round_trip_query_object(client) -> None:
     }
     query = Query(**query_raw)
     ref = weave.publish(query)
-    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri()]))
+    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri]))
 
     # remove the extra python class information that round tripping generates
     # specifically: _type, _class_name, _bases

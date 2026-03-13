@@ -7,8 +7,31 @@ from weave.trace_server.orm import (
     Table,
     _transform_external_field_to_internal_field,
     combine_conditions,
+    python_value_to_ch_type,
     split_escaped_field_path,
 )
+
+
+def test_python_value_to_ch_type_negative_integers():
+    """Negative integers must map to a signed type (Int64), not UInt64.
+
+    Requirement: Numeric filter literals support negative values
+    Interface: python_value_to_ch_type() return value used in ClickHouse query params
+    Given: A negative integer like -1 or -100
+    When: python_value_to_ch_type is called
+    Then: Returns "Int64" (signed), not "UInt64" (unsigned)
+    """
+    # Negative integers must use a signed type
+    assert python_value_to_ch_type(-1) == "Int64"
+    assert python_value_to_ch_type(-100) == "Int64"
+
+    # Positive integers should also work with signed type
+    assert python_value_to_ch_type(0) == "Int64"
+    assert python_value_to_ch_type(42) == "Int64"
+
+    # Floats (including negative) should remain Float64
+    assert python_value_to_ch_type(-0.1) == "Float64"
+    assert python_value_to_ch_type(3.14) == "Float64"
 
 
 def test_parambuilder_clickhouse():
@@ -16,7 +39,7 @@ def test_parambuilder_clickhouse():
     name = pb.add("bar", "foo", "String")
     assert name == "{foo:String}"
     name = pb.add(12, "bim")
-    assert name == "{bim:UInt64}"
+    assert name == "{bim:Int64}"
     assert pb.get_params() == {
         "foo": "bar",
         "bim": 12,

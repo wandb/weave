@@ -90,7 +90,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
     payload = {"value": 1}
 
     ref = weave.publish(AnnotationSpec(name=column_name, field_schema=int))
-    annotation_ref = ref.uri()
+    annotation_ref = ref.uri
 
     # Case 1: Errors with no name in type (dangle or char len 0)
     with pytest.raises(InvalidRequest):
@@ -411,7 +411,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 sort_by=[
                     SortBy(
                         field=field,
@@ -430,7 +430,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 sort_by=[
                     SortBy(
                         field=field,
@@ -478,7 +478,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 query={
                     "$expr": {
                         "$eq": [
@@ -498,7 +498,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 query={
                     "$expr": {
                         "$gt": [
@@ -532,7 +532,7 @@ async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
-            filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+            filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
             # Filter down to just correct matches
             query={
                 "$expr": {
@@ -752,11 +752,11 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     """Test that $contains works with numeric literals on JSON fields.
 
     This test reproduces the ClickHouse error:
-    Illegal type UInt64 of argument of function position
+    Illegal type Int64 of argument of function position
 
     The issue occurs when using $contains with a numeric literal on a JSON field.
     The query builder should convert the numeric literal to a string for the
-    position function, not cast it to UInt64.
+    position function, not cast it to an integer type.
     """
     project_id = client._project_id()
     call_ref_uri = f"weave:///{project_id}/call/call_id_456"
@@ -772,11 +772,11 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
 
     # Query for feedback where dataset_id contains the numeric literal 94
     # This should work but currently fails with:
-    # "Illegal type UInt64 of argument of function position"
+    # "Illegal type Int64 of argument of function position"
     if not client_is_sqlite(client):
         with pytest.raises(
             DatabaseError,
-            match="Illegal type UInt64 of argument of function position",
+            match="Illegal type Int64 of argument of function position",
         ):
             client.server.feedback_query(
                 FeedbackQueryReq(
