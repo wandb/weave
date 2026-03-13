@@ -752,9 +752,7 @@ def test_create_call_leak_restores_call_stack_sync(client, monkeypatch, log_coll
     def simple_op():
         return "hello"
 
-    monkeypatch.setattr(
-        "weave.trace.op._create_call", _make_leaking_create_call()
-    )
+    monkeypatch.setattr("weave.trace.op._create_call", _make_leaking_create_call())
 
     res = simple_op()
     assert res == "hello"
@@ -772,9 +770,7 @@ async def test_create_call_leak_restores_call_stack_async(
     async def simple_op():
         return "hello"
 
-    monkeypatch.setattr(
-        "weave.trace.op._create_call", _make_leaking_create_call()
-    )
+    monkeypatch.setattr("weave.trace.op._create_call", _make_leaking_create_call())
 
     res = await simple_op()
     assert res == "hello"
@@ -791,9 +787,7 @@ def test_create_call_leak_restores_call_stack_sync_gen(
     def gen_op():
         yield from [1, 2, 3]
 
-    monkeypatch.setattr(
-        "weave.trace.op._create_call", _make_leaking_create_call()
-    )
+    monkeypatch.setattr("weave.trace.op._create_call", _make_leaking_create_call())
 
     res = list(gen_op())
     assert res == [1, 2, 3]
@@ -813,9 +807,7 @@ async def test_create_call_leak_restores_call_stack_async_gen(
         yield 2
         yield 3
 
-    monkeypatch.setattr(
-        "weave.trace.op._create_call", _make_leaking_create_call()
-    )
+    monkeypatch.setattr("weave.trace.op._create_call", _make_leaking_create_call())
 
     res = [item async for item in gen_op()]
     assert res == [1, 2, 3]
@@ -831,9 +823,7 @@ def test_create_call_leak_preserves_parent_call(client, monkeypatch, log_collect
     def outer_op():
         # At this point outer's call is on the stack.
         # Now make the inner op's _create_call leak.
-        monkeypatch.setattr(
-            "weave.trace.op._create_call", _make_leaking_create_call()
-        )
+        monkeypatch.setattr("weave.trace.op._create_call", _make_leaking_create_call())
 
         @weave.op
         def inner_op():
