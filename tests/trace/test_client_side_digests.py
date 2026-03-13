@@ -14,7 +14,7 @@ import pytest
 from PIL import Image
 
 import weave
-from weave.shared.digest import compute_row_digest, compute_table_digest
+from weave.shared.digest import bytes_digest, compute_row_digest, compute_table_digest
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.refs import ObjectRef, OpRef, TableRef
 from weave.trace.serialization.serialize import to_json
@@ -1158,6 +1158,42 @@ def test_file_uploads_omit_expected_digest_after_session_disable(
             f"File upload sent expected_digest={req.expected_digest!r} after "
             "session disable — fast path was not fully disabled for files"
         )
+
+
+@pytest.mark.disable_logging_error_check
+def test_failed_file_upload_future_is_not_reused(
+    client: WeaveClient, fast_path: None, monkeypatch
+) -> None:
+    """A failed file upload should be evicted so the next identical request retries."""
+    original_file_create = client.server.server.file_create
+    attempts = 0
+
+    def fail_once(req: tsi.FileCreateReq):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise DigestMismatchError("forced file mismatch")
+        return original_file_create(req)
+
+    monkeypatch.setattr(client.server.server, "file_create", fail_once)
+
+    req = tsi.FileCreateReq(
+        project_id=client._project_id(),
+        name="retry.bin",
+        content=b"retry-me",
+        expected_digest=bytes_digest(b"retry-me"),
+    )
+
+    first_future = client._send_file_create(req)
+    client._flush()
+    with pytest.raises(DigestMismatchError):
+        first_future.result()
+
+    second_future = client._send_file_create(req)
+    client._flush()
+
+    assert second_future.result().digest is not None
+    assert attempts == 2
 
 
 # ---------------------------------------------------------------------------

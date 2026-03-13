@@ -2590,7 +2590,12 @@ class WeaveClient:
     def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
         cached_res = self.send_file_cache.get(req)
         if cached_res:
-            return cached_res
+            # Failed uploads must be retried. Replaying the same exceptional
+            # future forever makes identical-content publishes unrecoverable.
+            if cached_res.done() and cached_res.exception() is not None:
+                self.send_file_cache.delete(req)
+            else:
+                return cached_res
 
         if self.future_executor_fastlane:
             # If we have a separate upload worker pool, use it
@@ -2608,6 +2613,17 @@ class WeaveClient:
                 self._on_fire_and_forget_validation_done(fut, ref_uri=_uri)
 
             res.add_done_callback(_on_file_done)
+
+        def _evict_failed_upload(
+            fut: Future[FileCreateRes],
+            _req: FileCreateReq = req,
+        ) -> None:
+            # Keep successful uploads hot in the cache, but drop failures so a
+            # later publish can retry instead of inheriting the same exception.
+            if fut.exception() is not None:
+                self.send_file_cache.delete(_req)
+
+        res.add_done_callback(_evict_failed_upload)
 
         self.send_file_cache.put(req, res)
         return res
