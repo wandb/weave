@@ -27,6 +27,7 @@ from weave.shared.trace_server_interface_util import (
 from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.call_stats_helpers import validate_call_stats_range
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
     InvalidRequest,
@@ -960,8 +961,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
 
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
-        from weave.trace_server.call_stats_helpers import validate_call_stats_range
-
         end = req.end or datetime.datetime.now(datetime.timezone.utc)
         validate_call_stats_range(req.start, end)
 
@@ -1025,7 +1024,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         raw[key] = {}
                     for spec in req.usage_metrics:
                         token_keys = token_keys_map.get(spec.metric, [])
-                        val = sum(int(model_usage.get(k, 0) or 0) for k in token_keys)
+                        val = sum(int(model_usage.get(k) or 0) for k in token_keys)
                         raw[key].setdefault(spec.metric, []).append(val)
 
             for (ts, model), metrics in sorted(raw.items()):
@@ -1043,7 +1042,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         call_buckets: list[dict[str, Any]] = []
         if req.call_metrics:
             bucket_data: dict[
-                str, dict[str, list[float]]
+                str, dict[str, list[Any]]
             ] = {}  # ts -> metric -> values
 
             for call in calls:
@@ -1103,7 +1102,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 usage_utils.UsageCall(
                     id=call.id,
                     parent_id=call.parent_id,
-                    summary=call.summary,
+                    summary=dict(call.summary) if call.summary else None,
                 )
             )
             if call.ended_at is None:
@@ -1154,7 +1153,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 usage_utils.UsageCall(
                     id=call.id,
                     parent_id=call.parent_id,
-                    summary=call.summary,
+                    summary=dict(call.summary) if call.summary else None,
                 )
             )
             if call.ended_at is None:
