@@ -226,6 +226,27 @@ def test_defer_and_then() -> None:
     assert result_future.result() == 84
 
 
+def test_flush_waits_for_then_callbacks() -> None:
+    executor: FutureExecutor = FutureExecutor(max_workers=1)
+
+    def fetch_data() -> int:
+        time.sleep(0.05)
+        return 21
+
+    def process_data(data_list: list[int]) -> int:
+        # Keep the callback slow enough that a broken flush implementation
+        # will return before the chained future has actually completed.
+        time.sleep(0.2)
+        return data_list[0] * 2
+
+    future: Future[int] = executor.defer(fetch_data)
+    result_future: Future[int] = executor.then([future], process_data)
+
+    assert executor.flush() is True
+    assert result_future.done()
+    assert result_future.result() == 42
+
+
 def test_empty_futures_list() -> None:
     executor: FutureExecutor = FutureExecutor()
 

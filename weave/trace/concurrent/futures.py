@@ -32,6 +32,7 @@ from __future__ import annotations
 import atexit
 import concurrent.futures
 import logging
+import time
 from collections.abc import Callable
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
@@ -117,6 +118,16 @@ class FutureExecutor:
             Future[U]: A new Future object representing the result of applying g to the results of the futures.
         """
         result_future: Future[U] = Future()
+        with self._active_futures_lock:
+            self._active_futures.add(result_future)
+
+        def on_result_done(future: Future[U]) -> None:
+            # Track the chain future itself so flush waits for the full
+            # promise-like pipeline, not just the executor tasks it spawns.
+            with self._active_futures_lock:
+                self._active_futures.discard(future)
+
+        result_future.add_done_callback(on_result_done)
 
         def callback() -> None:
             try:
@@ -167,21 +178,33 @@ class FutureExecutor:
             RuntimeError: If called from within a thread context.
             TimeoutError: If the timeout is reached.
         """
-        with self._active_futures_lock:
-            if not self._active_futures:
-                return True
-            futures_to_wait = list(self._active_futures)
-
         if self._in_thread_context.get():
             raise RuntimeError("Cannot flush from within a thread")
 
-        for future in concurrent.futures.as_completed(futures_to_wait, timeout=timeout):
-            try:
-                future.result()
-            except Exception as e:
-                if get_raise_on_captured_errors():
-                    raise
-        return True
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while True:
+            with self._active_futures_lock:
+                if not self._active_futures:
+                    return True
+                futures_to_wait = list(self._active_futures)
+
+            # Futures can enqueue more work from done callbacks (for example
+            # FutureExecutor.then). Drain snapshots until the executor is
+            # quiescent so flush remains a real synchronization barrier.
+            remaining = None
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("Timed out waiting for futures to flush")
+
+            for future in concurrent.futures.as_completed(
+                futures_to_wait, timeout=remaining
+            ):
+                try:
+                    future.result()
+                except Exception as e:
+                    if get_raise_on_captured_errors():
+                        raise
 
     def _future_done_callback(self, future: Future) -> None:
         """Callback for when a future is done to remove it from the active futures list."""

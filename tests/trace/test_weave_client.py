@@ -65,6 +65,7 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
+from weave.trace_server_bindings.http_utils import _ENDPOINT_CACHE
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
@@ -1535,6 +1536,12 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         server=remote_client,
         ensure_project_exists=False,
     )
+
+    # The test asserts exactly 2 table_create_from_digests calls (1 endpoint
+    # availability probe + 1 actual request).  A prior test may have already
+    # populated _ENDPOINT_CACHE, which would skip the probe and break that
+    # assertion.  Clearing it here guarantees the probe is recorded.
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
 
     # Create a Table object and save it to trigger chunking logic
     table_obj = weave_client.Table(rows)

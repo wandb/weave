@@ -3,6 +3,7 @@ import pytest
 import weave
 from tests.trace.test_evaluate import Dataset
 from weave.trace.context.tests_context import raise_on_captured_errors
+from weave.trace.settings import should_enable_client_side_digests
 
 
 def test_basic_dataset_lifecycle(client):
@@ -42,10 +43,11 @@ def _top_level_logs(log):
     return [l for l in log if not l.startswith("_")]
 
 
-def test_dataset_laziness(client):
+def test_dataset_laziness(digest_params_client):
     """The intention of this test is to show that local construction of
     a dataset does not trigger any remote operations.
     """
+    client = digest_params_client
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
     assert _top_level_logs(log) == [
@@ -71,12 +73,14 @@ def test_dataset_laziness(client):
         assert _top_level_logs(log) == []
 
 
-def test_published_dataset_laziness(client):
+def test_published_dataset_laziness(digest_params_client):
     """The intention of this test is to show that publishing a dataset,
     then iterating through the "gotten" version of the dataset has
     minimal remote operations - and importantly delays the fetching
     of the rows until they are actually needed.
     """
+    client = digest_params_client
+    enable_client_side_digests = should_enable_client_side_digests()
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
     assert _top_level_logs(log) == [
@@ -89,7 +93,13 @@ def test_published_dataset_laziness(client):
 
     ref = weave.publish(dataset)
     log = client.server.attribute_access_log
-    assert _top_level_logs(log) == ["table_create", "obj_create"]
+    # publish creates a table and an object.
+    expected_publish_log = ["table_create", "obj_create"]
+    # When client-side digests are enabled, the first operation that
+    # needs _internal_project_id triggers lazy projects_info resolution.
+    if enable_client_side_digests:
+        expected_publish_log = ["projects_info"] + expected_publish_log
+    assert _top_level_logs(log) == expected_publish_log
     client.server.attribute_access_log = []
 
     dataset = ref.get()
