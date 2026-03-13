@@ -960,9 +960,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._update_client_headers()
         # Files API uses multipart/form-data - stainless expects (filename, content) tuple
         file_tuple = (req.name, req.content)
-        response = self._stainless_client.files.create(
-            file=file_tuple, project_id=req.project_id
-        )
+        kwargs: dict[str, Any] = {
+            "file": file_tuple,
+            "project_id": req.project_id,
+        }
+        if req.expected_digest is not None:
+            kwargs["expected_digest"] = req.expected_digest
+        response = self._stainless_client.files.create(**kwargs)
         return tsi.FileCreateRes.model_validate(response.model_dump())
 
     @validate_call

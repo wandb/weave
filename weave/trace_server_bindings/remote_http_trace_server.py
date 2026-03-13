@@ -849,9 +849,12 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     @with_retry
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        data: dict[str, str] = {"project_id": req.project_id}
+        if req.expected_digest is not None:
+            data["expected_digest"] = req.expected_digest
         r = self.post(
             "/files/create",
-            data={"project_id": req.project_id},
+            data=data,
             files={"file": (req.name, req.content)},
         )
         handle_response_error(r, "/files/create")

@@ -112,6 +112,7 @@ from weave.trace_server.datadog import (
     set_current_span_dd_tags,
     set_root_span_dd_tags,
 )
+from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
     InsertTooLarge,
@@ -344,7 +345,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> "ClickHouseTraceServer":
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
-        return ClickHouseTraceServer(
+        return cls(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
             user=wf_env.wf_clickhouse_user(),
@@ -1620,6 +1621,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         processed_val = digest_result.processed_val
         json_val = digest_result.json_val
         digest = digest_result.digest
+        validate_expected_digest(
+            expected=req.obj.expected_digest,
+            actual=digest,
+            label=f"obj {req.obj.object_id!r}",
+        )
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
@@ -2113,15 +2119,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
             )
 
+        row_digests = [r[1] for r in insert_rows]
+        digest = compute_table_digest(row_digests)
+        validate_expected_digest(
+            expected=req.table.expected_digest,
+            actual=digest,
+            label=f"table ({len(row_digests)} rows)",
+        )
+
         self._insert(
             "table_rows",
             data=insert_rows,
             column_names=["project_id", "digest", "refs", "val_dump"],
         )
-
-        row_digests = [r[1] for r in insert_rows]
-
-        digest = compute_table_digest(row_digests)
 
         self._insert(
             "tables",
@@ -2220,6 +2230,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Create a table by specifying row digests, instead actual rows."""
         # Calculate table digest from row digests
         digest = compute_table_digest(req.row_digests)
+        validate_expected_digest(
+            expected=req.expected_digest,
+            actual=digest,
+            label=f"table ({len(req.row_digests)} rows)",
+        )
 
         # Insert into tables table
         self._insert(
@@ -5289,6 +5304,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = compute_file_digest(req.content)
+        validate_expected_digest(
+            expected=req.expected_digest, actual=digest, label="file"
+        )
 
         # During a batch, _file_batch accumulates chunks. If we already have
         # chunks for this (project_id, digest), the content is identical and
