@@ -1715,6 +1715,24 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             payload=create_result.payload,
         )
 
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        """Compute feedback stats using SQLite + Python aggregation."""
+        from weave.trace_server.methods.sqlite_feedback_stats import (
+            sqlite_feedback_stats,
+        )
+
+        return sqlite_feedback_stats(self, req)
+
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        """Discover feedback payload schema from SQLite samples."""
+        from weave.trace_server.methods.sqlite_feedback_stats import (
+            sqlite_feedback_payload_schema,
+        )
+
+        return sqlite_feedback_payload_schema(self, req)
+
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:

@@ -1033,3 +1033,146 @@ def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
     # Query all feedback
     all_feedback = client.server.feedback_query(FeedbackQueryReq(project_id=project_id))
     assert len(all_feedback.result) == 3
+
+
+# ---------------------------------------------------------------------------
+# feedback_stats / feedback_payload_schema integration tests
+# ---------------------------------------------------------------------------
+
+
+def _seed_numeric_feedback(
+    client: WeaveClient,
+    scores: list[float],
+    feedback_type: str = "wandb.runnable.test-scorer",
+    trigger_ref: str | None = None,
+) -> None:
+    """Create feedback rows with numeric payload for stats testing."""
+    project_id = client._project_id()
+    call = client.create_call("x", {"a": 1})
+    client.finish_call(call, "done")
+    weave_ref = get_ref(client.get_call(call.id)).uri()
+    call_ref = f"weave:///{project_id}/call/{call.id}"
+    runnable_name = feedback_type.split("wandb.runnable.")[-1]
+    runnable_ref = f"weave:///{project_id}/op/{runnable_name}:op_digest_1"
+
+    for score in scores:
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type=feedback_type,
+                payload={"output": {"score": score}},
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+                trigger_ref=trigger_ref,
+            )
+        )
+
+
+def test_feedback_stats(client: WeaveClient) -> None:
+    """End-to-end: seed feedback, query aggregated stats, verify buckets and window_stats."""
+    project_id = client._project_id()
+    trigger = f"weave:///{project_id}/object/test-scorer:trig_1"
+    scores = [0.5, 0.8, 1.0]
+    _seed_numeric_feedback(
+        client,
+        scores,
+        feedback_type="wandb.runnable.test-scorer",
+        trigger_ref=trigger,
+    )
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    res = client.server.feedback_stats(
+        tsi.FeedbackStatsReq(
+            project_id=project_id,
+            start=now - datetime.timedelta(hours=1),
+            end=now + datetime.timedelta(minutes=5),
+            feedback_type="wandb.runnable.test-scorer",
+            trigger_ref=trigger,
+            metrics=[
+                tsi.FeedbackMetricSpec(
+                    json_path="output.score",
+                    value_type="numeric",
+                    aggregations=[
+                        tsi.AggregationType.AVG,
+                        tsi.AggregationType.MIN,
+                        tsi.AggregationType.MAX,
+                    ],
+                )
+            ],
+        )
+    )
+
+    assert isinstance(res.buckets, list)
+    assert len(res.buckets) >= 1
+    total_count = sum(b.get("count", 0) for b in res.buckets)
+    assert total_count == len(scores)
+    assert res.granularity > 0
+
+    assert res.window_stats is not None
+    assert "output_score" in res.window_stats
+    ws = res.window_stats["output_score"]
+    assert ws["min"] == pytest.approx(0.5)
+    assert ws["max"] == pytest.approx(1.0)
+    assert ws["avg"] == pytest.approx(sum(scores) / len(scores), abs=1e-6)
+
+
+def test_feedback_payload_schema(client: WeaveClient) -> None:
+    """End-to-end: seed varied feedback, discover payload schema paths."""
+    project_id = client._project_id()
+    call = client.create_call("x", {"a": 1})
+    client.finish_call(call, "done")
+    weave_ref = get_ref(client.get_call(call.id)).uri()
+    call_ref = f"weave:///{project_id}/call/{call.id}"
+    runnable_ref = f"weave:///{project_id}/op/schema-scorer:op_digest_1"
+    trigger = f"weave:///{project_id}/object/schema-scorer:trig_schema"
+
+    for payload in [
+        {"output": {"score": 0.9}},
+        {"output": {"score": 0.5}, "label": "good"},
+    ]:
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type="wandb.runnable.schema-scorer",
+                payload=payload,
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+                trigger_ref=trigger,
+            )
+        )
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    res = client.server.feedback_payload_schema(
+        tsi.FeedbackPayloadSchemaReq(
+            project_id=project_id,
+            start=now - datetime.timedelta(hours=1),
+            end=now + datetime.timedelta(minutes=5),
+            feedback_type="wandb.runnable.schema-scorer",
+            trigger_ref=trigger,
+        )
+    )
+
+    path_map = {p.json_path: p.value_type for p in res.paths}
+    assert "output.score" in path_map
+    assert path_map["output.score"] == "numeric"
+    assert "label" in path_map
+    assert path_map["label"] == "categorical"
+
+
+def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
+    """Empty metrics list returns empty buckets without error."""
+    project_id = client._project_id()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    res = client.server.feedback_stats(
+        tsi.FeedbackStatsReq(
+            project_id=project_id,
+            start=now - datetime.timedelta(hours=1),
+            end=now + datetime.timedelta(minutes=5),
+            metrics=[],
+        )
+    )
+
+    assert res.buckets == []
+    assert res.granularity == 3600
