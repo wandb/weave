@@ -3,13 +3,15 @@
 We should never be breaking the user's program with an error.
 """
 
-# TODO: Test code capture resilience
+from __future__ import annotations
 
 from collections import Counter
+from unittest.mock import patch
 
 import pytest
 
 import weave
+import weave.trace.serialization.op_type
 from tests.trace.util import DummyTestException
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
@@ -715,4 +717,354 @@ async def test_resilience_to_on_finish_handler_errors_async(client, log_collecto
 
     res = await simple_op()
     assert res == "hello"
+    assert_no_current_call()
+
+
+# =============================================================================
+# Tests for code capture resilience
+#
+# Key invariant: code capture failures must NEVER break the user's op execution.
+#
+# Code capture (serialization of op source code) happens inside a deferred
+# background executor (_save_object_basic → future_executor.defer). This means
+# serialization errors do NOT propagate synchronously to the op caller. Instead,
+# they are logged and the op returns its result normally.
+#
+# These tests verify that:
+#   1. Ops return correct values when code capture internals fail
+#   2. No exceptions leak to the user from code capture failures
+#   3. Various code capture edge cases (closures, lambdas, disabled) work
+# =============================================================================
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_getsource_failure(client, log_collector):
+    """Op returns correct value when inspect.getsource() raises OSError.
+
+    Simulates dynamically generated functions or C extensions where source
+    is unavailable. Serialization is deferred so errors don't reach the caller.
+    """
+
+    def do_test():
+        @weave.op
+        def simple_op(x: int) -> int:
+            return x + 1
+
+        return simple_op(1)
+
+    with patch(
+        "weave.trace.serialization.op_type.get_source_notebook_safe",
+        side_effect=OSError("could not get source code"),
+    ):
+        res = do_test()
+        assert res == 2
+
+    assert_no_current_call()
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_getsource_failure_async(client, log_collector):
+    """Async op returns correct value when getsource fails."""
+
+    async def do_test():
+        @weave.op
+        async def simple_op(x: int) -> int:
+            return x + 1
+
+        return await simple_op(1)
+
+    with patch(
+        "weave.trace.serialization.op_type.get_source_notebook_safe",
+        side_effect=OSError("could not get source code"),
+    ):
+        res = await do_test()
+        assert res == 2
+
+    assert_no_current_call()
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_ast_parse_failure(client, log_collector):
+    """Op returns correct value when AST parsing of source code fails."""
+
+    def do_test():
+        @weave.op
+        def simple_op() -> str:
+            return "hello"
+
+        return simple_op()
+
+    with patch(
+        "weave.trace.serialization.op_type.ast.parse",
+        side_effect=SyntaxError("invalid syntax"),
+    ):
+        res = do_test()
+        assert res == "hello"
+
+    assert_no_current_call()
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_code_deps_exception(client, log_collector):
+    """Op returns correct value when get_code_deps_safe raises."""
+
+    def do_test():
+        @weave.op
+        def simple_op() -> str:
+            return "hello"
+
+        return simple_op()
+
+    with patch(
+        "weave.trace.serialization.op_type.get_code_deps_safe",
+        side_effect=RuntimeError("unexpected serialization failure"),
+    ):
+        res = do_test()
+        assert res == "hello"
+
+    assert_no_current_call()
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_save_instance_exception(client, log_collector):
+    """Op returns correct value when save_instance completely fails."""
+
+    def do_test():
+        @weave.op
+        def simple_op(a: int, b: int) -> int:
+            return a + b
+
+        return simple_op(2, 3)
+
+    with patch(
+        "weave.trace.serialization.op_type.save_instance",
+        side_effect=Exception("total save failure"),
+    ):
+        res = do_test()
+        assert res == 5
+
+    assert_no_current_call()
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_save_instance_exception_async(client, log_collector):
+    """Async op returns correct value when save_instance completely fails."""
+
+    async def do_test():
+        @weave.op
+        async def simple_op(a: int, b: int) -> int:
+            return a + b
+
+        return await simple_op(2, 3)
+
+    with patch(
+        "weave.trace.serialization.op_type.save_instance",
+        side_effect=Exception("total save failure"),
+    ):
+        res = await do_test()
+        assert res == 5
+
+    assert_no_current_call()
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_signature_reconstruction_failure(client, log_collector):
+    """Op returns correct value when getsource and reconstruct_signature both fail."""
+
+    def do_test():
+        @weave.op
+        def simple_op() -> str:
+            return "works"
+
+        return simple_op()
+
+    with (
+        patch(
+            "weave.trace.serialization.op_type.get_source_notebook_safe",
+            side_effect=OSError("no source"),
+        ),
+        patch(
+            "weave.trace.serialization.op_type.reconstruct_signature",
+            side_effect=TypeError("cannot reconstruct"),
+        ),
+    ):
+        res = do_test()
+        assert res == "works"
+
+    assert_no_current_call()
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_code_capture_with_generator(client, log_collector):
+    """Generator op yields correct values when code capture fails."""
+
+    def do_test():
+        @weave.op
+        def gen_op():
+            yield from [1, 2, 3]
+
+        return list(gen_op())
+
+    with patch(
+        "weave.trace.serialization.op_type.get_code_deps_safe",
+        side_effect=RuntimeError("code capture broken"),
+    ):
+        res = do_test()
+        assert res == [1, 2, 3]
+
+    assert_no_current_call()
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_code_capture_with_async_generator(client, log_collector):
+    """Async generator op yields correct values when code capture fails."""
+
+    async def do_test():
+        @weave.op
+        async def async_gen_op():
+            yield 1
+            yield 2
+            yield 3
+
+        return [item async for item in async_gen_op()]
+
+    with patch(
+        "weave.trace.serialization.op_type.get_code_deps_safe",
+        side_effect=RuntimeError("code capture broken"),
+    ):
+        res = await do_test()
+        assert res == [1, 2, 3]
+
+    assert_no_current_call()
+
+
+def test_code_capture_disabled_does_not_crash(client):
+    """Disabling code capture per-op doesn't crash."""
+
+    @weave.op(enable_code_capture=False)
+    def simple_op() -> str:
+        return "no code captured"
+
+    res = simple_op()
+    assert res == "no code captured"
+    assert_no_current_call()
+
+
+def test_code_capture_disabled_globally_does_not_crash(client):
+    """Disabling code capture globally doesn't crash."""
+
+    def do_test():
+        @weave.op
+        def simple_op() -> str:
+            return "globally disabled"
+
+        return simple_op()
+
+    with patch(
+        "weave.trace.serialization.op_type.settings.should_capture_code",
+        return_value=False,
+    ):
+        res = do_test()
+        assert res == "globally disabled"
+
+    assert_no_current_call()
+
+
+def test_code_capture_with_closure_variables(client):
+    """Code capture works for ops that reference closure variables."""
+    multiplier = 10
+
+    @weave.op
+    def multiply(x: int) -> int:
+        return x * multiplier
+
+    res = multiply(5)
+    assert res == 50
+    assert_no_current_call()
+
+
+def test_code_capture_with_lambda_op(client):
+    """Code capture works for lambda-based ops."""
+    my_op = weave.op()(lambda x: x * 2)
+    res = my_op(5)
+    assert res == 10
+    assert_no_current_call()
+
+
+def test_code_capture_with_programmatic_op(client):
+    """Code capture works for programmatically created ops (no decorator in source)."""
+
+    def plain_function(x: int) -> int:
+        return x + 100
+
+    my_op = weave.op()(plain_function)
+    res = my_op(5)
+    assert res == 105
+    assert_no_current_call()
+
+
+@pytest.mark.asyncio
+async def test_code_capture_with_async_programmatic_op(client):
+    """Code capture works for async programmatically created ops."""
+
+    async def plain_async(x: int) -> int:
+        return x + 200
+
+    my_op = weave.op()(plain_async)
+    res = await my_op(5)
+    assert res == 205
+    assert_no_current_call()
+
+
+def test_code_capture_with_nested_op_calls(client):
+    """Code capture works with nested op calls (op calling another op)."""
+
+    @weave.op
+    def inner_op(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def outer_op(x: int) -> int:
+        return inner_op(x) + 1
+
+    res = outer_op(5)
+    assert res == 11
+    assert_no_current_call()
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_code_capture_failure_preserves_nested_calls(client, log_collector):
+    """Nested op calls still work when code capture fails for the outer op."""
+
+    def do_test():
+        @weave.op
+        def inner_op(x: int) -> int:
+            return x * 2
+
+        @weave.op
+        def outer_op(x: int) -> int:
+            return inner_op(x) + 1
+
+        return outer_op(5)
+
+    call_count = 0
+    original_save = weave.trace.serialization.op_type.save_instance
+
+    def failing_save_for_outer(obj, artifact, name):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise RuntimeError("outer code capture failed")
+        return original_save(obj, artifact, name)
+
+    with patch(
+        "weave.trace.serialization.op_type.save_instance",
+        side_effect=failing_save_for_outer,
+    ):
+        res = do_test()
+        assert res == 11
+
     assert_no_current_call()
