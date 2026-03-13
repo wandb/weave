@@ -383,7 +383,7 @@ def test_op_return_typeddict_annotation(
 
     assert saved_code == EXPECTED_TYPEDICT_ANNO_CODE
 
-    op2 = weave.ref(ref.uri()).get()
+    op2 = weave.ref(ref.uri).get()
     assert op2(2) == {"val": 2}
 
 
@@ -457,7 +457,7 @@ def test_op_nested_function(
     print(saved_code)
 
     assert saved_code == EXPECTED_NESTED_FUNCTION_CODE
-    assert weave.ref(ref.uri()).get()(2) == 5
+    assert weave.ref(ref.uri).get()(2) == 5
 
 
 def test_op_basic_execution(client):
@@ -470,7 +470,7 @@ def test_op_basic_execution(client):
     ref = as_op(adder).ref
     assert ref is not None
 
-    op2 = weave.ref(ref.uri()).get()
+    op2 = weave.ref(ref.uri).get()
     assert op2(2) == 3
 
 

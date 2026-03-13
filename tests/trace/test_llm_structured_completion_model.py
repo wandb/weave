@@ -656,7 +656,7 @@ def test_llm_structured_completion_model_predict_with_prompt(
     model = LLMStructuredCompletionModel(
         llm_model_id="claude-3",
         default_params=LLMStructuredCompletionModelDefaultParams(
-            prompt=prompt_ref.uri(),
+            prompt=prompt_ref.uri,
             response_format="text",
         ),
     )
@@ -676,7 +676,7 @@ def test_llm_structured_completion_model_predict_with_prompt(
     call_args = mock_client.server.completions_create.call_args[1]["req"]
 
     # Should have the prompt reference and template_vars in the request
-    assert call_args.inputs.prompt == prompt_ref.uri()
+    assert call_args.inputs.prompt == prompt_ref.uri
     assert call_args.inputs.template_vars == {
         "assistant_name": "Claude",
         "user_name": "Alice",
@@ -724,7 +724,7 @@ def test_llm_structured_completion_model_prompt_takes_precedence(
     model = LLMStructuredCompletionModel(
         llm_model_id="gpt-4",
         default_params=LLMStructuredCompletionModelDefaultParams(
-            prompt=prompt_ref.uri(),
+            prompt=prompt_ref.uri,
             messages_template=[
                 Message(role="system", content="Message from template: {var}"),
             ],
@@ -739,7 +739,7 @@ def test_llm_structured_completion_model_prompt_takes_precedence(
     call_args = mock_client.server.completions_create.call_args[1]["req"]
 
     # Should have prompt reference and template_vars
-    assert call_args.inputs.prompt == prompt_ref.uri()
+    assert call_args.inputs.prompt == prompt_ref.uri
     assert call_args.inputs.template_vars == {"var": "test_value"}
 
     # Should NOT have messages from messages_template (prompt takes precedence)

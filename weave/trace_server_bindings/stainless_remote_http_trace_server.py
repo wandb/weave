@@ -15,6 +15,7 @@ from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
@@ -26,7 +27,6 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
-    ServerInfoRes,
     StartBatchItem,
 )
 from weave.utils.project_id import from_project_id
@@ -960,9 +960,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._update_client_headers()
         # Files API uses multipart/form-data - stainless expects (filename, content) tuple
         file_tuple = (req.name, req.content)
-        response = self._stainless_client.files.create(
-            file=file_tuple, project_id=req.project_id
-        )
+        kwargs: dict[str, Any] = {
+            "file": file_tuple,
+            "project_id": req.project_id,
+        }
+        if req.expected_digest is not None:
+            kwargs["expected_digest"] = req.expected_digest
+        response = self._stainless_client.files.create(**kwargs)
         return tsi.FileCreateRes.model_validate(response.model_dump())
 
     @validate_call

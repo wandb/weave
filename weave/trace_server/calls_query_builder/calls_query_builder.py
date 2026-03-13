@@ -901,6 +901,35 @@ class CallsQuery(BaseModel):
             read_table=self.read_table,
         )
 
+    def _ensure_order_fields_selected(
+        self, select_fields: list["CallsMergedField"]
+    ) -> None:
+        """Ensure all order-by fields are in select_fields for cost queries.
+
+        When costs are included, the final cost SELECT/GROUP BY/ORDER BY
+        references column aliases from the all_calls CTE. If an order field
+        isn't selected there, ClickHouse raises UNKNOWN_IDENTIFIER.
+        """
+        for order_field in self.order_fields:
+            field_obj = order_field.field
+            # Skip feedback fields - they're handled via LEFT JOIN
+            if isinstance(field_obj, CallsMergedFeedbackPayloadField):
+                continue
+
+            if isinstance(
+                field_obj,
+                (CallsMergedDynamicField, QueryBuilderDynamicField),
+            ):
+                # Add the base field, not the dynamic path.
+                base_field = get_field_by_name(field_obj.field)
+                if base_field not in select_fields:
+                    select_fields.append(base_field)
+            elif field_obj not in select_fields:
+                assert isinstance(field_obj, CallsMergedField), (
+                    "Field must be a CallsMergedField"
+                )
+                select_fields.append(field_obj)
+
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
         self.include_costs = include_costs
         return self
@@ -1143,25 +1172,7 @@ class CallsQuery(BaseModel):
             # ordering are selected in select_query so they're available in the
             # final query's ORDER BY.
             if self.include_costs:
-                for order_field in self.order_fields:
-                    field_obj = order_field.field
-                    # Skip feedback fields - they're handled via LEFT JOIN
-                    if isinstance(field_obj, CallsMergedFeedbackPayloadField):
-                        continue
-
-                    if isinstance(
-                        field_obj,
-                        (CallsMergedDynamicField, QueryBuilderDynamicField),
-                    ):
-                        # Add the base field, not the dynamic path.
-                        base_field = get_field_by_name(field_obj.field)
-                        if base_field not in select_query.select_fields:
-                            select_query.select_fields.append(base_field)
-                    elif field_obj not in select_query.select_fields:
-                        assert isinstance(field_obj, CallsMergedField), (
-                            "Field must be a CallsMergedField"
-                        )
-                        select_query.select_fields.append(field_obj)
+                self._ensure_order_fields_selected(select_query.select_fields)
 
             filtered_calls_sql = filter_query._as_sql_base_format(
                 pb,
@@ -1181,6 +1192,13 @@ class CallsQuery(BaseModel):
         else:
             # Single-pass: the full query (with all filters, ordering, and
             # limit) is built directly — no filtered_calls CTE needed.
+            #
+            # When costs are included, ensure all fields used in ordering are
+            # selected so they're available in the cost query's final
+            # SELECT/GROUP BY/ORDER BY (same logic as the filter-CTE branch).
+            if self.include_costs:
+                self._ensure_order_fields_selected(self.select_fields)
+
             base_sql = self._as_sql_base_format(
                 pb,
                 table_alias_resolved,

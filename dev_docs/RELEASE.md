@@ -15,10 +15,14 @@ This document outlines how to publish a new Weave release to our public [PyPI pa
    - Both of these commits will be pushed to master
    - Note: if you need to make a new minor or major release, you can do these steps manually with 2 PRs modifying the files in `weave/version.py` and `weave/pyproject.toml`
 
-4. Go to the [publish-pypi-release](https://github.com/wandb/weave/actions/workflows/release.yaml) GitHub action and trigger a new release from the `x.y.z` tag (NOT MASTER). For riskier releases, make sure `Use Test PyPI` is checked so we first publish a test package to [test.pypi.org](https://test.pypi.org/project/weave/#history).
+4. Go to the [publish-pypi-release](https://github.com/wandb/weave/actions/workflows/release.yaml) GitHub action and trigger a new release from the `x.y.z` tag (NOT MASTER). Make sure `Use Test PyPI` is checked so we first publish a test package to [Test PyPI](https://test.pypi.org/project/weave/#history).
 
-5. Verify the new version of Weave exists in [PyPI](https://pypi.org/project/weave/) once it is complete.
+5. Verify the new version of Weave exists in [Test PyPI](https://test.pypi.org/project/weave/) and test it before proceeding.
 
-6. Go to the [GitHub new release page](https://github.com/wandb/weave/releases/new). Select the new tag, and click "Generate release notes". Publish the release.
+6. Once verified, re-run the [publish-pypi-release](https://github.com/wandb/weave/actions/workflows/release.yaml) GitHub action from the same `x.y.z` tag with `Use Test PyPI` unchecked to publish to production [PyPI](https://pypi.org/project/weave/).
 
-7. Finally, announce that the merge freeze is over.
+7. Verify the new version of Weave exists in [PyPI](https://pypi.org/project/weave/).
+
+8. Go to the [GitHub new release page](https://github.com/wandb/weave/releases/new). Select the new tag, and click "Generate release notes". Publish the release.
+
+9. Finally, announce that the merge freeze is over.

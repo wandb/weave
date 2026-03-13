@@ -30,7 +30,7 @@ def extract_refs_from_values(
         ):
             try:
                 parsed = refs_internal.parse_internal_uri(val)
-                if parsed.uri() == val:
+                if parsed.uri == val:
                     refs.append(val)
             except Exception:
                 pass

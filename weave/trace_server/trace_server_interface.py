@@ -23,6 +23,14 @@ from weave.trace_server.common_interface import (
 )
 from weave.trace_server.interface.query import Query
 
+# Re-exported from service_interface for backwards compatibility.
+# New code should import from weave.trace_server.service_interface directly.
+from weave.trace_server.service_interface import (  # noqa: F401
+    EnsureProjectExistsRes,
+    ProjectsInfoReq,
+    ProjectsInfoRes,
+)
+
 
 class ExtraKeysTypedDict(TypedDict):
     pass
@@ -293,6 +301,11 @@ class ObjSchemaForInsert(BaseModel):
     set_base_object_class: str | None = Field(
         exclude=True, default=None, deprecated=True
     )
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed digest for server-side validation. "
+        "If provided, the server will verify it matches the server-computed digest.",
+    )
 
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
@@ -305,6 +318,10 @@ class ObjSchemaForInsert(BaseModel):
 class TableSchemaForInsert(BaseModel):
     project_id: str
     rows: list[dict[str, Any]]
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed table digest for server-side validation.",
+    )
 
 
 class ProcessedResourceSpans(BaseModel):
@@ -864,6 +881,10 @@ class TableCreateReq(BaseModelStrict):
 class TableCreateFromDigestsReq(BaseModelStrict):
     project_id: str
     row_digests: list[str]
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed table digest for server-side validation.",
+    )
 
 
 class TableCreateFromDigestsRes(BaseModel):
@@ -1198,6 +1219,10 @@ class FileCreateReq(BaseModelStrict):
     project_id: str
     name: str
     content: bytes
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed file digest for server-side validation.",
+    )
 
 
 class FileCreateRes(BaseModel):
@@ -1219,26 +1244,6 @@ class FileContentReadRes(BaseModel):
 
 class FilesStatsRes(BaseModel):
     total_size_bytes: int
-
-
-class EnsureProjectExistsRes(BaseModel):
-    project_name: str
-
-
-class ProjectsInfoReq(BaseModelStrict):
-    project_ids: list[str] = Field(
-        description="External project IDs in 'entity/project' format.",
-        examples=[["entity-a/project-a", "entity-b/project-b"]],
-    )
-
-
-class ProjectsInfoRes(BaseModel):
-    external_project_id: str = Field(
-        description="External project ID in 'entity/project' format.",
-    )
-    internal_project_id: str = Field(
-        description="Internal project ID.",
-    )
 
 
 class CostCreateInput(BaseModelStrict):
@@ -2607,11 +2612,6 @@ class EvalResultsSummaryRes(BaseModel):
 
 
 class TraceServerInterface(Protocol):
-    def ensure_project_exists(
-        self, entity: str, project: str
-    ) -> EnsureProjectExistsRes:
-        return EnsureProjectExistsRes(project_name=project)
-
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 

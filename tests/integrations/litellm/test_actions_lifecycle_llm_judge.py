@@ -80,7 +80,7 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
     )
 
     # Construct the URI
-    action_ref_uri = published_ref.uri()
+    action_ref_uri = published_ref.uri
 
     @weave.op
     def example_op(input: str) -> str:
@@ -171,7 +171,7 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
     )
 
     # Construct the URI
-    action_ref_uri = published_ref.uri()
+    action_ref_uri = published_ref.uri
 
     @weave.op
     def example_op(input: str) -> str:
