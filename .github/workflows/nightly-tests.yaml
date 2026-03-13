@@ -32,6 +32,7 @@ jobs:
             "trace",
             "flow",
             "trace_server",
+            "trace_server_chdb",
             "trace_server_bindings",
             "anthropic",
             "bedrock",
@@ -129,14 +130,14 @@ jobs:
         if: steps.filter_shards.outputs.skip != 'true'
         run: |
           # Shards that are in the regular test matrix and need trace_server markers
-          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents mcp autogen_tests trace trace_no_server"
+          TRACE_SERVER_SHARDS="flow trace_server trace_server_chdb trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents mcp autogen_tests trace trace_no_server"
           if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
             echo "needs_markers=true" >> $GITHUB_OUTPUT
           else
             echo "needs_markers=false" >> $GITHUB_OUTPUT
           fi
       - name: Run nox (Sqlite Trace Server)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true' && matrix.shard != 'trace_server_chdb'
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -156,7 +157,7 @@ jobs:
             -m "trace_server" \
             --trace-server=sqlite
       - name: Run nox (Clickhouse Trace Server)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true' && matrix.shard != 'trace_server_chdb'
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -169,6 +170,18 @@ jobs:
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
+      - name: Run nox (chDB Trace Server)
+        if: steps.filter_shards.outputs.skip != 'true' && matrix.shard == 'trace_server_chdb'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WEAVE_USE_MEMRAY: 1
+          WB_SERVER_HOST: http://wandbservice
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
       - name: Run nox (No marker filters for integration-only shards)
         if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
         env:
