@@ -322,9 +322,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         ),
                         json.dumps(call.output),
                         json.dumps(
-                            extract_refs_from_values(
-                                list(parsable_output.values())
-                            )
+                            extract_refs_from_values(list(parsable_output.values()))
                         ),
                         json.dumps(call.summary),
                         call.wb_user_id,
