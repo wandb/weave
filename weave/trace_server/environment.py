@@ -88,6 +88,32 @@ def wf_scoring_worker_kafka_consumer_group_id_override() -> str | None:
     return os.environ.get("SCORING_WORKER_KAFKA_CONSUMER_GROUP_ID")
 
 
+def wf_scoring_worker_debounced_scoring_max_sampling_rate() -> float:
+    """Max sampling rate cap for debounced scoring (delay > 0). 0.0 = disable, 1.0 = no cap beyond monitor rate."""
+    default = 0.0
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_SAMPLING_RATE", str(default)
+    )
+    try:
+        rate = float(raw)
+    except ValueError:
+        return default
+    return max(0.0, min(1.0, rate))
+
+
+def wf_scoring_worker_debounced_scoring_max_call_history() -> int:
+    """Max number of prior calls to fetch per task when aggregation_method is 'all_messages'. 0 = disabled."""
+    default = 0
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_CALL_HISTORY", str(default)
+    )
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(0, value)
+
+
 # Clickhouse Settings
 
 

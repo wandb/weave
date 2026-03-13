@@ -18,7 +18,7 @@ def make_feedback_query_req(
     call_refs = []
     for call in calls:
         ref = ri.InternalCallRef(project_id=call["project_id"], id=call["id"])
-        call_refs.append(ref.uri())
+        call_refs.append(ref.uri)
 
     # construct mogo style query
     query = tsi.Query(

@@ -28,6 +28,7 @@ from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
+from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
@@ -921,6 +922,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         processed_val = digest_result.processed_val
         json_val = digest_result.json_val
         digest = digest_result.digest
+        validate_expected_digest(
+            expected=req.obj.expected_digest,
+            actual=digest,
+            label=f"obj {req.obj.object_id!r}",
+        )
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
             req.obj.object_id,
@@ -1183,6 +1189,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
             cursor.execute(delete_query, delete_parameters)
+            # Cascade: clean up tags and aliases for deleted digests
+            digest_placeholders = ",".join("?" * len(found_digests))
+            cursor.execute(
+                f"DELETE FROM tags WHERE project_id = ? AND object_id = ? AND digest IN ({digest_placeholders})",
+                [req.project_id, req.object_id] + list(found_digests),
+            )
+            cursor.execute(
+                f"DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND digest IN ({digest_placeholders})",
+                [req.project_id, req.object_id] + list(found_digests),
+            )
             conn.commit()
 
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
@@ -1227,29 +1243,33 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conn.commit()
         return tsi.ObjRemoveTagsRes()
 
-    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
             self._ensure_obj_version_exists(
                 cursor, req.project_id, req.object_id, req.digest
             )
-            cursor.execute(
-                "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
-                (req.project_id, req.object_id, req.alias, req.digest),
-            )
+            for alias in req.aliases:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
+                    (req.project_id, req.object_id, alias, req.digest),
+                )
             conn.commit()
-        return tsi.ObjSetAliasRes()
+        return tsi.ObjSetAliasesRes()
 
-    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
+            placeholders = ",".join("?" for _ in req.aliases)
             cursor.execute(
-                "DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias = ?",
-                (req.project_id, req.object_id, req.alias),
+                f"DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias IN ({placeholders})",
+                (req.project_id, req.object_id, *req.aliases),
             )
             conn.commit()
-        return tsi.ObjRemoveAliasRes()
+        return tsi.ObjRemoveAliasesRes()
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1278,15 +1298,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             row_json = json.dumps(r)
             row_digest = compute_row_digest(r)
             insert_rows.append((req.table.project_id, row_digest, row_json))
+
+        row_digests = [r[1] for r in insert_rows]
+        digest = compute_table_digest(row_digests)
+        validate_expected_digest(
+            expected=req.table.expected_digest,
+            actual=digest,
+            label=f"table ({len(row_digests)} rows)",
+        )
+
         with self.lock:
             cursor.executemany(
                 "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
                 insert_rows,
             )
-
-            row_digests = [r[1] for r in insert_rows]
-
-            digest = compute_table_digest(row_digests)
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
@@ -1304,6 +1329,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         # Calculate table digest from row digests
         digest = compute_table_digest(req.row_digests)
+        validate_expected_digest(
+            expected=req.expected_digest,
+            actual=digest,
+            label=f"table ({len(req.row_digests)} rows)",
+        )
 
         with self.lock:
             cursor.execute(
@@ -1695,6 +1725,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         digest = compute_file_digest(req.content)
+        validate_expected_digest(
+            expected=req.expected_digest, actual=digest, label="file"
+        )
         with self.lock:
             cursor.execute(
                 "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)",
@@ -2141,7 +2174,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         table_ref = ri.InternalTableRef(
             project_id=req.project_id,
             digest=table_res.digest,
-        ).uri()
+        ).uri
 
         # Create the dataset object
         dataset_val = object_creation_utils.build_dataset_val(
@@ -2309,7 +2342,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=scorer_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.ScorerCreateRes(
             digest=obj_result.digest,
@@ -2427,7 +2460,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=evaluation_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.EvaluationCreateRes(
             digest=obj_result.digest,
@@ -2577,7 +2610,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=object_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.ModelCreateRes(
             digest=obj_result.digest,
@@ -3056,7 +3089,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     id=predict_and_score_id,
                     trace_id=trace_id,
                     parent_id=req.evaluation_run_id,
-                    op_name=predict_and_score_op_ref.uri(),
+                    op_name=predict_and_score_op_ref.uri,
                     started_at=datetime.datetime.now(datetime.timezone.utc),
                     attributes={
                         constants.WEAVE_ATTRIBUTES_NAMESPACE: {
@@ -3127,7 +3160,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 id=prediction_id,
                 trace_id=trace_id,
                 parent_id=parent_id,
-                op_name=predict_op_ref.uri(),
+                op_name=predict_op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes=prediction_attributes,
                 inputs={
@@ -3523,7 +3556,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 id=score_id,
                 trace_id=trace_id,
                 parent_id=parent_id,
-                op_name=score_op_ref.uri(),
+                op_name=score_op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes=score_attributes,
                 inputs={
@@ -3564,7 +3597,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         feedback_req = tsi.FeedbackCreateReq(
             project_id=req.project_id,
-            weave_ref=prediction_call_ref.uri(),
+            weave_ref=prediction_call_ref.uri,
             feedback_type=f"{RUNNABLE_FEEDBACK_TYPE_PREFIX}.{scorer_name}",
             payload={"output": req.value},
             runnable_ref=req.scorer,

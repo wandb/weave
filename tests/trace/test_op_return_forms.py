@@ -20,7 +20,7 @@ def test_op_return_sync_empty(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -41,7 +41,7 @@ async def test_op_return_async_empty(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -61,7 +61,7 @@ def test_op_return_sync_obj(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == 1
 
@@ -82,7 +82,7 @@ async def test_op_return_async_obj(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == 1
 
@@ -120,7 +120,7 @@ def test_op_return_sync_generator(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, -1, -1))
 
@@ -145,7 +145,7 @@ async def test_op_return_async_generator(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, -1, -1))
 
@@ -178,7 +178,7 @@ def test_op_return_sync_iterator(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, -1, -1))
 
@@ -212,7 +212,7 @@ async def test_op_return_async_iterator(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, -1, -1))
 
@@ -235,7 +235,7 @@ def test_op_return_sync_generator_never_iter(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -260,7 +260,7 @@ async def test_op_return_async_generator_never_iter(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -292,7 +292,7 @@ def test_op_return_sync_iterator_never_iter(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -325,7 +325,7 @@ async def test_op_return_async_iterator_never_iter(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -350,7 +350,7 @@ def test_op_return_sync_generator_partial(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
 
@@ -377,7 +377,7 @@ async def test_op_return_async_generator_partial(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
 
@@ -411,7 +411,7 @@ def test_op_return_sync_iterator_partial(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
 
@@ -446,7 +446,7 @@ async def test_op_return_async_iterator_partial(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
 
@@ -475,7 +475,7 @@ def test_op_return_sync_generator_exception(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
     assert res.calls[0].exception is not None
@@ -506,7 +506,7 @@ async def test_op_return_async_generator_exception(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
     assert res.calls[0].exception is not None
@@ -545,7 +545,7 @@ def test_op_return_sync_iterator_exception(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
     assert res.calls[0].exception is not None
@@ -585,7 +585,7 @@ async def test_op_return_async_iterator_exception(client):
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
     assert res.calls[0].exception is not None

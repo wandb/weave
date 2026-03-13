@@ -73,7 +73,7 @@ def require_internal_ref_uri(s: str, ref_class: type | None = None) -> str:
 
     if ref_class is not None and not isinstance(parsed, ref_class):
         raise CHValidationError(f"Invalid ref: {s}. Must be of type {ref_class!s}")
-    parsed_str = parsed.uri()
+    parsed_str = parsed.uri
     if parsed_str != s:
         raise CHValidationError(f"Invalid ref: {s}. Ref did not round-trip")
     return s
