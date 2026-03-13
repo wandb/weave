@@ -5,7 +5,10 @@ We should never be breaking the user's program with an error.
 
 # TODO: Test code capture resilience
 
+from __future__ import annotations
+
 from collections import Counter
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -716,3 +719,135 @@ async def test_resilience_to_on_finish_handler_errors_async(client, log_collecto
     res = await simple_op()
     assert res == "hello"
     assert_no_current_call()
+
+
+# =============================================================================
+# Tests for call-context leak fix: _restore_call_stack on _create_call failure
+# =============================================================================
+
+
+def _make_leaking_create_call():
+    """Return a fake _create_call that pushes a call onto the stack then raises.
+
+    This simulates the scenario where client.create_call partially succeeds
+    (pushes a call) but then something fails, leaving an orphaned call on the
+    context stack.
+    """
+
+    def leaking_create_call(func, *args, **kwargs):
+        # Create a minimal mock call with an id, push it, then fail
+        fake_call = MagicMock()
+        fake_call.id = "leaked-call-id"
+        call_context.push_call(fake_call)
+        raise DummyTestException("Simulated _create_call failure after push")
+
+    return leaking_create_call
+
+
+@pytest.mark.disable_logging_error_check
+def test_create_call_leak_restores_call_stack_sync(client, monkeypatch, log_collector):
+    """If _create_call pushes a call then throws, the stack must be cleaned up."""
+
+    @weave.op
+    def simple_op():
+        return "hello"
+
+    monkeypatch.setattr(
+        "weave.trace.op._create_call", _make_leaking_create_call()
+    )
+
+    res = simple_op()
+    assert res == "hello"
+    assert_no_current_call()
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_create_call_leak_restores_call_stack_async(
+    client, monkeypatch, log_collector
+):
+    """Async variant: leaked call from _create_call is cleaned up."""
+
+    @weave.op
+    async def simple_op():
+        return "hello"
+
+    monkeypatch.setattr(
+        "weave.trace.op._create_call", _make_leaking_create_call()
+    )
+
+    res = await simple_op()
+    assert res == "hello"
+    assert_no_current_call()
+
+
+@pytest.mark.disable_logging_error_check
+def test_create_call_leak_restores_call_stack_sync_gen(
+    client, monkeypatch, log_collector
+):
+    """Sync generator variant: leaked call from _create_call is cleaned up."""
+
+    @weave.op
+    def gen_op():
+        yield from [1, 2, 3]
+
+    monkeypatch.setattr(
+        "weave.trace.op._create_call", _make_leaking_create_call()
+    )
+
+    res = list(gen_op())
+    assert res == [1, 2, 3]
+    assert_no_current_call()
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_create_call_leak_restores_call_stack_async_gen(
+    client, monkeypatch, log_collector
+):
+    """Async generator variant: leaked call from _create_call is cleaned up."""
+
+    @weave.op
+    async def gen_op():
+        yield 1
+        yield 2
+        yield 3
+
+    monkeypatch.setattr(
+        "weave.trace.op._create_call", _make_leaking_create_call()
+    )
+
+    res = [item async for item in gen_op()]
+    assert res == [1, 2, 3]
+    assert_no_current_call()
+
+
+@pytest.mark.disable_logging_error_check
+def test_create_call_leak_preserves_parent_call(client, monkeypatch, log_collector):
+    """When a nested op's _create_call leaks, the parent call must remain current."""
+    inner_saw_parent = None
+
+    @weave.op
+    def outer_op():
+        # At this point outer's call is on the stack.
+        # Now make the inner op's _create_call leak.
+        monkeypatch.setattr(
+            "weave.trace.op._create_call", _make_leaking_create_call()
+        )
+
+        @weave.op
+        def inner_op():
+            return 42
+
+        result = inner_op()
+
+        # After inner_op returns, the current call should still be outer's call
+        nonlocal inner_saw_parent
+        inner_saw_parent = call_context.get_current_call()
+        return result
+
+    res = outer_op()
+    assert res == 42
+    # The parent (outer) call should have been preserved during inner's failure
+    assert inner_saw_parent is not None
+    assert inner_saw_parent.id != "leaked-call-id"
