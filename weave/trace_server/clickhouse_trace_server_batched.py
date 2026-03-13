@@ -30,6 +30,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from typing_extensions import Self
 
 from weave.shared import refs_internal as ri
 from weave.shared.digest import (
@@ -341,11 +342,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._thread_local.calls_complete_batch = value
 
     @classmethod
-    def from_env(
-        cls, use_async_insert: bool = False, **kwargs: Any
-    ) -> "ClickHouseTraceServer":
-        # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
-        # that type checking is applied to the constructor.
+    def from_env(cls, use_async_insert: bool = False, **kwargs: Any) -> Self:
         return cls(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
