@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import threading
+import time
 from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
@@ -6337,6 +6338,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         summary = None
         parameters = _process_parameters(parameters)
+        start = time.monotonic()
         try:
             with self.ch_client.query_rows_stream(
                 query,
@@ -6347,9 +6349,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ) as stream:
                 if isinstance(stream.source, QueryResult):
                     summary = stream.source.summary
+                duration_ms = round((time.monotonic() - start) * 1000, 1)
                 logger.info(
                     "clickhouse_stream_query",
                     extra={
+                        "trace_duration_ms": duration_ms,
                         "query": query,
                         "parameters": parameters,
                         "summary": summary,
@@ -6357,9 +6361,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 yield from stream
         except Exception as e:
+            duration_ms = round((time.monotonic() - start) * 1000, 1)
             logger.exception(
                 "clickhouse_stream_query_error",
                 extra={
+                    "trace_duration_ms": duration_ms,
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
@@ -6382,6 +6388,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
 
         parameters = _process_parameters(parameters)
+        start = time.monotonic()
         try:
             res = self.ch_client.query(
                 query,
@@ -6391,17 +6398,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 settings=settings,
             )
         except Exception as e:
+            duration_ms = round((time.monotonic() - start) * 1000, 1)
             logger.exception(
                 "clickhouse_query_error",
-                extra={"error_str": str(e), "query": query, "parameters": parameters},
+                extra={
+                    "trace_duration_ms": duration_ms,
+                    "error_str": str(e),
+                    "query": query,
+                    "parameters": parameters,
+                },
             )
             # always raises, optionally with custom error class
             handle_clickhouse_query_error(e)
             return None
 
+        duration_ms = round((time.monotonic() - start) * 1000, 1)
         logger.info(
             "clickhouse_query",
             extra={
+                "trace_duration_ms": duration_ms,
                 "query": query,
                 "parameters": parameters,
                 "summary": res.summary,
@@ -6428,6 +6443,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
 
         processed_params = _process_parameters(parameters) if parameters else None
+        start = time.monotonic()
         try:
             self.ch_client.command(
                 command,
@@ -6435,9 +6451,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 settings=settings,
             )
         except Exception as e:
+            duration_ms = round((time.monotonic() - start) * 1000, 1)
             logger.exception(
                 "clickhouse_command_error",
                 extra={
+                    "trace_duration_ms": duration_ms,
                     "error_str": str(e),
                     "command": command,
                     "parameters": processed_params,
@@ -6446,9 +6464,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             handle_clickhouse_query_error(e)
             return
 
+        duration_ms = round((time.monotonic() - start) * 1000, 1)
         logger.info(
             "clickhouse_command",
             extra={
+                "trace_duration_ms": duration_ms,
                 "command": command,
                 "parameters": processed_params,
             },
@@ -6470,7 +6490,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             }
         )
 
-        if self._use_async_insert and not do_sync_insert:
+        async_insert = self._use_async_insert and not do_sync_insert
+        if async_insert:
             settings = ch_settings.update_settings_for_async_insert(settings)
             set_current_span_dd_tags(
                 {
@@ -6478,9 +6499,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 }
             )
 
+        start = time.monotonic()
         for attempt in range(ch_settings.INSERT_MAX_RETRIES):
             try:
-                return self.ch_client.insert(
+                result = self.ch_client.insert(
                     table, data=data, column_names=column_names, settings=settings
                 )
 
@@ -6499,6 +6521,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # All other errors: raise immediately, no retry
             except Exception as e:
                 _log_and_raise_insert_error(e, table, data)
+
+            else:
+                duration_ms = round((time.monotonic() - start) * 1000, 1)
+                logger.info(
+                    "clickhouse_insert",
+                    extra={
+                        "trace_duration_ms": duration_ms,
+                        "table": table,
+                        "row_count": len(data),
+                        "async_insert": async_insert,
+                    },
+                )
+                return result
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
