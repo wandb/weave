@@ -1024,7 +1024,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         raw[key] = {}
                     for spec in req.usage_metrics:
                         token_keys = token_keys_map.get(spec.metric, [])
-                        val = sum(int(model_usage.get(k) or 0) for k in token_keys)
+                        val = sum(
+                            int(v) for k in token_keys
+                            if (v := model_usage.get(k)) is not None and v != 0
+                        )
                         raw[key].setdefault(spec.metric, []).append(val)
 
             for (ts, model), metrics in sorted(raw.items()):
