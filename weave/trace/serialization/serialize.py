@@ -35,13 +35,6 @@ def _convert_ext_ref_string(
 
     Same-project refs use the pre-resolved internal_project_id.
     Cross-project refs are resolved lazily via client._resolve_ext_to_int_project_id.
-
-    When a cross-project ref cannot be resolved (client is None or resolution
-    returns None), the original external ref is returned unchanged.  This keeps
-    the fast-path (client-side digests) compatible with the legacy path, which
-    sends external refs to the server and lets the server convert them.  Raising
-    here would make the fast path strictly less capable than the fallback path —
-    payloads that publish fine with digests-off would crash with digests-on.
     """
     rest = ref_str[len(f"{WEAVE_SCHEME}:///") :]
     parts = rest.split("/", 2)
@@ -50,13 +43,16 @@ def _convert_ext_ref_string(
     entity_project = f"{parts[0]}/{parts[1]}"
     if entity_project == project_id:
         return f"{WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{parts[2]}"
-    if client is not None:
-        resolved = client._resolve_ext_to_int_project_id(entity_project)
-        if resolved is not None:
-            return f"{WEAVE_INTERNAL_SCHEME}:///{resolved}/{parts[2]}"
-    # Unresolvable cross-project ref — keep original external format so the
-    # server can still convert it, matching the legacy (digests-off) behaviour.
-    return ref_str
+    # When a cross-project ref cannot be resolved (no client, or resolution
+    # returns None), fall back to the original external URI so the server can
+    # convert it.  Raising would make the fast path less capable than the
+    # legacy (digests-off) path, where these payloads publish fine.
+    if client is None:
+        return ref_str
+    resolved = client._resolve_ext_to_int_project_id(entity_project)
+    if resolved is None:
+        return ref_str
+    return f"{WEAVE_INTERNAL_SCHEME}:///{resolved}/{parts[2]}"
 
 
 def is_pydantic_model_class(obj: Any) -> bool:
