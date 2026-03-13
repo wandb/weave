@@ -9,10 +9,9 @@ from threading import Event, Lock, Thread
 from typing import Generic, TypeVar
 
 from weave.telemetry.trace_sentry import (
-    SENTRY_AVAILABLE,
+    global_trace_sentry,
     log_error,
     log_warning,
-    sentry_sdk,
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 
@@ -308,8 +307,7 @@ class AsyncBatchProcessor(Generic[T]):
                 logger.info("Health check thread successfully revived")
             except Exception as e:
                 logger.exception("Failed to revive health check thread")
-                if SENTRY_AVAILABLE:
-                    sentry_sdk.capture_exception(e)
+                global_trace_sentry.exception(e, handled=True)
 
     def _health_check(self) -> None:
         """Health check thread that monitors and revives the processing thread if it dies."""
@@ -331,8 +329,7 @@ class AsyncBatchProcessor(Generic[T]):
                     logger.info("Processing thread successfully revived")
                 except Exception as e:
                     logger.exception("Failed to revive processing thread")
-                    if SENTRY_AVAILABLE:
-                        sentry_sdk.capture_exception(e)
+                    global_trace_sentry.exception(e, handled=True)
 
 
 def start_thread(target: Callable[[], None]) -> Thread:
