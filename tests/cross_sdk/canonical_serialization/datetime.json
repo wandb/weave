@@ -1,0 +1,11 @@
+{
+  "description": "datetime.datetime serializes as CustomWeaveType with ISO val",
+  "output": {
+    "_type": "CustomWeaveType",
+    "load_op": "weave:///test-entity/test-project/op/mock_load_op:mock_digest",
+    "val": "2024-01-15T10:30:00+00:00",
+    "weave_type": {
+      "type": "datetime.datetime"
+    }
+  }
+}

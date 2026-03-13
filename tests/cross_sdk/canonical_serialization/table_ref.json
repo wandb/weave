@@ -1,0 +1,4 @@
+{
+  "description": "TableRef serializes to weave:/// URI string",
+  "output": "weave:///test-entity/test-project/table/def456abc789"
+}

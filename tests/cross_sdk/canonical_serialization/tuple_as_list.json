@@ -1,0 +1,8 @@
+{
+  "description": "Python tuples serialize as JSON arrays",
+  "output": [
+    1,
+    "two",
+    3.0
+  ]
+}

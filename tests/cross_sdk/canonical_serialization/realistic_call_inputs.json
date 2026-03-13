@@ -1,0 +1,20 @@
+{
+  "description": "Realistic LLM call inputs with mixed types",
+  "output": {
+    "max_tokens": 100,
+    "metadata": {
+      "session": {
+        "id": "sess-456",
+        "turn": 3
+      },
+      "user_id": "user-123"
+    },
+    "model_ref": "weave:///test-entity/test-project/object/my-model:abc123def456",
+    "prompt": "Hello, world!",
+    "stop_sequences": [
+      "\n",
+      "END"
+    ],
+    "temperature": 0.7
+  }
+}

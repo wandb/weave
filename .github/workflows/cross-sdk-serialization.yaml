@@ -1,0 +1,59 @@
+name: Cross-SDK Serialization Check
+
+on:
+  push:
+    paths:
+      - 'weave/trace/serialization/**'
+      - 'weave/trace/refs.py'
+      - 'weave/trace/object_record.py'
+      - 'weave/type_handlers/**'
+      - 'scripts/generate_serialization_fixtures.py'
+      - 'tests/cross_sdk/**'
+      - 'sdks/node/src/**'
+      - '.github/workflows/cross-sdk-serialization.yaml'
+  pull_request:
+    paths:
+      - 'weave/trace/serialization/**'
+      - 'weave/trace/refs.py'
+      - 'weave/trace/object_record.py'
+      - 'weave/type_handlers/**'
+      - 'scripts/generate_serialization_fixtures.py'
+      - 'tests/cross_sdk/**'
+      - 'sdks/node/src/**'
+      - '.github/workflows/cross-sdk-serialization.yaml'
+
+jobs:
+  check-python-fixtures:
+    name: Python serialization fixtures are up-to-date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync
+      - name: Check fixtures match current to_json output
+        run: uv run python scripts/generate_serialization_fixtures.py --check
+
+  check-ts-parity:
+    name: TS SDK serialization matches fixtures
+    runs-on: ubuntu-latest
+    needs: check-python-fixtures
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install TS SDK dependencies
+        run: |
+          cd sdks/node
+          pnpm install --frozen-lockfile
+      - name: Run cross-SDK serialization tests
+        working-directory: sdks/node
+        run: pnpm exec jest --testPathPattern='crossSdkSerialization'

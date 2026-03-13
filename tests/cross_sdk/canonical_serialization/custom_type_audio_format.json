@@ -1,0 +1,13 @@
+{
+  "description": "Canonical CustomWeaveType format for audio",
+  "output": {
+    "_type": "CustomWeaveType",
+    "files": {
+      "audio.wav": "<sha256_digest>"
+    },
+    "weave_type": {
+      "type": "wave.Wave_read"
+    }
+  },
+  "static": true
+}

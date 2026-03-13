@@ -1,0 +1,13 @@
+{
+  "description": "List of dictionaries",
+  "output": [
+    {
+      "name": "a",
+      "value": 1
+    },
+    {
+      "name": "b",
+      "value": 2
+    }
+  ]
+}
