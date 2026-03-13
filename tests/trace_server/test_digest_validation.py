@@ -31,7 +31,7 @@ def test_validate_expected_digest_none_skips() -> None:
 
 def test_validate_expected_digest_mismatch_raises() -> None:
     """Mismatched digests raise DigestMismatchError."""
-    with pytest.raises(DigestMismatchError, match="client.*!=.*server"):
+    with pytest.raises(DigestMismatchError, match="(?i)client.*!=.*server"):
         validate_expected_digest(expected="wrong", actual="abc123", label="test")
 
 
