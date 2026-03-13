@@ -1,0 +1,7 @@
+{
+  "description": "Named tuple serializes to dict with field names as keys",
+  "output": {
+    "x": 10,
+    "y": 20
+  }
+}

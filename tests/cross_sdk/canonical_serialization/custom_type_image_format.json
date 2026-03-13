@@ -1,0 +1,13 @@
+{
+  "description": "Canonical CustomWeaveType format for PIL images",
+  "output": {
+    "_type": "CustomWeaveType",
+    "files": {
+      "image.png": "<sha256_digest>"
+    },
+    "weave_type": {
+      "type": "PIL.Image.Image"
+    }
+  },
+  "static": true
+}

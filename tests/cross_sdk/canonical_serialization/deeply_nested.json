@@ -1,0 +1,12 @@
+{
+  "description": "Deeply nested structure",
+  "output": {
+    "l1": {
+      "l2": {
+        "l3": {
+          "l4": "deep"
+        }
+      }
+    }
+  }
+}

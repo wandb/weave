@@ -1,0 +1,13 @@
+{
+  "description": "Simple ObjectRecord with primitive fields",
+  "output": {
+    "_class_name": "MyModel",
+    "_type": "MyModel",
+    "name": "test-model",
+    "tags": [
+      "a",
+      "b"
+    ],
+    "value": 42
+  }
+}

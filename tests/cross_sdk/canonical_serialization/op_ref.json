@@ -1,0 +1,4 @@
+{
+  "description": "OpRef serializes to weave:/// URI string",
+  "output": "weave:///test-entity/test-project/op/my-op:op123digest"
+}

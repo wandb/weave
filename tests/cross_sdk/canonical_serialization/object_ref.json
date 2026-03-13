@@ -1,0 +1,4 @@
+{
+  "description": "ObjectRef serializes to weave:/// URI string",
+  "output": "weave:///test-entity/test-project/object/my-model:abc123def456"
+}

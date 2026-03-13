@@ -1,0 +1,10 @@
+{
+  "description": "List of mixed primitives",
+  "output": [
+    1,
+    "two",
+    3.0,
+    true,
+    null
+  ]
+}
