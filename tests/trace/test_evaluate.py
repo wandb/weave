@@ -334,6 +334,62 @@ def test_sync_eval_parallelism(client):
     assert time.time() - now < (15 if sys.platform == "win32" else 5)
 
 
+def test_async_eval_parallelism(client):
+    @weave.op
+    async def async_op(a):
+        await asyncio.sleep(1)
+        return a
+
+    @weave.op
+    def score(output):
+        return 1
+
+    dataset = [{"a": 1}, {"a": 2}, {"a": 3}, {"a": 4}]
+
+    # 4 rows x 1s each; parallel should complete in <3s, sequential would be 4+
+
+    now = time.time()
+
+    evaluation = Evaluation(dataset=dataset, scorers=[score])
+    result = asyncio.run(evaluation.evaluate(async_op))
+    assert result == {
+        "output": {"mean": 2.5},
+        "score": {"mean": 1.0},
+        "model_latency": {"mean": pytest.approx(1, abs=_LATENCY_TOL)},
+    }
+    assert time.time() - now < (10 if sys.platform == "win32" else 3)
+
+
+def test_blocking_async_eval_parallelism(client):
+    """Async ops that do blocking work (e.g. sync HTTP calls) should still
+    run in parallel during evals, just like sync ops do.
+    """
+
+    @weave.op
+    async def blocking_async_op(a):
+        time.sleep(1)  # blocking sleep inside async fn
+        return a
+
+    @weave.op
+    def score(output):
+        return 1
+
+    dataset = [{"a": 1}, {"a": 2}, {"a": 3}, {"a": 4}]
+
+    # 4 rows x 1s each; parallel should complete in <3s, sequential would be 4+
+
+    now = time.time()
+
+    evaluation = Evaluation(dataset=dataset, scorers=[score])
+    result = asyncio.run(evaluation.evaluate(blocking_async_op))
+    assert result == {
+        "output": {"mean": 2.5},
+        "score": {"mean": 1.0},
+        "model_latency": {"mean": pytest.approx(1, abs=_LATENCY_TOL)},
+    }
+    assert time.time() - now < (10 if sys.platform == "win32" else 3)
+
+
 def test_evaluation_from_weaveobject_missing_evaluation_name(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
     dataset = Dataset(rows=dataset_rows)

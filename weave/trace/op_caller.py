@@ -35,7 +35,8 @@ def async_call_op(
     func: Op, *args: Any, **kwargs: Any
 ) -> Coroutine[Any, Any, tuple[Any, "Call"]]:
     """Similar to async_call but specifically for Ops, handling the Weave tracing
-    functionality. For sync Ops, runs them in a thread.
+    functionality. Both sync and async Ops are run in threads to ensure
+    parallelism during evaluations, even when async functions contain blocking code.
 
     Args:
         func: The Op to wrap
@@ -47,7 +48,8 @@ def async_call_op(
     """
     is_async = inspect.iscoroutinefunction(func.resolve_fn)
     if is_async:
-        return func.call(*args, __should_raise=True, **kwargs)
+        coro = func.call(*args, __should_raise=True, **kwargs)
+        return asyncio.to_thread(asyncio.run, coro)
     else:
         return asyncio.to_thread(
             lambda: func.call(*args, __should_raise=True, **kwargs)
