@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict
 from pydantic import BaseModel
 
 from weave.shared.digest import bytes_digest
+from weave.shared.refs_internal import WEAVE_INTERNAL_SCHEME, WEAVE_SCHEME
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
@@ -20,7 +21,46 @@ from weave.trace_server.trace_server_interface import (
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from weave.trace.weave_client import WeaveClient
+
+    # Type alias for a function that converts an external ref URI string to
+    # an alternative form (e.g. internal format).  When ``None`` is used in
+    # place of a converter the URI is left unchanged (slow-path behaviour).
+    RefConverter = Callable[[str], str]
+
+
+def _convert_ext_ref_string(
+    ref_str: str,
+    project_id: str,
+    internal_project_id: str,
+    client: WeaveClient | None = None,
+) -> str:
+    """Convert an external ``weave:///`` ref URI to ``weave-trace-internal:///`` format.
+
+    Same-project refs use the pre-resolved *internal_project_id*.
+    Cross-project refs are resolved lazily via
+    ``client._resolve_ext_to_int_project_id``; when resolution is not
+    possible the original URI is returned so the server can handle it.
+    """
+    prefix = f"{WEAVE_SCHEME}:///"
+    if not ref_str.startswith(prefix):
+        return ref_str
+    rest = ref_str[len(prefix) :]
+    parts = rest.split("/", 2)
+    if len(parts) != 3:
+        raise ValueError(f"Malformed ref URI, expected 3 path segments: {ref_str}")
+    entity_project = f"{parts[0]}/{parts[1]}"
+    if entity_project == project_id:
+        return f"{WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{parts[2]}"
+    # Cross-project: attempt lazy resolution, fall back to original URI.
+    if client is None:
+        return ref_str
+    resolved = client._resolve_ext_to_int_project_id(entity_project)
+    if resolved is None:
+        return ref_str
+    return f"{WEAVE_INTERNAL_SCHEME}:///{resolved}/{parts[2]}"
 
 
 def is_pydantic_model_class(obj: Any) -> bool:
@@ -39,10 +79,58 @@ def is_pydantic_model_class(obj: Any) -> bool:
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
-    if isinstance(obj, TableRef):
-        return obj.uri
-    elif isinstance(obj, ObjectRef):
-        return obj.uri
+    """Serialize *obj* to a JSON-compatible value.
+
+    This is the public entry point.  Today it always takes the slow path
+    (external ``weave:///`` refs, no ``expected_digest`` on file uploads).
+    When the client-side-digests feature is wired up, the dispatcher here
+    will call ``_to_json_fast`` instead.
+    """
+    return _to_json_slow(obj, project_id, client, use_dictify)
+
+
+def _to_json_slow(
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
+) -> Any:
+    """Slow path: refs stay as ``weave:///`` URIs, no ``expected_digest``."""
+    return _to_json_impl(obj, project_id, client, use_dictify, ref_converter=None)
+
+
+def _to_json_fast(
+    obj: Any,
+    project_id: str,
+    client: WeaveClient,
+    use_dictify: bool = False,
+    *,
+    internal_project_id: str,
+) -> Any:
+    """Fast path: refs become ``weave-trace-internal:///`` URIs and file
+    uploads include ``expected_digest``.
+
+    *internal_project_id* is the server-side UUID for the current project.
+    """
+
+    def convert_ref(uri: str) -> str:
+        return _convert_ext_ref_string(uri, project_id, internal_project_id, client)
+
+    return _to_json_impl(obj, project_id, client, use_dictify, ref_converter=convert_ref)
+
+
+# ── shared recursive implementation ──────────────────────────────────
+
+
+def _to_json_impl(
+    obj: Any,
+    project_id: str,
+    client: WeaveClient,
+    use_dictify: bool,
+    ref_converter: RefConverter | None,
+) -> Any:
+    recurse = _to_json_impl  # local alias for brevity
+
+    if isinstance(obj, (TableRef, ObjectRef)):
+        uri = obj.uri
+        return ref_converter(uri) if ref_converter else uri
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():
@@ -58,21 +146,32 @@ def to_json(
                 else:
                     logging.warning(f"Unexpected null ref in object record: {obj}")
                     continue
-            res[k] = to_json(v, project_id, client, use_dictify)
+            res[k] = recurse(v, project_id, client, use_dictify, ref_converter)
         return res
     elif isinstance_namedtuple(obj):
         return {
-            k: to_json(v, project_id, client, use_dictify)
+            k: recurse(v, project_id, client, use_dictify, ref_converter)
             for k, v in obj._asdict().items()
         }
     elif isinstance(obj, (list, tuple)):
-        return [to_json(v, project_id, client, use_dictify) for v in obj]
+        return [recurse(v, project_id, client, use_dictify, ref_converter) for v in obj]
     elif isinstance(obj, dict):
-        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
+        return {
+            k: recurse(v, project_id, client, use_dictify, ref_converter)
+            for k, v in obj.items()
+        }
     elif is_pydantic_model_class(obj):
         return obj.model_json_schema()
 
     if isinstance(obj, (int, float, str, bool)) or obj is None:
+        # String values may contain embedded ref URIs (e.g. from prior
+        # serialization).  On the fast path we convert them too.
+        if (
+            isinstance(obj, str)
+            and ref_converter is not None
+            and obj.startswith(f"{WEAVE_SCHEME}:///")
+        ):
+            return ref_converter(obj)
         return obj
 
     # Add explicit handling for WeaveScorerResult models
@@ -80,7 +179,7 @@ def to_json(
 
     if isinstance(obj, WeaveScorerResult):
         return {
-            k: to_json(v, project_id, client, use_dictify)
+            k: recurse(v, project_id, client, use_dictify, ref_converter)
             for k, v in obj.model_dump().items()
         }
 
@@ -98,11 +197,18 @@ def to_json(
         # However, even if dictify is false, i still want to try to convert to dict
         elif as_dict := try_to_dict(obj):
             return {
-                k: to_json(v, project_id, client, use_dictify)
+                k: recurse(v, project_id, client, use_dictify, ref_converter)
                 for k, v in as_dict.items()
             }
         return fallback_encode(obj)
-    result = _build_result_from_encoded(encoded, project_id, client)
+    result = _build_result_from_encoded(
+        encoded, project_id, client, include_expected_digest=ref_converter is not None
+    )
+    # Convert load_op URI on the fast path.
+    if ref_converter is not None:
+        load_op = result.get("load_op")
+        if isinstance(load_op, str) and load_op.startswith(f"{WEAVE_SCHEME}:///"):
+            result["load_op"] = ref_converter(load_op)
     return result
 
 
@@ -115,22 +221,24 @@ class EncodedCustomObjDictWithFilesAsDigests(TypedDict, total=False):
 
 
 def _build_result_from_encoded(
-    encoded: custom_objs.EncodedCustomObjDict, project_id: str, client: WeaveClient
+    encoded: custom_objs.EncodedCustomObjDict,
+    project_id: str,
+    client: WeaveClient,
+    include_expected_digest: bool = False,
 ) -> EncodedCustomObjDictWithFilesAsDigests:
     file_digests = {}
     for name, val in encoded.get("files", {}).items():
-        # Instead of waiting for the file to be created, we
-        # calculate the digest directly. This makes sure that the
-        # to_json procedure is not blocked on network requests.
-        # Technically it is possible that the file creation request
-        # fails.
-        client._send_file_create(
-            FileCreateReq(project_id=project_id, name=name, content=val)
-        )
+        # Calculate the digest up-front so to_json is never blocked on
+        # the network.  The file creation request is fired asynchronously.
         contents_as_bytes = val
         if isinstance(contents_as_bytes, str):
             contents_as_bytes = contents_as_bytes.encode("utf-8")
         digest = bytes_digest(contents_as_bytes)
+
+        req = FileCreateReq(project_id=project_id, name=name, content=val)
+        if include_expected_digest:
+            req.expected_digest = digest
+        client._send_file_create(req)
         file_digests[name] = digest
 
     result: EncodedCustomObjDictWithFilesAsDigests = {
