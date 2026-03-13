@@ -1041,9 +1041,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         # Build call buckets (grouped by timestamp only)
         call_buckets: list[dict[str, Any]] = []
         if req.call_metrics:
-            bucket_data: dict[
-                str, dict[str, list[Any]]
-            ] = {}  # ts -> metric -> values
+            bucket_data: dict[str, dict[str, list[Any]]] = {}  # ts -> metric -> values
 
             for call in calls:
                 ts = _bucket_ts(call.started_at)
