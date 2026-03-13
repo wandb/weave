@@ -157,9 +157,7 @@ class ProjectIdResolver:
             exc_info=exc,
         )
 
-    def on_fire_and_forget_done(
-        self, future: Future[Any], *, ref_uri: str
-    ) -> None:
+    def on_fire_and_forget_done(self, future: Future[Any], *, ref_uri: str) -> None:
         """Done-callback for fire-and-forget futures.
 
         If the future raised a digest validation error, disables the fast path.
