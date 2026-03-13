@@ -545,6 +545,7 @@ class WeaveTable(Traceable):  # noqa: PLW1641
                     )
 
                 if wc is not None:
+
                     def make_row_task(
                         v: Any, r: RefWithExtra | None
                     ) -> typing.Callable[[], Any]:
