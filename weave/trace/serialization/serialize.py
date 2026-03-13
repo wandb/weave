@@ -301,13 +301,18 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     if isinstance(obj, list):
         return [from_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):
-        if (val_type := obj.pop("_type", None)) is None:
+        val_type = obj.get("_type")
+        if val_type is None:
             return {k: from_json(v, project_id, server) for k, v in obj.items()}
-        elif val_type == "ObjectRecord":
+        typed_obj_payload = {k: v for k, v in obj.items() if k != "_type"}
+        if val_type == "ObjectRecord":
             return ObjectRecord(
-                {k: from_json(v, project_id, server) for k, v in obj.items()}
+                {
+                    k: from_json(v, project_id, server)
+                    for k, v in typed_obj_payload.items()
+                }
             )
-        elif val_type == "CustomWeaveType":
+        if val_type == "CustomWeaveType":
             encoded: custom_objs.EncodedCustomObjDict = {
                 "_type": "CustomWeaveType",
                 "weave_type": obj["weave_type"],
@@ -322,7 +327,7 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                     encoded["files"] = files
 
             return custom_objs.decode_custom_obj(encoded)
-        elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
+        if isinstance(val_type, str) and obj.get("_class_name") == val_type:
             from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
                 BUILTIN_OBJECT_REGISTRY,
             )
@@ -331,12 +336,17 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             if cls:
                 # Filter out metadata fields before validation
                 obj_data = {
-                    k: v for k, v in obj.items() if k in cls.model_fields.keys()
+                    k: v
+                    for k, v in typed_obj_payload.items()
+                    if k in cls.model_fields.keys()
                 }
                 return cls.model_validate(obj_data)
 
         return ObjectRecord(
-            {k: from_json(v, project_id, server) for k, v in obj.items()}
+            {
+                k: from_json(v, project_id, server)
+                for k, v in typed_obj_payload.items()
+            }
         )
     elif isinstance(obj, str) and obj.startswith("weave://"):
         return Ref.parse_uri(obj)
