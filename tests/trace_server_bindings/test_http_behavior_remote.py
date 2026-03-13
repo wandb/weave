@@ -57,6 +57,88 @@ def unbatched_server():
     return RemoteHTTPTraceServer("http://example.com")
 
 
+def make_feedback_create_req(
+    feedback_id: str = "feedback-id",
+) -> tsi.FeedbackCreateReq:
+    return tsi.FeedbackCreateReq(
+        id=feedback_id,
+        project_id="entity/project",
+        weave_ref="weave:///entity/project/object/name:digest",
+        feedback_type="custom",
+        payload={"score": 1},
+    )
+
+
+def test_flush_feedback_empty_batch_is_noop():
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server._send_feedback_batch_to_server = MagicMock()
+
+    try:
+        server._flush_feedback([])
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    server._send_feedback_batch_to_server.assert_not_called()
+
+
+def test_flush_feedback_sends_batch_payload():
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    feedback = make_feedback_create_req()
+    server._send_feedback_batch_to_server = MagicMock()
+
+    try:
+        server._flush_feedback([feedback])
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    server._send_feedback_batch_to_server.assert_called_once()
+    sent_data = server._send_feedback_batch_to_server.call_args[0][0]
+    payload = json.loads(sent_data.decode("utf-8"))
+    expected = tsi.FeedbackCreateBatchReq(batch=[feedback]).model_dump(mode="json")
+    assert payload == expected
+
+
+def test_flush_feedback_falls_back_to_individual_on_404():
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    feedback_batch = [
+        make_feedback_create_req("feedback-1"),
+        make_feedback_create_req("feedback-2"),
+    ]
+
+    request = httpx.Request("POST", "http://example.com/feedback/batch/create")
+    response = httpx.Response(404, request=request)
+    batch_error = httpx.HTTPStatusError(
+        "404 Not Found", request=request, response=response
+    )
+    server._send_feedback_batch_to_server = MagicMock(side_effect=batch_error)
+    server._generic_request = MagicMock()
+
+    try:
+        server._flush_feedback(feedback_batch)
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    assert server._send_feedback_batch_to_server.call_count == 1
+    assert server._generic_request.call_count == len(feedback_batch)
+
+    for call in server._generic_request.call_args_list:
+        url, item_req, req_model, res_model = call.args
+        assert url == "/feedback/create"
+        assert "id" not in item_req.model_dump()
+        assert "created_at" not in item_req.model_dump()
+        assert issubclass(req_model, tsi.FeedbackCreateReq)
+        assert res_model is tsi.FeedbackCreateRes
+
+
 @patch("weave.utils.http_requests.post")
 def test_call_start_ok(mock_post, unbatched_server):
     """Test successful call_start request."""
