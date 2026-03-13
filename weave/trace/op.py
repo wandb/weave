@@ -203,6 +203,7 @@ class OpKwargs(TypedDict, total=False):
     kind: OpKind | None
     color: OpColor | None
     eager_call_start: bool
+    trace_on_input_error: bool
 
 
 def setup_dunder_weave_dict(op: Op, d: WeaveKwargs | None = None) -> WeaveKwargs:
@@ -377,6 +378,65 @@ def _create_call(
     )
 
 
+def _record_error_span(
+    func: Op,
+    args: tuple,
+    kwargs: dict,
+    error: OpCallError,
+    *,
+    __weave: WeaveKwargs | None = None,
+    use_stack: bool = True,
+) -> None:
+    """Best-effort create and finish a trace span when argument binding fails.
+
+    When an op is called with incorrect arguments, sig.bind() fails and raises
+    OpCallError before a Call is created. This function creates a span with the
+    raw inputs so the failed call is visible in traces for debugging.
+    """
+    try:
+        client = weave_client_context.require_weave_client()
+
+        inputs: dict[str, Any] = {}
+        for i, arg in enumerate(args):
+            inputs[f"arg_{i}"] = arg
+        inputs.update(kwargs)
+
+        if "api_key" in inputs:
+            inputs["api_key"] = "REDACTED"
+
+        call_time_display_name = __weave.get("display_name") if __weave else None
+        call_attrs = __weave.get("attributes") if __weave else None
+        preferred_call_id = __weave.get("call_id") if __weave else None
+
+        parent_call = call_context.get_current_call()
+
+        from weave.trace.serialization.serialize import dictify
+
+        attributes = dictify(call_attributes.get())
+        if call_attrs is not None:
+            attributes = {**attributes, **call_attrs}
+
+        # Mark this span as a failed input binding attempt
+        weave_attrs = attributes.setdefault("weave", {})
+        weave_attrs["input_binding_error"] = True
+
+        call = client.create_call(
+            func,
+            inputs,
+            parent_call,
+            display_name=call_time_display_name or func.call_display_name,
+            attributes=attributes,
+            use_stack=use_stack,
+            _call_id_override=preferred_call_id,
+        )
+        try:
+            client.finish_call(call, None, error, op=func)
+        finally:
+            call_context.pop_call(call.id)
+    except Exception:
+        pass
+
+
 def is_tracing_setting_disabled() -> bool:
     if settings.should_disable_weave():
         return True
@@ -461,7 +521,9 @@ def _call_sync_func(
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
-        raise e
+        if op.trace_on_input_error:
+            _record_error_span(op, args, kwargs, e, __weave=__weave)
+        raise
     except Exception as e:
         if get_raise_on_captured_errors():
             raise
@@ -588,7 +650,9 @@ async def _call_async_func(
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
-        raise e
+        if op.trace_on_input_error:
+            _record_error_span(op, args, kwargs, e, __weave=__weave)
+        raise
     except Exception as e:
         if get_raise_on_captured_errors():
             raise
@@ -721,7 +785,9 @@ def _call_sync_gen(
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
         call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
-    except OpCallError:
+    except OpCallError as e:
+        if op.trace_on_input_error:
+            _record_error_span(op, args, kwargs, e, __weave=__weave, use_stack=False)
         raise
     except Exception:
         if get_raise_on_captured_errors():
@@ -941,7 +1007,9 @@ async def _call_async_gen(
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
         call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
-    except OpCallError:
+    except OpCallError as e:
+        if op.trace_on_input_error:
+            _record_error_span(op, args, kwargs, e, __weave=__weave, use_stack=False)
         raise
     except Exception:
         if get_raise_on_captured_errors():
@@ -1211,6 +1279,7 @@ def op(
     kind: OpKind | None = None,
     color: OpColor | None = None,
     eager_call_start: bool = False,
+    trace_on_input_error: bool = False,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
     """A decorator to weave op-ify a function or method. Works for both sync and async.
     Automatically detects iterator functions and applies appropriate behavior.
@@ -1227,6 +1296,10 @@ def op(
         eager_call_start: If True, call starts are sent immediately rather than batched.
             Useful for long-running operations like evaluations that should
             be visible in the UI immediately.
+        trace_on_input_error: If True, create a trace span when argument binding fails
+            (e.g. wrong kwargs). The span will have an `input_binding_error` marker
+            in the weave attributes. Useful for tool-calling ops where LLMs may pass
+            incorrect parameters.
     """
     if not isinstance(tracing_sample_rate, (int, float)):
         raise TypeError("tracing_sample_rate must be a float")
@@ -1334,6 +1407,7 @@ def op(
 
             wrapper.kind = kind  # type: ignore
             wrapper.color = color  # type: ignore
+            wrapper.trace_on_input_error = trace_on_input_error  # type: ignore
 
             return cast(Op[P, R], wrapper)
 

@@ -574,3 +574,111 @@ def test_args_concrete_splat_concrete_splat(client):
     assert res.calls[3].op_name == my_op.ref.uri
     assert res.calls[3].inputs == {"val": 1, "args": [2, 3], "a": 4, "kwargs": {"b": 5}}
     assert res.calls[3].output == [1, [2, 3], 4, {"b": 5}]
+
+
+# Tests for WB-30436: trace_on_input_error creates a trace span on binding failure
+# When argument binding fails (e.g. wrong kwargs) and trace_on_input_error=True,
+# a span should be recorded with the raw inputs, the error, and an
+# input_binding_error marker in the weave attributes.
+
+
+def test_wrong_kwargs_no_span_by_default(client):
+    """Without trace_on_input_error, no span is created on binding failure."""
+
+    @weave.op
+    def my_tool(*, issue_id: str) -> dict:
+        return {"id": issue_id}
+
+    with pytest.raises(Exception, match="my_tool"):
+        my_tool(ticket_number="123")
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(res.calls) == 0
+
+
+def test_wrong_kwargs_creates_trace_span(client):
+    @weave.op(trace_on_input_error=True)
+    def my_tool(*, issue_id: str) -> dict:
+        return {"id": issue_id}
+
+    with pytest.raises(Exception, match="my_tool"):
+        my_tool(ticket_number="123")
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].inputs == {"ticket_number": "123"}
+    assert res.calls[0].exception is not None
+    assert res.calls[0].attributes["weave"]["input_binding_error"] is True
+
+
+@pytest.mark.asyncio
+async def test_wrong_kwargs_creates_trace_span_async(client):
+    @weave.op(trace_on_input_error=True)
+    async def my_tool(*, issue_id: str) -> dict:
+        return {"id": issue_id}
+
+    with pytest.raises(Exception, match="my_tool"):
+        await my_tool(ticket_number="123")
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].inputs == {"ticket_number": "123"}
+    assert res.calls[0].exception is not None
+    assert res.calls[0].attributes["weave"]["input_binding_error"] is True
+
+
+def test_wrong_kwargs_creates_trace_span_generator(client):
+    @weave.op(trace_on_input_error=True)
+    def my_tool(*, issue_id: str):
+        yield {"id": issue_id}
+
+    with pytest.raises(Exception, match="my_tool"):
+        my_tool(ticket_number="123")
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].inputs == {"ticket_number": "123"}
+    assert res.calls[0].exception is not None
+    assert res.calls[0].attributes["weave"]["input_binding_error"] is True
+
+
+@pytest.mark.asyncio
+async def test_wrong_kwargs_creates_trace_span_async_generator(client):
+    @weave.op(trace_on_input_error=True)
+    async def my_tool(*, issue_id: str):
+        yield {"id": issue_id}
+
+    with pytest.raises(Exception, match="my_tool"):
+        async for _ in my_tool(ticket_number="123"):
+            pass
+
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+        )
+    )
+
+    assert len(res.calls) == 1
+    assert res.calls[0].inputs == {"ticket_number": "123"}
+    assert res.calls[0].exception is not None
+    assert res.calls[0].attributes["weave"]["input_binding_error"] is True
