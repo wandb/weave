@@ -65,6 +65,7 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
+from weave.trace_server_bindings.http_utils import _ENDPOINT_CACHE
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
@@ -1527,6 +1528,10 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     remote_client.remote_request_bytes_limit = (
         4 * 1024
     )  # Small enough to get multiple updates
+
+    # Clear cached endpoint availability so the probe call is always made,
+    # ensuring deterministic record counts regardless of test ordering.
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
 
     # Set the client to use the remote server so calls get recorded
     client = TestOnlyFlushingWeaveClient(
