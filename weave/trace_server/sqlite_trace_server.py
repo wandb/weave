@@ -1027,7 +1027,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         val = 0
                         for k in token_keys:
                             raw_val = model_usage.get(k)
-                            if raw_val is not None:
+                            if isinstance(raw_val, (int, float, str)):
                                 val += int(raw_val)
                         raw[key].setdefault(spec.metric, []).append(val)
 
@@ -1072,7 +1072,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     if not values:
                         continue
                     _apply_aggregations(
-                        bucket, cm_spec.metric, values, cm_spec.aggregations, cm_spec.percentiles
+                        bucket,
+                        cm_spec.metric,
+                        values,
+                        cm_spec.aggregations,
+                        cm_spec.percentiles,
                     )
                 call_buckets.append(bucket)
 
