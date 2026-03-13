@@ -71,6 +71,34 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 )
 
 
+def _apply_aggregations(
+    bucket: dict[str, Any],
+    metric: str,
+    values: list[float] | list[int],
+    aggregations: list[tsi.AggregationType],
+    percentiles: list[float] | None = None,
+) -> None:
+    """Apply aggregation functions and percentiles to a list of values, writing results into bucket."""
+    for agg in aggregations:
+        if agg == tsi.AggregationType.SUM:
+            bucket[f"sum_{metric}"] = sum(values)
+        elif agg == tsi.AggregationType.AVG:
+            bucket[f"avg_{metric}"] = sum(values) / len(values) if values else 0
+        elif agg == tsi.AggregationType.MIN:
+            bucket[f"min_{metric}"] = min(values) if values else 0
+        elif agg == tsi.AggregationType.MAX:
+            bucket[f"max_{metric}"] = max(values) if values else 0
+        elif agg == tsi.AggregationType.COUNT:
+            bucket[f"count_{metric}"] = len(values)
+    if percentiles:
+        sorted_vals = sorted(values)
+        n = len(sorted_vals)
+        for p in percentiles:
+            idx = int(p / 100 * (n - 1))
+            idx = max(0, min(idx, n - 1))
+            bucket[f"p{int(p)}_{metric}"] = sorted_vals[idx]
+
+
 @dataclass(frozen=True)
 class ConnCursor:
     conn: sqlite3.Connection
@@ -932,14 +960,122 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
 
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        from weave.trace_server.call_stats_helpers import validate_call_stats_range
+
         end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        validate_call_stats_range(req.start, end)
+
+        granularity = req.granularity or int((end - req.start).total_seconds())
+        if granularity <= 0:
+            granularity = 1
+
+        # Fetch matching calls
+        calls = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=req.filter,
+                )
+            )
+        )
+
+        # Filter to time range
+        calls = [
+            c
+            for c in calls
+            if c.started_at is not None
+            and c.started_at >= req.start
+            and c.started_at < end
+        ]
+
+        # Token field mapping: metric name -> summary.usage[model] keys to sum
+        token_keys_map: dict[str, list[str]] = {
+            "input_tokens": ["prompt_tokens", "input_tokens"],
+            "output_tokens": ["completion_tokens", "output_tokens"],
+            "total_tokens": ["total_tokens"],
+        }
+
+        def _bucket_ts(started_at: datetime.datetime) -> str:
+            offset = int((started_at - req.start).total_seconds())
+            bucket_idx = offset // granularity
+            return (
+                req.start + datetime.timedelta(seconds=bucket_idx * granularity)
+            ).isoformat()
+
+        # Build usage buckets (grouped by timestamp + model)
+        usage_buckets: list[dict[str, Any]] = []
+        if req.usage_metrics:
+            # Collect per-(bucket, model) raw values for each metric
+            raw: dict[
+                tuple[str, str], dict[str, list[int]]
+            ] = {}  # (ts, model) -> metric -> values
+
+            for call in calls:
+                if not call.summary or not isinstance(call.summary, dict):
+                    continue
+                usage = call.summary.get("usage")
+                if not isinstance(usage, dict):
+                    continue
+                ts = _bucket_ts(call.started_at)
+                for model, model_usage in usage.items():
+                    if not isinstance(model_usage, dict):
+                        continue
+                    key = (ts, model)
+                    if key not in raw:
+                        raw[key] = {}
+                    for spec in req.usage_metrics:
+                        token_keys = token_keys_map.get(spec.metric, [])
+                        val = sum(
+                            int(model_usage.get(k, 0) or 0) for k in token_keys
+                        )
+                        raw[key].setdefault(spec.metric, []).append(val)
+
+            for (ts, model), metrics in sorted(raw.items()):
+                bucket: dict[str, Any] = {"timestamp": ts, "model": model}
+                for spec in req.usage_metrics:
+                    values = metrics.get(spec.metric, [])
+                    if not values:
+                        continue
+                    _apply_aggregations(bucket, spec.metric, values, spec.aggregations, spec.percentiles)
+                usage_buckets.append(bucket)
+
+        # Build call buckets (grouped by timestamp only)
+        call_buckets: list[dict[str, Any]] = []
+        if req.call_metrics:
+            bucket_data: dict[str, dict[str, list[float]]] = {}  # ts -> metric -> values
+
+            for call in calls:
+                ts = _bucket_ts(call.started_at)
+                if ts not in bucket_data:
+                    bucket_data[ts] = {}
+                for spec in req.call_metrics:
+                    if spec.metric == "latency_ms":
+                        if call.ended_at and call.started_at:
+                            ms = (call.ended_at - call.started_at).total_seconds() * 1000
+                            bucket_data[ts].setdefault("latency_ms", []).append(ms)
+                    elif spec.metric == "call_count":
+                        bucket_data[ts].setdefault("call_count", []).append(1)
+                    elif spec.metric == "error_count":
+                        bucket_data[ts].setdefault("error_count", []).append(
+                            1 if call.exception else 0
+                        )
+
+            for ts, metrics in sorted(bucket_data.items()):
+                bucket = {"timestamp": ts}
+                for spec in req.call_metrics:
+                    values = metrics.get(spec.metric, [])
+                    if not values:
+                        continue
+                    _apply_aggregations(bucket, spec.metric, values, spec.aggregations, spec.percentiles)
+                call_buckets.append(bucket)
+
         return tsi.CallStatsRes(
             start=req.start,
             end=end,
-            granularity=req.granularity or 0,
+            granularity=granularity,
             timezone=req.timezone or "UTC",
-            usage_buckets=[],
-            call_buckets=[],
+            usage_buckets=usage_buckets,
+            call_buckets=call_buckets,
         )
 
     def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
