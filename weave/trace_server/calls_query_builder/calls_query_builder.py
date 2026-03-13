@@ -313,13 +313,9 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
                 extra_path=extra_path[1:],
             )
         elif extra_path[0] == "runnable_ref":
-            return cls(
-                field="runnable_ref", feedback_type=feedback_type, extra_path=[]
-            )
+            return cls(field="runnable_ref", feedback_type=feedback_type, extra_path=[])
         elif extra_path[0] == "trigger_ref":
-            return cls(
-                field="trigger_ref", feedback_type=feedback_type, extra_path=[]
-            )
+            return cls(field="trigger_ref", feedback_type=feedback_type, extra_path=[])
         raise InvalidFieldError(f"Invalid feedback path: {path}")
 
     def is_heavy(self) -> bool:

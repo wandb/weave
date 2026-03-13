@@ -17,7 +17,6 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
-from typing_extensions import Self
 from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
@@ -31,6 +30,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from typing_extensions import Self
 
 from weave.shared import refs_internal as ri
 from weave.shared.digest import (
@@ -342,9 +342,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._thread_local.calls_complete_batch = value
 
     @classmethod
-    def from_env(
-        cls, use_async_insert: bool = False, **kwargs: Any
-    ) -> Self:
+    def from_env(cls, use_async_insert: bool = False, **kwargs: Any) -> Self:
         return cls(
             host=wf_env.wf_clickhouse_host(),
             port=wf_env.wf_clickhouse_port(),
