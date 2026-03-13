@@ -2481,7 +2481,6 @@ class WeaveClient:
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
 
-    @property
     def _should_use_fast_path(self) -> bool:
         """Whether client-side digest computation (fast path) is active.
 
