@@ -1025,9 +1025,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         raw[key] = {}
                     for spec in req.usage_metrics:
                         token_keys = token_keys_map.get(spec.metric, [])
-                        val = sum(
-                            int(model_usage.get(k, 0) or 0) for k in token_keys
-                        )
+                        val = sum(int(model_usage.get(k, 0) or 0) for k in token_keys)
                         raw[key].setdefault(spec.metric, []).append(val)
 
             for (ts, model), metrics in sorted(raw.items()):
@@ -1036,13 +1034,17 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     values = metrics.get(spec.metric, [])
                     if not values:
                         continue
-                    _apply_aggregations(bucket, spec.metric, values, spec.aggregations, spec.percentiles)
+                    _apply_aggregations(
+                        bucket, spec.metric, values, spec.aggregations, spec.percentiles
+                    )
                 usage_buckets.append(bucket)
 
         # Build call buckets (grouped by timestamp only)
         call_buckets: list[dict[str, Any]] = []
         if req.call_metrics:
-            bucket_data: dict[str, dict[str, list[float]]] = {}  # ts -> metric -> values
+            bucket_data: dict[
+                str, dict[str, list[float]]
+            ] = {}  # ts -> metric -> values
 
             for call in calls:
                 ts = _bucket_ts(call.started_at)
@@ -1051,7 +1053,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 for spec in req.call_metrics:
                     if spec.metric == "latency_ms":
                         if call.ended_at and call.started_at:
-                            ms = (call.ended_at - call.started_at).total_seconds() * 1000
+                            ms = (
+                                call.ended_at - call.started_at
+                            ).total_seconds() * 1000
                             bucket_data[ts].setdefault("latency_ms", []).append(ms)
                     elif spec.metric == "call_count":
                         bucket_data[ts].setdefault("call_count", []).append(1)
@@ -1066,7 +1070,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     values = metrics.get(spec.metric, [])
                     if not values:
                         continue
-                    _apply_aggregations(bucket, spec.metric, values, spec.aggregations, spec.percentiles)
+                    _apply_aggregations(
+                        bucket, spec.metric, values, spec.aggregations, spec.percentiles
+                    )
                 call_buckets.append(bucket)
 
         return tsi.CallStatsRes(
