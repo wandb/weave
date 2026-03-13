@@ -1024,10 +1024,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         raw[key] = {}
                     for spec in req.usage_metrics:
                         token_keys = token_keys_map.get(spec.metric, [])
-                        val = sum(
-                            int(v) for k in token_keys
-                            if (v := model_usage.get(k)) is not None and v != 0
-                        )
+                        val = 0
+                        for k in token_keys:
+                            raw_val = model_usage.get(k)
+                            if raw_val is not None:
+                                val += int(raw_val)
                         raw[key].setdefault(spec.metric, []).append(val)
 
             for (ts, model), metrics in sorted(raw.items()):
@@ -1050,28 +1051,28 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 ts = _bucket_ts(call.started_at)
                 if ts not in bucket_data:
                     bucket_data[ts] = {}
-                for spec in req.call_metrics:
-                    if spec.metric == "latency_ms":
+                for cm_spec in req.call_metrics:
+                    if cm_spec.metric == "latency_ms":
                         if call.ended_at and call.started_at:
                             ms = (
                                 call.ended_at - call.started_at
                             ).total_seconds() * 1000
                             bucket_data[ts].setdefault("latency_ms", []).append(ms)
-                    elif spec.metric == "call_count":
+                    elif cm_spec.metric == "call_count":
                         bucket_data[ts].setdefault("call_count", []).append(1)
-                    elif spec.metric == "error_count":
+                    elif cm_spec.metric == "error_count":
                         bucket_data[ts].setdefault("error_count", []).append(
                             1 if call.exception else 0
                         )
 
             for ts, metrics in sorted(bucket_data.items()):
                 bucket = {"timestamp": ts}
-                for spec in req.call_metrics:
-                    values = metrics.get(spec.metric, [])
+                for cm_spec in req.call_metrics:
+                    values = metrics.get(cm_spec.metric, [])
                     if not values:
                         continue
                     _apply_aggregations(
-                        bucket, spec.metric, values, spec.aggregations, spec.percentiles
+                        bucket, cm_spec.metric, values, cm_spec.aggregations, cm_spec.percentiles
                     )
                 call_buckets.append(bucket)
 
