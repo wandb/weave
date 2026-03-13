@@ -20,6 +20,15 @@ from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
+try:
+    from weave.trace_server.chdb_trace_server import ChdbTraceServer
+
+    HAS_CHDB = True
+except ImportError:
+    HAS_CHDB = False
+
+_chdb_test_counter = 0
+
 TEST_ENTITY = "shawn"
 
 
@@ -282,6 +291,51 @@ def local_secret_fetcher():
 
 
 @pytest.fixture
+def get_chdb_trace_server(
+    request,
+) -> Callable[[], UserInjectingExternalTraceServer]:
+    if not HAS_CHDB:
+        pytest.skip("chdb is not installed")
+
+    servers_to_cleanup: list[tuple[ChdbTraceServer, str, str]] = []
+
+    def chdb_trace_server_inner() -> UserInjectingExternalTraceServer:
+        global _chdb_test_counter
+        _chdb_test_counter += 1
+        id_converter = DummyIdConverter()
+        db_suffix = _get_worker_db_suffix(request)
+        db_name = f"test_db{db_suffix}_{_chdb_test_counter}"
+        mgmt_db = f"db_management{db_suffix}_{_chdb_test_counter}"
+
+        chdb_server = ChdbTraceServer(
+            db_path=None,
+            database=db_name,
+            evaluate_model_dispatcher=EvaluateModelTestDispatcher(
+                id_converter=id_converter
+            ),
+        )
+        servers_to_cleanup.append((chdb_server, db_name, mgmt_db))
+        chdb_server._run_migrations()
+
+        return externalize_trace_server(
+            chdb_server, TEST_ENTITY, id_converter=id_converter
+        )
+
+    yield chdb_trace_server_inner
+
+    for server, db_name, mgmt_db in servers_to_cleanup:
+        try:
+            server.ch_client.command(f"DROP DATABASE IF EXISTS `{mgmt_db}`")
+            server.ch_client.command(f"DROP DATABASE IF EXISTS `{db_name}`")
+        except Exception:
+            pass
+        try:
+            server.close()
+        except Exception:
+            pass
+
+
+@pytest.fixture
 def trace_server(
     request, local_secret_fetcher, get_ch_trace_server, get_sqlite_trace_server
 ) -> UserInjectingExternalTraceServer:
@@ -290,6 +344,40 @@ def trace_server(
         return get_ch_trace_server()
     elif trace_server_flag == "sqlite":
         return get_sqlite_trace_server()
+    elif trace_server_flag == "chdb":
+        if not HAS_CHDB:
+            pytest.skip("chdb is not installed")
+        global _chdb_test_counter
+        _chdb_test_counter += 1
+        id_converter = DummyIdConverter()
+        db_suffix = _get_worker_db_suffix(request)
+        db_name = f"test_db{db_suffix}_{_chdb_test_counter}"
+        mgmt_db = f"db_management{db_suffix}_{_chdb_test_counter}"
+        chdb_server = ChdbTraceServer(
+            db_path=None,
+            database=db_name,
+            evaluate_model_dispatcher=EvaluateModelTestDispatcher(
+                id_converter=id_converter
+            ),
+        )
+        # Clean up any leftover databases from prior runs
+        chdb_server.ch_client.command(f"DROP DATABASE IF EXISTS `{mgmt_db}`")
+        chdb_server.ch_client.command(f"DROP DATABASE IF EXISTS `{db_name}`")
+        chdb_server._database_ensured = False
+        chdb_server._run_migrations()
+
+        def cleanup() -> None:
+            try:
+                chdb_server.ch_client.command(f"DROP DATABASE IF EXISTS `{mgmt_db}`")
+                chdb_server.ch_client.command(f"DROP DATABASE IF EXISTS `{db_name}`")
+            except Exception:
+                pass
+            chdb_server.close()
+
+        request.addfinalizer(cleanup)
+        return externalize_trace_server(
+            chdb_server, TEST_ENTITY, id_converter=id_converter
+        )
     else:
         # Once we split the trace server and client code, we can raise here.
         # For now, just return the sqlite trace server so we don't break existing tests.

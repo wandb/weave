@@ -64,6 +64,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace_calls_complete_only",
     "trace_no_server",
     "trace_server",
+    "trace_server_chdb",
     "trace_server_bindings",
     "openai_realtime",
     "autogen_tests",
@@ -84,6 +85,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "custom",
         "flow",
         "trace_server",
+        "trace_server_chdb",
         "trace_server_bindings",
         "anthropic",
         "cerebras",
@@ -139,6 +141,11 @@ def tests(session: nox.Session, shard: str):
     elif shard == "trace_server":
         # trace_server shard needs both trace_server dependency group and trace_server_tests
         sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
+    elif shard == "trace_server_chdb":
+        # chdb shard: trace_server deps + chdb
+        sync_args.extend(
+            ["--group", "trace_server", "--group", "trace_server_tests", "--group", "chdb"]
+        )
 
     session.run(*sync_args)
 
@@ -178,6 +185,7 @@ def tests(session: nox.Session, shard: str):
         "custom": [],
         "flow": ["tests/flow/"],
         "trace_server": ["tests/trace_server/", "tests/shared/"],
+        "trace_server_chdb": ["tests/trace_server/"],
         "trace_server_bindings": ["tests/trace_server_bindings/"],
         "stainless": ["tests/trace_server_bindings/"],
         "scorers": ["tests/scorers/"],
@@ -226,6 +234,9 @@ def tests(session: nox.Session, shard: str):
 
     if shard in {"trace", "trace_calls_complete_only"}:
         pytest_args.extend(["-m", "trace_server"])
+
+    if shard == "trace_server_chdb":
+        pytest_args.extend(["-m", "trace_server", "--trace-server=chdb"])
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])

@@ -441,6 +441,9 @@ trace_server_tests = [
   "moto[s3]>=5.0.0",
   "openai<1.100.0",
 ]
+chdb = [
+  "chdb>=2.1.0",
+]
 autogen_tests = [
   "autogen-agentchat>=0.5.7; python_version >= '3.10'",
   "autogen-ext[openai]>=0.5.7; python_version >= '3.10'",
