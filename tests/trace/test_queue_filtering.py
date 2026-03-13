@@ -11,9 +11,8 @@ import datetime
 import pytest
 
 import weave
-from tests.trace.server_utils import find_server_layer
+from tests.trace.server_utils import TEST_ENTITY, find_server_layer
 from tests.trace.util import client_is_sqlite
-from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer

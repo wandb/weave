@@ -12,9 +12,8 @@ from typing import NamedTuple
 import pytest
 
 import weave
-from tests.trace.server_utils import find_server_layer
+from tests.trace.server_utils import TEST_ENTITY, find_server_layer
 from tests.trace.util import client_is_sqlite
-from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy

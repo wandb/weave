@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from tests.trace.server_utils import TEST_ENTITY as TEST_ENTITY
+from tests.trace.server_utils import TEST_ENTITY
 from tests.trace_server.conftest_lib.clickhouse_server import *
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
