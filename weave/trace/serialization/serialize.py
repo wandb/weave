@@ -13,7 +13,6 @@ from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
-from weave.trace.settings import should_enable_client_side_digests
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -193,17 +192,12 @@ def _build_result_from_encoded(
             name=name,
             content=val,
         )
-        # Guard with both the global setting AND the per-session disable flag.
-        # After a digest validation failure the client sets
-        # _client_side_digests_disabled_event to disable the fast path for the
-        # rest of the session.  Checking only the global setting (as was done
-        # previously) meant file uploads kept sending expected_digest after a
-        # mismatch, leaving files on the fast path even though objects/tables
-        # had already fallen back.
-        if (
-            should_enable_client_side_digests()
-            and not client._client_side_digests_disabled_event.is_set()
-        ):
+        # Use the client's fast-path check, which covers both the global
+        # setting and the per-session disable flag (set after a digest
+        # validation failure).  Previously this only checked the global
+        # setting, so file uploads kept sending expected_digest after a
+        # mismatch even though objects/tables had already fallen back.
+        if client._should_use_fast_path():
             req.expected_digest = digest
         client._send_file_create(req)
         file_digests[name] = digest

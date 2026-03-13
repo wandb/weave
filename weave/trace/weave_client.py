@@ -2482,21 +2482,30 @@ class WeaveClient:
         return f"{self.entity}/{self.project}"
 
     @property
+    def _should_use_fast_path(self) -> bool:
+        """Whether client-side digest computation (fast path) is active.
+
+        Returns False when the global setting is off or when a digest
+        validation failure has disabled the fast path for this session.
+        """
+        if self._client_side_digests_disabled_event.is_set():
+            return False
+        return should_enable_client_side_digests()
+
+    @property
     def _internal_project_id(self) -> str | None:
-        """Return the internal project ID for the current project.
+        """Return the internal project ID for the current project, or None.
 
         Re-resolves lazily when the active project changes (e.g., tests
         set ``client.project`` between operations).
 
-        Returns None (forcing fallback path) when client_side_digests is disabled.
+        Returns None when the fast path is disabled or resolution fails.
 
         Thread-safety: uses a single `dict.get()` (atomic under the GIL) instead
         of `in` + `[]` to avoid a KeyError if another thread calls `.clear()` on
         the map between the two operations.
         """
-        if self._client_side_digests_disabled_event.is_set():
-            return None
-        if not should_enable_client_side_digests():
+        if not self._should_use_fast_path():
             return None
         current = self._project_id()
         cached = self._ext_to_int_project_map.get(current, _MISSING)

@@ -21,12 +21,11 @@ from weave.trace.settings import UserSettings, parse_and_apply_settings
 
 class DummyClient:
     def __init__(self, resolved_project_ids: dict[str, str] | None = None) -> None:
-        import threading
-
         self.resolved_project_ids = resolved_project_ids or {}
-        # Mirrors WeaveClient._client_side_digests_disabled_event so that
-        # _build_result_from_encoded can check the session-level disable flag.
-        self._client_side_digests_disabled_event = threading.Event()
+
+    def _should_use_fast_path(self) -> bool:
+        """Mirrors WeaveClient._should_use_fast_path for test dummies."""
+        return True
 
     def _resolve_ext_to_int_project_id(self, project_id: str) -> str | None:
         return self.resolved_project_ids.get(project_id)
