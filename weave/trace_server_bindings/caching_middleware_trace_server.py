@@ -275,6 +275,16 @@ class CachingMiddlewareTraceServer(
     def get_cache_recorder(self) -> CacheRecorder:
         return self._cache_recorder.copy()
 
+    def disk_cache_volume(self) -> int:
+        """Return the disk cache layer's current size in bytes.
+
+        This exposes the internal volume metric so tests can verify
+        size limits without reaching into private cache layers.
+        """
+        disk_layer = self._cache.layers[1]
+        assert isinstance(disk_layer, DiskCache)
+        return disk_layer._cache.volume()
+
     # Cacheable Methods:
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         if not digest_is_cacheable(req.digest):

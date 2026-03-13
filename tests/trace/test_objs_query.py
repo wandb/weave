@@ -1,6 +1,7 @@
 import base64
 
 import weave
+from tests.trace.server_utils import TEST_ENTITY
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -179,9 +180,7 @@ def test_objs_query_wb_user_id(client: WeaveClient):
     weave.publish({"i": 2}, name="obj_1")
     weave.publish({"i": 3}, name="obj_1")
 
-    correct_id = base64.b64encode(
-        bytes(client.server._next_trace_server._user_id, "utf-8")
-    ).decode("utf-8")
+    correct_id = base64.b64encode(TEST_ENTITY.encode()).decode()
 
     res = client._objects()
     assert len(res) == 3

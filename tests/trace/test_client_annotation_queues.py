@@ -12,9 +12,11 @@ from typing import NamedTuple
 import pytest
 
 import weave
+from tests.trace.server_utils import find_server_layer
 from tests.trace.util import client_is_sqlite
 from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
@@ -723,13 +725,11 @@ def test_annotation_queues_stats(client):
     # For Queue 2 (7 items): Mark 4 as skipped, 3 stay pending (no progress record)
 
     # We need to insert into the annotator_queue_items_progress table
-    # Access the ClickHouse client through the server wrapper chain
-    # The pattern is: client.server (caching middleware) -> _next_trace_server (actual CH server)
     try:
-        ch_client = client.server._next_trace_server.ch_client
-    except AttributeError:
-        # For non-ClickHouse backends (e.g., SQLite), skip the direct DB manipulation
+        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
+    except TypeError:
         pytest.skip("Direct DB manipulation only works with ClickHouse server")
+    ch_client = ch_server.ch_client
 
     # Ensure writes are flushed
 
@@ -2202,7 +2202,11 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     4. Verify items are correctly added with proper display_data
     5. Query items back to confirm correct data population
     """
-    if isinstance(trace_server._internal_trace_server, SqliteTraceServer):
+    try:
+        find_server_layer(trace_server, SqliteTraceServer)
+    except TypeError:
+        pass
+    else:
         pytest.skip("ClickHouse-only test")
 
     project_id = f"{TEST_ENTITY}/test_queue_add_calls_complete"
