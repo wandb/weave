@@ -188,6 +188,7 @@ def tests(session: nox.Session, shard: str):
             "tests/compat/",
             "tests/utils/",
             "tests/wandb_interface/",
+            "tests/durability/",
         ],
         "trace_calls_complete_only": [
             "tests/trace/",
