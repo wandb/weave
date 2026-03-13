@@ -1,9 +1,13 @@
 from dataclasses import dataclass
 
+import openai
+import pytest
 from pydantic import BaseModel
 
 import weave
+from weave.shared.digest import bytes_digest
 from weave.trace.object_record import pydantic_object_record
+from weave.trace.refs import ObjectRef, OpRef, TableRef
 from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
     dictify,
@@ -11,6 +15,37 @@ from weave.trace.serialization.serialize import (
     is_pydantic_model_class,
     to_json,
 )
+from weave.trace.settings import UserSettings, parse_and_apply_settings
+
+
+class DummyClient:
+    def __init__(self, resolved_project_ids: dict[str, str] | None = None) -> None:
+        self.resolved_project_ids = resolved_project_ids or {}
+
+    def _resolve_ext_to_int_project_id(self, project_id: str) -> str | None:
+        return self.resolved_project_ids.get(project_id)
+
+    def _send_file_create(self, req) -> None:
+        raise AssertionError(f"unexpected file upload: {req}")
+
+
+class RecordingFileClient(DummyClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.file_create_reqs = []
+
+    def _send_file_create(self, req) -> None:
+        self.file_create_reqs.append(req)
+
+
+def _make_ref(kind: str) -> ObjectRef | OpRef | TableRef:
+    if kind == "object":
+        return ObjectRef("entity", "other", "thing", "abc123")
+    if kind == "op":
+        return OpRef("entity", "other", "my_op", "def456")
+    if kind == "table":
+        return TableRef("entity", "other", "tab123")
+    raise ValueError(f"Unknown ref kind: {kind}")
 
 
 def test_dictify_simple() -> None:
@@ -256,6 +291,49 @@ def test_to_json_pydantic_class(client) -> None:
     }
 
 
+@pytest.mark.trace_server
+@pytest.mark.parametrize(
+    ("enable_client_side_digests", "expected_digest_present"),
+    [
+        pytest.param(False, False, id="client_side_digests_off"),
+        pytest.param(True, True, id="client_side_digests_on"),
+    ],
+)
+def test_to_json_custom_obj_file_upload_expected_digest_flag(
+    monkeypatch,
+    enable_client_side_digests: bool,
+    expected_digest_present: bool,
+) -> None:
+    client = RecordingFileClient()
+    expected_digest = bytes_digest(b"hello")
+
+    monkeypatch.setattr(
+        "weave.trace.serialization.custom_objs.encode_custom_obj",
+        lambda obj: {
+            "_type": "CustomWeaveType",
+            "weave_type": {"type": "dummy"},
+            "files": {"blob.bin": b"hello"},
+        },
+    )
+
+    parse_and_apply_settings(
+        UserSettings(enable_client_side_digests=enable_client_side_digests)
+    )
+    try:
+        serialized = to_json(object(), "entity/project", client)
+    finally:
+        parse_and_apply_settings(UserSettings())
+
+    assert serialized["files"] == {"blob.bin": expected_digest}
+    assert len(client.file_create_reqs) == 1
+
+    req = client.file_create_reqs[0]
+    if expected_digest_present:
+        assert req.expected_digest == expected_digest
+    else:
+        assert req.expected_digest is None
+
+
 def test_to_json_object_excludes_ref(client) -> None:
     class MyObj(weave.Object):
         @weave.op
@@ -266,6 +344,59 @@ def test_to_json_object_excludes_ref(client) -> None:
     obj_rec = pydantic_object_record(obj)
     serialized = to_json(obj_rec, client._project_id(), client)
     assert "ref" not in serialized
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize("kind", ["object", "op", "table"])
+def test_to_json_leaves_unresolved_cross_project_refs_external(kind: str) -> None:
+    client = DummyClient({"entity/current": "internal-current"})
+    project_id = "entity/current"
+    internal_project_id = "internal-current"
+    ref = _make_ref(kind)
+
+    # If the client cannot resolve the target project, serialization must keep
+    # the original external ref. Rewriting it to the current project corrupts it.
+    assert (
+        to_json(ref, project_id, client, internal_project_id=internal_project_id)
+        == ref.uri()
+    )
+    assert (
+        to_json(ref.uri(), project_id, client, internal_project_id=internal_project_id)
+        == ref.uri()
+    )
+
+
+@pytest.mark.trace_server
+def test_to_json_leaves_unresolved_nested_cross_project_refs_external() -> None:
+    client = DummyClient({"entity/current": "internal-current"})
+    project_id = "entity/current"
+    internal_project_id = "internal-current"
+    obj_ref = _make_ref("object")
+    op_ref = _make_ref("op")
+    table_ref = _make_ref("table")
+
+    # The same rule must hold recursively inside realistic dict/list/tuple
+    # payloads, not just for top-level ref values.
+    assert to_json(
+        {
+            "refs": [obj_ref, op_ref.uri()],
+            "nested": {
+                "op": op_ref,
+                "table": table_ref,
+            },
+            "tuple_like": (obj_ref.uri(), table_ref, op_ref.uri()),
+        },
+        project_id,
+        client,
+        internal_project_id=internal_project_id,
+    ) == {
+        "refs": [obj_ref.uri(), op_ref.uri()],
+        "nested": {
+            "op": op_ref.uri(),
+            "table": table_ref.uri(),
+        },
+        "tuple_like": [obj_ref.uri(), table_ref.uri(), op_ref.uri()],
+    }
 
 
 def test_to_json_function_with_memory_address_in_op(client) -> None:

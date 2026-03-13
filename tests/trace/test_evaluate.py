@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 import weave
 from weave import Dataset, Evaluation, Model
+from weave.trace.settings import should_enable_client_side_digests
 
 _LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
@@ -369,11 +370,13 @@ def test_evaluation_from_weaveobject_missing_evaluation_name(client):
     assert result == expected_eval_result
 
 
-def test_evaluate_table_lazy_iter(client, monkeypatch):
+def test_evaluate_table_lazy_iter(digest_params_client, monkeypatch):
     """The intention of this test is to show that an evaluation harness
     lazily fetches rows from a table rather than eagerly fetching all
     rows up front.
     """
+    client = digest_params_client
+    enable_client_side_digests = should_enable_client_side_digests()
     monkeypatch.setattr(weave.trace.vals, "REMOTE_ITER_PAGE_SIZE", 4)
 
     dataset = Dataset(rows=[{"input": i} for i in range(10)])
@@ -388,16 +391,26 @@ def test_evaluate_table_lazy_iter(client, monkeypatch):
     def score_simple(input, output):
         return input == output
 
-    log = client.server.attribute_access_log
-    assert [l for l in log if not l.startswith("_")] == [
+    # Client construction does not eagerly call projects_info; the
+    # internal project ID is resolved lazily on first use.
+    # When client-side digests are enabled, publish triggers
+    # the first lazy projects_info resolution.
+    expected_pre_eval_log = [
+        "ensure_project_exists",
         "get_call_processor",
         "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
-        "table_create",
-        "obj_create",
-        "obj_read",
     ]
+    # When client-side digests are enabled, publish triggers lazy
+    # resolution of the internal project ID via projects_info.
+    if enable_client_side_digests:
+        expected_pre_eval_log.extend(["projects_info"])
+    # publish creates a table + object; getting the dataset reads it back.
+    expected_pre_eval_log.extend(["table_create", "obj_create", "obj_read"])
+    assert [
+        l for l in client.server.attribute_access_log if not l.startswith("_")
+    ] == expected_pre_eval_log
     client.server.attribute_access_log = []
 
     evaluation = Evaluation(

@@ -1541,6 +1541,12 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         ensure_project_exists=False,
     )
 
+    # The test asserts exactly 2 table_create_from_digests calls (1 endpoint
+    # availability probe + 1 actual request).  A prior test may have already
+    # populated _ENDPOINT_CACHE, which would skip the probe and break that
+    # assertion.  Clearing it here guarantees the probe is recorded.
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
+
     # Create a Table object and save it to trigger chunking logic
     table_obj = weave_client.Table(rows)
     saved_table = client.save(table_obj, "table")
