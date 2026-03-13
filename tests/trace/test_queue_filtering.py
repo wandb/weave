@@ -11,8 +11,8 @@ import datetime
 import pytest
 
 import weave
+from tests.trace.server_utils import TEST_ENTITY, find_server_layer
 from tests.trace.util import client_is_sqlite
-from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -321,7 +321,11 @@ def test_filter_calls_by_queue_with_calls_complete_table(trace_server):
     4. Query by queue_id - should automatically use calls_complete table
     5. Verify INNER JOIN correctly filters results
     """
-    if isinstance(trace_server._internal_trace_server, SqliteTraceServer):
+    try:
+        find_server_layer(trace_server, SqliteTraceServer)
+    except TypeError:
+        pass
+    else:
         pytest.skip("ClickHouse-only test")
 
     project_id = f"{TEST_ENTITY}/test_queue_calls_complete"
