@@ -84,6 +84,8 @@ trace_server = [
   "openinference-semantic-conventions>=0.1.17",
   # For emoji shortcode support in Feedback
   "emoji>=2.12.1",
+  # Redis for optional task tracking and caching
+  "redis>=5.0.0",
 ]
 video_support = ["moviepy<=1.0.3"]
 anthropic = ["anthropic>=0.18.0"]

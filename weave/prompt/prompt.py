@@ -515,14 +515,14 @@ class EasyPrompt(UserList, Prompt):
                 "Prompt.load() takes a file-like object, not a string. Did you mean Prompt.e()?"
             )
         data = json.load(fp)
-        prompt = EasyPrompt(**data)
+        prompt = cls(**data)
         return prompt
 
     @classmethod
     def load_file(cls, filepath: str | Path) -> Self:
         expanded_path = os.path.expanduser(str(filepath))
         with open(expanded_path, encoding="utf-8") as f:
-            return EasyPrompt.load(f)
+            return cls.load(f)
 
     def dump(self, fp: IO) -> None:
         json.dump(self.as_pydantic_dict(), fp, indent=2)
