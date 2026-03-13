@@ -132,8 +132,7 @@ class WeaveClientSendFileCache:
         """
         expected_digest = req.expected_digest or ""
         cache_key_bytes = (
-            f"{req.project_id}/{req.name}/{expected_digest}/".encode("utf-8")
-            + req.content
+            f"{req.project_id}/{req.name}/{expected_digest}/".encode() + req.content
         )
         return hashlib.sha256(cache_key_bytes).hexdigest()
 
