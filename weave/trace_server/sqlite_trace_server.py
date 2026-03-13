@@ -24,7 +24,7 @@ from weave.shared.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     extract_refs_from_values,
 )
-from weave.trace_server import constants, object_creation_utils
+from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -280,6 +280,82 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             else:
                 raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
+
+    def calls_complete(
+        self, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            for call in req.batch:
+                parsable_output = call.output
+                if not isinstance(parsable_output, dict):
+                    parsable_output = {"output": parsable_output}
+                parsable_output = cast(dict, parsable_output)
+                otel_dump_str = None
+                if call.otel_dump is not None:
+                    otel_dump_str = json.dumps(call.otel_dump)
+
+                cursor.execute(
+                    """INSERT INTO calls (
+                        project_id, id, trace_id, parent_id, thread_id, turn_id,
+                        op_name, display_name, started_at, ended_at, exception,
+                        attributes, inputs, input_refs, output, output_refs,
+                        summary, wb_user_id, wb_run_id, wb_run_step, wb_run_step_end,
+                        otel_dump
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        call.project_id,
+                        call.id,
+                        call.trace_id,
+                        call.parent_id,
+                        call.thread_id,
+                        call.turn_id,
+                        call.op_name,
+                        call.display_name,
+                        call.started_at.isoformat(),
+                        call.ended_at.isoformat(),
+                        call.exception,
+                        json.dumps(call.attributes),
+                        json.dumps(call.inputs),
+                        json.dumps(
+                            extract_refs_from_values(list(call.inputs.values()))
+                        ),
+                        json.dumps(call.output),
+                        json.dumps(
+                            extract_refs_from_values(
+                                list(parsable_output.values())
+                            )
+                        ),
+                        json.dumps(call.summary),
+                        call.wb_user_id,
+                        call.wb_run_id,
+                        call.wb_run_step,
+                        call.wb_run_step_end,
+                        otel_dump_str,
+                    ),
+                )
+            conn.commit()
+        return tsi.CallsUpsertCompleteRes()
+
+    def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
+        res = self.call_start(tsi.CallStartReq(start=req.start))
+        return tsi.CallStartV2Res(id=res.id, trace_id=res.trace_id)
+
+    def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
+        self.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=req.end.project_id,
+                    id=req.end.id,
+                    ended_at=req.end.ended_at,
+                    exception=req.end.exception,
+                    output=req.end.output,
+                    summary=req.end.summary,
+                    wb_run_step_end=req.end.wb_run_step_end,
+                )
+            )
+        )
+        return tsi.CallEndV2Res()
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -855,6 +931,106 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 for call in calls
                 if call.total_storage_size_bytes is not None
             ),
+        )
+
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        return tsi.CallStatsRes(
+            start=req.start,
+            end=end,
+            granularity=req.granularity or 0,
+            timezone=req.timezone or "UTC",
+            usage_buckets=[],
+            call_buckets=[],
+        )
+
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        usage_calls: list[usage_utils.UsageCall] = []
+        unfinished_call_ids: set[str] = set()
+        for call in calls:
+            usage_calls.append(
+                usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=call.summary,
+                )
+            )
+            if call.ended_at is None:
+                unfinished_call_ids.add(call.id)
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            usage_calls, req.include_costs
+        )
+
+        return tsi.TraceUsageRes(
+            call_usage=aggregated_usage,
+            unfinished_call_ids=sorted(unfinished_call_ids),
+        )
+
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        if not req.call_ids:
+            return tsi.CallsUsageRes(call_usage={}, unfinished_call_ids=[])
+
+        root_calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(call_ids=req.call_ids),
+                columns=["trace_id"],
+                limit=len(req.call_ids),
+            )
+        )
+        trace_ids = {call.trace_id for call in root_calls}
+        if not trace_ids:
+            root_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {
+                call_id: {} for call_id in req.call_ids
+            }
+            return tsi.CallsUsageRes(call_usage=root_usage, unfinished_call_ids=[])
+
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        usage_calls: list[usage_utils.UsageCall] = []
+        unfinished_call_ids: set[str] = set()
+        for call in calls:
+            usage_calls.append(
+                usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=call.summary,
+                )
+            )
+            if call.ended_at is None:
+                unfinished_call_ids.add(call.id)
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            usage_calls, req.include_costs
+        )
+
+        root_usage = {
+            call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
+        }
+
+        return tsi.CallsUsageRes(
+            call_usage=root_usage,
+            unfinished_call_ids=sorted(unfinished_call_ids),
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
