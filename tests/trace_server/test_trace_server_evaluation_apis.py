@@ -126,7 +126,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             project=project,
             name=model_object_id,
             _digest=model_create_res.digest,
-        ).uri()
+        ).uri
 
     def create_dataset() -> str:
         """Create a test dataset and return its reference URI."""
@@ -166,7 +166,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             project=project,
             name=dataset_object_id,
             _digest=dataset_create_res.digest,
-        ).uri()
+        ).uri
 
     def create_scorer() -> str:
         """Create a test scorer and return its reference URI."""
@@ -201,7 +201,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             project=project,
             name=scorer_model_object_id,
             _digest=scorer_model_create_res.digest,
-        ).uri()
+        ).uri
 
         # Then create the scorer
         scorer_object_id = "test_eval_llm_judge_scorer"
@@ -228,7 +228,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             project=project,
             name=scorer_object_id,
             _digest=scorer_create_res.digest,
-        ).uri()
+        ).uri
 
     def create_evaluation(dataset_ref: str, scorer_ref: str) -> str:
         """Create a test evaluation and return its reference URI."""
@@ -257,7 +257,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             project=project,
             name=evaluation_object_id,
             _digest=evaluation_create_res.digest,
-        ).uri()
+        ).uri
 
     model_ref_uri = create_model()
     evaluation_ref_uri = create_evaluation(create_dataset(), create_scorer())

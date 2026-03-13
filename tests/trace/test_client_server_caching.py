@@ -521,3 +521,222 @@ def test_cache_directory_creation(tmp_path):
     assert cache_server._safe_cache_get("creation_test") == "success"
 
     cache_server.close()
+
+
+def test_cache_invalidation_on_add_tags(client):
+    """obj_read cache should be invalidated when tags are added."""
+    caching_server: CachingMiddlewareTraceServer = client.server.server
+    ref = weave.publish({"data": "test"}, name="cache_inv_add_tags")
+
+    # Prime the cache with an obj_read that includes tags
+    caching_server.reset_cache_recorder()
+    res1 = client.server.obj_read(
+        ObjReadReq(
+            project_id=client._project_id(),
+            object_id=ref.name,
+            digest=ref.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert caching_server.get_cache_recorder()["misses"] == 1
+    assert res1.obj.tags == []
+
+    # Second read should hit cache
+    caching_server.reset_cache_recorder()
+    client.server.obj_read(
+        ObjReadReq(
+            project_id=client._project_id(),
+            object_id=ref.name,
+            digest=ref.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert caching_server.get_cache_recorder()["hits"] == 1
+
+    # Add tags — should invalidate cache
+    client.add_tags(ref, ["new-tag"])
+
+    # Next read should miss (cache was invalidated)
+    caching_server.reset_cache_recorder()
+    res2 = client.server.obj_read(
+        ObjReadReq(
+            project_id=client._project_id(),
+            object_id=ref.name,
+            digest=ref.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert caching_server.get_cache_recorder()["misses"] == 1
+    assert res2.obj.tags == ["new-tag"]
+
+
+def test_cache_invalidation_on_remove_tags(client):
+    """obj_read cache should be invalidated when tags are removed."""
+    caching_server: CachingMiddlewareTraceServer = client.server.server
+    ref = weave.publish({"data": "test"}, name="cache_inv_rm_tags")
+    client.add_tags(ref, ["removable"])
+
+    # Prime cache
+    caching_server.reset_cache_recorder()
+    res1 = client.server.obj_read(
+        ObjReadReq(
+            project_id=client._project_id(),
+            object_id=ref.name,
+            digest=ref.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert res1.obj.tags == ["removable"]
+    assert caching_server.get_cache_recorder()["misses"] == 1
+
+    # Remove tags — should invalidate cache
+    client.remove_tags(ref, ["removable"])
+
+    # Next read should miss
+    caching_server.reset_cache_recorder()
+    res2 = client.server.obj_read(
+        ObjReadReq(
+            project_id=client._project_id(),
+            object_id=ref.name,
+            digest=ref.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert caching_server.get_cache_recorder()["misses"] == 1
+    assert res2.obj.tags == []
+
+
+def test_cache_invalidation_on_set_alias(client):
+    """obj_read cache should be invalidated when an alias is set."""
+    caching_server: CachingMiddlewareTraceServer = client.server.server
+    ref = weave.publish({"data": "test"}, name="cache_inv_set_alias")
+
+    # Prime cache
+    caching_server.reset_cache_recorder()
+    res1 = client.server.obj_read(
+        ObjReadReq(
+            project_id=client._project_id(),
+            object_id=ref.name,
+            digest=ref.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert caching_server.get_cache_recorder()["misses"] == 1
+    assert res1.obj.aliases == ["latest"]
+
+    # Set alias — should invalidate cache
+    client.set_aliases(ref, "prod")
+
+    # Next read should miss
+    caching_server.reset_cache_recorder()
+    res2 = client.server.obj_read(
+        ObjReadReq(
+            project_id=client._project_id(),
+            object_id=ref.name,
+            digest=ref.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert caching_server.get_cache_recorder()["misses"] == 1
+    assert "prod" in res2.obj.aliases
+
+
+def test_cache_invalidation_on_remove_aliases(client):
+    """obj_read cache should be invalidated when aliases are removed."""
+    caching_server: CachingMiddlewareTraceServer = client.server.server
+    ref = weave.publish({"data": "test"}, name="cache_inv_rm_alias")
+    client.set_aliases(ref, "staging")
+
+    # Prime cache
+    caching_server.reset_cache_recorder()
+    res1 = client.server.obj_read(
+        ObjReadReq(
+            project_id=client._project_id(),
+            object_id=ref.name,
+            digest=ref.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert "staging" in res1.obj.aliases
+    assert caching_server.get_cache_recorder()["misses"] == 1
+
+    # Remove alias — should invalidate cache
+    client.remove_aliases(ref, "staging")
+
+    # Next read should miss
+    caching_server.reset_cache_recorder()
+    res2 = client.server.obj_read(
+        ObjReadReq(
+            project_id=client._project_id(),
+            object_id=ref.name,
+            digest=ref.digest,
+            include_tags_and_aliases=True,
+        )
+    )
+    assert caching_server.get_cache_recorder()["misses"] == 1
+    assert "staging" not in res2.obj.aliases
+
+
+def test_invalidation_prefix_is_prefix_of_cache_key():
+    """Verify _build_invalidation_prefix output is a valid prefix of the full cache key.
+
+    The cache invalidation logic relies on the prefix string being an actual
+    prefix of keys generated by pydantic_bytes_safe_dump. This test guards
+    against field ordering mismatches between the two serialization paths.
+    """
+    from weave.trace_server_bindings.caching_middleware_trace_server import (
+        _build_invalidation_prefix,
+        pydantic_bytes_safe_dump,
+    )
+
+    # --- ObjReadReq: version-specific invalidation (project_id, object_id, digest) ---
+    req = ObjReadReq(
+        project_id="test/proj",
+        object_id="my-obj",
+        digest="abc123",
+        metadata_only=False,
+        include_tags_and_aliases=True,
+    )
+    full_key = f"obj_read_{pydantic_bytes_safe_dump(req)}"
+    prefix_version = _build_invalidation_prefix(
+        "obj_read",
+        {"project_id": "test/proj", "object_id": "my-obj", "digest": "abc123"},
+    )
+    assert full_key.startswith(prefix_version), (
+        f"Version-specific prefix is not a prefix of the full key.\n"
+        f"  prefix: {prefix_version}\n"
+        f"  key:    {full_key}"
+    )
+
+    # --- ObjReadReq: object-wide invalidation (project_id, object_id only) ---
+    prefix_all = _build_invalidation_prefix(
+        "obj_read",
+        {"project_id": "test/proj", "object_id": "my-obj"},
+    )
+    assert full_key.startswith(prefix_all), (
+        f"Object-wide prefix is not a prefix of the full key.\n"
+        f"  prefix: {prefix_all}\n"
+        f"  key:    {full_key}"
+    )
+
+    # The object-wide prefix should be shorter (fewer fields)
+    assert len(prefix_all) < len(prefix_version)
+
+    # --- ObjCreateReq: invalidation uses nested obj dict ---
+    create_req = ObjCreateReq(
+        obj=ObjSchemaForInsert(
+            project_id="test/proj",
+            object_id="my-obj",
+            val={"hello": "world"},
+        )
+    )
+    create_full_key = f"obj_create_{pydantic_bytes_safe_dump(create_req)}"
+    create_prefix = _build_invalidation_prefix(
+        "obj_create",
+        {"obj": {"project_id": "test/proj", "object_id": "my-obj"}},
+    )
+    assert create_full_key.startswith(create_prefix), (
+        f"ObjCreateReq prefix is not a prefix of the full key.\n"
+        f"  prefix: {create_prefix}\n"
+        f"  key:    {create_full_key}"
+    )

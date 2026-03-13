@@ -14,6 +14,7 @@ export {
   wrapGoogleGenAI,
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
+  patchRealtimeSession,
 } from './integrations';
 export {weaveAudio, weaveImage, WeaveAudio, WeaveImage} from './media';
 export {op} from './op';

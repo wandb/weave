@@ -15,6 +15,7 @@ from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
@@ -26,7 +27,6 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
-    ServerInfoRes,
     StartBatchItem,
 )
 from weave.utils.project_id import from_project_id
@@ -718,6 +718,79 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.objects.delete,
         )
 
+    # Tag and Alias API
+    # NOTE: These methods require the Stainless SDK to include tag/alias endpoints.
+    # Until the SDK spec is updated, these will raise NotImplementedError at call time.
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        try:
+            return self._stainless_request(
+                req, tsi.ObjAddTagsRes, self._stainless_client.objects.tags.add
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Tag operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            ) from None
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        try:
+            return self._stainless_request(
+                req, tsi.ObjRemoveTagsRes, self._stainless_client.objects.tags.remove
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Tag operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            ) from None
+
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+        try:
+            return self._stainless_request(
+                req, tsi.ObjSetAliasesRes, self._stainless_client.objects.aliases.set
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Alias operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            ) from None
+
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
+        try:
+            return self._stainless_request(
+                req,
+                tsi.ObjRemoveAliasesRes,
+                self._stainless_client.objects.aliases.remove,
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Alias operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            ) from None
+
+    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+        try:
+            return self._stainless_request(
+                req, tsi.TagsListRes, self._stainless_client.objects.tags.list
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Tag operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            ) from None
+
+    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+        try:
+            return self._stainless_request(
+                req, tsi.AliasesListRes, self._stainless_client.objects.aliases.list
+            )
+        except AttributeError:
+            raise NotImplementedError(
+                "Alias operations are not yet supported by the Stainless SDK. "
+                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
+            ) from None
+
     # Table API
     @validate_call
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
@@ -887,9 +960,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._update_client_headers()
         # Files API uses multipart/form-data - stainless expects (filename, content) tuple
         file_tuple = (req.name, req.content)
-        response = self._stainless_client.files.create(
-            file=file_tuple, project_id=req.project_id
-        )
+        kwargs: dict[str, Any] = {
+            "file": file_tuple,
+            "project_id": req.project_id,
+        }
+        if req.expected_digest is not None:
+            kwargs["expected_digest"] = req.expected_digest
+        response = self._stainless_client.files.create(**kwargs)
         return tsi.FileCreateRes.model_validate(response.model_dump())
 
     @validate_call

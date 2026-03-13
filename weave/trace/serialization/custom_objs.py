@@ -95,7 +95,7 @@ def encode_custom_obj(obj: Any) -> EncodedCustomObjDict | None:
             load_instance_op_ref = wc._save_op(
                 serializer.load, "load_" + serializer.id()
             )  # type: ignore
-            load_op_uri = load_instance_op_ref.uri()
+            load_op_uri = load_instance_op_ref.uri
 
     encoded: EncodedCustomObjDict = {
         "_type": "CustomWeaveType",

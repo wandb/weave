@@ -334,7 +334,7 @@ class Evaluation(Object):
         eval_op_ref = f"weave:///{client._project_id()}/op/{evaluate_op_name}:*"
         return client.get_calls(
             filter=CallsFilter(
-                input_refs=[self.ref.uri()],
+                input_refs=[self.ref.uri],
                 op_names=[eval_op_ref],
             ),
         )
