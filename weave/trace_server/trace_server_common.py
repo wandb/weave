@@ -86,6 +86,15 @@ def make_derived_summary_fields(
     """
     weave_summary = summary.pop("weave", {})
 
+    # Sanitize usage: values must be dicts (keyed by model name).
+    # Some legacy data has flat integer values (e.g. {"input_tokens": 16})
+    # instead of the expected {"model_name": {"input_tokens": 16}} format.
+    # Without this, CallSchema.model_validate() raises a ValidationError
+    # because dict[str, LLMUsageSchema] rejects int values.
+    usage = summary.get("usage")
+    if isinstance(usage, dict):
+        summary["usage"] = {k: v for k, v in usage.items() if isinstance(v, dict)}
+
     status = tsi.TraceStatus.SUCCESS
     if exception:
         status = tsi.TraceStatus.ERROR
