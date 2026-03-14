@@ -164,7 +164,10 @@ def test_redact_dataclass_fields() -> None:
             api_token="token-456",
         )
 
-        redacted = redact_pii(config)
+        with mock.patch.dict(
+            os.environ, {"WEAVE_REDACT_PII_FIELDS": "EMAIL_ADDRESS"}, clear=True
+        ):
+            redacted = redact_pii(config)
 
         # The api_key field should be redacted
         assert redacted.api_key == sanitize.REDACTED_VALUE
@@ -227,7 +230,10 @@ def test_redact_dataclass_in_list() -> None:
             Credential(api_key="key2", username="user2"),
         ]
 
-        redacted = redact_pii(credentials)
+        with mock.patch.dict(
+            os.environ, {"WEAVE_REDACT_PII_FIELDS": "EMAIL_ADDRESS"}, clear=True
+        ):
+            redacted = redact_pii(credentials)
 
         # All dataclass instances in the list should have api_key redacted
         assert redacted[0].api_key == sanitize.REDACTED_VALUE

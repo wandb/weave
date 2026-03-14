@@ -30,6 +30,7 @@ jobs:
         shard:
           [
             "trace",
+            "presidio",
             "flow",
             "trace_server",
             "trace_server_bindings",
