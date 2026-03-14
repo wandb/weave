@@ -85,6 +85,9 @@ class UserInjectingExternalTraceServer(
     external_to_internal_trace_server_adapter.ExternalTraceServer
 ):
     # Tests-only adapter that injects a fixed user id into external-facing requests.
+    # Also exposes projects_info (a TraceServerClientInterface method) so that
+    # WeaveClient.project_id_resolver can resolve internal project IDs
+    # in the test environment via hasattr duck-typing.
 
     def __init__(
         self,
@@ -94,6 +97,15 @@ class UserInjectingExternalTraceServer(
     ):
         super().__init__(internal_trace_server, id_converter)
         self._user_id = user_id
+
+    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
+        return [
+            tsi.ProjectsInfoRes(
+                external_project_id=ext_id,
+                internal_project_id=self._idc.ext_to_int_project_id(ext_id),
+            )
+            for ext_id in req.project_ids
+        ]
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.wb_user_id = self._user_id
