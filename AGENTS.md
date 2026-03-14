@@ -254,6 +254,12 @@ npm run test
 - Add JSDoc comments for TypeScript code
 - Update this file when introducing new patterns or concepts
 
+### Trace Usage Rollup Queries
+
+- `CallsQueryReq` now supports `include_descendant_usage` for query-time usage rollups.
+- When enabled, `calls_query`/`calls_query_stream` replace each returned call's `summary.usage` with descendant-rolled totals (same semantics as `trace/usage`), and preserve `summary.weave.costs` shape when `include_costs=True`.
+- This mode can be expensive on large traces because it materializes trace calls for aggregation; leave it disabled when rolled-up usage is not needed.
+
 ---
 
 ## Integration Patching
