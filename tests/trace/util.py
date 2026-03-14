@@ -109,16 +109,25 @@ def get_info_loglines(
 def capture_output(callbacks: list[Callable[[], None]]):
     captured_logs = io.StringIO()
 
-    # Store original stdout and logging handlers
+    # Store original logging configuration
     old_handlers = logging.getLogger().handlers[:]
+    old_level = logging.getLogger().level
+    weave_logger = logging.getLogger("weave")
+    old_weave_handlers = weave_logger.handlers[:]
+    old_weave_level = weave_logger.level
+    old_weave_propagate = weave_logger.propagate
 
     # Create a new handler for capturing logs
     log_handler = logging.StreamHandler(captured_logs)
     log_handler.setFormatter(logging.Formatter("%(message)s"))
 
-    # Replace stdout and logging handlers
+    # Capture both root and weave-prefixed logger output for deterministic tests.
     root_logger = logging.getLogger()
     root_logger.handlers = [log_handler]
+    root_logger.setLevel(logging.INFO)
+    weave_logger.handlers = [log_handler]
+    weave_logger.setLevel(logging.INFO)
+    weave_logger.propagate = False
 
     try:
         yield captured_logs
@@ -128,6 +137,10 @@ def capture_output(callbacks: list[Callable[[], None]]):
         for callback in callbacks:
             callback()
         root_logger.handlers = old_handlers
+        root_logger.setLevel(old_level)
+        weave_logger.handlers = old_weave_handlers
+        weave_logger.setLevel(old_weave_level)
+        weave_logger.propagate = old_weave_propagate
 
 
 def flushing_callback(client):
