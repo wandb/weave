@@ -29,6 +29,7 @@ from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
 from weave.trace_server.common_interface import SortBy
+from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
@@ -1242,6 +1243,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         processed_val = digest_result.processed_val
         json_val = digest_result.json_val
         digest = digest_result.digest
+        validate_expected_digest(
+            expected=req.obj.expected_digest,
+            actual=digest,
+            label=f"obj {req.obj.object_id!r}",
+        )
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
             req.obj.object_id,
@@ -1613,15 +1619,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             row_json = json.dumps(r)
             row_digest = compute_row_digest(r)
             insert_rows.append((req.table.project_id, row_digest, row_json))
+
+        row_digests = [r[1] for r in insert_rows]
+        digest = compute_table_digest(row_digests)
+        validate_expected_digest(
+            expected=req.table.expected_digest,
+            actual=digest,
+            label=f"table ({len(row_digests)} rows)",
+        )
+
         with self.lock:
             cursor.executemany(
                 "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
                 insert_rows,
             )
-
-            row_digests = [r[1] for r in insert_rows]
-
-            digest = compute_table_digest(row_digests)
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
@@ -1639,6 +1650,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         # Calculate table digest from row digests
         digest = compute_table_digest(req.row_digests)
+        validate_expected_digest(
+            expected=req.expected_digest,
+            actual=digest,
+            label=f"table ({len(req.row_digests)} rows)",
+        )
 
         with self.lock:
             cursor.execute(
@@ -2030,6 +2046,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         digest = compute_file_digest(req.content)
+        validate_expected_digest(
+            expected=req.expected_digest, actual=digest, label="file"
+        )
         with self.lock:
             cursor.execute(
                 "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)",

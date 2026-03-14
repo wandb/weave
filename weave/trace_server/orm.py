@@ -5,15 +5,15 @@ Abstracts away some of their differences and allows building up SQL queries in a
 import datetime
 import json
 import re
-import typing
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import Any, Literal, TypeAlias
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.interface import query as tsi_query
 
-DatabaseType = typing.Literal["clickhouse", "sqlite"]
+DatabaseType = Literal["clickhouse", "sqlite"]
 
 
 param_builder_count = 0
@@ -45,16 +45,16 @@ class ParamBuilder:
     ):
         global param_builder_count  # noqa: PLW0603
         param_builder_count += 1
-        self._params: dict[str, typing.Any] = {}
+        self._params: dict[str, Any] = {}
         self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
         self._database_type = database_type
-        self._param_to_name: dict[typing.Any, str] = {}
+        self._param_to_name: dict[Any, str] = {}
 
-    def add_param(self, param_value: typing.Any) -> str:
+    def add_param(self, param_value: Any) -> str:
         param_name = self._prefix + str(len(self._params))
 
         # Only attempt caching for hashable values
-        if isinstance(param_value, typing.Hashable):
+        if isinstance(param_value, Hashable):
             if param_value in self._param_to_name:
                 return self._param_to_name[param_value]
             self._param_to_name[param_value] = param_name
@@ -65,7 +65,7 @@ class ParamBuilder:
 
     def add(
         self,
-        param_value: typing.Any,
+        param_value: Any,
         param_name: str | None = None,
         param_type: str | None = None,
     ) -> str:
@@ -81,24 +81,18 @@ class ParamBuilder:
             return f"{{{param_name}:{ptype}}}"
         return ":" + param_name
 
-    def get_params(self) -> dict[str, typing.Any]:
+    def get_params(self) -> dict[str, Any]:
         return {**self._params}
 
 
 Value: TypeAlias = (
-    str
-    | float
-    | datetime.datetime
-    | list[str]
-    | list[float]
-    | dict[str, typing.Any]
-    | None
+    str | float | datetime.datetime | list[str] | list[float] | dict[str, Any] | None
 )
 Row: TypeAlias = dict[str, Value]
 Rows: TypeAlias = list[Row]
 
 
-ColumnType = typing.Literal[
+ColumnType = Literal[
     "string",
     "datetime",
     "json",  # Represented as string in ClickHouse
@@ -205,13 +199,13 @@ class Table:
         return rows
 
 
-Action = typing.Literal["SELECT", "DELETE"]
+Action = Literal["SELECT", "DELETE"]
 
 
 @dataclass
 class PreparedSelect:
     sql: str
-    parameters: dict[str, typing.Any]
+    parameters: dict[str, Any]
     fields: list[str]
 
 
@@ -437,7 +431,7 @@ class Select:
 class PreparedInsert:
     sql: str
     column_names: list[str]
-    data: typing.Sequence[typing.Sequence[typing.Any]]
+    data: Sequence[Sequence[Any]]
 
 
 class Insert:
@@ -465,7 +459,7 @@ class Insert:
 
         data = []
         for row in self.rows:
-            r: list[typing.Any] = []
+            r: list[Any] = []
             for field in given_column_names:
                 if (
                     field in self.table.col_types
@@ -500,7 +494,7 @@ def combine_conditions(conditions: list[str], operator: str) -> str:
     return f"({combined})"
 
 
-def python_value_to_ch_type(value: typing.Any) -> str:
+def python_value_to_ch_type(value: Any) -> str:
     """Helper function to convert python types to clickhouse types."""
     if isinstance(value, str):
         return "String"
@@ -587,8 +581,8 @@ def quote_json_path_parts(parts: list[str]) -> str:
 
 def _transform_external_field_to_internal_field(
     field: str,
-    all_columns: typing.Sequence[str],
-    json_columns: typing.Sequence[str],
+    all_columns: Sequence[str],
+    json_columns: Sequence[str],
     cast: str | None = None,
     param_builder: ParamBuilder | None = None,
 ) -> tuple[str, ParamBuilder, set[str]]:
@@ -646,8 +640,8 @@ def _transform_external_field_to_internal_field(
 
 def _process_query_to_conditions(
     query: tsi.Query,
-    all_columns: typing.Sequence[str],
-    json_columns: typing.Sequence[str],
+    all_columns: Sequence[str],
+    json_columns: Sequence[str],
     param_builder: ParamBuilder | None = None,
 ) -> tuple[list[str], set[str]]:
     """Converts a Query to a list of conditions for a clickhouse query."""
