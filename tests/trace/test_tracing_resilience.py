@@ -14,6 +14,11 @@ from tests.trace.util import DummyTestException
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.op import _add_accumulator
+from weave.trace.settings import (
+    UserSettings,
+    parse_and_apply_settings,
+    should_enable_client_side_digests,
+)
 
 
 def assert_no_current_call():
@@ -46,8 +51,31 @@ def test_resilience_to_user_code_errors(client):
     assert_no_current_call()
 
 
+@pytest.fixture
+def _apply_digest_settings(request):
+    """Side-effect-only fixture (underscore-prefixed because the yielded value is unused).
+
+    Toggled via ``indirect=True`` parametrize to set digest mode for each test variant.
+    """
+    parse_and_apply_settings(UserSettings(enable_client_side_digests=request.param))
+    yield
+    parse_and_apply_settings(UserSettings())
+
+
 @pytest.mark.disable_logging_error_check
-def test_resilience_to_server_errors(client_with_throwing_server, log_collector):
+@pytest.mark.parametrize(
+    "_apply_digest_settings",
+    [
+        pytest.param(False, id="client_side_digests_off"),
+        pytest.param(True, id="client_side_digests_on"),
+    ],
+    indirect=True,
+)
+def test_resilience_to_server_errors(
+    client_with_throwing_server,
+    log_collector,
+    _apply_digest_settings,
+):
     def do_test():
         @weave.op
         def simple_op():
@@ -70,12 +98,21 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     # Tim: This is very specific and intentional, please don't change
-    # this unless you are sure that is the expected behavior
-    assert ag_res == {
+    # this unless you are sure that is the expected behavior.
+    # The enabled and disabled digest paths fail in different places, so we
+    # assert the exact log categories for both modes.
+    expected_errors = {
         "Task failed: DummyTestException: ('FAILURE - call_end": 1,
         "Task failed: DummyTestException: ('FAILURE - file_create": 1,
         "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
     }
+    # When client-side digests are enabled, call_start sends a pre-computed
+    # digest to the server.  The ThrowingServer rejects every RPC, so the
+    # digest-carrying call_start fails twice (once per do_test() invocation
+    # above) instead of being silently deferred.
+    if should_enable_client_side_digests():
+        expected_errors["Task failed: DummyTestException: ('FAILURE - call_start"] = 2
+    assert ag_res == Counter(expected_errors)
 
 
 @pytest.mark.disable_logging_error_check
