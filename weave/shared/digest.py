@@ -22,6 +22,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from weave.shared.object_class_util import process_incoming_object_val
+from weave.shared.refs_internal import (
+    InternalObjectRef,
+    InternalOpRef,
+    InternalTableRef,
+)
 
 
 def bytes_digest(json_val: bytes) -> str:
@@ -88,3 +93,89 @@ def compute_table_digest(row_digests: list[str]) -> str:
 def compute_file_digest(content: bytes) -> str:
     """Compute file digest using server-equivalent file hashing."""
     return bytes_digest(content)
+
+
+def compute_object_ref_uri(
+    project_id: str,
+    object_id: str,
+    val: Any,
+    builtin_object_class: str | None = None,
+    extra: list[str] | None = None,
+) -> str:
+    """Compute the internal ref URI for an object.
+
+    Combines digest computation with internal ref construction.
+    The project_id must be an internal project ID — typically resolved once
+    via project_ids_external_to_internal during weave.init and cached for
+    the lifetime of the session.
+
+    Pass extra to append a sub-path (e.g. ["attr", "rows", "id", "<digest>"]
+    for a dataset row ref).
+    """
+    digest = compute_object_digest(val, builtin_object_class)
+    return InternalObjectRef(
+        project_id=project_id,
+        name=object_id,
+        version=digest,
+        extra=extra or [],
+    ).uri()
+
+
+def compute_op_ref_uri(
+    project_id: str,
+    op_name: str,
+    val: Any,
+) -> str:
+    """Compute the internal ref URI for an op.
+
+    The project_id must be an internal project ID — typically resolved once
+    via project_ids_external_to_internal during weave.init and cached for
+    the lifetime of the session.
+    """
+    digest = compute_object_digest(val)
+    return InternalOpRef(
+        project_id=project_id,
+        name=op_name,
+        version=digest,
+    ).uri()
+
+
+def compute_table_ref_uri(
+    project_id: str,
+    row_digests: list[str],
+) -> str:
+    """Compute the internal ref URI for a table.
+
+    The project_id must be an internal project ID — typically resolved once
+    via project_ids_external_to_internal during weave.init and cached for
+    the lifetime of the session.
+    """
+    digest = compute_table_digest(row_digests)
+    return InternalTableRef(
+        project_id=project_id,
+        digest=digest,
+    ).uri()
+
+
+def compute_file_content_ref_uri(
+    project_id: str,
+    object_id: str,
+    object_val: Any,
+    attr_name: str,
+) -> str:
+    """Compute the internal ref URI for a file attribute within an object.
+
+    Files are stored by digest via file_create and referenced as attributes
+    on their parent object.  This returns the object ref with an extra
+    path pointing at the attribute (e.g. .../object/name:version/attr/source).
+
+    The project_id must be an internal project ID — typically resolved once
+    via project_ids_external_to_internal during weave.init and cached for
+    the lifetime of the session.
+    """
+    return compute_object_ref_uri(
+        project_id,
+        object_id,
+        object_val,
+        extra=["attr", attr_name],
+    )
