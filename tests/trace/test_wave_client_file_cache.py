@@ -240,11 +240,20 @@ class TestWeaveClientSendFileCache:
         key2 = cache._key(req2)
         key3 = cache._key(req3)
         key4 = cache._key(req4)
+        key5 = cache._key(
+            FileCreateReq(
+                project_id="test",
+                name="file1",
+                content=b"content1",
+                expected_digest="validated",
+            )
+        )
 
         # Different requests should have different keys
         assert key1 != key2
         assert key1 != key3
         assert key1 != key4
+        assert key1 != key5
 
         # Same request should have the same key
         assert key1 == cache._key(
