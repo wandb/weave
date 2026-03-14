@@ -5,6 +5,7 @@ import datetime
 import hashlib
 import json
 import logging
+import os
 import threading
 import time
 from collections import defaultdict
@@ -7438,6 +7439,29 @@ class CompletionModelInfo:
     vertex_credentials: str | None = None
 
 
+FORGE_API_KEY_NAME = "FORGE_API_KEY"
+FORGE_API_BASE_ENV = "FORGE_API_BASE"
+FORGE_DEFAULT_BASE_URL = "https://api.forge.tensorblock.co/v1"
+FORGE_SKIP_PREFIXES = {
+    "azure",
+    "azure_ai",
+    "bedrock",
+    "bedrock_converse",
+    "coreweave",
+    "custom",
+    "openrouter",
+    "vertex_ai",
+    "vertex_ai-language-models",
+}
+
+
+def _normalize_forge_model_name(model_name: str) -> str:
+    if "/" not in model_name:
+        return model_name
+    provider, rest = model_name.split("/", 1)
+    return f"{provider.lower()}/{rest}"
+
+
 def _setup_completion_model_info(
     model_info: LLMModelProviderInfo | None,
     req: tsi.CompletionsCreateReq,
@@ -7566,6 +7590,35 @@ def _setup_completion_model_info(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
+
+    elif "/" in model_name:
+        provider_prefix = model_name.split("/", 1)[0].lower()
+        if provider_prefix not in FORGE_SKIP_PREFIXES:
+            secret_fetcher = _secret_fetcher_context.get()
+            if secret_fetcher is not None:
+                forge_api_key = (
+                    secret_fetcher.fetch(FORGE_API_KEY_NAME)
+                    .get("secrets", {})
+                    .get(FORGE_API_KEY_NAME)
+                )
+            else:
+                forge_api_key = None
+            if forge_api_key:
+                extra_headers = {}
+                if req.inputs.extra_headers:
+                    extra_headers = req.inputs.extra_headers
+                    req.inputs.extra_headers = None
+                req.inputs.model = _normalize_forge_model_name(model_name)
+                return CompletionModelInfo(
+                    model_name=model_name,
+                    api_key=forge_api_key,
+                    provider="custom",
+                    base_url=os.getenv(FORGE_API_BASE_ENV)
+                    or FORGE_DEFAULT_BASE_URL,
+                    extra_headers=extra_headers,
+                    return_type="openai",
+                    vertex_credentials=None,
+                )
 
     return CompletionModelInfo(
         model_name=model_name,
