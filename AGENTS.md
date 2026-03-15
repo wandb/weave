@@ -233,6 +233,11 @@ npm run test
 - Include meaningful error messages
 - Add error handling tests
 
+### Tracing Behavior
+
+- `@weave.op` should emit an error call span even when input argument binding fails (for example, unexpected keyword arguments that raise `OpCallError`).
+- For binding failures, traced inputs should preserve raw user-provided values (`kwargs` and positional args mapped best-effort, with fallback keys like `_arg0` for unnamed extras).
+
 ### Integration Testing
 
 - Since autopatching was removed from `weave.init()`, integration tests must explicitly patch their integrations
