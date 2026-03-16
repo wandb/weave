@@ -173,7 +173,9 @@ def test_cross_project_resolves_via_resolver() -> None:
     )
     assert isinstance(result, InternalObjectRef)
     assert result.uri == "weave-trace-internal:///other-int-id/object/thing:xyz"
-    resolver.resolve_external_to_internal_project_id.assert_called_once_with("other_entity/other_proj")
+    resolver.resolve_external_to_internal_project_id.assert_called_once_with(
+        "other_entity/other_proj"
+    )
 
 
 def test_cross_project_raises_when_unresolvable() -> None:
