@@ -2,11 +2,22 @@
 # This file should be in the trace SDK dir
 
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from typing import Any
+
+import httpx
+import tenacity
+from gql.transport.exceptions import (
+    TransportClosed,
+    TransportConnectionFailed,
+    TransportQueryError,
+    TransportServerError,
+)
 
 from weave.compat import wandb
 from weave.compat.wandb import WANDB_AVAILABLE, wandb_logger
+from weave.trace.settings import retry_max_attempts, retry_max_interval
 
 
 class UnableToCreateProjectError(Exception): ...
@@ -33,6 +44,51 @@ def ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]
         return _ensure_project_exists(entity_name, project_name)
 
 
+def _call_wandb_api_with_retry(
+    func: Callable[..., Any], *args: Any, **kwargs: Any
+) -> Any:
+    retryer = tenacity.Retrying(
+        stop=tenacity.stop_after_attempt(retry_max_attempts()),
+        wait=tenacity.wait_exponential_jitter(initial=1, max=retry_max_interval()),
+        retry=tenacity.retry_if_exception(_is_retryable_project_exception),
+        before_sleep=tenacity.before_sleep_log(logger, logging.INFO),
+        reraise=True,
+    )
+    return retryer(func, *args, **kwargs)
+
+
+def _is_retryable_project_exception(exception: BaseException) -> bool:
+    if isinstance(exception, wandb.AuthenticationError):
+        return False
+    if isinstance(exception, TransportQueryError):
+        return False
+    return isinstance(
+        exception,
+        (
+            wandb.CommError,
+            TransportClosed,
+            TransportConnectionFailed,
+            TransportServerError,
+            httpx.HTTPError,
+            OSError,
+        ),
+    )
+
+
+def _raise_project_access_error(
+    entity_name: str, project_name: str, exception: Exception
+) -> None:
+    logger.error(f"Unable to access `{entity_name}/{project_name}`.")
+    logger.error(str(exception))
+
+    if isinstance(exception, (wandb.AuthenticationError, wandb.CommError)):
+        # Suppress the stack trace for these exceptions to minimize noise for users
+        cls = exception.__class__
+        raise cls(str(exception)) from None
+
+    raise exception
+
+
 def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]:
     """Ensures that a W&B project exists by trying to access it, returns the project_name,
     which is not guaranteed to be the same if the provided project_name contains invalid
@@ -42,14 +98,25 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
     api = wandb.Api()
 
     # Check if the project already exists
-    project_response = api.project(entity_name, project_name)
+    project_exception = None
+    try:
+        project_response = _call_wandb_api_with_retry(
+            api.project, entity_name, project_name
+        )
+    except Exception as e:
+        project_exception = e
+        project_response = None
     if project_response is not None and project_response.get("project") is not None:
         return _format_project_result(project_response["project"])
+    if project_exception is not None:
+        _raise_project_access_error(entity_name, project_name, project_exception)
 
     # Try to create the project
     exception = None
     try:
-        project_response = api.upsert_project(entity=entity_name, project=project_name)
+        project_response = _call_wandb_api_with_retry(
+            api.upsert_project, entity=entity_name, project=project_name
+        )
     except Exception as e:
         exception = e
 
@@ -66,16 +133,7 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
             f"Failed to create project {entity_name}/{project_name}"
         )
 
-    # Log and re-raise with clean exception types
-    logger.error(f"Unable to access `{entity_name}/{project_name}`.")
-    logger.error(str(exception))
-
-    if isinstance(exception, (wandb.AuthenticationError, wandb.CommError)):
-        # Suppress the stack trace for these exceptions to minimize noise for users
-        cls = exception.__class__
-        raise cls(str(exception)) from None
-
-    raise exception
+    _raise_project_access_error(entity_name, project_name, exception)
 
 
 def _format_project_result(project: dict) -> dict[str, str]:
