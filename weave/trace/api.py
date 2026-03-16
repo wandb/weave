@@ -24,6 +24,7 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace.trace import Trace
 from weave.trace.view_utils import set_call_view
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
@@ -511,6 +512,35 @@ def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadCo
         yield context
 
 
+def get_trace(
+    trace_id: str,
+    include_costs: bool = False,
+    include_feedback: bool = False,
+) -> Trace:
+    """Load an entire trace tree in a single round-trip.
+
+    Args:
+        trace_id: The trace ID to load.
+        include_costs: If true, cost info is included at summary.weave.
+        include_feedback: If true, feedback info is included at summary.weave.feedback.
+
+    Returns:
+        A Trace object with the full call tree.
+
+    Example::
+
+        trace = weave.get_trace("abc-123")
+        for depth, call in trace.walk():
+            print("  " * depth + call.func_name)
+    """
+    client = weave_client_context.require_weave_client()
+    return client.get_trace(
+        trace_id,
+        include_costs=include_costs,
+        include_feedback=include_feedback,
+    )
+
+
 def finish() -> None:
     """Stops logging to weave.
 
@@ -530,6 +560,7 @@ __all__ = [
     "ObjectRef",
     "Table",
     "ThreadContext",
+    "Trace",
     "add_tags",
     "as_op",
     "attributes",
@@ -540,6 +571,7 @@ __all__ = [
     "get_current_call",
     "get_tags",
     "get_tags_and_aliases",
+    "get_trace",
     "init",
     "list_aliases",
     "list_tags",

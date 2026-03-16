@@ -33,6 +33,7 @@ from weave.utils.project_id import from_project_id
 
 if TYPE_CHECKING:
     from weave.flow.scorer import ApplyScorerResult, Scorer
+    from weave.trace.trace import Trace
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +179,16 @@ class Call:
             CallsFilter(parent_ids=[self.id]),
             page_size=page_size,
         )
+
+    def trace(self) -> Trace:
+        """Load the full trace this call belongs to.
+
+        Returns a :class:`Trace` with every call in the trace, assembled
+        into a tree.  This is a single server round-trip regardless of
+        trace depth.
+        """
+        client = weave_client_context.require_weave_client()
+        return client.get_trace(self.trace_id)
 
     def delete(self) -> bool:
         """Delete the call."""

@@ -82,6 +82,7 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
+from weave.trace.trace import Trace, build_trace
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.wandb_run_context import (
@@ -90,6 +91,7 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
@@ -644,6 +646,50 @@ class WeaveClient:
             raise ValueError(f"Call not found: {call_id}")
         response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_trace(
+        self,
+        trace_id: str,
+        include_costs: bool = False,
+        include_feedback: bool = False,
+    ) -> Trace:
+        """Load an entire trace tree in a single round-trip.
+
+        Returns a :class:`Trace` whose calls are already organised into a
+        parent→children tree, so you can walk the hierarchy without extra
+        server calls.
+
+        Args:
+            trace_id: The trace ID to load.
+            include_costs: If true, cost info is included at summary.weave.
+            include_feedback: If true, feedback info is included at summary.weave.feedback.
+
+        Returns:
+            A :class:`Trace` object with the full call tree.
+
+        Example::
+
+            trace = client.get_trace("abc-123")
+            for depth, call in trace.walk():
+                print("  " * depth + call.func_name)
+        """
+        calls = list(
+            self.server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=self._project_id(),
+                    filter=CallsFilter(trace_ids=[trace_id]),
+                    include_costs=include_costs,
+                    include_feedback=include_feedback,
+                    sort_by=[SortBy(field="started_at", direction="asc")],
+                )
+            )
+        )
+        weave_objects = [
+            make_client_call(self.entity, self.project, c, self.server)
+            for c in calls
+        ]
+        return build_trace(trace_id, weave_objects)
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
