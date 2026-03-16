@@ -124,13 +124,18 @@ def _build_result_from_encoded(
         # to_json procedure is not blocked on network requests.
         # Technically it is possible that the file creation request
         # fails.
-        client._send_file_create(
-            FileCreateReq(project_id=project_id, name=name, content=val)
-        )
         contents_as_bytes = val
         if isinstance(contents_as_bytes, str):
             contents_as_bytes = contents_as_bytes.encode("utf-8")
         digest = bytes_digest(contents_as_bytes)
+        client._send_file_create(
+            FileCreateReq(
+                project_id=project_id,
+                name=name,
+                content=val,
+                expected_digest=digest,
+            )
+        )
         file_digests[name] = digest
 
     result: EncodedCustomObjDictWithFilesAsDigests = {

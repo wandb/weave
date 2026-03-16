@@ -21,6 +21,11 @@ from httpx import HTTPStatusError as HTTPError
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
+from weave.shared.digest import (
+    compute_object_digest,
+    compute_row_digest,
+    compute_table_digest,
+)
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -362,6 +367,14 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+        # Eagerly resolve and cache the internal project ID so that
+        # client-side digest checks don't incur a server round-trip later.
+        # Must happen after all other attributes are initialised because
+        # _project_id() may trigger a flush in test subclasses.
+        self._cached_internal_project_id = (
+            self.project_id_resolver.get_internal_project_id(self._project_id())
+        )
 
     ################ High Level Convenience Methods ################
 
@@ -1841,6 +1854,14 @@ class WeaveClient:
             for v in obj.values():
                 self._save_nested_objects(v)
 
+    def _should_compute_client_digests(self) -> bool:
+        """Return True if the client should compute digests locally."""
+        if not settings.should_enable_client_side_digests():
+            return False
+        if self.project_id_resolver.is_disabled:
+            return False
+        return True
+
     @trace_sentry.global_trace_sentry.watch()
     def _save_object_basic(
         self, val: Any, name: str | None = None, branch: str = "latest"
@@ -1875,20 +1896,29 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
+        compute_digests = self._should_compute_client_digests()
+
         def send_obj_create() -> ObjCreateRes:
-            # `to_json` is mostly fast, except for CustomWeaveTypes
-            # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
+
+            expected_digest = None
+            if compute_digests:
+                expected_digest = compute_object_digest(json_val)
+
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
                     object_id=name,
                     val=json_val,
+                    expected_digest=expected_digest,
                 )
             )
-            return self.server.obj_create(req)
+            res = self.server.obj_create(req)
+            return res
 
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
+        res_future: Future[ObjCreateRes] = self.future_executor.defer(
+            send_obj_create
+        )
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
         )
@@ -1921,8 +1951,18 @@ class WeaveClient:
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
         json_rows = to_json(rows, self._project_id(), self)
+
+        expected_digest = None
+        if self._should_compute_client_digests():
+            row_digests = [compute_row_digest(row) for row in json_rows]
+            expected_digest = compute_table_digest(row_digests)
+
         req = TableCreateReq(
-            table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
+            table=TableSchemaForInsert(
+                project_id=self._project_id(),
+                rows=json_rows,
+                expected_digest=expected_digest,
+            )
         )
         return self.server.table_create(req)
 
@@ -2040,8 +2080,13 @@ class WeaveClient:
                 all_row_digests.extend(chunk_result.row_digests)
 
             # Create final table from digests
+            expected_digest = None
+            if self._should_compute_client_digests():
+                expected_digest = compute_table_digest(all_row_digests)
             create_req = TableCreateFromDigestsReq(
-                project_id=self._project_id(), row_digests=all_row_digests
+                project_id=self._project_id(),
+                row_digests=all_row_digests,
+                expected_digest=expected_digest,
             )
             create_res = self.server.table_create_from_digests(create_req)
 
