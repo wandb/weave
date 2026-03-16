@@ -147,6 +147,12 @@ class InvalidExternalRef(Error):
     pass
 
 
+class DigestMismatchError(Error):
+    """Raised when a client-provided digest does not match the server-computed digest."""
+
+    pass
+
+
 class ProjectNotFound(Error):
     """Raised when a project is not found."""
 
@@ -270,6 +276,7 @@ class ErrorRegistry:
         self.register(InvalidRequest, 400)
         self.register(CallsCompleteModeRequired, 400)
         self.register(InvalidExternalRef, 400)
+        self.register(DigestMismatchError, 409)
         self.register(QueryNoCommonTypeError, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
         self.register(InvalidIdFormat, 400)

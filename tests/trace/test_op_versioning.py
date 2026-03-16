@@ -1,6 +1,6 @@
 import re
-import typing
 from collections.abc import Callable
+from typing import TypedDict
 
 import numpy as np
 import pytest
@@ -350,10 +350,10 @@ def test_op_versioning_2ops(client):
     saved_code = get_saved_code(client, ref)
 
 
-EXPECTED_TYPEDICT_ANNO_CODE = """import typing
+EXPECTED_TYPEDICT_ANNO_CODE = """from typing import TypedDict
 import weave
 
-class SomeDict(typing.TypedDict):
+class SomeDict(TypedDict):
     val: int
 
 @weave.op
@@ -365,7 +365,7 @@ def some_d(v: int) -> SomeDict:
 def test_op_return_typeddict_annotation(
     client,
 ):
-    class SomeDict(typing.TypedDict):
+    class SomeDict(TypedDict):
         val: int
 
     @weave.op

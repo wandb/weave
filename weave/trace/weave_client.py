@@ -58,6 +58,7 @@ from weave.trace.op import (
 )
 from weave.trace.op import op as op_deco
 from weave.trace.op_protocol import Op
+from weave.trace.project_id_resolver import ProjectIdResolver
 from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
     CallRef,
@@ -334,6 +335,7 @@ class WeaveClient:
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
+        self.project_id_resolver = ProjectIdResolver(server)
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)

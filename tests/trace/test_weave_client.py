@@ -17,6 +17,7 @@ import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
 from tests.conftest import TestOnlyFlushingWeaveClient
+from tests.trace.server_utils import find_server_layer
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     AnyIntMatcher,
@@ -45,7 +46,10 @@ from weave.trace.serialization.serializer import (
     register_serializer,
 )
 from weave.trace.wandb_run_context import WandbRunContext
-from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
+from weave.trace_server.clickhouse_trace_server_batched import (
+    ClickHouseTraceServer,
+    NotFoundError,
+)
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.ids import generate_id
@@ -65,6 +69,7 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
+from weave.trace_server_bindings.http_utils import _ENDPOINT_CACHE
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
@@ -1528,6 +1533,10 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         4 * 1024
     )  # Small enough to get multiple updates
 
+    # Clear cached endpoint availability so the probe call is always made,
+    # ensuring deterministic record counts regardless of test ordering.
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
+
     # Set the client to use the remote server so calls get recorded
     client = TestOnlyFlushingWeaveClient(
         entity=client.entity,
@@ -1779,9 +1788,11 @@ def test_get_calls_storage_size_with_limit(client):
 
 @pytest.fixture
 def clickhouse_client(client):
-    if client_is_sqlite(client):
+    try:
+        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
+    except TypeError:
         return None
-    return client.server._next_trace_server.ch_client
+    return ch_server.ch_client
 
 
 def test_get_calls_storage_size_values(client, clickhouse_client):

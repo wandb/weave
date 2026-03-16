@@ -21,7 +21,7 @@ simplifications:
     language. This is a simple substring match operator.
 """
 
-import typing
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -114,7 +114,7 @@ class ConvertOperation(BaseModel):
     convert_: "ConvertSpec" = Field(alias="$convert")
 
 
-CastTo = typing.Literal["double", "string", "int", "bool", "exists"]
+CastTo = Literal["double", "string", "int", "bool", "exists"]
 
 
 class ConvertSpec(BaseModel):
