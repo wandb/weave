@@ -18,7 +18,7 @@ from weave.shared.refs_internal import (
     InternalOpRef,
     InternalTableRef,
 )
-from weave.trace.serialization.serialize import (
+from weave.trace.ref_conversion import (
     CrossProjectRefError,
     ProjectNotFoundError,
     convert_cross_project_ref,
@@ -164,7 +164,7 @@ def test_same_project_raises_for_unknown_kind() -> None:
 
 def test_cross_project_resolves_via_resolver() -> None:
     resolver = MagicMock()
-    resolver.resolve.return_value = "other-int-id"
+    resolver.resolve_external_to_internal_project_id.return_value = "other-int-id"
 
     result = convert_cross_project_ref(
         "weave:///other_entity/other_proj/object/thing:xyz",
@@ -173,12 +173,12 @@ def test_cross_project_resolves_via_resolver() -> None:
     )
     assert isinstance(result, InternalObjectRef)
     assert result.uri == "weave-trace-internal:///other-int-id/object/thing:xyz"
-    resolver.resolve.assert_called_once_with("other_entity/other_proj")
+    resolver.resolve_external_to_internal_project_id.assert_called_once_with("other_entity/other_proj")
 
 
 def test_cross_project_raises_when_unresolvable() -> None:
     resolver = MagicMock()
-    resolver.resolve.return_value = None
+    resolver.resolve_external_to_internal_project_id.return_value = None
 
     with pytest.raises(ProjectNotFoundError, match="other_entity/other_proj"):
         convert_cross_project_ref(
@@ -197,7 +197,7 @@ def test_cross_project_raises_for_same_project() -> None:
             ext_project_id="entity/proj",
             resolver=resolver,
         )
-    resolver.resolve.assert_not_called()
+    resolver.resolve_external_to_internal_project_id.assert_not_called()
 
 
 def test_cross_project_raises_for_non_weave_uri() -> None:
