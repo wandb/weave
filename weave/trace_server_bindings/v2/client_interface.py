@@ -94,11 +94,18 @@ if TYPE_CHECKING:
 class ClientInterface(Protocol):
     """SDK-facing contract. What WeaveClient types against.
 
-    Batching methods (call_start_v2, calls_complete) are NOT here —
-    they are internal transport details hidden behind the batch processor.
+    The v2 call protocol methods (call_start_v2, calls_complete) are NOT
+    here — they are server-internal details that the client abstracts away.
+    From the SDK's perspective, there is only call_start and call_end.
 
     get_call_processor / get_feedback_processor expose batch processors
     so the SDK can enqueue work and control flushing.
+
+    Note: We currently reuse the server's Req/Res types for simplicity.
+    The client could define its own input/output shapes if the SDK needs
+    a different contract than the server (e.g. simpler inputs, richer
+    error metadata, pagination cursors). For now, shared types avoid an
+    unnecessary translation layer.
     """
 
     # ── Calls ────────────────────────────────────────────────────────
