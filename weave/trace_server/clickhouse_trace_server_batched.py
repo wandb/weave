@@ -492,12 +492,29 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        from weave.trace_server.opentelemetry.parsers.logfire import (
+            span_to_calls as logfire_span_to_calls,
+        )
+
         assert_non_null_wb_user_id(req)
         calls: list[
             tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
         ] = []
         rejected_spans = 0
         error_messages: list[str] = []
+
+        # Pre-collect every span ID in this batch so each converter can
+        # determine whether a parent reference is within the batch or external.
+        all_span_ids: set[str] = set()
+        for processed_span in req.processed_spans:
+            if isinstance(processed_span.resource_spans, ResourceSpans):
+                for proto_scope_spans in processed_span.resource_spans.scope_spans:
+                    for proto_span in proto_scope_spans.spans:
+                        try:
+                            all_span_ids.add(proto_span.span_id.hex())
+                        except Exception:
+                            pass
+
         for processed_span in req.processed_spans:
             # Extract wb_run_id from the processed span
             wb_run_id = processed_span.run_id
@@ -510,6 +527,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             proto_resource_spans = processed_span.resource_spans
             resource = Resource.from_proto(proto_resource_spans.resource)
             for proto_scope_spans in proto_resource_spans.scope_spans:
+                scope_name: str = (
+                    proto_scope_spans.scope.name
+                    if proto_scope_spans.scope
+                    else ""
+                )
+                is_logfire = scope_name.startswith("logfire.")
+
                 for proto_span in proto_scope_spans.spans:
                     try:
                         span = Span.from_proto(proto_span, resource)
@@ -531,13 +555,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
+                    if is_logfire:
+                        # Use event-parser-backed conversion for all logfire.*
+                        # scopes: richer inputs/outputs, display_name from
+                        # logfire.msg, and synthetic child calls for embedded
+                        # tool-call round-trips.
+                        calls.extend(
+                            logfire_span_to_calls(
+                                span,
+                                req.project_id,
+                                all_span_ids,
+                                wb_user_id=req.wb_user_id,
+                                wb_run_id=wb_run_id,
+                            )
                         )
-                    )
+                    else:
+                        calls.append(
+                            span.to_call(
+                                req.project_id,
+                                wb_user_id=req.wb_user_id,
+                                wb_run_id=wb_run_id,
+                            )
+                        )
 
         set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
 
