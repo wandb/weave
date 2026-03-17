@@ -1859,9 +1859,35 @@ class WeaveClient:
         """Return True if the client should compute digests locally."""
         if not settings.should_enable_client_side_digests():
             return False
+        # The resolver is disabled when the server doesn't support
+        # projects_info (e.g. old server versions) or after a digest
+        # mismatch forced a fallback to server-computed digests.
         if self.project_id_resolver.is_disabled:
             return False
         return True
+
+    def _convert_refs_to_internal(self, json_val: Any) -> Any:
+        """Convert external weave:/// refs to weave-trace-internal:/// refs.
+
+        The server stores refs using internal project IDs.  To compute a digest
+        that matches what the server will compute, the client must first convert
+        its external-format refs (weave:///entity/project/...) to the internal
+        format (weave-trace-internal:///internal_project_id/...).
+
+        Uses the same ``universal_ext_to_int_ref_converter`` that the server's
+        ExternalToInternalTraceServerAdapter uses, so the two always agree.
+        """
+        internal_project_id = self._cached_internal_project_id
+        if internal_project_id is None:
+            return json_val
+        project_id = self._project_id()
+
+        def ext_to_int(ext_project_id: str) -> str:
+            if ext_project_id == project_id:
+                return internal_project_id
+            return ext_project_id
+
+        return universal_ext_to_int_ref_converter(json_val, ext_to_int)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_object_basic(
@@ -1898,20 +1924,18 @@ class WeaveClient:
         name = sanitize_object_name(name)
 
         compute_digests = self._should_compute_client_digests()
-        internal_pid = self._cached_internal_project_id if compute_digests else None
 
         def send_obj_create() -> ObjCreateRes:
+            # `to_json` is mostly fast, except for CustomWeaveTypes
+            # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
 
+            # Fast path: compute the digest client-side so the server can
+            # validate it via expected_digest instead of the client waiting
+            # for the server-computed digest in the response.
             expected_digest = None
-            if compute_digests and internal_pid is not None:
-                project_id = self._project_id()
-                json_val_internal = universal_ext_to_int_ref_converter(
-                    json_val,
-                    lambda ext_pid: internal_pid
-                    if ext_pid == project_id
-                    else ext_pid,
-                )
+            if compute_digests:
+                json_val_internal = self._convert_refs_to_internal(json_val)
                 expected_digest = compute_object_digest(json_val_internal)
 
             req = ObjCreateReq(
@@ -1922,8 +1946,7 @@ class WeaveClient:
                     expected_digest=expected_digest,
                 )
             )
-            res = self.server.obj_create(req)
-            return res
+            return self.server.obj_create(req)
 
         res_future: Future[ObjCreateRes] = self.future_executor.defer(
             send_obj_create
@@ -1960,18 +1983,11 @@ class WeaveClient:
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
         compute_digests = self._should_compute_client_digests()
-        internal_pid = self._cached_internal_project_id if compute_digests else None
         json_rows = to_json(rows, self._project_id(), self)
 
         expected_digest = None
-        if compute_digests and internal_pid is not None:
-            project_id = self._project_id()
-            json_rows_internal = universal_ext_to_int_ref_converter(
-                json_rows,
-                lambda ext_pid: internal_pid
-                if ext_pid == project_id
-                else ext_pid,
-            )
+        if compute_digests:
+            json_rows_internal = self._convert_refs_to_internal(json_rows)
             row_digests = [compute_row_digest(row) for row in json_rows_internal]
             expected_digest = compute_table_digest(row_digests)
 
