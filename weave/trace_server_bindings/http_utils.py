@@ -164,7 +164,7 @@ def process_batch_with_retry(
     # Warn if single item exceeds limit (can't split further)
     if encoded_bytes > remote_request_bytes_limit and len(batch) == 1:
         logger.warning(
-            "Single %s size (%s bytes) may be too large to send.The configured maximum size is %s bytes.",
+            "Single %s size (%s bytes) may be too large to send. The configured maximum size is %s bytes.",
             batch_name,
             encoded_bytes,
             remote_request_bytes_limit,
