@@ -3244,12 +3244,10 @@ def test_calls_complete_with_refs_filter() -> None:
                 OR length(calls_complete.input_refs) = 0)
             AND (hasAny(calls_complete.output_refs, {pb_5:Array(String)})
                 OR length(calls_complete.output_refs) = 0)))
-        AND (
-            ((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+        AND (((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
             AND ((((hasAny(calls_complete.input_refs, {pb_1:Array(String)})
                     OR arrayExists(x -> x LIKE {pb_2:String}, calls_complete.input_refs)))
                 AND (hasAny(calls_complete.output_refs, {pb_3:Array(String)})))))
-        )
         """,
         {
             "pb_0": SENTINEL_DATETIME,
