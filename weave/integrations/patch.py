@@ -263,6 +263,16 @@ def patch_verifiers(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def patch_ag2(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for AG2 (formerly AutoGen)."""
+    _patch_integration(
+        module_path="weave.integrations.ag2.ag2_sdk",
+        patcher_func_getter_name="get_ag2_patcher",
+        triggering_symbols=["autogen"],
+        settings=settings,
+    )
+
+
 def patch_autogen(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for AutoGen."""
     _patch_integration(
@@ -310,6 +320,23 @@ def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+# If legacy autogen support is removed, replace _patch_ag2_or_autogen with patch_ag2 directly in INTEGRATION_MODULE_MAPPING.
+def _patch_ag2_or_autogen(settings: IntegrationSettings | None = None) -> None:
+    """Dispatch to AG2 or Microsoft AutoGen patcher based on
+    which package is installed."""
+    try:
+        # AG2 provides ConversableAgent in the autogen namespace
+        from autogen import ConversableAgent  # noqa: F401
+
+        # Verify it's AG2 (has initiate_group_chat)
+        from autogen.agentchat import initiate_group_chat  # noqa: F401
+
+        patch_ag2(settings)
+    except ImportError:
+        # Fall back to Microsoft AutoGen patcher
+        patch_autogen(settings)
+
+
 # Mapping of module names to patch functions for implicit patching
 # When a module is already imported, we'll automatically call its patch function
 
@@ -337,7 +364,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "claude_agent_sdk": patch_claude_agent_sdk,
     "verdict": patch_verdict,
     "verifiers": patch_verifiers,
-    "autogen": patch_autogen,
+    "autogen": _patch_ag2_or_autogen,
     "langchain": patch_langchain,
     "langchain_core": patch_langchain,
     "llama_index": patch_llamaindex,
