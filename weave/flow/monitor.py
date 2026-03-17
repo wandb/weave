@@ -13,6 +13,14 @@ from weave.trace_server.interface.query import Query
 DebounceAggregationField = Literal["trace_id", "thread_id"]
 DebounceAggregationMethod = Literal["last_message", "all_messages"]
 
+# Runtime-valid sets for validation without get_args(); keep in sync with Literals above.
+VALID_DEBOUNCE_AGGREGATION_FIELDS: frozenset[DebounceAggregationField] = frozenset(
+    ["trace_id", "thread_id"]
+)
+VALID_DEBOUNCE_AGGREGATION_METHODS: frozenset[DebounceAggregationMethod] = frozenset(
+    ["last_message", "all_messages"]
+)
+
 
 class ScorerDebounceConfig(TypedDict):
     """Configuration for debounced scoring on a monitor."""
