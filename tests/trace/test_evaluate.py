@@ -358,7 +358,7 @@ def test_evaluation_from_weaveobject_missing_evaluation_name(client):
     # To simulate it being an older object, we delete the evaluation_name attribute from
     # the gotten weave object.
     eval_obj = ref.get(objectify=False)
-    delattr(eval_obj._val, "evaluation_name")
+    del eval_obj._val.evaluation_name
 
     # We should still be able to load the Evaluation object even if this attr doesn't exist
     # and it should continue to work and produce expected results
