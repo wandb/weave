@@ -16,7 +16,7 @@ from typing_extensions import ParamSpec, TypeVar
 
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter
-    from weave.trace.op import AsyncOpDef, OpDef
+    from weave.trace.op import AsyncOp, SyncOp
     from weave.trace.refs import ObjectRef
 
 P = ParamSpec("P")
@@ -38,7 +38,7 @@ class Opified(Protocol[P, R]):
     while the sidecar provides a nominal runtime object for invocation logic.
     """
 
-    __op__: OpDef[P, R] | AsyncOpDef[P, R]
+    __op__: SyncOp[P, R] | AsyncOp[P, R]
 
     # needed so type checkers bind `self` when an Op is used as a method
     @overload
@@ -65,6 +65,9 @@ class Op(Opified[P, R], Protocol[P, R]):
     using the `inspect` module for control flow, and Op instances don't always
     pass those checks.  In particular, `inspect.iscoroutinefunction` always
     fails for classes, even ones that implement async methods or protocols.
+
+    This protocol models the public callable wrapper surface. The nominal
+    runtime sidecar lives on `__op__` as `SyncOp` or `AsyncOp`.
 
     Some of the attributes are carry-overs from when Op was a class.  We should
     consider removing the unnecessary ones where possible.

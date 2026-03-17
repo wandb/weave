@@ -6,9 +6,11 @@ import pytest
 import weave
 from weave.trace.call import Call
 from weave.trace.op import (
+    AsyncOp,
     AsyncOpDef,
     OpCallError,
     OpDef,
+    SyncOp,
     as_op,
     is_op,
     op,
@@ -188,40 +190,45 @@ async def test_async_method_call(client, weave_obj, py_obj):
 
 def test_sync_func_patching_passes_inspection(func):
     assert is_op(func)
-    assert isinstance(func.__op__, OpDef)
+    assert isinstance(func.__op__, SyncOp)
     assert inspect.isfunction(func)
 
 
 def test_async_func_patching_passes_inspection(afunc):
     assert is_op(afunc)
-    assert isinstance(afunc.__op__, AsyncOpDef)
+    assert isinstance(afunc.__op__, AsyncOp)
     assert inspect.iscoroutinefunction(afunc)
+
+
+def test_sidecar_compatibility_aliases():
+    assert OpDef is SyncOp
+    assert AsyncOpDef is AsyncOp
 
 
 def test_sync_method_patching_passes_inspection(weave_obj, py_obj):
     assert is_op(weave_obj.method)
-    assert isinstance(weave_obj.method.__op__, OpDef)
+    assert isinstance(weave_obj.method.__op__, SyncOp)
     assert inspect.ismethod(weave_obj.method)
 
     assert is_op(py_obj.method)
-    assert isinstance(py_obj.method.__op__, OpDef)
+    assert isinstance(py_obj.method.__op__, SyncOp)
     assert inspect.ismethod(py_obj.method)
 
 
 def test_async_method_patching_passes_inspection(weave_obj, py_obj):
     assert is_op(weave_obj.amethod)
-    assert isinstance(weave_obj.amethod.__op__, AsyncOpDef)
+    assert isinstance(weave_obj.amethod.__op__, AsyncOp)
     assert inspect.iscoroutinefunction(weave_obj.amethod)
     assert inspect.ismethod(weave_obj.amethod)
 
     assert is_op(py_obj.amethod)
-    assert isinstance(py_obj.amethod.__op__, AsyncOpDef)
+    assert isinstance(py_obj.amethod.__op__, AsyncOp)
     assert inspect.iscoroutinefunction(py_obj.amethod)
     assert inspect.ismethod(py_obj.amethod)
 
 
 def test_sync_sidecar_invoke(func):
-    assert isinstance(func.__op__, OpDef)
+    assert isinstance(func.__op__, SyncOp)
     assert func.__op__.invoke(func, 1) == 2
 
 
@@ -243,10 +250,10 @@ def test_sync_wrapper_dispatches_through_sidecar(func):
 
 
 def test_sync_sidecar_invoke_bound_method(weave_obj, py_obj):
-    assert isinstance(weave_obj.method.__op__, OpDef)
+    assert isinstance(weave_obj.method.__op__, SyncOp)
     assert weave_obj.method.__op__.invoke(weave_obj.method, 1) == 2
 
-    assert isinstance(py_obj.method.__op__, OpDef)
+    assert isinstance(py_obj.method.__op__, SyncOp)
     assert py_obj.method.__op__.invoke(py_obj.method, 1) == 2
 
 
@@ -262,7 +269,7 @@ def test_as_op_bound_method_call_injects_self(weave_obj, py_obj):
 
 @pytest.mark.asyncio
 async def test_async_sidecar_invoke(afunc):
-    assert isinstance(afunc.__op__, AsyncOpDef)
+    assert isinstance(afunc.__op__, AsyncOp)
     assert await afunc.__op__.invoke(afunc, 1) == 2
 
 
@@ -290,10 +297,10 @@ async def test_async_wrapper_dispatches_through_sidecar(afunc):
 
 @pytest.mark.asyncio
 async def test_async_sidecar_invoke_bound_method(weave_obj, py_obj):
-    assert isinstance(weave_obj.amethod.__op__, AsyncOpDef)
+    assert isinstance(weave_obj.amethod.__op__, AsyncOp)
     assert await weave_obj.amethod.__op__.invoke(weave_obj.amethod, 1) == 2
 
-    assert isinstance(py_obj.amethod.__op__, AsyncOpDef)
+    assert isinstance(py_obj.amethod.__op__, AsyncOp)
     assert await py_obj.amethod.__op__.invoke(py_obj.amethod, 1) == 2
 
 
