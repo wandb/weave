@@ -67,7 +67,7 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
         )
 
     # Log and re-raise with clean exception types
-    logger.error(f"Unable to access `{entity_name}/{project_name}`.")
+    logger.error("Unable to access `%s/%s`.", entity_name, project_name)
     logger.error(str(exception))
 
     if isinstance(exception, (wandb.AuthenticationError, wandb.CommError)):

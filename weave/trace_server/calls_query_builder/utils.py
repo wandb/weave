@@ -46,7 +46,7 @@ def safely_format_sql(
     try:
         return sqlparse.format(sql, reindent=True)
     except:
-        logger.info(f"Failed to format SQL: {sql}")
+        logger.info("Failed to format SQL: %s", sql)
         return sql
 
 

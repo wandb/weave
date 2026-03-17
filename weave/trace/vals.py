@@ -796,7 +796,7 @@ def make_trace_obj(
         except ObjectDeletedError as e:
             # encountered a deleted object, return DeletedRef, warn and continue
             val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)
-            logger.warning(f"Could not read deleted object: {new_ref}")
+            logger.warning("Could not read deleted object: %s", new_ref)
 
     if isinstance(val, Table):
         val_ref = val.ref

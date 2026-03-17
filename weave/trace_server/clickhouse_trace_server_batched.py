@@ -3466,14 +3466,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for obj in obj_res.objs:
             if not hasattr(obj, "val") or not obj.val:
                 logger.warning(
-                    f"Skipping dataset object {obj.object_id} with digest {obj.digest}: missing or empty val"
+                    "Skipping dataset object %s with digest %s: missing or empty val",
+                    obj.object_id,
+                    obj.digest,
                 )
                 continue
 
             val = obj.val
             if not isinstance(val, dict):
                 logger.warning(
-                    f"Skipping dataset object {obj.object_id} with digest {obj.digest}: val is not a dict"
+                    "Skipping dataset object %s with digest %s: val is not a dict",
+                    obj.object_id,
+                    obj.digest,
                 )
                 continue
 
@@ -5772,7 +5776,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 req.inputs.messages = combined_messages
 
             except Exception as e:
-                logger.error(f"Failed to resolve prompt: {e}", exc_info=True)
+                logger.exception("Failed to resolve prompt")
                 return tsi.CompletionsCreateRes(
                     response={"error": f"Failed to resolve prompt: {e!s}"}
                 )
@@ -5919,7 +5923,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 obj_read_func=self.obj_read,
             )
         except Exception as e:
-            logger.error(f"Failed to resolve and apply prompt: {e}", exc_info=True)
+            logger.exception("Failed to resolve and apply prompt")
 
             # Yield error as single chunk then stop.
             def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:

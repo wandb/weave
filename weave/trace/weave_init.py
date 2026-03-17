@@ -122,7 +122,7 @@ def init_weave(
     wandb_context = wandb_context_module.get_wandb_api_context()
     if wandb_context is None:
         url = wandb.app_url(env.wandb_base_url())
-        logger.info(f"Please login to Weights & Biases ({url}) to continue...")
+        logger.info("Please login to Weights & Biases (%s) to continue...", url)
         wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
 
         wandb_context_module.init()
