@@ -29,6 +29,24 @@ except ImportError:
 
 _chdb_test_counter = 0
 
+# Tables that hold static reference data and should NOT be truncated between tests.
+_CHDB_PRESERVE_TABLES = {"llm_token_prices"}
+
+
+def _chdb_truncate_data_tables(server: "ChdbTraceServer") -> None:
+    """Truncate all data tables except static reference data (costs, etc.)."""
+    rows = server.ch_client.query("SHOW TABLES").result_rows
+    for (table_name,) in rows:
+        if table_name in _CHDB_PRESERVE_TABLES:
+            continue
+        # Skip views — they cannot be truncated
+        if table_name.endswith(("_deduped", "_view")):
+            continue
+        try:
+            server.ch_client.command(f"TRUNCATE TABLE `{table_name}`")
+        except Exception:
+            pass
+
 TEST_ENTITY = "shawn"
 
 
@@ -290,49 +308,32 @@ def local_secret_fetcher():
         yield
 
 
-@pytest.fixture
-def get_chdb_trace_server(
-    request,
-) -> Callable[[], UserInjectingExternalTraceServer]:
+@pytest.fixture(scope="session")
+def _chdb_session_server():
+    """Session-scoped chdb server: runs migrations + cost insertion once."""
     if not HAS_CHDB:
         pytest.skip("chdb is not installed")
 
-    servers_to_cleanup: list[tuple[ChdbTraceServer, str, str]] = []
+    db_name = "test_db_session"
+    chdb_server = ChdbTraceServer(
+        db_path=None,
+        database=db_name,
+        evaluate_model_dispatcher=EvaluateModelTestDispatcher(
+            id_converter=DummyIdConverter()
+        ),
+    )
+    chdb_server._run_migrations()
 
-    def chdb_trace_server_inner() -> UserInjectingExternalTraceServer:
-        global _chdb_test_counter
-        _chdb_test_counter += 1
-        id_converter = DummyIdConverter()
-        db_suffix = _get_worker_db_suffix(request)
-        db_name = f"test_db{db_suffix}_{_chdb_test_counter}"
-        mgmt_db = f"db_management{db_suffix}_{_chdb_test_counter}"
+    yield chdb_server
 
-        chdb_server = ChdbTraceServer(
-            db_path=None,
-            database=db_name,
-            evaluate_model_dispatcher=EvaluateModelTestDispatcher(
-                id_converter=id_converter
-            ),
-        )
-        servers_to_cleanup.append((chdb_server, db_name, mgmt_db))
-        chdb_server._run_migrations()
-
-        return externalize_trace_server(
-            chdb_server, TEST_ENTITY, id_converter=id_converter
-        )
-
-    yield chdb_trace_server_inner
-
-    for server, db_name, mgmt_db in servers_to_cleanup:
-        try:
-            server.ch_client.command(f"DROP DATABASE IF EXISTS `{mgmt_db}`")
-            server.ch_client.command(f"DROP DATABASE IF EXISTS `{db_name}`")
-        except Exception:
-            pass
-        try:
-            server.close()
-        except Exception:
-            pass
+    try:
+        chdb_server.ch_client.command(f"DROP DATABASE IF EXISTS `{db_name}`")
+    except Exception:
+        pass
+    try:
+        chdb_server.close()
+    except Exception:
+        pass
 
 
 @pytest.fixture
@@ -345,36 +346,13 @@ def trace_server(
     elif trace_server_flag == "sqlite":
         return get_sqlite_trace_server()
     elif trace_server_flag == "chdb":
-        if not HAS_CHDB:
-            pytest.skip("chdb is not installed")
-        global _chdb_test_counter
-        _chdb_test_counter += 1
+        chdb_server = request.getfixturevalue("_chdb_session_server")
+        # Reuse the session-scoped server; just truncate data tables for isolation
+        _chdb_truncate_data_tables(chdb_server)
         id_converter = DummyIdConverter()
-        db_suffix = _get_worker_db_suffix(request)
-        db_name = f"test_db{db_suffix}_{_chdb_test_counter}"
-        mgmt_db = f"db_management{db_suffix}_{_chdb_test_counter}"
-        chdb_server = ChdbTraceServer(
-            db_path=None,
-            database=db_name,
-            evaluate_model_dispatcher=EvaluateModelTestDispatcher(
-                id_converter=id_converter
-            ),
+        chdb_server._evaluate_model_dispatcher = EvaluateModelTestDispatcher(
+            id_converter=id_converter
         )
-        # Clean up any leftover databases from prior runs
-        chdb_server.ch_client.command(f"DROP DATABASE IF EXISTS `{mgmt_db}`")
-        chdb_server.ch_client.command(f"DROP DATABASE IF EXISTS `{db_name}`")
-        chdb_server._database_ensured = False
-        chdb_server._run_migrations()
-
-        def cleanup() -> None:
-            try:
-                chdb_server.ch_client.command(f"DROP DATABASE IF EXISTS `{mgmt_db}`")
-                chdb_server.ch_client.command(f"DROP DATABASE IF EXISTS `{db_name}`")
-            except Exception:
-                pass
-            chdb_server.close()
-
-        request.addfinalizer(cleanup)
         return externalize_trace_server(
             chdb_server, TEST_ENTITY, id_converter=id_converter
         )
