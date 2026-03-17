@@ -65,6 +65,7 @@ def _call_wandb_api_with_retry(
 
 
 def _is_retryable_project_exception(exception: BaseException) -> bool:
+    """Return True if the exception is transient and the request should be retried."""
     if isinstance(exception, wandb.AuthenticationError):
         return False
     if isinstance(exception, TransportQueryError):
