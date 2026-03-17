@@ -84,7 +84,7 @@ def _is_retryable_project_exception(exception: BaseException) -> bool:
 def _raise_project_access_error(
     entity_name: str, project_name: str, exception: Exception
 ) -> None:
-    logger.error(f"Unable to access `{entity_name}/{project_name}`.")
+    logger.error("Unable to access `%s/%s`.", entity_name, project_name)
     logger.error(str(exception))
 
     if isinstance(exception, (wandb.AuthenticationError, wandb.CommError)):

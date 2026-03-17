@@ -22,8 +22,12 @@ def mock_api():
 @pytest.fixture(autouse=True)
 def fast_retry_settings():
     with (
-        patch("weave.wandb_interface.project_creator.retry_max_attempts", return_value=2),
-        patch("weave.wandb_interface.project_creator.retry_max_interval", return_value=0),
+        patch(
+            "weave.wandb_interface.project_creator.retry_max_attempts", return_value=2
+        ),
+        patch(
+            "weave.wandb_interface.project_creator.retry_max_interval", return_value=0
+        ),
     ):
         yield
 
