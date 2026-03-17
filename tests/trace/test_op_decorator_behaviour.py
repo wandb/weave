@@ -5,7 +5,15 @@ import pytest
 
 import weave
 from weave.trace.call import Call
-from weave.trace.op import OpCallError, is_op, op, setup_dunder_weave_dict
+from weave.trace.op import (
+    AsyncOpDef,
+    OpCallError,
+    OpDef,
+    as_op,
+    is_op,
+    op,
+    setup_dunder_weave_dict,
+)
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.vals import MissingSelfInstanceError
 
@@ -180,30 +188,124 @@ async def test_async_method_call(client, weave_obj, py_obj):
 
 def test_sync_func_patching_passes_inspection(func):
     assert is_op(func)
+    assert isinstance(func.__op__, OpDef)
     assert inspect.isfunction(func)
 
 
 def test_async_func_patching_passes_inspection(afunc):
     assert is_op(afunc)
+    assert isinstance(afunc.__op__, AsyncOpDef)
     assert inspect.iscoroutinefunction(afunc)
 
 
 def test_sync_method_patching_passes_inspection(weave_obj, py_obj):
     assert is_op(weave_obj.method)
+    assert isinstance(weave_obj.method.__op__, OpDef)
     assert inspect.ismethod(weave_obj.method)
 
     assert is_op(py_obj.method)
+    assert isinstance(py_obj.method.__op__, OpDef)
     assert inspect.ismethod(py_obj.method)
 
 
 def test_async_method_patching_passes_inspection(weave_obj, py_obj):
     assert is_op(weave_obj.amethod)
+    assert isinstance(weave_obj.amethod.__op__, AsyncOpDef)
     assert inspect.iscoroutinefunction(weave_obj.amethod)
     assert inspect.ismethod(weave_obj.amethod)
 
     assert is_op(py_obj.amethod)
+    assert isinstance(py_obj.amethod.__op__, AsyncOpDef)
     assert inspect.iscoroutinefunction(py_obj.amethod)
     assert inspect.ismethod(py_obj.amethod)
+
+
+def test_sync_sidecar_invoke(func):
+    assert isinstance(func.__op__, OpDef)
+    assert func.__op__.invoke(func, 1) == 2
+
+
+def test_as_op_returns_bound_handle(func):
+    handle = as_op(func)
+
+    assert handle is not func
+    assert handle.__op__ is func.__op__
+    assert handle(1) == 2
+
+    res, call = handle.call(1)
+    assert res == 2
+    assert call.output == 2
+
+
+def test_sync_wrapper_dispatches_through_sidecar(func):
+    func.__op__ = lambda a: a + 2
+    assert func(1) == 3
+
+
+def test_sync_sidecar_invoke_bound_method(weave_obj, py_obj):
+    assert isinstance(weave_obj.method.__op__, OpDef)
+    assert weave_obj.method.__op__.invoke(weave_obj.method, 1) == 2
+
+    assert isinstance(py_obj.method.__op__, OpDef)
+    assert py_obj.method.__op__.invoke(py_obj.method, 1) == 2
+
+
+def test_as_op_bound_method_call_injects_self(weave_obj, py_obj):
+    weave_res, weave_call = as_op(weave_obj.method).call(1)
+    assert weave_res == 2
+    assert weave_call.output == 2
+
+    py_res, py_call = as_op(py_obj.method).call(1)
+    assert py_res == 2
+    assert py_call.output == 2
+
+
+@pytest.mark.asyncio
+async def test_async_sidecar_invoke(afunc):
+    assert isinstance(afunc.__op__, AsyncOpDef)
+    assert await afunc.__op__.invoke(afunc, 1) == 2
+
+
+@pytest.mark.asyncio
+async def test_as_op_returns_bound_async_handle(afunc):
+    handle = as_op(afunc)
+
+    assert handle is not afunc
+    assert handle.__op__ is afunc.__op__
+    assert await handle(1) == 2
+
+    res, call = await handle.call(1)
+    assert res == 2
+    assert call.output == 2
+
+
+@pytest.mark.asyncio
+async def test_async_wrapper_dispatches_through_sidecar(afunc):
+    async def fake_op(a):
+        return a + 2
+
+    afunc.__op__ = fake_op
+    assert await afunc(1) == 3
+
+
+@pytest.mark.asyncio
+async def test_async_sidecar_invoke_bound_method(weave_obj, py_obj):
+    assert isinstance(weave_obj.amethod.__op__, AsyncOpDef)
+    assert await weave_obj.amethod.__op__.invoke(weave_obj.amethod, 1) == 2
+
+    assert isinstance(py_obj.amethod.__op__, AsyncOpDef)
+    assert await py_obj.amethod.__op__.invoke(py_obj.amethod, 1) == 2
+
+
+@pytest.mark.asyncio
+async def test_as_op_bound_async_method_call_injects_self(weave_obj, py_obj):
+    weave_res, weave_call = await as_op(weave_obj.amethod).call(1)
+    assert weave_res == 2
+    assert weave_call.output == 2
+
+    py_res, py_call = await as_op(py_obj.amethod).call(1)
+    assert py_res == 2
+    assert py_call.output == 2
 
 
 def test_sync_method_calls(client, weave_obj):
@@ -405,6 +507,21 @@ def test_op_call_display_name_modified_dynamically(client):
     assert calls[0].display_name == "string"
     assert calls[1].display_name == "wow"
     assert calls[2].display_name == "amazing"
+
+
+def test_op_tracing_enabled_modified_dynamically(client):
+    @weave.op
+    def func():
+        return 1
+
+    func()
+
+    func._tracing_enabled = False
+    func()
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    assert func.__op__._tracing_enabled is False
 
 
 def test_op_name(client):

@@ -16,6 +16,7 @@ from typing_extensions import ParamSpec, TypeVar
 
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter
+    from weave.trace.op import AsyncOpDef, OpDef
     from weave.trace.refs import ObjectRef
 
 P = ParamSpec("P")
@@ -30,7 +31,33 @@ OpColor = Literal["red", "orange", "yellow", "green", "blue", "purple"]
 
 
 @runtime_checkable
-class Op(Protocol[P, R]):
+class Opified(Protocol[P, R]):
+    """A real Python callable that carries an Op sidecar on `__op__`.
+
+    The callable itself remains function-shaped for `inspect` compatibility,
+    while the sidecar provides a nominal runtime object for invocation logic.
+    """
+
+    __op__: OpDef[P, R] | AsyncOpDef[P, R]
+
+    # needed so type checkers bind `self` when an Op is used as a method
+    @overload
+    def __get__(self, instance: None, owner: type) -> Opified[P, R]: ...
+    @overload
+    def __get__(
+        self: Opified[Concatenate[Any, P2], R], instance: object, owner: type
+    ) -> Opified[P2, R]: ...
+
+    @overload
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
+    @overload
+    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pyright: ignore[reportOverlappingOverload]
+
+    __self__: Any
+
+
+@runtime_checkable
+class Op(Opified[P, R], Protocol[P, R]):
     """The interface for Op-ified functions and methods.
 
     Op was previously a class, and has been converted to a Protocol to allow
@@ -69,22 +96,6 @@ class Op(Protocol[P, R]):
     _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
     _on_finish_handler: OnFinishHandlerType | None
     _on_finish_post_processor: Callable[[Any], Any] | None
-
-    # needed so type checkers bind `self` when an Op is used as a method
-    @overload
-    def __get__(self, instance: None, owner: type) -> Op[P, R]: ...
-    @overload
-    def __get__(
-        self: Op[Concatenate[Any, P2], R], instance: object, owner: type
-    ) -> Op[P2, R]: ...
-
-    # __call__: Callable[..., Any]
-    @overload
-    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
-    @overload
-    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pyright: ignore[reportOverlappingOverload]
-
-    __self__: Any
 
     # `_tracing_enabled` is a runtime-only flag that can be used to disable
     # call tracing for an op. It is not persisted as a property of the op, but is

@@ -19,7 +19,7 @@ from collections.abc import (
     Iterator,
     Mapping,
 )
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from functools import partial, wraps
 from types import MethodType
 from typing import (
@@ -56,6 +56,7 @@ from weave.trace.op_protocol import (
     OnOutputHandlerType,
     Op,
     OpColor,
+    Opified,
     OpKind,
     PostprocessInputsFunc,
     PostprocessOutputFunc,
@@ -65,6 +66,7 @@ from weave.trace.util import log_once
 
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter, NoOpCall
+    from weave.trace.refs import ObjectRef
 
 S = TypeVar("S")
 V = TypeVar("V")
@@ -204,6 +206,239 @@ class OpKwargs(TypedDict, total=False):
     color: OpColor | None
     eager_call_start: bool
 
+def _unwrap_opified(oplike: Opified[P, R] | MethodType | partial) -> Opified[P, R]:
+    if isinstance(oplike, MethodType):
+        return cast(Opified[P, R], oplike.__func__)
+    if isinstance(oplike, partial):
+        return cast(Opified[P, R], oplike.func)
+    return oplike
+
+
+@dataclass
+class _OpRuntimeState(Generic[P, R]):
+    op: Opified[P, R] | None = None
+    resolve_fn: Callable[P, R] | None = None
+    name: str = ""
+    ref: ObjectRef | None = None
+    call_display_name: str | CallDisplayNameFunc | None = None
+    postprocess_inputs: PostprocessInputsFunc | None = None
+    postprocess_output: PostprocessOutputFunc | None = None
+    _on_input_handler: OnInputHandlerType | None = None
+    _on_output_handler: OnOutputHandlerType | None = None
+    _on_finish_handler: OnFinishHandlerType | None = None
+    _on_finish_post_processor: Callable[[Any], Any] | None = None
+    _tracing_enabled: bool = True
+    _code_capture_enabled: bool = True
+    tracing_sample_rate: float = 1.0
+    _accumulator: Callable[[Any | None, Any], Any] | None = None
+    kind: OpKind | None = None
+    color: OpColor | None = None
+    eager_call_start: bool = False
+
+    def require_resolve_fn(self) -> Callable[P, R]:
+        if self.resolve_fn is None:
+            raise ValueError("Op sidecar is missing resolve_fn")
+        return self.resolve_fn
+
+    def sync_from_wrapper(self, op: Opified[P, R]) -> None:
+        for attr in _MIRRORED_RUNTIME_OP_ATTRS:
+            if hasattr(op, attr):
+                setattr(self, attr, getattr(op, attr))
+
+    def mirror_to_wrapper(self, op: Opified[P, R]) -> None:
+        for attr in _MIRRORED_RUNTIME_OP_ATTRS:
+            setattr(op, attr, getattr(self, attr))
+
+
+# These fields still need wrapper <-> sidecar mirroring because the rest of the
+# repo can mutate them directly on the wrapper function for compatibility.
+_MIRRORED_RUNTIME_OP_ATTRS = tuple(
+    field.name for field in fields(_OpRuntimeState) if field.name != "op"
+)
+
+
+def _normalize_sidecar_invoke_target(
+    fn: Opified[P, R] | MethodType | partial, args: tuple[Any, ...]
+) -> tuple[Opified[P, R], tuple[Any, ...]]:
+    normalized_args = args
+    if isinstance(fn, MethodType):
+        bound_self = fn.__self__
+        if bound_self is not None and (not args or args[0] is not bound_self):
+            normalized_args = (bound_self, *args)
+        normalized_fn = cast(Opified[P, R], fn.__func__)
+    elif isinstance(fn, partial):
+        normalized_fn = cast(Opified[P, R], fn.func)
+        if fn.args:
+            normalized_args = (*fn.args, *normalized_args)
+        if fn.keywords:
+            raise ValueError(
+                "Sidecar invocation for partials with keyword arguments is not supported"
+            )
+    else:
+        normalized_fn = fn
+
+    return normalized_fn, normalized_args
+
+
+@dataclass
+class OpDef(_OpRuntimeState[P, R]):
+    is_generator: bool = False
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        if self.op is None:
+            raise ValueError("OpDef is not attached to an opified callable")
+        return self.invoke(self.op, *args, **kwargs)
+
+    def invoke(
+        self,
+        fn: Opified[P, R] | MethodType | partial,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
+        fn, args = _normalize_sidecar_invoke_target(fn, args)
+        if self.is_generator:
+            res, _ = _call_sync_gen(cast(Op, fn), *args, __should_raise=True, **kwargs)
+        else:
+            res, _ = _call_sync_func(cast(Op, fn), *args, __should_raise=True, **kwargs)
+        return cast(R, res)
+
+
+@dataclass
+class AsyncOpDef(_OpRuntimeState[P, R]):
+    is_async_generator: bool = False
+
+    async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        if self.op is None:
+            raise ValueError("AsyncOpDef is not attached to an opified callable")
+        return await self.invoke(self.op, *args, **kwargs)
+
+    async def invoke(
+        self,
+        fn: Opified[P, R] | MethodType | partial,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
+        fn, args = _normalize_sidecar_invoke_target(fn, args)
+        if self.is_async_generator:
+            res, _ = await _call_async_gen(
+                cast(Op, fn), *args, __should_raise=True, **kwargs
+            )
+        else:
+            res, _ = await _call_async_func(
+                cast(Op, fn), *args, __should_raise=True, **kwargs
+            )
+        return cast(R, res)
+
+
+def _sync_op_runtime_state(
+    oplike: Opified[P, R] | MethodType | partial,
+) -> tuple[Opified[P, R], OpDef[P, R] | AsyncOpDef[P, R]]:
+    opified = _unwrap_opified(oplike)
+    op_def = get_op_def(opified)
+    op_def.sync_from_wrapper(opified)
+    return opified, op_def
+
+
+def _set_runtime_attr(
+    oplike: Opified[P, R] | MethodType | partial, attr: str, value: Any
+) -> None:
+    opified = _unwrap_opified(oplike)
+    op_def = get_op_def(opified)
+    setattr(op_def, attr, value)
+    setattr(opified, attr, value)
+
+
+def _bound_runtime_property(attr: str) -> property:
+    def getter(self: BoundOp[Any, Any]) -> Any:
+        _, op_def = _sync_op_runtime_state(self._target)
+        return getattr(op_def, attr)
+
+    def setter(self: BoundOp[Any, Any], value: Any) -> None:
+        _set_runtime_attr(self._target, attr, value)
+
+    return property(getter, setter)
+
+
+class BoundOp(Generic[P, R]):
+    """A bound handle over an opified callable's `__op__` sidecar.
+
+    The wrapper function remains the public inspect-compatible callable.
+    `BoundOp` is the nominal interface returned by `as_op(...)` for metadata
+    and helper methods like `call()`/`calls()`.
+    """
+
+    __op__: OpDef[P, R] | AsyncOpDef[P, R]
+    __self__: Any
+    __wrapped__: Opified[P, R] | MethodType | partial
+
+    def __init__(self, target: Opified[P, R] | MethodType | partial) -> None:
+        opified, op_def = _sync_op_runtime_state(target)
+        self._target = target
+        self._opified = opified
+        self.__op__ = op_def
+        self.__self__ = getattr(target, "__self__", opified)
+        self.__wrapped__ = target
+        self.__signature__ = inspect.signature(target)
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        return cast(R, self.__wrapped__(*args, **kwargs))
+
+    resolve_fn = _bound_runtime_property("resolve_fn")
+    name = _bound_runtime_property("name")
+    ref = _bound_runtime_property("ref")
+    call_display_name = _bound_runtime_property("call_display_name")
+    postprocess_inputs = _bound_runtime_property("postprocess_inputs")
+    postprocess_output = _bound_runtime_property("postprocess_output")
+    _on_input_handler = _bound_runtime_property("_on_input_handler")
+    _on_output_handler = _bound_runtime_property("_on_output_handler")
+    _on_finish_handler = _bound_runtime_property("_on_finish_handler")
+    _on_finish_post_processor = _bound_runtime_property("_on_finish_post_processor")
+    _tracing_enabled = _bound_runtime_property("_tracing_enabled")
+    _code_capture_enabled = _bound_runtime_property("_code_capture_enabled")
+    tracing_sample_rate = _bound_runtime_property("tracing_sample_rate")
+    _accumulator = _bound_runtime_property("_accumulator")
+    kind = _bound_runtime_property("kind")
+    color = _bound_runtime_property("color")
+    eager_call_start = _bound_runtime_property("eager_call_start")
+
+    def call(
+        self,
+        *args: Any,
+        __weave: WeaveKwargs | None = None,
+        __should_raise: bool = False,
+        __require_explicit_finish: bool = False,
+        **kwargs: Any,
+    ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
+        opified, normalized_args = _normalize_sidecar_invoke_target(
+            self._target, args
+        )
+        return call(
+            cast(Op, opified),
+            *normalized_args,
+            __weave=__weave,
+            __should_raise=__should_raise,
+            __require_explicit_finish=__require_explicit_finish,
+            **kwargs,
+        )
+
+    def calls(self) -> CallsIter:
+        return calls(cast(Op, self._opified))
+
+    def invoke(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        return cast(R, self.__op__.invoke(self._target, *args, **kwargs))
+
+    def _set_on_input_handler(self, on_input: OnInputHandlerType) -> None:
+        _set_on_input_handler(cast(Op, self._opified), on_input)
+
+    def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:
+        _set_on_output_handler(cast(Op, self._opified), on_output)
+
+    def _set_on_finish_handler(self, on_finish: OnFinishHandlerType) -> None:
+        _set_on_finish_handler(cast(Op, self._opified), on_finish)
+
+    def get_captured_code(self) -> str:
+        return get_captured_code(cast(Op, self._opified))
+
 
 def setup_dunder_weave_dict(op: Op, d: WeaveKwargs | None = None) -> WeaveKwargs:
     """Sets up a __weave dict used to pass WeaveKwargs to ops.
@@ -221,30 +456,34 @@ def setup_dunder_weave_dict(op: Op, d: WeaveKwargs | None = None) -> WeaveKwargs
     weave_dict = res.setdefault("attributes", defaultdict(dict)).setdefault("weave", {})
     res.setdefault("display_name", None)
 
-    if op.kind:
-        weave_dict["kind"] = op.kind
-    if op.color:
-        weave_dict["color"] = op.color
+    _, op_def = _sync_op_runtime_state(op)
+    if op_def.kind:
+        weave_dict["kind"] = op_def.kind
+    if op_def.color:
+        weave_dict["color"] = op_def.color
 
     return cast(WeaveKwargs, res)
 
 
 def _set_on_input_handler(func: Op, on_input: OnInputHandlerType) -> None:
-    if func._on_input_handler is not None:
+    _, op_def = _sync_op_runtime_state(func)
+    if op_def._on_input_handler is not None:
         raise ValueError("Cannot set on_input_handler multiple times")
-    func._on_input_handler = on_input
+    _set_runtime_attr(func, "_on_input_handler", on_input)
 
 
 def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
-    if func._on_output_handler is not None:
+    _, op_def = _sync_op_runtime_state(func)
+    if op_def._on_output_handler is not None:
         raise ValueError("Cannot set on_output_handler multiple times")
-    func._on_output_handler = on_output
+    _set_runtime_attr(func, "_on_output_handler", on_output)
 
 
 def _set_on_finish_handler(func: Op, on_finish: OnFinishHandlerType) -> None:
-    if func._on_finish_handler is not None:
+    _, op_def = _sync_op_runtime_state(func)
+    if op_def._on_finish_handler is not None:
         raise ValueError("Cannot set on_finish_handler multiple times")
-    func._on_finish_handler = on_finish
+    _set_runtime_attr(func, "_on_finish_handler", on_finish)
 
 
 def _is_unbound_method(func: Callable) -> bool:
@@ -272,18 +511,21 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     )
     from weave.type_wrappers import Content
 
+    _, op_def = _sync_op_runtime_state(func)
+    resolve_fn = op_def.require_resolve_fn()
+
     try:
-        sig = inspect.signature(func)
+        sig = inspect.signature(resolve_fn)
         inputs = sig.bind(*args, **kwargs).arguments
     except TypeError as e:
-        raise OpCallError(f"Error calling {func.name}: {e}") from e
+        raise OpCallError(f"Error calling {op_def.name}: {e}") from e
 
-    inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
+    inputs_with_defaults = _apply_fn_defaults_to_inputs(resolve_fn, inputs)
 
     # Annotated input type flow
     # If user defines postprocess_inputs manually, trust it instead of running this
     to_weave_inputs = {}
-    if not func.postprocess_inputs:
+    if not op_def.postprocess_inputs:
         parsed_annotations = parse_from_signature(sig)
         for param_name, value in inputs_with_defaults.items():
             # Check if we found an annotation which requires substitution
@@ -301,11 +543,15 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
 
     # Annotated return type flow
     # If user defines postprocess_output manually, trust it instead of running this
-    if not func.postprocess_output and sig.return_annotation:
+    if not op_def.postprocess_output and sig.return_annotation:
         parsed = parse_content_annotation(str(sig.return_annotation))
         if isinstance(parsed, ContentAnnotation):
-            func.postprocess_output = lambda x: Content._from_guess(
-                x, mimetype=parsed.mimetype, extension=parsed.extension
+            _set_runtime_attr(
+                func,
+                "postprocess_output",
+                lambda x: Content._from_guess(
+                    x, mimetype=parsed.mimetype, extension=parsed.extension
+                ),
             )
 
     return ProcessedInputs(
@@ -339,9 +585,11 @@ def _create_call(
     """
     client = weave_client_context.require_weave_client()
 
+    _, op_def = _sync_op_runtime_state(func)
+
     pargs = None
-    if func._on_input_handler is not None:
-        pargs = func._on_input_handler(func, args, kwargs)
+    if op_def._on_input_handler is not None:
+        pargs = op_def._on_input_handler(func, args, kwargs)
     if not pargs:
         pargs = _default_on_input_handler(func, args, kwargs)
     inputs_with_defaults = pargs.inputs
@@ -370,7 +618,7 @@ def _create_call(
         inputs_with_defaults,
         parent_call,
         # Very important for `call_time_display_name` to take precedence over `func.call_display_name`
-        display_name=call_time_display_name or func.call_display_name,
+        display_name=call_time_display_name or op_def.call_display_name,
         attributes=attributes,
         use_stack=use_stack,
         _call_id_override=preferred_call_id,
@@ -389,14 +637,16 @@ def is_tracing_setting_disabled() -> bool:
 
 
 def should_skip_tracing_for_op(op: Op) -> bool:
-    return not op._tracing_enabled
+    _, op_def = _sync_op_runtime_state(op)
+    return not op_def._tracing_enabled
 
 
 def _should_sample_traces(op: Op) -> bool:
     if call_context.get_current_call():
         return False  # Don't sample traces for child calls
 
-    if random.random() > op.tracing_sample_rate:
+    _, op_def = _sync_op_runtime_state(op)
+    if random.random() > op_def.tracing_sample_rate:
         return True  # Sample traces for this call
 
     return False
@@ -437,7 +687,8 @@ def _call_sync_func(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
-    func = op.resolve_fn
+    _, op_def = _sync_op_runtime_state(op)
+    func = op_def.require_resolve_fn()
     call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
@@ -488,7 +739,7 @@ def _call_sync_func(
         try:
             # Apply any post-processing to the accumulated state if needed
             try:
-                if processor := getattr(op, "_on_finish_post_processor", None):
+                if processor := op_def._on_finish_post_processor:
                     output = processor(output)
             except Exception as e:
                 if get_raise_on_captured_errors():
@@ -508,17 +759,17 @@ def _call_sync_func(
                 call_context.pop_call(call.id)
 
     def on_output(output: Any) -> Any:
-        if handler := getattr(op, "_on_output_handler", None):
+        if handler := op_def._on_output_handler:
             return handler(output, finish, call.inputs)
 
         if (
-            op._accumulator
+            op_def._accumulator
             and isinstance(output, (Iterator, Generator, AsyncIterator))
             and not isinstance(output, (str, bytes))
         ):
             return _build_iterator_from_accumulator_for_op(
                 output,
-                op._accumulator,
+                op_def._accumulator,
                 finish,
                 _IteratorWrapper,
             )
@@ -566,7 +817,8 @@ async def _call_async_func(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
-    func = op.resolve_fn
+    _, op_def = _sync_op_runtime_state(op)
+    func = op_def.require_resolve_fn()
     call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
@@ -615,7 +867,7 @@ async def _call_async_func(
         try:
             # Apply any post-processing to the accumulated state if needed
             try:
-                if processor := getattr(op, "_on_finish_post_processor", None):
+                if processor := op_def._on_finish_post_processor:
                     output = processor(output)
             except Exception as e:
                 if get_raise_on_captured_errors():
@@ -635,17 +887,17 @@ async def _call_async_func(
                 call_context.pop_call(call.id)
 
     def on_output(output: Any) -> Any:
-        if handler := getattr(op, "_on_output_handler", None):
+        if handler := op_def._on_output_handler:
             return handler(output, finish, call.inputs)
 
         if (
-            op._accumulator
+            op_def._accumulator
             and isinstance(output, AsyncIterator)
             and not isinstance(output, (str, bytes))
         ):
             return _build_iterator_from_accumulator_for_op(
                 output,
-                op._accumulator,
+                op_def._accumulator,
                 finish,
                 _IteratorWrapper,
             )
@@ -691,7 +943,8 @@ def _call_sync_gen(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Generator[Any], Call]:
-    func = op.resolve_fn
+    _, op_def = _sync_op_runtime_state(op)
+    func = op_def.require_resolve_fn()
     call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
@@ -737,7 +990,7 @@ def _call_sync_gen(
     client = weave_client_context.require_weave_client()
     has_finished = False
     accumulated_state = None
-    acc = op._accumulator
+    acc = op_def._accumulator
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
         if __require_explicit_finish:
@@ -751,7 +1004,7 @@ def _call_sync_gen(
         try:
             # Apply any post-processing to the accumulated state if needed
             try:
-                if processor := getattr(op, "_on_finish_post_processor", None):
+                if processor := op_def._on_finish_post_processor:
                     output = processor(output)
             except Exception as e:
                 if get_raise_on_captured_errors():
@@ -786,7 +1039,7 @@ def _call_sync_gen(
 
                 # If there's an on_output_handler, let it process the generator
                 # This is important for integrations that wrap the generator
-                if (handler := op._on_output_handler) is not None:
+                if (handler := op_def._on_output_handler) is not None:
                     try:
                         # The handler might return a different generator or wrap the original
                         processed_gen = handler(original_gen, finish, call.inputs)
@@ -910,7 +1163,8 @@ async def _call_async_gen(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[AsyncIterator, Call]:
-    func = op.resolve_fn
+    _, op_def = _sync_op_runtime_state(op)
+    func = op_def.require_resolve_fn()
     call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
@@ -957,7 +1211,7 @@ async def _call_async_gen(
     client = weave_client_context.require_weave_client()
     has_finished = False
     accumulated_state = None
-    acc = op._accumulator
+    acc = op_def._accumulator
 
     def finish(output: Any = None, exception: BaseException | None = None) -> None:
         if __require_explicit_finish:
@@ -971,7 +1225,7 @@ async def _call_async_gen(
         try:
             # Apply any post-processing to the accumulated state if needed
             try:
-                if processor := getattr(op, "_on_finish_post_processor", None):
+                if processor := op_def._on_finish_post_processor:
                     output = processor(output)
             except Exception as e:
                 if get_raise_on_captured_errors():
@@ -1006,7 +1260,7 @@ async def _call_async_gen(
 
                 # If there's an on_output_handler, let it process the generator
                 # This is important for integrations that wrap the generator
-                if (handler := op._on_output_handler) is not None:
+                if (handler := op_def._on_output_handler) is not None:
                     try:
                         # The handler might return a different generator or wrap the original
                         processed_gen = handler(original_gen, finish, call.inputs)
@@ -1154,7 +1408,8 @@ def call(
     result, call = add.call(1, 2)
     ```
     """
-    if inspect.iscoroutinefunction(op.resolve_fn):
+    _, op_def = _sync_op_runtime_state(op)
+    if inspect.iscoroutinefunction(op_def.require_resolve_fn()):
         return _call_async_func(
             op,
             *args,
@@ -1246,41 +1501,37 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
-                    res, _ = await _call_async_func(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                    return cast(
+                        R,
+                        await cast(AsyncOpDef[P, R], wrapper.__op__)(*args, **kwargs),
                     )
-                    return cast(R, res)
             elif is_sync_generator:
 
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
-                    res, _ = _call_sync_gen(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                    return cast(
+                        R,
+                        cast(OpDef[P, R], wrapper.__op__)(*args, **kwargs),
                     )
-                    return cast(R, res)
             elif is_async_generator:
 
                 @wraps(func)
                 async def wrapper(  # pyright: ignore[reportRedeclaration]
                     *args: P.args, **kwargs: P.kwargs
                 ) -> AsyncGenerator[R]:
-                    res, _ = await _call_async_gen(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
-                    )
+                    res = await cast(AsyncOpDef[P, R], wrapper.__op__)(*args, **kwargs)
                     async for item in res:
                         yield item
             else:
 
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-                    res, _ = _call_sync_func(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                    return cast(
+                        R,
+                        cast(OpDef[P, R], wrapper.__op__)(*args, **kwargs),
                     )
-                    return cast(R, res)
 
             # Tack these helpers on to our wrapper
-            wrapper.resolve_fn = func  # type: ignore
-
             inferred_name = func.__qualname__ if is_method else func.__name__
 
             # funcs and methods defined inside another func will have the
@@ -1288,36 +1539,48 @@ def op(
             # this is noisy for us, so we strip it out
             inferred_name = inferred_name.split(".<locals>.")[-1]
 
-            wrapper.name = name or inferred_name  # type: ignore
-            wrapper.ref = None  # type: ignore
-
-            wrapper.postprocess_inputs = postprocess_inputs  # type: ignore
-            wrapper.postprocess_output = postprocess_output  # type: ignore
+            op_def: OpDef[P, R] | AsyncOpDef[P, R]
+            op_def_kwargs = {
+                "op": cast(Opified[P, R], wrapper),
+                "resolve_fn": func,
+                "name": name or inferred_name,
+                "ref": None,
+                "call_display_name": call_display_name,
+                "postprocess_inputs": postprocess_inputs,
+                "postprocess_output": postprocess_output,
+                "_on_input_handler": None,
+                "_on_output_handler": None,
+                "_on_finish_handler": None,
+                "_on_finish_post_processor": None,
+                "_tracing_enabled": True,
+                "_code_capture_enabled": enable_code_capture,
+                "tracing_sample_rate": tracing_sample_rate,
+                "_accumulator": accumulator,
+                "kind": kind,
+                "color": color,
+                "eager_call_start": eager_call_start,
+            }
+            if is_async or is_async_generator:
+                op_def = AsyncOpDef(
+                    is_async_generator=is_async_generator, **op_def_kwargs
+                )
+            else:
+                op_def = OpDef(is_generator=is_sync_generator, **op_def_kwargs)
+            wrapper.__op__ = op_def  # type: ignore
+            op_def.mirror_to_wrapper(cast(Opified[P, R], wrapper))
 
             wrapper.call = partial(call, wrapper)  # type: ignore
             wrapper.calls = partial(calls, wrapper)  # type: ignore
 
-            wrapper.__call__ = wrapper  # type: ignore
             wrapper.__self__ = wrapper  # type: ignore
 
             wrapper._set_on_input_handler = partial(_set_on_input_handler, wrapper)  # type: ignore
-            wrapper._on_input_handler = None  # type: ignore
 
             wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
-            wrapper._on_output_handler = None  # type: ignore
 
             wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
-            wrapper._on_finish_handler = None  # type: ignore
-            wrapper._on_finish_post_processor = None  # type: ignore
-
-            wrapper._tracing_enabled = True  # type: ignore
-            wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
-
-            wrapper._accumulator = accumulator  # type: ignore
 
             wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
-            wrapper._code_capture_enabled = enable_code_capture  # type: ignore
-            wrapper.eager_call_start = eager_call_start  # type: ignore
 
             if callable(call_display_name):
                 params = inspect.signature(call_display_name).parameters
@@ -1325,15 +1588,6 @@ def op(
                     raise DisplayNameFuncError(
                         "`call_display_name` function must take exactly 1 argument (the Call object)"
                     )
-            wrapper.call_display_name = call_display_name  # type: ignore
-
-            # Mark what type of function this is for runtime type checking
-            wrapper._is_async = is_async  # type: ignore
-            wrapper._is_generator = is_sync_generator  # type: ignore
-            wrapper._is_async_generator = is_async_generator  # type: ignore
-
-            wrapper.kind = kind  # type: ignore
-            wrapper.color = color  # type: ignore
 
             return cast(Op[P, R], wrapper)
 
@@ -1391,33 +1645,53 @@ def maybe_unbind_method(oplike: Op | MethodType | partial) -> Op:
     return cast(Op, op)
 
 
+def get_op_def(
+    oplike: Opified[Any, Any] | MethodType | partial | BoundOp[Any, Any],
+) -> OpDef | AsyncOpDef:
+    if isinstance(oplike, BoundOp):
+        return oplike.__op__
+
+    if isinstance(oplike, MethodType):
+        maybe_opified = oplike.__func__
+    elif isinstance(oplike, partial):
+        maybe_opified = oplike.func
+    else:
+        maybe_opified = oplike
+
+    op_def = getattr(maybe_opified, "__op__", None)
+    if not isinstance(op_def, (OpDef, AsyncOpDef)):
+        raise TypeError("Expected an opified callable with a __op__ sidecar")
+    return op_def
+
+
 def is_op(obj: Any) -> TypeIs[Op]:
     """Check if an object is an Op."""
+    if isinstance(obj, partial):
+        return is_op(obj.func)
+
+    sidecar = getattr(obj, "__op__", None)
+    if isinstance(sidecar, (OpDef, AsyncOpDef)):
+        return True
+
     if sys.version_info < (3, 12):
         return isinstance(obj, Op)
 
     return all(hasattr(obj, attr) for attr in Op.__annotations__)
 
 
-def as_op(fn: Callable[P, R]) -> Op[P, R]:
-    """Given a @weave.op decorated function, return its Op.
+def as_op(
+    fn: Callable[P, R] | MethodType | partial | BoundOp[P, R],
+) -> BoundOp[P, R]:
+    """Given a @weave.op decorated callable, return a bound Op handle.
 
-    @weave.op decorated functions are instances of Op already, so this
-    function should be a no-op at runtime. But you can use it to satisfy type checkers
-    if you need to access OpDef attributes in a typesafe way.
-
-    Args:
-        fn: A weave.op decorated function.
-
-    Returns:
-        The Op of the function.
+    The returned handle exposes op helpers and metadata via the callable's
+    `__op__` sidecar while preserving method binding semantics.
     """
+    if isinstance(fn, BoundOp):
+        return fn
     if not is_op(fn):
         raise ValueError("fn must be a weave.op decorated function")
-
-    # The unbinding is necessary for methods because `MethodType` is applied after the
-    # func is decorated into an Op.
-    return cast(Op[P, R], maybe_unbind_method(cast(Op, fn)))
+    return BoundOp(cast(Opified[P, R] | MethodType | partial, fn))
 
 
 _OnYieldType = Callable[[V], None]
