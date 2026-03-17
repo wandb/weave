@@ -1,6 +1,6 @@
 import weave
 from weave.trace.context.weave_client_context import set_weave_client_global
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import LazyObject
 
 
 def test_weaveobject_properties():
@@ -9,7 +9,7 @@ def test_weaveobject_properties():
         def x(self):
             return 1
 
-    to = WeaveObject(A(), None, None, None)
+    to = LazyObject(A(), None, None, None)
     assert to.x == 1
 
 

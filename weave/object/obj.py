@@ -15,7 +15,7 @@ from weave.trace.objectify import Objectifyable
 from weave.trace.op_protocol import Op
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import ObjectRef
-from weave.trace.vals import WeaveObject, pydantic_getattribute
+from weave.trace.vals import LazyObject, pydantic_getattribute
 
 
 class Object(BaseModel):
@@ -88,10 +88,10 @@ class Object(BaseModel):
     def handle_relocatable_object(
         cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
     ) -> Any:
-        """Handle validation of relocatable objects including ObjectRef and WeaveObject.
+        """Handle validation of relocatable objects including ObjectRef and LazyObject.
 
         This validator handles special cases where the input is an ObjectRef or
-        WeaveObject that needs to be properly converted to a standard Object instance.
+        LazyObject that needs to be properly converted to a standard Object instance.
         It ensures that references are preserved and that ignored types are handled
         correctly during the validation process.
 
@@ -110,13 +110,13 @@ class Object(BaseModel):
             # When an ObjectRef is passed
             obj = MyObject(some_object_ref)
 
-            # When a WeaveObject is passed
+            # When a LazyObject is passed
             obj = MyObject(some_weave_object)
             ```
         """
         if isinstance(v, ObjectRef):
             return v.get()
-        if isinstance(v, WeaveObject):
+        if isinstance(v, LazyObject):
             # This is a relocated object, so destructure it into a dictionary
             # so pydantic can validate it.
             keys = v._val.__dict__.keys()
@@ -142,7 +142,7 @@ class Object(BaseModel):
             # TODO: fix this. I think dedupe may make it so the user data ends up
             #    working fine, but not setting a ref here will cause the client
             #    to do extra work.
-            if isinstance(v, WeaveObject):
+            if isinstance(v, LazyObject):
                 ref = get_ref(v)
                 new_obj.__dict__["ref"] = ref
             # return new_obj

@@ -13,7 +13,7 @@ from weave.trace.box import (
 )
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef
-from weave.trace.vals import WeaveDict, WeaveList, WeaveObject
+from weave.trace.vals import LazyObject, WeaveDict, WeaveList
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ def test_deepcopy_weavedict_e2e(client):
 def test_deepcopy_weaveobject(client, example_class):
     _, expected_record = example_class
 
-    o = WeaveObject(
+    o = LazyObject(
         expected_record,
         ref=None,
         root=None,

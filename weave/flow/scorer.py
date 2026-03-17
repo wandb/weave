@@ -15,7 +15,7 @@ from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import OpCallError, as_op, is_op, op
 from weave.trace.op_caller import async_call_op
 from weave.trace.op_protocol import Op
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import LazyObject
 from weave.trace.weave_client import sanitize_object_name
 
 
@@ -50,7 +50,7 @@ class Scorer(Object):
         return auto_summarize(score_rows)
 
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Self:
+    def from_obj(cls, obj: LazyObject) -> Self:
         field_values = {}
         for field_name in cls.model_fields:
             if hasattr(obj, field_name):

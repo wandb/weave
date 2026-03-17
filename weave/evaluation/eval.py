@@ -35,7 +35,7 @@ from weave.trace.op import OpCallError, as_op, is_op, op
 from weave.trace.op_protocol import CallDisplayNameFunc, Op
 from weave.trace.refs import ObjectRef
 from weave.trace.table import Table
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import LazyObject
 from weave.trace.weave_client import get_ref
 from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id
@@ -117,7 +117,7 @@ class Evaluation(Object):
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
 
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Self:
+    def from_obj(cls, obj: LazyObject) -> Self:
         field_values = {}
         for field_name in cls.model_fields:
             if hasattr(obj, field_name):
@@ -142,7 +142,7 @@ class Evaluation(Object):
             for scorer in orig_scorers:
                 maybe_objectified_scorer = (
                     maybe_objectify(scorer)
-                    if isinstance(scorer, WeaveObject)
+                    if isinstance(scorer, LazyObject)
                     else scorer
                 )
                 scorers.append(maybe_objectified_scorer)
@@ -457,7 +457,7 @@ def is_valid_model(model: Any) -> bool:
         # Saved Models (Objects with predict) are supported
         or (
             get_ref(model) is not None
-            and isinstance(model, WeaveObject)
+            and isinstance(model, LazyObject)
             and hasattr(model, "predict")
             and is_op(model.predict)
         )

@@ -84,7 +84,7 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.util import log_once
-from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.vals import LazyObject, WeaveTable, make_trace_obj
 from weave.trace.wandb_run_context import (
     WandbRunContext,
     check_wandb_run_matches,
@@ -167,7 +167,7 @@ ALLOW_MIXED_PROJECT_REFS = False
 logger = logging.getLogger(__name__)
 
 
-# TODO: should be Call, not WeaveObject
+# TODO: should be Call, not LazyObject
 
 
 def print_call_link(call: Call) -> None:
@@ -281,9 +281,9 @@ def map_to_refs(obj: Any) -> Any:
         return {k: map_to_refs(v) for k, v in obj.items()}
 
     # This path should only be reached if the object is both:
-    # 1. A `WeaveObject`; and
+    # 1. A `LazyObject`; and
     # 2. Has been dirtied (edited in any way), causing obj.ref=None
-    elif isinstance(obj, WeaveObject):
+    elif isinstance(obj, LazyObject):
         return map_to_refs(obj._val)
 
     return obj
@@ -617,7 +617,7 @@ class WeaveClient:
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
-    ) -> WeaveObject:
+    ) -> LazyObject:
         """Get a single call by its ID.
 
         Args:
@@ -1813,9 +1813,9 @@ class WeaveClient:
         elif isinstance(obj, WeaveTable):
             self._save_table(obj)
 
-        # Special case: Custom recursive handling for WeaveObject with rows
+        # Special case: Custom recursive handling for LazyObject with rows
         # TODO: Kinda hacky way to dispatching Dataset with rows: Table
-        elif isinstance(obj, WeaveObject) and hasattr(obj, "rows"):
+        elif isinstance(obj, LazyObject) and hasattr(obj, "rows"):
             self._save_nested_objects(obj.rows)
 
         # Recursive traversal of other pydantic objects

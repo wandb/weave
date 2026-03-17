@@ -13,7 +13,7 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.table import Table
-from weave.trace.vals import WeaveObject, WeaveTable
+from weave.trace.vals import LazyObject, WeaveTable
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -50,7 +50,7 @@ class Dataset(Object):
     rows: Table | WeaveTable
 
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Self:
+    def from_obj(cls, obj: LazyObject) -> Self:
         field_values = {}
         for field_name in cls.model_fields:
             if hasattr(obj, field_name):

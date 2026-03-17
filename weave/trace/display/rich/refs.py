@@ -6,7 +6,7 @@ from weave.trace.context import weave_client_context
 from weave.trace.display import display
 from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.refs import AnyRef, CallRef, Ref
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import LazyObject
 
 
 class Refs(AbstractRichContainer[str]):
@@ -30,7 +30,7 @@ class Refs(AbstractRichContainer[str]):
         )
 
     # TODO: Perhaps there should be a Calls that extends AbstractRichContainer
-    def calls(self) -> list[WeaveObject]:
+    def calls(self) -> list[LazyObject]:
         client = weave_client_context.require_weave_client()
         objs = []
         for ref in self.call_refs():

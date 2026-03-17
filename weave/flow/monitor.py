@@ -7,7 +7,7 @@ from weave.flow.casting import Scorer
 from weave.object.obj import Object
 from weave.trace.api import ObjectRef, publish
 from weave.trace.objectify import register_object
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import LazyObject
 from weave.trace_server.interface.query import Query
 
 DebounceAggregationField = Literal["trace_id", "thread_id"]
@@ -98,7 +98,7 @@ class Monitor(Object):
         return publish(self)
 
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Self:
+    def from_obj(cls, obj: LazyObject) -> Self:
         return cls.model_validate(obj.unwrap())
 
 

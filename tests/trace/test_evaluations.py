@@ -763,8 +763,8 @@ async def test_eval_with_complex_types(client):
         # Note: when we start recursively saving dataset rows, this will
         # probably break. We need a way to deserialize back to the actual
         # classes for these assertions to maintain, else they will be
-        # WeaveObjects here and not pass these checks. I suspect customers
-        # will not be happy with WeaveObjects, so this is a good sanity check
+        # LazyObjects here and not pass these checks. I suspect customers
+        # will not be happy with LazyObjects, so this is a good sanity check
         # for now.
         assert isinstance(dc, MyDataclass)
         assert isinstance(model, MyModel)
@@ -779,8 +779,8 @@ async def test_eval_with_complex_types(client):
         # Note: when we start recursively saving dataset rows, this will
         # probably break. We need a way to deserialize back to the actual
         # classes for these assertions to maintain, else they will be
-        # WeaveObjects here and not pass these checks. I suspect customers
-        # will not be happy with WeaveObjects, so this is a good sanity check
+        # LazyObjects here and not pass these checks. I suspect customers
+        # will not be happy with LazyObjects, so this is a good sanity check
         # for now.
         assert isinstance(dc, MyDataclass)
         assert isinstance(model, MyModel)

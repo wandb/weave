@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, TypeGuard, TypeVar
 
 from weave.trace.object_record import ObjectRecord
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import LazyObject
 
 C = TypeVar("C")
 
@@ -17,7 +17,7 @@ def weave_isinstance(obj: Any, cls: type[C] | tuple[type[C], ...]) -> TypeGuard[
         return obj._class_name == cls.__name__ or any(
             b == cls.__name__ for b in obj._bases
         )
-    if isinstance(obj, WeaveObject):
+    if isinstance(obj, LazyObject):
         return obj._class_name == cls.__name__ or any(
             b == cls.__name__ for b in obj._bases
         )

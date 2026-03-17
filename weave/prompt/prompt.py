@@ -18,7 +18,7 @@ from weave.trace.display.rich import pydantic_util
 from weave.trace.objectify import register_object
 from weave.trace.op import op
 from weave.trace.refs import ObjectRef
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import LazyObject
 
 
 class Message(TypedDict):
@@ -97,7 +97,7 @@ class StringPrompt(Prompt):
         return self.content.format(**kwargs)
 
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Self:
+    def from_obj(cls, obj: LazyObject) -> Self:
         prompt = cls(content=obj.content)
         prompt.name = obj.name
         prompt.description = obj.description
@@ -181,7 +181,7 @@ class MessagesPrompt(Prompt):
         return [self.format_message(m, **kwargs) for m in self.messages]
 
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Self:
+    def from_obj(cls, obj: LazyObject) -> Self:
         prompt = cls(messages=obj.messages)
         prompt.name = obj.name
         prompt.description = obj.description
@@ -494,7 +494,7 @@ class EasyPrompt(UserList, Prompt):
         }
 
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> Self:
+    def from_obj(cls, obj: LazyObject) -> Self:
         messages = obj.messages if hasattr(obj, "messages") else obj.data
         messages = [dict(m) for m in messages]
         config = dict(obj.config)

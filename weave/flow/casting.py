@@ -11,14 +11,14 @@ from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import as_op, is_op
 from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef, OpRef
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import LazyObject
 
 
 def cast_to_dataset(obj: Any) -> Dataset:
     if isinstance(obj, Dataset):
         return obj
 
-    if isinstance(obj, WeaveObject):
+    if isinstance(obj, LazyObject):
         return Dataset.from_obj(obj)
 
     if isinstance(obj, ObjectRef):

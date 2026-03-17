@@ -16,7 +16,7 @@ from weave.trace.display.grid import Grid
 from weave.trace.display.rich import pydantic_util
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.traverse import ObjectPath, get_paths
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import LazyObject
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.interface import query as tsi_query
@@ -454,7 +454,7 @@ def query_to_filters(query: tsi.Query | None) -> Filters | None:
     raise QueryTranslationException(f"Could not parse {query}")
 
 
-def get_object_path(obj: WeaveObject, path: str | ObjectPath) -> Any:
+def get_object_path(obj: LazyObject, path: str | ObjectPath) -> Any:
     """Given a path and an object, return what is pointed to."""
     if isinstance(path, str):
         path = ObjectPath.parse_str(path)

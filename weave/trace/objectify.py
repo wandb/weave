@@ -6,7 +6,7 @@ from weave.trace.ref_util import set_ref
 
 if TYPE_CHECKING:
     from weave.object.obj import Object
-    from weave.trace.vals import WeaveObject
+    from weave.trace.vals import LazyObject
 
 T_co = TypeVar("T_co", bound="Object", covariant=True)
 
@@ -14,7 +14,7 @@ T_co = TypeVar("T_co", bound="Object", covariant=True)
 @runtime_checkable
 class Objectifyable(Protocol[T_co]):
     @classmethod
-    def from_obj(cls, obj: WeaveObject) -> T_co: ...
+    def from_obj(cls, obj: LazyObject) -> T_co: ...
 
 
 _registry: dict[str, type[Object]] = {}
@@ -28,7 +28,7 @@ def register_object(cls: type[T_co]) -> type[T_co]:
     return cls
 
 
-def maybe_objectify(obj: WeaveObject) -> Object | WeaveObject:
+def maybe_objectify(obj: LazyObject) -> Object | LazyObject:
     if (cls_name := getattr(obj, "_class_name", None)) is None:
         return obj
 

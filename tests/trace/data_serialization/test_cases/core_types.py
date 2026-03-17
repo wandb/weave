@@ -63,7 +63,7 @@ core_cases = [
         ],
         equality_check=lambda a, b: (
             # Unfortunately this does not correct deserialize right now - specifically
-            # for the inputs case! It is left as a WeaveObject. Ideally we could comment
+            # for the inputs case! It is left as a LazyObject. Ideally we could comment
             # this back in
             # isinstance(a, CustomObject) and isinstance(b, CustomObject) and
             a.my_name == b.my_name

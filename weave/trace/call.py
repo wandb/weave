@@ -16,7 +16,7 @@ from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef, ObjectRef, OpRef
 from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import LazyObject
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.interface.query import Query
@@ -325,7 +325,7 @@ class CallDict(TypedDict):
     total_storage_size_bytes: int | None
 
 
-CallsIter = PaginatedIterator[CallSchema, WeaveObject]
+CallsIter = PaginatedIterator[CallSchema, LazyObject]
 
 
 def elide_display_name(name: str) -> str:
@@ -382,8 +382,8 @@ def _make_calls_iterator(
             )
         )
 
-    # TODO: Should be Call, not WeaveObject
-    def transform_func(call: CallSchema) -> WeaveObject:
+    # TODO: Should be Call, not LazyObject
+    def transform_func(call: CallSchema) -> LazyObject:
         entity, project = from_project_id(project_id)
         return make_client_call(entity, project, call, server)
 
@@ -418,7 +418,7 @@ def _make_calls_iterator(
 
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
-) -> WeaveObject:
+) -> LazyObject:
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
 
@@ -448,4 +448,4 @@ def make_client_call(
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()
     ref = CallRef(entity, project, call_id)
-    return WeaveObject(call, ref, server, None)
+    return LazyObject(call, ref, server, None)

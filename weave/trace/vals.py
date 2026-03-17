@@ -219,7 +219,9 @@ def attribute_access_result(
     )
 
 
-class WeaveObject(Traceable):  # noqa: PLW1641
+# LazyObject: A lazy-loading proxy that wraps server-fetched objects, resolving attributes on access.
+class LazyObject(Traceable):  # noqa: PLW1641
+    # Renamed from WeaveObject to LazyObject to better describe its lazy-loading behavior.
     def __init__(
         self,
         val: Any,
@@ -234,9 +236,9 @@ class WeaveObject(Traceable):  # noqa: PLW1641
         self.root = root or self
         self.parent = parent
 
-    def __deepcopy__(self, memo: dict) -> "WeaveObject":
+    def __deepcopy__(self, memo: dict) -> "LazyObject":
         val_copy = deepcopy(self._val, memo)
-        res = WeaveObject(
+        res = LazyObject(
             val_copy,
             ref=self.ref,  # maybe this should be zero'd?
             server=self.server,
@@ -284,13 +286,16 @@ class WeaveObject(Traceable):  # noqa: PLW1641
         return dir(self._val)
 
     def __repr__(self) -> str:
-        return f"WeaveObject({self._val})"
+        return f"LazyObject({self._val})"
 
     def __eq__(self, other: Any) -> bool:
         return self._val == other
 
     def unwrap(self) -> Any:
         return unwrap(self._val)
+
+
+WeaveObject = LazyObject  # Backward-compat alias (deprecated)
 
 
 class WeaveTable(Traceable):  # noqa: PLW1641
@@ -869,7 +874,7 @@ def make_trace_obj(
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return WeaveObject(
+            return LazyObject(
                 val, ref=new_ref, server=server, root=root, parent=parent
             )
         elif isinstance(val, list):
