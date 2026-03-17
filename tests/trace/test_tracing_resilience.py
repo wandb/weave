@@ -71,7 +71,7 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
     client_with_throwing_server.flush()
 
     logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
+    ag_res = Counter([k.split(", req:")[0] for k in {l.getMessage() for l in logs}])
     # Tim: This is very specific and intentional, please don't change
     # this unless you are sure that is the expected behavior
     assert ag_res == {
