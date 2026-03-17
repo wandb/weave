@@ -558,6 +558,114 @@ async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
     assert [c.id for c in calls] == [ids[2], ids[0]]
 
 
+@pytest.mark.asyncio
+async def test_filter_by_wildcard_feedback_with_multiple_items(
+    client: WeaveClient,
+) -> None:
+    """Test that wildcard feedback filtering searches across ALL feedback entries.
+
+    Regression test for a bug where filtering with feedback.[*].payload.X used
+    any() which only checked one arbitrary feedback row, missing matches in other
+    feedback entries on the same call.
+    """
+    if client_is_sqlite(client):
+        return pytest.skip()
+
+    @weave.op
+    def my_scorer_a(x: int, output: str) -> dict:
+        return {"label": "scorer_a", "score": x * 10}
+
+    @weave.op
+    def my_scorer_b(x: int, output: str) -> dict:
+        return {"label": "scorer_b", "score": x * 100}
+
+    @weave.op
+    def my_model(x: int) -> str:
+        return f"result_{x}"
+
+    # Create 3 calls, each scored by both scorers
+    ids = []
+    for x in range(3):
+        _, c = my_model.call(x)
+        ids.append(c.id)
+        await c.apply_scorer(my_scorer_a)
+        await c.apply_scorer(my_scorer_b)
+
+    model_ref = get_ref(my_model).uri
+
+    # Each call now has 2 feedback items (one per scorer).
+    # Wildcard filter should search across BOTH feedback entries.
+
+    # Filter for scorer_b's label — should match all 3 calls.
+    # With the old any() approach, this could miss scorer_b if any() picked
+    # scorer_a's feedback row arbitrarily.
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_names=[model_ref]),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "feedback.[*].payload.output.label"},
+                            "substr": {"$literal": "scorer_b"},
+                            "case_insensitive": False,
+                        }
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 3, (
+        f"Expected all 3 calls to match wildcard filter for scorer_b label, got {len(calls)}"
+    )
+
+    # Also verify scorer_a is findable via the same wildcard path
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_names=[model_ref]),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "feedback.[*].payload.output.label"},
+                            "substr": {"$literal": "scorer_a"},
+                            "case_insensitive": False,
+                        }
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 3, (
+        f"Expected all 3 calls to match wildcard filter for scorer_a label, got {len(calls)}"
+    )
+
+    # Filter using a specific scorer type (non-wildcard) still works
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_names=[model_ref]),
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {
+                                "$getField": "feedback.[wandb.runnable.my_scorer_a].payload.output.label"
+                            },
+                            {"$literal": "scorer_a"},
+                        ]
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 3, (
+        f"Expected all 3 calls to match specific feedback type filter, got {len(calls)}"
+    )
+
+
 def test_feedback_replace(client) -> None:
     # Create initial feedback
     create_req = FeedbackCreateReq(
