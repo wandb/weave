@@ -4,7 +4,7 @@
 import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, NoReturn
 
 import httpx
 from gql.transport.exceptions import (
@@ -83,7 +83,7 @@ def _is_retryable_project_exception(exception: BaseException) -> bool:
 
 def _raise_project_access_error(
     entity_name: str, project_name: str, exception: Exception
-) -> None:
+) -> NoReturn:
     logger.error("Unable to access `%s/%s`.", entity_name, project_name)
     logger.error(str(exception))
 
