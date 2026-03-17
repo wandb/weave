@@ -9,7 +9,8 @@ jobs:
     name: Auto-fix lint
     if: >-
       github.event.issue.pull_request &&
-      github.event.comment.body == '/lint'
+      github.event.comment.body == '/lint' &&
+      contains(fromJSON('["MEMBER","OWNER","COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -23,6 +24,12 @@ jobs:
           PR_DATA=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }})
           echo "ref=$(echo "$PR_DATA" | jq -r .head.ref)" >> "$GITHUB_OUTPUT"
           echo "repo=$(echo "$PR_DATA" | jq -r .head.repo.full_name)" >> "$GITHUB_OUTPUT"
+
+      - name: Reject fork PRs
+        if: steps.pr.outputs.repo != github.repository
+        run: |
+          echo "::error::Cannot run /lint on fork PRs for security reasons."
+          exit 1
 
       - name: Checkout PR branch
         uses: actions/checkout@v6
