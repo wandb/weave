@@ -802,8 +802,9 @@ def test_caching_middleware_not_delegated_method_raises_attribute_error():
 
 
 def test_weave_client_can_be_initialized_with_caching_server():
-    # Ensure that WeaveClient.__init__ doesn't crash. We had a regression where it did
-    # because we didn't delegate ensure_project_exists, which it calls.
+    # Ensure that WeaveClient constructor (called by weave.init()) doesn't crash. We had
+    # a regression where it did because we didn't delegate ensure_project_exists, which
+    # it calls.
     mock_server = MagicMock()
     caching_server = CachingMiddlewareTraceServer.from_env(mock_server)
     client = weave_client.WeaveClient(
