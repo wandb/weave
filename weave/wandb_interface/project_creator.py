@@ -7,12 +7,18 @@ from contextlib import contextmanager
 from typing import Any
 
 import httpx
-import tenacity
 from gql.transport.exceptions import (
     TransportClosed,
     TransportConnectionFailed,
     TransportQueryError,
     TransportServerError,
+)
+from tenacity import (
+    Retrying,
+    before_sleep_log,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential_jitter,
 )
 
 from weave.compat import wandb
@@ -47,11 +53,11 @@ def ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]
 def _call_wandb_api_with_retry(
     func: Callable[..., Any], *args: Any, **kwargs: Any
 ) -> Any:
-    retryer = tenacity.Retrying(
-        stop=tenacity.stop_after_attempt(retry_max_attempts()),
-        wait=tenacity.wait_exponential_jitter(initial=1, max=retry_max_interval()),
-        retry=tenacity.retry_if_exception(_is_retryable_project_exception),
-        before_sleep=tenacity.before_sleep_log(logger, logging.INFO),
+    retryer = Retrying(
+        stop=stop_after_attempt(retry_max_attempts()),
+        wait=wait_exponential_jitter(initial=1, max=retry_max_interval()),
+        retry=retry_if_exception(_is_retryable_project_exception),
+        before_sleep=before_sleep_log(logger, logging.INFO),
         reraise=True,
     )
     return retryer(func, *args, **kwargs)
