@@ -226,7 +226,8 @@ def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
         return int(val)
     except ValueError:
         logger.exception(
-            "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '%s' is not valid", val
+            "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '%s' is not valid",
+            val,
         )
         return 100
 
@@ -247,7 +248,8 @@ def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
         return int(val)
     except ValueError:
         logger.exception(
-            "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '%s' is not valid", val
+            "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '%s' is not valid",
+            val,
         )
         return 1000
 

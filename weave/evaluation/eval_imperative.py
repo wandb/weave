@@ -784,9 +784,7 @@ class EvaluationLogger:
             wc.finish_call(self._evaluate_call, output=output, exception=exception)
         except Exception:
             # Log error but continue cleanup
-            logger.exception(
-                "Failed to finish evaluation call during finalization."
-            )
+            logger.exception("Failed to finish evaluation call during finalization.")
 
         self._is_finalized = True
 

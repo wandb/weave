@@ -89,7 +89,8 @@ class DSPyPatcher(MultiPatcher):
 
                 if callback_metadata:
                     logger.debug(
-                        "Evaluate is called with callback metadata: %s", callback_metadata
+                        "Evaluate is called with callback metadata: %s",
+                        callback_metadata,
                     )
 
                 max_errors = getattr(self, "max_errors", dspy.settings.max_errors)

@@ -210,7 +210,7 @@ class SlackNotifier:
             print(f"Message sent to {channel}:")
             print(message)
         except SlackApiError as e:
-            logger.exception("Failed to send message: %s", e.response['error'])
+            logger.exception("Failed to send message: %s", e.response["error"])
             raise
         return True
 

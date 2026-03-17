@@ -164,7 +164,10 @@ def process_batch_with_retry(
     # Warn if single item exceeds limit (can't split further)
     if encoded_bytes > remote_request_bytes_limit and len(batch) == 1:
         logger.warning(
-            "Single %s size (%s bytes) may be too large to send.The configured maximum size is %s bytes.", batch_name, encoded_bytes, remote_request_bytes_limit
+            "Single %s size (%s bytes) may be too large to send.The configured maximum size is %s bytes.",
+            batch_name,
+            encoded_bytes,
+            remote_request_bytes_limit,
         )
 
     try:
@@ -176,7 +179,9 @@ def process_batch_with_retry(
         # Handle 413 specially: server rejected as too large, split and retry
         if _is_413_error(e) and len(batch) > 1:
             logger.warning(
-                "Server returned 413 for %s batch of %s items, splitting and retrying", batch_name, len(batch)
+                "Server returned 413 for %s batch of %s items, splitting and retrying",
+                batch_name,
+                len(batch),
             )
             _split_and_process_halves(
                 batch,
@@ -195,12 +200,16 @@ def process_batch_with_retry(
                 log_dropped_fn(batch, e)
             else:
                 logger.exception(
-                    "Error sending batch of %s %s to server.", len(batch), batch_name,
+                    "Error sending batch of %s %s to server.",
+                    len(batch),
+                    batch_name,
                 )
         else:
             # Add items back to the queue for later processing
             logger.warning(
-                "%s batch failed after max retries, requeuing batch with len(batch)=%s for later processing", batch_name.capitalize(), len(batch),
+                "%s batch failed after max retries, requeuing batch with len(batch)=%s for later processing",
+                batch_name.capitalize(),
+                len(batch),
             )
 
             if logger.isEnabledFor(logging.DEBUG) and get_item_id_fn:
@@ -216,7 +225,9 @@ def process_batch_with_retry(
                 processor_obj.enqueue(batch)
             else:
                 logger.exception(
-                    "Failed to enqueue %s batch of size %s - Processor is shutting down", batch_name, len(batch),
+                    "Failed to enqueue %s batch of size %s - Processor is shutting down",
+                    batch_name,
+                    len(batch),
                 )
 
 

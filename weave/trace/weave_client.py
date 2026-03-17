@@ -826,7 +826,9 @@ class WeaveClient:
             bytes_size = len(call_start_req.model_dump_json())
             if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
                 logger.warning(
-                    "Trace input size (%s bytes) exceeds the maximum allowed size of %s bytes.Inputs may be dropped.", bytes_size, MAX_TRACE_PAYLOAD_SIZE
+                    "Trace input size (%s bytes) exceeds the maximum allowed size of %s bytes.Inputs may be dropped.",
+                    bytes_size,
+                    MAX_TRACE_PAYLOAD_SIZE,
                 )
 
             # eager_call_start is a client-side hint that tells the batch processor
@@ -1008,7 +1010,9 @@ class WeaveClient:
             bytes_size = len(call_end_req.model_dump_json())
             if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
                 logger.warning(
-                    "Trace output size (%s bytes) exceeds the maximum allowed size of %s bytes. Output may be dropped.", bytes_size, MAX_TRACE_PAYLOAD_SIZE
+                    "Trace output size (%s bytes) exceeds the maximum allowed size of %s bytes. Output may be dropped.",
+                    bytes_size,
+                    MAX_TRACE_PAYLOAD_SIZE,
                 )
             self.server.call_end(call_end_req)
 

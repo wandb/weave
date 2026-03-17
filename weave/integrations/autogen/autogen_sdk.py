@@ -369,12 +369,18 @@ def _get_symbol_patcher(
         module = importlib.import_module(module_path)
     except ModuleNotFoundError as e:
         logger.warning(
-            "Module %s not found, skipping patching for %s: %s", module_path, class_name, e
+            "Module %s not found, skipping patching for %s: %s",
+            module_path,
+            class_name,
+            e,
         )
         return None
     except ImportError as e:
         logger.warning(
-            "Could not import module %s, skipping patching for %s: %s", module_path, class_name, e
+            "Could not import module %s, skipping patching for %s: %s",
+            module_path,
+            class_name,
+            e,
         )
         return None
 
@@ -385,7 +391,9 @@ def _get_symbol_patcher(
     cls = getattr(module, class_name)
 
     if not hasattr(cls, method_name):
-        logger.error("Method %s not found in %s.%s", method_name, module_path, class_name)
+        logger.error(
+            "Method %s not found in %s.%s", method_name, module_path, class_name
+        )
         return None
 
     display_name = f"{module_path}.{class_name}.{method_name}"
@@ -430,12 +438,18 @@ def _get_class_and_subclass_patchers(
         module = importlib.import_module(module_path)
     except ModuleNotFoundError as e:
         logger.warning(
-            "Module %s not found, skipping patching for %s: %s", module_path, class_name, e
+            "Module %s not found, skipping patching for %s: %s",
+            module_path,
+            class_name,
+            e,
         )
         return patchers  # Return empty list, skip patching for this module
     except ImportError as e:
         logger.warning(
-            "Could not import module %s, skipping patching for %s: %s", module_path, class_name, e
+            "Could not import module %s, skipping patching for %s: %s",
+            module_path,
+            class_name,
+            e,
         )
         return patchers
 
@@ -494,11 +508,15 @@ def _get_class_and_subclass_patchers(
                     patchers.append(patcher)
 
     except AttributeError as e:
-        logger.warning("Class %s not found in %s, skipping: %s", class_name, module_path, e)
+        logger.warning(
+            "Class %s not found in %s, skipping: %s", class_name, module_path, e
+        )
         return patchers
     except Exception as e:
         logger.exception(
-            "Unexpected error creating patchers for %s.%s", module_path, class_name,
+            "Unexpected error creating patchers for %s.%s",
+            module_path,
+            class_name,
             stacklevel=2,
         )
         return patchers
@@ -534,7 +552,8 @@ def _preload_autogen_extensions() -> None:
             except Exception as e:
                 # Unexpected errors should still be logged as warnings
                 logger.exception(
-                    "Unexpected error loading extension module %s", name,
+                    "Unexpected error loading extension module %s",
+                    name,
                     stacklevel=2,
                 )
 
@@ -603,8 +622,8 @@ def get_autogen_patcher(
                 except Exception as e:
                     logger.exception(
                         "Failed to create patchers for %s.%s",
-                        module_config['module_path'],
-                        class_config['class_name'],
+                        module_config["module_path"],
+                        class_config["class_name"],
                         stacklevel=2,
                     )
 

@@ -143,7 +143,8 @@ def replace_base64_with_content_objects(
                     )
                 except Exception as e:
                     logger.warning(
-                        "Failed to create and store content from data URI with error %s", e
+                        "Failed to create and store content from data URI with error %s",
+                        e,
                     )
 
             if is_base64(val):

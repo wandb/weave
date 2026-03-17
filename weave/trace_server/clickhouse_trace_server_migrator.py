@@ -363,7 +363,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
             return res
         if target_version < current_version:
             logger.warning(
-                "Automatically running down migrations is disabled and should be done manually. Current version (%s) is greater than target version (%s).", current_version, target_version
+                "Automatically running down migrations is disabled and should be done manually. Current version (%s) is greater than target version (%s).",
+                current_version,
+                target_version,
             )
             # res = []
             # for i in range(current_version, target_version, -1):
@@ -736,7 +738,8 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         # Skip MATERIALIZE commands (not supported by distributed tables)
         if SQLPatterns.MATERIALIZE.search(command_for_match):
             logger.warning(
-                "Skipping MATERIALIZE command (not supported in distributed mode): %s", command
+                "Skipping MATERIALIZE command (not supported in distributed mode): %s",
+                command,
             )
             self.ch_client.database = curr_db
             return
