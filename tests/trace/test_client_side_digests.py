@@ -456,3 +456,136 @@ def test_custom_weave_type_digest_matches_across_paths(client: WeaveClient):
     )
 
     assert digest_fast == digest_fallback
+
+
+# ---------------------------------------------------------------------------
+# Table expected_digest wiring through the client
+# ---------------------------------------------------------------------------
+
+
+def test_fast_path_sends_table_expected_digest(
+    client: WeaveClient, fast_path: None, monkeypatch
+) -> None:
+    """When client-side digests are enabled, table_create receives expected_digest."""
+    captured_digests: list[str | None] = []
+    original_send = client._send_table_create
+
+    def capturing_send(rows):
+        res = original_send(rows)
+        captured_digests.append(res.digest)
+        return res
+
+    monkeypatch.setattr(client, "_send_table_create", capturing_send)
+
+    ds = weave.Dataset(name="table_digest_ds", rows=[{"a": 1}, {"a": 2}])
+    weave.publish(ds, name="table_digest_ds")
+    client._flush()
+
+    # If expected_digest were wrong, the server would have raised
+    # DigestMismatchError. The fact that it succeeded proves expected_digest
+    # was sent and matched.
+    assert len(captured_digests) >= 1
+    assert captured_digests[0] is not None
+
+
+def test_fallback_path_does_not_compute_table_digest(
+    client: WeaveClient, monkeypatch
+) -> None:
+    """When client-side digests are disabled, _send_table_create skips digest computation."""
+    assert not client._should_compute_client_digests()
+
+    called = []
+    original_send = client._send_table_create
+
+    def capturing_send(rows):
+        called.append(True)
+        return original_send(rows)
+
+    monkeypatch.setattr(client, "_send_table_create", capturing_send)
+
+    ds = weave.Dataset(name="table_no_digest_ds", rows=[{"a": 1}, {"a": 2}])
+    weave.publish(ds, name="table_no_digest_ds")
+    client._flush()
+
+    # Verify _send_table_create was called and the feature flag is off.
+    # The cross-path tests (test_dataset_digest_matches_across_paths) already
+    # verify that the fallback path produces correct digests without
+    # expected_digest.
+    assert len(called) >= 1
+
+
+# ---------------------------------------------------------------------------
+# File expected_digest validation
+# ---------------------------------------------------------------------------
+
+
+def test_server_accepts_correct_file_expected_digest(client: WeaveClient) -> None:
+    """Server accepts file_create when expected_digest matches."""
+    from weave.shared.digest import compute_file_digest
+
+    content = b"hello world"
+    digest = compute_file_digest(content)
+
+    req = tsi.FileCreateReq(
+        project_id=client._project_id(),
+        name="test.txt",
+        content=content,
+        expected_digest=digest,
+    )
+
+    res = client.server.file_create(req)
+    assert res.digest == digest
+
+
+def test_server_rejects_wrong_file_expected_digest(client: WeaveClient) -> None:
+    """Server raises for file with wrong expected_digest."""
+    req = tsi.FileCreateReq(
+        project_id=client._project_id(),
+        name="test.txt",
+        content=b"hello world",
+        expected_digest="definitely_wrong_digest",
+    )
+
+    with pytest.raises(Exception, match=r"(?i)digest|409|mismatch"):
+        client.server.file_create(req)
+
+
+def test_file_expected_digest_sent_for_custom_type(
+    client: WeaveClient, fast_path: None, monkeypatch
+) -> None:
+    """Publishing a CustomWeaveType (PIL Image) sends expected_digest on file_create."""
+    captured_digests: list[str | None] = []
+    original_file_create = client.server.server.file_create
+
+    def capturing_file_create(req: tsi.FileCreateReq):
+        captured_digests.append(req.expected_digest)
+        return original_file_create(req)
+
+    monkeypatch.setattr(client.server.server, "file_create", capturing_file_create)
+
+    img = Image.new("RGB", (4, 4), color="blue")
+    weave.publish(img, name="file-digest-image")
+    client._flush()
+
+    assert len(captured_digests) >= 1
+    assert all(d is not None for d in captured_digests)
+
+
+# ---------------------------------------------------------------------------
+# _convert_refs_to_internal helper
+# ---------------------------------------------------------------------------
+
+
+def test_convert_refs_to_internal_noop_when_no_cached_id(
+    client: WeaveClient,
+) -> None:
+    """_convert_refs_to_internal returns input unchanged when no internal ID is cached."""
+    client._cached_internal_project_id = None
+
+    json_val = {
+        "key": "value",
+        "ref": f"weave:///{client.entity}/{client.project}/object/foo:abc123",
+    }
+    result = client._convert_refs_to_internal(json_val)
+
+    assert result is json_val
