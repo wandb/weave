@@ -492,13 +492,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
     def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.feedback_stats, req)
+        return self._ref_apply(self._internal_trace_server.feedback_stats, req, req.project_id)
 
     def feedback_payload_schema(
         self, req: tsi.FeedbackPayloadSchemaReq
     ) -> tsi.FeedbackPayloadSchemaRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.feedback_payload_schema, req)
+        return self._ref_apply(self._internal_trace_server.feedback_payload_schema, req, req.project_id)
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
