@@ -237,6 +237,23 @@ class BaseOp(Generic[P, R]):
     color: OpColor | None = None
     eager_call_start: bool = False
 
+    def __post_init__(self) -> None:
+        if self.op is not None:
+            self.__op__ = self
+            self.__wrapped__ = self.op
+            self.__signature__ = inspect.signature(self.op)
+            self.__self__ = self
+
+    def __get__(self, instance: object | None, owner: type | None = None) -> Any:
+        if instance is None:
+            return self
+        return BoundOp(MethodType(self.require_opified(), instance))
+
+    def require_opified(self) -> Opified[P, R]:
+        if self.op is None:
+            raise ValueError("Op sidecar is not attached to an opified callable")
+        return self.op
+
     def require_resolve_fn(self) -> Callable[P, R]:
         if self.resolve_fn is None:
             raise ValueError("Op sidecar is missing resolve_fn")
@@ -250,6 +267,41 @@ class BaseOp(Generic[P, R]):
     def mirror_to_wrapper(self, op: Opified[P, R]) -> None:
         for attr in _MIRRORED_RUNTIME_OP_ATTRS:
             setattr(op, attr, getattr(self, attr))
+
+    def call(
+        self,
+        /,
+        *args: Any,
+        **kwargs: Any,
+    ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
+        weave_kwargs = cast(WeaveKwargs | None, kwargs.pop("__weave", None))
+        should_raise = cast(bool, kwargs.pop("__should_raise", False))
+        require_explicit_finish = cast(
+            bool, kwargs.pop("__require_explicit_finish", False)
+        )
+        return call(
+            cast(Op, self.require_opified()),
+            *args,
+            __weave=weave_kwargs,
+            __should_raise=should_raise,
+            __require_explicit_finish=require_explicit_finish,
+            **kwargs,
+        )
+
+    def calls(self) -> CallsIter:
+        return calls(cast(Op, self.require_opified()))
+
+    def _set_on_input_handler(self, on_input: OnInputHandlerType) -> None:
+        _set_on_input_handler(cast(Op, self.require_opified()), on_input)
+
+    def _set_on_output_handler(self, on_output: OnOutputHandlerType) -> None:
+        _set_on_output_handler(cast(Op, self.require_opified()), on_output)
+
+    def _set_on_finish_handler(self, on_finish: OnFinishHandlerType) -> None:
+        _set_on_finish_handler(cast(Op, self.require_opified()), on_finish)
+
+    def get_captured_code(self) -> str:
+        return get_captured_code(cast(Op, self.require_opified()))
 
 
 # These fields still need wrapper <-> sidecar mirroring because the rest of the
@@ -391,8 +443,7 @@ class BoundOp(Generic[P, R]):
     """A bound handle over an opified callable's `__op__` sidecar.
 
     The wrapper function remains the public inspect-compatible callable.
-    `BoundOp` is the nominal interface returned by `as_op(...)` for metadata
-    and helper methods like `call()`/`calls()`.
+    `BoundOp` is now reserved for bound callables like methods and partials.
     """
 
     __op__: SyncOp[P, R] | AsyncOp[P, R]
@@ -406,7 +457,10 @@ class BoundOp(Generic[P, R]):
         self.__op__ = op_def
         self.__self__ = getattr(target, "__self__", opified)
         self.__wrapped__ = target
-        self.__signature__ = inspect.signature(target)
+        try:
+            self.__signature__ = inspect.signature(target)
+        except ValueError:
+            self.__signature__ = inspect.signature(opified)
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         return cast(R, self.__wrapped__(*args, **kwargs))
@@ -431,20 +485,28 @@ class BoundOp(Generic[P, R]):
 
     def call(
         self,
+        /,
         *args: Any,
-        __weave: WeaveKwargs | None = None,
-        __should_raise: bool = False,
-        __require_explicit_finish: bool = False,
         **kwargs: Any,
     ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
+        weave_kwargs = cast(WeaveKwargs | None, kwargs.pop("__weave", None))
+        should_raise = cast(bool, kwargs.pop("__should_raise", False))
+        require_explicit_finish = cast(
+            bool, kwargs.pop("__require_explicit_finish", False)
+        )
         opified, normalized_args = _normalize_sidecar_invoke_target(self._target, args)
+        normalized_kwargs = kwargs
+        if isinstance(self._target, MethodType):
+            bound_self = self._target.__self__
+            if bound_self is not None and kwargs.get("self") is bound_self:
+                normalized_kwargs = {k: v for k, v in kwargs.items() if k != "self"}
         return call(
             cast(Op, opified),
             *normalized_args,
-            __weave=__weave,
-            __should_raise=__should_raise,
-            __require_explicit_finish=__require_explicit_finish,
-            **kwargs,
+            __weave=weave_kwargs,
+            __should_raise=should_raise,
+            __require_explicit_finish=require_explicit_finish,
+            **normalized_kwargs,
         )
 
     def calls(self) -> CallsIter:
@@ -1661,7 +1723,11 @@ def maybe_unbind_method(oplike: Op | MethodType | partial) -> Op:
     - methods, remove set `self` param
     - partials, remove any preset params
     """
-    if isinstance(oplike, MethodType):
+    if isinstance(oplike, BoundOp):
+        op = oplike._opified
+    elif isinstance(oplike, (SyncOp, AsyncOp)):
+        op = oplike.require_opified()
+    elif isinstance(oplike, MethodType):
         op = oplike.__func__
     elif isinstance(oplike, partial):  # Handle cases op is defined as
         op = oplike.func
@@ -1672,10 +1738,17 @@ def maybe_unbind_method(oplike: Op | MethodType | partial) -> Op:
 
 
 def get_op_def(
-    oplike: Opified[Any, Any] | MethodType | partial | BoundOp[Any, Any],
+    oplike: Opified[Any, Any]
+    | MethodType
+    | partial
+    | SyncOp[Any, Any]
+    | AsyncOp[Any, Any]
+    | BoundOp[Any, Any],
 ) -> SyncOp | AsyncOp:
     if isinstance(oplike, BoundOp):
         return oplike.__op__
+    if isinstance(oplike, (SyncOp, AsyncOp)):
+        return oplike
 
     if isinstance(oplike, MethodType):
         maybe_opified = oplike.__func__
@@ -1706,18 +1779,29 @@ def is_op(obj: Any) -> TypeIs[Op]:
 
 
 def as_op(
-    fn: Callable[P, R] | MethodType | partial | BoundOp[P, R],
-) -> BoundOp[P, R]:
-    """Given a @weave.op decorated callable, return a bound Op handle.
+    fn: Callable[P, R]
+    | MethodType
+    | partial
+    | SyncOp[P, R]
+    | AsyncOp[P, R]
+    | BoundOp[P, R],
+) -> SyncOp[P, R] | AsyncOp[P, R] | BoundOp[P, R]:
+    """Given a @weave.op decorated value, return its nominal op view.
 
-    The returned handle exposes op helpers and metadata via the callable's
-    `__op__` sidecar while preserving method binding semantics.
+    Plain opified callables return their shared sidecar. Bound methods and
+    partials return a `BoundOp` so binding information is preserved.
     """
     if isinstance(fn, BoundOp):
         return fn
+    if isinstance(fn, (SyncOp, AsyncOp)):
+        return fn
+    if isinstance(fn, (MethodType, partial)):
+        if not is_op(fn):
+            raise ValueError("fn must be a weave.op decorated function")
+        return BoundOp(cast(Opified[P, R] | MethodType | partial, fn))
     if not is_op(fn):
         raise ValueError("fn must be a weave.op decorated function")
-    return BoundOp(cast(Opified[P, R] | MethodType | partial, fn))
+    return get_op_def(cast(Opified[P, R], fn))
 
 
 _OnYieldType = Callable[[V], None]

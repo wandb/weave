@@ -48,6 +48,9 @@ from weave.trace.object_record import (
 )
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import (
+    AsyncOp,
+    BoundOp,
+    SyncOp,
     as_op,
     is_op,
     is_placeholder_call,
@@ -1908,14 +1911,27 @@ class WeaveClient:
         return ref
 
     @trace_sentry.global_trace_sentry.watch()
-    def _save_op(self, op: Op, name: str | None = None) -> ObjectRef:
+    def _save_op(
+        self, op: Op | SyncOp[Any, Any] | AsyncOp[Any, Any] | BoundOp[Any, Any], name: str | None = None
+    ) -> ObjectRef:
         """Saves an Op to the weave server and returns the Ref. This is the sister
         function to _save_object_basic, but for Ops.
         """
+        orig_op = op
         if name is None:
             name = op.name
+        if isinstance(op, BoundOp):
+            op = cast(Op, op._opified)
+        elif isinstance(op, (SyncOp, AsyncOp)):
+            op = cast(Op, op.require_opified())
 
-        return self._save_object_basic(op, name)
+        ref = self._save_object_basic(op, name)
+        if op is not orig_op:
+            try:
+                set_ref(orig_op, ref)
+            except Exception:
+                pass
+        return ref
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
         json_rows = to_json(rows, self._project_id(), self)

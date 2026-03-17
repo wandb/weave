@@ -8,6 +8,7 @@ from weave.trace.call import Call
 from weave.trace.op import (
     AsyncOp,
     AsyncOpDef,
+    BoundOp,
     OpCallError,
     OpDef,
     SyncOp,
@@ -232,11 +233,11 @@ def test_sync_sidecar_invoke(func):
     assert func.__op__.invoke(func, 1) == 2
 
 
-def test_as_op_returns_bound_handle(func):
+def test_as_op_returns_sidecar_for_function(func):
     handle = as_op(func)
 
-    assert handle is not func
-    assert handle.__op__ is func.__op__
+    assert handle is func.__op__
+    assert inspect.signature(handle) == inspect.signature(func)
     assert handle(1) == 2
 
     res, call = handle.call(1)
@@ -258,6 +259,9 @@ def test_sync_sidecar_invoke_bound_method(weave_obj, py_obj):
 
 
 def test_as_op_bound_method_call_injects_self(weave_obj, py_obj):
+    assert isinstance(as_op(weave_obj.method), BoundOp)
+    assert isinstance(as_op(py_obj.method), BoundOp)
+
     weave_res, weave_call = as_op(weave_obj.method).call(1)
     assert weave_res == 2
     assert weave_call.output == 2
@@ -277,8 +281,8 @@ async def test_async_sidecar_invoke(afunc):
 async def test_as_op_returns_bound_async_handle(afunc):
     handle = as_op(afunc)
 
-    assert handle is not afunc
-    assert handle.__op__ is afunc.__op__
+    assert handle is afunc.__op__
+    assert inspect.signature(handle) == inspect.signature(afunc)
     assert await handle(1) == 2
 
     res, call = await handle.call(1)
@@ -306,6 +310,9 @@ async def test_async_sidecar_invoke_bound_method(weave_obj, py_obj):
 
 @pytest.mark.asyncio
 async def test_as_op_bound_async_method_call_injects_self(weave_obj, py_obj):
+    assert isinstance(as_op(weave_obj.amethod), BoundOp)
+    assert isinstance(as_op(py_obj.amethod), BoundOp)
+
     weave_res, weave_call = await as_op(weave_obj.amethod).call(1)
     assert weave_res == 2
     assert weave_call.output == 2
