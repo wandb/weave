@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import Field
 from typing_extensions import NotRequired, Self, TypedDict
@@ -13,12 +13,12 @@ from weave.trace_server.interface.query import Query
 DebounceAggregationField = Literal["trace_id", "thread_id"]
 DebounceAggregationMethod = Literal["last_message", "all_messages"]
 
-# Runtime-valid sets for validation without get_args(); keep in sync with Literals above.
+# Runtime-valid sets derived from Literals above
 VALID_DEBOUNCE_AGGREGATION_FIELDS: frozenset[DebounceAggregationField] = frozenset(
-    ["trace_id", "thread_id"]
+    get_args(DebounceAggregationField)
 )
 VALID_DEBOUNCE_AGGREGATION_METHODS: frozenset[DebounceAggregationMethod] = frozenset(
-    ["last_message", "all_messages"]
+    get_args(DebounceAggregationMethod)
 )
 
 
