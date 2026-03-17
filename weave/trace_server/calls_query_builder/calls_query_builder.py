@@ -2378,8 +2378,27 @@ def process_ref_filters_to_sql(
             raise TypeError(f"{field_name} is not an aggregate field")
 
         field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
-        param = param_builder.add_param(refs)
-        ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
+        non_wildcarded_refs: list[str] = []
+        wildcarded_refs: list[str] = []
+        for ref in refs:
+            if ref.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+                wildcarded_refs.append(ref)
+            else:
+                non_wildcarded_refs.append(ref)
+
+        or_conditions: list[str] = []
+        if non_wildcarded_refs:
+            param = param_builder.add_param(non_wildcarded_refs)
+            or_conditions.append(
+                f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
+            )
+        for ref in wildcarded_refs:
+            like_ref = ref[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
+            or_conditions.append(
+                f"arrayExists(x -> x LIKE {param_slot(param_builder.add_param(like_ref), 'String')}, {field_sql})"
+            )
+
+        ref_filter_sql = " OR ".join(or_conditions)
         return f"{ref_filter_sql} OR length({field_sql}) = 0"
 
     ref_filters = []
@@ -2502,15 +2521,49 @@ def process_calls_filter_to_conditions(
     # the output_refs, so lets keep both for clarity
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
-        conditions.append(
-            f"hasAny({get_field_sql('input_refs')}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
-        )
+        non_wildcarded_refs: list[str] = []
+        wildcarded_refs: list[str] = []
+        for ref in filter.input_refs:
+            if ref.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+                wildcarded_refs.append(ref)
+            else:
+                non_wildcarded_refs.append(ref)
+
+        or_conditions: list[str] = []
+        input_refs_sql = get_field_sql("input_refs")
+        if non_wildcarded_refs:
+            or_conditions.append(
+                f"hasAny({input_refs_sql}, {param_slot(param_builder.add_param(non_wildcarded_refs), 'Array(String)')})"
+            )
+        for ref in wildcarded_refs:
+            like_ref = ref[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
+            or_conditions.append(
+                f"arrayExists(x -> x LIKE {param_slot(param_builder.add_param(like_ref), 'String')}, {input_refs_sql})"
+            )
+        conditions.append("(" + " OR ".join(or_conditions) + ")")
 
     if filter.output_refs:
         assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
-        conditions.append(
-            f"hasAny({get_field_sql('output_refs')}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
-        )
+        non_wildcarded_output_refs: list[str] = []
+        wildcarded_output_refs: list[str] = []
+        for ref in filter.output_refs:
+            if ref.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+                wildcarded_output_refs.append(ref)
+            else:
+                non_wildcarded_output_refs.append(ref)
+
+        output_or_conditions: list[str] = []
+        output_refs_sql = get_field_sql("output_refs")
+        if non_wildcarded_output_refs:
+            output_or_conditions.append(
+                f"hasAny({output_refs_sql}, {param_slot(param_builder.add_param(non_wildcarded_output_refs), 'Array(String)')})"
+            )
+        for ref in wildcarded_output_refs:
+            like_ref = ref[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
+            output_or_conditions.append(
+                f"arrayExists(x -> x LIKE {param_slot(param_builder.add_param(like_ref), 'String')}, {output_refs_sql})"
+            )
+        conditions.append("(" + " OR ".join(output_or_conditions) + ")")
 
     if filter.parent_ids:
         assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))

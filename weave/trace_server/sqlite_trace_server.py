@@ -523,7 +523,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 )
                 or_conditions = []
                 for ref in filter.input_refs:
-                    or_conditions.append(f"input_refs LIKE '%{ref}%'")
+                    like_ref = (
+                        ref[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
+                        if ref.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH)
+                        else ref
+                    )
+                    or_conditions.append(f"input_refs LIKE '%{like_ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.output_refs:
                 assert_parameter_length_less_than_max(
@@ -531,7 +536,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 )
                 or_conditions = []
                 for ref in filter.output_refs:
-                    or_conditions.append(f"output_refs LIKE '%{ref}%'")
+                    like_ref = (
+                        ref[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
+                        if ref.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH)
+                        else ref
+                    )
+                    or_conditions.append(f"output_refs LIKE '%{like_ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.parent_ids:
                 assert_parameter_length_less_than_max(
