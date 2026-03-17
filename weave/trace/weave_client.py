@@ -1866,7 +1866,7 @@ class WeaveClient:
             return False
         return True
 
-    def _convert_refs_to_internal(self, json_val: Any) -> Any:
+    def _convert_refs_to_internal(self, json_val: Any) -> Any | None:
         """Convert external weave:/// refs to weave-trace-internal:/// refs.
 
         The server stores refs using internal project IDs.  To compute a digest
@@ -1876,18 +1876,30 @@ class WeaveClient:
 
         Uses the same ``universal_ext_to_int_ref_converter`` that the server's
         ExternalToInternalTraceServerAdapter uses, so the two always agree.
+
+        Returns None if the value contains cross-project refs that cannot be
+        resolved to internal IDs. Callers should skip digest computation in
+        that case to avoid a guaranteed mismatch.
         """
         internal_project_id = self._cached_internal_project_id
         if internal_project_id is None:
-            return json_val
+            return None
         project_id = self._project_id()
+        has_unresolved_refs = False
 
         def ext_to_int(ext_project_id: str) -> str:
+            nonlocal has_unresolved_refs
             if ext_project_id == project_id:
                 return internal_project_id
+            # Cross-project ref we can't resolve — flag it so callers
+            # know the conversion is incomplete and skip digest computation.
+            has_unresolved_refs = True
             return ext_project_id
 
-        return universal_ext_to_int_ref_converter(json_val, ext_to_int)
+        result = universal_ext_to_int_ref_converter(json_val, ext_to_int)
+        if has_unresolved_refs:
+            return None
+        return result
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_object_basic(
@@ -1936,7 +1948,8 @@ class WeaveClient:
             expected_digest = None
             if compute_digests:
                 json_val_internal = self._convert_refs_to_internal(json_val)
-                expected_digest = compute_object_digest(json_val_internal)
+                if json_val_internal is not None:
+                    expected_digest = compute_object_digest(json_val_internal)
 
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
@@ -1988,8 +2001,9 @@ class WeaveClient:
         expected_digest = None
         if compute_digests:
             json_rows_internal = self._convert_refs_to_internal(json_rows)
-            row_digests = [compute_row_digest(row) for row in json_rows_internal]
-            expected_digest = compute_table_digest(row_digests)
+            if json_rows_internal is not None:
+                row_digests = [compute_row_digest(row) for row in json_rows_internal]
+                expected_digest = compute_table_digest(row_digests)
 
         req = TableCreateReq(
             table=TableSchemaForInsert(

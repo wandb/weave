@@ -576,10 +576,10 @@ def test_file_expected_digest_sent_for_custom_type(
 # ---------------------------------------------------------------------------
 
 
-def test_convert_refs_to_internal_noop_when_no_cached_id(
+def test_convert_refs_to_internal_returns_none_when_no_cached_id(
     client: WeaveClient,
 ) -> None:
-    """_convert_refs_to_internal returns input unchanged when no internal ID is cached."""
+    """_convert_refs_to_internal returns None when no internal ID is cached."""
     client._cached_internal_project_id = None
 
     json_val = {
@@ -588,4 +588,58 @@ def test_convert_refs_to_internal_noop_when_no_cached_id(
     }
     result = client._convert_refs_to_internal(json_val)
 
-    assert result is json_val
+    assert result is None
+
+
+def test_convert_refs_to_internal_returns_none_for_cross_project_ref(
+    client: WeaveClient, fast_path: None
+) -> None:
+    """_convert_refs_to_internal returns None when cross-project refs are present.
+
+    Cross-project refs can't be resolved to internal IDs without a server
+    round-trip. Rather than computing a digest that will definitely mismatch,
+    callers should skip digest computation entirely.
+    """
+    json_val = {
+        "same_project": f"weave:///{client.entity}/{client.project}/object/foo:abc123",
+        "cross_project": f"weave:///{client.entity}/other-project/object/bar:def456",
+    }
+    result = client._convert_refs_to_internal(json_val)
+
+    assert result is None
+
+
+def test_cross_project_ref_skips_expected_digest(
+    client: WeaveClient, fast_path: None, monkeypatch
+) -> None:
+    """Publishing an object with a cross-project ref falls back to no expected_digest.
+
+    When the client can't resolve all refs to internal IDs, it must not send
+    expected_digest — a partial conversion would guarantee a mismatch.
+    """
+    captured_digests: list[str | None] = []
+    original_obj_create = client.server.server.obj_create
+
+    def capturing_obj_create(req: tsi.ObjCreateReq):
+        captured_digests.append(req.obj.expected_digest)
+        return original_obj_create(req)
+
+    monkeypatch.setattr(client.server.server, "obj_create", capturing_obj_create)
+
+    # Publish an inner object in a different project to get a cross-project ref
+    original_project = client.project
+    client.project = "other-project"
+    inner_ref = client._save_object({"msg": "hi"}, "inner")
+    client._flush()
+
+    # Now publish an outer object in the original project that references it
+    client.project = original_project
+    outer = {"cross_ref": inner_ref.uri(), "data": "test"}
+    weave.publish(outer, name="outer-with-cross-ref")
+    client._flush()
+
+    # The outer object's obj_create should have expected_digest=None
+    # because of the unresolvable cross-project ref
+    assert len(captured_digests) >= 1
+    # The last captured digest is for the outer object
+    assert captured_digests[-1] is None
