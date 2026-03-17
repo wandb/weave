@@ -152,6 +152,39 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.otel_export, req, req.project_id
         )
 
+    def genai_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        """Same ID conversion as otel_export, routing to genai_otel_export."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        for i, processed_span in enumerate(req.processed_spans):
+            if processed_span.run_id is not None:
+                processed_span.run_id = self._idc.ext_to_int_run_id(
+                    processed_span.run_id
+                )
+            req.processed_spans[i] = processed_span
+
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+
+        return self._ref_apply(
+            self._internal_trace_server.genai_otel_export, req, req.project_id
+        )
+
+    def genai_spans_query(
+        self, req: tsi.GenAISpansQueryReq
+    ) -> tsi.GenAISpansQueryRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.genai_spans_query, req, req.project_id
+        )
+
+    def genai_spans_trace(
+        self, req: tsi.GenAISpansTraceReq
+    ) -> tsi.GenAISpansTraceRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.genai_spans_trace, req, req.project_id
+        )
+
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
         if req.start.wb_run_id is not None:

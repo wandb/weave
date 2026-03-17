@@ -5,6 +5,7 @@
 #     "opentelemetry-instrumentation-anthropic",
 #     "opentelemetry-sdk",
 #     "opentelemetry-exporter-otlp-proto-grpc",
+#     "opentelemetry-exporter-otlp-proto-http",
 # ]
 # ///
 """Anthropic SDK with OTel tracing via Traceloop's instrumentor.
@@ -16,6 +17,7 @@ the full span hierarchy.
 Usage:
     uv run --python 3.12 anthropic_example.py
     uv run --python 3.12 anthropic_example.py --otlp-endpoint http://localhost:4317
+    uv run --python 3.12 anthropic_example.py --genai-endpoint http://localhost:6345/otel/v1/genai/traces
 """
 
 import argparse
@@ -24,6 +26,9 @@ import json
 import anthropic
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+    OTLPSpanExporter as OTLPHTTPSpanExporter,
+)
 from opentelemetry.instrumentation.anthropic import AnthropicInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -59,17 +64,26 @@ def handle_tool_call(tool_name: str, tool_input: dict) -> str:
     return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
 
-def setup_otel(otlp_endpoint: str | None = None) -> TracerProvider:
-    """Configure the OTel TracerProvider with console or OTLP export."""
+def setup_otel(
+    otlp_endpoint: str | None = None,
+    genai_endpoint: str | None = None,
+) -> TracerProvider:
+    """Configure the OTel TracerProvider with console, OTLP, or GenAI endpoint export."""
     resource = Resource.create(
         {
             "service.name": "anthropic-otel-example",
             "service.version": "0.1.0",
+            "wandb.entity": "ben-urmomsclothes",
+            "wandb.project": "genai-otel-test",
         }
     )
     provider = TracerProvider(resource=resource)
 
-    if otlp_endpoint:
+    if genai_endpoint:
+        provider.add_span_processor(
+            BatchSpanProcessor(OTLPHTTPSpanExporter(endpoint=genai_endpoint))
+        )
+    elif otlp_endpoint:
         provider.add_span_processor(
             BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint))
         )
@@ -94,7 +108,6 @@ def run_tool_use_conversation() -> None:
         messages=messages,
     )
 
-    # If the model requests a tool call, execute it and send the result back
     if response.stop_reason == "tool_use":
         tool_use_block = next(b for b in response.content if b.type == "tool_use")
 
@@ -138,9 +151,15 @@ def main() -> None:
         default=None,
         help="OTLP gRPC endpoint (e.g. http://localhost:4317). Defaults to console export.",
     )
+    parser.add_argument(
+        "--genai-endpoint",
+        type=str,
+        default=None,
+        help="Weave GenAI OTel HTTP endpoint (e.g. http://localhost:6345/otel/v1/genai/traces).",
+    )
     args = parser.parse_args()
 
-    provider = setup_otel(args.otlp_endpoint)
+    provider = setup_otel(args.otlp_endpoint, args.genai_endpoint)
     AnthropicInstrumentor().instrument()
 
     run_tool_use_conversation()

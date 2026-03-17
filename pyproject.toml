@@ -454,6 +454,14 @@ verifiers_test = [
   "datasets>=4.1.0",
 ]
 pandas_test = ["pandas>=2.2.3"]
+otel-genai = [
+  "openai-agents; python_version >= '3.11'",
+  "openai-agents-opentelemetry; python_version >= '3.11'",
+  "anthropic",
+  "opentelemetry-instrumentation-anthropic",
+  "opentelemetry-sdk",
+  "opentelemetry-exporter-otlp-proto-common",
+]
 test = [
   "nox",
   "pytest>=8.2.0; platform_python_implementation != 'PyPy'",

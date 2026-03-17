@@ -4,6 +4,7 @@
 #     "google-adk",
 #     "opentelemetry-sdk",
 #     "opentelemetry-exporter-otlp-proto-grpc",
+#     "opentelemetry-exporter-otlp-proto-http",
 # ]
 # ///
 """Google Agent Development Kit (ADK) with OTel tracing.
@@ -15,6 +16,7 @@ a calculator tool and exports all spans to the console (or OTLP endpoint).
 Usage:
     uv run --python 3.12 google_adk_example.py
     uv run --python 3.12 google_adk_example.py --otlp-endpoint http://localhost:4317
+    uv run --python 3.12 google_adk_example.py --genai-endpoint http://localhost:6345/otel/v1/genai/traces
 """
 
 import argparse
@@ -22,6 +24,9 @@ import asyncio
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+    OTLPSpanExporter as OTLPHTTPSpanExporter,
+)
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import (
@@ -31,8 +36,11 @@ from opentelemetry.sdk.trace.export import (
 )
 
 
-def setup_otel(otlp_endpoint: str | None = None) -> TracerProvider:
-    """Configure the OTel TracerProvider with console or OTLP export.
+def setup_otel(
+    otlp_endpoint: str | None = None,
+    genai_endpoint: str | None = None,
+) -> TracerProvider:
+    """Configure the OTel TracerProvider with console, OTLP, or GenAI endpoint export.
 
     Must be called BEFORE importing any ADK components so the global
     TracerProvider is picked up by ADK's module-level tracer.
@@ -41,11 +49,17 @@ def setup_otel(otlp_endpoint: str | None = None) -> TracerProvider:
         {
             "service.name": "google-adk-otel-example",
             "service.version": "0.1.0",
+            "wandb.entity": "ben-urmomsclothes",
+            "wandb.project": "genai-otel-test",
         }
     )
     provider = TracerProvider(resource=resource)
 
-    if otlp_endpoint:
+    if genai_endpoint:
+        provider.add_span_processor(
+            BatchSpanProcessor(OTLPHTTPSpanExporter(endpoint=genai_endpoint))
+        )
+    elif otlp_endpoint:
         provider.add_span_processor(
             BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint))
         )
@@ -121,9 +135,15 @@ def main() -> None:
         default=None,
         help="OTLP gRPC endpoint (e.g. http://localhost:4317). Defaults to console export.",
     )
+    parser.add_argument(
+        "--genai-endpoint",
+        type=str,
+        default=None,
+        help="Weave GenAI OTel HTTP endpoint (e.g. http://localhost:6345/otel/v1/genai/traces).",
+    )
     args = parser.parse_args()
 
-    provider = setup_otel(args.otlp_endpoint)
+    provider = setup_otel(args.otlp_endpoint, args.genai_endpoint)
 
     asyncio.run(run_agent())
     provider.force_flush()

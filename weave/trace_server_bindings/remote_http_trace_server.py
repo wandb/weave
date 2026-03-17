@@ -598,6 +598,25 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
+    def genai_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        raise NotImplementedError(
+            "Sending GenAI otel traces directly is not yet supported."
+        )
+
+    def genai_spans_query(
+        self, req: tsi.GenAISpansQueryReq
+    ) -> tsi.GenAISpansQueryRes:
+        r = self._post_request_executor("/genai/spans/query", req)
+        handle_response_error(r, "/genai/spans/query")
+        return tsi.GenAISpansQueryRes.model_validate(r.json())
+
+    def genai_spans_trace(
+        self, req: tsi.GenAISpansTraceReq
+    ) -> tsi.GenAISpansTraceRes:
+        r = self._post_request_executor("/genai/spans/trace", req)
+        handle_response_error(r, "/genai/spans/trace")
+        return tsi.GenAISpansTraceRes.model_validate(r.json())
+
     # Call API
     @validate_call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

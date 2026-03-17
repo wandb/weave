@@ -34,19 +34,35 @@ By default, spans are printed to stdout as JSON via `ConsoleSpanExporter`.
 ### Sending to an OTLP collector
 
 Pass `--otlp-endpoint` to export to a gRPC OTLP collector (Jaeger, Grafana
-Tempo, Weave, etc.) instead of the console:
+Tempo, etc.) instead of the console:
 
 ```bash
 uv run --python 3.12 openai_agents_example.py --otlp-endpoint http://localhost:4317
 ```
 
-### Sending to local Weave dev server
+### Sending to the Weave GenAI ingest endpoint
 
-Use the `devall` alias to set the local dev environment, then point at
-the Weave OTel endpoint:
+Pass `--genai-endpoint` to send spans to the Weave trace server's GenAI
+normalized ingest endpoint via OTLP HTTP:
 
 ```bash
-devall uv run --python 3.12 openai_agents_example.py --otlp-endpoint http://localhost:6345
+# Send to local dev server (use devall alias for auth env vars)
+devall uv run --python 3.12 openai_agents_example.py \
+    --genai-endpoint http://localhost:6345/otel/v1/genai/traces
+
+devall uv run --python 3.12 google_adk_example.py \
+    --genai-endpoint http://localhost:6345/otel/v1/genai/traces
+
+devall uv run --python 3.12 anthropic_example.py \
+    --genai-endpoint http://localhost:6345/otel/v1/genai/traces
+```
+
+Then query the ingested spans:
+
+```bash
+curl -X POST http://localhost:6345/genai/spans/query \
+    -H 'Content-Type: application/json' \
+    -d '{"project_id": "ben-urmomsclothes/genai-otel-test", "limit": 20}'
 ```
 
 ## What to look for

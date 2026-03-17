@@ -162,6 +162,11 @@ from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
+from weave.trace_server.genai_schema import (
+    ALL_GENAI_SPAN_INSERT_COLUMNS,
+    GenAISpanCHInsertable,
+)
+from weave.trace_server.opentelemetry.genai_extraction import extract_genai_fields
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
@@ -246,6 +251,24 @@ _CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
     for idx, col in enumerate(ALL_CALL_COMPLETE_INSERT_COLUMNS)
     if ch_sentinel_values.is_sentinel_field(col)
 ]
+
+
+def _genai_span_to_row(span: GenAISpanCHInsertable) -> list[Any]:
+    """Convert a GenAISpanCHInsertable to a row list matching ALL_GENAI_SPAN_INSERT_COLUMNS order."""
+    params = span.model_dump()
+    return [params.get(col) for col in ALL_GENAI_SPAN_INSERT_COLUMNS]
+
+
+def _query_result_to_genai_spans(
+    query_result: QueryResult,
+) -> list[tsi.GenAISpanSchema]:
+    """Convert a ClickHouse QueryResult to a list of GenAISpanSchema."""
+    col_names = query_result.column_names
+    spans = []
+    for row in query_result.result_rows:
+        row_dict = dict(zip(col_names, row))
+        spans.append(tsi.GenAISpanSchema(**row_dict))
+    return spans
 
 
 class ClickHouseTraceServer(tsi.FullTraceServerInterface):
@@ -654,6 +677,134 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
             )
         return tsi.OTelExportRes()
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_otel_export")
+    def genai_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        """Ingest OTel spans into the genai_spans table with normalized GenAI fields."""
+        assert_non_null_wb_user_id(req)
+        rows: list[list[Any]] = []
+        rejected_spans = 0
+        error_messages: list[str] = []
+
+        for processed_span in req.processed_spans:
+            proto_resource_spans = processed_span.resource_spans
+            resource = Resource.from_proto(proto_resource_spans.resource)
+            for proto_scope_spans in proto_resource_spans.scope_spans:
+                for proto_span in proto_scope_spans.spans:
+                    try:
+                        span = Span.from_proto(proto_span, resource)
+                    except AttributePathConflictError as e:
+                        rejected_spans += 1
+                        error_messages.append(str(e))
+                        continue
+                    try:
+                        genai_row = extract_genai_fields(
+                            span,
+                            project_id=req.project_id,
+                            wb_user_id=req.wb_user_id,
+                        )
+                        rows.append(_genai_span_to_row(genai_row))
+                    except Exception as e:
+                        rejected_spans += 1
+                        error_messages.append(f"Failed to extract genai fields: {e}")
+                        continue
+
+        if rows:
+            self._insert_genai_span_batch(rows)
+
+        if rejected_spans > 0:
+            joined_errors = "; ".join(error_messages[:20]) + (
+                "; ..." if len(error_messages) > 20 else ""
+            )
+            return tsi.OTelExportRes(
+                partial_success=tsi.ExportTracePartialSuccess(
+                    rejected_spans=rejected_spans,
+                    error_message=joined_errors,
+                )
+            )
+        return tsi.OTelExportRes()
+
+    def _insert_genai_span_batch(
+        self,
+        batch: list[list[Any]],
+        settings: dict[str, Any] | None = None,
+    ) -> None:
+        """Insert a batch of rows into the genai_spans table."""
+        if not batch:
+            return
+        self._insert(
+            "genai_spans",
+            data=batch,
+            column_names=ALL_GENAI_SPAN_INSERT_COLUMNS,
+            settings=settings,
+        )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_spans_query")
+    def genai_spans_query(
+        self, req: tsi.GenAISpansQueryReq
+    ) -> tsi.GenAISpansQueryRes:
+        """Query genai_spans with optional filters."""
+        conditions = ["project_id = {project_id:String}"]
+        parameters: dict[str, Any] = {"project_id": req.project_id}
+
+        if req.filters:
+            if req.filters.trace_id:
+                conditions.append("trace_id = {filter_trace_id:String}")
+                parameters["filter_trace_id"] = req.filters.trace_id
+            if req.filters.operation_name:
+                conditions.append("operation_name = {filter_op:String}")
+                parameters["filter_op"] = req.filters.operation_name
+            if req.filters.agent_name:
+                conditions.append("agent_name = {filter_agent:String}")
+                parameters["filter_agent"] = req.filters.agent_name
+            if req.filters.provider_name:
+                conditions.append("provider_name = {filter_provider:String}")
+                parameters["filter_provider"] = req.filters.provider_name
+            if req.filters.tool_name:
+                conditions.append("tool_name = {filter_tool:String}")
+                parameters["filter_tool"] = req.filters.tool_name
+            if req.filters.request_model:
+                conditions.append("request_model = {filter_model:String}")
+                parameters["filter_model"] = req.filters.request_model
+            if req.filters.conversation_id:
+                conditions.append("conversation_id = {filter_conv:String}")
+                parameters["filter_conv"] = req.filters.conversation_id
+
+        where_clause = " AND ".join(conditions)
+        parameters["limit"] = min(req.limit, 1000)
+        parameters["offset"] = req.offset
+
+        query = f"""
+            SELECT *
+            FROM genai_spans
+            WHERE {where_clause}
+            ORDER BY started_at DESC
+            LIMIT {{limit:UInt64}} OFFSET {{offset:UInt64}}
+        """
+
+        query_result = self.ch_client.query(query, parameters=parameters)
+        spans = _query_result_to_genai_spans(query_result)
+        return tsi.GenAISpansQueryRes(spans=spans)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_spans_trace")
+    def genai_spans_trace(
+        self, req: tsi.GenAISpansTraceReq
+    ) -> tsi.GenAISpansTraceRes:
+        """Get all genai_spans for a specific trace, ordered by start time."""
+        query = """
+            SELECT *
+            FROM genai_spans
+            WHERE project_id = {project_id:String}
+              AND trace_id = {trace_id:String}
+            ORDER BY started_at ASC
+        """
+        parameters = {
+            "project_id": req.project_id,
+            "trace_id": req.trace_id,
+        }
+        query_result = self.ch_client.query(query, parameters=parameters)
+        spans = _query_result_to_genai_spans(query_result)
+        return tsi.GenAISpansTraceRes(spans=spans)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:

@@ -352,6 +352,91 @@ class OTelExportRes(BaseModel):
     )
 
 
+class GenAISpanSchema(BaseModel):
+    """A normalized GenAI span returned by query APIs."""
+
+    project_id: str
+    trace_id: str
+    span_id: str
+    parent_span_id: str = ""
+    span_name: str = ""
+    span_kind: str = ""
+    started_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    status_code: str = ""
+    status_message: str = ""
+    operation_name: str = ""
+    provider_name: str = ""
+    agent_name: str = ""
+    agent_id: str = ""
+    agent_description: str = ""
+    agent_version: str = ""
+    request_model: str = ""
+    response_model: str = ""
+    response_id: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    conversation_id: str = ""
+    tool_name: str = ""
+    tool_type: str = ""
+    tool_call_id: str = ""
+    tool_description: str = ""
+    finish_reasons: list[str] = Field(default_factory=list)
+    request_temperature: float = 0.0
+    request_max_tokens: int = 0
+    request_top_p: float = 0.0
+    input_messages: str = ""
+    output_messages: str = ""
+    system_instructions: str = ""
+    tool_call_arguments: str = ""
+    tool_call_result: str = ""
+    attributes_dump: str = ""
+    events_dump: str = ""
+    resource_dump: str = ""
+    wb_user_id: str = ""
+
+
+class GenAISpansQueryFilters(BaseModel):
+    """Optional filters for querying genai_spans."""
+
+    trace_id: str | None = None
+    operation_name: str | None = None
+    agent_name: str | None = None
+    provider_name: str | None = None
+    tool_name: str | None = None
+    request_model: str | None = None
+    conversation_id: str | None = None
+
+
+class GenAISpansQueryReq(BaseModel):
+    """Request to list GenAI spans for a project."""
+
+    project_id: str
+    filters: GenAISpansQueryFilters | None = None
+    limit: int = 100
+    offset: int = 0
+
+
+class GenAISpansQueryRes(BaseModel):
+    """Response containing a list of GenAI spans."""
+
+    spans: list[GenAISpanSchema]
+
+
+class GenAISpansTraceReq(BaseModel):
+    """Request to get all GenAI spans for a specific trace."""
+
+    project_id: str
+    trace_id: str
+
+
+class GenAISpansTraceRes(BaseModel):
+    """Response containing all spans for a trace, ordered by start time."""
+
+    spans: list[GenAISpanSchema]
+
+
 class CallStartReq(BaseModelStrict):
     start: StartedCallSchemaForInsert
 
@@ -2614,6 +2699,11 @@ class EvalResultsSummaryRes(BaseModel):
 class TraceServerInterface(Protocol):
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
+
+    # GenAI OTEL API
+    def genai_otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
+    def genai_spans_query(self, req: GenAISpansQueryReq) -> GenAISpansQueryRes: ...
+    def genai_spans_trace(self, req: GenAISpansTraceReq) -> GenAISpansTraceRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

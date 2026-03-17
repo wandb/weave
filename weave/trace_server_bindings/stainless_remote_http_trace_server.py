@@ -446,6 +446,24 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
+    def genai_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        """Export GenAI OTel traces."""
+        raise NotImplementedError(
+            "Sending GenAI otel traces directly is not yet supported."
+        )
+
+    def genai_spans_query(
+        self, req: tsi.GenAISpansQueryReq
+    ) -> tsi.GenAISpansQueryRes:
+        """Query GenAI spans."""
+        raise NotImplementedError("GenAI spans query is not yet supported.")
+
+    def genai_spans_trace(
+        self, req: tsi.GenAISpansTraceReq
+    ) -> tsi.GenAISpansTraceRes:
+        """Get all GenAI spans for a trace."""
+        raise NotImplementedError("GenAI spans trace is not yet supported.")
+
     # Call API
     @validate_call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

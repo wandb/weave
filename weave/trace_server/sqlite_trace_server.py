@@ -1852,6 +1852,25 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             )
         return tsi.OTelExportRes()
 
+    def genai_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        raise NotImplementedError(
+            "genai_otel_export is not implemented for SQLite trace server"
+        )
+
+    def genai_spans_query(
+        self, req: tsi.GenAISpansQueryReq
+    ) -> tsi.GenAISpansQueryRes:
+        raise NotImplementedError(
+            "genai_spans_query is not implemented for SQLite trace server"
+        )
+
+    def genai_spans_trace(
+        self, req: tsi.GenAISpansTraceReq
+    ) -> tsi.GenAISpansTraceRes:
+        raise NotImplementedError(
+            "genai_spans_trace is not implemented for SQLite trace server"
+        )
+
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         raise NotImplementedError(
             "project_stats is not implemented for SQLite trace server"
