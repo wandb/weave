@@ -2540,7 +2540,10 @@ def process_calls_filter_to_conditions(
             or_conditions.append(
                 f"arrayExists(x -> x LIKE {param_slot(param_builder.add_param(like_ref), 'String')}, {input_refs_sql})"
             )
-        conditions.append("(" + " OR ".join(or_conditions) + ")")
+        if len(or_conditions) == 1:
+            conditions.append(or_conditions[0])
+        else:
+            conditions.append("(" + " OR ".join(or_conditions) + ")")
 
     if filter.output_refs:
         assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
@@ -2563,7 +2566,10 @@ def process_calls_filter_to_conditions(
             output_or_conditions.append(
                 f"arrayExists(x -> x LIKE {param_slot(param_builder.add_param(like_ref), 'String')}, {output_refs_sql})"
             )
-        conditions.append("(" + " OR ".join(output_or_conditions) + ")")
+        if len(output_or_conditions) == 1:
+            conditions.append(output_or_conditions[0])
+        else:
+            conditions.append("(" + " OR ".join(output_or_conditions) + ")")
 
     if filter.parent_ids:
         assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
