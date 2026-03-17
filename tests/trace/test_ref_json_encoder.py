@@ -10,7 +10,9 @@ from weave.trace.serialization.op_type import RefJSONEncoder
 
 @pytest.fixture
 def object_ref() -> ObjectRef:
-    return ObjectRef(entity="my-entity", project="my-project", name="my-obj", _digest="abc123")
+    return ObjectRef(
+        entity="my-entity", project="my-project", name="my-obj", _digest="abc123"
+    )
 
 
 class TestRefJSONEncoderDefault:
@@ -55,7 +57,9 @@ class TestRefJSONEncoderIntegration:
         token = RefJSONEncoder.SPECIAL_REF_TOKEN
         assert token in result
 
-    def test_token_replacement_produces_valid_python(self, object_ref: ObjectRef) -> None:
+    def test_token_replacement_produces_valid_python(
+        self, object_ref: ObjectRef
+    ) -> None:
         """Test the same token-replacement logic used in _get_code_deps."""
         token = RefJSONEncoder.SPECIAL_REF_TOKEN
         json_str = json.dumps({"key": object_ref}, cls=RefJSONEncoder, indent=4)
@@ -67,7 +71,7 @@ class TestRefJSONEncoderIntegration:
         # Result should contain the bare ref call (not quoted)
         assert f"weave.ref('{object_ref!s}').get()" in json_str
         # The ref call should NOT be inside quotes
-        assert f'"weave.ref(' not in json_str
+        assert '"weave.ref(' not in json_str
 
     def test_mixed_ref_and_plain_values(self, object_ref: ObjectRef) -> None:
         token = RefJSONEncoder.SPECIAL_REF_TOKEN
@@ -85,8 +89,12 @@ class TestRefJSONEncoderIntegration:
         assert f"weave.ref('{object_ref!s}').get()" in json_str
 
     def test_multiple_refs(self) -> None:
-        ref1 = ObjectRef(entity="my-entity", project="my-project", name="obj-a", _digest="aaa")
-        ref2 = ObjectRef(entity="my-entity", project="my-project", name="obj-b", _digest="bbb")
+        ref1 = ObjectRef(
+            entity="my-entity", project="my-project", name="obj-a", _digest="aaa"
+        )
+        ref2 = ObjectRef(
+            entity="my-entity", project="my-project", name="obj-b", _digest="bbb"
+        )
         token = RefJSONEncoder.SPECIAL_REF_TOKEN
         data = {"first": ref1, "second": ref2}
         json_str = json.dumps(data, cls=RefJSONEncoder, indent=4)
