@@ -9,7 +9,7 @@ jobs:
     name: Auto-fix lint
     if: >-
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/lint')
+      github.event.comment.body == '/lint'
     runs-on: ubuntu-latest
     permissions:
       contents: write
