@@ -13,7 +13,7 @@ jobs:
     # Only run on PR comments containing "/mirror"
     if: >-
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/mirror')
+      github.event.comment.body == '/mirror'
     runs-on: ubuntu-latest
     steps:
       - name: Add reaction
