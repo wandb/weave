@@ -35,6 +35,8 @@ from typing_extensions import Self
 
 from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    split_exact_and_wildcard_values,
+    wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import ch_sentinel_values
 from weave.trace_server import trace_server_interface as tsi
@@ -2378,27 +2380,10 @@ def process_ref_filters_to_sql(
             raise TypeError(f"{field_name} is not an aggregate field")
 
         field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
-        non_wildcarded_refs: list[str] = []
-        wildcarded_refs: list[str] = []
-        for ref in refs:
-            if ref.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                wildcarded_refs.append(ref)
-            else:
-                non_wildcarded_refs.append(ref)
-
-        or_conditions: list[str] = []
-        if non_wildcarded_refs:
-            param = param_builder.add_param(non_wildcarded_refs)
-            or_conditions.append(
-                f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
-            )
-        for ref in wildcarded_refs:
-            like_ref = ref[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-            or_conditions.append(
-                f"arrayExists(x -> x LIKE {param_slot(param_builder.add_param(like_ref), 'String')}, {field_sql})"
-            )
-
-        ref_filter_sql = " OR ".join(or_conditions)
+        ref_filter_sql = combine_conditions(
+            _build_clickhouse_ref_match_conditions(refs, field_sql, param_builder),
+            "OR",
+        )
         return f"{ref_filter_sql} OR length({field_sql}) = 0"
 
     ref_filters = []
@@ -2521,55 +2506,27 @@ def process_calls_filter_to_conditions(
     # the output_refs, so lets keep both for clarity
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
-        non_wildcarded_refs: list[str] = []
-        wildcarded_refs: list[str] = []
-        for ref in filter.input_refs:
-            if ref.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                wildcarded_refs.append(ref)
-            else:
-                non_wildcarded_refs.append(ref)
-
-        or_conditions: list[str] = []
         input_refs_sql = get_field_sql("input_refs")
-        if non_wildcarded_refs:
-            or_conditions.append(
-                f"hasAny({input_refs_sql}, {param_slot(param_builder.add_param(non_wildcarded_refs), 'Array(String)')})"
+        conditions.append(
+            combine_conditions(
+                _build_clickhouse_ref_match_conditions(
+                    filter.input_refs, input_refs_sql, param_builder
+                ),
+                "OR",
             )
-        for ref in wildcarded_refs:
-            like_ref = ref[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-            or_conditions.append(
-                f"arrayExists(x -> x LIKE {param_slot(param_builder.add_param(like_ref), 'String')}, {input_refs_sql})"
-            )
-        if len(or_conditions) == 1:
-            conditions.append(or_conditions[0])
-        else:
-            conditions.append("(" + " OR ".join(or_conditions) + ")")
+        )
 
     if filter.output_refs:
         assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
-        non_wildcarded_output_refs: list[str] = []
-        wildcarded_output_refs: list[str] = []
-        for ref in filter.output_refs:
-            if ref.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-                wildcarded_output_refs.append(ref)
-            else:
-                non_wildcarded_output_refs.append(ref)
-
-        output_or_conditions: list[str] = []
         output_refs_sql = get_field_sql("output_refs")
-        if non_wildcarded_output_refs:
-            output_or_conditions.append(
-                f"hasAny({output_refs_sql}, {param_slot(param_builder.add_param(non_wildcarded_output_refs), 'Array(String)')})"
+        conditions.append(
+            combine_conditions(
+                _build_clickhouse_ref_match_conditions(
+                    filter.output_refs, output_refs_sql, param_builder
+                ),
+                "OR",
             )
-        for ref in wildcarded_output_refs:
-            like_ref = ref[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-            output_or_conditions.append(
-                f"arrayExists(x -> x LIKE {param_slot(param_builder.add_param(like_ref), 'String')}, {output_refs_sql})"
-            )
-        if len(output_or_conditions) == 1:
-            conditions.append(output_or_conditions[0])
-        else:
-            conditions.append("(" + " OR ".join(output_or_conditions) + ")")
+        )
 
     if filter.parent_ids:
         assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
@@ -2606,6 +2563,23 @@ def process_calls_filter_to_conditions(
         )
 
     return conditions
+
+
+def _build_clickhouse_ref_match_conditions(
+    refs: list[str], field_sql: str, param_builder: ParamBuilder
+) -> list[str]:
+    exact_refs, wildcard_refs = split_exact_and_wildcard_values(refs)
+    or_conditions: list[str] = []
+    if exact_refs:
+        or_conditions.append(
+            f"hasAny({field_sql}, {param_slot(param_builder.add_param(exact_refs), 'Array(String)')})"
+        )
+    for ref in wildcard_refs:
+        ref_prefix = wildcard_version_value_to_ref_prefix(ref)
+        or_conditions.append(
+            f"arrayExists(x -> startsWith(x, {param_slot(param_builder.add_param(ref_prefix), 'String')}), {field_sql})"
+        )
+    return or_conditions
 
 
 ######### STATS QUERY HANDLING ##########

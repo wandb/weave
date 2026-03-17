@@ -2544,25 +2544,25 @@ def test_input_output_refs_filter_with_wildcards():
             calls_merged.id AS id
         FROM calls_merged
         PREWHERE calls_merged.project_id = {pb_6:String}
-        WHERE (((hasAny(calls_merged.input_refs, {pb_4:Array(String)})
-                OR arrayExists(x -> x LIKE {pb_1:String}, calls_merged.input_refs)
+        WHERE (((((hasAny(calls_merged.input_refs, {pb_4:Array(String)}))
+                OR (arrayExists(x -> startsWith(x, {pb_1:String}), calls_merged.input_refs)))
                 OR length(calls_merged.input_refs) = 0)
-            AND (hasAny(calls_merged.output_refs, {pb_5:Array(String)})
-                OR arrayExists(x -> x LIKE {pb_3:String}, calls_merged.output_refs)
+            AND (((hasAny(calls_merged.output_refs, {pb_5:Array(String)}))
+                OR (arrayExists(x -> startsWith(x, {pb_3:String}), calls_merged.output_refs)))
                 OR length(calls_merged.output_refs) = 0)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
-            AND ((((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)})
-                    OR arrayExists(x -> x LIKE {pb_1:String}, array_concat_agg(calls_merged.input_refs))))
-                AND ((hasAny(array_concat_agg(calls_merged.output_refs), {pb_2:Array(String)})
-                    OR arrayExists(x -> x LIKE {pb_3:String}, array_concat_agg(calls_merged.output_refs)))))))
+            AND (((((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)}))
+                    OR (arrayExists(x -> startsWith(x, {pb_1:String}), array_concat_agg(calls_merged.input_refs)))))
+                AND (((hasAny(array_concat_agg(calls_merged.output_refs), {pb_2:Array(String)}))
+                    OR (arrayExists(x -> startsWith(x, {pb_3:String}), array_concat_agg(calls_merged.output_refs))))))))
         """,
         {
             "pb_0": [exact_input_ref],
-            "pb_1": "weave-trace-internal:///project/object/my_input:%",
+            "pb_1": "weave-trace-internal:///project/object/my_input:",
             "pb_2": [exact_output_ref],
-            "pb_3": "weave-trace-internal:///project/object/my_output:%",
+            "pb_3": "weave-trace-internal:///project/object/my_output:",
             "pb_4": [exact_input_ref],
             "pb_5": [exact_output_ref],
             "pb_6": "project",
@@ -3239,20 +3239,20 @@ def test_calls_complete_with_refs_filter() -> None:
             calls_complete.id AS id
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_6:String}
-        WHERE (((hasAny(calls_complete.input_refs, {pb_4:Array(String)})
-                OR arrayExists(x -> x LIKE {pb_2:String}, calls_complete.input_refs)
+        WHERE (((((hasAny(calls_complete.input_refs, {pb_4:Array(String)}))
+                OR (arrayExists(x -> startsWith(x, {pb_2:String}), calls_complete.input_refs)))
                 OR length(calls_complete.input_refs) = 0)
             AND (hasAny(calls_complete.output_refs, {pb_5:Array(String)})
                 OR length(calls_complete.output_refs) = 0)))
         AND (((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
-            AND ((((hasAny(calls_complete.input_refs, {pb_1:Array(String)})
-                    OR arrayExists(x -> x LIKE {pb_2:String}, calls_complete.input_refs)))
+            AND (((((hasAny(calls_complete.input_refs, {pb_1:Array(String)}))
+                    OR (arrayExists(x -> startsWith(x, {pb_2:String}), calls_complete.input_refs))))
                 AND (hasAny(calls_complete.output_refs, {pb_3:Array(String)})))))
         """,
         {
             "pb_0": SENTINEL_DATETIME,
             "pb_1": ["weave-trace-internal:///project/object/my_input:abc"],
-            "pb_2": "weave-trace-internal:///project/object/my_input:%",
+            "pb_2": "weave-trace-internal:///project/object/my_input:",
             "pb_3": ["weave-trace-internal:///project/object/my_output:xyz"],
             "pb_4": ["weave-trace-internal:///project/object/my_input:abc"],
             "pb_5": ["weave-trace-internal:///project/object/my_output:xyz"],

@@ -3794,12 +3794,12 @@ def test_filter_calls_by_ref(client):
 
 
 def test_filter_calls_by_ref_wildcard_versions(client):
-    input_ref_v1 = client.save({"a": 1}, "obj").ref
-    input_ref_v2 = client.save({"a": 2}, "obj").ref
-    output_ref_v1 = client.save({"b": 1}, "obj2").ref
-    output_ref_v2 = client.save({"b": 2}, "obj2").ref
-    other_input_ref = client.save({"a": 99}, "other_obj").ref
-    other_output_ref = client.save({"b": 99}, "other_obj2").ref
+    input_ref_v1 = client.save({"a": 1}, "my_input").ref
+    input_ref_v2 = client.save({"a": 2}, "my_input").ref
+    output_ref_v1 = client.save({"b": 1}, "my_output").ref
+    output_ref_v2 = client.save({"b": 2}, "my_output").ref
+    colliding_input_ref = client.save({"a": 99}, "myXinput").ref
+    colliding_output_ref = client.save({"b": 99}, "myXoutput").ref
 
     assert input_ref_v1.uri != input_ref_v2.uri
     assert output_ref_v1.uri != output_ref_v2.uri
@@ -3810,7 +3810,7 @@ def test_filter_calls_by_ref_wildcard_versions(client):
 
     log_obj(input_ref_v1, output_ref_v1)
     log_obj(input_ref_v2, output_ref_v2)
-    log_obj(other_input_ref, other_output_ref)
+    log_obj(colliding_input_ref, colliding_output_ref)
 
     input_wildcard = (
         input_ref_v1.uri.rsplit(":", 1)[0] + WILDCARD_ARTIFACT_VERSION_AND_PATH

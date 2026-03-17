@@ -13,6 +13,27 @@ valid_internal_schemes = [
 ]
 
 
+def split_exact_and_wildcard_values(values: list[str]) -> tuple[list[str], list[str]]:
+    exact_values: list[str] = []
+    wildcard_values: list[str] = []
+    for value in values:
+        if value.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+            wildcard_values.append(value)
+        else:
+            exact_values.append(value)
+    return exact_values, wildcard_values
+
+
+def wildcard_version_value_to_ref_prefix(value: str) -> str:
+    if not value.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+        raise ValueError(f"Value does not end with wildcard suffix: {value}")
+    return value[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":"
+
+
+def wildcard_version_value_to_like_prefix(value: str) -> str:
+    return wildcard_version_value_to_ref_prefix(value) + "%"
+
+
 def extract_refs_from_values(
     vals: Any,
 ) -> list[str]:
