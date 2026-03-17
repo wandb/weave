@@ -8,7 +8,11 @@ from weave.trace_server.service_interface import ServiceInterface
 _TRACE_SERVER_METHOD_NAMES = frozenset(
     {
         name
-        for interface in (tsi.TraceServerInterface, tsi.ObjectInterface, ServiceInterface)
+        for interface in (
+            tsi.TraceServerInterface,
+            tsi.ObjectInterface,
+            ServiceInterface,
+        )
         for name, value in vars(interface).items()
         if callable(value) and not name.startswith("_")
     }

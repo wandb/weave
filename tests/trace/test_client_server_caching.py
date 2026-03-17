@@ -65,9 +65,7 @@ def test_caching_middleware_delegates_ensure_project_exists(tmp_path):
     expected = EnsureProjectExistsRes(project_name="my-project")
     mock_server.ensure_project_exists.return_value = expected
 
-    caching_server = CachingMiddlewareTraceServer(
-        mock_server, str(tmp_path / "cache")
-    )
+    caching_server = CachingMiddlewareTraceServer(mock_server, str(tmp_path / "cache"))
     result = caching_server.ensure_project_exists("entity", "project")
 
     assert result is expected
