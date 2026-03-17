@@ -53,6 +53,7 @@ def ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]
 def _call_wandb_api_with_retry(
     func: Callable[..., Any], *args: Any, **kwargs: Any
 ) -> Any:
+    """Invoke a W&B API call with exponential-backoff retry on transient errors."""
     retryer = Retrying(
         stop=stop_after_attempt(retry_max_attempts()),
         wait=wait_exponential_jitter(initial=1, max=retry_max_interval()),
