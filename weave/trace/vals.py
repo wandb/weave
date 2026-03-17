@@ -775,114 +775,191 @@ class WeaveDict(Traceable, dict):  # noqa: PLW1641
         return unwrap(dict(self.items()))
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _DerefResult:
+    """Result of dereferencing an ObjectRef from the server."""
+
+    val: Any
+    ref: RefWithExtra
+    extra: tuple[str, ...]
+
+
+def _deref_object_ref(
+    val: ObjectRef,
+    server: TraceServerInterface,
+) -> _DerefResult:
+    """Fetch the object behind an ObjectRef from the server.
+
+    On deletion, val is a DeletedRef.
+    """
+    extra = val.extra
+    new_ref: RefWithExtra = val
+    try:
+        project_id = to_project_id(val.entity, val.project)
+        read_res = server.obj_read(
+            ObjReadReq(
+                project_id=project_id,
+                object_id=val.name,
+                digest=val.digest,
+            )
+        )
+        resolved = from_json(read_res.obj.val, project_id, server)
+    except ObjectDeletedError as e:
+        resolved = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)
+        logger.warning("Could not read deleted object: %s", new_ref)
+    return _DerefResult(resolved, new_ref, extra)
+
+
+def _wrap_table(
+    val: Table,
+    ref: RefWithExtra | None,
+    server: TraceServerInterface,
+    root: Traceable | None,
+    parent: Any,
+) -> WeaveTable:
+    """Wrap a Table object into a WeaveTable, preserving in-memory rows."""
+    table_ref = val.ref
+    if not isinstance(table_ref, TableRef):
+        table_ref = getattr(val, "table_ref", None)
+        if not isinstance(table_ref, TableRef):
+            raise InternalError(
+                "Expected Table.ref or Table.table_ref to be TableRef"
+            )
+    rows = val.rows
+    wt = WeaveTable(
+        table_ref=table_ref,
+        ref=ref,
+        server=server,
+        filter=TableRowFilter(),
+        root=root,
+        parent=parent,
+    )
+    # Preserve in-memory rows to avoid an expensive re-fetch from the server.
+    wt.set_prefetched_rows(rows)
+    return wt
+
+
+def _wrap_table_ref(
+    val: TableRef,
+    ref: RefWithExtra | None,
+    server: TraceServerInterface,
+    root: Traceable | None,
+    parent: Any,
+    filter: TableRowFilter | None = None,
+) -> WeaveTable:
+    """Wrap a bare TableRef into a WeaveTable."""
+    return WeaveTable(
+        table_ref=val,
+        ref=ref,
+        server=server,
+        filter=filter or TableRowFilter(),
+        root=root,
+        parent=parent,
+    )
+
+
+def _resolve_extra_path(
+    val: Any,
+    extra: tuple[str, ...],
+    ref: RefWithExtra | None,
+    server: TraceServerInterface,
+    root: Traceable | None,
+    parent: Any,
+) -> Any:
+    """Walk extra path segments (attr, key, index, row-id) to drill into a value."""
+    for extra_index in range(0, len(extra), 2):
+        op, arg = extra[extra_index], extra[extra_index + 1]
+        if op == DICT_KEY_EDGE_NAME:
+            val = val[arg]
+        elif op == OBJECT_ATTR_EDGE_NAME:
+            val = getattr(val, arg)
+        elif op == LIST_INDEX_EDGE_NAME:
+            val = val[int(arg)]
+        elif op == TABLE_ROW_ID_EDGE_NAME:
+            val = val[arg]
+        else:
+            raise ValueError(f"Unknown ref type: {op}")
+
+        if isinstance(val, TableRef):
+            table_row_filter = TableRowFilter()
+            if (
+                len(extra) == 4
+                and extra[0] == OBJECT_ATTR_EDGE_NAME
+                and extra[1] == "rows"
+                and extra[2] == TABLE_ROW_ID_EDGE_NAME
+            ):
+                table_row_filter.row_digests = [extra[3]]
+            val = _wrap_table_ref(val, ref, server, root, parent, table_row_filter)
+
+    return val
+
+
+def _maybe_bind_op(val: Any, parent: Any) -> Any:
+    """If val is an Op with a `self` parameter, bind it to the parent instance.
+
+    This is a heuristic: it assumes the parent is the correct `self`. This works
+    for instance methods (case 1) and unbound property-assigned ops (case 2), but
+    may be wrong if the op was pre-bound to a different object (case 3).
+    """
+    if not (is_op(val) and inspect.signature(val.resolve_fn).parameters.get("self")):
+        return val
+    if parent is None:
+        raise MissingSelfInstanceError(
+            f"{val.name} Op requires a bound self instance. Must be called from an instance method."
+        )
+    return maybe_bind_method(val, parent)
+
+
+def _box_and_attach_ref(val: Any, ref: RefWithExtra | None) -> Any:
+    """Box a primitive value and attach a ref for tracking.
+
+    None and bool are intentionally not ref-tracked because they can't be
+    subclassed in a way that preserves `x is None` / `x is True` semantics.
+    """
+    box_val = box.box(val)
+    if is_op(val):
+        box_val.__dict__["ref"] = ref
+    elif box_val is None or isinstance(box_val, bool):
+        pass
+    elif hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
+        box_val.ref = ref
+    return box_val
+
+
 def make_trace_obj(
     val: Any,
-    new_ref: RefWithExtra | None,  # Can this actually be None?
+    new_ref: RefWithExtra | None,
     server: TraceServerInterface,
     root: Traceable | None,
     parent: Any = None,
 ) -> Any:
+    # Already wrapped — just update WeaveTable's ref to prefer the outer path
+    # (e.g. Dataset.rows[id] rather than table[id])
     if isinstance(val, Traceable):
-        # If val is a WeaveTable, we want to refer to it via the outer object
-        # that it is within, rather than via the TableRef. For example we
-        # want Dataset row refs to be Dataset.rows[id] rather than table[id]
         if isinstance(val, WeaveTable):
             val.ref = new_ref
         return val
+    # Already has a ref (Ops, Boxed classes) — nothing to do
     if hasattr(val, "ref") and isinstance(val.ref, RefWithExtra):
-        # The Traceable check above does not currently work for Ops, where we
-        # directly attach a ref, or to our Boxed classes. We should use Traceable
-        # for all of these, but for now we need to check for the ref attribute.
         return val
-    # Dereference val and create the appropriate wrapper object
+
+    # Dereference ObjectRef → fetch from server
     extra: tuple[str, ...] = ()
     if isinstance(val, ObjectRef):
-        new_ref = val
-        extra = val.extra
-        try:
-            project_id = to_project_id(val.entity, val.project)
-            read_res = server.obj_read(
-                ObjReadReq(
-                    project_id=project_id,
-                    object_id=val.name,
-                    digest=val.digest,
-                )
-            )
-            val = from_json(read_res.obj.val, project_id, server)
-        except ObjectDeletedError as e:
-            # encountered a deleted object, return DeletedRef, warn and continue
-            val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)
-            logger.warning("Could not read deleted object: %s", new_ref)
+        deref = _deref_object_ref(val, server)
+        val, new_ref, extra = deref.val, deref.ref, deref.extra
 
+    # Wrap Table/TableRef → WeaveTable
     if isinstance(val, Table):
-        val_ref = val.ref
-        if not isinstance(val_ref, TableRef):
-            val_table_ref = getattr(val, "table_ref", None)
-            if not isinstance(val_table_ref, TableRef):
-                raise InternalError(
-                    "Expected Table.ref or Table.table_ref to be TableRef"
-                )
-            val_ref = val_table_ref
-        rows = val.rows
-        val = WeaveTable(
-            table_ref=val_ref,
-            ref=new_ref,
-            server=server,
-            filter=TableRowFilter(),
-            root=root,
-            parent=parent,
-        )
-        # Use in memory rows! This is the case where we are making
-        # a trace object from an existing Table! If we don't do this
-        # then the WeaveTable will try to fetch all the rows from the
-        # server, throwing away the in memory rows. This is really expensive
-        # when we are doing evaluations!
-        val.set_prefetched_rows(rows)
-    if isinstance(val, TableRef):
-        val = WeaveTable(
-            table_ref=val,
-            ref=new_ref,
-            server=server,
-            filter=TableRowFilter(),
-            root=root,
-            parent=parent,
-        )
+        val = _wrap_table(val, new_ref, server, root, parent)
+    elif isinstance(val, TableRef):
+        val = _wrap_table_ref(val, new_ref, server, root, parent)
 
+    # Resolve extra path segments (attr/key/index/row-id)
     if extra:
-        # This is where extra resolution happens?
-        for extra_index in range(0, len(extra), 2):
-            op, arg = extra[extra_index], extra[extra_index + 1]
-            if op == DICT_KEY_EDGE_NAME:
-                val = val[arg]
-            elif op == OBJECT_ATTR_EDGE_NAME:
-                val = getattr(val, arg)
-            elif op == LIST_INDEX_EDGE_NAME:
-                val = val[int(arg)]
-            elif op == TABLE_ROW_ID_EDGE_NAME:
-                val = val[arg]
-            else:
-                raise ValueError(f"Unknown ref type: {extra[extra_index]}")
+        val = _resolve_extra_path(val, extra, new_ref, server, root, parent)
 
-            # need to deref if we encounter these
-            if isinstance(val, TableRef):
-                table_row_filter = TableRowFilter()
-                if (
-                    len(extra) == 4
-                    and extra[0] == OBJECT_ATTR_EDGE_NAME
-                    and extra[1] == "rows"
-                    and extra[2] == TABLE_ROW_ID_EDGE_NAME
-                ):
-                    table_row_filter.row_digests = [extra[3]]
-
-                val = WeaveTable(
-                    table_ref=val,
-                    ref=new_ref,
-                    server=server,
-                    filter=table_row_filter,
-                    root=root,
-                    parent=parent,
-                )
-
+    # Wrap plain containers → Traceable subclasses
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
             return WeaveObject(
@@ -891,44 +968,10 @@ def make_trace_obj(
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):
-            return WeaveDict(val, ref=new_ref, server=server, root=root)
-    if is_op(val) and inspect.signature(val.resolve_fn).parameters.get("self"):
-        # This condition attempts to bind the current `self` to the attribute if
-        # it happens to be both an `Op` and have a `self` argument. This is a
-        # bit of a hack since we are not always sure that the current object is
-        # the correct object to bind. There are 3 cases:
-        # 1. The attribute is part of the instance methods and the binding is
-        #    correct
-        # 2. The attribute is assigned as a property and is not bound at
-        #    assignment time. In this case, it is "unlikely" that the args
-        #    contain a `self` argument - which is why we apply this heuristic.
-        # 3. The attribute is assigned as a property and is bound to another
-        #    object at the time of assignment. In this case, the binding is
-        #    incorrect. However, in our evaluation use case we do not have this
-        #    case. We are accepting the incorrect assignment here for the sake
-        #    of expediency, but should be fixed.
-        if parent is None:
-            raise MissingSelfInstanceError(
-                f"{val.name} Op requires a bound self instance. Must be called from an instance method."
-            )
-        # TODO: This binding is correct but not done for consistency with the
-        # not-yet-saved-method-op API which requires explicitly passing self
-        # val.call = partial(call, val, parent)
-        val = maybe_bind_method(val, parent)
-    box_val = box.box(val)
-    if is_op(val):
-        box_val.__dict__["ref"] = new_ref
-    elif box_val is None or isinstance(box_val, bool):
-        # We intentionally don't box None and bools because it's impossible to
-        # make them behave like the underlying True/False/None objects in python.
-        # This is unlike other objects (dict, list, int) that can be inherited
-        # from and compared.
+            return WeaveDict(val, ref=new_ref, server=server, root=root, parent=parent)
 
-        # The tradeoff we're making here is:
-        # 1. We won't ref track bools or None when passed into a call; but
-        # 2. Users can compare them pythonically (e.g. `x is None` vs. `x == None`)
+    # Bind method-ops to their parent instance
+    val = _maybe_bind_op(val, parent)
 
-        pass
-    elif hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
-        box_val.ref = new_ref
-    return box_val
+    # Box primitives and attach ref
+    return _box_and_attach_ref(val, new_ref)
