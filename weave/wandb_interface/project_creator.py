@@ -84,6 +84,7 @@ def _is_retryable_project_exception(exception: BaseException) -> bool:
 def _raise_project_access_error(
     entity_name: str, project_name: str, exception: Exception
 ) -> NoReturn:
+    """Log and re-raise an exception from a failed project access or creation attempt."""
     logger.error("Unable to access `%s/%s`.", entity_name, project_name)
     logger.error(str(exception))
 
