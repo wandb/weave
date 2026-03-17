@@ -259,21 +259,9 @@ _MIRRORED_RUNTIME_OP_ATTRS = tuple(
 )
 
 
-@dataclass(frozen=True, slots=True)
-class NormalizedInvokeTarget(Generic[P, R]):
-    fn: Opified[P, R]
-    args: tuple[Any, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class SyncedOpRuntimeState(Generic[P, R]):
-    opified: Opified[P, R]
-    op_def: SyncOp[P, R] | AsyncOp[P, R]
-
-
 def _normalize_sidecar_invoke_target(
     fn: Opified[P, R] | MethodType | partial, args: tuple[Any, ...]
-) -> NormalizedInvokeTarget[P, R]:
+) -> tuple[Opified[P, R], tuple[Any, ...]]:
     normalized_args = args
     if isinstance(fn, MethodType):
         bound_self = fn.__self__
@@ -291,7 +279,7 @@ def _normalize_sidecar_invoke_target(
     else:
         normalized_fn = fn
 
-    return NormalizedInvokeTarget(fn=normalized_fn, args=normalized_args)
+    return normalized_fn, normalized_args
 
 
 @dataclass
@@ -311,18 +299,18 @@ class SyncOp(BaseOp[P, R]):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> R:
-        normalized_target = _normalize_sidecar_invoke_target(fn, args)
+        fn, args = _normalize_sidecar_invoke_target(fn, args)
         if self.is_generator:
             res, _ = _call_sync_gen(
-                cast(Op, normalized_target.fn),
-                *normalized_target.args,
+                cast(Op, fn),
+                *args,
                 __should_raise=True,
                 **kwargs,
             )
         else:
             res, _ = _call_sync_func(
-                cast(Op, normalized_target.fn),
-                *normalized_target.args,
+                cast(Op, fn),
+                *args,
                 __should_raise=True,
                 **kwargs,
             )
@@ -346,18 +334,18 @@ class AsyncOp(BaseOp[P, R]):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> R:
-        normalized_target = _normalize_sidecar_invoke_target(fn, args)
+        fn, args = _normalize_sidecar_invoke_target(fn, args)
         if self.is_async_generator:
             res, _ = await _call_async_gen(
-                cast(Op, normalized_target.fn),
-                *normalized_target.args,
+                cast(Op, fn),
+                *args,
                 __should_raise=True,
                 **kwargs,
             )
         else:
             res, _ = await _call_async_func(
-                cast(Op, normalized_target.fn),
-                *normalized_target.args,
+                cast(Op, fn),
+                *args,
                 __should_raise=True,
                 **kwargs,
             )
@@ -366,11 +354,12 @@ class AsyncOp(BaseOp[P, R]):
 
 def _sync_op_runtime_state(
     oplike: Opified[P, R] | MethodType | partial,
-) -> SyncedOpRuntimeState[P, R]:
+) -> tuple[Opified[P, R], SyncOp[P, R] | AsyncOp[P, R]]:
+    # Transitional while wrapper attrs can still diverge from the `__op__` sidecar.
     opified = _unwrap_opified(oplike)
     op_def = get_op_def(opified)
     op_def.sync_from_wrapper(opified)
-    return SyncedOpRuntimeState(opified=opified, op_def=op_def)
+    return opified, op_def
 
 
 # Compatibility aliases while the rest of the repo migrates off the old names.
@@ -389,8 +378,8 @@ def _set_runtime_attr(
 
 def _bound_runtime_property(attr: str) -> property:
     def getter(self: BoundOp[Any, Any]) -> Any:
-        runtime_state = _sync_op_runtime_state(self._target)
-        return getattr(runtime_state.op_def, attr)
+        _, op_def = _sync_op_runtime_state(self._target)
+        return getattr(op_def, attr)
 
     def setter(self: BoundOp[Any, Any], value: Any) -> None:
         _set_runtime_attr(self._target, attr, value)
@@ -411,11 +400,11 @@ class BoundOp(Generic[P, R]):
     __wrapped__: Opified[P, R] | MethodType | partial
 
     def __init__(self, target: Opified[P, R] | MethodType | partial) -> None:
-        runtime_state = _sync_op_runtime_state(target)
+        opified, op_def = _sync_op_runtime_state(target)
         self._target = target
-        self._opified = runtime_state.opified
-        self.__op__ = runtime_state.op_def
-        self.__self__ = getattr(target, "__self__", runtime_state.opified)
+        self._opified = opified
+        self.__op__ = op_def
+        self.__self__ = getattr(target, "__self__", opified)
         self.__wrapped__ = target
         self.__signature__ = inspect.signature(target)
 
@@ -448,10 +437,10 @@ class BoundOp(Generic[P, R]):
         __require_explicit_finish: bool = False,
         **kwargs: Any,
     ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
-        normalized_target = _normalize_sidecar_invoke_target(self._target, args)
+        opified, normalized_args = _normalize_sidecar_invoke_target(self._target, args)
         return call(
-            cast(Op, normalized_target.fn),
-            *normalized_target.args,
+            cast(Op, opified),
+            *normalized_args,
             __weave=__weave,
             __should_raise=__should_raise,
             __require_explicit_finish=__require_explicit_finish,
@@ -493,8 +482,7 @@ def setup_dunder_weave_dict(op: Op, d: WeaveKwargs | None = None) -> WeaveKwargs
     weave_dict = res.setdefault("attributes", defaultdict(dict)).setdefault("weave", {})
     res.setdefault("display_name", None)
 
-    runtime_state = _sync_op_runtime_state(op)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(op)
     if op_def.kind:
         weave_dict["kind"] = op_def.kind
     if op_def.color:
@@ -504,24 +492,21 @@ def setup_dunder_weave_dict(op: Op, d: WeaveKwargs | None = None) -> WeaveKwargs
 
 
 def _set_on_input_handler(func: Op, on_input: OnInputHandlerType) -> None:
-    runtime_state = _sync_op_runtime_state(func)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(func)
     if op_def._on_input_handler is not None:
         raise ValueError("Cannot set on_input_handler multiple times")
     _set_runtime_attr(func, "_on_input_handler", on_input)
 
 
 def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
-    runtime_state = _sync_op_runtime_state(func)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(func)
     if op_def._on_output_handler is not None:
         raise ValueError("Cannot set on_output_handler multiple times")
     _set_runtime_attr(func, "_on_output_handler", on_output)
 
 
 def _set_on_finish_handler(func: Op, on_finish: OnFinishHandlerType) -> None:
-    runtime_state = _sync_op_runtime_state(func)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(func)
     if op_def._on_finish_handler is not None:
         raise ValueError("Cannot set on_finish_handler multiple times")
     _set_runtime_attr(func, "_on_finish_handler", on_finish)
@@ -552,8 +537,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     )
     from weave.type_wrappers import Content
 
-    runtime_state = _sync_op_runtime_state(func)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(func)
     resolve_fn = op_def.require_resolve_fn()
 
     try:
@@ -627,8 +611,7 @@ def _create_call(
     """
     client = weave_client_context.require_weave_client()
 
-    runtime_state = _sync_op_runtime_state(func)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(func)
 
     pargs = None
     if op_def._on_input_handler is not None:
@@ -680,8 +663,7 @@ def is_tracing_setting_disabled() -> bool:
 
 
 def should_skip_tracing_for_op(op: Op) -> bool:
-    runtime_state = _sync_op_runtime_state(op)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(op)
     return not op_def._tracing_enabled
 
 
@@ -689,8 +671,7 @@ def _should_sample_traces(op: Op) -> bool:
     if call_context.get_current_call():
         return False  # Don't sample traces for child calls
 
-    runtime_state = _sync_op_runtime_state(op)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(op)
     if random.random() > op_def.tracing_sample_rate:
         return True  # Sample traces for this call
 
@@ -732,8 +713,7 @@ def _call_sync_func(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
-    runtime_state = _sync_op_runtime_state(op)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(op)
     func = op_def.require_resolve_fn()
     call = placeholder_call()
 
@@ -863,8 +843,7 @@ async def _call_async_func(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
-    runtime_state = _sync_op_runtime_state(op)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(op)
     func = op_def.require_resolve_fn()
     call = placeholder_call()
 
@@ -990,8 +969,7 @@ def _call_sync_gen(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Generator[Any], Call]:
-    runtime_state = _sync_op_runtime_state(op)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(op)
     func = op_def.require_resolve_fn()
     call = placeholder_call()
 
@@ -1211,8 +1189,7 @@ async def _call_async_gen(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[AsyncIterator, Call]:
-    runtime_state = _sync_op_runtime_state(op)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(op)
     func = op_def.require_resolve_fn()
     call = placeholder_call()
 
@@ -1457,8 +1434,7 @@ def call(
     result, call = add.call(1, 2)
     ```
     """
-    runtime_state = _sync_op_runtime_state(op)
-    op_def = runtime_state.op_def
+    _, op_def = _sync_op_runtime_state(op)
     if inspect.iscoroutinefunction(op_def.require_resolve_fn()):
         return _call_async_func(
             op,
