@@ -103,6 +103,7 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
+from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
 from weave.trace_server.trace_server_interface import (
     AliasesListReq,
     CallEndReq,
@@ -1897,13 +1898,21 @@ class WeaveClient:
         name = sanitize_object_name(name)
 
         compute_digests = self._should_compute_client_digests()
+        internal_pid = self._cached_internal_project_id if compute_digests else None
 
         def send_obj_create() -> ObjCreateRes:
             json_val = to_json(val, self._project_id(), self)
 
             expected_digest = None
-            if compute_digests:
-                expected_digest = compute_object_digest(json_val)
+            if compute_digests and internal_pid is not None:
+                project_id = self._project_id()
+                json_val_internal = universal_ext_to_int_ref_converter(
+                    json_val,
+                    lambda ext_pid: internal_pid
+                    if ext_pid == project_id
+                    else ext_pid,
+                )
+                expected_digest = compute_object_digest(json_val_internal)
 
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
@@ -1950,11 +1959,20 @@ class WeaveClient:
         return self._save_object_basic(op, name)
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
+        compute_digests = self._should_compute_client_digests()
+        internal_pid = self._cached_internal_project_id if compute_digests else None
         json_rows = to_json(rows, self._project_id(), self)
 
         expected_digest = None
-        if self._should_compute_client_digests():
-            row_digests = [compute_row_digest(row) for row in json_rows]
+        if compute_digests and internal_pid is not None:
+            project_id = self._project_id()
+            json_rows_internal = universal_ext_to_int_ref_converter(
+                json_rows,
+                lambda ext_pid: internal_pid
+                if ext_pid == project_id
+                else ext_pid,
+            )
+            row_digests = [compute_row_digest(row) for row in json_rows_internal]
             expected_digest = compute_table_digest(row_digests)
 
         req = TableCreateReq(
