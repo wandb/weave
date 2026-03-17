@@ -826,7 +826,7 @@ class WeaveClient:
             bytes_size = len(call_start_req.model_dump_json())
             if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
                 logger.warning(
-                    "Trace input size (%s bytes) exceeds the maximum allowed size of %s bytes.Inputs may be dropped.",
+                    "Trace input size (%s bytes) exceeds the maximum allowed size of %s bytes. Inputs may be dropped.",
                     bytes_size,
                     MAX_TRACE_PAYLOAD_SIZE,
                 )
