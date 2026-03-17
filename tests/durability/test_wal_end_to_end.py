@@ -136,6 +136,45 @@ class TestDrain:
         remaining = list(consumer2.read_pending())
         assert len(remaining) == 2
 
+    def test_unknown_type_logs_warning(
+        self, tmp_path: str, caplog: object
+    ) -> None:
+        """Records with a type that has no handler log a warning."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with mgr.create_file() as writer:
+            writer.write({"type": "obj_create", "seq": 0})
+            writer.write({"type": "unknown_future_type", "data": 123})
+            writer.write({"type": "obj_create", "seq": 2})
+
+        received: list[WALRecord] = []
+        consumer = JSONLWALConsumer(mgr.list_files()[0])
+        with caplog.at_level(logging.WARNING):  # type: ignore[union-attr]
+            count = drain(consumer, {"obj_create": received.append})
+
+        assert count == 2
+        assert any("unknown_future_type" in msg for msg in caplog.messages)  # type: ignore[union-attr]
+        # All records (including unknown) are acknowledged past.
+        assert list(consumer.read_pending()) == []
+
+    def test_max_records_limits_processing(self, tmp_path: str) -> None:
+        """drain() stops after max_records have been processed."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with mgr.create_file() as writer:
+            for i in range(5):
+                writer.write({"type": "obj_create", "seq": i})
+
+        received: list[WALRecord] = []
+        consumer = JSONLWALConsumer(mgr.list_files()[0])
+        count = drain(consumer, {"obj_create": received.append}, max_records=2)
+
+        assert count == 2
+        assert len(received) == 2
+        assert [r["seq"] for r in received] == [0, 1]
+
+        # Remaining records are still pending.
+        remaining = list(consumer.read_pending())
+        assert len(remaining) == 3
+
     def test_records_without_type_key_are_skipped_with_warning(
         self, tmp_path: str, caplog: object
     ) -> None:

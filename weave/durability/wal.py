@@ -237,12 +237,16 @@ class WALDirectoryManager(Protocol):
 # ---------------------------------------------------------------------------
 
 
-def drain(consumer: WALConsumer, handlers: WALHandlers) -> int:
-    """Process one batch of pending records from a single WAL file.
+def drain(
+    consumer: WALConsumer,
+    handlers: WALHandlers,
+    max_records: int = 0,
+) -> int:
+    """Process pending records from a single WAL file.
 
-    Reads all unacknowledged records, dispatches each to the handler matching
-    its "type" key, then acknowledges the batch.  Records with unknown types
-    are skipped.
+    Reads unacknowledged records, dispatches each to the handler matching its
+    "type" key, then acknowledges the batch.  Records with unknown types are
+    skipped with a warning.
 
     Acknowledgement is all-or-nothing: if a handler raises, the exception
     propagates, acknowledge() is never called, and the entire batch replays
@@ -252,6 +256,8 @@ def drain(consumer: WALConsumer, handlers: WALHandlers) -> int:
     Args:
         consumer: A consumer bound to a specific WAL file.
         handlers: Maps record type strings to handler callables.
+        max_records: Maximum number of records to process.  0 (default)
+            means no limit — drain the entire file.
 
     Returns:
         The number of records successfully processed.
@@ -271,7 +277,15 @@ def drain(consumer: WALConsumer, handlers: WALHandlers) -> int:
         if handler is not None:
             handler(entry.record)
             processed += 1
+        else:
+            logger.warning(
+                "No handler registered for record type %r at offset %d",
+                record_type,
+                entry.end_offset,
+            )
         last_offset = entry.end_offset
+        if max_records and processed >= max_records:
+            break
     if last_offset:
         consumer.acknowledge(last_offset)
     return processed
