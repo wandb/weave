@@ -5,12 +5,16 @@ import sys
 import tempfile
 import time
 from typing import Any
+from unittest.mock import MagicMock
 
 import PIL
+import pytest
 
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
 from tests.trace.server_utils import find_server_layer
+from weave.trace import weave_client
+from weave.trace.context import weave_client_context
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -737,3 +741,75 @@ def test_invalidation_prefix_is_prefix_of_cache_key():
         f"  prefix: {create_prefix}\n"
         f"  key:    {create_full_key}"
     )
+
+
+@pytest.mark.parametrize(
+    "method_name",
+    [
+        "get_call_processor",
+        "get_feedback_processor",
+        "ensure_project_exists",
+        "projects_info",
+    ],
+)
+def test_caching_middleware_optional_methods_delegate_when_present(method_name):
+    """Optional methods are forwarded to the underlying server when it has them."""
+    mock_server = MagicMock()
+    caching_server = CachingMiddlewareTraceServer.from_env(mock_server)
+    getattr(caching_server, method_name)("arg1", "arg2")
+    getattr(mock_server, method_name).assert_called_once_with("arg1", "arg2")
+
+
+@pytest.mark.parametrize(
+    "method_name",
+    [
+        "get_call_processor",
+        "get_feedback_processor",
+        "ensure_project_exists",
+        "projects_info",
+    ],
+)
+def test_caching_middleware_optional_methods_return_none_when_absent(method_name):
+    """Optional methods return None (not AttributeError) when the underlying server lacks them."""
+
+    class MinimalServer:
+        pass
+
+    caching_server = CachingMiddlewareTraceServer.from_env(MinimalServer())
+    result = getattr(caching_server, method_name)("arg1", "arg2")
+    assert result is None
+
+
+@pytest.mark.parametrize("method_name", ["call_start", "call_end"])
+def test_caching_middleware_delegated_methods_forward_to_underlying_server(method_name):
+    """Non-optional delegated methods are forwarded to the underlying server."""
+    mock_server = MagicMock()
+    caching_server = CachingMiddlewareTraceServer.from_env(mock_server)
+    req = MagicMock()
+    getattr(caching_server, method_name)(req)
+    getattr(mock_server, method_name).assert_called_once_with(req)
+
+
+def test_caching_middleware_not_delegated_method_raises_attribute_error():
+    """Methods not in delegated_methods or optional_delegated_methods raise AttributeError."""
+
+    class MinimalServer:
+        pass
+
+    caching_server = CachingMiddlewareTraceServer.from_env(MinimalServer())
+    with pytest.raises(AttributeError):
+        caching_server.this_method_does_not_exist()
+
+
+def test_weave_client_can_be_initialized_with_caching_server():
+    # Ensure that WeaveClient.__init__ doesn't crash. We had a regression where it did
+    # because we didn't delegate ensure_project_exists, which it calls.
+    mock_server = MagicMock()
+    caching_server = CachingMiddlewareTraceServer.from_env(mock_server)
+    client = weave_client.WeaveClient(
+        "entity", "project", caching_server, ensure_project_exists=True
+    )
+    try:
+        assert client.entity == "entity"
+    finally:
+        weave_client_context.set_weave_client_global(None)
