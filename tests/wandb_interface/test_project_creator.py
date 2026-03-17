@@ -61,6 +61,8 @@ def test_ensure_project_exists_project_not_found_create_success(
     """Test project creation when project doesn't exist and creation succeeds."""
     # Mock upsert response - GraphQL structure
     upsert_response = {"upsertModel": {"model": {"name": "new_project"}}}
+    # The fixture already made the existence check return "not found"; this is the
+    # successful response from the follow-up create request.
     mock_api_with_no_project.upsert_project.return_value = upsert_response
 
     result = ensure_project_exists("test_entity", "test_project")
@@ -92,6 +94,8 @@ def test_ensure_project_exists_retries_project_create_on_comm_error(
     mock_api_with_no_project,
 ):
     """Test project creation retries on transient communication errors."""
+    # This models a transient W&B error during project creation after the initial
+    # existence check already determined the project does not exist.
     mock_api_with_no_project.upsert_project.side_effect = [
         CommError("Network error"),
         {"upsertModel": {"model": {"name": "new_project"}}},
@@ -100,6 +104,8 @@ def test_ensure_project_exists_retries_project_create_on_comm_error(
     result = ensure_project_exists("test_entity", "test_project")
 
     assert result == {"project_name": "new_project"}
+    # Only the create call is retried here: the existence lookup succeeded once,
+    # then the first create attempt failed transiently and the second one succeeded.
     assert mock_api_with_no_project.project.call_count == 1
     assert mock_api_with_no_project.upsert_project.call_count == 2
 
@@ -142,5 +148,7 @@ def test_ensure_project_exists_comm_error(mock_api_with_no_project):
     with pytest.raises(CommError, match="Network error"):
         ensure_project_exists("test_entity", "test_project")
 
+    # The lookup still happens once, then project creation is attempted twice:
+    # the initial call plus one retry before surfacing the final CommError.
     assert mock_api_with_no_project.project.call_count == 1
     assert mock_api_with_no_project.upsert_project.call_count == 2
