@@ -1,17 +1,25 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#     "google-adk",
+#     "google-adk>=1.0",
 #     "opentelemetry-sdk",
 #     "opentelemetry-exporter-otlp-proto-grpc",
 #     "opentelemetry-exporter-otlp-proto-http",
 # ]
 # ///
-"""Google Agent Development Kit (ADK) with OTel tracing.
+"""Google ADK with subagents, delegation, and tools — all OTel traced.
 
-ADK has native OTel instrumentation -- setting a global TracerProvider before
-running an agent is all that's needed. This script creates a simple agent with
-a calculator tool and exports all spans to the console (or OTLP endpoint).
+ADK has native OTel instrumentation.  This script creates a multi-agent
+system with LLM-driven delegation:
+
+  - Coordinator: triage agent that routes to specialists via sub_agents
+  - WeatherAgent: looks up weather via a tool
+  - MathAgent: performs arithmetic via a calculator tool
+  - JokeAgent: tells jokes (pure LLM, no tools)
+
+The coordinator decides which specialist to delegate to based on the
+user's question.  Each delegation, tool call, and LLM generation becomes
+a separate OTel span in a parent→child hierarchy.
 
 Usage:
     uv run --python 3.12 google_adk_example.py
@@ -49,11 +57,7 @@ def setup_otel(
     otlp_endpoint: str | None = None,
     genai_endpoint: str | None = None,
 ) -> TracerProvider:
-    """Configure the OTel TracerProvider with console, OTLP, or GenAI endpoint export.
-
-    Must be called BEFORE importing any ADK components so the global
-    TracerProvider is picked up by ADK's module-level tracer.
-    """
+    """Configure OTel TracerProvider. Must be called BEFORE importing ADK."""
     entity = os.environ.get("WANDB_ENTITY", "ben-urmomsclothes")
     resource = Resource.create(
         {
@@ -85,64 +89,146 @@ def setup_otel(
     return provider
 
 
-def calculator(a: float, b: float, operation: str) -> str:
-    """Perform a basic arithmetic operation.
+# ---------------------------------------------------------------------------
+# Tools (defined before ADK imports since they're plain functions)
+# ---------------------------------------------------------------------------
+
+def get_weather(city: str) -> str:
+    """Get the current weather for a city.
 
     Args:
-        a: First number.
-        b: Second number.
-        operation: One of 'add', 'subtract', 'multiply', 'divide'.
+        city: Name of the city.
+
+    Returns:
+        Weather description string.
+    """
+    forecasts = {
+        "san francisco": "Foggy, 58°F, wind 12 mph W",
+        "tokyo": "Clear, 75°F, humidity 45%",
+        "london": "Rainy, 52°F, wind 8 mph SW",
+        "paris": "Overcast, 61°F, light drizzle",
+        "barcelona": "Sunny, 82°F, UV index 7",
+    }
+    return forecasts.get(city.lower(), f"Partly cloudy, 68°F in {city}")
+
+
+def calculator(expression: str) -> str:
+    """Evaluate an arithmetic expression safely.
+
+    Args:
+        expression: A mathematical expression like '42 * 17' or '(3 + 4) * 2'.
 
     Returns:
         The result as a string.
     """
-    ops = {
-        "add": a + b,
-        "subtract": a - b,
-        "multiply": a * b,
-        "divide": a / b if b != 0 else "error: division by zero",
-    }
-    result = ops.get(operation, f"unknown operation: {operation}")
-    return str(result)
+    allowed = set("0123456789+-*/.(). ")
+    if not all(c in allowed for c in expression):
+        return f"Error: invalid characters in expression: {expression}"
+    try:
+        result = eval(expression)  # noqa: S307
+        return str(result)
+    except Exception as e:
+        return f"Error: {e}"
 
 
-async def run_agent() -> None:
-    """Create and run a Google ADK agent with a calculator tool."""
-    # Deferred imports so the global TracerProvider is already set
+# ---------------------------------------------------------------------------
+# Agent construction (deferred to avoid importing ADK before OTel is set up)
+# ---------------------------------------------------------------------------
+
+def build_agents():
+    """Build the multi-agent hierarchy. Call after OTel is configured."""
     from google.adk.agents import LlmAgent
-    from google.adk.runners import InMemoryRunner
-    from google.genai import types
 
-    agent = LlmAgent(
+    weather_agent = LlmAgent(
+        name="WeatherAgent",
+        model="gemini-2.0-flash",
+        description="Specialist for weather forecasts and conditions in any city.",
+        instruction=(
+            "You are a weather specialist. Use the get_weather tool to look "
+            "up weather for cities. Give a short, friendly answer."
+        ),
+        tools=[get_weather],
+    )
+
+    math_agent = LlmAgent(
         name="MathAgent",
         model="gemini-2.0-flash",
-        instruction="You are a helpful math assistant. Use the calculator tool to solve arithmetic problems. Give a short answer.",
+        description="Specialist for arithmetic calculations and math questions.",
+        instruction=(
+            "You are a math specialist. Use the calculator tool to evaluate "
+            "arithmetic expressions. Show your work briefly."
+        ),
         tools=[calculator],
     )
 
-    runner = InMemoryRunner(agent=agent, app_name="math_app")
-
-    session = await runner.session_service.create_session(
-        app_name="math_app",
-        user_id="user1",
+    joke_agent = LlmAgent(
+        name="JokeAgent",
+        model="gemini-2.0-flash",
+        description="Specialist for telling jokes and being funny.",
+        instruction=(
+            "You are a comedian. Tell a short, clever joke related to the "
+            "user's topic. Keep it to 2-3 sentences max."
+        ),
     )
 
-    user_message = types.Content(
-        role="user",
-        parts=[types.Part(text="What is 42 multiplied by 17?")],
+    coordinator = LlmAgent(
+        name="Coordinator",
+        model="gemini-2.0-flash",
+        description="Routes requests to the appropriate specialist agent.",
+        instruction=(
+            "You are a helpful coordinator. Based on the user's request, "
+            "delegate to the appropriate specialist:\n"
+            "  - WeatherAgent for weather questions\n"
+            "  - MathAgent for calculations and math\n"
+            "  - JokeAgent for jokes and humor\n\n"
+            "Always delegate — do not answer directly."
+        ),
+        sub_agents=[weather_agent, math_agent, joke_agent],
     )
 
-    async for event in runner.run_async(
-        user_id="user1",
-        session_id=session.id,
-        new_message=user_message,
-    ):
-        if event.is_final_response() and event.content:
-            text = event.content.parts[0].text.strip()
-            print(f"\n--- Agent output ---\n{text}\n")
+    return coordinator
+
+
+async def run_agents(coordinator) -> None:
+    """Run multiple queries through the coordinator to exercise delegation."""
+    from google.adk.runners import InMemoryRunner
+    from google.genai import types
+
+    runner = InMemoryRunner(agent=coordinator, app_name="multi_agent_app")
+
+    queries = [
+        "What's the weather in Tokyo and Paris?",
+        "What is (42 * 17) + (256 / 8)?",
+        "Tell me a joke about programming.",
+    ]
+
+    for q in queries:
+        print(f"\n{'='*60}")
+        print(f"User: {q}")
+        print(f"{'='*60}")
+
+        session = await runner.session_service.create_session(
+            app_name="multi_agent_app",
+            user_id="user1",
+        )
+
+        user_message = types.Content(
+            role="user",
+            parts=[types.Part(text=q)],
+        )
+
+        async for event in runner.run_async(
+            user_id="user1",
+            session_id=session.id,
+            new_message=user_message,
+        ):
+            if event.is_final_response() and event.content:
+                text = event.content.parts[0].text.strip()
+                print(f"\nAgent: {text}\n")
 
 
 def main() -> None:
+    """Entry point: parse args, set up OTel, build agents, run, flush."""
     parser = argparse.ArgumentParser(description="Google ADK OTel example")
     parser.add_argument(
         "--otlp-endpoint",
@@ -160,7 +246,9 @@ def main() -> None:
 
     provider = setup_otel(args.otlp_endpoint, args.genai_endpoint)
 
-    asyncio.run(run_agent())
+    coordinator = build_agents()
+    asyncio.run(run_agents(coordinator))
+
     provider.force_flush()
     provider.shutdown()
 

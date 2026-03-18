@@ -1,18 +1,32 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#     "anthropic",
-#     "opentelemetry-instrumentation-anthropic",
-#     "opentelemetry-sdk",
+#     "claude-agent-sdk>=0.1.14",
+#     "opentelemetry-instrumentation-claude-agent-sdk @ file:///tmp/otel-claude-instr/dist/opentelemetry_instrumentation_claude_agent_sdk-2.0b0.dev0-py3-none-any.whl",
+#     "opentelemetry-api>=1.37.0",
+#     "opentelemetry-sdk>=1.37.0",
+#     "opentelemetry-instrumentation==0.58b0",
+#     "opentelemetry-semantic-conventions==0.58b0",
+#     "opentelemetry-util-genai>=0.2b0,<0.4b0",
 #     "opentelemetry-exporter-otlp-proto-grpc",
 #     "opentelemetry-exporter-otlp-proto-http",
+#     "anyio",
 # ]
+#
+# [tool.uv]
+# prerelease = "allow"
 # ///
-"""Anthropic SDK with OTel tracing via Traceloop's instrumentor.
+"""Anthropic Claude Agent SDK with OTel tracing.
 
-Uses the opentelemetry-instrumentation-anthropic package to auto-instrument
-the anthropic client. Runs a multi-turn tool-use conversation to exercise
-the full span hierarchy.
+Uses the opentelemetry-instrumentation-claude-agent-sdk package (built from
+source at /tmp/otel-claude-instr/) to auto-instrument the Claude Agent SDK.
+The instrumentor monkey-patches InternalClient.process_query to create OTel
+spans for agent invocations, chat turns, and tool executions.
+
+Setup (one-time):
+    git clone --depth 1 --sparse https://github.com/open-telemetry/opentelemetry-python-contrib.git /tmp/otel-claude-instr
+    cd /tmp/otel-claude-instr && git sparse-checkout set instrumentation-genai/opentelemetry-instrumentation-claude-agent-sdk
+    cd instrumentation-genai/opentelemetry-instrumentation-claude-agent-sdk && uv build
 
 Usage:
     uv run --python 3.12 anthropic_example.py
@@ -21,16 +35,23 @@ Usage:
 """
 
 import argparse
-import json
 import os
 
-import anthropic
+import anyio
+from claude_agent_sdk import (
+    AgentDefinition,
+    AssistantMessage,
+    ClaudeAgentOptions,
+    ResultMessage,
+    TextBlock,
+    query,
+)
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
     OTLPSpanExporter as OTLPHTTPSpanExporter,
 )
-from opentelemetry.instrumentation.anthropic import AnthropicInstrumentor
+from opentelemetry.instrumentation.claude_agent_sdk import ClaudeAgentSDKInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import (
@@ -38,31 +59,6 @@ from opentelemetry.sdk.trace.export import (
     ConsoleSpanExporter,
     SimpleSpanProcessor,
 )
-
-TOOLS = [
-    {
-        "name": "get_weather",
-        "description": "Get the current weather for a location.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "city": {
-                    "type": "string",
-                    "description": "City name, e.g. 'San Francisco'",
-                }
-            },
-            "required": ["city"],
-        },
-    }
-]
-
-
-def handle_tool_call(tool_name: str, tool_input: dict) -> str:
-    """Simulate tool execution for the get_weather tool."""
-    if tool_name == "get_weather":
-        city = tool_input.get("city", "Unknown")
-        return json.dumps({"city": city, "temperature": "72°F", "condition": "Sunny"})
-    return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
 
 def _wandb_auth_headers() -> dict[str, str]:
@@ -109,59 +105,44 @@ def setup_otel(
     return provider
 
 
-def run_tool_use_conversation() -> None:
-    """Run a multi-turn conversation with tool use against the Anthropic API."""
-    client = anthropic.Anthropic()
-    model = "claude-sonnet-4-20250514"
+async def run_agent() -> None:
+    """Run a Claude agent that answers a question about travel."""
+    os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "true"
 
-    messages: list[dict] = [
-        {"role": "user", "content": "What's the weather in San Francisco?"}
-    ]
-
-    response = client.messages.create(
-        model=model,
-        max_tokens=256,
-        tools=TOOLS,
-        messages=messages,
+    options = ClaudeAgentOptions(
+        agents={
+            "assistant": AgentDefinition(
+                description="A helpful travel assistant",
+                prompt=(
+                    "You are a concise travel assistant. "
+                    "Answer questions about travel destinations briefly."
+                ),
+                model="sonnet",
+            ),
+        },
     )
 
-    if response.stop_reason == "tool_use":
-        tool_use_block = next(b for b in response.content if b.type == "tool_use")
-
-        tool_result = handle_tool_call(tool_use_block.name, tool_use_block.input)
-
-        messages.append({"role": "assistant", "content": response.content})
-        messages.append(
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": tool_use_block.id,
-                        "content": tool_result,
-                    }
-                ],
-            }
-        )
-
-        final_response = client.messages.create(
-            model=model,
-            max_tokens=256,
-            tools=TOOLS,
-            messages=messages,
-        )
-
-        text = next(
-            (b.text for b in final_response.content if hasattr(b, "text")), ""
-        )
-        print(f"\n--- Agent output ---\n{text}\n")
-    else:
-        text = next((b.text for b in response.content if hasattr(b, "text")), "")
-        print(f"\n--- Agent output ---\n{text}\n")
+    print("=== Claude Agent SDK Example ===")
+    async for message in query(
+        prompt="What are the top 3 things to do in Barcelona? Be very brief.",
+        options=options,
+    ):
+        if isinstance(message, AssistantMessage):
+            for block in message.content:
+                if isinstance(block, TextBlock):
+                    print(f"Claude: {block.text}")
+        elif (
+            isinstance(message, ResultMessage)
+            and message.total_cost_usd
+            and message.total_cost_usd > 0
+        ):
+            print(f"\nCost: ${message.total_cost_usd:.4f}")
+    print()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Anthropic SDK OTel example")
+    """Entry point: parse args, set up OTel, run agent, flush."""
+    parser = argparse.ArgumentParser(description="Anthropic Claude Agent SDK OTel example")
     parser.add_argument(
         "--otlp-endpoint",
         type=str,
@@ -177,9 +158,9 @@ def main() -> None:
     args = parser.parse_args()
 
     provider = setup_otel(args.otlp_endpoint, args.genai_endpoint)
-    AnthropicInstrumentor().instrument(tracer_provider=provider)
+    ClaudeAgentSDKInstrumentor().instrument(tracer_provider=provider)
 
-    run_tool_use_conversation()
+    anyio.run(run_agent)
 
     provider.force_flush()
     provider.shutdown()

@@ -25,7 +25,11 @@ uv run --python 3.12 openai_agents_example.py
 # Google ADK — agent with tool call, native OTel instrumentation
 uv run --python 3.12 google_adk_example.py
 
-# Anthropic — multi-turn tool use conversation, traced via Traceloop instrumentor
+# Anthropic Claude Agent SDK — traced via OTel instrumentor (built from source)
+# First build the instrumentor wheel (one-time setup):
+#   git clone --depth 1 --sparse https://github.com/open-telemetry/opentelemetry-python-contrib.git /tmp/otel-claude-instr
+#   cd /tmp/otel-claude-instr && git sparse-checkout set instrumentation-genai/opentelemetry-instrumentation-claude-agent-sdk
+#   cd instrumentation-genai/opentelemetry-instrumentation-claude-agent-sdk && uv build
 uv run --python 3.12 anthropic_example.py
 ```
 
