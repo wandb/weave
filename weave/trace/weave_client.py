@@ -173,6 +173,18 @@ ALLOW_MIXED_PROJECT_REFS = False
 logger = logging.getLogger(__name__)
 
 
+class NoInternalProjectIDError(Exception):
+    """Raised when client-side digest computation cannot proceed because
+    no internal project ID has been resolved yet.
+    """
+
+
+class CrossProjectRefError(Exception):
+    """Raised when client-side digest computation encounters a ref to a
+    different project that cannot be resolved to an internal ID.
+    """
+
+
 # TODO: should be Call, not WeaveObject
 
 
@@ -1866,7 +1878,7 @@ class WeaveClient:
             return False
         return True
 
-    def _convert_refs_to_internal(self, json_val: Any) -> Any | None:
+    def _convert_refs_to_internal(self, json_val: Any) -> Any:
         """Convert external weave:/// refs to weave-trace-internal:/// refs.
 
         The server stores refs using internal project IDs.  To compute a digest
@@ -1877,29 +1889,27 @@ class WeaveClient:
         Uses the same ``universal_ext_to_int_ref_converter`` that the server's
         ExternalToInternalTraceServerAdapter uses, so the two always agree.
 
-        Returns None if the value contains cross-project refs that cannot be
-        resolved to internal IDs. Callers should skip digest computation in
-        that case to avoid a guaranteed mismatch.
+        Raises:
+            NoInternalProjectIDError: No cached internal project ID is available.
+            CrossProjectRefError: The value contains cross-project refs that
+                cannot be resolved without a server round-trip.
         """
         internal_project_id = self._cached_internal_project_id
         if internal_project_id is None:
-            return None
+            raise NoInternalProjectIDError(
+                "No internal project ID cached; cannot convert refs for digest"
+            )
         project_id = self._project_id()
-        has_unresolved_refs = False
 
         def ext_to_int(ext_project_id: str) -> str:
-            nonlocal has_unresolved_refs
             if ext_project_id == project_id:
                 return internal_project_id
-            # Cross-project ref we can't resolve — flag it so callers
-            # know the conversion is incomplete and skip digest computation.
-            has_unresolved_refs = True
-            return ext_project_id
+            raise CrossProjectRefError(
+                f"Cannot resolve cross-project ref for '{ext_project_id}'; "
+                "skipping client-side digest computation"
+            )
 
-        result = universal_ext_to_int_ref_converter(json_val, ext_to_int)
-        if has_unresolved_refs:
-            return None
-        return result
+        return universal_ext_to_int_ref_converter(json_val, ext_to_int)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_object_basic(
@@ -1947,9 +1957,11 @@ class WeaveClient:
             # for the server-computed digest in the response.
             expected_digest = None
             if compute_digests:
-                json_val_internal = self._convert_refs_to_internal(json_val)
-                if json_val_internal is not None:
+                try:
+                    json_val_internal = self._convert_refs_to_internal(json_val)
                     expected_digest = compute_object_digest(json_val_internal)
+                except (NoInternalProjectIDError, CrossProjectRefError):
+                    pass  # fall back to server-computed digest
 
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
@@ -2000,10 +2012,12 @@ class WeaveClient:
 
         expected_digest = None
         if compute_digests:
-            json_rows_internal = self._convert_refs_to_internal(json_rows)
-            if json_rows_internal is not None:
+            try:
+                json_rows_internal = self._convert_refs_to_internal(json_rows)
                 row_digests = [compute_row_digest(row) for row in json_rows_internal]
                 expected_digest = compute_table_digest(row_digests)
+            except (NoInternalProjectIDError, CrossProjectRefError):
+                pass  # fall back to server-computed digest
 
         req = TableCreateReq(
             table=TableSchemaForInsert(
