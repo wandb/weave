@@ -549,6 +549,8 @@ class ScoreLogger:
         scorer = self._prepare_scorer(scorer)
 
         if is_tracing_setting_disabled():
+            scorer_name = cast(str, scorer.name)
+            self._captured_scores[scorer_name] = score
             return
 
         @op(name=scorer.name, enable_code_capture=False)
