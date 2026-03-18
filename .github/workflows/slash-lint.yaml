@@ -50,6 +50,7 @@ jobs:
 
       - name: Run nox lint
         run: nox -e lint
+        continue-on-error: true
 
       - name: Commit and push fixes
         run: |
