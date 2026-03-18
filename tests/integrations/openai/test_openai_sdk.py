@@ -1,4 +1,3 @@
-from dataclasses import dataclass, field
 from unittest.mock import Mock
 
 import pytest
@@ -12,17 +11,20 @@ from weave.integrations.openai.openai_sdk import (
 from weave.trace.autopatch import OpSettings
 
 
-@dataclass
-class DummyClient:
-    base_url: str
-    version: str = "1.0.0"
+class DummyClient:  # noqa: B903 - can't use dataclass; needs private attrs (_base_url, _version)
+    """Mimics openai client with private attrs used by completion_instance_check."""
+
+    def __init__(self, base_url: str, version: str = "1.0.0") -> None:
+        self._base_url = base_url
+        self._version = version
 
 
-@dataclass
 class DummyCompletion:
-    base_url: str
-    version: str = "1.0.0"
-    messages: list[dict] = field(default_factory=list)
+    """Mimics openai completion resource with _client and messages attrs."""
+
+    def __init__(self, base_url: str, version: str = "1.0.0") -> None:
+        self._client = DummyClient(base_url, version)
+        self.messages: list[dict] = []
 
 
 class NonCompletion:
