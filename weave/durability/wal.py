@@ -10,12 +10,15 @@ disk and forwards requests to their destination.
 
 Architecture overview:
 
+    WAL directory: ~/.weave/wal/{project_id}/
+    Each process gets its own .wal file — no cross-process locking.
+
     Caller
       │
       ▼
-    WALWriter  ──►  ~/.weave/wal/{project_id}/{file}
-      │
-      │           WALDirectoryManager
+    WALWriter  ──►  ~/.weave/wal/{project_id}/{timestamp}-{uuid}.wal
+      │                                        ├── .checkpoint (progress)
+      │           WALDirectoryManager          └── .deadletter (failures)
       │             │ create_file() → WALWriter
       │             │ list_files()  → paths for WALConsumer
       ▼             ▼

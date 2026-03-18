@@ -96,13 +96,18 @@ class JSONLWALWriter:
         self._lock = threading.Lock()
 
     def write(self, record: WALRecord) -> int:
+        # Serialize outside the lock — json.dumps is pure computation.
         line = json.dumps(record, separators=(",", ":")) + "\n"
         with self._lock:
             self._file.write(line.encode("utf-8"))
+            # flush() pushes to OS page cache — survives process crashes.
             self._file.flush()
             self._unsynced += 1
+            # fsync to disk if batch-count or timeout trigger fires.
             if self._should_fsync():
                 self._fsync()
+            # tell() returns the byte offset after this record — used by
+            # WALEntry.end_offset for checkpoint-based progress tracking.
             return self._file.tell()
 
     def flush(self) -> None:
