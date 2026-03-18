@@ -155,6 +155,9 @@ class CallSchema(BaseModel):
 
     deleted_at: datetime.datetime | None = None
 
+    # TTL expiration timestamp for this call
+    ttl_at: datetime.datetime | None = None
+
     # Size of metadata storage for this call
     storage_size_bytes: int | None = None
 
