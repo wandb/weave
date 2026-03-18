@@ -181,7 +181,10 @@ def test_mcp_server(client: WeaveClient) -> None:
         fastmcp.get_prompt("review_code", {"code": "print('Hello, world!')"})
     )
 
-    assert result[0].text == str(3)
+    # MCP >= 1.10.0 returns (content_list, structured_content) tuple from call_tool
+    # MCP < 1.10.0 returns content_list directly
+    call_tool_content = result[0] if isinstance(result, tuple) else result
+    assert call_tool_content[0].text == str(3)
     assert resource[0].content == "Hello, cw!"
     assert (
         prompt.messages[0].content.text
@@ -201,7 +204,20 @@ def test_mcp_server(client: WeaveClient) -> None:
     assert inputs["arguments"]["b"] == 2
     assert call_0.started_at < call_0.ended_at
 
-    outputs = call_0.output[0]
+    # MCP >= 1.10.0: output is (content_list, structured_content) tuple
+    # MCP < 1.10.0: output is content_list directly
+    call_tool_output = call_0.output
+    if isinstance(call_tool_output, (list, tuple)) and len(call_tool_output) > 0:
+        first_item = call_tool_output[0]
+        # If first_item is a list, we have the tuple format (content_list, structured)
+        if isinstance(first_item, (list,)) or (
+            hasattr(first_item, "__iter__") and not hasattr(first_item, "text")
+        ):
+            outputs = first_item[0]
+        else:
+            outputs = first_item
+    else:
+        outputs = call_tool_output[0]
     assert outputs._class_name == "TextContent"
     assert outputs.text == "3"
 
