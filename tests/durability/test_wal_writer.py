@@ -5,15 +5,15 @@ import os
 
 import pytest
 
-from weave.durability.wal_writer import JSONLWALWriter
+from weave.durability.wal_writer import _JSONLWALFileWriter
 
 
-class TestJSONLWALWriter:
+class TestJSONLWALFileWriter:
     def test_write_single_record(self, tmp_path: str) -> None:
         """A single write produces exactly one valid JSON line on disk."""
         path = os.path.join(str(tmp_path), "test.jsonl")
 
-        with JSONLWALWriter(path) as writer:
+        with _JSONLWALFileWriter(path) as writer:
             writer.write({"type": "call_start", "id": "abc"})
 
         with open(path, encoding="utf-8") as f:
@@ -26,7 +26,7 @@ class TestJSONLWALWriter:
         """File order matches write order so the consumer replays correctly."""
         path = os.path.join(str(tmp_path), "test.jsonl")
 
-        with JSONLWALWriter(path) as writer:
+        with _JSONLWALFileWriter(path) as writer:
             for i in range(5):
                 writer.write({"seq": i})
 
@@ -41,7 +41,7 @@ class TestJSONLWALWriter:
         """Returned offset is monotonically increasing and matches file size."""
         path = os.path.join(str(tmp_path), "test.jsonl")
 
-        with JSONLWALWriter(path) as writer:
+        with _JSONLWALFileWriter(path) as writer:
             offset1 = writer.write({"a": 1})
             offset2 = writer.write({"b": 2})
 
@@ -52,7 +52,7 @@ class TestJSONLWALWriter:
     def test_write_is_durable_on_disk(self, tmp_path: str) -> None:
         """Data is readable from disk before the writer is closed."""
         path = os.path.join(str(tmp_path), "test.jsonl")
-        writer = JSONLWALWriter(path)
+        writer = _JSONLWALFileWriter(path)
         writer.write({"durable": True})
 
         # Read without closing the writer — file.flush() already pushed to page cache.
@@ -67,7 +67,7 @@ class TestJSONLWALWriter:
         path = os.path.join(str(tmp_path), "test.jsonl")
         record = {"nested": {"list": [1, 2, 3], "deep": {"key": "value"}}}
 
-        with JSONLWALWriter(path) as writer:
+        with _JSONLWALFileWriter(path) as writer:
             writer.write(record)
 
         with open(path, encoding="utf-8") as f:
@@ -77,7 +77,7 @@ class TestJSONLWALWriter:
         """Unicode in payloads survives without encoding corruption."""
         path = os.path.join(str(tmp_path), "test.jsonl")
 
-        with JSONLWALWriter(path) as writer:
+        with _JSONLWALFileWriter(path) as writer:
             writer.write({"emoji": "\U0001f600", "cjk": "\u4e16\u754c"})
 
         with open(path, encoding="utf-8") as f:
@@ -89,7 +89,7 @@ class TestJSONLWALWriter:
     def test_flush_forces_fsync(self, tmp_path: str) -> None:
         """flush() forces os.fsync() even with a large batch size."""
         path = os.path.join(str(tmp_path), "test.jsonl")
-        writer = JSONLWALWriter(path, fsync_batch_size=100)
+        writer = _JSONLWALFileWriter(path, fsync_batch_size=100)
         writer.write({"buffered": True})
         writer.flush()
 
@@ -100,7 +100,7 @@ class TestJSONLWALWriter:
     def test_fsync_batch_size_controls_frequency(self, tmp_path: str) -> None:
         """With fsync_batch_size=3, os.fsync() triggers every 3rd write."""
         path = os.path.join(str(tmp_path), "test.jsonl")
-        writer = JSONLWALWriter(path, fsync_batch_size=3, fsync_timeout=0)
+        writer = _JSONLWALFileWriter(path, fsync_batch_size=3, fsync_timeout=0)
 
         # Write 5 records: fsync fires after write 3, not after 4 or 5.
         for i in range(5):
@@ -120,7 +120,7 @@ class TestJSONLWALWriter:
         """When fsync_timeout elapses, the next write triggers an fsync."""
         path = os.path.join(str(tmp_path), "test.jsonl")
         # Large batch size so count alone won't trigger; short timeout.
-        writer = JSONLWALWriter(path, fsync_batch_size=1000, fsync_timeout=0.01)
+        writer = _JSONLWALFileWriter(path, fsync_batch_size=1000, fsync_timeout=0.01)
 
         writer.write({"seq": 0})
         # Batch hasn't filled — 1 unsynced.
@@ -141,7 +141,7 @@ class TestJSONLWALWriter:
         """close() flushes remaining records even if the batch hasn't filled."""
         path = os.path.join(str(tmp_path), "test.jsonl")
 
-        with JSONLWALWriter(path, fsync_batch_size=100) as writer:
+        with _JSONLWALFileWriter(path, fsync_batch_size=100) as writer:
             writer.write({"partial": 1})
             writer.write({"partial": 2})
 
@@ -155,7 +155,7 @@ class TestJSONLWALWriter:
         path = os.path.join(str(tmp_path), "test.jsonl")
         record = {"text": "line1\nline2\nline3"}
 
-        with JSONLWALWriter(path) as writer:
+        with _JSONLWALFileWriter(path) as writer:
             writer.write(record)
 
         with open(path, encoding="utf-8") as f:
@@ -169,7 +169,7 @@ class TestJSONLWALWriter:
         """Writer used as context manager flushes, closes, and rejects further writes."""
         path = os.path.join(str(tmp_path), "test.jsonl")
 
-        with JSONLWALWriter(path) as writer:
+        with _JSONLWALFileWriter(path) as writer:
             writer.write({"ctx": True})
 
         # Data is flushed and readable after exiting the with block.

@@ -4,7 +4,11 @@ import os
 import time
 import uuid
 
-from weave.durability.wal_writer import JSONLWALWriter
+from weave.durability.wal_writer import (
+    DEFAULT_FSYNC_BATCH_SIZE,
+    DEFAULT_FSYNC_TIMEOUT,
+    _JSONLWALFileWriter,
+)
 
 
 class FileWALDirectoryManager:
@@ -16,13 +20,17 @@ class FileWALDirectoryManager:
         file_ext: str = ".jsonl",
         checkpoint_ext: str = ".checkpoint",
         dead_letter_ext: str = ".deadletter",
+        fsync_batch_size: int = DEFAULT_FSYNC_BATCH_SIZE,
+        fsync_timeout: float = DEFAULT_FSYNC_TIMEOUT,
     ) -> None:
         self._directory = directory
         self._file_ext = file_ext
         self._checkpoint_ext = checkpoint_ext
         self._dead_letter_ext = dead_letter_ext
+        self._fsync_batch_size = fsync_batch_size
+        self._fsync_timeout = fsync_timeout
 
-    def create_file(self) -> JSONLWALWriter:
+    def create_file(self) -> _JSONLWALFileWriter:
         os.makedirs(self._directory, exist_ok=True)
         # Timestamp prefix ensures deterministic oldest-first ordering
         # when sorted alphabetically.  UUID suffix avoids collisions
@@ -30,7 +38,11 @@ class FileWALDirectoryManager:
         ts = f"{time.time_ns():020d}"
         filename = f"{ts}_{uuid.uuid4().hex}{self._file_ext}"
         path = os.path.join(self._directory, filename)
-        return JSONLWALWriter(path)
+        return _JSONLWALFileWriter(
+            path,
+            fsync_batch_size=self._fsync_batch_size,
+            fsync_timeout=self._fsync_timeout,
+        )
 
     def list_files(self) -> list[str]:
         if not os.path.isdir(self._directory):

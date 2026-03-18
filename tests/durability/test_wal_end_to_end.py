@@ -9,7 +9,7 @@ import pytest
 from weave.durability.wal import WALRecord, drain, drain_all
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
-from weave.durability.wal_writer import JSONLWALWriter
+from weave.durability.wal_writer import JSONLWALWriter, _JSONLWALFileWriter
 
 
 class TestDrain:
@@ -338,7 +338,7 @@ class TestDrainAll:
         drain(consumer, {"obj_create": lambda r: None})
 
         # Simulate a late write between drain and the cleanup check.
-        with JSONLWALWriter(path) as late_writer:
+        with _JSONLWALFileWriter(path) as late_writer:
             late_writer.write({"type": "obj_create", "name": "late-arrival"})
 
         # The guard in drain_all checks read_pending() after drain —
@@ -372,3 +372,53 @@ class TestDrainAll:
 
         assert [r["seq"] for r in received] == [0, 1, 2, 3]
         assert list(consumer.read_pending()) == []
+
+
+class TestJSONLWALWriter:
+    def test_rotates_when_file_exceeds_max_size(self, tmp_path: str) -> None:
+        """Writer creates a new file when the current one exceeds max_file_size."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        # Use a tiny max size to force rotation after a few records.
+        with JSONLWALWriter(mgr, max_file_size=100) as writer:
+            for i in range(10):
+                writer.write({"type": "obj_create", "seq": i})
+
+        # Multiple files should have been created.
+        files = mgr.list_files()
+        assert len(files) > 1
+
+    def test_all_records_recoverable_after_rotation(self, tmp_path: str) -> None:
+        """Every record written across rotations is recovered by drain_all."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with JSONLWALWriter(mgr, max_file_size=100) as writer:
+            for i in range(20):
+                writer.write({"type": "obj_create", "seq": i})
+
+        received: list[WALRecord] = []
+        total = drain_all(mgr, {"obj_create": received.append}, JSONLWALConsumer)
+
+        assert total == 20
+        assert [r["seq"] for r in received] == list(range(20))
+        assert mgr.list_files() == []
+
+    def test_no_rotation_when_disabled(self, tmp_path: str) -> None:
+        """max_file_size=0 disables rotation — single file like plain writer."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with JSONLWALWriter(mgr, max_file_size=0) as writer:
+            for i in range(10):
+                writer.write({"type": "obj_create", "seq": i})
+
+        assert len(mgr.list_files()) == 1
+
+    def test_oldest_files_drained_first(self, tmp_path: str) -> None:
+        """Rotated files are drained oldest-first, preserving write order."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with JSONLWALWriter(mgr, max_file_size=50) as writer:
+            for i in range(10):
+                writer.write({"type": "obj_create", "seq": i})
+
+        received: list[WALRecord] = []
+        drain_all(mgr, {"obj_create": received.append}, JSONLWALConsumer)
+
+        # Records arrive in the order they were written, across files.
+        assert [r["seq"] for r in received] == list(range(10))

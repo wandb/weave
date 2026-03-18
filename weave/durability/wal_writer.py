@@ -5,7 +5,13 @@ import os
 import threading
 import time
 
-from weave.durability.wal import WALRecord
+from weave.durability.wal import WALDirectoryManager, WALRecord
+
+# Default max file size before rotation.  64 MB keeps individual files
+# manageable while avoiding excessive rotation churn.  Drained bytes at
+# the front of a file are dead weight until the file is fully consumed
+# and removed — rotation bounds that waste.
+DEFAULT_MAX_FILE_SIZE = 64 * 1024 * 1024
 
 # Number of writes between automatic os.fsync() calls.  Every write is pushed
 # to the OS page cache (file.flush()), which survives process crashes.  The
@@ -21,64 +27,11 @@ DEFAULT_FSYNC_BATCH_SIZE = 64
 DEFAULT_FSYNC_TIMEOUT = 0.5
 
 
-class JSONLWALWriter:
-    """Appends JSON line records to a WAL file with configurable fsync batching.
+class _JSONLWALFileWriter:
+    """Single-file JSONL writer with fsync batching.  Private implementation detail.
 
-    Durability model:
-        Every write() is immediately flushed to the OS page cache, which
-        survives process crashes (SIGKILL, OOM, uncaught exceptions).
-        Power-failure durability (os.fsync) is triggered by *either*:
-
-        - **Batch count**: after ``fsync_batch_size`` writes, or
-        - **Timeout**: if ``fsync_timeout`` seconds have elapsed since the
-          last fsync (checked on each write).
-
-        Whichever fires first wins.  This means records are always durable
-        against process crashes on every write, and durable against power
-        failures within at most ``fsync_timeout`` seconds or
-        ``fsync_batch_size`` writes.
-
-    Power-failure vulnerability window:
-        Between a write() and the next fsync, records live only in the OS
-        page cache.  A *process crash* in this window is safe (the page
-        cache survives).  A *power failure* in this window loses unfsynced
-        records.  The window is bounded by whichever trigger fires first:
-
-        - At most ``fsync_batch_size`` writes (count trigger), or
-        - At most ``fsync_timeout`` seconds (time trigger).
-
-        With the defaults (batch_size=64, timeout=0.5s), the worst case is
-        0.5 seconds of writes lost on power failure.  Set batch_size=1 for
-        zero window (every write fsynced, ~2-5x slower on SSD).
-
-        Note: the *directory entry* is not fsynced, so after a power failure
-        the file itself may not appear in the directory listing on some
-        filesystems (e.g., ext4 with default mount options).  The file
-        contents are durable, but the filename is not.  Full power-loss
-        durability of the filename requires a directory fsync (not yet
-        implemented).
-
-    Tuning guide::
-
-        QPS   batch_size  timeout  fsyncs/sec  max unfsynced window
-        ───   ──────────  ───────  ──────────  ────────────────────
-          10       8       0.5s       ~2           0.5s (timeout)
-         100      64       0.5s       ~2           0.5s (timeout)
-        1000     256       0.5s       ~4           0.26s (batch)
-
-        For maximum durability: fsync_batch_size=1 (every write fsynced).
-        For maximum throughput: raise batch_size and timeout together.
-
-    Args:
-        path: Absolute path to the .jsonl file.
-        fsync_batch_size: Number of writes between automatic os.fsync() calls.
-            1 means every write is immediately fsynced (maximum durability,
-            lowest throughput).  Higher values amortize fsync cost across
-            multiple writes while still surviving process crashes on every
-            write.
-        fsync_timeout: Maximum seconds between fsyncs.  On each write, if
-            this many seconds have passed since the last fsync, an fsync is
-            triggered regardless of batch count.  0 disables the timeout.
+    Use JSONLWALWriter (the rotating writer) as the public API.
+    This class handles the low-level I/O for a single WAL file.
     """
 
     def __init__(
@@ -137,7 +90,7 @@ class JSONLWALWriter:
         if self._unsynced > 0:
             self._fsync()
 
-    def __enter__(self) -> JSONLWALWriter:
+    def __enter__(self) -> _JSONLWALFileWriter:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -147,3 +100,112 @@ class JSONLWALWriter:
         os.fsync(self._file.fileno())
         self._unsynced = 0
         self._last_fsync_time = time.monotonic()
+
+
+class JSONLWALWriter:
+    """Rotating JSONL WAL writer with configurable fsync batching.
+
+    Delegates all I/O to a _JSONLWALFileWriter (single-file writer).  This
+    class manages file rotation: when the current file exceeds
+    ``max_file_size``, it closes the active _JSONLWALFileWriter and asks
+    the WALDirectoryManager for a new one.  Old (rotated) files remain on
+    disk for the consumer to drain; ``drain_all()`` picks them up
+    oldest-first and deletes them after processing.
+
+    Durability model:
+        Every write() is immediately flushed to the OS page cache, which
+        survives process crashes (SIGKILL, OOM, uncaught exceptions).
+        Power-failure durability (os.fsync) is triggered by *either*:
+
+        - **Batch count**: after ``fsync_batch_size`` writes, or
+        - **Timeout**: if ``fsync_timeout`` seconds have elapsed since the
+          last fsync (checked on each write).
+
+        Whichever fires first wins.  This means records are always durable
+        against process crashes on every write, and durable against power
+        failures within at most ``fsync_timeout`` seconds or
+        ``fsync_batch_size`` writes.
+
+    Power-failure vulnerability window:
+        Between a write() and the next fsync, records live only in the OS
+        page cache.  A *process crash* in this window is safe (the page
+        cache survives).  A *power failure* in this window loses unfsynced
+        records.  The window is bounded by whichever trigger fires first:
+
+        - At most ``fsync_batch_size`` writes (count trigger), or
+        - At most ``fsync_timeout`` seconds (time trigger).
+
+        With the defaults (batch_size=64, timeout=0.5s), the worst case is
+        0.5 seconds of writes lost on power failure.  Set batch_size=1 for
+        zero window (every write fsynced, ~2-5x slower on SSD).
+
+        Note: the *directory entry* is not fsynced, so after a power failure
+        the file itself may not appear in the directory listing on some
+        filesystems (e.g., ext4 with default mount options).  The file
+        contents are durable, but the filename is not.  Full power-loss
+        durability of the filename requires a directory fsync (not yet
+        implemented).
+
+    Tuning guide::
+
+        QPS   batch_size  timeout  fsyncs/sec  max unfsynced window
+        ───   ──────────  ───────  ──────────  ────────────────────
+          10       8       0.5s       ~2           0.5s (timeout)
+         100      64       0.5s       ~2           0.5s (timeout)
+        1000     256       0.5s       ~4           0.26s (batch)
+
+        For maximum durability: fsync_batch_size=1 (every write fsynced).
+        For maximum throughput: raise batch_size and timeout together.
+
+    Args:
+        directory_manager: Creates new WAL files on rotation.
+        max_file_size: Rotate after the current file exceeds this many bytes.
+            0 disables rotation (single file forever).
+        fsync_batch_size: Number of writes between automatic os.fsync() calls.
+        fsync_timeout: Maximum seconds between fsyncs.  0 disables the timeout.
+    """
+
+    def __init__(
+        self,
+        directory_manager: WALDirectoryManager,
+        max_file_size: int = DEFAULT_MAX_FILE_SIZE,
+        fsync_batch_size: int = DEFAULT_FSYNC_BATCH_SIZE,
+        fsync_timeout: float = DEFAULT_FSYNC_TIMEOUT,
+    ) -> None:
+        self._mgr = directory_manager
+        self._max_file_size = max_file_size
+        self._fsync_batch_size = fsync_batch_size
+        self._fsync_timeout = fsync_timeout
+        self._writer = self._new_file_writer()
+        self._lock = threading.Lock()
+
+    def write(self, record: WALRecord) -> int:
+        # Delegates to _JSONLWALFileWriter.write(), then checks rotation.
+        with self._lock:
+            offset = self._writer.write(record)
+            if self._max_file_size and offset >= self._max_file_size:
+                self._writer.close()
+                self._writer = self._new_file_writer()
+            return offset
+
+    def flush(self) -> None:
+        # Delegates to _JSONLWALFileWriter.flush().
+        with self._lock:
+            self._writer.flush()
+
+    def close(self) -> None:
+        # Delegates to _JSONLWALFileWriter.close().
+        with self._lock:
+            self._writer.close()
+
+    def __enter__(self) -> JSONLWALWriter:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
+
+    def _new_file_writer(self) -> _JSONLWALFileWriter:
+        writer = self._mgr.create_file()
+        # Propagate fsync settings to the underlying file writer.
+        assert isinstance(writer, _JSONLWALFileWriter)
+        return writer
