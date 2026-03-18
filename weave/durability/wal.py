@@ -310,7 +310,13 @@ def drain(
                     record_type,
                     entry.end_offset,
                 )
-                _write_dead_letter(consumer.dead_letter_path, entry.record)
+                try:
+                    _write_dead_letter(consumer.dead_letter_path, entry.record)
+                except Exception:
+                    logger.exception(
+                        "Failed to write dead-letter record at offset %d",
+                        entry.end_offset,
+                    )
         else:
             logger.warning(
                 "No handler registered for record type %r at offset %d",
