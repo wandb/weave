@@ -78,7 +78,11 @@ ALTER TABLE calls_complete_stats
 
 ALTER TABLE calls_complete_stats MODIFY TTL ttl_at DELETE;
 
--- Step 9: Update calls_merged_stats_view to propagate ttl_at
+-- Step 9: Upgrade calls_complete.ttl_at from DateTime to DateTime64(3)
+-- (migration 024 created it as DateTime; align with all other datetime columns)
+ALTER TABLE calls_complete MODIFY COLUMN ttl_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
+
+-- Step 10: Update calls_merged_stats_view to propagate ttl_at
 ALTER TABLE calls_merged_stats_view MODIFY QUERY
 SELECT
     call_parts.project_id,
