@@ -5,11 +5,15 @@ import sys
 import tempfile
 import time
 from typing import Any
+from unittest.mock import MagicMock
 
 import PIL
 
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
+from tests.trace.server_utils import find_server_layer
+from weave.trace import weave_client
+from weave.trace_server.service_interface import EnsureProjectExistsRes
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -51,13 +55,44 @@ def compare_datasets(ds1: weave.Dataset, ds2: weave.Dataset):
         assert row1["label"] == row2["label"]
 
 
+def test_caching_middleware_delegates_ensure_project_exists(tmp_path):
+    """CachingMiddlewareTraceServer must delegate ensure_project_exists.
+
+    Regression test: when ensure_project_exists was not in delegated_methods,
+    __getattribute__ resolved the Protocol stub on the class itself (returning
+    None), causing 'NoneType' has no attribute 'project_name' in WeaveClient.__init__.
+    """
+    mock_server = MagicMock()
+    expected = EnsureProjectExistsRes(project_name="my-project")
+    mock_server.ensure_project_exists.return_value = expected
+
+    caching_server = CachingMiddlewareTraceServer(mock_server, str(tmp_path / "cache"))
+    result = caching_server.ensure_project_exists("entity", "project")
+
+    assert result is expected
+    assert result.project_name == "my-project"
+    mock_server.ensure_project_exists.assert_called_once_with("entity", "project")
+
+
+def test_weave_client_init_with_caching_middleware():
+    """WeaveClient.__init__ with ensure_project_exists=True must work through CachingMiddlewareTraceServer.
+
+    Regression test for the full init path: CachingMiddlewareTraceServer.from_env
+    wrapping a server, then passed to WeaveClient with ensure_project_exists=True.
+    """
+    mock_server = MagicMock()
+    caching_server = CachingMiddlewareTraceServer.from_env(mock_server)
+    client = weave_client.WeaveClient(
+        "entity", "project", caching_server, ensure_project_exists=True
+    )
+    mock_server.ensure_project_exists.assert_called_once_with("entity", "project")
+
+
 def test_server_caching(client):
     os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
+    caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     dataset = weave.Dataset(rows=create_dataset_rows(5))
     ref = weave.publish(dataset)
-
-    recording_caching_server = client.server
-    caching_server: CachingMiddlewareTraceServer = recording_caching_server.server
 
     # First call should miss
     caching_server.reset_cache_recorder()
@@ -150,10 +185,8 @@ def test_server_cache_size_limit(client):
                 ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
             )
 
-            # Internally, the cache estimates it's own size
-            # Access the disk cache layer (second layer in the stack)
-            disk_cache = caching_server._cache.layers[1]
-            assert disk_cache._cache.volume() <= limit * 1.1
+            # Internally, the cache estimates its own size
+            assert caching_server.disk_cache_volume() <= limit * 1.1
 
             # Allows us to test the on-disk size
             sizes = get_cache_sizes(temp_dir)
@@ -208,7 +241,7 @@ def test_server_cache_latency(client):
 
 
 def test_file_create_caching(client):
-    caching_server: CachingMiddlewareTraceServer = client.server.server
+    caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     file_bytes = b"hello"
     caching_server.reset_cache_recorder()
     create_0 = client.server.file_create(
@@ -266,7 +299,7 @@ def test_file_create_caching(client):
 
 
 def test_obj_create_caching(client):
-    caching_server: CachingMiddlewareTraceServer = client.server.server
+    caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     val = {"hello": "world"}
     caching_server.reset_cache_recorder()
     create_0 = client.server.obj_create(
@@ -525,7 +558,7 @@ def test_cache_directory_creation(tmp_path):
 
 def test_cache_invalidation_on_add_tags(client):
     """obj_read cache should be invalidated when tags are added."""
-    caching_server: CachingMiddlewareTraceServer = client.server.server
+    caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     ref = weave.publish({"data": "test"}, name="cache_inv_add_tags")
 
     # Prime the cache with an obj_read that includes tags
@@ -572,7 +605,7 @@ def test_cache_invalidation_on_add_tags(client):
 
 def test_cache_invalidation_on_remove_tags(client):
     """obj_read cache should be invalidated when tags are removed."""
-    caching_server: CachingMiddlewareTraceServer = client.server.server
+    caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     ref = weave.publish({"data": "test"}, name="cache_inv_rm_tags")
     client.add_tags(ref, ["removable"])
 
@@ -608,7 +641,7 @@ def test_cache_invalidation_on_remove_tags(client):
 
 def test_cache_invalidation_on_set_alias(client):
     """obj_read cache should be invalidated when an alias is set."""
-    caching_server: CachingMiddlewareTraceServer = client.server.server
+    caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     ref = weave.publish({"data": "test"}, name="cache_inv_set_alias")
 
     # Prime cache
@@ -643,7 +676,7 @@ def test_cache_invalidation_on_set_alias(client):
 
 def test_cache_invalidation_on_remove_aliases(client):
     """obj_read cache should be invalidated when aliases are removed."""
-    caching_server: CachingMiddlewareTraceServer = client.server.server
+    caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     ref = weave.publish({"data": "test"}, name="cache_inv_rm_alias")
     client.set_aliases(ref, "staging")
 

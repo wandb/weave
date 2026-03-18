@@ -20,6 +20,7 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 import weave.trace.call
+from tests.trace.server_utils import find_server_layer
 from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
@@ -48,6 +49,7 @@ from weave.trace.refs import TableRef
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
@@ -939,15 +941,13 @@ def test_trace_call_query_filter_wb_run_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_user_ids(client):
+def test_trace_call_query_filter_wb_user_ids(client, trace_server):
     call_spec_1 = simple_line_call_bootstrap()
 
-    # OMG! How ugly is this?! The layers of testing servers is nasty
-    client.server.server._next_trace_server._user_id = "second_user"
+    trace_server.set_user_id("second_user")
     call_spec_2 = simple_line_call_bootstrap()
 
-    # OMG! How ugly is this?! The layers of testing servers is nasty
-    client.server.server._next_trace_server._user_id = "third_user"
+    trace_server.set_user_id("third_user")
     call_spec_3 = simple_line_call_bootstrap()
 
     for wb_user_ids, exp_count in [
@@ -4353,9 +4353,11 @@ def test_call_stream_query_heavy_query_batch(client):
 
 @pytest.fixture
 def clickhouse_client(client):
-    if client_is_sqlite(client):
+    try:
+        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
+    except TypeError:
         return None
-    return client.server._next_trace_server.ch_client
+    return ch_server.ch_client
 
 
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):

@@ -17,6 +17,7 @@ import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
 from tests.conftest import TestOnlyFlushingWeaveClient
+from tests.trace.server_utils import find_server_layer
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     AnyIntMatcher,
@@ -45,7 +46,10 @@ from weave.trace.serialization.serializer import (
     register_serializer,
 )
 from weave.trace.wandb_run_context import WandbRunContext
-from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
+from weave.trace_server.clickhouse_trace_server_batched import (
+    ClickHouseTraceServer,
+    NotFoundError,
+)
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.ids import generate_id
@@ -1784,9 +1788,11 @@ def test_get_calls_storage_size_with_limit(client):
 
 @pytest.fixture
 def clickhouse_client(client):
-    if client_is_sqlite(client):
+    try:
+        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
+    except TypeError:
         return None
-    return client.server._next_trace_server.ch_client
+    return ch_server.ch_client
 
 
 def test_get_calls_storage_size_values(client, clickhouse_client):

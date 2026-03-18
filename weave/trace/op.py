@@ -88,6 +88,17 @@ class DisplayNameFuncError(ValueError): ...
 class OpCallError(Exception): ...
 
 
+def _restore_call_stack(snapshot: list[Call]) -> None:
+    """Restore the call stack to a previous snapshot.
+
+    Used to undo any partial modifications made by _create_call before it
+    raised.  A full snapshot-restore is safer than popping a single call
+    because it handles the (unlikely) case where multiple calls were pushed.
+    """
+    if call_context.get_call_stack() != snapshot:
+        call_context._call_stack.set(snapshot)
+
+
 # Call, original function output, exception if occurred
 
 
@@ -458,11 +469,13 @@ def _call_sync_func(
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
     # If the parent was traced (sampled in), the child will be too.
+    call_stack_snapshot = call_context.get_call_stack().copy()
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
         raise e
     except Exception as e:
+        _restore_call_stack(call_stack_snapshot)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -585,11 +598,13 @@ async def _call_async_func(
     _set_python_function_type_on_weave_dict(__weave, "async_function")
 
     # Proceed with tracing
+    call_stack_snapshot = call_context.get_call_stack().copy()
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
         raise e
     except Exception as e:
+        _restore_call_stack(call_stack_snapshot)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -717,6 +732,7 @@ def _call_sync_gen(
     _set_python_function_type_on_weave_dict(__weave, "generator")
 
     # Proceed with tracing
+    call_stack_snapshot = call_context.get_call_stack().copy()
     try:
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
@@ -724,6 +740,7 @@ def _call_sync_gen(
     except OpCallError:
         raise
     except Exception:
+        _restore_call_stack(call_stack_snapshot)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -937,6 +954,7 @@ async def _call_async_gen(
     _set_python_function_type_on_weave_dict(__weave, "async_generator")
 
     # Proceed with tracing
+    call_stack_snapshot = call_context.get_call_stack().copy()
     try:
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
@@ -944,6 +962,7 @@ async def _call_async_gen(
     except OpCallError:
         raise
     except Exception:
+        _restore_call_stack(call_stack_snapshot)
         if get_raise_on_captured_errors():
             raise
         log_once(
