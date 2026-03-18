@@ -1960,8 +1960,8 @@ class WeaveClient:
                 try:
                     json_val_internal = self._convert_refs_to_internal(json_val)
                     expected_digest = compute_object_digest(json_val_internal)
-                except (NoInternalProjectIDError, CrossProjectRefError):
-                    pass  # fall back to server-computed digest
+                except (NoInternalProjectIDError, CrossProjectRefError) as e:
+                    logger.debug("Skipping client-side digest for obj %r: %s", name, e)
 
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
@@ -2014,8 +2014,8 @@ class WeaveClient:
                 json_rows_internal = self._convert_refs_to_internal(json_rows)
                 row_digests = [compute_row_digest(row) for row in json_rows_internal]
                 expected_digest = compute_table_digest(row_digests)
-            except (NoInternalProjectIDError, CrossProjectRefError):
-                pass  # fall back to server-computed digest
+            except (NoInternalProjectIDError, CrossProjectRefError) as e:
+                logger.debug("Skipping client-side digest for table: %s", e)
 
         req = TableCreateReq(
             table=TableSchemaForInsert(
