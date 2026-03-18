@@ -610,7 +610,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.ProjectTTLSettingsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(
-            self._internal_trace_server.project_ttl_settings_read, req
+            self._internal_trace_server.project_ttl_settings_read, req, req.project_id
         )
 
     def project_ttl_settings_set(
@@ -618,7 +618,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.SetProjectTTLSettingsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(
-            self._internal_trace_server.project_ttl_settings_set, req
+            self._internal_trace_server.project_ttl_settings_set, req, req.project_id
         )
 
     def threads_query_stream(
