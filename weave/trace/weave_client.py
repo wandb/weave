@@ -185,28 +185,6 @@ class CrossProjectRefError(Exception):
     """
 
 
-class SameProjectRefConverter:
-    """Callable that converts same-project external IDs to internal IDs.
-
-    Raises CrossProjectRefError for any project it doesn't recognise,
-    signalling that digest computation should be skipped.
-    """
-
-    __slots__ = ("_project_id", "_internal_project_id")
-
-    def __init__(self, project_id: str, internal_project_id: str) -> None:
-        self._project_id = project_id
-        self._internal_project_id = internal_project_id
-
-    def __call__(self, ext_project_id: str) -> str:
-        if ext_project_id == self._project_id:
-            return self._internal_project_id
-        raise CrossProjectRefError(
-            f"Cannot resolve cross-project ref for '{ext_project_id}'; "
-            "skipping client-side digest computation"
-        )
-
-
 # TODO: should be Call, not WeaveObject
 
 
@@ -1922,10 +1900,16 @@ class WeaveClient:
                 "No internal project ID cached; cannot convert refs for digest"
             )
         project_id = self._project_id()
-        return universal_ext_to_int_ref_converter(
-            json_val,
-            SameProjectRefConverter(project_id, internal_project_id),
-        )
+
+        def ext_to_int(ext_project_id: str) -> str:
+            if ext_project_id == project_id:
+                return internal_project_id
+            raise CrossProjectRefError(
+                f"Cannot resolve cross-project ref for '{ext_project_id}'; "
+                "skipping client-side digest computation"
+            )
+
+        return universal_ext_to_int_ref_converter(json_val, ext_to_int)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_object_basic(
