@@ -26,7 +26,7 @@ from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op, as_op, is_placeholder_call, op
+from weave.trace.op import Op, as_op, is_tracing_setting_disabled, op
 from weave.trace.table import Table
 from weave.trace.util import Thread
 from weave.trace.view_utils import set_call_view
@@ -548,9 +548,7 @@ class ScoreLogger:
 
         scorer = self._prepare_scorer(scorer)
 
-        # When tracing is disabled, predict_call is a NoOpCall with empty inputs,
-        # so apply_scorer would fail.
-        if is_placeholder_call(self.predict_call):
+        if is_tracing_setting_disabled():
             return
 
         @op(name=scorer.name, enable_code_capture=False)
