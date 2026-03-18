@@ -1,0 +1,39 @@
+name: mirror
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  mirror:
+    # Only run on PR comments containing "/mirror"
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.body == '/mirror'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add reaction
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -f content='rocket'
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install mirror tool
+        run: uv tool install "devtools @ git+https://github.com/wandb/devtools.git"
+
+      - name: Run mirror
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mirror "https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}"
