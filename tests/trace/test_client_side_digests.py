@@ -7,12 +7,11 @@ the expected_digest field.
 
 from __future__ import annotations
 
-import base64
-
 import pytest
 from PIL import Image
 
 import weave
+from tests.trace.server_utils import find_server_layer
 from weave.shared.digest import (
     compute_file_digest,
     compute_object_digest,
@@ -30,33 +29,31 @@ from weave.trace.weave_client import (
 )
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import DigestMismatchError
-
-
-def _compute_test_internal_project_id(client: WeaveClient) -> str:
-    """Compute the internal project ID that the test DummyIdConverter produces.
-
-    In tests, DummyIdConverter maps entity/project -> base64(entity/project).
-    """
-    ext_id = f"{client.entity}/{client.project}"
-    return base64.b64encode(ext_id.encode()).decode()
+from weave.trace_server.external_to_internal_trace_server_adapter import (
+    ExternalTraceServer,
+)
 
 
 def _configure_digests(client: WeaveClient, *, enable: bool) -> None:
     """Apply digest settings and configure the resolver for tests.
 
-    In test environments, ``projects_info`` is not available on the local
-    server chain (it lives on ``ServiceInterface``, a remote-only concern).
-    The multi-layer delegation (ServerRecorder -> CachingMiddleware ->
-    ExternalToInternal adapter) makes clean mocking impractical, so we set
-    the resolver state directly.
+    In production, the ``ProjectIdResolver`` calls ``projects_info`` on the
+    remote server to discover internal project IDs.  In tests, that endpoint
+    doesn't exist (it's on ``ServiceInterface``, not ``TraceServerInterface``),
+    so the resolver permanently disables itself during ``__init__``.
+
+    To work around this, we resolve the internal project ID directly from the
+    test server's ``DummyIdConverter`` (via ``find_server_layer``) and populate
+    the resolver state manually.
     """
     parse_and_apply_settings(UserSettings(enable_client_side_digests=enable))
     if enable:
-        # Re-enable the resolver (it gets permanently disabled during
-        # __init__ because projects_info raises AttributeError on the
-        # local server chain) and populate the internal project ID cache.
+        adapter = find_server_layer(client.server, ExternalTraceServer)
+        internal_id = adapter._idc.ext_to_int_project_id(client._project_id())
+        # Re-enable the resolver (disabled during __init__ because
+        # projects_info doesn't exist on the test server chain).
         client.project_id_resolver._disabled_event.clear()
-        client._cached_internal_project_id = _compute_test_internal_project_id(client)
+        client._cached_internal_project_id = internal_id
     else:
         client._cached_internal_project_id = None
 
@@ -423,11 +420,6 @@ class TestConvertRefsToInternal:
         CrossProjectRefError which is caught by the caller, causing it to skip
         expected_digest and let the server compute the digest instead.
         """
-        from tests.trace.server_utils import find_server_layer
-        from weave.trace_server.external_to_internal_trace_server_adapter import (
-            ExternalTraceServer,
-        )
-
         # Spy on the adapter's obj_create to capture expected_digest values
         captured: list[str | None] = []
         adapter = find_server_layer(client.server, ExternalTraceServer)
