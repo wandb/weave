@@ -385,6 +385,19 @@ class WeaveClient:
         # client-side digest checks don't incur a server round-trip later.
         # Must happen after all other attributes are initialised because
         # _project_id() may trigger a flush in test subclasses.
+        #
+        # Latency: get_internal_project_id returns None immediately when the
+        # feature flag is off (the default).  When on, it makes one
+        # projects_info RPC — a single extra round-trip at startup, amortized
+        # over the session.
+        #
+        # Graceful degradation: if the server is outdated and doesn't support
+        # projects_info, the resolver catches the AttributeError and
+        # permanently disables itself.  Any other transient error (timeout,
+        # network) returns None without caching so the next access retries.
+        # In all failure cases _cached_internal_project_id stays None,
+        # _should_compute_client_digests() returns False, and the client
+        # silently falls back to server-computed digests.
         self._cached_internal_project_id = (
             self.project_id_resolver.get_internal_project_id(self._project_id())
         )
