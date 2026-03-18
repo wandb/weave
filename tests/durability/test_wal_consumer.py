@@ -4,7 +4,15 @@ import json
 import logging
 import os
 
+import pytest
+
 from weave.durability.wal_consumer import JSONLWALConsumer
+
+
+def _checkpoint_path(wal_path: str) -> str:
+    """Derive the expected checkpoint sidecar path from a WAL file path."""
+    base, _ = os.path.splitext(wal_path)
+    return base + ".checkpoint"
 
 
 class TestJSONLWALConsumer:
@@ -66,7 +74,15 @@ class TestJSONLWALConsumer:
         assert list(consumer.read_pending()) == []
 
     def test_checkpoint_survives_new_instance(self, tmp_path: str) -> None:
-        """A new consumer instance resumes from the previously acknowledged offset."""
+        """A new consumer instance resumes from the previously acknowledged offset.
+
+        To simulate a real process restart (no shared in-process state), the
+        WAL and checkpoint files are copied to new paths before creating the
+        second consumer.  This catches bugs where recovery depends on cached
+        global state (e.g., a module-level dict keyed by path).
+        """
+        import shutil
+
         path = os.path.join(str(tmp_path), "test.jsonl")
         with open(path, "w", encoding="utf-8") as f:
             f.write(json.dumps({"seq": 0}) + "\n")
@@ -77,54 +93,55 @@ class TestJSONLWALConsumer:
         entries = list(consumer1.read_pending())
         consumer1.acknowledge(entries[0].end_offset)
 
-        # Second consumer (simulating process restart) picks up from offset.
-        consumer2 = JSONLWALConsumer(path)
+        # Copy files to new paths to eliminate any in-process state leakage.
+        path2 = os.path.join(str(tmp_path), "restart.jsonl")
+        shutil.copy2(path, path2)
+        shutil.copy2(_checkpoint_path(path), _checkpoint_path(path2))
+
+        # Second consumer on the copied files — no shared state with consumer1.
+        consumer2 = JSONLWALConsumer(path2)
         remaining = list(consumer2.read_pending())
 
         assert len(remaining) == 1
         assert remaining[0].record == {"seq": 1}
 
-    def test_truncated_trailing_line_is_skipped(
-        self, tmp_path: str, caplog: object
+    @pytest.mark.parametrize(
+        "good_before, good_after",
+        [(0, 0), (1, 0), (1, 1), (0, 1)],
+        ids=["only-corrupt", "trailing-corrupt", "mid-file-corrupt", "leading-corrupt"],
+    )
+    def test_corrupt_line_is_skipped(
+        self,
+        tmp_path: str,
+        caplog: object,
+        good_before: int,
+        good_after: int,
     ) -> None:
-        """Incomplete trailing JSON (crash mid-write) is skipped with a warning."""
+        """Corrupt lines are skipped; valid records before and after are yielded."""
         path = os.path.join(str(tmp_path), "test.jsonl")
         with open(path, "wb") as f:
-            f.write(json.dumps({"good": True}).encode("utf-8") + b"\n")
-            f.write(b'{"truncated": tr')  # simulate crash mid-write
-
-        consumer = JSONLWALConsumer(path)
-        with caplog.at_level(logging.WARNING):  # type: ignore[union-attr]
-            entries = list(consumer.read_pending())
-
-        assert len(entries) == 1
-        assert entries[0].record == {"good": True}
-        assert "Skipping corrupt WAL line" in caplog.text  # type: ignore[union-attr]
-
-    def test_mid_file_corruption_recovers_subsequent_records(
-        self, tmp_path: str, caplog: object
-    ) -> None:
-        """A corrupt line mid-file is skipped; records after it are still yielded."""
-        path = os.path.join(str(tmp_path), "test.jsonl")
-        with open(path, "wb") as f:
-            f.write(json.dumps({"seq": 0}).encode("utf-8") + b"\n")
+            for i in range(good_before):
+                f.write(json.dumps({"seq": i}).encode("utf-8") + b"\n")
             f.write(b"not valid json\n")
-            f.write(json.dumps({"seq": 2}).encode("utf-8") + b"\n")
+            for i in range(good_after):
+                f.write(json.dumps({"seq": good_before + i}).encode("utf-8") + b"\n")
 
         consumer = JSONLWALConsumer(path)
         with caplog.at_level(logging.WARNING):  # type: ignore[union-attr]
             entries = list(consumer.read_pending())
 
-        assert len(entries) == 2
-        assert entries[0].record == {"seq": 0}
-        assert entries[1].record == {"seq": 2}
+        assert len(entries) == good_before + good_after
+        for i, entry in enumerate(entries):
+            assert entry.record == {"seq": i}
         assert "Skipping corrupt WAL line" in caplog.text  # type: ignore[union-attr]
 
     def test_end_offsets_are_correct(self, tmp_path: str) -> None:
         """end_offset equals the byte position immediately after each record's newline."""
         path = os.path.join(str(tmp_path), "test.jsonl")
+        # Use different-length records so offset arithmetic is non-trivial.
         line1 = json.dumps({"a": 1}) + "\n"
-        line2 = json.dumps({"b": 2}) + "\n"
+        line2 = json.dumps({"longer_key": "longer_value"}) + "\n"
+        assert len(line1.encode("utf-8")) != len(line2.encode("utf-8"))
         with open(path, "wb") as f:
             f.write(line1.encode("utf-8"))
             f.write(line2.encode("utf-8"))
@@ -148,8 +165,8 @@ class TestJSONLWALConsumer:
         consumer.acknowledge(entry.end_offset)
 
         # The checkpoint sidecar should exist and no temp files should remain.
-        assert os.path.exists(os.path.join(str(tmp_path), "test.checkpoint"))
-        assert os.path.exists(os.path.join(str(tmp_path), "test.jsonl"))
+        assert os.path.exists(_checkpoint_path(path))
+        assert os.path.exists(path)
         temp_files = [f for f in os.listdir(str(tmp_path)) if f.startswith("tmp")]
         assert temp_files == []
 
@@ -171,17 +188,22 @@ class TestJSONLWALConsumer:
             f.write(json.dumps({"a": 1}) + "\n")
             f.write(json.dumps({"b": 2}) + "\n")
 
-        # Write garbage to the checkpoint sidecar.
-        checkpoint_path = os.path.join(str(tmp_path), "test.checkpoint")
-        with open(checkpoint_path, "w", encoding="utf-8") as f:
-            f.write("not-a-number")
-
+        # First, do a valid acknowledge so a real checkpoint exists.
         consumer = JSONLWALConsumer(path)
         entries = list(consumer.read_pending())
+        consumer.acknowledge(entries[0].end_offset)
+        assert len(list(consumer.read_pending())) == 1  # checkpoint works
+
+        # Now corrupt the checkpoint sidecar.
+        with open(_checkpoint_path(path), "w", encoding="utf-8") as f:
+            f.write("not-a-number")
+
+        consumer2 = JSONLWALConsumer(path)
+        entries2 = list(consumer2.read_pending())
 
         # All records replayed from the start.
-        assert len(entries) == 2
-        assert entries[0].record == {"a": 1}
+        assert len(entries2) == 2
+        assert entries2[0].record == {"a": 1}
 
     def test_missing_wal_file_yields_nothing(self, tmp_path: str) -> None:
         """read_pending() on a non-existent file yields nothing instead of raising."""
