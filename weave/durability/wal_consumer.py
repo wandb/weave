@@ -11,8 +11,17 @@ from weave.durability.wal import WALEntry
 logger = logging.getLogger(__name__)
 
 
+_active_consumers: set[str] = set()
+
+
 class JSONLWALConsumer:
     """Reads unprocessed JSONL records and tracks progress via a checkpoint sidecar.
+
+    One consumer per WAL file.  Multiple consumers on the same file will race
+    on the checkpoint sidecar (each acknowledge() does an atomic rename, so
+    the last writer wins and earlier checkpoints are lost).  In practice,
+    drain() and drain_all() enforce this — they create exactly one consumer
+    per file path.  A debug-mode assert catches violations during development.
 
     Not thread-safe.  If a background drain thread is added, callers must
     synchronize access or use separate consumer instances.
@@ -24,10 +33,19 @@ class JSONLWALConsumer:
         checkpoint_ext: str = ".checkpoint",
         dead_letter_ext: str = ".deadletter",
     ) -> None:
+        assert path not in _active_consumers, (
+            f"A JSONLWALConsumer already exists for {path}. "
+            "Only one consumer per WAL file is supported."
+        )
+        _active_consumers.add(path)
         self._path = path
         base, _ = os.path.splitext(path)
         self._checkpoint_path = base + checkpoint_ext
         self._dead_letter_path = base + dead_letter_ext
+
+    def close(self) -> None:
+        """Release this consumer's claim on its WAL file path."""
+        _active_consumers.discard(self._path)
 
     @property
     def dead_letter_path(self) -> str:

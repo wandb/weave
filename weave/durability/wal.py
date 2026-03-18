@@ -195,6 +195,10 @@ class WALConsumer(Protocol):
         """
         ...
 
+    def close(self) -> None:
+        """Release any resources held by this consumer."""
+        ...
+
 
 @runtime_checkable
 class WALDirectoryManager(Protocol):
@@ -361,9 +365,12 @@ def drain_all(
     total = 0
     for path in directory_manager.list_files():
         consumer = consumer_factory(path)
-        total += drain(consumer, handlers)
-        # Check if fully consumed — any remaining records means we shouldn't
-        # delete yet (e.g., writer is still appending in the same process).
-        if next(consumer.read_pending(), None) is None:
-            directory_manager.remove(path)
+        try:
+            total += drain(consumer, handlers)
+            # Check if fully consumed — any remaining records means we shouldn't
+            # delete yet (e.g., writer is still appending in the same process).
+            if next(consumer.read_pending(), None) is None:
+                directory_manager.remove(path)
+        finally:
+            consumer.close()
     return total

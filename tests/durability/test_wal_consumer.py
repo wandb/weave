@@ -193,6 +193,7 @@ class TestJSONLWALConsumer:
         entries = list(consumer.read_pending())
         consumer.acknowledge(entries[0].end_offset)
         assert len(list(consumer.read_pending())) == 1  # checkpoint works
+        consumer.close()
 
         # Now corrupt the checkpoint sidecar.
         with open(_checkpoint_path(path), "w", encoding="utf-8") as f:
@@ -223,6 +224,7 @@ class TestJSONLWALConsumer:
         consumer = JSONLWALConsumer(path)
         entries = list(consumer.read_pending())
         consumer.acknowledge(entries[0].end_offset)
+        consumer.close()
 
         with open(path, "wb") as f:
             f.truncate(0)

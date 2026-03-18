@@ -100,7 +100,7 @@ class TestJSONLWALWriter:
     def test_fsync_batch_size_controls_frequency(self, tmp_path: str) -> None:
         """With fsync_batch_size=3, os.fsync() triggers every 3rd write."""
         path = os.path.join(str(tmp_path), "test.jsonl")
-        writer = JSONLWALWriter(path, fsync_batch_size=3)
+        writer = JSONLWALWriter(path, fsync_batch_size=3, fsync_timeout=0)
 
         # Write 5 records: fsync fires after write 3, not after 4 or 5.
         for i in range(5):
@@ -113,6 +113,27 @@ class TestJSONLWALWriter:
 
         # Internal counter: 2 unsynced (writes 4 and 5 since last fsync at 3).
         assert writer._unsynced == 2
+
+        writer.close()
+
+    def test_fsync_timeout_triggers_sync(self, tmp_path: str) -> None:
+        """When fsync_timeout elapses, the next write triggers an fsync."""
+        path = os.path.join(str(tmp_path), "test.jsonl")
+        # Large batch size so count alone won't trigger; short timeout.
+        writer = JSONLWALWriter(path, fsync_batch_size=1000, fsync_timeout=0.01)
+
+        writer.write({"seq": 0})
+        # Batch hasn't filled — 1 unsynced.
+        assert writer._unsynced == 1
+
+        # Wait for the timeout to elapse.
+        import time
+
+        time.sleep(0.02)
+
+        # Next write should trigger fsync due to timeout.
+        writer.write({"seq": 1})
+        assert writer._unsynced == 0
 
         writer.close()
 
