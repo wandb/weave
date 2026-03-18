@@ -327,7 +327,7 @@ def drain(
 
 def _write_dead_letter(path: str, record: WALRecord) -> None:
     """Append a single record to the dead-letter JSONL file."""
-    with open(path, "a") as f:
+    with open(path, "a", encoding="utf-8") as f:
         json.dump(record, f, separators=(",", ":"))
         f.write("\n")
 

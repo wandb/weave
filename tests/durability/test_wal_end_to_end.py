@@ -134,14 +134,12 @@ class TestDrain:
         assert count == 1
         assert list(consumer.read_pending()) == []
 
-        with open(consumer.dead_letter_path) as f:
+        with open(consumer.dead_letter_path, encoding="utf-8") as f:
             dead = [json.loads(line) for line in f]
         assert len(dead) == 1
         assert dead[0]["seq"] == 1
 
-    def test_unknown_type_logs_warning(
-        self, tmp_path: str, caplog: object
-    ) -> None:
+    def test_unknown_type_logs_warning(self, tmp_path: str, caplog: object) -> None:
         """Records with a type that has no handler log a warning."""
         mgr = FileWALDirectoryManager(str(tmp_path))
         with mgr.create_file() as writer:
@@ -198,7 +196,7 @@ class TestDrain:
         assert count == 2
         assert list(consumer.read_pending()) == []
 
-        with open(consumer.dead_letter_path) as f:
+        with open(consumer.dead_letter_path, encoding="utf-8") as f:
             dead = [json.loads(line) for line in f]
         assert len(dead) == 1
         assert dead[0]["seq"] == 1
@@ -213,7 +211,7 @@ class TestDrain:
         consumer = JSONLWALConsumer(path)
 
         # Create a dead-letter file.
-        with open(consumer.dead_letter_path, "w") as f:
+        with open(consumer.dead_letter_path, "w", encoding="utf-8") as f:
             f.write('{"type":"obj_create","seq":0}\n')
 
         mgr.remove(path)

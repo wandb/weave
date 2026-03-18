@@ -105,7 +105,7 @@ class TestJSONLWALConsumer:
         assert remaining[0].record == {"seq": 1}
 
     @pytest.mark.parametrize(
-        "good_before, good_after",
+        ("good_before", "good_after"),
         [(0, 0), (1, 0), (1, 1), (0, 1)],
         ids=["only-corrupt", "trailing-corrupt", "mid-file-corrupt", "leading-corrupt"],
     )
