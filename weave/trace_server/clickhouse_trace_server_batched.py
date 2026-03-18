@@ -423,10 +423,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
     ) -> dict[str, str]:
-        """Look up existing op ref URIs, using the cache to skip repeated CH queries."""
+        """Look up existing op ref URIs, using an in-memory TTL cache to skip repeated CH queries.
+
+        Returns a dict of op_name -> op_ref_uri for all ops that already exist
+        (either from cache or from CH).
+        """
         resolved: dict[str, str] = {}
         uncached_ids: set[str] = set()
 
+        # Check cache first
         with self._op_ref_cache_lock:
             for op_name in seen_ids:
                 cached_uri = self._op_ref_cache.get((project_id, op_name))
@@ -435,6 +440,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 else:
                     uncached_ids.add(op_name)
 
+        # Query CH only for uncached ops
         if uncached_ids:
             obj_version_filter = tsi.ObjectVersionFilter(
                 object_ids=list(uncached_ids),
@@ -450,6 +456,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 ),
             ).objs
 
+            # Populate cache and resolved dict with CH results
             with self._op_ref_cache_lock:
                 for obj in ch_results:
                     uri = ri.InternalOpRef(
@@ -463,6 +470,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return resolved
 
     def _cache_op_ref(self, project_id: str, op_name: str, uri: str) -> None:
+        """Cache a resolved op ref URI."""
         with self._op_ref_cache_lock:
             self._op_ref_cache[project_id, op_name] = uri
 
@@ -545,8 +553,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         for op_name, op_ref_uri in existing_ops.items():
+            # Modify each of the matched start calls in place
             for idx in obj_id_idx_map[op_name]:
                 calls[idx][0].op_name = op_ref_uri
+            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
             obj_id_idx_map.pop(op_name)
 
         if obj_id_idx_map:
