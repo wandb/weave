@@ -1973,9 +1973,7 @@ class WeaveClient:
             )
             return self.server.obj_create(req)
 
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(
-            send_obj_create
-        )
+        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
         )

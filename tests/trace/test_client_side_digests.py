@@ -56,9 +56,7 @@ def _configure_digests(client: WeaveClient, *, enable: bool) -> None:
         # __init__ because projects_info raises AttributeError on the
         # local server chain) and populate the internal project ID cache.
         client.project_id_resolver._disabled_event.clear()
-        client._cached_internal_project_id = _compute_test_internal_project_id(
-            client
-        )
+        client._cached_internal_project_id = _compute_test_internal_project_id(client)
     else:
         client._cached_internal_project_id = None
 
@@ -118,9 +116,7 @@ class TestClientServerDigestConsistency:
             "metadata": {"nested": {"deep": True}},
         }
 
-        digest_client = _publish_with_digests(
-            client, obj, "nested_client", enable=True
-        )
+        digest_client = _publish_with_digests(client, obj, "nested_client", enable=True)
         digest_server = _publish_with_digests(
             client, obj, "nested_server", enable=False
         )
@@ -144,12 +140,8 @@ class TestClientServerDigestConsistency:
     def test_empty_dict(self, client: WeaveClient):
         obj: dict = {}
 
-        digest_client = _publish_with_digests(
-            client, obj, "empty_client", enable=True
-        )
-        digest_server = _publish_with_digests(
-            client, obj, "empty_server", enable=False
-        )
+        digest_client = _publish_with_digests(client, obj, "empty_client", enable=True)
+        digest_server = _publish_with_digests(client, obj, "empty_server", enable=False)
 
         assert digest_client == digest_server
 
@@ -331,9 +323,7 @@ class TestServerDigestValidation:
     @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
     def test_object(self, client: WeaveClient, correct: bool):
         val = {"hello": "world"}
-        expected_digest = (
-            compute_object_digest(val) if correct else "definitely_wrong"
-        )
+        expected_digest = compute_object_digest(val) if correct else "definitely_wrong"
 
         req = tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
