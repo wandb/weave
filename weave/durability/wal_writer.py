@@ -100,8 +100,11 @@ class JSONLWALWriter:
             self._file.close()
 
     def _should_fsync(self) -> bool:
+        # Batch-count trigger: enough writes have accumulated.
         if self._unsynced >= self._fsync_batch_size:
             return True
+        # Timeout trigger: too long since last fsync (bounds the
+        # power-failure window for low-QPS workloads).
         if (
             self._fsync_timeout > 0
             and self._unsynced > 0
