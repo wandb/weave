@@ -1880,7 +1880,9 @@ class WeaveClient:
         """
         self.project_id_resolver.get_internal_project_id(self._project_id())
 
-    def _handle_digest_mismatch(self, e: DigestMismatchError | HTTPError, label: str) -> None:
+    def _handle_digest_mismatch(
+        self, e: DigestMismatchError | HTTPError, label: str
+    ) -> None:
         """If *e* is a digest-mismatch error, disable client-side digests.
 
         Raises the original exception if it is NOT a digest mismatch
@@ -1991,7 +1993,11 @@ class WeaveClient:
                 try:
                     json_val_internal = self._convert_refs_to_internal(json_val)
                     expected_digest = compute_object_digest(json_val_internal)
-                except (NoInternalProjectIDError, CrossProjectRefError, InvalidExternalRef) as e:
+                except (
+                    NoInternalProjectIDError,
+                    CrossProjectRefError,
+                    InvalidExternalRef,
+                ) as e:
                     logger.debug("Skipping client-side digest for obj %r: %s", name, e)
 
             req = ObjCreateReq(
@@ -2054,7 +2060,11 @@ class WeaveClient:
                 json_rows_internal = self._convert_refs_to_internal(json_rows)
                 row_digests = [compute_row_digest(row) for row in json_rows_internal]
                 expected_digest = compute_table_digest(row_digests)
-            except (NoInternalProjectIDError, CrossProjectRefError, InvalidExternalRef) as e:
+            except (
+                NoInternalProjectIDError,
+                CrossProjectRefError,
+                InvalidExternalRef,
+            ) as e:
                 logger.debug("Skipping client-side digest for table: %s", e)
 
         req = TableCreateReq(
