@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 
 from weave.durability.wal import WALRecord
 
@@ -42,25 +43,32 @@ class JSONLWALWriter:
         self._file = open(path, "ab")
         self._fsync_batch_size = fsync_batch_size
         self._unsynced = 0
+        self._lock = threading.Lock()
 
     def write(self, record: WALRecord) -> int:
         line = json.dumps(record, separators=(",", ":")) + "\n"
-        self._file.write(line.encode("utf-8"))
-        # Always push to OS page cache (survives process crash).
-        # Only fsync to disk (survives power failure) every fsync_batch_size writes.
-        self._file.flush()
-        self._unsynced += 1
-        if self._unsynced >= self._fsync_batch_size:
-            self._fsync()
-        return self._file.tell()
+        with self._lock:
+            self._file.write(line.encode("utf-8"))
+            # Always push to OS page cache (survives process crash).
+            # Only fsync to disk (survives power failure) every fsync_batch_size writes.
+            self._file.flush()
+            self._unsynced += 1
+            if self._unsynced >= self._fsync_batch_size:
+                self._fsync()
+            return self._file.tell()
 
     def flush(self) -> None:
-        if self._unsynced > 0:
-            self._fsync()
+        with self._lock:
+            self._flush_unlocked()
 
     def close(self) -> None:
-        self.flush()
-        self._file.close()
+        with self._lock:
+            self._flush_unlocked()
+            self._file.close()
+
+    def _flush_unlocked(self) -> None:
+        if self._unsynced > 0:
+            self._fsync()
 
     def __enter__(self) -> JSONLWALWriter:
         return self

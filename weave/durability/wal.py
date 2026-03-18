@@ -97,9 +97,8 @@ class WALWriter(Protocol):
         - flush() forces an fsync of all buffered writes.
         - close() calls flush() then closes the file handle.
 
-    Not thread-safe.  If a background drain thread runs in the same
-    process, callers must synchronize write() calls or use a dedicated
-    writer per thread.
+    Thread-safe.  The concrete implementation (JSONLWALWriter) guards all
+    mutable state with a lock, so multiple threads may share a single writer.
     """
 
     def write(self, record: WALRecord) -> int:
