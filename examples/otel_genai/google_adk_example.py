@@ -17,8 +17,15 @@ Creates a multi-agent system with LLM-driven delegation:
   - CreativeAgent: generates images and describes them
   - MathAgent: performs arithmetic via a calculator tool
 
-Demonstrates weave.otel.log_content() pattern for capturing generated
-images and attaching content references to OTel spans.
+Demonstrates media capture via log_content() and manual system prompt
+attribution via gen_ai.system_instructions.
+
+NOTE: System prompts / agent instructions are manually injected because
+Google ADK's native OTel tracing does not emit gen_ai.system_instructions.
+The OTel GenAI spec defines this attribute (semantic-conventions PR #2179)
+but neither ADK nor any other instrumentor implements it yet:
+  - https://github.com/open-telemetry/semantic-conventions/pull/2179
+  - https://github.com/google/adk-python/pull/2575
 
 Usage:
     uv run --python 3.12 google_adk_example.py
@@ -114,6 +121,43 @@ def log_content(
 
 
 # ---------------------------------------------------------------------------
+# Agent instructions (defined before OTel setup for the injector)
+# ---------------------------------------------------------------------------
+
+COORDINATOR_INSTRUCTIONS = (
+    "You are a helpful coordinator. Based on the user's request, "
+    "delegate to the appropriate specialist:\n"
+    "  - WeatherAgent for weather questions\n"
+    "  - MathAgent for calculations and math\n"
+    "  - CreativeAgent for image generation and visual content\n\n"
+    "Always delegate — do not answer directly."
+)
+
+WEATHER_INSTRUCTIONS = (
+    "You are a weather specialist. Use the get_weather tool to look "
+    "up weather for cities. Give a short, friendly answer."
+)
+
+MATH_INSTRUCTIONS = (
+    "You are a math specialist. Use the calculator tool to evaluate "
+    "arithmetic expressions. Show your work briefly."
+)
+
+CREATIVE_INSTRUCTIONS = (
+    "You are a creative image specialist. Use the generate_image tool "
+    "to create images from descriptions. After generating, briefly "
+    "describe what was created."
+)
+
+AGENT_INSTRUCTIONS = {
+    "Coordinator": COORDINATOR_INSTRUCTIONS,
+    "WeatherAgent": WEATHER_INSTRUCTIONS,
+    "MathAgent": MATH_INSTRUCTIONS,
+    "CreativeAgent": CREATIVE_INSTRUCTIONS,
+}
+
+
+# ---------------------------------------------------------------------------
 # OTel setup
 # ---------------------------------------------------------------------------
 
@@ -123,6 +167,40 @@ def _wandb_auth_headers() -> dict[str, str]:
     if api_key:
         return {"wandb-api-key": api_key}
     return {}
+
+
+class _SystemPromptInjector:
+    """SpanProcessor that injects gen_ai.system_instructions on agent spans.
+
+    Google ADK doesn't emit system prompts in its OTel tracing. This
+    processor fills the gap by matching agent names to their instructions.
+    Uses _on_ending because gen_ai.agent.name may not be set at on_start.
+    """
+
+    def __init__(self, agent_instructions: dict[str, str]):
+        self._instructions = agent_instructions
+
+    def on_start(self, span, parent_context=None):
+        name = span.name or ""
+        for agent_name, instructions in self._instructions.items():
+            if agent_name in name:
+                span.set_attribute(
+                    "gen_ai.system_instructions",
+                    json.dumps([{"role": "system", "content": instructions}]),
+                )
+                break
+
+    def on_end(self, span):
+        pass
+
+    def _on_ending(self, span):
+        pass
+
+    def shutdown(self):
+        pass
+
+    def force_flush(self, timeout_millis=None):
+        return True
 
 
 def setup_otel(
@@ -140,6 +218,9 @@ def setup_otel(
         }
     )
     provider = TracerProvider(resource=resource)
+
+    # Inject system prompts on agent spans (upstream gap workaround)
+    provider.add_span_processor(_SystemPromptInjector(AGENT_INSTRUCTIONS))
 
     if genai_endpoint:
         provider.add_span_processor(
@@ -262,10 +343,7 @@ def build_agents():
         name="WeatherAgent",
         model="gemini-2.0-flash",
         description="Specialist for weather forecasts and conditions in any city.",
-        instruction=(
-            "You are a weather specialist. Use the get_weather tool to look "
-            "up weather for cities. Give a short, friendly answer."
-        ),
+        instruction=WEATHER_INSTRUCTIONS,
         tools=[get_weather],
     )
 
@@ -273,10 +351,7 @@ def build_agents():
         name="MathAgent",
         model="gemini-2.0-flash",
         description="Specialist for arithmetic calculations and math questions.",
-        instruction=(
-            "You are a math specialist. Use the calculator tool to evaluate "
-            "arithmetic expressions. Show your work briefly."
-        ),
+        instruction=MATH_INSTRUCTIONS,
         tools=[calculator],
     )
 
@@ -284,11 +359,7 @@ def build_agents():
         name="CreativeAgent",
         model="gemini-2.0-flash",
         description="Specialist for generating images from text descriptions.",
-        instruction=(
-            "You are a creative image specialist. Use the generate_image tool "
-            "to create images from descriptions. After generating, briefly "
-            "describe what was created."
-        ),
+        instruction=CREATIVE_INSTRUCTIONS,
         tools=[generate_image],
     )
 
@@ -296,14 +367,7 @@ def build_agents():
         name="Coordinator",
         model="gemini-2.0-flash",
         description="Routes requests to the appropriate specialist agent.",
-        instruction=(
-            "You are a helpful coordinator. Based on the user's request, "
-            "delegate to the appropriate specialist:\n"
-            "  - WeatherAgent for weather questions\n"
-            "  - MathAgent for calculations and math\n"
-            "  - CreativeAgent for image generation and visual content\n\n"
-            "Always delegate — do not answer directly."
-        ),
+        instruction=COORDINATOR_INSTRUCTIONS,
         sub_agents=[weather_agent, math_agent, creative_agent],
     )
 

@@ -100,6 +100,9 @@ class LiveSpanProcessor(SpanProcessor):
     def on_end(self, span: ReadableSpan) -> None:
         """No-op — full export handled by BatchSpanProcessor."""
 
+    def _on_ending(self, span: ReadableSpan) -> None:
+        """No-op — required by some OTel SDK versions."""
+
     def shutdown(self) -> None:
         """Shut down the thread pool."""
         self._executor.shutdown(wait=False)

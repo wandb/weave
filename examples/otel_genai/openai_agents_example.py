@@ -16,19 +16,22 @@ Demonstrates a triage agent that routes to specialized subagents:
   - TravelAdvisor: looks up flights and hotels via tools
   - Translator: translates text (no tools, just LLM)
 
-The triage agent decides which specialist to hand off to based on the
-user's question.  Each handoff, tool call, and LLM generation becomes
-a separate OTel span, so you can see the full parent→child hierarchy
-in any trace viewer.
+NOTE: System prompts / agent instructions are manually attached to spans
+via gen_ai.system_instructions because the OpenAI Agents v2 OTel
+instrumentor does not emit them. The OTel GenAI semantic conventions
+define this attribute (merged in semantic-conventions PR #2179, Aug 2025)
+but no instrumentor implements it yet:
+  - https://github.com/open-telemetry/semantic-conventions/pull/2179
+  - https://github.com/open-telemetry/opentelemetry-python-contrib/issues/4038
 
 Usage:
     uv run --python 3.12 openai_agents_example.py
-    uv run --python 3.12 openai_agents_example.py --otlp-endpoint http://localhost:4317
     uv run --python 3.12 openai_agents_example.py --genai-endpoint http://localhost:6345/otel/v1/genai/traces
 """
 
 import argparse
 import asyncio
+import json
 import os
 from datetime import datetime, timezone
 
@@ -86,15 +89,51 @@ def search_hotels(city: str, checkin: str, checkout: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Agent instructions
+# ---------------------------------------------------------------------------
+
+TRIAGE_INSTRUCTIONS = (
+    "You are a helpful concierge. Based on the user's request, hand off "
+    "to the appropriate specialist:\n"
+    "  - WeatherBot for weather questions\n"
+    "  - TravelAdvisor for flight/hotel/trip planning\n"
+    "  - Translator for translation requests\n\n"
+    "If the request spans multiple domains, handle the most relevant one "
+    "first. Always hand off — do not answer directly."
+)
+
+WEATHER_INSTRUCTIONS = (
+    "You are a weather specialist. Use the get_weather tool to look up "
+    "weather for any city the user asks about. Give a short, friendly answer."
+)
+
+TRAVEL_INSTRUCTIONS = (
+    "You are a travel planning specialist. Use search_flights and "
+    "search_hotels to help the user plan trips. Summarize options clearly. "
+    "If the user hasn't specified dates, suggest reasonable ones."
+)
+
+TRANSLATOR_INSTRUCTIONS = (
+    "You are a translation specialist. Translate the user's text into "
+    "the requested language. If no target language is specified, translate "
+    "to Spanish. Only output the translation, nothing else."
+)
+
+# Map agent name -> instructions for manual system prompt attribution
+AGENT_INSTRUCTIONS = {
+    "TriageAgent": TRIAGE_INSTRUCTIONS,
+    "WeatherBot": WEATHER_INSTRUCTIONS,
+    "TravelAdvisor": TRAVEL_INSTRUCTIONS,
+    "Translator": TRANSLATOR_INSTRUCTIONS,
+}
+
+# ---------------------------------------------------------------------------
 # Specialist agents
 # ---------------------------------------------------------------------------
 
 weather_agent = Agent(
     name="WeatherBot",
-    instructions=(
-        "You are a weather specialist. Use the get_weather tool to look up "
-        "weather for any city the user asks about. Give a short, friendly answer."
-    ),
+    instructions=WEATHER_INSTRUCTIONS,
     tools=[get_weather],
     model="gpt-4o-mini",
     handoff_description="Specialist for weather forecasts and conditions",
@@ -102,11 +141,7 @@ weather_agent = Agent(
 
 travel_agent = Agent(
     name="TravelAdvisor",
-    instructions=(
-        "You are a travel planning specialist. Use search_flights and "
-        "search_hotels to help the user plan trips. Summarize options clearly. "
-        "If the user hasn't specified dates, suggest reasonable ones."
-    ),
+    instructions=TRAVEL_INSTRUCTIONS,
     tools=[search_flights, search_hotels],
     model="gpt-4o-mini",
     handoff_description="Specialist for flight and hotel bookings",
@@ -114,31 +149,14 @@ travel_agent = Agent(
 
 translator_agent = Agent(
     name="Translator",
-    instructions=(
-        "You are a translation specialist. Translate the user's text into "
-        "the requested language. If no target language is specified, translate "
-        "to Spanish. Only output the translation, nothing else."
-    ),
+    instructions=TRANSLATOR_INSTRUCTIONS,
     model="gpt-4o-mini",
     handoff_description="Specialist for translating text between languages",
 )
 
-
-# ---------------------------------------------------------------------------
-# Triage agent (the orchestrator)
-# ---------------------------------------------------------------------------
-
 triage_agent = Agent(
     name="TriageAgent",
-    instructions=(
-        "You are a helpful concierge. Based on the user's request, hand off "
-        "to the appropriate specialist:\n"
-        "  - WeatherBot for weather questions\n"
-        "  - TravelAdvisor for flight/hotel/trip planning\n"
-        "  - Translator for translation requests\n\n"
-        "If the request spans multiple domains, handle the most relevant one "
-        "first. Always hand off — do not answer directly."
-    ),
+    instructions=TRIAGE_INSTRUCTIONS,
     handoffs=[weather_agent, travel_agent, translator_agent],
     model="gpt-4o-mini",
 )
@@ -157,14 +175,12 @@ def _wandb_auth_headers() -> dict[str, str]:
     return {}
 
 
-# ---------------------------------------------------------------------------
-# Inline LiveSpanProcessor — ships span-start events for real-time UI.
-# When weave is installed as a package, use weave.otel.LiveSpanProcessor.
-# ---------------------------------------------------------------------------
-
-
 class _LiveSpanProcessor:
-    """Sends lightweight span-start POSTs so the UI can show in-progress spans."""
+    """Sends lightweight span-start POSTs so the UI can show in-progress spans.
+
+    Also injects gen_ai.system_instructions on invoke_agent spans since
+    the OpenAI Agents v2 instrumentor doesn't emit them.
+    """
 
     def __init__(self, endpoint: str, headers: dict[str, str] | None = None):
         from concurrent.futures import ThreadPoolExecutor
@@ -237,8 +253,48 @@ class _LiveSpanProcessor:
     def on_end(self, span):
         pass
 
+    def _on_ending(self, span):
+        pass
+
     def shutdown(self):
         self._executor.shutdown(wait=False)
+
+    def force_flush(self, timeout_millis=None):
+        return True
+
+
+class _SystemPromptInjector:
+    """SpanProcessor that injects gen_ai.system_instructions on agent spans.
+
+    The OTel GenAI semantic conventions define gen_ai.system_instructions
+    (semantic-conventions PR #2179) but no instrumentor emits it yet.
+    This processor fills the gap by matching agent names to their instructions.
+
+    Uses _on_ending (called just before span finalization) because
+    gen_ai.agent.name isn't available at on_start time.
+    """
+
+    def __init__(self, agent_instructions: dict[str, str]):
+        self._instructions = agent_instructions
+
+    def on_start(self, span, parent_context=None):
+        name = span.name or ""
+        for agent_name, instructions in self._instructions.items():
+            if agent_name in name:
+                span.set_attribute(
+                    "gen_ai.system_instructions",
+                    json.dumps([{"role": "system", "content": instructions}]),
+                )
+                break
+
+    def on_end(self, span):
+        pass
+
+    def _on_ending(self, span):
+        pass
+
+    def shutdown(self):
+        pass
 
     def force_flush(self, timeout_millis=None):
         return True
@@ -248,7 +304,7 @@ def setup_otel(
     otlp_endpoint: str | None = None,
     genai_endpoint: str | None = None,
 ) -> TracerProvider:
-    """Configure the OTel TracerProvider with console, OTLP, or GenAI endpoint export."""
+    """Configure the OTel TracerProvider."""
     entity = os.environ.get("WANDB_ENTITY", "ben-urmomsclothes")
     resource = Resource.create(
         {
@@ -259,6 +315,9 @@ def setup_otel(
         }
     )
     provider = TracerProvider(resource=resource)
+
+    # Inject system prompts on invoke_agent spans (upstream gap workaround)
+    provider.add_span_processor(_SystemPromptInjector(AGENT_INSTRUCTIONS))
 
     if genai_endpoint:
         server_url = genai_endpoint.rsplit("/otel/", 1)[0]
@@ -309,20 +368,10 @@ async def run_agents() -> None:
 
 
 def main() -> None:
-    """Entry point: parse args, set up OTel, run agents, flush."""
+    """Entry point."""
     parser = argparse.ArgumentParser(description="OpenAI Agents SDK OTel example")
-    parser.add_argument(
-        "--otlp-endpoint",
-        type=str,
-        default=None,
-        help="OTLP gRPC endpoint (e.g. http://localhost:4317). Defaults to console export.",
-    )
-    parser.add_argument(
-        "--genai-endpoint",
-        type=str,
-        default=None,
-        help="Weave GenAI OTel HTTP endpoint (e.g. http://localhost:6345/otel/v1/genai/traces).",
-    )
+    parser.add_argument("--otlp-endpoint", type=str, default=None)
+    parser.add_argument("--genai-endpoint", type=str, default=None)
     args = parser.parse_args()
 
     os.environ.setdefault(
