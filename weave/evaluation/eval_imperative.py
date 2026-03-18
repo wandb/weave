@@ -549,9 +549,8 @@ class ScoreLogger:
         scorer = self._prepare_scorer(scorer)
 
         # When tracing is disabled, predict_call is a NoOpCall with empty inputs,
-        # so apply_scorer would fail. Just record the score and return.
+        # so apply_scorer would fail.
         if is_placeholder_call(self.predict_call):
-            self._captured_scores[cast(str, scorer.name)] = score
             return
 
         @op(name=scorer.name, enable_code_capture=False)

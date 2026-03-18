@@ -1150,3 +1150,4 @@ def test_evaluation_logger_with_weave_disabled(client, monkeypatch):
     pred.log_score("correctness", 0.9)
     pred.finish()
     ev.log_summary({"avg_score": 0.9})
+    ev.finish()
