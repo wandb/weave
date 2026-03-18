@@ -98,15 +98,14 @@ class JSONLWALConsumer:
         try:
             os.write(fd, str(offset).encode("utf-8"))
             os.fsync(fd)
+        except BaseException:
             os.close(fd)
+            os.unlink(tmp_path)
+            raise
+        os.close(fd)
+        try:
             os.replace(tmp_path, self._checkpoint_path)
-        except (
-            BaseException
-        ):  # intentional: clean up temp file on KeyboardInterrupt too
-            try:
-                os.close(fd)
-            except OSError:
-                pass
+        except BaseException:
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
             raise
