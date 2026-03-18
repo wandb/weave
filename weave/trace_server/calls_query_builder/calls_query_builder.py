@@ -1804,7 +1804,7 @@ ALLOWED_CALL_FIELDS = {
         join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
     ),
     "otel_dump": CallsMergedAggField(field="otel_dump", agg_fn="any"),
-    "ttl_at": CallsMergedAggField(field="ttl_at", agg_fn="min"),
+    "expire_at": CallsMergedAggField(field="expire_at", agg_fn="min"),
 }
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
@@ -1812,7 +1812,7 @@ DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 # Fields that are stored as DateTime64 columns in ClickHouse. When comparing
 # these fields with numeric unix timestamps, the value must be converted to a
 # datetime string so ClickHouse can properly use primary key / ORDER BY indexes.
-DATETIME_COLUMN_FIELDS = {"started_at", "ended_at", "deleted_at", "ttl_at"}
+DATETIME_COLUMN_FIELDS = {"started_at", "ended_at", "deleted_at", "expire_at"}
 
 
 def get_field_by_name(name: str) -> CallsMergedField:

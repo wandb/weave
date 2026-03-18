@@ -2606,17 +2606,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             **dict(zip(columns, query_result.result_rows[0], strict=False))
         )
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.project_ttl_settings_read"
+    )
     def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReq
     ) -> tsi.ProjectTTLSettingsRes:
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
         return tsi.ProjectTTLSettingsRes(retention_days=retention_days)
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.project_ttl_settings_set"
+    )
     def project_ttl_settings_set(
         self, req: tsi.SetProjectTTLSettingsReq
     ) -> tsi.SetProjectTTLSettingsRes:
-        if req.retention_days < 0:
-            raise InvalidRequest("retention_days must be 0 (no TTL) or >= 1")
+        # Negative values encode minutes-based retention (e.g. -5 = 5 minutes) for testing
+        if req.retention_days < -1440:
+            raise InvalidRequest(
+                "retention_days must be 0 (no TTL), >= 1, or negative for minutes-based retention (min -1440)"
+            )
 
         self.ch_client.insert(
             "project_ttl_settings",
