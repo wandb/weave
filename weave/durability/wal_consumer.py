@@ -18,10 +18,20 @@ class JSONLWALConsumer:
     synchronize access or use separate consumer instances.
     """
 
-    def __init__(self, path: str, checkpoint_ext: str = ".checkpoint") -> None:
+    def __init__(
+        self,
+        path: str,
+        checkpoint_ext: str = ".checkpoint",
+        dead_letter_ext: str = ".deadletter",
+    ) -> None:
         self._path = path
         base, _ = os.path.splitext(path)
         self._checkpoint_path = base + checkpoint_ext
+        self._dead_letter_path = base + dead_letter_ext
+
+    @property
+    def dead_letter_path(self) -> str:
+        return self._dead_letter_path
 
     def read_pending(self) -> Iterator[WALEntry]:
         offset = self._load_checkpoint()

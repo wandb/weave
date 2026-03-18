@@ -106,13 +106,13 @@ class TestDrain:
         assert count == 0
         assert list(consumer.read_pending()) == []
 
-    def test_handler_error_prevents_acknowledgement(self, tmp_path: str) -> None:
-        """If a handler raises, no acknowledge happens and all records replay.
+    @pytest.mark.disable_logging_error_check
+    def test_handler_error_sends_to_dead_letter(self, tmp_path: str) -> None:
+        """If a handler raises, the record goes to dead-letter and the batch continues.
 
-        drain() uses all-or-nothing acknowledgement: the acknowledge call
-        comes after the loop, so an exception mid-batch means the checkpoint
-        never advances.  On the next drain(), all records replay from the
-        same offset — including the one that succeeded before the error.
+        drain() catches handler exceptions, writes the failed record to the
+        dead-letter sidecar, and keeps processing.  The batch is acknowledged
+        so the WAL always makes forward progress.
         """
         mgr = FileWALDirectoryManager(str(tmp_path))
         with mgr.create_file() as writer:
@@ -127,16 +127,17 @@ class TestDrain:
             if call_count == 2:
                 raise RuntimeError("simulated network error")
 
-        path = mgr.list_files()[0]
-        consumer = JSONLWALConsumer(path)
+        consumer = JSONLWALConsumer(mgr.list_files()[0])
+        count = drain(consumer, {"obj_create": exploding_handler})
 
-        with pytest.raises(RuntimeError, match="simulated network error"):
-            drain(consumer, {"obj_create": exploding_handler})
+        # Record 0 succeeded, record 1 went to dead-letter.
+        assert count == 1
+        assert list(consumer.read_pending()) == []
 
-        # No acknowledgement — all records still pending on retry.
-        consumer2 = JSONLWALConsumer(path)
-        remaining = list(consumer2.read_pending())
-        assert len(remaining) == 2
+        with open(consumer.dead_letter_path) as f:
+            dead = [json.loads(line) for line in f]
+        assert len(dead) == 1
+        assert dead[0]["seq"] == 1
 
     def test_unknown_type_logs_warning(
         self, tmp_path: str, caplog: object
@@ -179,7 +180,7 @@ class TestDrain:
 
     @pytest.mark.disable_logging_error_check
     def test_dead_letter_captures_failed_records(self, tmp_path: str) -> None:
-        """With dead_letter_path, handler errors don't block the batch."""
+        """Handler errors write to the dead-letter sidecar, not block the batch."""
         mgr = FileWALDirectoryManager(str(tmp_path))
         with mgr.create_file() as writer:
             writer.write({"type": "obj_create", "seq": 0})
@@ -190,36 +191,17 @@ class TestDrain:
             if record["seq"] == 1:
                 raise ValueError("bad record")
 
-        path = mgr.list_files()[0]
-        dl_path = mgr.dead_letter_path(path)
-        consumer = JSONLWALConsumer(path)
-        count = drain(
-            consumer,
-            {"obj_create": failing_handler},
-            dead_letter_path=dl_path,
-        )
+        consumer = JSONLWALConsumer(mgr.list_files()[0])
+        count = drain(consumer, {"obj_create": failing_handler})
 
         # Records 0 and 2 succeeded; record 1 went to dead-letter.
         assert count == 2
         assert list(consumer.read_pending()) == []
 
-        with open(dl_path) as f:
+        with open(consumer.dead_letter_path) as f:
             dead = [json.loads(line) for line in f]
         assert len(dead) == 1
         assert dead[0]["seq"] == 1
-
-    def test_dead_letter_not_set_still_raises(self, tmp_path: str) -> None:
-        """Without dead_letter_path, handler errors propagate as before."""
-        mgr = FileWALDirectoryManager(str(tmp_path))
-        with mgr.create_file() as writer:
-            writer.write({"type": "obj_create", "seq": 0})
-
-        consumer = JSONLWALConsumer(mgr.list_files()[0])
-        with pytest.raises(ValueError, match="boom"):
-            drain(
-                consumer,
-                {"obj_create": lambda r: (_ for _ in ()).throw(ValueError("boom"))},
-            )
 
     def test_remove_cleans_up_dead_letter(self, tmp_path: str) -> None:
         """WALDirectoryManager.remove() deletes the dead-letter sidecar."""
@@ -228,14 +210,14 @@ class TestDrain:
             writer.write({"type": "obj_create", "seq": 0})
 
         path = mgr.list_files()[0]
-        dl_path = mgr.dead_letter_path(path)
+        consumer = JSONLWALConsumer(path)
 
         # Create a dead-letter file.
-        with open(dl_path, "w") as f:
+        with open(consumer.dead_letter_path, "w") as f:
             f.write('{"type":"obj_create","seq":0}\n')
 
         mgr.remove(path)
-        assert not os.path.exists(dl_path)
+        assert not os.path.exists(consumer.dead_letter_path)
         assert not os.path.exists(path)
 
     def test_records_without_type_key_are_skipped_with_warning(
