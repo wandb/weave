@@ -30,7 +30,9 @@ Usage:
 import argparse
 import asyncio
 import os
+from datetime import datetime, timezone
 
+import requests as _req
 from agents import Agent, Runner, function_tool
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -160,21 +162,21 @@ def _wandb_auth_headers() -> dict[str, str]:
 # When weave is installed as a package, use weave.otel.LiveSpanProcessor.
 # ---------------------------------------------------------------------------
 
+
 class _LiveSpanProcessor:
     """Sends lightweight span-start POSTs so the UI can show in-progress spans."""
 
     def __init__(self, endpoint: str, headers: dict[str, str] | None = None):
         from concurrent.futures import ThreadPoolExecutor
+
         self._endpoint = endpoint
         self._headers = headers or {}
-        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="live-span")
+        self._executor = ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="live-span"
+        )
 
     def on_start(self, span, parent_context=None):
         try:
-            import json as _json
-            from datetime import datetime, timezone
-            import requests as _req
-
             ctx = span.get_span_context()
             if not ctx or not ctx.is_valid:
                 return
@@ -184,10 +186,26 @@ class _LiveSpanProcessor:
             if not entity or not project:
                 return
             parent = getattr(span, "parent", None)
-            parent_id = format(parent.span_id, "016x") if parent and hasattr(parent, "span_id") else ""
-            attrs = dict(span._attributes) if hasattr(span, "_attributes") and span._attributes else {}
-            ns = span.start_time if hasattr(span, "start_time") and span.start_time else 0
-            started = datetime.fromtimestamp(ns / 1e9, tz=timezone.utc).isoformat() if ns else datetime.now(timezone.utc).isoformat()
+            parent_id = (
+                format(parent.span_id, "016x")
+                if parent and hasattr(parent, "span_id")
+                else ""
+            )
+            attrs = (
+                dict(span._attributes)
+                if hasattr(span, "_attributes") and span._attributes
+                else {}
+            )
+            ns = (
+                span.start_time
+                if hasattr(span, "start_time") and span.start_time
+                else 0
+            )
+            started = (
+                datetime.fromtimestamp(ns / 1e9, tz=timezone.utc).isoformat()
+                if ns
+                else datetime.now(timezone.utc).isoformat()
+            )
 
             payload = {
                 "project_id": f"{entity}/{project}",
@@ -203,10 +221,15 @@ class _LiveSpanProcessor:
 
             def _post():
                 try:
-                    _req.post(self._endpoint, json=payload,
-                              headers={"Content-Type": "application/json", **self._headers}, timeout=5)
+                    _req.post(
+                        self._endpoint,
+                        json=payload,
+                        headers={"Content-Type": "application/json", **self._headers},
+                        timeout=5,
+                    )
                 except Exception:
                     pass
+
             self._executor.submit(_post)
         except Exception:
             pass
