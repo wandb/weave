@@ -17,6 +17,7 @@ import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
 from tests.conftest import TestOnlyFlushingWeaveClient
+from tests.trace.server_utils import find_server_layer
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     AnyIntMatcher,
@@ -27,6 +28,9 @@ from tests.trace.util import (
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
+from weave.shared.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+)
 from weave.trace import refs, settings, table_upload_chunking, weave_client
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
@@ -45,7 +49,10 @@ from weave.trace.serialization.serializer import (
     register_serializer,
 )
 from weave.trace.wandb_run_context import WandbRunContext
-from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
+from weave.trace_server.clickhouse_trace_server_batched import (
+    ClickHouseTraceServer,
+    NotFoundError,
+)
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.ids import generate_id
@@ -1784,9 +1791,11 @@ def test_get_calls_storage_size_with_limit(client):
 
 @pytest.fixture
 def clickhouse_client(client):
-    if client_is_sqlite(client):
+    try:
+        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
+    except TypeError:
         return None
-    return client.server._next_trace_server.ch_client
+    return ch_server.ch_client
 
 
 def test_get_calls_storage_size_values(client, clickhouse_client):
@@ -3782,6 +3791,47 @@ def test_filter_calls_by_ref(client):
     # this as "no filter"
     calls = client.get_calls(filter={"input_refs": [], "output_refs": []})
     assert len(calls) == 1
+
+
+def test_filter_calls_by_ref_wildcard_versions(client):
+    input_ref_v1 = client.save({"a": 1}, "my_input").ref
+    input_ref_v2 = client.save({"a": 2}, "my_input").ref
+    output_ref_v1 = client.save({"b": 1}, "my_output").ref
+    output_ref_v2 = client.save({"b": 2}, "my_output").ref
+    colliding_input_ref = client.save({"a": 99}, "myXinput").ref
+    colliding_output_ref = client.save({"b": 99}, "myXoutput").ref
+
+    assert input_ref_v1.uri != input_ref_v2.uri
+    assert output_ref_v1.uri != output_ref_v2.uri
+
+    @weave.op
+    def log_obj(ref: str, out_ref: str):
+        return {"ref2": out_ref}
+
+    log_obj(input_ref_v1, output_ref_v1)
+    log_obj(input_ref_v2, output_ref_v2)
+    log_obj(colliding_input_ref, colliding_output_ref)
+
+    input_wildcard = (
+        input_ref_v1.uri.rsplit(":", 1)[0] + WILDCARD_ARTIFACT_VERSION_AND_PATH
+    )
+    output_wildcard = (
+        output_ref_v1.uri.rsplit(":", 1)[0] + WILDCARD_ARTIFACT_VERSION_AND_PATH
+    )
+
+    calls = client.get_calls(filter={"input_refs": [input_wildcard]})
+    assert len(calls) == 2
+    assert sorted(call.inputs["ref"]["a"] for call in calls) == [1, 2]
+
+    calls = client.get_calls(filter={"output_refs": [output_wildcard]})
+    assert len(calls) == 2
+    assert sorted(call.output["ref2"]["b"] for call in calls) == [1, 2]
+
+    calls = client.get_calls(
+        filter={"input_refs": [input_wildcard], "output_refs": [output_wildcard]}
+    )
+    assert len(calls) == 2
+    assert sorted(call.inputs["ref"]["a"] for call in calls) == [1, 2]
 
 
 def test_files_stats(client):

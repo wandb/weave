@@ -95,6 +95,14 @@ class UserInjectingExternalTraceServer(
         super().__init__(internal_trace_server, id_converter)
         self._user_id = user_id
 
+    def set_user_id(self, user_id: str) -> None:
+        """Set the user identity for subsequent requests.
+
+        This is a test utility — use it instead of reaching through
+        internal layers to mutate _user_id directly.
+        """
+        self._user_id = user_id
+
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.wb_user_id = self._user_id
         return super().call_start(req)

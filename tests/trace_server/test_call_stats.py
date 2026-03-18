@@ -4,9 +4,6 @@ These tests validate the full end-to-end flow of the call statistics feature by:
 1. Inserting calls with known usage data via call_start/call_end
 2. Querying the call_stats endpoint
 3. Verifying aggregated metrics match expected values
-
-Note: call_stats is only implemented in ClickHouseTraceServer, so these tests
-skip when running against SQLite.
 """
 
 import datetime
@@ -29,12 +26,6 @@ from weave.trace_server.trace_server_interface import (
 # Fixed base time used by all tests: 2025-01-15 12:00:00 UTC.
 # Chosen to sit well inside an hour boundary so data never straddles buckets.
 _BASE_TIME = datetime.datetime(2025, 1, 15, 12, 0, 0, tzinfo=datetime.timezone.utc)
-
-
-def skip_if_sqlite(client: weave_client.WeaveClient):
-    """Skip test if running against SQLite (call_stats not implemented)."""
-    if client_is_sqlite(client):
-        pytest.skip("call_stats is only implemented in ClickHouse")
 
 
 def force_merge_calls(client: weave_client.WeaveClient):
@@ -98,8 +89,6 @@ def create_call_with_usage(
 
 def test_call_stats_usage_sum_aggregation(client: weave_client.WeaveClient):
     """Test basic SUM aggregation across multiple calls with known usage data."""
-    skip_if_sqlite(client)
-
     project_id = client._project_id()
     model_name = "gpt-4o-test"
     op_name = f"weave:///{project_id}/op/test_op:abc123"
@@ -190,8 +179,6 @@ def test_call_stats_date_range_limit_validation():
 
 def test_call_stats_multiple_models(client: weave_client.WeaveClient):
     """Test that different models are tracked and aggregated separately."""
-    skip_if_sqlite(client)
-
     project_id = client._project_id()
     op_name = f"weave:///{project_id}/op/multi_model_op:def456"
 
@@ -255,8 +242,6 @@ def test_call_stats_multiple_models(client: weave_client.WeaveClient):
 
 def test_call_stats_all_aggregation_types(client: weave_client.WeaveClient):
     """Test SUM, AVG, MIN, MAX, COUNT aggregations compute correctly."""
-    skip_if_sqlite(client)
-
     project_id = client._project_id()
     model_name = "gpt-4o-agg-test"
     op_name = f"weave:///{project_id}/op/agg_test_op:ghi789"
@@ -355,8 +340,6 @@ def test_call_stats_all_aggregation_types(client: weave_client.WeaveClient):
 
 def test_call_stats_percentiles(client: weave_client.WeaveClient):
     """Test percentile calculations (p50, p95, p99) with varied data."""
-    skip_if_sqlite(client)
-
     project_id = client._project_id()
     model_name = "gpt-4o-pct-test"
     op_name = f"weave:///{project_id}/op/pct_test_op:jkl012"
@@ -421,8 +404,6 @@ def test_call_stats_percentiles(client: weave_client.WeaveClient):
 
 def test_call_stats_time_buckets(client: weave_client.WeaveClient):
     """Test that calls are grouped into correct time buckets based on started_at."""
-    skip_if_sqlite(client)
-
     project_id = client._project_id()
     model_name = "gpt-4o-bucket-test"
     op_name = f"weave:///{project_id}/op/bucket_test_op:mno345"
@@ -490,8 +471,6 @@ def test_call_stats_time_buckets(client: weave_client.WeaveClient):
 
 def test_call_stats_op_names_filter(client: weave_client.WeaveClient):
     """Test op_names filter works correctly."""
-    skip_if_sqlite(client)
-
     project_id = client._project_id()
     model_name = "gpt-4o-filter-test"
 
@@ -538,8 +517,6 @@ def test_call_stats_op_names_filter(client: weave_client.WeaveClient):
 
 def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
     """Test trace_roots_only filter excludes child calls."""
-    skip_if_sqlite(client)
-
     project_id = client._project_id()
     model_name = "gpt-4o-roots-test"
 
@@ -630,8 +607,6 @@ def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
 
 def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
     """Test trace_ids filter limits to specific traces."""
-    skip_if_sqlite(client)
-
     project_id = client._project_id()
     model_name = "gpt-4o-trace-filter-test"
 
@@ -722,8 +697,6 @@ def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
 
 def test_call_stats_call_metrics(client: weave_client.WeaveClient):
     """Test call-level metrics (latency, call_count, error_count)."""
-    skip_if_sqlite(client)
-
     project_id = client._project_id()
     op_name = f"weave:///{project_id}/op/call_metrics_test:xyz123"
 
@@ -859,8 +832,6 @@ def test_call_stats_call_metrics(client: weave_client.WeaveClient):
 
 def test_call_stats_date_range_limit_query_layer(client: weave_client.WeaveClient):
     """Ensure call_stats rejects max date range during request handling."""
-    skip_if_sqlite(client)
-
     end_time = _BASE_TIME
     start_time = end_time - datetime.timedelta(days=32)
     req = tsi.CallStatsReq.model_construct(

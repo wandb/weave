@@ -58,6 +58,7 @@ from weave.trace.op import (
 )
 from weave.trace.op import op as op_deco
 from weave.trace.op_protocol import Op
+from weave.trace.project_id_resolver import ProjectIdResolver
 from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
     CallRef,
@@ -171,7 +172,7 @@ logger = logging.getLogger(__name__)
 
 def print_call_link(call: Call) -> None:
     if settings.should_print_call_link():
-        logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
+        logger.info("%s %s", TRACE_CALL_EMOJI, call.ui_url)
 
 
 def _add_scored_by_to_calls_query(
@@ -334,6 +335,7 @@ class WeaveClient:
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
+        self.project_id_resolver = ProjectIdResolver(server)
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
@@ -523,7 +525,7 @@ class WeaveClient:
             try:
                 evaluation_obj = ref.get()
             except Exception:
-                logger.exception(f"Failed to convert {obj} to Evaluation")
+                logger.exception("Failed to convert %s to Evaluation", obj)
             else:
                 lst.append(evaluation_obj)
         return lst
@@ -824,8 +826,9 @@ class WeaveClient:
             bytes_size = len(call_start_req.model_dump_json())
             if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
                 logger.warning(
-                    f"Trace input size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes."
-                    "Inputs may be dropped."
+                    "Trace input size (%s bytes) exceeds the maximum allowed size of %s bytes. Inputs may be dropped.",
+                    bytes_size,
+                    MAX_TRACE_PAYLOAD_SIZE,
                 )
 
             # eager_call_start is a client-side hint that tells the batch processor
@@ -1007,8 +1010,9 @@ class WeaveClient:
             bytes_size = len(call_end_req.model_dump_json())
             if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
                 logger.warning(
-                    f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
-                    "Output may be dropped."
+                    "Trace output size (%s bytes) exceeds the maximum allowed size of %s bytes. Output may be dropped.",
+                    bytes_size,
+                    MAX_TRACE_PAYLOAD_SIZE,
                 )
             self.server.call_end(call_end_req)
 

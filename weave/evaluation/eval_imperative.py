@@ -26,7 +26,7 @@ from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op, as_op, op
+from weave.trace.op import Op, as_op, is_tracing_setting_disabled, op
 from weave.trace.table import Table
 from weave.trace.util import Thread
 from weave.trace.view_utils import set_call_view
@@ -60,7 +60,7 @@ def _cleanup_evaluation(eval_logger: EvaluationLogger) -> None:
         if not eval_logger._is_finalized:
             eval_logger.finish()
     except Exception:
-        logger.error("Error during cleanup of EvaluationLogger", exc_info=True)
+        logger.exception("Error during cleanup of EvaluationLogger")
 
 
 atexit.register(_cleanup_all_evaluations)
@@ -407,8 +407,10 @@ class ScoreLogger:
             scorer_name = cast(str, scorer.name)
             if scorer_name not in self.predefined_scorers:
                 logger.warning(
-                    f"Scorer '{scorer_name}' is not in the predefined scorers list. "
-                    f"Expected one of: {sorted(self.predefined_scorers)}"
+                    "Scorer '%s' is not in the predefined scorers list. "
+                    "Expected one of: %s",
+                    scorer_name,
+                    sorted(self.predefined_scorers),
                 )
 
         return scorer
@@ -547,6 +549,11 @@ class ScoreLogger:
             raise ValueError("Cannot log score after finish has been called")
 
         scorer = self._prepare_scorer(scorer)
+
+        if is_tracing_setting_disabled():
+            scorer_name = cast(str, scorer.name)
+            self._captured_scores[scorer_name] = score
+            return
 
         @op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
@@ -782,9 +789,7 @@ class EvaluationLogger:
             wc.finish_call(self._evaluate_call, output=output, exception=exception)
         except Exception:
             # Log error but continue cleanup
-            logger.error(
-                "Failed to finish evaluation call during finalization.", exc_info=True
-            )
+            logger.exception("Failed to finish evaluation call during finalization.")
 
         self._is_finalized = True
 
@@ -943,7 +948,7 @@ class EvaluationLogger:
                     with attributes(IMPERATIVE_EVAL_MARKER):
                         self._pseudo_evaluation.summarize()
             except Exception:
-                logger.error("Error during execution of summarize op.", exc_info=True)
+                logger.exception("Error during execution of summarize op.")
                 # Even if summarize fails, try to finalize with the calculated summary
 
         self._finalize_evaluation(output=final_summary)

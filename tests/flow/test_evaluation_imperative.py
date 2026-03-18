@@ -1139,3 +1139,15 @@ def test_log_example_after_log_summary_raises_error(client):
             output="another answer",
             scores={"score": 0.5},
         )
+
+
+def test_evaluation_logger_with_weave_disabled(client, monkeypatch):
+    """Test that EvaluationLogger works when WEAVE_DISABLED=true (WB-32259)."""
+    monkeypatch.setenv("WEAVE_DISABLED", "true")
+
+    ev = EvaluationLogger(model="my-model")
+    pred = ev.log_prediction(inputs={"q": "Hello"}, output="Hi there!")
+    pred.log_score("correctness", 0.9)
+    pred.finish()
+    ev.log_summary({"avg_score": 0.9})
+    ev.finish()

@@ -105,7 +105,7 @@ class SymbolPatcher(Patcher):
         try:
             new_val = self._make_new_value(original_value)
         except Exception:
-            logger.exception(f"Failed to patch {self._attribute_name}")
+            logger.exception("Failed to patch %s", self._attribute_name)
             return False
         setattr(
             target.base_symbol,
