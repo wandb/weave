@@ -208,4 +208,6 @@ class JSONLWALWriter:
         writer = self._mgr.create_file()
         # Propagate fsync settings to the underlying file writer.
         assert isinstance(writer, _JSONLWALFileWriter)
+        writer._fsync_batch_size = self._fsync_batch_size
+        writer._fsync_timeout = self._fsync_timeout
         return writer
