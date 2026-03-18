@@ -35,27 +35,17 @@ from weave.trace_server.external_to_internal_trace_server_adapter import (
 
 
 def _configure_digests(client: WeaveClient, *, enable: bool) -> None:
-    """Apply digest settings and configure the resolver for tests.
+    """Toggle client-side digest computation on or off.
 
-    In production, the ``ProjectIdResolver`` calls ``projects_info`` on the
-    remote server to discover internal project IDs.  In tests, that endpoint
-    doesn't exist (it's on ``ServiceInterface``, not ``TraceServerInterface``),
-    so the resolver permanently disables itself during ``__init__``.
-
-    To work around this, we resolve the internal project ID directly from the
-    test server's ``DummyIdConverter`` (via ``find_server_layer``) and populate
-    the resolver state manually.
+    Re-resolves the internal project ID because the initial resolution
+    during ``__init__`` returns None when the setting is off (the default).
     """
     parse_and_apply_settings(UserSettings(enable_client_side_digests=enable))
-    if enable:
-        adapter = find_server_layer(client.server, ExternalTraceServer)
-        internal_id = adapter._idc.ext_to_int_project_id(client._project_id())
-        # Re-enable the resolver (disabled during __init__ because
-        # projects_info doesn't exist on the test server chain).
-        client.project_id_resolver._disabled_event.clear()
-        client._cached_internal_project_id = internal_id
-    else:
-        client._cached_internal_project_id = None
+    # Re-resolve: the __init__ resolution returned None because the setting
+    # was off at that point.  Now that it's toggled, re-cache.
+    client._cached_internal_project_id = (
+        client.project_id_resolver.get_internal_project_id(client._project_id())
+    )
 
 
 def _publish_with_digests(
