@@ -2,25 +2,30 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "openai-agents",
-#     "openai-agents-opentelemetry",
+#     "opentelemetry-instrumentation-openai-agents-v2",
 #     "opentelemetry-sdk",
 #     "opentelemetry-exporter-otlp-proto-grpc",
 #     "opentelemetry-exporter-otlp-proto-http",
 # ]
 # ///
-"""OpenAI Agents SDK with OTel tracing.
+"""OpenAI Agents SDK with OTel tracing via official OTel instrumentation.
 
-Runs a simple agent with a tool call and exports all OTel spans to the console
-(or an OTLP endpoint) so you can inspect the exact semantic conventions emitted.
+Uses the opentelemetry-instrumentation-openai-agents-v2 package from
+opentelemetry-python-contrib. This follows the GenAI semantic conventions
+and captures agents, tools, generations, guardrails, and handoffs with
+full content capture support.
 
 Usage:
     uv run --python 3.12 openai_agents_example.py
     uv run --python 3.12 openai_agents_example.py --otlp-endpoint http://localhost:4317
     uv run --python 3.12 openai_agents_example.py --genai-endpoint http://localhost:6345/otel/v1/genai/traces
+
+Set OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=span_and_event to capture full content.
 """
 
 import argparse
 import asyncio
+import os
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -35,8 +40,7 @@ from opentelemetry.sdk.trace.export import (
     SimpleSpanProcessor,
 )
 
-from agents import Agent, Runner, function_tool, set_trace_processors
-from openai_agents_opentelemetry import OpenTelemetryTracingProcessor
+from agents import Agent, Runner, function_tool
 
 
 @function_tool
@@ -45,16 +49,25 @@ def get_weather(city: str) -> str:
     return f"Sunny, 72°F in {city}"
 
 
+def _wandb_auth_headers() -> dict[str, str]:
+    """Build auth headers from WANDB_API_KEY if present."""
+    api_key = os.environ.get("WANDB_API_KEY", "")
+    if api_key:
+        return {"wandb-api-key": api_key}
+    return {}
+
+
 def setup_otel(
     otlp_endpoint: str | None = None,
     genai_endpoint: str | None = None,
 ) -> TracerProvider:
     """Configure the OTel TracerProvider with console, OTLP, or GenAI endpoint export."""
+    entity = os.environ.get("WANDB_ENTITY", "ben-urmomsclothes")
     resource = Resource.create(
         {
             "service.name": "openai-agents-otel-example",
             "service.version": "0.1.0",
-            "wandb.entity": "ben-urmomsclothes",
+            "wandb.entity": entity,
             "wandb.project": "genai-otel-test",
         }
     )
@@ -62,7 +75,12 @@ def setup_otel(
 
     if genai_endpoint:
         provider.add_span_processor(
-            BatchSpanProcessor(OTLPHTTPSpanExporter(endpoint=genai_endpoint))
+            BatchSpanProcessor(
+                OTLPHTTPSpanExporter(
+                    endpoint=genai_endpoint,
+                    headers=_wandb_auth_headers(),
+                )
+            )
         )
     elif otlp_endpoint:
         provider.add_span_processor(
@@ -104,10 +122,16 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # Enable full content capture on spans and events
+    os.environ.setdefault(
+        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "span_and_event"
+    )
+
     provider = setup_otel(args.otlp_endpoint, args.genai_endpoint)
 
-    otel_processor = OpenTelemetryTracingProcessor()
-    set_trace_processors([otel_processor])
+    from opentelemetry.instrumentation.openai_agents import OpenAIAgentsInstrumentor
+
+    OpenAIAgentsInstrumentor().instrument(tracer_provider=provider)
 
     asyncio.run(run_agent())
     provider.force_flush()

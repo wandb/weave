@@ -22,6 +22,7 @@ Usage:
 
 import argparse
 import json
+import os
 
 import anthropic
 from opentelemetry import trace
@@ -64,16 +65,25 @@ def handle_tool_call(tool_name: str, tool_input: dict) -> str:
     return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
 
+def _wandb_auth_headers() -> dict[str, str]:
+    """Build auth headers from WANDB_API_KEY if present."""
+    api_key = os.environ.get("WANDB_API_KEY", "")
+    if api_key:
+        return {"wandb-api-key": api_key}
+    return {}
+
+
 def setup_otel(
     otlp_endpoint: str | None = None,
     genai_endpoint: str | None = None,
 ) -> TracerProvider:
     """Configure the OTel TracerProvider with console, OTLP, or GenAI endpoint export."""
+    entity = os.environ.get("WANDB_ENTITY", "ben-urmomsclothes")
     resource = Resource.create(
         {
             "service.name": "anthropic-otel-example",
             "service.version": "0.1.0",
-            "wandb.entity": "ben-urmomsclothes",
+            "wandb.entity": entity,
             "wandb.project": "genai-otel-test",
         }
     )
@@ -81,7 +91,12 @@ def setup_otel(
 
     if genai_endpoint:
         provider.add_span_processor(
-            BatchSpanProcessor(OTLPHTTPSpanExporter(endpoint=genai_endpoint))
+            BatchSpanProcessor(
+                OTLPHTTPSpanExporter(
+                    endpoint=genai_endpoint,
+                    headers=_wandb_auth_headers(),
+                )
+            )
         )
     elif otlp_endpoint:
         provider.add_span_processor(
@@ -99,7 +114,9 @@ def run_tool_use_conversation() -> None:
     client = anthropic.Anthropic()
     model = "claude-sonnet-4-20250514"
 
-    messages = [{"role": "user", "content": "What's the weather in San Francisco?"}]
+    messages: list[dict] = [
+        {"role": "user", "content": "What's the weather in San Francisco?"}
+    ]
 
     response = client.messages.create(
         model=model,
@@ -160,7 +177,7 @@ def main() -> None:
     args = parser.parse_args()
 
     provider = setup_otel(args.otlp_endpoint, args.genai_endpoint)
-    AnthropicInstrumentor().instrument()
+    AnthropicInstrumentor().instrument(tracer_provider=provider)
 
     run_tool_use_conversation()
 

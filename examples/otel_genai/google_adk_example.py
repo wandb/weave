@@ -21,6 +21,7 @@ Usage:
 
 import argparse
 import asyncio
+import os
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -36,6 +37,14 @@ from opentelemetry.sdk.trace.export import (
 )
 
 
+def _wandb_auth_headers() -> dict[str, str]:
+    """Build auth headers from WANDB_API_KEY if present."""
+    api_key = os.environ.get("WANDB_API_KEY", "")
+    if api_key:
+        return {"wandb-api-key": api_key}
+    return {}
+
+
 def setup_otel(
     otlp_endpoint: str | None = None,
     genai_endpoint: str | None = None,
@@ -45,11 +54,12 @@ def setup_otel(
     Must be called BEFORE importing any ADK components so the global
     TracerProvider is picked up by ADK's module-level tracer.
     """
+    entity = os.environ.get("WANDB_ENTITY", "ben-urmomsclothes")
     resource = Resource.create(
         {
             "service.name": "google-adk-otel-example",
             "service.version": "0.1.0",
-            "wandb.entity": "ben-urmomsclothes",
+            "wandb.entity": entity,
             "wandb.project": "genai-otel-test",
         }
     )
@@ -57,7 +67,12 @@ def setup_otel(
 
     if genai_endpoint:
         provider.add_span_processor(
-            BatchSpanProcessor(OTLPHTTPSpanExporter(endpoint=genai_endpoint))
+            BatchSpanProcessor(
+                OTLPHTTPSpanExporter(
+                    endpoint=genai_endpoint,
+                    headers=_wandb_auth_headers(),
+                )
+            )
         )
     elif otlp_endpoint:
         provider.add_span_processor(

@@ -103,6 +103,7 @@ def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
     2. agent.span.type mapped via _OPENAI_SPAN_TYPE_TO_OP
     3. Infer from span name pattern (e.g. "chat gpt-4o" -> "chat")
     4. llm.request.type mapped (Traceloop: "completion" -> "chat")
+    5. Infer from span name with dot prefix (e.g. "anthropic.chat" -> "chat")
     """
     val = _get(attrs, "gen_ai.operation.name")
     if val:
@@ -131,6 +132,49 @@ def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
             return suffix
 
     return ""
+
+
+def _extract_traceloop_tool_info(attrs: dict[str, Any]) -> tuple[str, str, str]:
+    """Extract tool call info from Traceloop's indexed completion format.
+
+    Traceloop puts tool calls in gen_ai.completion.0.tool_calls.0.* attributes.
+    After unflattening these become nested dicts.
+
+    Returns:
+        (tool_name, tool_call_arguments, tool_call_id)
+    """
+    completion = _get(attrs, "gen_ai.completion")
+    if not isinstance(completion, (dict, list)):
+        return "", "", ""
+
+    # Handle both list format [{"tool_calls": ...}] and dict format {"0": {"tool_calls": ...}}
+    first_completion = None
+    if isinstance(completion, list) and len(completion) > 0:
+        first_completion = completion[0]
+    elif isinstance(completion, dict):
+        first_completion = completion.get("0") or completion
+
+    if not isinstance(first_completion, dict):
+        return "", "", ""
+
+    tool_calls = first_completion.get("tool_calls")
+    if not tool_calls:
+        return "", "", ""
+
+    first_tool = None
+    if isinstance(tool_calls, list) and len(tool_calls) > 0:
+        first_tool = tool_calls[0]
+    elif isinstance(tool_calls, dict):
+        first_tool = tool_calls.get("0") or tool_calls
+
+    if not isinstance(first_tool, dict):
+        return "", "", ""
+
+    name = str(first_tool.get("name", ""))
+    arguments = _json_str(first_tool.get("arguments", ""))
+    call_id = str(first_tool.get("id", ""))
+
+    return name, arguments, call_id
 
 
 def extract_agent_name(attrs: dict[str, Any], span_name: str) -> str:
@@ -286,13 +330,16 @@ def extract_tool_call_result(
     return ""
 
 
-def extract_input_messages(attrs: dict[str, Any]) -> str:
+def extract_input_messages(
+    attrs: dict[str, Any], events: list[dict[str, Any]]
+) -> str:
     """Extract input messages.
 
     Fallback chain:
     1. gen_ai.input.messages (standard)
-    2. gen_ai.prompt (Traceloop indexed format, already unflattened)
-    3. gcp.vertex.agent.llm_request (Google ADK)
+    2. gen_ai.prompt attribute (Traceloop indexed format, already unflattened)
+    3. gen_ai.content.prompt event (OpenAI agents bridge)
+    4. gcp.vertex.agent.llm_request (Google ADK)
     """
     val = _get(attrs, "gen_ai.input.messages")
     if val:
@@ -302,6 +349,13 @@ def extract_input_messages(attrs: dict[str, Any]) -> str:
     if val:
         return _json_str(val)
 
+    for event in events:
+        if event.get("name") == "gen_ai.content.prompt":
+            event_attrs = event.get("attributes", {})
+            val = get_attribute(event_attrs, "gen_ai.prompt")
+            if val:
+                return _json_str(val)
+
     val = _get(attrs, "gcp.vertex.agent.llm_request")
     if val:
         return _json_str(val)
@@ -309,13 +363,16 @@ def extract_input_messages(attrs: dict[str, Any]) -> str:
     return ""
 
 
-def extract_output_messages(attrs: dict[str, Any]) -> str:
+def extract_output_messages(
+    attrs: dict[str, Any], events: list[dict[str, Any]]
+) -> str:
     """Extract output messages.
 
     Fallback chain:
     1. gen_ai.output.messages (standard)
-    2. gen_ai.completion (Traceloop indexed format)
-    3. gcp.vertex.agent.llm_response (Google ADK)
+    2. gen_ai.completion attribute (Traceloop indexed format)
+    3. gen_ai.content.completion event (OpenAI agents bridge)
+    4. gcp.vertex.agent.llm_response (Google ADK)
     """
     val = _get(attrs, "gen_ai.output.messages")
     if val:
@@ -324,6 +381,13 @@ def extract_output_messages(attrs: dict[str, Any]) -> str:
     val = _get(attrs, "gen_ai.completion")
     if val:
         return _json_str(val)
+
+    for event in events:
+        if event.get("name") == "gen_ai.content.completion":
+            event_attrs = event.get("attributes", {})
+            val = get_attribute(event_attrs, "gen_ai.completion")
+            if val:
+                return _json_str(val)
 
     val = _get(attrs, "gcp.vertex.agent.llm_response")
     if val:
@@ -349,6 +413,17 @@ def extract_genai_fields(
     output_t = extract_output_tokens(attrs)
     total_t = extract_total_tokens(attrs, input_t, output_t)
 
+    # Normalize UNSET -> OK when there's no error, for cleaner display
+    status_code = span.status.code.name
+    if status_code == "UNSET" and not span.status.message:
+        status_code = "OK"
+
+    # Extract tool info from Traceloop indexed format as fallback
+    tl_tool_name, tl_tool_args, tl_tool_id = _extract_traceloop_tool_info(attrs)
+
+    tool_name = str(_get(attrs, "gen_ai.tool.name") or "") or tl_tool_name
+    tool_call_id = str(_get(attrs, "gen_ai.tool.call.id") or "") or tl_tool_id
+
     return GenAISpanCHInsertable(
         project_id=project_id,
         trace_id=span.trace_id,
@@ -358,7 +433,7 @@ def extract_genai_fields(
         span_kind=span.kind.name,
         started_at=span.start_time,
         ended_at=span.end_time,
-        status_code=span.status.code.name,
+        status_code=status_code,
         status_message=span.status.message or "",
         operation_name=extract_operation_name(attrs, span.name),
         provider_name=extract_provider(attrs, span.name),
@@ -377,20 +452,20 @@ def extract_genai_fields(
         output_tokens=output_t,
         total_tokens=total_t,
         conversation_id=extract_conversation_id(attrs),
-        tool_name=str(_get(attrs, "gen_ai.tool.name") or ""),
+        tool_name=tool_name,
         tool_type=str(_get(attrs, "gen_ai.tool.type") or ""),
-        tool_call_id=str(_get(attrs, "gen_ai.tool.call.id") or ""),
+        tool_call_id=tool_call_id,
         tool_description=str(_get(attrs, "gen_ai.tool.description") or ""),
         finish_reasons=extract_finish_reasons(attrs),
         request_temperature=_safe_float(_get(attrs, "gen_ai.request.temperature")),
         request_max_tokens=_safe_int(_get(attrs, "gen_ai.request.max_tokens")),
         request_top_p=_safe_float(_get(attrs, "gen_ai.request.top_p")),
-        input_messages=extract_input_messages(attrs),
-        output_messages=extract_output_messages(attrs),
+        input_messages=extract_input_messages(attrs, events_dicts),
+        output_messages=extract_output_messages(attrs, events_dicts),
         system_instructions=_json_str(
             _get(attrs, "gen_ai.system_instructions")
         ),
-        tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts),
+        tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts) or tl_tool_args,
         tool_call_result=extract_tool_call_result(attrs, events_dicts),
         attributes_dump=_json_str(attrs),
         events_dump=_json_str(events_dicts) if events_dicts else "",
