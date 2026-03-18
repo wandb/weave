@@ -52,6 +52,12 @@ class JSONLWALConsumer:
         return self._dead_letter_path
 
     def read_pending(self) -> Iterator[WALEntry]:
+        """Yield unacknowledged records from the WAL file.
+
+        Loads the checkpoint offset, seeks to it, and yields each valid
+        JSON line as a WALEntry.  Corrupt or truncated lines are skipped
+        with a warning log.
+        """
         offset = self._load_checkpoint()
         try:
             with open(self._path, "rb") as f:
@@ -82,6 +88,7 @@ class JSONLWALConsumer:
             return
 
     def acknowledge(self, offset: int) -> None:
+        """Persist the checkpoint offset atomically (write temp, fsync, rename)."""
         # Atomically persist checkpoint: write temp → fsync → replace.
         # Note: the directory is not fsynced, so after power loss the
         # checkpoint rename may not be durable on all filesystems.
