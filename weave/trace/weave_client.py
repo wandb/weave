@@ -1888,11 +1888,16 @@ class WeaveClient:
         Raises the original exception if it is NOT a digest mismatch
         (e.g. an HTTPError with a non-409 status code).
         """
-        is_mismatch = isinstance(e, DigestMismatchError) or (
+        # DigestMismatchError: raised directly by local servers (SQLite, ClickHouse).
+        is_local_mismatch = isinstance(e, DigestMismatchError)
+        # HTTPError 409: raised by RemoteHTTPTraceServer when the remote
+        # server returns HTTP 409 Conflict for a digest mismatch.
+        is_remote_mismatch = (
             isinstance(e, HTTPError)
             and e.response is not None
             and e.response.status_code == 409
         )
+        is_mismatch = is_local_mismatch or is_remote_mismatch
         if is_mismatch:
             self.project_id_resolver.disable_after_validation_error(e, label)
             return
