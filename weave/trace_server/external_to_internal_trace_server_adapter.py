@@ -191,6 +191,18 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.genai_traces_chat(req)
 
+    def genai_agents_query(
+        self, req: tsi.GenAIAgentsQueryReq
+    ) -> tsi.GenAIAgentsQueryRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.genai_agents_query(req)
+
+    def genai_agent_metrics(
+        self, req: tsi.GenAIAgentMetricsReq
+    ) -> tsi.GenAIAgentMetricsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.genai_agent_metrics(req)
+
     def genai_span_start(
         self, req: tsi.GenAISpanStartReq
     ) -> tsi.GenAISpanStartRes:

@@ -523,6 +523,79 @@ class GenAITraceChatRes(BaseModel):
     messages: list[GenAIChatMessage] = Field(default_factory=list)
 
 
+class GenAIModelUsage(BaseModel):
+    """Token usage for a specific model within an agent's runs."""
+
+    model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+
+
+class GenAIAgentSchema(BaseModel):
+    """Aggregated per-agent stats from the genai_agents table."""
+
+    project_id: str
+    agent_name: str
+    invocation_count: int = 0
+    span_count: int = 0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_duration_ms: int = 0
+    error_count: int = 0
+    model_usage: list[GenAIModelUsage] = Field(default_factory=list)
+    agent_description: str = ""
+    agent_id: str = ""
+    provider_name: str = ""
+    system_instructions: str = ""
+    first_seen: datetime.datetime | None = None
+    last_seen: datetime.datetime | None = None
+    llm_summary: str = ""
+
+
+class GenAIAgentsQueryReq(BaseModel):
+    """Request to list agents with aggregated stats for a project."""
+
+    project_id: str
+    limit: int = 100
+    offset: int = 0
+
+
+class GenAIAgentsQueryRes(BaseModel):
+    """Response containing aggregated agent stats."""
+
+    agents: list[GenAIAgentSchema]
+
+
+class GenAIAgentMetricsReq(BaseModel):
+    """Request for time-bucketed metrics for a specific agent."""
+
+    project_id: str
+    agent_name: str
+    start: str | None = None
+    end: str | None = None
+    granularity_seconds: int = 3600
+
+
+class GenAIAgentMetricsBucket(BaseModel):
+    """A single time bucket of agent metrics."""
+
+    timestamp: str
+    invocation_count: int = 0
+    span_count: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    error_count: int = 0
+    avg_duration_ms: float = 0.0
+
+
+class GenAIAgentMetricsRes(BaseModel):
+    """Response with time-bucketed agent metrics."""
+
+    agent_name: str
+    buckets: list[GenAIAgentMetricsBucket] = Field(default_factory=list)
+
+
 class CallStartReq(BaseModelStrict):
     start: StartedCallSchemaForInsert
 
@@ -2790,6 +2863,8 @@ class TraceServerInterface(Protocol):
     def genai_otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
     def genai_spans_query(self, req: GenAISpansQueryReq) -> GenAISpansQueryRes: ...
     def genai_spans_trace(self, req: GenAISpansTraceReq) -> GenAISpansTraceRes: ...
+    def genai_agents_query(self, req: GenAIAgentsQueryReq) -> GenAIAgentsQueryRes: ...
+    def genai_agent_metrics(self, req: GenAIAgentMetricsReq) -> GenAIAgentMetricsRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

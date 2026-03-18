@@ -821,6 +821,169 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return build_trace_chat(trace_res.spans, req.trace_id)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_agents_query")
+    def genai_agents_query(
+        self, req: tsi.GenAIAgentsQueryReq
+    ) -> tsi.GenAIAgentsQueryRes:
+        """List agents with aggregated stats, including per-model token rollup."""
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "limit": min(req.limit, 1000),
+            "offset": req.offset,
+        }
+
+        # 1) Agent metadata from the pre-aggregated genai_agents table.
+        #    Filter out agents with 0 invocations — these are ghost entries
+        #    from chat/tool spans that carry a generic agent_name (e.g.
+        #    "OpenAI Agent") but have no invoke_agent boundary span.
+        meta_query = """
+            SELECT
+                project_id, agent_name, invocation_count, span_count,
+                total_input_tokens, total_output_tokens, total_duration_ms,
+                error_count, agent_description, agent_id, provider_name,
+                system_instructions, first_seen, last_seen, llm_summary
+            FROM genai_agents FINAL
+            WHERE project_id = {project_id:String}
+              AND invocation_count > 0
+            ORDER BY invocation_count DESC
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+        """
+        meta_result = self.ch_client.query(meta_query, parameters=parameters)
+        col_names = list(meta_result.column_names)
+
+        agents_by_name: dict[str, tsi.GenAIAgentSchema] = {}
+        agent_order: list[str] = []
+        for row in meta_result.result_rows:
+            row_dict = dict(zip(col_names, row, strict=False))
+            schema = tsi.GenAIAgentSchema(**row_dict)
+            agents_by_name[schema.agent_name] = schema
+            agent_order.append(schema.agent_name)
+
+        if not agents_by_name:
+            return tsi.GenAIAgentsQueryRes(agents=[])
+
+        # 2) Per-model token rollup: sum tokens from ALL spans in the
+        #    same trace as each agent's invoke_agent span. Uses the
+        #    span tree: tokens on chat/generate_content children get
+        #    attributed to the agent that owns the trace.
+        #    Also picks up tokens directly on spans that carry agent_name
+        #    (Google ADK generate_content spans).
+        token_query = """
+            SELECT
+                agent_name,
+                model,
+                sum(inp)  AS input_tokens,
+                sum(outp) AS output_tokens
+            FROM (
+                SELECT
+                    a.agent_name AS agent_name,
+                    s.request_model AS model,
+                    s.input_tokens AS inp,
+                    s.output_tokens AS outp
+                FROM genai_spans a
+                INNER JOIN genai_spans s
+                    ON a.trace_id = s.trace_id
+                    AND a.project_id = s.project_id
+                WHERE a.project_id = {project_id:String}
+                  AND a.agent_name != ''
+                  AND a.operation_name = 'invoke_agent'
+                  AND s.input_tokens + s.output_tokens > 0
+                  AND s.request_model != ''
+            )
+            GROUP BY agent_name, model
+            ORDER BY agent_name, input_tokens + output_tokens DESC
+        """
+        token_result = self.ch_client.query(token_query, parameters=parameters)
+
+        for row in token_result.result_rows:
+            agent_name = str(row[0])
+            model = str(row[1])
+            inp = int(row[2])
+            out = int(row[3])
+            if agent_name in agents_by_name:
+                agent = agents_by_name[agent_name]
+                agent.model_usage.append(tsi.GenAIModelUsage(
+                    model=model,
+                    input_tokens=inp,
+                    output_tokens=out,
+                    total_tokens=inp + out,
+                ))
+                agent.total_input_tokens += inp
+                agent.total_output_tokens += out
+
+        return tsi.GenAIAgentsQueryRes(
+            agents=[agents_by_name[n] for n in agent_order]
+        )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_agent_metrics")
+    def genai_agent_metrics(
+        self, req: tsi.GenAIAgentMetricsReq
+    ) -> tsi.GenAIAgentMetricsRes:
+        """Get time-bucketed metrics for a specific agent.
+
+        Token counts are rolled up from all spans in traces where the
+        agent had a root invoke_agent span, so they include tokens from
+        child chat/tool spans even if those don't carry agent_name.
+        """
+        granularity = max(req.granularity_seconds, 60)
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "agent_name": req.agent_name,
+            "granularity": granularity,
+        }
+
+        time_conditions = []
+        if req.start:
+            time_conditions.append("AND a.started_at >= {start_time:String}")
+            parameters["start_time"] = req.start
+        if req.end:
+            time_conditions.append("AND a.started_at < {end_time:String}")
+            parameters["end_time"] = req.end
+
+        time_clause = " ".join(time_conditions)
+
+        query = f"""
+            SELECT
+                toStartOfInterval(a.started_at, INTERVAL {{granularity:UInt32}} SECOND) AS bucket,
+                count()                            AS invocation_count,
+                uniq(a.trace_id)                   AS span_count,
+                sum(t.trace_input)                 AS input_tokens,
+                sum(t.trace_output)                AS output_tokens,
+                countIf(a.status_code = 'ERROR')   AS error_count,
+                avg(toUnixTimestamp64Milli(a.ended_at) - toUnixTimestamp64Milli(a.started_at)) AS avg_duration_ms
+            FROM genai_spans a
+            INNER JOIN (
+                SELECT trace_id, project_id,
+                       sum(input_tokens) AS trace_input,
+                       sum(output_tokens) AS trace_output
+                FROM genai_spans
+                WHERE project_id = {{project_id:String}}
+                GROUP BY trace_id, project_id
+            ) t ON a.trace_id = t.trace_id AND a.project_id = t.project_id
+            WHERE a.project_id = {{project_id:String}}
+              AND a.agent_name = {{agent_name:String}}
+              AND a.operation_name = 'invoke_agent'
+              {time_clause}
+            GROUP BY bucket
+            ORDER BY bucket ASC
+        """
+        query_result = self.ch_client.query(query, parameters=parameters)
+        buckets = []
+        for row in query_result.result_rows:
+            buckets.append(tsi.GenAIAgentMetricsBucket(
+                timestamp=str(row[0]),
+                invocation_count=int(row[1]),
+                span_count=int(row[2]),
+                input_tokens=int(row[3]),
+                output_tokens=int(row[4]),
+                error_count=int(row[5]),
+                avg_duration_ms=float(row[6]) if row[6] else 0.0,
+            ))
+        return tsi.GenAIAgentMetricsRes(
+            agent_name=req.agent_name,
+            buckets=buckets,
+        )
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_span_start")
     def genai_span_start(
         self, req: tsi.GenAISpanStartReq
