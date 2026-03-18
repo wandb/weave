@@ -242,6 +242,20 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_ENABLE_CLIENT_SIDE_DIGESTS`
     """
 
+    enable_wal: bool = False
+    """
+    Toggles the Write-Ahead Log (WAL) for durable API persistence.
+
+    If True, every write operation is appended to a local JSONL WAL file
+    before being sent to the server.  This enables crash recovery by
+    replaying unacknowledged writes on the next startup.
+
+    If False (default), writes go directly to the server with no local
+    persistence.
+
+    Can be overridden with the environment variable `WEAVE_ENABLE_WAL`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -384,6 +398,11 @@ def should_use_calls_complete() -> bool:
 def should_enable_client_side_digests() -> bool:
     """Returns whether client-side digest computation should be used."""
     return _should("enable_client_side_digests")
+
+
+def should_enable_wal() -> bool:
+    """Returns whether the Write-Ahead Log should be used."""
+    return _should("enable_wal")
 
 
 def parse_and_apply_settings(

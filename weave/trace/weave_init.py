@@ -9,6 +9,7 @@ from weave.telemetry import trace_sentry
 from weave.trace import env, init_message, weave_client
 from weave.trace.context import weave_client_context
 from weave.trace.settings import (
+    should_enable_wal,
     should_redact_pii,
     should_use_stainless_server,
     use_server_cache,
@@ -147,6 +148,8 @@ def init_weave(
     server: TraceServerClientInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
+    if should_enable_wal():
+        server = _wrap_with_wal(server, entity_name, project_name)
 
     client = weave_client.WeaveClient(
         entity_name, project_name, server, ensure_project_exists
@@ -233,6 +236,24 @@ def init_weave_disabled() -> weave_client.WeaveClient:
 
     weave_client_context.set_weave_client_global(client)
     return client
+
+
+def _wrap_with_wal(
+    server: TraceServerClientInterface,
+    entity_name: str,
+    project_name: str,
+) -> TraceServerClientInterface:
+    """Wrap the trace server with a WAL tee for durable write persistence."""
+    from pathlib import Path
+
+    from weave.durability.wal_directory_manager import FileWALDirectoryManager
+    from weave.durability.wal_tee_trace_server import WALTeeTraceServer
+    from weave.durability.wal_writer import JSONLWALWriter
+
+    wal_dir = str(Path.home() / ".weave" / "wal" / entity_name / project_name)
+    directory_manager = FileWALDirectoryManager(wal_dir)
+    wal_writer = JSONLWALWriter(directory_manager)
+    return WALTeeTraceServer(server, wal_writer)
 
 
 def init_weave_get_server(
