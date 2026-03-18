@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 
 import pytest
 
@@ -81,8 +82,6 @@ class TestJSONLWALConsumer:
         second consumer.  This catches bugs where recovery depends on cached
         global state (e.g., a module-level dict keyed by path).
         """
-        import shutil
-
         path = os.path.join(str(tmp_path), "test.jsonl")
         with open(path, "w", encoding="utf-8") as f:
             f.write(json.dumps({"seq": 0}) + "\n")

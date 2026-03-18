@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 
 import pytest
 
@@ -127,8 +128,6 @@ class TestJSONLWALFileWriter:
         assert writer._unsynced == 1
 
         # Wait for the timeout to elapse.
-        import time
-
         time.sleep(0.02)
 
         # Next write should trigger fsync due to timeout.
