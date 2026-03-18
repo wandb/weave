@@ -276,7 +276,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
         self._op_ref_cache: TTLCache[tuple[str, str], str] = TTLCache(
-            maxsize=50_000, ttl=86_400
+            maxsize=50_000, ttl=300
         )
         self._op_ref_cache_lock = threading.Lock()
         self._database_ensured = False
@@ -420,46 +420,51 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
         return "calls_complete"
 
-    def _ensure_otel_ops_exist(
-        self,
-        project_id: str,
-        op_names: set[str],
-        wb_user_id: str | None,
-    ) -> None:
-        """Ensure placeholder op objects exist in CH for each op name.
+    def _get_existing_ops_from_spans(
+        self, seen_ids: set[str], project_id: str, limit: int | None = None
+    ) -> dict[str, str]:
+        """Look up existing op ref URIs, using the cache to skip repeated CH queries."""
+        resolved: dict[str, str] = {}
+        uncached_ids: set[str] = set()
 
-        Uses the in-memory TTL cache to skip writes for already-known op names.
-        All OTEL ops share a single constant digest, so no DB read is needed to
-        determine the op ref URI — writes are idempotent via ReplacingMergeTree.
-        """
-        new_op_names: set[str] = set()
         with self._op_ref_cache_lock:
-            for op_name in op_names:
-                if (project_id, op_name) not in self._op_ref_cache:
-                    new_op_names.add(op_name)
-                    # Pre-populate cache to suppress concurrent duplicate writes
-                    self._op_ref_cache[(project_id, op_name)] = ri.InternalOpRef(
-                        project_id=project_id,
-                        name=op_name,
-                        version=object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST,
-                    ).uri
+            for op_name in seen_ids:
+                cached_uri = self._op_ref_cache.get((project_id, op_name))
+                if cached_uri is not None:
+                    resolved[op_name] = cached_uri
+                else:
+                    uncached_ids.add(op_name)
 
-        if not new_op_names:
-            return
-
-        # Ensure the shared placeholder source file exists for this project
-        self._create_or_get_placeholder_ops_digest(project_id=project_id, create=True)
-
-        batch = [
-            tsi.ObjSchemaForInsert(
-                project_id=project_id,
-                object_id=op_name,
-                val=object_creation_utils._OTEL_PLACEHOLDER_OP_VAL,
-                wb_user_id=wb_user_id,
+        if uncached_ids:
+            obj_version_filter = tsi.ObjectVersionFilter(
+                object_ids=list(uncached_ids),
+                latest_only=True,
+                is_op=True,
             )
-            for op_name in new_op_names
-        ]
-        self.obj_create_batch(batch)
+            ch_results = self.objs_query(
+                tsi.ObjQueryReq(
+                    project_id=project_id,
+                    filter=obj_version_filter,
+                    metadata_only=True,
+                    limit=limit,
+                ),
+            ).objs
+
+            with self._op_ref_cache_lock:
+                for obj in ch_results:
+                    uri = ri.InternalOpRef(
+                        project_id=project_id,
+                        name=obj.object_id,
+                        version=obj.digest,
+                    ).uri
+                    self._op_ref_cache[project_id, obj.object_id] = uri
+                    resolved[obj.object_id] = uri
+
+        return resolved
+
+    def _cache_op_ref(self, project_id: str, op_name: str, uri: str) -> None:
+        with self._op_ref_cache_lock:
+            self._op_ref_cache[project_id, op_name] = uri
 
     def _create_or_get_placeholder_ops_digest(
         self, project_id: str, create: bool
@@ -533,23 +538,41 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             op_name = object_creation_utils.make_safe_name(start_call.op_name)
             obj_id_idx_map[op_name].append(idx)
 
-        # Assign op ref URIs deterministically — no DB read needed.
-        # All OTEL placeholder ops share a single constant digest.
-        for op_name, idxs in obj_id_idx_map.items():
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=op_name,
-                version=object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST,
-            ).uri
-            for idx in idxs:
-                calls[idx][0].op_name = op_ref_uri
-
-        # Ensure op objects exist in CH — write-only, cache-guarded, no reads.
-        self._ensure_otel_ops_exist(
+        existing_ops = self._get_existing_ops_from_spans(
+            seen_ids=set(obj_id_idx_map.keys()),
             project_id=req.project_id,
-            op_names=set(obj_id_idx_map.keys()),
-            wb_user_id=req.wb_user_id,
+            limit=len(calls),
         )
+
+        for op_name, op_ref_uri in existing_ops.items():
+            for idx in obj_id_idx_map[op_name]:
+                calls[idx][0].op_name = op_ref_uri
+            obj_id_idx_map.pop(op_name)
+
+        if obj_id_idx_map:
+            self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=True
+            )
+            obj_creation_batch = [
+                tsi.ObjSchemaForInsert(
+                    project_id=req.project_id,
+                    object_id=op_name,
+                    val=object_creation_utils._OTEL_PLACEHOLDER_OP_VAL,
+                    wb_user_id=req.wb_user_id,
+                )
+                for op_name in obj_id_idx_map.keys()
+            ]
+            self.obj_create_batch(obj_creation_batch)
+
+            for op_name, idxs in obj_id_idx_map.items():
+                op_ref_uri = ri.InternalOpRef(
+                    project_id=req.project_id,
+                    name=op_name,
+                    version=object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST,
+                ).uri
+                for idx in idxs:
+                    calls[idx][0].op_name = op_ref_uri
+                self._cache_op_ref(req.project_id, op_name, op_ref_uri)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
