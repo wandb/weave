@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 import textwrap
 
 import pytest
@@ -133,12 +134,37 @@ class TestDiscoverPayloadSchema:
         names = [p.json_path for p in paths]
         assert names == sorted(names)
 
-    def test_path_with_unsafe_chars_excluded(self):
-        # Paths with spaces or special chars must be excluded
+    def test_path_with_spaces_included(self):
+        # Spaces are allowed (classifier monitors use human-readable names as keys)
         paths = discover_payload_schema(['{"a b": 1, "c": 2}'])
         names = [p.json_path for p in paths]
-        assert "a b" not in names
+        assert "a b" in names
         assert "c" in names
+
+    def test_path_with_unsafe_chars_excluded(self):
+        # Special chars like quotes must still be excluded
+        paths = discover_payload_schema(["""{"a'b": 1, "c": 2}"""])
+        names = [p.json_path for p in paths]
+        assert "a'b" not in names
+        assert "c" in names
+
+    def test_classifier_monitor_payload(self):
+        # Classifier monitors use human-readable names as dictionary keys
+        payload = json.dumps({
+            "output": {
+                "classifier_tags": "Low quality, Bug",
+                "classifier_meta": {
+                    "Low quality": {"confidence": 0.95, "reason": "evidence"},
+                    "Bug": {"confidence": 0.80, "reason": "evidence"},
+                },
+            }
+        })
+        paths = discover_payload_schema([payload])
+        path_map = {p.json_path: p.value_type for p in paths}
+        assert "output.classifier_meta.Low quality.confidence" in path_map
+        assert path_map["output.classifier_meta.Low quality.confidence"] == "numeric"
+        assert "output.classifier_meta.Bug.confidence" in path_map
+        assert path_map["output.classifier_meta.Bug.confidence"] == "numeric"
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +199,7 @@ class TestJsonPathHelpers:
 
     def test_invalid_path_raises(self):
         with pytest.raises(ValueError, match="json_path may only contain"):
-            _json_path_to_metric_slug("output score")
+            _json_path_to_metric_slug("output'score")
 
     def test_empty_path_raises(self):
         with pytest.raises(ValueError, match="cannot be empty"):
@@ -185,11 +211,12 @@ class TestJsonPathPattern:
         assert JSON_PATH_PATTERN.match("output.score")
         assert JSON_PATH_PATTERN.match("score")
         assert JSON_PATH_PATTERN.match("a_b.c_d")
+        assert JSON_PATH_PATTERN.match("output.classifier_meta.Low quality.confidence")
 
     def test_invalid(self):
-        assert not JSON_PATH_PATTERN.match("output score")
         assert not JSON_PATH_PATTERN.match("a[0]")
         assert not JSON_PATH_PATTERN.match("")
+        assert not JSON_PATH_PATTERN.match("path'injection")
 
 
 # ---------------------------------------------------------------------------

@@ -23,10 +23,12 @@ from weave.trace_server.trace_server_interface import (
 
 logger = logging.getLogger(__name__)
 
-# Only allow alphanumeric, underscore, and dot in json_path to prevent SQL injection.
+# Only allow alphanumeric, underscore, dot, and space in json_path to prevent SQL injection.
+# Spaces are needed because classifier monitor payloads use human-readable classifier names
+# (e.g. "Low quality", "Bad Request") as dictionary keys.
 # Also used by feedback_payload_schema.py to filter discovered paths to those safe for
 # JSONExtract calls.
-JSON_PATH_PATTERN = re.compile(r"^[a-zA-Z0-9_.]+$")
+JSON_PATH_PATTERN = re.compile(r"^[a-zA-Z0-9_. ]+$")
 
 
 def _validate_and_sanitize_json_path(json_path: str) -> str:
@@ -35,7 +37,7 @@ def _validate_and_sanitize_json_path(json_path: str) -> str:
         raise ValueError("json_path cannot be empty")
     if not JSON_PATH_PATTERN.match(json_path):
         raise ValueError(
-            f"json_path may only contain [a-zA-Z0-9_.], got: {json_path!r}"
+            f"json_path may only contain [a-zA-Z0-9_. ], got: {json_path!r}"
         )
     return json_path.strip()
 
