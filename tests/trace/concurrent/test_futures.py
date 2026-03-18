@@ -30,7 +30,7 @@ def test_defer_with_exception(log_collector) -> None:
 
     logs = log_collector.get_error_logs()
     assert len(logs) == 1
-    assert "ValueError: Test exception" in logs[0].msg
+    assert "ValueError: Test exception" in logs[0].getMessage()
 
 
 def test_then_single_future() -> None:
@@ -130,7 +130,7 @@ def test_then_with_exception_in_future(log_collector) -> None:
 
     logs = log_collector.get_error_logs()
     assert len(logs) == 1
-    assert "ValueError: Future exception" in logs[0].msg
+    assert "ValueError: Future exception" in logs[0].getMessage()
 
 
 @pytest.mark.disable_logging_error_check
@@ -151,7 +151,7 @@ def test_then_with_exception_in_callback(log_collector) -> None:
 
     logs = log_collector.get_error_logs()
     assert len(logs) == 1
-    assert "ValueError: Callback exception" in logs[0].msg
+    assert "ValueError: Callback exception" in logs[0].getMessage()
 
 
 def test_concurrent_execution() -> None:

@@ -191,8 +191,10 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
         with self.lock:
             if self._pending_starts:
                 logger.warning(
-                    f"Flush timeout: dropping {len(self._pending_starts)} calls "
-                    f"that did not complete within {FLUSH_TIMEOUT_SECONDS}s."
+                    "Flush timeout: dropping %s calls "
+                    "that did not complete within %ss.",
+                    len(self._pending_starts),
+                    FLUSH_TIMEOUT_SECONDS,
                 )
                 for call_id, start_item in self._pending_starts.items():
                     self._write_item_to_disk(
@@ -203,8 +205,10 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
 
             if self._pending_ends:
                 logger.warning(
-                    f"Flush timeout: dropping {len(self._pending_ends)} orphaned "
-                    f"call ends that did not pair within {FLUSH_TIMEOUT_SECONDS}s."
+                    "Flush timeout: dropping %s orphaned "
+                    "call ends that did not pair within %ss.",
+                    len(self._pending_ends),
+                    FLUSH_TIMEOUT_SECONDS,
                 )
                 for call_id, end_item in self._pending_ends.items():
                     self._write_item_to_disk(

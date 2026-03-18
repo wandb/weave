@@ -238,9 +238,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             return
 
         logger.warning(
-            "Project has been previously written to with `use_calls_complete=True` and requires 'calls_complete' mode. "
-            "Automatically upgrading SDK to use the more performant calls_complete processor. "
-            f"Server message: {error_message}"
+            "Project has been previously written to with `use_calls_complete=True` and requires 'calls_complete' mode. Automatically upgrading SDK to use the more performant calls_complete processor. Server message: %s",
+            error_message,
         )
 
         # Store old processor reference for cleanup
@@ -432,7 +431,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                     response := getattr(e, "response", None)
                 ) and response.status_code == 404:
                     logger.debug(
-                        f"Batching endpoint not available, falling back to individual feedback creation: {e}"
+                        "Batching endpoint not available, falling back to individual feedback creation: %s",
+                        e,
                     )
 
                     # Feedback endpoint doesn't support id, created_at, so we need to strip them
@@ -454,7 +454,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                             )
                         except Exception as individual_error:
                             logger.warning(
-                                f"Failed to create individual feedback: {individual_error}"
+                                "Failed to create individual feedback: %s",
+                                individual_error,
                             )
                 else:
                     # Re-raise server errors (5xx) as they're not client compatibility issues

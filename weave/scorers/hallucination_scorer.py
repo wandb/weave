@@ -252,7 +252,9 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
         # Handle large inputs
         if len_inps + len_outs > self._model_max_length:
             logger.info(
-                f"sum of query, key and output tokens ({len_inps + len_outs}) > model_max_length ({self._model_max_length}), curtailing input query and context.."
+                "sum of query, key and output tokens (%s) > model_max_length (%s), curtailing input query and context..",
+                len_inps + len_outs,
+                self._model_max_length,
             )
             # If the output is less than 1000 tokens, curtail the input query and context only
             if len_outs < self._model_max_length - 1000:
