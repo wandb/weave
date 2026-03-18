@@ -38,10 +38,25 @@ class JSONLWALWriter:
         failures within at most ``fsync_timeout`` seconds or
         ``fsync_batch_size`` writes.
 
-        Note: the directory entry is not fsynced, so after a power failure
+    Power-failure vulnerability window:
+        Between a write() and the next fsync, records live only in the OS
+        page cache.  A *process crash* in this window is safe (the page
+        cache survives).  A *power failure* in this window loses unfsynced
+        records.  The window is bounded by whichever trigger fires first:
+
+        - At most ``fsync_batch_size`` writes (count trigger), or
+        - At most ``fsync_timeout`` seconds (time trigger).
+
+        With the defaults (batch_size=64, timeout=0.5s), the worst case is
+        0.5 seconds of writes lost on power failure.  Set batch_size=1 for
+        zero window (every write fsynced, ~2-5x slower on SSD).
+
+        Note: the *directory entry* is not fsynced, so after a power failure
         the file itself may not appear in the directory listing on some
-        filesystems.  Full power-loss durability of the filename requires
-        a directory fsync (not yet implemented).
+        filesystems (e.g., ext4 with default mount options).  The file
+        contents are durable, but the filename is not.  Full power-loss
+        durability of the filename requires a directory fsync (not yet
+        implemented).
 
     Tuning guide::
 
