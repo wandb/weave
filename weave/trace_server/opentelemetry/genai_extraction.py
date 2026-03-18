@@ -467,6 +467,9 @@ def extract_genai_fields(
         ),
         tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts) or tl_tool_args,
         tool_call_result=extract_tool_call_result(attrs, events_dicts),
+        content_refs=_json_str(_get(attrs, "weave.content_refs")),
+        artifact_refs=_json_str(_get(attrs, "weave.artifact_refs")),
+        object_refs=_json_str(_get(attrs, "weave.object_refs")),
         attributes_dump=_json_str(attrs),
         events_dump=_json_str(events_dicts) if events_dicts else "",
         resource_dump=_json_str(

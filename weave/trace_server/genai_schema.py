@@ -76,6 +76,11 @@ class GenAISpanCHInsertable(BaseModel):
     tool_call_arguments: str = ""
     tool_call_result: str = ""
 
+    # Weave refs (JSON arrays from weave.otel utilities)
+    content_refs: str = ""
+    artifact_refs: str = ""
+    object_refs: str = ""
+
     # Raw dumps
     attributes_dump: str = ""
     events_dump: str = ""

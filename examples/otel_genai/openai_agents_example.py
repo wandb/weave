@@ -44,10 +44,10 @@ from opentelemetry.sdk.trace.export import (
     SimpleSpanProcessor,
 )
 
-
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
+
 
 @function_tool
 def get_weather(city: str) -> str:
@@ -145,6 +145,7 @@ triage_agent = Agent(
 # OTel setup
 # ---------------------------------------------------------------------------
 
+
 def _wandb_auth_headers() -> dict[str, str]:
     """Build auth headers from WANDB_API_KEY if present."""
     api_key = os.environ.get("WANDB_API_KEY", "")
@@ -193,6 +194,7 @@ def setup_otel(
 # Main
 # ---------------------------------------------------------------------------
 
+
 async def run_agents() -> None:
     """Run a multi-turn scenario that exercises handoffs and tools."""
     queries = [
@@ -202,9 +204,9 @@ async def run_agents() -> None:
     ]
 
     for q in queries:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"User: {q}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         result = await Runner.run(triage_agent, q)
         print(f"\nAgent: {result.final_output}\n")
 
