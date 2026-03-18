@@ -376,14 +376,15 @@ class TestJSONLWALWriter:
     def test_rotates_when_file_exceeds_max_size(self, tmp_path: str) -> None:
         """Writer creates a new file when the current one exceeds max_file_size."""
         mgr = FileWALDirectoryManager(str(tmp_path))
-        # Use a tiny max size to force rotation after a few records.
+        # Each record is ~30 bytes (compact JSON + newline).  With
+        # max_file_size=100, rotation triggers after 4 writes (~120 bytes).
+        # 10 records → 3 files (4 + 4 + 2).
         with JSONLWALWriter(mgr, max_file_size=100) as writer:
             for i in range(10):
                 writer.write({"type": "obj_create", "seq": i})
 
-        # Multiple files should have been created.
         files = mgr.list_files()
-        assert len(files) > 1
+        assert len(files) == 3
 
     def test_all_records_recoverable_after_rotation(self, tmp_path: str) -> None:
         """Every record written across rotations is recovered by drain_all."""
