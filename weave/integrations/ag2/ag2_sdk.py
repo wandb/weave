@@ -22,7 +22,8 @@ _ag2_patcher: MultiPatcher | None = None
 
 def _postprocess_chat_inputs(inputs: dict) -> dict:
     """Sanitize initiate_chat / initiate_group_chat inputs
-    for serialization."""
+    for serialization.
+    """
     sanitized = {}
     for key, value in inputs.items():
         if key == "self":
@@ -35,9 +36,9 @@ def _postprocess_chat_inputs(inputs: dict) -> dict:
                 if isinstance(value, (str, list))
                 else str(value)
             )
-        elif key in ("pattern", "recipient"):
+        elif key in {"pattern", "recipient"}:
             sanitized[key] = str(type(value).__name__)
-        elif key in ("max_rounds", "max_turns", "clear_history"):
+        elif key in {"max_rounds", "max_turns", "clear_history"}:
             sanitized[key] = value
         # Skip non-serializable args (agents, callbacks, etc.)
     return sanitized
@@ -51,7 +52,7 @@ def _postprocess_llm_inputs(inputs: dict) -> dict:
             continue
         elif key == "messages":
             sanitized["messages"] = value
-        elif key in ("model", "cache_seed", "max_tokens"):
+        elif key in {"model", "cache_seed", "max_tokens"}:
             sanitized[key] = value
     return sanitized
 

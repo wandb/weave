@@ -9,6 +9,7 @@ This module provides:
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
 import sys
 from collections.abc import Callable
 from importlib.abc import MetaPathFinder
@@ -323,17 +324,12 @@ def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
 # If legacy autogen support is removed, replace _patch_ag2_or_autogen with patch_ag2 directly in INTEGRATION_MODULE_MAPPING.
 def _patch_ag2_or_autogen(settings: IntegrationSettings | None = None) -> None:
     """Dispatch to AG2 or Microsoft AutoGen patcher based on
-    which package is installed."""
+    which package is installed.
+    """
     try:
-        # AG2 provides ConversableAgent in the autogen namespace
-        from autogen import ConversableAgent  # noqa: F401
-
-        # Verify it's AG2 (has initiate_group_chat)
-        from autogen.agentchat import initiate_group_chat  # noqa: F401
-
+        importlib.metadata.version("ag2")
         patch_ag2(settings)
-    except ImportError:
-        # Fall back to Microsoft AutoGen patcher
+    except importlib.metadata.PackageNotFoundError:
         patch_autogen(settings)
 
 

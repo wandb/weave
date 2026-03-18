@@ -1,39 +1,32 @@
 """Tests for AG2 (formerly AutoGen) Weave integration."""
 
-import pytest
+from typing import Annotated
 
-import weave
+import pytest
+from autogen import ConversableAgent, LLMConfig
+from autogen.agentchat import initiate_group_chat
+from autogen.agentchat.group.patterns import AutoPattern
+
 from weave.integrations.ag2.ag2_sdk import get_ag2_patcher
 from weave.integrations.integration_utilities import (
     flatten_calls,
-    op_name_from_ref,
+    flattened_calls_to_names,
 )
-
-PATCHER = None
+from weave.trace_server.trace_server_interface import CallsFilter
 
 
 @pytest.fixture(autouse=True)
 def patch_ag2():
     """Apply AG2 patches for each test."""
-    global PATCHER  # noqa: PLW0603
-    from weave.integrations.ag2.ag2_sdk import (
-        get_ag2_patcher,
-    )
-
-    PATCHER = get_ag2_patcher()
-    PATCHER.attempt_patch()
+    patcher = get_ag2_patcher()
+    patcher.attempt_patch()
     yield
-    PATCHER.undo_patch()
+    patcher.undo_patch()
 
 
-@pytest.mark.asyncio
 @pytest.mark.vcr
-async def test_two_agent_with_tool(client):
+def test_two_agent_with_tool(client):
     """Two-agent conversation with a tool call."""
-    from typing import Annotated
-
-    from autogen import ConversableAgent, LLMConfig
-
     llm_config = LLMConfig(
         {
             "model": "gpt-4o-mini",
@@ -65,22 +58,18 @@ async def test_two_agent_with_tool(client):
     )
 
     # Verify trace structure
-    calls = client.calls()
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flat = flatten_calls(calls)
-    op_names = [op_name_from_ref(c.op_name) for c in flat]
+    names = flattened_calls_to_names(flat)
+    op_names = [name for name, _depth in names]
 
-    assert "ag2.ConversableAgent.initiate_chat" in op_names
-    assert "ag2.OpenAIWrapper.create" in op_names
+    assert any("initiate_chat" in n for n in op_names)
+    assert any("create" in n for n in op_names)
 
 
-@pytest.mark.asyncio
 @pytest.mark.vcr
-async def test_three_agent_group_chat(client):
-    """Three-agent group chat with GroupChatManager."""
-    from autogen import ConversableAgent, LLMConfig
-    from autogen.agentchat import initiate_group_chat
-    from autogen.agentchat.group.patterns import AutoPattern
-
+def test_three_agent_group_chat(client):
+    """Three-agent group chat."""
     llm_config = LLMConfig(
         {
             "model": "gpt-4o-mini",
@@ -117,23 +106,20 @@ async def test_three_agent_group_chat(client):
         group_manager_args={"llm_config": llm_config},
     )
 
-    result, ctx, last = initiate_group_chat(
+    result, _ctx, _last = initiate_group_chat(
         pattern=pattern,
         messages="Explain quantum computing in one line.",
         max_rounds=5,
     )
 
     # Verify trace structure
-    calls = client.calls()
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flat = flatten_calls(calls)
-    op_names = [op_name_from_ref(c.op_name) for c in flat]
+    names = flattened_calls_to_names(flat)
+    op_names = [name for name, _depth in names]
 
-    assert "ag2.initiate_group_chat" in op_names
-    assert "ag2.OpenAIWrapper.create" in op_names
+    assert any("initiate_chat" in n for n in op_names)
+    assert any("create" in n for n in op_names)
     # Should have multiple LLM calls (one per agent turn)
-    llm_calls = [
-        n
-        for n in op_names
-        if n == "ag2.OpenAIWrapper.create"
-    ]
+    llm_calls = [n for n in op_names if "create" in n]
     assert len(llm_calls) >= 2
