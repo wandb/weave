@@ -97,6 +97,7 @@ from weave.trace.wandb_run_context import (
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
+from weave.trace_server.errors import InvalidExternalRef
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
@@ -1973,7 +1974,7 @@ class WeaveClient:
                 try:
                     json_val_internal = self._convert_refs_to_internal(json_val)
                     expected_digest = compute_object_digest(json_val_internal)
-                except (NoInternalProjectIDError, CrossProjectRefError) as e:
+                except (NoInternalProjectIDError, CrossProjectRefError, InvalidExternalRef) as e:
                     logger.debug("Skipping client-side digest for obj %r: %s", name, e)
 
             req = ObjCreateReq(
@@ -2036,7 +2037,7 @@ class WeaveClient:
                 json_rows_internal = self._convert_refs_to_internal(json_rows)
                 row_digests = [compute_row_digest(row) for row in json_rows_internal]
                 expected_digest = compute_table_digest(row_digests)
-            except (NoInternalProjectIDError, CrossProjectRefError) as e:
+            except (NoInternalProjectIDError, CrossProjectRefError, InvalidExternalRef) as e:
                 logger.debug("Skipping client-side digest for table: %s", e)
 
         req = TableCreateReq(
