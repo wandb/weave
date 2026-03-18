@@ -97,7 +97,7 @@ from weave.trace.wandb_run_context import (
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
-from weave.trace_server.errors import InvalidExternalRef
+from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
@@ -382,6 +382,7 @@ class WeaveClient:
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
+        # No-op when the feature flag is off (returns immediately).
         self._warm_project_id_resolver()
 
     ################ High Level Convenience Methods ################
@@ -1879,6 +1880,22 @@ class WeaveClient:
         """
         self.project_id_resolver.get_internal_project_id(self._project_id())
 
+    def _handle_digest_mismatch(self, e: DigestMismatchError | HTTPError, label: str) -> None:
+        """If *e* is a digest-mismatch error, disable client-side digests.
+
+        Raises the original exception if it is NOT a digest mismatch
+        (e.g. an HTTPError with a non-409 status code).
+        """
+        is_mismatch = isinstance(e, DigestMismatchError) or (
+            isinstance(e, HTTPError)
+            and e.response is not None
+            and e.response.status_code == 409
+        )
+        if is_mismatch:
+            self.project_id_resolver.disable_after_validation_error(e, label)
+            return
+        raise e
+
     def _should_compute_client_digests(self) -> bool:
         """Return True if the client should compute digests locally."""
         if not settings.should_enable_client_side_digests():
@@ -1987,14 +2004,14 @@ class WeaveClient:
             )
             try:
                 return self.server.obj_create(req)
-            except Exception as e:
-                if expected_digest is not None and self.project_id_resolver.is_digest_validation_error(e):
-                    self.project_id_resolver.disable_after_validation_error(
-                        e, f"weave:///{self.entity}/{self.project}/object/{name}"
-                    )
-                    req.obj.expected_digest = None
-                    return self.server.obj_create(req)
-                raise
+            except (DigestMismatchError, HTTPError) as e:
+                if expected_digest is None:
+                    raise
+                self._handle_digest_mismatch(
+                    e, f"weave:///{self.entity}/{self.project}/object/{name}"
+                )
+                req.obj.expected_digest = None
+                return self.server.obj_create(req)
 
         res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
         digest_future: Future[str] = self.future_executor.then(
@@ -2049,14 +2066,12 @@ class WeaveClient:
         )
         try:
             return self.server.table_create(req)
-        except Exception as e:
-            if expected_digest is not None and self.project_id_resolver.is_digest_validation_error(e):
-                self.project_id_resolver.disable_after_validation_error(
-                    e, f"table in {self._project_id()}"
-                )
-                req.table.expected_digest = None
-                return self.server.table_create(req)
-            raise
+        except (DigestMismatchError, HTTPError) as e:
+            if expected_digest is None:
+                raise
+            self._handle_digest_mismatch(e, f"table in {self._project_id()}")
+            req.table.expected_digest = None
+            return self.server.table_create(req)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
@@ -2180,7 +2195,14 @@ class WeaveClient:
                 row_digests=all_row_digests,
                 expected_digest=expected_digest,
             )
-            create_res = self.server.table_create_from_digests(create_req)
+            try:
+                create_res = self.server.table_create_from_digests(create_req)
+            except (DigestMismatchError, HTTPError) as e:
+                if expected_digest is None:
+                    raise
+                self._handle_digest_mismatch(e, "table_create_from_digests")
+                create_req.expected_digest = None
+                create_res = self.server.table_create_from_digests(create_req)
 
             return TableCreateRes(
                 digest=create_res.digest,
@@ -2323,14 +2345,12 @@ class WeaveClient:
         def file_create_with_fallback() -> FileCreateRes:
             try:
                 return self.server.file_create(req)
-            except Exception as e:
-                if req.expected_digest is not None and self.project_id_resolver.is_digest_validation_error(e):
-                    self.project_id_resolver.disable_after_validation_error(
-                        e, f"file://{req.name}"
-                    )
-                    req.expected_digest = None
-                    return self.server.file_create(req)
-                raise
+            except (DigestMismatchError, HTTPError) as e:
+                if req.expected_digest is None:
+                    raise
+                self._handle_digest_mismatch(e, f"file://{req.name}")
+                req.expected_digest = None
+                return self.server.file_create(req)
 
         if self.future_executor_fastlane:
             res = self.future_executor_fastlane.defer(file_create_with_fallback)
