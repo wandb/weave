@@ -94,6 +94,7 @@ def ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
         "total_storage_size_bytes": ch_call_dict.get("total_storage_size_bytes"),
+        "ttl_at": ensure_datetimes_have_tz(ch_call_dict.get("ttl_at")),
     }
 
 

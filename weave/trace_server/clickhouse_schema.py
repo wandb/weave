@@ -179,6 +179,8 @@ class SelectableCHCallSchema(BaseModel):
 
     deleted_at: datetime.datetime | None = None
 
+    ttl_at: datetime.datetime | None = None
+
 
 class ObjCHInsertable(BaseModel):
     project_id: str
