@@ -250,6 +250,50 @@ def extract_total_tokens(attrs: dict[str, Any], input_t: int, output_t: int) -> 
     return input_t + output_t
 
 
+def extract_reasoning_tokens(attrs: dict[str, Any]) -> int:
+    """Extract reasoning token count.
+
+    Fallback chain:
+    1. gen_ai.usage.reasoning_tokens (custom weave attr / future semconv)
+    2. gen_ai.usage.output_tokens_details.reasoning_tokens (OpenAI nested)
+    """
+    return _safe_int(
+        _get(
+            attrs,
+            "gen_ai.usage.reasoning_tokens",
+            "gen_ai.usage.output_tokens_details.reasoning_tokens",
+        )
+    )
+
+
+def extract_reasoning_content(output_messages_str: str) -> str:
+    """Extract reasoning/thinking text from output messages ReasoningPart entries.
+
+    The OTel semconv output messages schema includes a ``ReasoningPart`` with
+    ``{"type": "reasoning", "content": "..."}`` for models like o1/o3/Gemini
+    with thinking enabled.
+    """
+    if not output_messages_str:
+        return ""
+    try:
+        messages = json.loads(output_messages_str)
+    except (json.JSONDecodeError, TypeError):
+        return ""
+    if not isinstance(messages, list):
+        return ""
+
+    reasoning_parts: list[str] = []
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        for part in msg.get("parts", []):
+            if isinstance(part, dict) and part.get("type") == "reasoning":
+                content = part.get("content", "")
+                if content:
+                    reasoning_parts.append(str(content))
+    return "\n".join(reasoning_parts)
+
+
 def extract_finish_reasons(attrs: dict[str, Any]) -> list[str]:
     """Extract finish reasons array.
 
@@ -412,6 +456,7 @@ def extract_genai_fields(
     input_t = extract_input_tokens(attrs)
     output_t = extract_output_tokens(attrs)
     total_t = extract_total_tokens(attrs, input_t, output_t)
+    reasoning_t = extract_reasoning_tokens(attrs)
 
     # Normalize UNSET -> OK when there's no error, for cleaner display
     status_code = span.status.code.name
@@ -423,6 +468,9 @@ def extract_genai_fields(
 
     tool_name = str(_get(attrs, "gen_ai.tool.name") or "") or tl_tool_name
     tool_call_id = str(_get(attrs, "gen_ai.tool.call.id") or "") or tl_tool_id
+
+    output_msgs_str = extract_output_messages(attrs, events_dicts)
+    reasoning_content = extract_reasoning_content(output_msgs_str)
 
     return GenAISpanCHInsertable(
         project_id=project_id,
@@ -451,22 +499,32 @@ def extract_genai_fields(
         input_tokens=input_t,
         output_tokens=output_t,
         total_tokens=total_t,
+        reasoning_tokens=reasoning_t,
+        reasoning_content=reasoning_content,
         conversation_id=extract_conversation_id(attrs),
         tool_name=tool_name,
         tool_type=str(_get(attrs, "gen_ai.tool.type") or ""),
         tool_call_id=tool_call_id,
         tool_description=str(_get(attrs, "gen_ai.tool.description") or ""),
+        tool_definitions=_json_str(_get(attrs, "gen_ai.tool.definitions")),
         finish_reasons=extract_finish_reasons(attrs),
         request_temperature=_safe_float(_get(attrs, "gen_ai.request.temperature")),
         request_max_tokens=_safe_int(_get(attrs, "gen_ai.request.max_tokens")),
         request_top_p=_safe_float(_get(attrs, "gen_ai.request.top_p")),
         input_messages=extract_input_messages(attrs, events_dicts),
-        output_messages=extract_output_messages(attrs, events_dicts),
+        output_messages=output_msgs_str,
         system_instructions=_json_str(
             _get(attrs, "gen_ai.system_instructions")
         ),
         tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts) or tl_tool_args,
         tool_call_result=extract_tool_call_result(attrs, events_dicts),
+        compaction_summary=str(_get(attrs, "weave.compaction.summary") or ""),
+        compaction_items_before=_safe_int(
+            _get(attrs, "weave.compaction.items_before")
+        ),
+        compaction_items_after=_safe_int(
+            _get(attrs, "weave.compaction.items_after")
+        ),
         content_refs=_json_str(_get(attrs, "weave.content_refs")),
         artifact_refs=_json_str(_get(attrs, "weave.artifact_refs")),
         object_refs=_json_str(_get(attrs, "weave.object_refs")),

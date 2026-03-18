@@ -341,6 +341,7 @@ def build_chat_messages(
                         model=span.request_model,
                         status=span.status_code,
                         system_instructions=_extract_system_prompt(span.system_instructions),
+                        tool_definitions=span.tool_definitions or "",
                     )
                 )
 
@@ -358,6 +359,8 @@ def build_chat_messages(
                             agent_name=name,
                             model=span.response_model or span.request_model,
                             text=text,
+                            reasoning_content=span.reasoning_content or "",
+                            reasoning_tokens=span.reasoning_tokens,
                             input_tokens=span.input_tokens,
                             output_tokens=span.output_tokens,
                             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
@@ -365,6 +368,19 @@ def build_chat_messages(
                             content_refs=_parse_content_refs(span.content_refs),
                         )
                     )
+
+            # Emit compaction event if this span triggered context compaction
+            if span.compaction_summary or span.compaction_items_before > 0:
+                messages.append(
+                    GenAIChatMessage(
+                        type="context_compacted",
+                        span_id=span.span_id,
+                        agent_name=name,
+                        compaction_summary=span.compaction_summary,
+                        compaction_items_before=span.compaction_items_before,
+                        compaction_items_after=span.compaction_items_after,
+                    )
+                )
             return
 
         # ---- execute_tool ----
@@ -440,6 +456,8 @@ def build_chat_messages(
                         agent_name=nearest_agent or agent_name,
                         model=span.response_model or span.request_model,
                         text=text,
+                        reasoning_content=span.reasoning_content or "",
+                        reasoning_tokens=span.reasoning_tokens,
                         input_tokens=span.input_tokens,
                         output_tokens=span.output_tokens,
                         duration_ms=_compute_duration_ms(span.started_at, span.ended_at),

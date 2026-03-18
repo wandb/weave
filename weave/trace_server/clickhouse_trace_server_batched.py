@@ -821,6 +821,101 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return build_trace_chat(trace_res.spans, req.trace_id)
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_conversations_query"
+    )
+    def genai_conversations_query(
+        self, req: tsi.GenAIConversationsQueryReq
+    ) -> tsi.GenAIConversationsQueryRes:
+        """List conversations grouped by conversation_id with aggregate stats."""
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "limit": min(req.limit, 1000),
+            "offset": req.offset,
+        }
+        query = """
+            SELECT
+                conversation_id,
+                project_id,
+                countDistinct(trace_id)   AS turn_count,
+                count()                   AS span_count,
+                sum(input_tokens)         AS total_input_tokens,
+                sum(output_tokens)        AS total_output_tokens,
+                any(provider_name)        AS provider_name,
+                min(started_at)           AS first_seen,
+                max(ended_at)             AS last_seen
+            FROM genai_spans
+            WHERE project_id = {project_id:String}
+              AND conversation_id != ''
+            GROUP BY conversation_id, project_id
+            ORDER BY last_seen DESC
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+        """
+        result = self.ch_client.query(query, parameters=parameters)
+        col_names = list(result.column_names)
+        conversations: list[tsi.GenAIConversationSchema] = []
+        for row in result.result_rows:
+            row_dict = dict(zip(col_names, row))
+            conversations.append(
+                tsi.GenAIConversationSchema(
+                    conversation_id=str(row_dict.get("conversation_id", "")),
+                    project_id=str(row_dict.get("project_id", req.project_id)),
+                    turn_count=int(row_dict.get("turn_count", 0)),
+                    span_count=int(row_dict.get("span_count", 0)),
+                    total_input_tokens=int(row_dict.get("total_input_tokens", 0)),
+                    total_output_tokens=int(row_dict.get("total_output_tokens", 0)),
+                    provider_name=str(row_dict.get("provider_name", "") or ""),
+                    first_seen=row_dict.get("first_seen"),
+                    last_seen=row_dict.get("last_seen"),
+                )
+            )
+        return tsi.GenAIConversationsQueryRes(conversations=conversations)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_conversation_chat"
+    )
+    def genai_conversation_chat(
+        self, req: tsi.GenAIConversationChatReq
+    ) -> tsi.GenAIConversationChatRes:
+        """Build a multi-turn chat view for all traces in a conversation."""
+        from weave.trace_server.genai_chat_view import build_trace_chat
+
+        spans_res = self.genai_spans_query(
+            tsi.GenAISpansQueryReq(
+                project_id=req.project_id,
+                filters=tsi.GenAISpansQueryFilters(
+                    conversation_id=req.conversation_id
+                ),
+                limit=5000,
+            )
+        )
+
+        # Group spans by trace_id, then order groups by the earliest started_at
+        turns_by_trace: dict[str, list[tsi.GenAISpanSchema]] = defaultdict(list)
+        for span in spans_res.spans:
+            turns_by_trace[span.trace_id].append(span)
+
+        ordered_traces = sorted(
+            turns_by_trace.items(),
+            key=lambda kv: min(
+                (s.started_at.isoformat() if s.started_at else "") for s in kv[1]
+            ),
+        )
+
+        turns = [build_trace_chat(spans, tid) for tid, spans in ordered_traces]
+
+        # Infer metadata from the assembled turns
+        provider = next((t.provider for t in turns if t.provider), "")
+        total_duration_ms = sum(t.total_duration_ms for t in turns)
+
+        return tsi.GenAIConversationChatRes(
+            conversation_id=req.conversation_id,
+            provider=provider,
+            turn_count=len(turns),
+            total_duration_ms=total_duration_ms,
+            turns=turns,
+        )
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_agents_query")
     def genai_agents_query(
         self, req: tsi.GenAIAgentsQueryReq

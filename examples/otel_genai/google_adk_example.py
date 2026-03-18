@@ -16,6 +16,7 @@ Demonstrates:
   - LLM-driven delegation to specialist sub_agents
   - Tool calls within a conversation that builds on prior context
   - Media capture via weave.otel.log_content()
+  - Tool definitions injection (gen_ai.tool.definitions on invoke_agent spans)
 
 The conversation is designed so each turn builds on prior context:
   1. Ask about weather in Tokyo and Paris
@@ -38,7 +39,12 @@ import argparse
 import asyncio
 import tempfile
 
-from weave.otel import SystemPromptInjector, log_content, setup_tracing
+from weave.otel import (
+    SystemPromptInjector,
+    ToolDefinitionsInjector,
+    log_content,
+    setup_tracing,
+)
 
 # ---------------------------------------------------------------------------
 # Agent instructions (defined before OTel setup for the injector)
@@ -74,6 +80,23 @@ AGENT_INSTRUCTIONS = {
     "WeatherAgent": WEATHER_INSTRUCTIONS,
     "MathAgent": MATH_INSTRUCTIONS,
     "CreativeAgent": CREATIVE_INSTRUCTIONS,
+}
+
+AGENT_TOOL_DEFS: dict[str, list[dict]] = {
+    "Coordinator": [
+        {"type": "sub_agent", "name": "WeatherAgent", "description": "Specialist for weather forecasts"},
+        {"type": "sub_agent", "name": "MathAgent", "description": "Specialist for arithmetic calculations"},
+        {"type": "sub_agent", "name": "CreativeAgent", "description": "Specialist for generating images"},
+    ],
+    "WeatherAgent": [
+        {"type": "function", "name": "get_weather", "description": "Get the current weather for a city"},
+    ],
+    "MathAgent": [
+        {"type": "function", "name": "calculator", "description": "Evaluate an arithmetic expression"},
+    ],
+    "CreativeAgent": [
+        {"type": "function", "name": "generate_image", "description": "Generate an image from a text description"},
+    ],
 }
 
 
@@ -277,7 +300,10 @@ def main() -> None:
         project="genai-otel-test",
         genai_endpoint=args.genai_endpoint,
         otlp_endpoint=args.otlp_endpoint,
-        processors=[SystemPromptInjector(AGENT_INSTRUCTIONS)],
+        processors=[
+            SystemPromptInjector(AGENT_INSTRUCTIONS),
+            ToolDefinitionsInjector(AGENT_TOOL_DEFS),
+        ],
     )
 
     coordinator = build_agents()

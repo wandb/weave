@@ -43,6 +43,14 @@ def __getattr__(name: str) -> Any:
         from weave.otel import setup as _setup
 
         return getattr(_setup, name)
+    if name in {"ToolDefinitionsInjector", "ReasoningTokenExtractor"}:
+        from weave.otel import processors as _proc
+
+        return getattr(_proc, name)
+    if name in {"patch_openai_compaction", "unpatch_openai_compaction"}:
+        from weave.otel import compaction as _comp
+
+        return getattr(_comp, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 _CONTENT_REFS_ATTR = "weave.content_refs"

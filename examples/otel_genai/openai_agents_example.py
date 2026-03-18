@@ -16,6 +16,8 @@ Demonstrates:
   - Automatic context compaction via OpenAIResponsesCompactionSession
   - Subagent handoffs: TriageAgent routes to WeatherBot, TravelAdvisor, Translator
   - Tool calls within a persistent conversation
+  - Tool definitions injection (gen_ai.tool.definitions on invoke_agent spans)
+  - Compaction tracking (weave.compaction.* attributes)
 
 The conversation is designed so each turn builds on prior context:
   1. Ask about weather in Tokyo
@@ -43,7 +45,8 @@ import os
 from agents import Agent, Runner, SQLiteSession, function_tool
 from agents.memory import OpenAIResponsesCompactionSession
 
-from weave.otel import SystemPromptInjector, setup_tracing
+from weave.otel import SystemPromptInjector, ToolDefinitionsInjector, setup_tracing
+from weave.otel.compaction import patch_openai_compaction
 
 # ---------------------------------------------------------------------------
 # Tools
@@ -120,6 +123,47 @@ AGENT_INSTRUCTIONS = {
     "WeatherBot": WEATHER_INSTRUCTIONS,
     "TravelAdvisor": TRAVEL_INSTRUCTIONS,
     "Translator": TRANSLATOR_INSTRUCTIONS,
+}
+
+# Tool definitions for ToolDefinitionsInjector (gen_ai.tool.definitions)
+AGENT_TOOL_DEFS: dict[str, list[dict]] = {
+    "TriageAgent": [
+        {
+            "type": "handoff",
+            "name": "WeatherBot",
+            "description": "Specialist for weather forecasts and conditions",
+        },
+        {
+            "type": "handoff",
+            "name": "TravelAdvisor",
+            "description": "Specialist for flight and hotel bookings",
+        },
+        {
+            "type": "handoff",
+            "name": "Translator",
+            "description": "Specialist for translating text between languages",
+        },
+    ],
+    "WeatherBot": [
+        {
+            "type": "function",
+            "name": "get_weather",
+            "description": "Get the current weather for a city",
+        },
+    ],
+    "TravelAdvisor": [
+        {
+            "type": "function",
+            "name": "search_flights",
+            "description": "Search for available flights between two cities",
+        },
+        {
+            "type": "function",
+            "name": "search_hotels",
+            "description": "Search for available hotels in a city",
+        },
+    ],
+    "Translator": [],
 }
 
 # ---------------------------------------------------------------------------
@@ -213,12 +257,17 @@ def main() -> None:
         "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "span_and_event"
     )
 
+    patch_openai_compaction()
+
     provider = setup_tracing(
         service_name="openai-agents-otel-example",
         project="genai-otel-test",
         genai_endpoint=args.genai_endpoint,
         otlp_endpoint=args.otlp_endpoint,
-        processors=[SystemPromptInjector(AGENT_INSTRUCTIONS)],
+        processors=[
+            SystemPromptInjector(AGENT_INSTRUCTIONS),
+            ToolDefinitionsInjector(AGENT_TOOL_DEFS),
+        ],
     )
 
     from opentelemetry.instrumentation.openai_agents import OpenAIAgentsInstrumentor

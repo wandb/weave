@@ -51,6 +51,10 @@ class GenAISpanCHInsertable(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
+    reasoning_tokens: int = 0
+
+    # Reasoning content (from ReasoningPart in output messages)
+    reasoning_content: str = ""
 
     # Conversation / session
     conversation_id: str = ""
@@ -60,6 +64,7 @@ class GenAISpanCHInsertable(BaseModel):
     tool_type: str = ""
     tool_call_id: str = ""
     tool_description: str = ""
+    tool_definitions: str = ""
 
     # Response
     finish_reasons: list[str] = []
@@ -75,6 +80,11 @@ class GenAISpanCHInsertable(BaseModel):
     system_instructions: str = ""
     tool_call_arguments: str = ""
     tool_call_result: str = ""
+
+    # Compaction tracking
+    compaction_summary: str = ""
+    compaction_items_before: int = 0
+    compaction_items_after: int = 0
 
     # Weave refs (JSON arrays from weave.otel utilities)
     content_refs: str = ""

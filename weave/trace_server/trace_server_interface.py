@@ -377,11 +377,14 @@ class GenAISpanSchema(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
+    reasoning_tokens: int = 0
+    reasoning_content: str = ""
     conversation_id: str = ""
     tool_name: str = ""
     tool_type: str = ""
     tool_call_id: str = ""
     tool_description: str = ""
+    tool_definitions: str = ""
     finish_reasons: list[str] = Field(default_factory=list)
     request_temperature: float = 0.0
     request_max_tokens: int = 0
@@ -391,6 +394,9 @@ class GenAISpanSchema(BaseModel):
     system_instructions: str = ""
     tool_call_arguments: str = ""
     tool_call_result: str = ""
+    compaction_summary: str = ""
+    compaction_items_before: int = 0
+    compaction_items_after: int = 0
     content_refs: str = ""
     artifact_refs: str = ""
     object_refs: str = ""
@@ -488,20 +494,27 @@ class GenAIChatMessage(BaseModel):
         "tool_call",
         "agent_handoff",
         "agent_start",
+        "context_compacted",
     ]
     span_id: str = ""
     agent_name: str = ""
     text: str = ""
     model: str = ""
     system_instructions: str = ""
+    reasoning_content: str = ""
+    reasoning_tokens: int = 0
     tool_name: str = ""
     tool_arguments: str = ""
     tool_result: str = ""
+    tool_definitions: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
     duration_ms: int = 0
     status: str = "OK"
     content_refs: str = ""
+    compaction_summary: str = ""
+    compaction_items_before: int = 0
+    compaction_items_after: int = 0
 
 
 class GenAITraceChatReq(BaseModel):
@@ -521,6 +534,57 @@ class GenAITraceChatRes(BaseModel):
     provider: str = ""
     total_duration_ms: int = 0
     messages: list[GenAIChatMessage] = Field(default_factory=list)
+
+
+class GenAIConversationSchema(BaseModel):
+    """Metadata for a single multi-turn conversation, keyed by conversation_id."""
+
+    conversation_id: str
+    project_id: str
+    turn_count: int = 0
+    span_count: int = 0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    provider_name: str = ""
+    first_seen: datetime.datetime | None = None
+    last_seen: datetime.datetime | None = None
+
+
+class GenAIConversationsQueryReq(BaseModel):
+    """Request to list conversations for a project, ordered by most recent."""
+
+    project_id: str
+    limit: int = 100
+    offset: int = 0
+
+
+class GenAIConversationsQueryRes(BaseModel):
+    """Response containing a list of conversations."""
+
+    conversations: list[GenAIConversationSchema]
+
+
+class GenAIConversationChatReq(BaseModel):
+    """Request to get the multi-turn chat view for a conversation."""
+
+    project_id: str
+    conversation_id: str
+
+
+class GenAIConversationChatRes(BaseModel):
+    """Multi-turn chat view: an ordered list of per-turn chat responses.
+
+    Each entry in ``turns`` corresponds to one OTel trace (one agent
+    invocation / one user turn).  The frontend can render turn-number
+    dividers between them and still reuse ``GenAITraceChatRes`` rendering
+    for each individual turn.
+    """
+
+    conversation_id: str
+    provider: str = ""
+    turn_count: int = 0
+    total_duration_ms: int = 0
+    turns: list[GenAITraceChatRes] = Field(default_factory=list)
 
 
 class GenAIModelUsage(BaseModel):
@@ -2865,6 +2929,12 @@ class TraceServerInterface(Protocol):
     def genai_spans_trace(self, req: GenAISpansTraceReq) -> GenAISpansTraceRes: ...
     def genai_agents_query(self, req: GenAIAgentsQueryReq) -> GenAIAgentsQueryRes: ...
     def genai_agent_metrics(self, req: GenAIAgentMetricsReq) -> GenAIAgentMetricsRes: ...
+    def genai_conversations_query(
+        self, req: GenAIConversationsQueryReq
+    ) -> GenAIConversationsQueryRes: ...
+    def genai_conversation_chat(
+        self, req: GenAIConversationChatReq
+    ) -> GenAIConversationChatRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...
