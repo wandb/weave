@@ -1,22 +1,28 @@
-"""Minimal utilities for attaching media and lineage to OTel GenAI spans.
+"""Utilities for OTel-based GenAI tracing with Weave.
 
-Provides three functions that operate on the **active OTel span**:
+Key surface area:
 
-- ``log_content``: store bytes (image, audio, video, etc.) and attach a
-  content-addressed reference to the span.
-- ``use_artifact``: mark that the span consumed a W&B artifact.
-- ``use_object``: mark that the span consumed a Weave object.
+Setup:
+    - ``setup_tracing``: one-call TracerProvider configuration.
+    - ``SystemPromptInjector``: SpanProcessor that fills the upstream gap
+      where instrumentors don't emit ``gen_ai.system_instructions``.
+    - ``LiveSpanProcessor``: ships span-start notifications for real-time UI.
 
-All functions are no-ops when there is no active recording span or when
-the required project context cannot be resolved.
+Span enrichment (operate on the **active OTel span**):
+    - ``log_content``: store bytes and attach a content-addressed reference.
+    - ``use_artifact``: mark that the span consumed a W&B artifact.
+    - ``use_object``: mark that the span consumed a Weave object.
 
 Examples:
-
-    >>> import weave.otel
-    >>> # Inside any OTel-traced tool or function:
-    >>> weave.otel.log_content(image_bytes, key="generated_poster", media_type="image/png")
-    >>> weave.otel.use_artifact("my-dataset:v3", key="training_data")
-    >>> weave.otel.use_object("my-prompt:latest", key="system_prompt")
+    >>> from weave.otel import setup_tracing, SystemPromptInjector, log_content
+    >>> provider = setup_tracing(
+    ...     service_name="my-agent",
+    ...     project="demo",
+    ...     genai_endpoint="http://localhost:6345/otel/v1/genai/traces",
+    ...     processors=[SystemPromptInjector({"Bot": "You are helpful."})],
+    ... )
+    >>> # Inside any OTel-traced tool:
+    >>> log_content(image_bytes, key="poster", media_type="image/png")
 """
 
 from __future__ import annotations
@@ -28,7 +34,16 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["log_content", "use_artifact", "use_object"]
+def __getattr__(name: str) -> Any:
+    if name == "LiveSpanProcessor":
+        from weave.otel.live_processor import LiveSpanProcessor
+
+        return LiveSpanProcessor
+    if name in {"SystemPromptInjector", "setup_tracing"}:
+        from weave.otel import setup as _setup
+
+        return getattr(_setup, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 _CONTENT_REFS_ATTR = "weave.content_refs"
 _ARTIFACT_REFS_ATTR = "weave.artifact_refs"

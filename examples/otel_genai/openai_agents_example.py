@@ -6,7 +6,7 @@
 #     "opentelemetry-sdk",
 #     "opentelemetry-exporter-otlp-proto-grpc",
 #     "opentelemetry-exporter-otlp-proto-http",
-#     "requests",
+#     "weave @ file:///Users/ben/repos/core/services/weave-python/weave-public",
 # ]
 # ///
 """OpenAI Agents SDK with subagents, handoffs, and tools — all OTel traced.
@@ -31,24 +31,11 @@ Usage:
 
 import argparse
 import asyncio
-import json
 import os
-from datetime import datetime, timezone
 
-import requests as _req
 from agents import Agent, Runner, function_tool
-from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-    OTLPSpanExporter as OTLPHTTPSpanExporter,
-)
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import (
-    BatchSpanProcessor,
-    ConsoleSpanExporter,
-    SimpleSpanProcessor,
-)
+
+from weave.otel import SystemPromptInjector, setup_tracing
 
 # ---------------------------------------------------------------------------
 # Tools
@@ -119,7 +106,6 @@ TRANSLATOR_INSTRUCTIONS = (
     "to Spanish. Only output the translation, nothing else."
 )
 
-# Map agent name -> instructions for manual system prompt attribution
 AGENT_INSTRUCTIONS = {
     "TriageAgent": TRIAGE_INSTRUCTIONS,
     "WeatherBot": WEATHER_INSTRUCTIONS,
@@ -163,190 +149,6 @@ triage_agent = Agent(
 
 
 # ---------------------------------------------------------------------------
-# OTel setup
-# ---------------------------------------------------------------------------
-
-
-def _wandb_auth_headers() -> dict[str, str]:
-    """Build auth headers from WANDB_API_KEY if present."""
-    api_key = os.environ.get("WANDB_API_KEY", "")
-    if api_key:
-        return {"wandb-api-key": api_key}
-    return {}
-
-
-class _LiveSpanProcessor:
-    """Sends lightweight span-start POSTs so the UI can show in-progress spans.
-
-    Also injects gen_ai.system_instructions on invoke_agent spans since
-    the OpenAI Agents v2 instrumentor doesn't emit them.
-    """
-
-    def __init__(self, endpoint: str, headers: dict[str, str] | None = None):
-        from concurrent.futures import ThreadPoolExecutor
-
-        self._endpoint = endpoint
-        self._headers = headers or {}
-        self._executor = ThreadPoolExecutor(
-            max_workers=2, thread_name_prefix="live-span"
-        )
-
-    def on_start(self, span, parent_context=None):
-        try:
-            ctx = span.get_span_context()
-            if not ctx or not ctx.is_valid:
-                return
-            resource = getattr(span, "resource", None)
-            entity = resource.attributes.get("wandb.entity", "") if resource else ""
-            project = resource.attributes.get("wandb.project", "") if resource else ""
-            if not entity or not project:
-                return
-            parent = getattr(span, "parent", None)
-            parent_id = (
-                format(parent.span_id, "016x")
-                if parent and hasattr(parent, "span_id")
-                else ""
-            )
-            attrs = (
-                dict(span._attributes)
-                if hasattr(span, "_attributes") and span._attributes
-                else {}
-            )
-            ns = (
-                span.start_time
-                if hasattr(span, "start_time") and span.start_time
-                else 0
-            )
-            started = (
-                datetime.fromtimestamp(ns / 1e9, tz=timezone.utc).isoformat()
-                if ns
-                else datetime.now(timezone.utc).isoformat()
-            )
-
-            payload = {
-                "project_id": f"{entity}/{project}",
-                "trace_id": format(ctx.trace_id, "032x"),
-                "span_id": format(ctx.span_id, "016x"),
-                "parent_span_id": parent_id,
-                "span_name": span.name or "",
-                "operation_name": str(attrs.get("gen_ai.operation.name", "")),
-                "agent_name": str(attrs.get("gen_ai.agent.name", "")),
-                "request_model": str(attrs.get("gen_ai.request.model", "")),
-                "started_at": started,
-            }
-
-            def _post():
-                try:
-                    _req.post(
-                        self._endpoint,
-                        json=payload,
-                        headers={"Content-Type": "application/json", **self._headers},
-                        timeout=5,
-                    )
-                except Exception:
-                    pass
-
-            self._executor.submit(_post)
-        except Exception:
-            pass
-
-    def on_end(self, span):
-        pass
-
-    def _on_ending(self, span):
-        pass
-
-    def shutdown(self):
-        self._executor.shutdown(wait=False)
-
-    def force_flush(self, timeout_millis=None):
-        return True
-
-
-class _SystemPromptInjector:
-    """SpanProcessor that injects gen_ai.system_instructions on agent spans.
-
-    The OTel GenAI semantic conventions define gen_ai.system_instructions
-    (semantic-conventions PR #2179) but no instrumentor emits it yet.
-    This processor fills the gap by matching agent names to their instructions.
-
-    Uses _on_ending (called just before span finalization) because
-    gen_ai.agent.name isn't available at on_start time.
-    """
-
-    def __init__(self, agent_instructions: dict[str, str]):
-        self._instructions = agent_instructions
-
-    def on_start(self, span, parent_context=None):
-        name = span.name or ""
-        for agent_name, instructions in self._instructions.items():
-            if agent_name in name:
-                span.set_attribute(
-                    "gen_ai.system_instructions",
-                    json.dumps([{"role": "system", "content": instructions}]),
-                )
-                break
-
-    def on_end(self, span):
-        pass
-
-    def _on_ending(self, span):
-        pass
-
-    def shutdown(self):
-        pass
-
-    def force_flush(self, timeout_millis=None):
-        return True
-
-
-def setup_otel(
-    otlp_endpoint: str | None = None,
-    genai_endpoint: str | None = None,
-) -> TracerProvider:
-    """Configure the OTel TracerProvider."""
-    entity = os.environ.get("WANDB_ENTITY", "ben-urmomsclothes")
-    resource = Resource.create(
-        {
-            "service.name": "openai-agents-otel-example",
-            "service.version": "0.1.0",
-            "wandb.entity": entity,
-            "wandb.project": "genai-otel-test",
-        }
-    )
-    provider = TracerProvider(resource=resource)
-
-    # Inject system prompts on invoke_agent spans (upstream gap workaround)
-    provider.add_span_processor(_SystemPromptInjector(AGENT_INSTRUCTIONS))
-
-    if genai_endpoint:
-        server_url = genai_endpoint.rsplit("/otel/", 1)[0]
-        provider.add_span_processor(
-            _LiveSpanProcessor(
-                endpoint=f"{server_url}/otel/v1/genai/span/start",
-                headers=_wandb_auth_headers(),
-            )
-        )
-        provider.add_span_processor(
-            BatchSpanProcessor(
-                OTLPHTTPSpanExporter(
-                    endpoint=genai_endpoint,
-                    headers=_wandb_auth_headers(),
-                )
-            )
-        )
-    elif otlp_endpoint:
-        provider.add_span_processor(
-            BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint))
-        )
-    else:
-        provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-
-    trace.set_tracer_provider(provider)
-    return provider
-
-
-# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -378,7 +180,13 @@ def main() -> None:
         "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "span_and_event"
     )
 
-    provider = setup_otel(args.otlp_endpoint, args.genai_endpoint)
+    provider = setup_tracing(
+        service_name="openai-agents-otel-example",
+        project="genai-otel-test",
+        genai_endpoint=args.genai_endpoint,
+        otlp_endpoint=args.otlp_endpoint,
+        processors=[SystemPromptInjector(AGENT_INSTRUCTIONS)],
+    )
 
     from opentelemetry.instrumentation.openai_agents import OpenAIAgentsInstrumentor
 
