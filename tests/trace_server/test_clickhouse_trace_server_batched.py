@@ -10,6 +10,7 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_client_manager import ClickHouseClientManager
 from weave.trace_server.clickhouse_schema import (
     CallEndCHInsertable,
     CallStartCHInsertable,
@@ -34,7 +35,7 @@ def test_clickhouse_storage_size_query_generation():
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
         patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+            ClickHouseClientManager, "create_client", return_value=mock_ch_client
         ),
     ):
         # Create a mock CallsQuery instance
@@ -389,7 +390,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
         patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+            ClickHouseClientManager, "create_client", return_value=mock_ch_client
         ),
     ):
         # Mock the litellm completion stream
@@ -562,7 +563,7 @@ def test_completions_create_stream_multiple_choices():
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
         patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+            ClickHouseClientManager, "create_client", return_value=mock_ch_client
         ),
     ):
         # Mock the litellm completion stream
@@ -701,7 +702,7 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
         patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+            ClickHouseClientManager, "create_client", return_value=mock_ch_client
         ),
     ):
         # Mock the litellm completion stream
@@ -949,7 +950,7 @@ def test_insert_retries_empty_query_error():
     ]
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ClickHouseClientManager, "create_client", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         result = server._insert("t", data=[[1]], column_names=["a"])
@@ -986,7 +987,7 @@ def test_insert_error_handling(error, expected_calls):
         expected_exception = type(error)
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ClickHouseClientManager, "create_client", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         with pytest.raises(expected_exception):
@@ -1009,7 +1010,7 @@ def test_call_batch_clears_on_insert_failure():
     project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ClickHouseClientManager, "create_client", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
 
@@ -1049,7 +1050,7 @@ def server_with_mock_kafka():
     mock_producer = MagicMock()
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ClickHouseClientManager, "create_client", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._kafka_producer = mock_producer
@@ -1134,7 +1135,7 @@ def test_file_batch_clears_on_insert_failure():
     mock_ch_client.insert.side_effect = _MockInsertError("Connection refused")
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ClickHouseClientManager, "create_client", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
 

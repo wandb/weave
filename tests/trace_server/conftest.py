@@ -171,16 +171,17 @@ def get_ch_trace_server(
             # Clean up any existing worker-specific databases
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
-            ch_server._database_ensured = False
+            ch_server._ch_manager._database_ensured = False
 
             # Patch _run_migrations to use worker-specific management database
             def patched_run_migrations():
                 import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
 
                 migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-                    ch_server._mint_client(), management_db=management_db
+                    ch_server._ch_manager.create_client(),
+                    management_db=management_db,
                 )
-                migrator.apply_migrations(ch_server._database)
+                migrator.apply_migrations(ch_server._ch_manager.database)
 
             ch_server._run_migrations = patched_run_migrations  # type: ignore[assignment]
             ch_server._run_migrations()

@@ -15,12 +15,10 @@ from re import sub
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
-import clickhouse_connect
 import ddtrace
 from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
-from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
@@ -83,6 +81,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
+from weave.trace_server.clickhouse_client_manager import ClickHouseClientManager
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
     ALL_CALL_INSERT_COLUMNS,
@@ -232,11 +231,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-# Create a shared connection pool manager for all ClickHouse connections
-# maxsize: Maximum connections per pool (set higher than thread count to avoid blocking)
-# num_pools: Number of distinct connection pools (for different hosts/configs)
-_CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
-
 # Precomputed list of (column_index, field_name) for every sentinel field that appears
 # in ALL_CALL_COMPLETE_INSERT_COLUMNS.  Used by _insert_call_complete_batch to enforce
 # sentinel conversion as a last line of defense — preventing "Invalid None value in
@@ -261,12 +255,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         evaluate_model_dispatcher: EvaluateModelDispatcher | None = None,
     ):
         super().__init__()
+        self._ch_manager = ClickHouseClientManager(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=database,
+        )
         self._thread_local = threading.local()
-        self._host = host
-        self._port = port
-        self._user = user
-        self._password = password
-        self._database = database
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._init_lock = threading.Lock()
@@ -279,7 +275,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             maxsize=50_000, ttl=86_400
         )
         self._op_ref_cache_lock = threading.Lock()
-        self._database_ensured = False
 
     def __del__(self) -> None:
         """Flush batches and the Kafka producer on cleanup."""
@@ -2151,7 +2146,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ORDER BY project_id, digest
         """
 
-        row_digest_result_query = self.ch_client.query(
+        row_digest_result_query = self._query(
             query,
             parameters={
                 "project_id": req.project_id,
@@ -2403,7 +2398,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             parameters = pb.get_params()
 
-        query_result = self.ch_client.query(query, parameters=parameters)
+        query_result = self._query(query, parameters=parameters)
 
         tables = [
             _ch_table_stats_to_table_stats_schema(row)
@@ -2457,7 +2452,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_files_storage_size=_default_true(req.include_file_storage_size),
             read_table=read_table,
         )
-        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        query_result = self._query(query, parameters=pb.get_params())
 
         if len(query_result.result_rows) != 1:
             raise RuntimeError("Unexpected number of results", query_result)
@@ -2630,7 +2625,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, parameters=pb.get_params())
         rows = result.named_results()
 
         try:
@@ -2669,7 +2664,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_id=req.queue_id,
             pb=pb,
         )
-        result = self.ch_client.query(read_query, parameters=pb.get_params())
+        result = self._query(read_query, parameters=pb.get_params())
         res = result.named_results()
         try:
             row = next(res)
@@ -2911,7 +2906,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_position=req.include_position,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, parameters=pb.get_params())
 
         items = []
         for row in result.named_results():
@@ -2956,7 +2951,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, parameters=pb.get_params())
 
         stats = []
         for row in result.result_rows:
@@ -2987,7 +2982,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             offset=None,
             include_position=False,
         )
-        fetch_result = self.ch_client.query(fetch_query, parameters=pb.get_params())
+        fetch_result = self._query(fetch_query, parameters=pb.get_params())
 
         for row in fetch_result.named_results():
             item = tsi.AnnotationQueueItemSchema(
@@ -3059,7 +3054,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         GROUP BY annotation_state
         """
 
-        check_result = self.ch_client.query(check_query, parameters=pb.get_params())
+        check_result = self._query(check_query, parameters=pb.get_params())
         current_state = None
         has_record = False
 
@@ -3104,7 +3099,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         LIMIT 1
         """
 
-        item_check_result = self.ch_client.query(
+        item_check_result = self._query(
             item_check_query, parameters=pb.get_params()
         )
         if not list(item_check_result.named_results()):
@@ -5436,7 +5431,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest
-        query_result = self.ch_client.query(
+        query_result = self._query(
             """
             SELECT n_chunks, val_bytes, file_storage_uri
             FROM (
@@ -5532,7 +5527,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         FROM files_stats
         WHERE project_id = {{{project_id_param}: String}}
         """
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, parameters=pb.get_params())
 
         if len(result.result_rows) == 0 or result.result_rows[0][0] is None:
             raise RuntimeError("No results found")
@@ -5603,7 +5598,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="clickhouse")
-        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        query_result = self._query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
             query_result.result_rows, prepared.fields
         )
@@ -5634,7 +5629,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = LLM_TOKEN_PRICES_TABLE.purge()
         query = query.where(query_with_pricing_level)
         prepared = query.prepare(database_type="clickhouse")
-        self.ch_client.query(prepared.sql, prepared.parameters)
+        self._query(prepared.sql, prepared.parameters)
         return tsi.CostPurgeRes()
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
@@ -5691,7 +5686,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="clickhouse")
-        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        query_result = self._query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
             query_result.result_rows, prepared.fields
         )
@@ -5707,7 +5702,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.project_id(req.project_id)
         query = query.where(req.query)
         prepared = query.prepare(database_type="clickhouse")
-        self.ch_client.query(prepared.sql, prepared.parameters)
+        self._query(prepared.sql, prepared.parameters)
         return tsi.FeedbackPurgeRes()
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
@@ -6189,36 +6184,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def ch_client(self) -> CHClient:
         """Returns a thread-local clickhouse client.
 
-        Each thread gets its own client instance to avoid session conflicts,
-        but all clients share the same underlying connection pool via _CH_POOL_MANAGER.
+        Delegates to :pyattr:`_ch_manager` which handles thread-local
+        storage and connection pooling.
         """
-        if not hasattr(self._thread_local, "ch_client"):
-            self._thread_local.ch_client = self._mint_client()
-        return self._thread_local.ch_client
-
-    def _ensure_database(self, client: CHClient) -> None:
-        """Run CREATE DATABASE IF NOT EXISTS once per process."""
-        if self._database_ensured:
-            return
-        with self._init_lock:
-            if self._database_ensured:
-                return
-            client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
-            self._database_ensured = True
-
-    def _mint_client(self) -> CHClient:
-        """Create a new ClickHouse client using the shared pool manager."""
-        client = clickhouse_connect.get_client(
-            host=self._host,
-            port=self._port,
-            user=self._user,
-            password=self._password,
-            secure=self._port == 8443,
-            pool_mgr=_CH_POOL_MANAGER,
-        )
-        self._ensure_database(client)
-        client.database = self._database
-        return client
+        return self._ch_manager.client
 
     @contextmanager
     def with_new_client(self) -> Iterator[None]:
@@ -6231,14 +6200,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self.feedback_query(req)
         ```
         """
-        client = self._mint_client()
-        original_client = self.ch_client
-        self._thread_local.ch_client = client
-        try:
+        with self._ch_manager.new_client():
             yield
-        finally:
-            self._thread_local.ch_client = original_client
-            client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(
@@ -6316,13 +6279,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            self._mint_client(),
+            self._ch_manager.create_client(),
             replicated=wf_env.wf_clickhouse_replicated(),
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
             replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
             use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
         )
-        migrator.apply_migrations(self._database)
+        migrator.apply_migrations(self._ch_manager.database)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query_stream")
     def _query_stream(

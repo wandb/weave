@@ -16,6 +16,7 @@ from tests.trace.util import client_is_sqlite
 from weave.shared.digest import str_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
+from weave.trace_server.clickhouse_client_manager import ClickHouseClientManager
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import InvalidRequest, ObjectDeletedError
 
@@ -78,9 +79,9 @@ def test_clickhouse_batching():
     # MagicMock is truthy, so get_project_data_residence() returns BOTH, which is incorrect, mock it
     mock_ch_client.query.return_value.result_rows = []
 
-    # Create a ClickHouseTraceServer instance and patch _mint_client
+    # Create a ClickHouseTraceServer instance and patch create_client
     with patch.object(
-        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ClickHouseClientManager, "create_client", return_value=mock_ch_client
     ):
         trace_server = ClickHouseTraceServer(host="test_host")
 
@@ -178,7 +179,7 @@ def test_clickhouse_batching_deduplicates_identical_files():
     mock_ch_client.query.return_value.result_rows = []
 
     with patch.object(
-        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ClickHouseClientManager, "create_client", return_value=mock_ch_client
     ):
         trace_server = ClickHouseTraceServer(host="test_host")
         project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
