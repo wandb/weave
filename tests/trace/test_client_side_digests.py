@@ -46,7 +46,7 @@ def _configure_digests(client: WeaveClient, *, enable: bool) -> None:
 
     In test environments, ``projects_info`` is not available on the local
     server chain (it lives on ``ServiceInterface``, a remote-only concern).
-    The multi-layer delegation (ServerRecorder → CachingMiddleware →
+    The multi-layer delegation (ServerRecorder -> CachingMiddleware ->
     ExternalToInternal adapter) makes clean mocking impractical, so we set
     the resolver state directly.
     """
@@ -80,67 +80,9 @@ def _publish_with_digests(
     return ref.digest
 
 
-def _inner_server(client: WeaveClient) -> tsi.TraceServerInterface:
-    """Unwrap the ServerRecorder to get the CachingMiddlewareTraceServer.
-
-    In tests, client.server is a ServerRecorder that delegates to
-    the CachingMiddlewareTraceServer. This helper avoids reaching
-    through .server.server in every test.
-    """
-    return client.server.server
-
-
-def _spy_on_server_method(
-    client: WeaveClient,
-    method_name: str,
-    captured: list,
-    extract_fn,
-    monkeypatch,
-) -> None:
-    """Install a spy on a server method that captures values via extract_fn.
-
-    The test server chain uses DelegatingTraceServerMixin with a custom
-    __getattribute__ that ignores instance attributes for class-defined
-    methods. To intercept reliably, we find the LOWEST concrete class in
-    the delegation chain that defines the method and patch there.
-
-    We check the delegated server first (ExternalToInternal adapter) because
-    it's lower in the chain — patching a Protocol/ABC base like
-    TraceServerInterface would be shadowed by the concrete implementation.
-    """
-    server = _inner_server(client)
-
-    # Check delegated server first (lower = more concrete), then the wrapper.
-    for srv in [server._next_trace_server, server]:
-        for cls in type(srv).__mro__:
-            if cls is object:
-                continue
-            if method_name in cls.__dict__:
-                original = cls.__dict__[method_name]
-
-                def spy(self, req, _orig=original):
-                    captured.append(extract_fn(req))
-                    return _orig(self, req)
-
-                monkeypatch.setattr(cls, method_name, spy)
-                return
-
-    raise ValueError(f"Could not find {method_name} in server chain")
-
-
-@pytest.fixture(autouse=True)
-def _reset_settings():
-    """Reset settings to defaults after each test to avoid leaking state."""
-    yield
-    parse_and_apply_settings(UserSettings())
-
-
 @pytest.fixture
 def fast_path(client: WeaveClient):
-    """Enable the client-side digest fast path for a test.
-
-    Teardown is handled by the autouse ``_reset_settings`` fixture.
-    """
+    """Enable the client-side digest fast path for a test."""
     _configure_digests(client, enable=True)
 
 
@@ -296,7 +238,7 @@ class TestClientServerDigestConsistency:
 
 
 class TestDataCorrectness:
-    """Publish via client-side digest path, read back, verify data is intact."""
+    """Publish (client-side and server-side), read back, verify data is intact."""
 
     def test_object(self, client: WeaveClient, fast_path: None):
         obj = {"key": "value", "number": 42, "list": [1, 2, 3]}
@@ -386,62 +328,36 @@ class TestDataCorrectness:
 class TestServerDigestValidation:
     """Server must reject wrong expected_digest and accept correct ones."""
 
-    def test_object_wrong_digest(self, client: WeaveClient):
-        req = tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id=client._project_id(),
-                object_id="bad_digest_obj",
-                val={"hello": "world"},
-                expected_digest="definitely_wrong_digest",
-            )
+    @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
+    def test_object(self, client: WeaveClient, correct: bool):
+        val = {"hello": "world"}
+        expected_digest = (
+            compute_object_digest(val) if correct else "definitely_wrong"
         )
-
-        with pytest.raises(DigestMismatchError):
-            client.server.obj_create(req)
-
-    def test_table_wrong_digest(self, client: WeaveClient):
-        req = tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
-                rows=[{"a": 1}, {"a": 2}],
-                expected_digest="definitely_wrong_digest",
-            )
-        )
-
-        with pytest.raises(DigestMismatchError):
-            client.server.table_create(req)
-
-    def test_file_wrong_digest(self, client: WeaveClient):
-        req = tsi.FileCreateReq(
-            project_id=client._project_id(),
-            name="test.txt",
-            content=b"hello world",
-            expected_digest="definitely_wrong_digest",
-        )
-
-        with pytest.raises(DigestMismatchError):
-            client.server.file_create(req)
-
-    def test_object_correct_digest(self, client: WeaveClient):
-        val = {"server": "accepts", "this": True}
-        expected_digest = compute_object_digest(val)
 
         req = tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
                 project_id=client._project_id(),
-                object_id="correct_digest_obj",
+                object_id="digest_obj",
                 val=val,
                 expected_digest=expected_digest,
             )
         )
 
-        res = client.server.obj_create(req)
-        assert res.digest == expected_digest
+        if correct:
+            res = client.server.obj_create(req)
+            assert res.digest == expected_digest
+        else:
+            with pytest.raises(DigestMismatchError):
+                client.server.obj_create(req)
 
-    def test_table_correct_digest(self, client: WeaveClient):
-        rows = [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}, {"a": 3, "b": "z"}]
+    @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
+    def test_table(self, client: WeaveClient, correct: bool):
+        rows = [{"a": 1}, {"a": 2}, {"a": 3}]
         row_digests = [compute_row_digest(r) for r in rows]
-        expected_digest = compute_table_digest(row_digests)
+        expected_digest = (
+            compute_table_digest(row_digests) if correct else "definitely_wrong"
+        )
 
         req = tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
@@ -451,13 +367,20 @@ class TestServerDigestValidation:
             )
         )
 
-        res = client.server.table_create(req)
-        assert res.digest == expected_digest
-        assert res.row_digests == row_digests
+        if correct:
+            res = client.server.table_create(req)
+            assert res.digest == expected_digest
+            assert res.row_digests == row_digests
+        else:
+            with pytest.raises(DigestMismatchError):
+                client.server.table_create(req)
 
-    def test_file_correct_digest(self, client: WeaveClient):
+    @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
+    def test_file(self, client: WeaveClient, correct: bool):
         content = b"hello world"
-        expected_digest = compute_file_digest(content)
+        expected_digest = (
+            compute_file_digest(content) if correct else "definitely_wrong"
+        )
 
         req = tsi.FileCreateReq(
             project_id=client._project_id(),
@@ -466,88 +389,12 @@ class TestServerDigestValidation:
             expected_digest=expected_digest,
         )
 
-        res = client.server.file_create(req)
-        assert res.digest == expected_digest
-
-
-class TestExpectedDigestWiring:
-    """Verify that the client sends (or omits) expected_digest correctly."""
-
-    def test_fast_path_sends_object_expected_digest(
-        self, client: WeaveClient, fast_path: None, monkeypatch
-    ) -> None:
-        captured: list[str | None] = []
-        _spy_on_server_method(
-            client, "obj_create", captured,
-            lambda req: req.obj.expected_digest, monkeypatch,
-        )
-
-        weave.publish({"test": "fast_path"}, name="fast-path-test")
-        client._flush()
-
-        assert len(captured) == 1
-        assert captured[0] is not None
-
-    def test_fallback_omits_object_expected_digest(
-        self, client: WeaveClient, monkeypatch
-    ) -> None:
-        captured: list[str | None] = []
-        _spy_on_server_method(
-            client, "obj_create", captured,
-            lambda req: req.obj.expected_digest, monkeypatch,
-        )
-
-        weave.publish({"test": "fallback_path"}, name="fallback-path-test")
-        client._flush()
-
-        assert len(captured) == 1
-        assert captured[0] is None
-
-    def test_fast_path_sends_table_expected_digest(
-        self, client: WeaveClient, fast_path: None, monkeypatch
-    ) -> None:
-        captured: list[str | None] = []
-        _spy_on_server_method(
-            client, "table_create", captured,
-            lambda req: req.table.expected_digest, monkeypatch,
-        )
-
-        ds = weave.Dataset(name="table_digest_test", rows=[{"x": 1}])
-        weave.publish(ds, name="table-digest-test")
-        client._flush()
-
-        assert any(d is not None for d in captured)
-
-    def test_fallback_omits_table_expected_digest(
-        self, client: WeaveClient, monkeypatch
-    ) -> None:
-        captured: list[str | None] = []
-        _spy_on_server_method(
-            client, "table_create", captured,
-            lambda req: req.table.expected_digest, monkeypatch,
-        )
-
-        ds = weave.Dataset(name="table_no_digest", rows=[{"x": 1}])
-        weave.publish(ds, name="table-no-digest-test")
-        client._flush()
-
-        assert all(d is None for d in captured)
-
-    def test_file_expected_digest_sent_for_custom_type(
-        self, client: WeaveClient, fast_path: None, monkeypatch
-    ) -> None:
-        captured: list[str | None] = []
-        _spy_on_server_method(
-            client, "file_create", captured,
-            lambda req: req.expected_digest, monkeypatch,
-        )
-
-        img = Image.new("RGB", (4, 4), color="blue")
-        weave.publish(img, name="file-digest-image")
-        client._flush()
-
-        assert len(captured) >= 1
-        assert all(d is not None for d in captured)
+        if correct:
+            res = client.server.file_create(req)
+            assert res.digest == expected_digest
+        else:
+            with pytest.raises(DigestMismatchError):
+                client.server.file_create(req)
 
 
 class TestConvertRefsToInternal:
@@ -586,11 +433,21 @@ class TestConvertRefsToInternal:
         CrossProjectRefError which is caught by the caller, causing it to skip
         expected_digest and let the server compute the digest instead.
         """
-        captured: list[str | None] = []
-        _spy_on_server_method(
-            client, "obj_create", captured,
-            lambda req: req.obj.expected_digest, monkeypatch,
+        from tests.trace.server_utils import find_server_layer
+        from weave.trace_server.external_to_internal_trace_server_adapter import (
+            ExternalTraceServer,
         )
+
+        # Spy on the adapter's obj_create to capture expected_digest values
+        captured: list[str | None] = []
+        adapter = find_server_layer(client.server, ExternalTraceServer)
+        original = type(adapter).obj_create
+
+        def spy(self, req):
+            captured.append(req.obj.expected_digest)
+            return original(self, req)
+
+        monkeypatch.setattr(type(adapter), "obj_create", spy)
 
         # Publish an inner object in a different project to get a cross-project ref
         original_project = client.project

@@ -89,6 +89,15 @@ def reset_project_residence_cache():
 
 
 @pytest.fixture(autouse=True)
+def reset_digest_settings():
+    """Reset client-side digest settings after each test."""
+    from weave.trace.settings import UserSettings, parse_and_apply_settings
+
+    yield
+    parse_and_apply_settings(UserSettings())
+
+
+@pytest.fixture(autouse=True)
 def disable_datadog():
     """Disables Datadog logging and tracing for tests.
 
