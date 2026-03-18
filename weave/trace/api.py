@@ -86,10 +86,11 @@ def init(
             "Please use explicit patching instead. For example:\n"
             "----------------------------------------\n"
             "    import weave\n"
-            f"    weave.init('{project_name}')\n"
+            "    weave.init('%s')\n"
             "    weave.integrations.patch_openai()\n"
             "----------------------------------------\n"
             "See https://docs.wandb.ai/guides/integrations for more information.",
+            project_name,
         )
 
     parse_and_apply_settings(settings)

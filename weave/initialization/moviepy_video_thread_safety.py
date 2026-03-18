@@ -57,7 +57,7 @@ def apply_threadsafe_patch_to_moviepy_video() -> None:
             _apply_threadsafe_patch()
         except Exception as e:
             logger.info(
-                f"Failed to patch moviepy.editor.VideoFileClip: Unexpected error - {e}"
+                "Failed to patch moviepy.editor.VideoFileClip: Unexpected error - %s", e
             )
         else:
             _patched = True
@@ -130,7 +130,8 @@ def undo_threadsafe_patch_to_moviepy_video() -> None:
         pass
     except Exception as e:
         logger.info(
-            f"Failed to unpatch moviepy.editor.VideoFileClip: Unable to restore original methods - {e}"
+            "Failed to unpatch moviepy.editor.VideoFileClip: Unable to restore original methods - %s",
+            e,
         )
     else:
         _patched = False
@@ -181,7 +182,7 @@ class MoviePyPatchHook(MetaPathFinder):
             _apply_threadsafe_patch()
         except Exception as e:
             logger.info(
-                f"Failed to patch moviepy.editor.VideoFileClip during import: {e}"
+                "Failed to patch moviepy.editor.VideoFileClip during import: %s", e
             )
         else:
             _patched = True

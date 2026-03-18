@@ -240,7 +240,7 @@ def check_netrc_access(netrc_path: str) -> _NetrcPermissions:
         write_access = True
         read_access = True
     except OSError:
-        logger.exception(f"Unable to read permissions for {netrc_path}")
+        logger.exception("Unable to read permissions for %s", netrc_path)
 
     return _NetrcPermissions(
         exists=file_exists,

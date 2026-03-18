@@ -64,7 +64,7 @@ class LRUCache(Generic[K, V]):
                 self._cache.move_to_end(key)
                 return self._cache[key]
         except Exception as e:
-            logger.debug(f"Error getting key '{key}' from memory cache: {e}")
+            logger.debug("Error getting key '%s' from memory cache: %s", key, e)
             return None
 
     def put(self, key: K, value: V) -> None:
@@ -82,7 +82,7 @@ class LRUCache(Generic[K, V]):
                     if len(self._cache) > self._max_size:
                         self._cache.popitem(last=False)  # Remove oldest (first item)
         except Exception as e:
-            logger.debug(f"Error setting key '{key}' in memory cache: {e}")
+            logger.debug("Error setting key '%s' in memory cache: %s", key, e)
 
     def delete(self, key: K) -> None:
         """Delete a key from the cache. Silent on errors."""
@@ -91,7 +91,7 @@ class LRUCache(Generic[K, V]):
                 del self._cache[key]
         except (KeyError, Exception) as e:
             # Silent on both KeyError (key doesn't exist) and other errors
-            logger.debug(f"Error deleting key '{key}' from memory cache: {e}")
+            logger.debug("Error deleting key '%s' from memory cache: %s", key, e)
 
     def keys(self) -> set[K]:
         """Return all keys in the cache. Returns empty set on errors."""
@@ -99,7 +99,7 @@ class LRUCache(Generic[K, V]):
             with self._lock:
                 return set(self._cache.keys())
         except Exception as e:
-            logger.debug(f"Error getting keys from memory cache: {e}")
+            logger.debug("Error getting keys from memory cache: %s", e)
             return set()
 
     def clear(self) -> None:
@@ -108,7 +108,7 @@ class LRUCache(Generic[K, V]):
             with self._lock:
                 self._cache.clear()
         except Exception as e:
-            logger.debug(f"Error clearing memory cache: {e}")
+            logger.debug("Error clearing memory cache: %s", e)
 
     def __contains__(self, key: K) -> bool:
         """Check if key exists in cache. Returns False on errors."""
@@ -116,7 +116,7 @@ class LRUCache(Generic[K, V]):
             with self._lock:
                 return key in self._cache
         except Exception as e:
-            logger.debug(f"Error checking memory cache for key '{key}': {e}")
+            logger.debug("Error checking memory cache for key '%s': %s", key, e)
             return False
 
     def close(self) -> None:
@@ -151,7 +151,7 @@ class DiskCache:
         try:
             return self._cache.get(key)
         except Exception as e:
-            logger.debug(f"Error reading from disk cache for key '{key}': {e}")
+            logger.debug("Error reading from disk cache for key '%s': %s", key, e)
             return None
 
     def put(self, key: str, value: str | bytes) -> None:
@@ -159,7 +159,7 @@ class DiskCache:
         try:
             self._cache.set(key, value)
         except Exception as e:
-            logger.debug(f"Error writing to disk cache for key '{key}': {e}")
+            logger.debug("Error writing to disk cache for key '%s': %s", key, e)
 
     def delete(self, key: str) -> None:
         """Delete a key from the cache. Silent on errors."""
@@ -167,14 +167,14 @@ class DiskCache:
             del self._cache[key]
         except (KeyError, Exception) as e:
             # Silent on both KeyError (key doesn't exist) and other errors
-            logger.debug(f"Error deleting from disk cache for key '{key}': {e}")
+            logger.debug("Error deleting from disk cache for key '%s': %s", key, e)
 
     def keys(self) -> set[str]:
         """Return all keys in the disk cache. Returns empty set on errors."""
         try:
             return set(self._cache.iterkeys())
         except Exception as e:
-            logger.debug(f"Error getting keys from disk cache: {e}")
+            logger.debug("Error getting keys from disk cache: %s", e)
             return set()
 
     def close(self) -> None:
@@ -189,7 +189,7 @@ class DiskCache:
         try:
             return key in self._cache
         except Exception as e:
-            logger.debug(f"Error checking disk cache for key '{key}': {e}")
+            logger.debug("Error checking disk cache for key '%s': %s", key, e)
             return False
 
 
@@ -260,7 +260,7 @@ class StackedCache:
                 layer_keys = layer.keys()
                 all_keys.update(layer_keys)
             except Exception as e:
-                logger.debug(f"Error getting keys from cache layer: {e}")
+                logger.debug("Error getting keys from cache layer: %s", e)
                 # Continue with other layers
         return all_keys
 
@@ -271,7 +271,7 @@ class StackedCache:
                 if key in layer:
                     return True
             except Exception as e:
-                logger.debug(f"Error checking cache layer for key '{key}': {e}")
+                logger.debug("Error checking cache layer for key '%s': %s", key, e)
                 # Continue with other layers
         return False
 

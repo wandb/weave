@@ -266,7 +266,7 @@ class Evaluation(Object):
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            logger.info(f"Evaluated {n_complete} of {num_rows} examples")
+            logger.info("Evaluated %s of %s examples", n_complete, num_rows)
             normalized_eval_row: dict[str, Any]
             if eval_row is None:
                 normalized_eval_row = {self._output_key: None, "scores": {}}
@@ -299,7 +299,7 @@ class Evaluation(Object):
 
         summary_str = _safe_summarize_to_str(summary)
         if summary_str:
-            logger.info(f"Evaluation summary {summary_str}")
+            logger.info("Evaluation summary %s", summary_str)
 
         return summary
 

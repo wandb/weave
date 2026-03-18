@@ -649,7 +649,7 @@ class StateExporter(BaseModel):
             response_parent = session_call
 
         else:
-            logger.warning(f"Could not find session for response - {response_id}")
+            logger.warning("Could not find session for response - %s", response_id)
             # Will not happen in GA but potentially possible in Beta
             response_parent = None
 

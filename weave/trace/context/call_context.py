@@ -37,7 +37,8 @@ def pop_call(call_id: str | None) -> None:
     new_stack = copy.copy(_call_stack.get())
     if len(new_stack) == 0:
         logger.debug(
-            f"weave pop_call error: Found empty callstack when popping call_id: {call_id}."
+            "weave pop_call error: Found empty callstack when popping call_id: %s.",
+            call_id,
         )
         # raise ValueError("Call stack is empty")
         return
@@ -57,7 +58,7 @@ def pop_call(call_id: str | None) -> None:
                 break
         else:
             logger.debug(
-                f"weave pop_call error: Call with id {call_id} not found in stack."
+                "weave pop_call error: Call with id %s not found in stack.", call_id
             )
             # raise ValueError(f"Call with id {call_id} not found in stack")
             return

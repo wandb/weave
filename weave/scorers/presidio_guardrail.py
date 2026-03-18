@@ -78,7 +78,9 @@ class PresidioScorer(weave.Scorer):
 
             if invalid_entities:
                 logger.warning(
-                    f"\nThe following entities are not available and will be ignored: {invalid_entities}\nContinuing with valid entities: {valid_entities}"
+                    "\nThe following entities are not available and will be ignored: %s\nContinuing with valid entities: %s",
+                    invalid_entities,
+                    valid_entities,
                 )
                 self.selected_entities = valid_entities
         else:
