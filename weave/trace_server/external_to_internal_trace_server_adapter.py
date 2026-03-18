@@ -1001,3 +1001,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._ref_apply(
             self._internal_trace_server.call_end_v2, req, req.end.project_id
         )
+
+    def projects_info(
+        self, req: tsi.ProjectsInfoReq
+    ) -> list[tsi.ProjectsInfoRes]:
+        """Resolve external project IDs to internal project IDs."""
+        return [
+            tsi.ProjectsInfoRes(
+                external_project_id=pid,
+                internal_project_id=self._idc.ext_to_int_project_id(pid),
+            )
+            for pid in req.project_ids
+        ]
