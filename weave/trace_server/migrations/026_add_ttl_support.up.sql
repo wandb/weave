@@ -18,16 +18,19 @@ SETTINGS
     enable_block_number_column = 1,
     enable_block_offset_column = 1;
 
--- Step 2: Add ttl_at to call_parts (v1 raw storage)
-ALTER TABLE call_parts
-    ADD COLUMN ttl_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
+-- Step 1b: Rename existing ttl_at column on calls_complete (created by migration 024) to expire_at
+ALTER TABLE calls_complete RENAME COLUMN ttl_at TO expire_at;
 
--- Step 3: Add ttl_at to calls_merged (v1 aggregated table)
+-- Step 2: Add expire_at to call_parts (v1 raw storage)
+ALTER TABLE call_parts
+    ADD COLUMN expire_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
+
+-- Step 3: Add expire_at to calls_merged (v1 aggregated table)
 ALTER TABLE calls_merged
-    ADD COLUMN ttl_at SimpleAggregateFunction(min, DateTime64(3))
+    ADD COLUMN expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
--- Step 4: Update calls_merged_view to propagate ttl_at from call_parts
+-- Step 4: Update calls_merged_view to propagate expire_at from call_parts
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
         id,
@@ -53,36 +56,32 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         argMaxState(display_name, call_parts.created_at) as display_name,
         anySimpleState(coalesce(call_parts.started_at, call_parts.ended_at, call_parts.created_at)) as sortable_datetime,
         anySimpleState(otel_dump) as otel_dump,
-        minSimpleState(ttl_at) as ttl_at
+        minSimpleState(expire_at) as expire_at
     FROM call_parts
     GROUP BY project_id,
         id;
 
 -- Step 5: Enable TTL deletion on calls_merged
-ALTER TABLE calls_merged MODIFY TTL ttl_at DELETE;
+ALTER TABLE calls_merged MODIFY TTL expire_at DELETE;
 
 -- Step 6: Enable TTL deletion on call_parts
-ALTER TABLE call_parts MODIFY TTL ttl_at DELETE;
+ALTER TABLE call_parts MODIFY TTL expire_at DELETE;
 
--- Step 7: Add ttl_at column and TTL to calls_merged_stats
+-- Step 7: Add expire_at column and TTL to calls_merged_stats
 ALTER TABLE calls_merged_stats
-    ADD COLUMN IF NOT EXISTS ttl_at SimpleAggregateFunction(min, DateTime64(3))
+    ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
-ALTER TABLE calls_merged_stats MODIFY TTL ttl_at DELETE;
+ALTER TABLE calls_merged_stats MODIFY TTL expire_at DELETE;
 
--- Step 8: Add ttl_at column and TTL to calls_complete_stats
+-- Step 8: Add expire_at column and TTL to calls_complete_stats
 ALTER TABLE calls_complete_stats
-    ADD COLUMN IF NOT EXISTS ttl_at SimpleAggregateFunction(min, DateTime64(3))
+    ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
-ALTER TABLE calls_complete_stats MODIFY TTL ttl_at DELETE;
+ALTER TABLE calls_complete_stats MODIFY TTL expire_at DELETE;
 
--- Step 9: Upgrade calls_complete.ttl_at from DateTime to DateTime64(3)
--- (migration 024 created it as DateTime; align with all other datetime columns)
-ALTER TABLE calls_complete MODIFY COLUMN ttl_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
-
--- Step 10: Update calls_merged_stats_view to propagate ttl_at
+-- Step 9: Update calls_merged_stats_view to propagate expire_at
 ALTER TABLE calls_merged_stats_view MODIFY QUERY
 SELECT
     call_parts.project_id,
@@ -107,13 +106,13 @@ SELECT
     maxSimpleState(call_parts.created_at) as updated_at,
     argMaxState(call_parts.display_name, call_parts.created_at) as display_name,
     anySimpleState(length(call_parts.otel_dump)) as otel_dump_size_bytes,
-    minSimpleState(call_parts.ttl_at) as ttl_at
+    minSimpleState(call_parts.expire_at) as expire_at
 FROM call_parts
 GROUP BY
     call_parts.project_id,
     call_parts.id;
 
--- Step 10: Update calls_complete_stats_view to propagate ttl_at
+-- Step 10: Update calls_complete_stats_view to propagate expire_at
 ALTER TABLE calls_complete_stats_view MODIFY QUERY
 SELECT
     calls_complete.project_id,
@@ -138,7 +137,7 @@ SELECT
     minSimpleState(calls_complete.created_at) as created_at,
     maxSimpleState(calls_complete.updated_at) as updated_at,
     argMaxState(calls_complete.display_name, calls_complete.created_at) as display_name,
-    minSimpleState(calls_complete.ttl_at) as ttl_at
+    minSimpleState(calls_complete.expire_at) as expire_at
 FROM calls_complete
 GROUP BY
     calls_complete.project_id,
