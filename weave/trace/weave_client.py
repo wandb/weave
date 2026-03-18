@@ -381,26 +381,7 @@ class WeaveClient:
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
-        # Eagerly resolve and cache the internal project ID so that
-        # client-side digest checks don't incur a server round-trip later.
-        # Must happen after all other attributes are initialised because
-        # _project_id() may trigger a flush in test subclasses.
-        #
-        # Latency: get_internal_project_id returns None immediately when the
-        # feature flag is off (the default).  When on, it makes one
-        # projects_info RPC — a single extra round-trip at startup, amortized
-        # over the session.
-        #
-        # Graceful degradation: if the server is outdated and doesn't support
-        # projects_info, the resolver catches the AttributeError and
-        # permanently disables itself.  Any other transient error (timeout,
-        # network) returns None without caching so the next access retries.
-        # In all failure cases _cached_internal_project_id stays None,
-        # _should_compute_client_digests() returns False, and the client
-        # silently falls back to server-computed digests.
-        self._cached_internal_project_id = (
-            self.project_id_resolver.get_internal_project_id(self._project_id())
-        )
+        self._warm_project_id_resolver()
 
     ################ High Level Convenience Methods ################
 
@@ -1880,6 +1861,23 @@ class WeaveClient:
             for v in obj.values():
                 self._save_nested_objects(v)
 
+    def _warm_project_id_resolver(self) -> None:
+        """Pre-populate the resolver cache for the current project.
+
+        Called at init and when the feature flag is toggled.
+        get_internal_project_id returns None immediately when the feature
+        flag is off (the default).  When on, it makes one projects_info
+        RPC, amortized over the session.
+
+        Graceful degradation: if the server doesn't support projects_info,
+        the resolver catches AttributeError and permanently disables itself.
+        Transient errors return None without caching so the next access
+        retries.  In all failure cases _should_compute_client_digests()
+        returns False and the client silently falls back to server-computed
+        digests.
+        """
+        self.project_id_resolver.get_internal_project_id(self._project_id())
+
     def _should_compute_client_digests(self) -> bool:
         """Return True if the client should compute digests locally."""
         if not settings.should_enable_client_side_digests():
@@ -1907,12 +1905,14 @@ class WeaveClient:
             CrossProjectRefError: The value contains cross-project refs that
                 cannot be resolved without a server round-trip.
         """
-        internal_project_id = self._cached_internal_project_id
+        project_id = self._project_id()
+        internal_project_id = self.project_id_resolver.get_internal_project_id(
+            project_id
+        )
         if internal_project_id is None:
             raise NoInternalProjectIDError(
-                "No internal project ID cached; cannot convert refs for digest"
+                "No internal project ID available; cannot convert refs for digest"
             )
-        project_id = self._project_id()
 
         def ext_to_int(ext_project_id: str) -> str:
             if ext_project_id == project_id:

@@ -35,17 +35,9 @@ from weave.trace_server.external_to_internal_trace_server_adapter import (
 
 
 def _configure_digests(client: WeaveClient, *, enable: bool) -> None:
-    """Toggle client-side digest computation on or off.
-
-    Re-resolves the internal project ID because the initial resolution
-    during ``__init__`` returns None when the setting is off (the default).
-    """
+    """Toggle client-side digest computation on or off."""
     parse_and_apply_settings(UserSettings(enable_client_side_digests=enable))
-    # Re-resolve: the __init__ resolution returned None because the setting
-    # was off at that point.  Now that it's toggled, re-cache.
-    client._cached_internal_project_id = (
-        client.project_id_resolver.get_internal_project_id(client._project_id())
-    )
+    client._warm_project_id_resolver()
 
 
 def _publish_with_digests(
@@ -377,9 +369,14 @@ class TestServerDigestValidation:
 class TestConvertRefsToInternal:
     """Unit tests for _convert_refs_to_internal."""
 
-    def test_raises_when_no_cached_id(self, client: WeaveClient) -> None:
-        """Raises NoInternalProjectIDError when no internal ID is cached."""
-        client._cached_internal_project_id = None
+    def test_raises_when_no_internal_id(self, client: WeaveClient) -> None:
+        """Raises NoInternalProjectIDError when the resolver returns None.
+
+        This happens when the feature flag is off (default) or the resolver
+        is disabled — get_internal_project_id returns None.
+        """
+        # Ensure the setting is off so the resolver returns None
+        parse_and_apply_settings(UserSettings(enable_client_side_digests=False))
 
         json_val = {
             "key": "value",
