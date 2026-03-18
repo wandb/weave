@@ -20,12 +20,12 @@ SETTINGS
 
 -- Step 2: Add ttl_at to call_parts (v1 raw storage)
 ALTER TABLE call_parts
-    ADD COLUMN ttl_at DateTime DEFAULT '2100-01-01 00:00:00';
+    ADD COLUMN ttl_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
 -- Step 3: Add ttl_at to calls_merged (v1 aggregated table)
 ALTER TABLE calls_merged
-    ADD COLUMN ttl_at SimpleAggregateFunction(min, DateTime)
-    DEFAULT '2100-01-01 00:00:00';
+    ADD COLUMN ttl_at SimpleAggregateFunction(min, DateTime64(3))
+    DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
 -- Step 4: Update calls_merged_view to propagate ttl_at from call_parts
 ALTER TABLE calls_merged_view MODIFY QUERY
@@ -66,15 +66,15 @@ ALTER TABLE call_parts MODIFY TTL ttl_at DELETE;
 
 -- Step 7: Add ttl_at column and TTL to calls_merged_stats
 ALTER TABLE calls_merged_stats
-    ADD COLUMN IF NOT EXISTS ttl_at SimpleAggregateFunction(min, DateTime)
-    DEFAULT '2100-01-01 00:00:00';
+    ADD COLUMN IF NOT EXISTS ttl_at SimpleAggregateFunction(min, DateTime64(3))
+    DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
 ALTER TABLE calls_merged_stats MODIFY TTL ttl_at DELETE;
 
 -- Step 8: Add ttl_at column and TTL to calls_complete_stats
 ALTER TABLE calls_complete_stats
-    ADD COLUMN IF NOT EXISTS ttl_at SimpleAggregateFunction(min, DateTime)
-    DEFAULT '2100-01-01 00:00:00';
+    ADD COLUMN IF NOT EXISTS ttl_at SimpleAggregateFunction(min, DateTime64(3))
+    DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
 ALTER TABLE calls_complete_stats MODIFY TTL ttl_at DELETE;
 
