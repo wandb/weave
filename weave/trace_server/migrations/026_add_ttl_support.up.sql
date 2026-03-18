@@ -9,7 +9,7 @@
 -- retention_days = 0 means "no TTL" (infinite retention).
 CREATE TABLE project_ttl_settings (
     project_id      String,
-    retention_days  UInt32,
+    retention_days  Int32,
     updated_at      DateTime64(3) DEFAULT now64(3),
     updated_by      String DEFAULT ''
 ) ENGINE = MergeTree()
