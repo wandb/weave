@@ -474,6 +474,55 @@ class GenAIActiveSpansRes(BaseModel):
     spans: list[GenAISpanSchema]
 
 
+class GenAIChatMessage(BaseModel):
+    """A single element in the structured agent trajectory / chat view.
+
+    Produced by the backend normalization of GenAI spans into a linear
+    sequence of user messages, agent responses, tool calls, handoffs,
+    and agent boundaries.
+    """
+
+    type: Literal[
+        "user_message",
+        "agent_message",
+        "tool_call",
+        "agent_handoff",
+        "agent_start",
+    ]
+    span_id: str = ""
+    agent_name: str = ""
+    text: str = ""
+    model: str = ""
+    system_instructions: str = ""
+    tool_name: str = ""
+    tool_arguments: str = ""
+    tool_result: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    duration_ms: int = 0
+    status: str = "OK"
+    content_refs: str = ""
+
+
+class GenAITraceChatReq(BaseModel):
+    """Request to get the structured chat / trajectory view for a trace."""
+
+    project_id: str
+    trace_id: str
+
+
+class GenAITraceChatRes(BaseModel):
+    """Structured chat view: a linear sequence of messages representing
+    the agent trajectory for a single trace.
+    """
+
+    trace_id: str
+    root_span_name: str = ""
+    provider: str = ""
+    total_duration_ms: int = 0
+    messages: list[GenAIChatMessage] = Field(default_factory=list)
+
+
 class CallStartReq(BaseModelStrict):
     start: StartedCallSchemaForInsert
 

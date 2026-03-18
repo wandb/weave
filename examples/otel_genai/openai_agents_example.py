@@ -9,18 +9,25 @@
 #     "weave @ file:///Users/ben/repos/core/services/weave-python/weave-public",
 # ]
 # ///
-"""OpenAI Agents SDK with subagents, handoffs, and tools — all OTel traced.
+"""OpenAI Agents SDK — multi-turn conversation with compaction, all OTel traced.
 
-Demonstrates a triage agent that routes to specialized subagents:
-  - WeatherBot: checks weather via a tool
-  - TravelAdvisor: looks up flights and hotels via tools
-  - Translator: translates text (no tools, just LLM)
+Demonstrates:
+  - Multi-turn conversation via SQLiteSession (context carries across turns)
+  - Automatic context compaction via OpenAIResponsesCompactionSession
+  - Subagent handoffs: TriageAgent routes to WeatherBot, TravelAdvisor, Translator
+  - Tool calls within a persistent conversation
 
-NOTE: System prompts / agent instructions are manually attached to spans
-via gen_ai.system_instructions because the OpenAI Agents v2 OTel
-instrumentor does not emit them. The OTel GenAI semantic conventions
-define this attribute (merged in semantic-conventions PR #2179, Aug 2025)
-but no instrumentor implements it yet:
+The conversation is designed so each turn builds on prior context:
+  1. Ask about weather in Tokyo
+  2. Follow up about Barcelona (requires knowing we're comparing cities)
+  3. Ask for a trip recommendation (requires both weather results)
+  4. Book flights to the recommended city (handoff to TravelAdvisor)
+  5. Find a hotel there (requires knowing destination from turn 4)
+  6. Translate the recommendation to Japanese (handoff to Translator)
+  7. Summarize everything discussed (tests full context recall / compaction)
+
+NOTE: System prompts / agent instructions are manually attached via
+gen_ai.system_instructions because no instrumentor emits them yet:
   - https://github.com/open-telemetry/semantic-conventions/pull/2179
   - https://github.com/open-telemetry/opentelemetry-python-contrib/issues/4038
 
@@ -33,7 +40,8 @@ import argparse
 import asyncio
 import os
 
-from agents import Agent, Runner, function_tool
+from agents import Agent, Runner, SQLiteSession, function_tool
+from agents.memory import OpenAIResponsesCompactionSession
 
 from weave.otel import SystemPromptInjector, setup_tracing
 
@@ -50,6 +58,7 @@ def get_weather(city: str) -> str:
         "tokyo": "Clear, 75°F, humidity 45%",
         "london": "Rainy, 52°F, wind 8 mph SW",
         "barcelona": "Sunny, 82°F, UV index 7",
+        "paris": "Overcast, 61°F, light drizzle",
     }
     return forecasts.get(city.lower(), f"Partly cloudy, 68°F in {city}")
 
@@ -147,26 +156,50 @@ triage_agent = Agent(
     model="gpt-4o-mini",
 )
 
+# Multi-turn conversation: each turn builds on prior context
+CONVERSATION = [
+    "What's the weather like in Tokyo?",
+    "How about Barcelona?",
+    "Which city would be better for a beach day? Explain why.",
+    "Book me a flight from San Francisco to whichever city you recommended, next Friday.",
+    "And find me a hotel there for 3 nights starting that Friday.",
+    "Translate your hotel recommendation into Japanese.",
+    "Give me a brief summary of everything we've discussed in this conversation.",
+]
+
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 
-async def run_agents() -> None:
-    """Run a multi-turn scenario that exercises handoffs and tools."""
-    queries = [
-        "What's the weather like in Tokyo and Barcelona?",
-        "I want to fly from San Francisco to Tokyo next Friday and need a hotel for 3 nights.",
-        "Translate 'The weather is beautiful today' to Japanese.",
-    ]
+async def run_conversation() -> None:
+    """Run a multi-turn conversation with context carryover and compaction."""
+    # SQLiteSession stores conversation history in-memory across turns
+    underlying = SQLiteSession("trip-planning-session")
 
-    for q in queries:
+    # OpenAIResponsesCompactionSession wraps it to automatically compact
+    # context when the history grows large (triggers after 10+ items by default)
+    session = OpenAIResponsesCompactionSession(
+        session_id="trip-planning-session",
+        underlying_session=underlying,
+    )
+
+    for i, query in enumerate(CONVERSATION, 1):
         print(f"\n{'=' * 60}")
-        print(f"User: {q}")
+        print(f"Turn {i}/{len(CONVERSATION)}")
+        print(f"User: {query}")
         print(f"{'=' * 60}")
-        result = await Runner.run(triage_agent, q)
+
+        result = await Runner.run(triage_agent, query, session=session)
         print(f"\nAgent: {result.final_output}\n")
+
+    # Show final session state
+    items = await session.get_items()
+    print(f"\n{'=' * 60}")
+    print(f"Session has {len(items)} items after {len(CONVERSATION)} turns")
+    print("(compaction reduces this from what would otherwise be much larger)")
+    print(f"{'=' * 60}")
 
 
 def main() -> None:
@@ -192,7 +225,7 @@ def main() -> None:
 
     OpenAIAgentsInstrumentor().instrument(tracer_provider=provider)
 
-    asyncio.run(run_agents())
+    asyncio.run(run_conversation())
     provider.force_flush()
     provider.shutdown()
 

@@ -9,21 +9,23 @@
 #     "weave @ file:///Users/ben/repos/core/services/weave-python/weave-public",
 # ]
 # ///
-"""Google ADK with subagents, delegation, multimodal tools — all OTel traced.
+"""Google ADK — multi-turn conversation with subagent delegation, all OTel traced.
 
-Creates a multi-agent system with LLM-driven delegation:
-  - Coordinator: routes to specialists via sub_agents
-  - WeatherAgent: looks up weather via a tool
-  - CreativeAgent: generates images and describes them
-  - MathAgent: performs arithmetic via a calculator tool
+Demonstrates:
+  - Multi-turn conversation via a persistent ADK session (context carries across turns)
+  - LLM-driven delegation to specialist sub_agents
+  - Tool calls within a conversation that builds on prior context
+  - Media capture via weave.otel.log_content()
 
-Demonstrates media capture via weave.otel.log_content() and manual system
-prompt attribution via SystemPromptInjector.
+The conversation is designed so each turn builds on prior context:
+  1. Ask about weather in Tokyo and Paris
+  2. Follow up asking which is warmer + calculate temperature difference
+  3. Ask for the temperature in Fahrenheit converted to Celsius
+  4. Generate an image of the warmer city at sunset
+  5. Summarize the conversation
 
 NOTE: System prompts / agent instructions are manually injected because
-Google ADK's native OTel tracing does not emit gen_ai.system_instructions.
-The OTel GenAI spec defines this attribute (semantic-conventions PR #2179)
-but neither ADK nor any other instrumentor implements it yet:
+Google ADK's native OTel tracing does not emit gen_ai.system_instructions:
   - https://github.com/open-telemetry/semantic-conventions/pull/2179
   - https://github.com/google/adk-python/pull/2575
 
@@ -207,32 +209,38 @@ def build_agents():
     return coordinator
 
 
-async def run_agents(coordinator) -> None:
-    """Run queries including multimodal image generation."""
+# Multi-turn conversation: each turn builds on prior context
+CONVERSATION = [
+    "What's the weather in Tokyo and Paris?",
+    "Which city is warmer? Use the calculator to convert both temperatures from Fahrenheit to Celsius.",
+    "What is (42 * 17) + (256 / 8)?",
+    "Generate an image of the warmer city at sunset with cherry blossoms.",
+    "Summarize everything we've discussed so far in this conversation.",
+]
+
+
+async def run_conversation(coordinator) -> None:
+    """Run a multi-turn conversation that reuses a single ADK session."""
     from google.adk.runners import InMemoryRunner
     from google.genai import types
 
     runner = InMemoryRunner(agent=coordinator, app_name="multi_agent_app")
 
-    queries = [
-        "What's the weather in Tokyo and Paris?",
-        "What is (42 * 17) + (256 / 8)?",
-        "Generate an image of a futuristic city at sunset with flying cars.",
-    ]
+    # Create ONE session and reuse it — this is how ADK maintains multi-turn context
+    session = await runner.session_service.create_session(
+        app_name="multi_agent_app",
+        user_id="user1",
+    )
 
-    for q in queries:
+    for i, query in enumerate(CONVERSATION, 1):
         print(f"\n{'='*60}")
-        print(f"User: {q}")
+        print(f"Turn {i}/{len(CONVERSATION)}")
+        print(f"User: {query}")
         print(f"{'='*60}")
-
-        session = await runner.session_service.create_session(
-            app_name="multi_agent_app",
-            user_id="user1",
-        )
 
         user_message = types.Content(
             role="user",
-            parts=[types.Part(text=q)],
+            parts=[types.Part(text=query)],
         )
 
         async for event in runner.run_async(
@@ -244,6 +252,17 @@ async def run_agents(coordinator) -> None:
                 for part in event.content.parts:
                     if hasattr(part, "text") and part.text:
                         print(f"\nAgent: {part.text.strip()}\n")
+
+    # Show session event count to demonstrate context accumulation
+    final_session = await runner.session_service.get_session(
+        app_name="multi_agent_app",
+        user_id="user1",
+        session_id=session.id,
+    )
+    if final_session:
+        print(f"\n{'='*60}")
+        print(f"Session has {len(final_session.events)} events after {len(CONVERSATION)} turns")
+        print(f"{'='*60}")
 
 
 def main() -> None:
@@ -262,7 +281,7 @@ def main() -> None:
     )
 
     coordinator = build_agents()
-    asyncio.run(run_agents(coordinator))
+    asyncio.run(run_conversation(coordinator))
 
     provider.force_flush()
     provider.shutdown()

@@ -806,6 +806,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         spans = _query_result_to_genai_spans(query_result)
         return tsi.GenAISpansTraceRes(spans=spans)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_traces_chat")
+    def genai_traces_chat(
+        self, req: tsi.GenAITraceChatReq
+    ) -> tsi.GenAITraceChatRes:
+        """Build a structured chat view for a GenAI trace."""
+        from weave.trace_server.genai_chat_view import build_trace_chat
+
+        trace_res = self.genai_spans_trace(
+            tsi.GenAISpansTraceReq(
+                project_id=req.project_id,
+                trace_id=req.trace_id,
+            )
+        )
+        return build_trace_chat(trace_res.spans, req.trace_id)
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_span_start")
     def genai_span_start(
         self, req: tsi.GenAISpanStartReq
