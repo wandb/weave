@@ -279,6 +279,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             maxsize=50_000, ttl=300
         )
         self._op_ref_cache_lock = threading.Lock()
+        self._placeholder_file_projects: set[str] = set()
         self._database_ensured = False
 
     def __del__(self) -> None:
@@ -474,21 +475,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         with self._op_ref_cache_lock:
             self._op_ref_cache[project_id, op_name] = uri
 
-    def _create_or_get_placeholder_ops_digest(
-        self, project_id: str, create: bool
-    ) -> str:
-        if not create:
-            return compute_file_digest(
-                (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
-            )
+    def _ensure_placeholder_file_exists(self, project_id: str) -> None:
+        """Write the OTEL placeholder source file at most once per project per process."""
+        with self._op_ref_cache_lock:
+            if project_id in self._placeholder_file_projects:
+                return
+            self._placeholder_file_projects.add(project_id)
 
-        source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
-        source_file_req = tsi.FileCreateReq(
-            project_id=project_id,
-            name=object_creation_utils.OP_SOURCE_FILE_NAME,
-            content=source_code.encode("utf-8"),
+        self.file_create(
+            tsi.FileCreateReq(
+                project_id=project_id,
+                name=object_creation_utils.OP_SOURCE_FILE_NAME,
+                content=object_creation_utils.PLACEHOLDER_OP_SOURCE.encode("utf-8"),
+            )
         )
-        return self.file_create(source_file_req).digest
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
@@ -560,9 +560,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             obj_id_idx_map.pop(op_name)
 
         if obj_id_idx_map:
-            self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=True
-            )
+            self._ensure_placeholder_file_exists(req.project_id)
             obj_creation_batch = [
                 tsi.ObjSchemaForInsert(
                     project_id=req.project_id,

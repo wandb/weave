@@ -703,3 +703,34 @@ def test_otel_many_unique_ops_in_batch(trace_server, clickhouse_trace_server):
                 break
     for name, uri_set in by_op.items():
         assert len(uri_set) == 1, f"Op {name} has inconsistent refs: {uri_set}"
+
+
+def test_placeholder_file_created_at_most_once_per_project(
+    trace_server, clickhouse_trace_server, monkeypatch
+):
+    """_ensure_placeholder_file_exists writes the file at most once per project per process."""
+    project_id = f"{TEST_ENTITY}/otel_idempotent_file"
+
+    original_file_create = clickhouse_trace_server.file_create
+    file_create_count = 0
+
+    def counting_file_create(req):
+        nonlocal file_create_count
+        file_create_count += 1
+        return original_file_create(req)
+
+    monkeypatch.setattr(clickhouse_trace_server, "file_create", counting_file_create)
+
+    # First export — should trigger file_create
+    span1 = _create_otel_span("op_a")
+    trace_server.otel_export(_create_otel_export_req(project_id, [span1]))
+    assert file_create_count == 1
+
+    # Second export with a new op name — should NOT trigger file_create again
+    span2 = _create_otel_span("op_b")
+    trace_server.otel_export(_create_otel_export_req(project_id, [span2]))
+    assert file_create_count == 1
+
+    # Verify both calls were still created successfully
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 2
