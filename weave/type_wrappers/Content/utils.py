@@ -160,7 +160,7 @@ def get_extension_from_mimetype(mimetype: str) -> str | None:
     extension = mimetypes.guess_extension(mimetype)
     if not extension:
         logger.warning(
-            f"Got mime-type {mimetype} but failed to resolve a valid extension"
+            "Got mime-type %s but failed to resolve a valid extension", mimetype
         )
     return extension
 

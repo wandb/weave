@@ -189,7 +189,7 @@ class FutureExecutor:
             self._active_futures.discard(future)
 
             if exception := future.exception():
-                logger.error(f"Task failed: {_format_exception(exception)}")
+                logger.error("Task failed: %s", _format_exception(exception))
 
     def _shutdown(self) -> None:
         """Shutdown the thread pool executor. Should only be called when the program is exiting."""
@@ -253,7 +253,7 @@ class FutureExecutor:
             res = f(*args, **kwargs)
             fut.set_result(res)
         except Exception as e:
-            logger.exception(f"Task failed: {_format_exception(e)}")  # noqa: TRY401
+            logger.exception("Task failed: %s", _format_exception(e))  # noqa: TRY401
             fut.set_exception(e)
         return fut
 

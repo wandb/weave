@@ -54,9 +54,9 @@ def to_json(
                 # bug. However, we would prefer not to raise and error as that would
                 # result in lost data. These refs should be removed before serialization.
                 if v is not None:
-                    logging.exception(f"Unexpected ref in object record: {obj}")
+                    logging.exception("Unexpected ref in object record: %s", obj)
                 else:
-                    logging.warning(f"Unexpected null ref in object record: {obj}")
+                    logging.warning("Unexpected null ref in object record: %s", obj)
                     continue
             res[k] = to_json(v, project_id, client, use_dictify)
         return res
