@@ -434,3 +434,99 @@ class TestConvertRefsToInternal:
         # because of the unresolvable cross-project ref
         assert len(captured) >= 1
         assert captured[-1] is None
+
+
+class TestDigestMismatchAutoDisable:
+    """On DigestMismatchError the client retries without expected_digest
+    and disables client-side digests for the rest of the session.
+    """
+
+    @pytest.mark.disable_logging_error_check
+    def test_object_mismatch_retries_and_disables(
+        self, client: WeaveClient, fast_path: None, monkeypatch
+    ) -> None:
+        """First obj_create with expected_digest fails; client retries without
+        it and disables fast path for subsequent saves.
+        """
+        adapter = find_server_layer(client.server, ExternalTraceServer)
+        original = adapter.obj_create
+        seen_digests: list[str | None] = []
+        injected = False
+
+        def mismatch_once(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+            nonlocal injected
+            seen_digests.append(req.obj.expected_digest)
+            if not injected and req.obj.expected_digest is not None:
+                injected = True
+                raise DigestMismatchError("forced mismatch")
+            return original(req)
+
+        monkeypatch.setattr(adapter, "obj_create", mismatch_once)
+
+        # First publish: expected_digest sent, server rejects, client retries
+        ref = weave.publish({"first": True}, name="mismatch-first")
+        client._flush()
+
+        # Should have seen: [digest, None] (first attempt + retry)
+        assert seen_digests == [ref.digest, None]
+        assert client.project_id_resolver.is_disabled
+
+        # Second publish: fast path is disabled, no expected_digest
+        seen_digests.clear()
+        weave.publish({"second": True}, name="mismatch-second")
+        client._flush()
+
+        assert seen_digests == [None]
+
+    @pytest.mark.disable_logging_error_check
+    def test_table_mismatch_retries_and_disables(
+        self, client: WeaveClient, fast_path: None, monkeypatch
+    ) -> None:
+        """Table digest mismatch retries and disables fast path."""
+        adapter = find_server_layer(client.server, ExternalTraceServer)
+        original = adapter.table_create
+        injected = False
+
+        def mismatch_once(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+            nonlocal injected
+            if not injected and req.table.expected_digest is not None:
+                injected = True
+                raise DigestMismatchError("forced table mismatch")
+            return original(req)
+
+        monkeypatch.setattr(adapter, "table_create", mismatch_once)
+
+        ds = weave.Dataset(name="mismatch-ds", rows=[{"x": 1}, {"x": 2}])
+        ref = weave.publish(ds, name="mismatch-ds")
+        client._flush()
+
+        assert client.project_id_resolver.is_disabled
+
+        # Data should still be readable (retry succeeded)
+        got = ref.get()
+        got_rows = list(got.rows)
+        assert len(got_rows) == 2
+
+    @pytest.mark.disable_logging_error_check
+    def test_file_mismatch_retries_and_disables(
+        self, client: WeaveClient, fast_path: None, monkeypatch
+    ) -> None:
+        """File digest mismatch retries and disables fast path."""
+        adapter = find_server_layer(client.server, ExternalTraceServer)
+        original = adapter.file_create
+        injected = False
+
+        def mismatch_once(req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+            nonlocal injected
+            if not injected and req.expected_digest is not None:
+                injected = True
+                raise DigestMismatchError("forced file mismatch")
+            return original(req)
+
+        monkeypatch.setattr(adapter, "file_create", mismatch_once)
+
+        img = Image.new("RGB", (2, 2), color="red")
+        weave.publish(img, name="mismatch-img")
+        client._flush()
+
+        assert client.project_id_resolver.is_disabled

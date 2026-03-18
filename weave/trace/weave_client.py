@@ -1984,7 +1984,16 @@ class WeaveClient:
                     expected_digest=expected_digest,
                 )
             )
-            return self.server.obj_create(req)
+            try:
+                return self.server.obj_create(req)
+            except Exception as e:
+                if expected_digest is not None and self.project_id_resolver.is_digest_validation_error(e):
+                    self.project_id_resolver.disable_after_validation_error(
+                        e, f"weave:///{self.entity}/{self.project}/object/{name}"
+                    )
+                    req.obj.expected_digest = None
+                    return self.server.obj_create(req)
+                raise
 
         res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
         digest_future: Future[str] = self.future_executor.then(
@@ -2037,7 +2046,16 @@ class WeaveClient:
                 expected_digest=expected_digest,
             )
         )
-        return self.server.table_create(req)
+        try:
+            return self.server.table_create(req)
+        except Exception as e:
+            if expected_digest is not None and self.project_id_resolver.is_digest_validation_error(e):
+                self.project_id_resolver.disable_after_validation_error(
+                    e, f"table in {self._project_id()}"
+                )
+                req.table.expected_digest = None
+                return self.server.table_create(req)
+            raise
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
@@ -2301,11 +2319,22 @@ class WeaveClient:
         if cached_res:
             return cached_res
 
+        def file_create_with_fallback() -> FileCreateRes:
+            try:
+                return self.server.file_create(req)
+            except Exception as e:
+                if req.expected_digest is not None and self.project_id_resolver.is_digest_validation_error(e):
+                    self.project_id_resolver.disable_after_validation_error(
+                        e, f"file://{req.name}"
+                    )
+                    req.expected_digest = None
+                    return self.server.file_create(req)
+                raise
+
         if self.future_executor_fastlane:
-            # If we have a separate upload worker pool, use it
-            res = self.future_executor_fastlane.defer(self.server.file_create, req)
+            res = self.future_executor_fastlane.defer(file_create_with_fallback)
         else:
-            res = self.future_executor.defer(self.server.file_create, req)
+            res = self.future_executor.defer(file_create_with_fallback)
 
         self.send_file_cache.put(req, res)
         return res
