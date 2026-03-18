@@ -15,10 +15,12 @@ class FileWALDirectoryManager:
         directory: str,
         file_ext: str = ".jsonl",
         checkpoint_ext: str = ".checkpoint",
+        dead_letter_ext: str = ".deadletter",
     ) -> None:
         self._directory = directory
         self._file_ext = file_ext
         self._checkpoint_ext = checkpoint_ext
+        self._dead_letter_ext = dead_letter_ext
 
     def create_file(self) -> JSONLWALWriter:
         os.makedirs(self._directory, exist_ok=True)
@@ -43,9 +45,14 @@ class FileWALDirectoryManager:
         paths.sort()
         return paths
 
+    def dead_letter_path(self, wal_path: str) -> str:
+        """Return the dead-letter sidecar path for a given WAL file."""
+        base, _ = os.path.splitext(wal_path)
+        return base + self._dead_letter_ext
+
     def remove(self, path: str) -> None:
         base, _ = os.path.splitext(path)
-        for p in (path, base + self._checkpoint_ext):
+        for p in (path, base + self._checkpoint_ext, base + self._dead_letter_ext):
             try:
                 os.unlink(p)
             except FileNotFoundError:

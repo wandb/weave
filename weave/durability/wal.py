@@ -33,6 +33,7 @@ The directory manager creates writers (create_file) and discovers file paths
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -241,6 +242,7 @@ def drain(
     consumer: WALConsumer,
     handlers: WALHandlers,
     max_records: int = 0,
+    dead_letter_path: str | None = None,
 ) -> int:
     """Process pending records from a single WAL file.
 
@@ -248,16 +250,20 @@ def drain(
     "type" key, then acknowledges the batch.  Records with unknown types are
     skipped with a warning.
 
-    Acknowledgement is all-or-nothing: if a handler raises, the exception
+    Poison pill protection: if ``dead_letter_path`` is provided and a handler
+    raises, the failed record is appended to the dead-letter file and
+    processing continues.  Without a dead-letter path, the exception
     propagates, acknowledge() is never called, and the entire batch replays
-    on the next drain().  This provides at-least-once delivery — handlers
-    must be idempotent.
+    on the next drain() (at-least-once delivery).
 
     Args:
         consumer: A consumer bound to a specific WAL file.
         handlers: Maps record type strings to handler callables.
         max_records: Maximum number of records to process.  0 (default)
             means no limit — drain the entire file.
+        dead_letter_path: Optional path to a JSONL file for records whose
+            handlers fail.  When set, handler exceptions are caught and the
+            record is written here instead of blocking the batch.
 
     Returns:
         The number of records successfully processed.
@@ -275,8 +281,19 @@ def drain(
             continue
         handler = handlers.get(record_type)
         if handler is not None:
-            handler(entry.record)
-            processed += 1
+            try:
+                handler(entry.record)
+                processed += 1
+            except Exception:
+                if dead_letter_path is None:
+                    raise
+                logger.exception(
+                    "Handler failed for record type %r at offset %d; "
+                    "writing to dead-letter file",
+                    record_type,
+                    entry.end_offset,
+                )
+                _write_dead_letter(dead_letter_path, entry.record)
         else:
             logger.warning(
                 "No handler registered for record type %r at offset %d",
@@ -289,6 +306,13 @@ def drain(
     if last_offset:
         consumer.acknowledge(last_offset)
     return processed
+
+
+def _write_dead_letter(path: str, record: WALRecord) -> None:
+    """Append a single record to the dead-letter JSONL file."""
+    with open(path, "a") as f:
+        json.dump(record, f, separators=(",", ":"))
+        f.write("\n")
 
 
 def drain_all(
