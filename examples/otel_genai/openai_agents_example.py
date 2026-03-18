@@ -45,7 +45,12 @@ import os
 from agents import Agent, Runner, SQLiteSession, function_tool
 from agents.memory import OpenAIResponsesCompactionSession
 
-from weave.otel import SystemPromptInjector, ToolDefinitionsInjector, setup_tracing
+from weave.otel import (
+    SystemPromptInjector,
+    ToolDefinitionsInjector,
+    patch_openai_reasoning,
+    setup_tracing,
+)
 from weave.otel.compaction import patch_openai_compaction
 
 # ---------------------------------------------------------------------------
@@ -197,7 +202,9 @@ triage_agent = Agent(
     name="TriageAgent",
     instructions=TRIAGE_INSTRUCTIONS,
     handoffs=[weather_agent, travel_agent, translator_agent],
-    model="gpt-4o-mini",
+    # o4-mini is a reasoning model — it produces chain-of-thought reasoning
+    # tokens and content that we can capture and display in Weave.
+    model="o4-mini",
 )
 
 # Multi-turn conversation: each turn builds on prior context
@@ -258,6 +265,7 @@ def main() -> None:
     )
 
     patch_openai_compaction()
+    patch_openai_reasoning()
 
     provider = setup_tracing(
         service_name="openai-agents-otel-example",

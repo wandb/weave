@@ -84,18 +84,42 @@ AGENT_INSTRUCTIONS = {
 
 AGENT_TOOL_DEFS: dict[str, list[dict]] = {
     "Coordinator": [
-        {"type": "sub_agent", "name": "WeatherAgent", "description": "Specialist for weather forecasts"},
-        {"type": "sub_agent", "name": "MathAgent", "description": "Specialist for arithmetic calculations"},
-        {"type": "sub_agent", "name": "CreativeAgent", "description": "Specialist for generating images"},
+        {
+            "type": "sub_agent",
+            "name": "WeatherAgent",
+            "description": "Specialist for weather forecasts",
+        },
+        {
+            "type": "sub_agent",
+            "name": "MathAgent",
+            "description": "Specialist for arithmetic calculations",
+        },
+        {
+            "type": "sub_agent",
+            "name": "CreativeAgent",
+            "description": "Specialist for generating images",
+        },
     ],
     "WeatherAgent": [
-        {"type": "function", "name": "get_weather", "description": "Get the current weather for a city"},
+        {
+            "type": "function",
+            "name": "get_weather",
+            "description": "Get the current weather for a city",
+        },
     ],
     "MathAgent": [
-        {"type": "function", "name": "calculator", "description": "Evaluate an arithmetic expression"},
+        {
+            "type": "function",
+            "name": "calculator",
+            "description": "Evaluate an arithmetic expression",
+        },
     ],
     "CreativeAgent": [
-        {"type": "function", "name": "generate_image", "description": "Generate an image from a text description"},
+        {
+            "type": "function",
+            "name": "generate_image",
+            "description": "Generate an image from a text description",
+        },
     ],
 }
 
@@ -103,6 +127,7 @@ AGENT_TOOL_DEFS: dict[str, list[dict]] = {
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
+
 
 def get_weather(city: str) -> str:
     """Get the current weather for a city.
@@ -170,7 +195,11 @@ def generate_image(prompt: str) -> str:
             image_bytes = part.inline_data.data
             mime = part.inline_data.mime_type or "image/png"
             ext = "png" if "png" in mime else "jpeg"
-            key = f"generated_image_{image_count}" if image_count > 0 else "generated_image"
+            key = (
+                f"generated_image_{image_count}"
+                if image_count > 0
+                else "generated_image"
+            )
 
             log_content(image_bytes, key=key, media_type=mime, role="output")
 
@@ -178,7 +207,9 @@ def generate_image(prompt: str) -> str:
             tmp.write(image_bytes)
             tmp.close()
             print(f"  [generate_image] Saved {len(image_bytes):,} bytes -> {tmp.name}")
-            description_parts.append(f"Image generated ({len(image_bytes):,} bytes, {mime})")
+            description_parts.append(
+                f"Image generated ({len(image_bytes):,} bytes, {mime})"
+            )
             image_count += 1
         elif part.text:
             description_parts.append(part.text)
@@ -192,6 +223,7 @@ def generate_image(prompt: str) -> str:
 # ---------------------------------------------------------------------------
 # Agent construction
 # ---------------------------------------------------------------------------
+
 
 def build_agents():
     """Build the multi-agent hierarchy. Call after OTel is configured."""
@@ -256,10 +288,10 @@ async def run_conversation(coordinator) -> None:
     )
 
     for i, query in enumerate(CONVERSATION, 1):
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Turn {i}/{len(CONVERSATION)}")
         print(f"User: {query}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         user_message = types.Content(
             role="user",
@@ -283,9 +315,11 @@ async def run_conversation(coordinator) -> None:
         session_id=session.id,
     )
     if final_session:
-        print(f"\n{'='*60}")
-        print(f"Session has {len(final_session.events)} events after {len(CONVERSATION)} turns")
-        print(f"{'='*60}")
+        print(f"\n{'=' * 60}")
+        print(
+            f"Session has {len(final_session.events)} events after {len(CONVERSATION)} turns"
+        )
+        print(f"{'=' * 60}")
 
 
 def main() -> None:

@@ -43,7 +43,12 @@ def __getattr__(name: str) -> Any:
         from weave.otel import setup as _setup
 
         return getattr(_setup, name)
-    if name in {"ToolDefinitionsInjector", "ReasoningTokenExtractor"}:
+    if name in {
+        "ToolDefinitionsInjector",
+        "ReasoningTokenExtractor",
+        "patch_openai_reasoning",
+        "unpatch_openai_reasoning",
+    }:
         from weave.otel import processors as _proc
 
         return getattr(_proc, name)

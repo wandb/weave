@@ -214,6 +214,28 @@ def _compute_duration_ms(
 _NOISE_TOOL_NAMES = {"(merged tools)", "(merged)", "transfer_to_agent"}
 
 
+def _sum_descendant_tokens(
+    node: SpanNode,
+) -> tuple[int, int, int, str]:
+    """Recursively sum input, output, and reasoning tokens across a subtree.
+
+    Returns:
+        (input_tokens, output_tokens, reasoning_tokens, reasoning_content)
+    """
+    input_t = node.span.input_tokens or 0
+    output_t = node.span.output_tokens or 0
+    reasoning_t = node.span.reasoning_tokens or 0
+    reasoning_text = node.span.reasoning_content or ""
+    for child in node.children:
+        ci, co, cr, ct = _sum_descendant_tokens(child)
+        input_t += ci
+        output_t += co
+        reasoning_t += cr
+        if ct and not reasoning_text:
+            reasoning_text = ct
+    return input_t, output_t, reasoning_t, reasoning_text
+
+
 @dataclass
 class SpanNode:
     """A span with its children, for tree traversal."""
@@ -352,6 +374,11 @@ def build_chat_messages(
                 text = _extract_assistant_text(_safe_parse_json(span.output_messages))
                 if text and not _looks_like_tool_call(text):
                     agent_response_emitted.add(span.span_id)
+                    # Tokens live on child chat spans, not on the invoke_agent
+                    # span itself, so aggregate across the whole subtree.
+                    agg_in, agg_out, agg_reasoning, agg_reasoning_text = (
+                        _sum_descendant_tokens(node)
+                    )
                     messages.append(
                         GenAIChatMessage(
                             type="agent_message",
@@ -359,10 +386,10 @@ def build_chat_messages(
                             agent_name=name,
                             model=span.response_model or span.request_model,
                             text=text,
-                            reasoning_content=span.reasoning_content or "",
-                            reasoning_tokens=span.reasoning_tokens,
-                            input_tokens=span.input_tokens,
-                            output_tokens=span.output_tokens,
+                            reasoning_content=agg_reasoning_text,
+                            reasoning_tokens=agg_reasoning,
+                            input_tokens=agg_in or span.input_tokens,
+                            output_tokens=agg_out or span.output_tokens,
                             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
                             status=span.status_code,
                             content_refs=_parse_content_refs(span.content_refs),
@@ -464,6 +491,7 @@ def build_chat_messages(
                         status=span.status_code,
                     )
                 )
+
 
     for root in tree:
         _walk(root)
