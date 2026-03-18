@@ -440,6 +440,40 @@ class GenAISpansTraceRes(BaseModel):
     spans: list[GenAISpanSchema]
 
 
+class GenAISpanStartReq(BaseModel):
+    """Lightweight notification that a span has opened (in-progress)."""
+
+    project_id: str
+    trace_id: str
+    span_id: str
+    parent_span_id: str = ""
+    span_name: str = ""
+    span_kind: str = "UNSPECIFIED"
+    operation_name: str = ""
+    agent_name: str = ""
+    request_model: str = ""
+    started_at: datetime.datetime
+
+
+class GenAISpanStartRes(BaseModel):
+    """Acknowledgement of a span start notification."""
+
+    ok: bool = True
+
+
+class GenAIActiveSpansReq(BaseModel):
+    """Request to list in-progress spans for a project."""
+
+    project_id: str
+    limit: int = 100
+
+
+class GenAIActiveSpansRes(BaseModel):
+    """Response containing in-progress spans (started but not yet completed)."""
+
+    spans: list[GenAISpanSchema]
+
+
 class CallStartReq(BaseModelStrict):
     start: StartedCallSchemaForInsert
 

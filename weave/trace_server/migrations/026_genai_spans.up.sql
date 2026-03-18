@@ -1,3 +1,4 @@
+-- Completed GenAI spans (written once when a span ends via OTLP export)
 CREATE TABLE genai_spans (
     -- Core span identity
     project_id          String,
@@ -60,6 +61,11 @@ CREATE TABLE genai_spans (
     tool_call_arguments String DEFAULT '',
     tool_call_result    String DEFAULT '',
 
+    -- Weave media / lineage refs (JSON arrays from weave.otel utilities)
+    content_refs        String DEFAULT '',
+    artifact_refs       String DEFAULT '',
+    object_refs         String DEFAULT '',
+
     -- Raw dumps for debugging / future extraction
     attributes_dump     String DEFAULT '',
     events_dump         String DEFAULT '',
@@ -81,3 +87,24 @@ CREATE TABLE genai_spans (
 PARTITION BY toYYYYMM(started_at)
 ORDER BY (project_id, started_at, span_id)
 SETTINGS min_bytes_for_wide_part=0, enable_block_number_column=1, enable_block_offset_column=1;
+
+
+-- In-progress span notifications (written immediately when a span opens via LiveSpanProcessor).
+-- Plain MergeTree with TTL auto-cleanup — no dedup complexity, no FINAL needed.
+-- The "active spans" query is a LEFT ANTI JOIN against genai_spans.
+CREATE TABLE genai_span_starts (
+    project_id     String,
+    trace_id       String,
+    span_id        String,
+    parent_span_id String DEFAULT '',
+    span_name      String,
+    span_kind      Enum8('UNSPECIFIED'=0,'INTERNAL'=1,'SERVER'=2,'CLIENT'=3,'PRODUCER'=4,'CONSUMER'=5),
+    operation_name LowCardinality(String) DEFAULT '',
+    agent_name     String DEFAULT '',
+    request_model  String DEFAULT '',
+    started_at     DateTime64(6),
+    created_at     DateTime64(3) DEFAULT now64(3),
+    INDEX idx_trace trace_id TYPE bloom_filter GRANULARITY 1
+) ENGINE = MergeTree()
+ORDER BY (project_id, started_at, span_id)
+TTL toDateTime(started_at) + INTERVAL 1 HOUR;

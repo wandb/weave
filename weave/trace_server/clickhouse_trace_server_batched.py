@@ -806,6 +806,81 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         spans = _query_result_to_genai_spans(query_result)
         return tsi.GenAISpansTraceRes(spans=spans)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_span_start")
+    def genai_span_start(
+        self, req: tsi.GenAISpanStartReq
+    ) -> tsi.GenAISpanStartRes:
+        """Insert a lightweight span-start notification for live streaming."""
+        row = [
+            req.project_id,
+            req.trace_id,
+            req.span_id,
+            req.parent_span_id,
+            req.span_name,
+            req.span_kind,
+            req.operation_name,
+            req.agent_name,
+            req.request_model,
+            req.started_at,
+        ]
+        self.ch_client.insert(
+            "genai_span_starts",
+            [row],
+            column_names=[
+                "project_id",
+                "trace_id",
+                "span_id",
+                "parent_span_id",
+                "span_name",
+                "span_kind",
+                "operation_name",
+                "agent_name",
+                "request_model",
+                "started_at",
+            ],
+        )
+        return tsi.GenAISpanStartRes()
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_active_spans")
+    def genai_active_spans(
+        self, req: tsi.GenAIActiveSpansReq
+    ) -> tsi.GenAIActiveSpansRes:
+        """Return in-progress spans (started but not yet completed)."""
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "limit": min(req.limit, 500),
+        }
+        query = """
+            SELECT
+                s.project_id,
+                s.trace_id,
+                s.span_id,
+                s.parent_span_id,
+                s.span_name,
+                s.span_kind,
+                s.started_at,
+                s.operation_name,
+                s.agent_name,
+                s.request_model
+            FROM genai_span_starts s
+            LEFT JOIN genai_spans g
+                ON s.project_id = g.project_id
+               AND s.trace_id   = g.trace_id
+               AND s.span_id    = g.span_id
+            WHERE g.span_id IS NULL
+              AND s.project_id = {project_id:String}
+            ORDER BY s.started_at DESC
+            LIMIT {limit:UInt64}
+        """
+        query_result = self.ch_client.query(query, parameters=parameters)
+        col_names = query_result.column_names
+        spans = []
+        for row in query_result.result_rows:
+            row_dict = dict(zip(col_names, row))
+            row_dict["status_code"] = "UNSET"
+            spans.append(tsi.GenAISpanSchema(**row_dict))
+        return tsi.GenAIActiveSpansRes(spans=spans)
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
         producer = self.kafka_producer

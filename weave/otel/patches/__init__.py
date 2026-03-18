@@ -28,12 +28,9 @@ def patch_all() -> None:
     except Exception:
         logger.debug("Google media patch skipped", exc_info=True)
 
-    try:
-        from weave.otel.patches import anthropic as anthropic_patch
-
-        anthropic_patch.patch()
-    except Exception:
-        logger.debug("Anthropic media patch skipped", exc_info=True)
+    # Anthropic patch omitted — official OTel Claude Agent SDK instrumentation
+    # is still in development:
+    # https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation-genai/opentelemetry-instrumentation-claude-agent-sdk
 
 
 def unpatch_all() -> None:
@@ -52,9 +49,3 @@ def unpatch_all() -> None:
     except Exception:
         pass
 
-    try:
-        from weave.otel.patches import anthropic as anthropic_patch
-
-        anthropic_patch.unpatch()
-    except Exception:
-        pass

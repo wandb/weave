@@ -1,170 +1,30 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "claude-agent-sdk>=0.1.14",
-#     "opentelemetry-instrumentation-claude-agent-sdk @ file:///tmp/otel-claude-instr/dist/opentelemetry_instrumentation_claude_agent_sdk-2.0b0.dev0-py3-none-any.whl",
-#     "opentelemetry-api>=1.37.0",
-#     "opentelemetry-sdk>=1.37.0",
-#     "opentelemetry-instrumentation==0.58b0",
-#     "opentelemetry-semantic-conventions==0.58b0",
-#     "opentelemetry-util-genai>=0.2b0,<0.4b0",
-#     "opentelemetry-exporter-otlp-proto-grpc",
-#     "opentelemetry-exporter-otlp-proto-http",
-#     "anyio",
-# ]
-#
-# [tool.uv]
-# prerelease = "allow"
-# ///
-"""Anthropic Claude Agent SDK with OTel tracing.
+"""Anthropic Claude Agent SDK — OTel instrumentation coming soon.
 
-Uses the opentelemetry-instrumentation-claude-agent-sdk package (built from
-source at /tmp/otel-claude-instr/) to auto-instrument the Claude Agent SDK.
-The instrumentor monkey-patches InternalClient.process_query to create OTel
-spans for agent invocations, chat turns, and tool executions.
+The official OpenTelemetry instrumentation for the Claude Agent SDK
+(opentelemetry-instrumentation-claude-agent-sdk) is currently in active
+development in the opentelemetry-python-contrib repository. As of March 2026
+the package exists but the actual patching logic is still a stub — the
+`_instrument()` method does not yet wrap any SDK calls.
 
-Setup (one-time):
-    git clone --depth 1 --sparse https://github.com/open-telemetry/opentelemetry-python-contrib.git /tmp/otel-claude-instr
-    cd /tmp/otel-claude-instr && git sparse-checkout set instrumentation-genai/opentelemetry-instrumentation-claude-agent-sdk
-    cd instrumentation-genai/opentelemetry-instrumentation-claude-agent-sdk && uv build
+Relevant links:
+  - Package skeleton (merged):
+    https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation-genai/opentelemetry-instrumentation-claude-agent-sdk
+  - Anthropic issue tracking the SDK instrumentation (last 3 weeks):
+    https://github.com/anthropics/claude-agent-sdk-python/issues/611
 
-Usage:
-    uv run --python 3.12 anthropic_example.py
-    uv run --python 3.12 anthropic_example.py --otlp-endpoint http://localhost:4317
-    uv run --python 3.12 anthropic_example.py --genai-endpoint http://localhost:6345/otel/v1/genai/traces
-"""
+Once the instrumentation is complete you should be able to do:
 
-import argparse
-import os
-
-import anyio
-from claude_agent_sdk import (
-    AgentDefinition,
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ResultMessage,
-    TextBlock,
-    query,
-)
-from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-    OTLPSpanExporter as OTLPHTTPSpanExporter,
-)
-from opentelemetry.instrumentation.claude_agent_sdk import ClaudeAgentSDKInstrumentor
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import (
-    BatchSpanProcessor,
-    ConsoleSpanExporter,
-    SimpleSpanProcessor,
-)
-
-
-def _wandb_auth_headers() -> dict[str, str]:
-    """Build auth headers from WANDB_API_KEY if present."""
-    api_key = os.environ.get("WANDB_API_KEY", "")
-    if api_key:
-        return {"wandb-api-key": api_key}
-    return {}
-
-
-def setup_otel(
-    otlp_endpoint: str | None = None,
-    genai_endpoint: str | None = None,
-) -> TracerProvider:
-    """Configure the OTel TracerProvider with console, OTLP, or GenAI endpoint export."""
-    entity = os.environ.get("WANDB_ENTITY", "ben-urmomsclothes")
-    resource = Resource.create(
-        {
-            "service.name": "anthropic-otel-example",
-            "service.version": "0.1.0",
-            "wandb.entity": entity,
-            "wandb.project": "genai-otel-test",
-        }
-    )
-    provider = TracerProvider(resource=resource)
-
-    if genai_endpoint:
-        provider.add_span_processor(
-            BatchSpanProcessor(
-                OTLPHTTPSpanExporter(
-                    endpoint=genai_endpoint,
-                    headers=_wandb_auth_headers(),
-                )
-            )
-        )
-    elif otlp_endpoint:
-        provider.add_span_processor(
-            BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint))
-        )
-    else:
-        provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-
-    trace.set_tracer_provider(provider)
-    return provider
-
-
-async def run_agent() -> None:
-    """Run a Claude agent that answers a question about travel."""
-    os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "true"
-
-    options = ClaudeAgentOptions(
-        agents={
-            "assistant": AgentDefinition(
-                description="A helpful travel assistant",
-                prompt=(
-                    "You are a concise travel assistant. "
-                    "Answer questions about travel destinations briefly."
-                ),
-                model="sonnet",
-            ),
-        },
-    )
-
-    print("=== Claude Agent SDK Example ===")
-    async for message in query(
-        prompt="What are the top 3 things to do in Barcelona? Be very brief.",
-        options=options,
-    ):
-        if isinstance(message, AssistantMessage):
-            for block in message.content:
-                if isinstance(block, TextBlock):
-                    print(f"Claude: {block.text}")
-        elif (
-            isinstance(message, ResultMessage)
-            and message.total_cost_usd
-            and message.total_cost_usd > 0
-        ):
-            print(f"\nCost: ${message.total_cost_usd:.4f}")
-    print()
-
-
-def main() -> None:
-    """Entry point: parse args, set up OTel, run agent, flush."""
-    parser = argparse.ArgumentParser(description="Anthropic Claude Agent SDK OTel example")
-    parser.add_argument(
-        "--otlp-endpoint",
-        type=str,
-        default=None,
-        help="OTLP gRPC endpoint (e.g. http://localhost:4317). Defaults to console export.",
-    )
-    parser.add_argument(
-        "--genai-endpoint",
-        type=str,
-        default=None,
-        help="Weave GenAI OTel HTTP endpoint (e.g. http://localhost:6345/otel/v1/genai/traces).",
-    )
-    args = parser.parse_args()
-
-    provider = setup_otel(args.otlp_endpoint, args.genai_endpoint)
+    pip install opentelemetry-instrumentation-claude-agent-sdk claude-agent-sdk
+    from opentelemetry.instrumentation.claude_agent_sdk import ClaudeAgentSDKInstrumentor
     ClaudeAgentSDKInstrumentor().instrument(tracer_provider=provider)
 
-    anyio.run(run_agent)
+In the meantime, Anthropic API calls made through the plain `anthropic` Python
+client can be traced using the Traceloop instrumentor:
 
-    provider.force_flush()
-    provider.shutdown()
+    pip install opentelemetry-instrumentation-anthropic
+    from opentelemetry.instrumentation.anthropic import AnthropicInstrumentor
+    AnthropicInstrumentor().instrument(tracer_provider=provider)
 
-
-if __name__ == "__main__":
-    main()
+This captures individual `messages.create` calls with input/output content
+but does not produce agent-level or tool-call spans.
+"""

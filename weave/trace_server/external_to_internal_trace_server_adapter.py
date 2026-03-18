@@ -185,6 +185,20 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.genai_spans_trace, req, req.project_id
         )
 
+    def genai_span_start(
+        self, req: tsi.GenAISpanStartReq
+    ) -> tsi.GenAISpanStartRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.genai_span_start(req)
+
+    def genai_active_spans(
+        self, req: tsi.GenAIActiveSpansReq
+    ) -> tsi.GenAIActiveSpansRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.genai_active_spans, req, req.project_id
+        )
+
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
         if req.start.wb_run_id is not None:
