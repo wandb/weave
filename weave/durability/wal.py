@@ -54,10 +54,17 @@ WALHandlers = dict[str, WALHandler]  # keyed by record "type"
 class WALEntry:
     """A record read back from the WAL, paired with its position.
 
+    The end_offset enables checkpoint-based progress tracking: after
+    successfully processing a batch, the caller passes the last entry's
+    end_offset to WALConsumer.acknowledge().  On the next read_pending()
+    (or after a crash/restart), the consumer seeks directly to that offset,
+    skipping all previously processed records.
+
     Attributes:
         record: The deserialized WAL record.
         end_offset: Byte position immediately after this record in the file.
-            Pass this to WALConsumer.acknowledge() after successful processing.
+            Used by WALConsumer.acknowledge() to advance the checkpoint so
+            processed records are never re-read.
     """
 
     record: WALRecord
@@ -123,7 +130,9 @@ class WALWriter(Protocol):
 
         Calls flush() to ensure all records are durable, then closes the file
         handle.  After close(), no further writes are accepted.  The file
-        remains on disk for the consumer to finish draining.
+        remains on disk for the consumer to finish draining;
+        WALDirectoryManager.remove() handles file cleanup once the consumer
+        has fully drained it.
         """
         ...
 
@@ -166,8 +175,9 @@ class WALConsumer(Protocol):
         """Yield records not yet acknowledged, one at a time.
 
         Internally loads the checkpoint, reads from that offset forward, and
-        yields results lazily.  Truncated trailing lines (from a crash
-        mid-write) are silently skipped.
+        yields results lazily.  Corrupt or truncated lines (e.g., from a
+        crash mid-write) are detected by a failed JSON parse and skipped
+        with a warning log.
 
         Yields:
             Records with their end offsets, in file order.
