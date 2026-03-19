@@ -5913,36 +5913,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
 
-        try:
-            # Use helper to resolve prompt, combine messages, and apply template vars
-            combined_messages, initial_messages = resolve_and_apply_prompt(
-                prompt=prompt,
-                messages=getattr(req.inputs, "messages", None),
-                template_vars=template_vars,
-                project_id=req.project_id,
-                obj_read_func=self.obj_read,
-            )
-        except Exception as e:
-            logger.exception("Failed to resolve and apply prompt")
-
-            # Yield error as single chunk then stop.
-            def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
-                yield {"error": f"Failed to resolve and apply prompt: {err!s}"}
-
-            return _single_error_iter(e)
+        # Use helper to resolve prompt, combine messages, and apply template vars.
+        # Raises on failure — callers (trace_server.py) let this propagate to
+        # FastAPI's exception handlers for a proper error response.
+        combined_messages, initial_messages = resolve_and_apply_prompt(
+            prompt=prompt,
+            messages=getattr(req.inputs, "messages", None),
+            template_vars=template_vars,
+            project_id=req.project_id,
+            obj_read_func=self.obj_read,
+        )
 
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
-        try:
-            completion_model_info = _setup_completion_model_info(
-                model_info, req, self.obj_read
-            )
-        except Exception as e:
-            # Yield error as single chunk then stop.
-            def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
-                yield {"error": str(err)}
-
-            return _single_error_iter(e)
+        # Raises on failure (e.g. missing secret, unrecognised model).
+        completion_model_info = _setup_completion_model_info(
+            model_info, req, self.obj_read
+        )
 
         model_name = completion_model_info.model_name
         api_key = completion_model_info.api_key
@@ -7545,6 +7532,9 @@ def _setup_completion_model_info(
             vertex_credentials=None,
         )
     elif model_info:
+        raise InvalidRequest(
+            f"No secret fetcher found, cannot fetch API key for model {model_name}"
+        )
         secret_name = model_info.get("api_key_name")
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
