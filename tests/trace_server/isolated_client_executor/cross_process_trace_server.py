@@ -198,7 +198,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
                 raise CrossProcessTraceServerError(response_item.error)
 
         except Exception as e:
-            logger.exception(f"Error waiting for response to {method}")
+            logger.exception("Error waiting for response to %s", method)
             raise
 
         return response_item.payload
@@ -246,7 +246,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
                 yield response_item.payload
 
             except Exception as e:
-                logger.exception(f"Error in streaming response for {method}")
+                logger.exception("Error in streaming response for %s", method)
                 raise
 
     def stop(self) -> None:
@@ -574,7 +574,7 @@ class CrossProcessTraceServerReceiver:
                 except Exception as e:
                     # Send error response for any processing failure
                     logger.exception(
-                        f"Error processing request {request_item.request_id}"
+                        "Error processing request %s", request_item.request_id
                     )
                     self._send_error_response(request_item.request_id, str(e))
 

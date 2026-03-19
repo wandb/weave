@@ -54,7 +54,7 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
 
             # Print initial message
             if first_update:
-                logger.info(f"Flushing {counts['total_jobs']} pending tasks...")
+                logger.info("Flushing %s pending tasks...", counts["total_jobs"])
                 first_update = False
 
             # Create the task

@@ -28,6 +28,9 @@ from tests.trace.util import (
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
+from weave.shared.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+)
 from weave.trace import refs, settings, table_upload_chunking, weave_client
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
@@ -3788,6 +3791,47 @@ def test_filter_calls_by_ref(client):
     # this as "no filter"
     calls = client.get_calls(filter={"input_refs": [], "output_refs": []})
     assert len(calls) == 1
+
+
+def test_filter_calls_by_ref_wildcard_versions(client):
+    input_ref_v1 = client.save({"a": 1}, "my_input").ref
+    input_ref_v2 = client.save({"a": 2}, "my_input").ref
+    output_ref_v1 = client.save({"b": 1}, "my_output").ref
+    output_ref_v2 = client.save({"b": 2}, "my_output").ref
+    colliding_input_ref = client.save({"a": 99}, "myXinput").ref
+    colliding_output_ref = client.save({"b": 99}, "myXoutput").ref
+
+    assert input_ref_v1.uri != input_ref_v2.uri
+    assert output_ref_v1.uri != output_ref_v2.uri
+
+    @weave.op
+    def log_obj(ref: str, out_ref: str):
+        return {"ref2": out_ref}
+
+    log_obj(input_ref_v1, output_ref_v1)
+    log_obj(input_ref_v2, output_ref_v2)
+    log_obj(colliding_input_ref, colliding_output_ref)
+
+    input_wildcard = (
+        input_ref_v1.uri.rsplit(":", 1)[0] + WILDCARD_ARTIFACT_VERSION_AND_PATH
+    )
+    output_wildcard = (
+        output_ref_v1.uri.rsplit(":", 1)[0] + WILDCARD_ARTIFACT_VERSION_AND_PATH
+    )
+
+    calls = client.get_calls(filter={"input_refs": [input_wildcard]})
+    assert len(calls) == 2
+    assert sorted(call.inputs["ref"]["a"] for call in calls) == [1, 2]
+
+    calls = client.get_calls(filter={"output_refs": [output_wildcard]})
+    assert len(calls) == 2
+    assert sorted(call.output["ref2"]["b"] for call in calls) == [1, 2]
+
+    calls = client.get_calls(
+        filter={"input_refs": [input_wildcard], "output_refs": [output_wildcard]}
+    )
+    assert len(calls) == 2
+    assert sorted(call.inputs["ref"]["a"] for call in calls) == [1, 2]
 
 
 def test_files_stats(client):

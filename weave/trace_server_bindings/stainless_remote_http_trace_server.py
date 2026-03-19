@@ -375,7 +375,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 # If batching endpoint doesn't exist (404) fall back to individual calls
                 if hasattr(e, "status_code") and e.status_code == 404:
                     logger.debug(
-                        f"Batching endpoint not available, falling back to individual feedback creation: {e}"
+                        "Batching endpoint not available, falling back to individual feedback creation: %s",
+                        e,
                     )
                     # Fall back to individual feedback creation calls
                     for item in batch_req.batch:
@@ -386,7 +387,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                             self._stainless_client.feedback.create(**item_dict)
                         except Exception as individual_error:
                             logger.warning(
-                                f"Failed to create individual feedback: {individual_error}"
+                                "Failed to create individual feedback: %s",
+                                individual_error,
                             )
                 else:
                     raise

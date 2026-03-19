@@ -157,6 +157,12 @@ from weave.trace_server.llm_completion import (
     resolve_and_apply_prompt,
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
+from weave.trace_server.methods.feedback_stats import (
+    feedback_payload_schema as feedback_payload_schema_handler,
+)
+from weave.trace_server.methods.feedback_stats import (
+    feedback_stats as feedback_stats_handler,
+)
 from weave.trace_server.model_providers.model_providers import (
     VERTEX_PROVIDER_NAMES,
     LLMModelProviderInfo,
@@ -236,6 +242,7 @@ logger.setLevel(logging.INFO)
 # maxsize: Maximum connections per pool (set higher than thread count to avoid blocking)
 # num_pools: Number of distinct connection pools (for different hosts/configs)
 _CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
+
 
 # Precomputed list of (column_index, field_name) for every sentinel field that appears
 # in ALL_CALL_COMPLETE_INSERT_COLUMNS.  Used by _insert_call_complete_batch to enforce
@@ -1151,6 +1158,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             usage_buckets=usage_buckets,
             call_buckets=call_buckets,
         )
+
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        """Return aggregated feedback statistics over time buckets.
+
+        Extracts numeric values from payload_dump via json_path and aggregates
+        by time bucket. Filters by project_id, optional feedback_type and trigger_ref.
+        Also includes window-level stats (min, max, avg, percentiles) over the full range.
+        """
+        return feedback_stats_handler(self, req)
+
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        """Discover feedback payload schema from sample rows."""
+        return feedback_payload_schema_handler(self, req)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.trace_usage")
     def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
@@ -3466,14 +3488,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for obj in obj_res.objs:
             if not hasattr(obj, "val") or not obj.val:
                 logger.warning(
-                    f"Skipping dataset object {obj.object_id} with digest {obj.digest}: missing or empty val"
+                    "Skipping dataset object %s with digest %s: missing or empty val",
+                    obj.object_id,
+                    obj.digest,
                 )
                 continue
 
             val = obj.val
             if not isinstance(val, dict):
                 logger.warning(
-                    f"Skipping dataset object {obj.object_id} with digest {obj.digest}: val is not a dict"
+                    "Skipping dataset object %s with digest %s: val is not a dict",
+                    obj.object_id,
+                    obj.digest,
                 )
                 continue
 
@@ -5772,7 +5798,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 req.inputs.messages = combined_messages
 
             except Exception as e:
-                logger.error(f"Failed to resolve prompt: {e}", exc_info=True)
+                logger.exception("Failed to resolve prompt")
                 return tsi.CompletionsCreateRes(
                     response={"error": f"Failed to resolve prompt: {e!s}"}
                 )
@@ -5919,7 +5945,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 obj_read_func=self.obj_read,
             )
         except Exception as e:
-            logger.error(f"Failed to resolve and apply prompt: {e}", exc_info=True)
+            logger.exception("Failed to resolve and apply prompt")
 
             # Yield error as single chunk then stop.
             def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
