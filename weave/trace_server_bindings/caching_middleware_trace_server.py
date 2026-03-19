@@ -78,7 +78,7 @@ class CachingMiddlewareTraceServer(
 
     _next_trace_server: TraceServerClientInterface
     _cache_prefix: str
-    delegated_methods = DelegatingTraceServerMixin.delegated_methods | {"server_info"}
+    delegated_methods = DelegatingTraceServerMixin.delegated_methods
     optional_delegated_methods = frozenset(
         {
             "get_call_processor",
@@ -180,7 +180,7 @@ class CachingMiddlewareTraceServer(
         for key in keys_to_delete:
             self._cache.delete(key)
 
-        logger.debug(f"Deleted {len(keys_to_delete)} keys with prefix '{prefix}'")
+        logger.debug("Deleted %s keys with prefix '%s'", len(keys_to_delete), prefix)
 
     def _make_cache_key(self, namespace: str, key: str) -> str:
         return f"{namespace}_{key}_{CACHE_KEY_SUFFIX}"

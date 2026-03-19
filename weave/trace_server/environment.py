@@ -34,7 +34,7 @@ def kafka_producer_max_buffer_size() -> int | None:
     try:
         return int(size)
     except ValueError:
-        logger.exception(f"KAFKA_PRODUCER_MAX_BUFFER_SIZE value '{size}' is not valid")
+        logger.exception("KAFKA_PRODUCER_MAX_BUFFER_SIZE value '%s' is not valid", size)
         return None
 
 
@@ -193,7 +193,7 @@ def wf_clickhouse_max_memory_usage() -> int | None:
     try:
         return int(mem)
     except ValueError:
-        logger.exception(f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not valid")
+        logger.exception("WF_CLICKHOUSE_MAX_MEMORY_USAGE value '%s' is not valid", mem)
         return None
 
 
@@ -206,7 +206,7 @@ def wf_clickhouse_max_execution_time() -> int | None:
         return int(time)
     except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not valid"
+            "WF_CLICKHOUSE_MAX_EXECUTION_TIME value '%s' is not valid", time
         )
         return None
 
@@ -226,7 +226,8 @@ def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
         return int(val)
     except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '{val}' is not valid"
+            "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '%s' is not valid",
+            val,
         )
         return 100
 
@@ -247,7 +248,8 @@ def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
         return int(val)
     except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '{val}' is not valid"
+            "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '%s' is not valid",
+            val,
         )
         return 1000
 

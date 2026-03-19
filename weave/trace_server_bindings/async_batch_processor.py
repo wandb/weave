@@ -187,7 +187,8 @@ class AsyncBatchProcessor(Generic[T]):
                     if get_raise_on_captured_errors():
                         raise
                     logger.warning(
-                        f"Batch processing failed, processing items individually. Error: {e}"
+                        "Batch processing failed, processing items individually. Error: %s",
+                        e,
                     )
                     # Process each item individually to identify unprocessable items, this can be
                     # costly for large batches!

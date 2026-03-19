@@ -32,7 +32,7 @@ def log_dropped_call_batch(
     batch: list[Union["StartBatchItem", "EndBatchItem"]], e: Exception
 ) -> None:
     """Log details about a dropped call batch for debugging purposes."""
-    logger.error(f"Error sending batch of {len(batch)} call events to server")
+    logger.error("Error sending batch of %s call events to server", len(batch))
     dropped_start_ids = []
     dropped_end_ids = []
     for item in batch:
@@ -44,36 +44,36 @@ def log_dropped_call_batch(
             # For end items, access the end request
             dropped_end_ids.append(item.req.end.id)
     if dropped_start_ids:
-        logger.error(f"dropped call start ids: {dropped_start_ids}")
+        logger.error("dropped call start ids: %s", dropped_start_ids)
     if dropped_end_ids:
-        logger.error(f"dropped call end ids: {dropped_end_ids}")
+        logger.error("dropped call end ids: %s", dropped_end_ids)
     response = getattr(e, "response", None)
     if isinstance(e, (httpx.HTTPError, httpx.HTTPStatusError)) and response:
-        logger.error(f"status code: {response.status_code}")
-        logger.error(f"reason: {response.reason_phrase}")
-        logger.error(f"text: {response.text}")
+        logger.error("status code: %s", response.status_code)
+        logger.error("reason: %s", response.reason_phrase)
+        logger.error("text: %s", response.text)
     else:
-        logger.error(f"error: {e}")
+        logger.error("error: %s", e)
 
 
 def log_dropped_feedback_batch(
     batch: list[tsi.FeedbackCreateReq], e: Exception
 ) -> None:
     """Log details about a dropped feedback batch for debugging purposes."""
-    logger.error(f"Error sending batch of {len(batch)} feedback events to server")
+    logger.error("Error sending batch of %s feedback events to server", len(batch))
     dropped_feedback_types = []
     for item in batch:
         feedback_item = item.req if hasattr(item, "req") else item
         dropped_feedback_types.append(feedback_item.feedback_type)
     if dropped_feedback_types:
-        logger.error(f"dropped feedback types: {dropped_feedback_types}")
+        logger.error("dropped feedback types: %s", dropped_feedback_types)
     response = getattr(e, "response", None)
     if isinstance(e, (httpx.HTTPError, httpx.HTTPStatusError)) and response:
-        logger.error(f"status code: {response.status_code}")
-        logger.error(f"reason: {response.reason_phrase}")
-        logger.error(f"text: {response.text}")
+        logger.error("status code: %s", response.status_code)
+        logger.error("reason: %s", response.reason_phrase)
+        logger.error("text: %s", response.text)
     else:
-        logger.error(f"error: {e}")
+        logger.error("error: %s", e)
 
 
 def _split_and_process_halves(
@@ -164,8 +164,10 @@ def process_batch_with_retry(
     # Warn if single item exceeds limit (can't split further)
     if encoded_bytes > remote_request_bytes_limit and len(batch) == 1:
         logger.warning(
-            f"Single {batch_name} size ({encoded_bytes} bytes) may be too large to send."
-            f"The configured maximum size is {remote_request_bytes_limit} bytes."
+            "Single %s size (%s bytes) may be too large to send. The configured maximum size is %s bytes.",
+            batch_name,
+            encoded_bytes,
+            remote_request_bytes_limit,
         )
 
     try:
@@ -177,7 +179,9 @@ def process_batch_with_retry(
         # Handle 413 specially: server rejected as too large, split and retry
         if _is_413_error(e) and len(batch) > 1:
             logger.warning(
-                f"Server returned 413 for {batch_name} batch of {len(batch)} items, splitting and retrying"
+                "Server returned 413 for %s batch of %s items, splitting and retrying",
+                batch_name,
+                len(batch),
             )
             _split_and_process_halves(
                 batch,
@@ -196,18 +200,21 @@ def process_batch_with_retry(
                 log_dropped_fn(batch, e)
             else:
                 logger.exception(
-                    f"Error sending batch of {len(batch)} {batch_name} to server.",
-                    exc_info=True,
+                    "Error sending batch of %s %s to server.",
+                    len(batch),
+                    batch_name,
                 )
         else:
             # Add items back to the queue for later processing
             logger.warning(
-                f"{batch_name.capitalize()} batch failed after max retries, requeuing batch with {len(batch)=} for later processing",
+                "%s batch failed after max retries, requeuing batch with len(batch)=%s for later processing",
+                batch_name.capitalize(),
+                len(batch),
             )
 
             if logger.isEnabledFor(logging.DEBUG) and get_item_id_fn:
                 ids = [get_item_id_fn(item) for item in batch]
-                logger.debug(f"Requeuing {batch_name} batch with {ids=}")
+                logger.debug("Requeuing %s batch with %s", batch_name, ids)
 
             # Only requeue if the processor is still accepting work
             if (
@@ -218,7 +225,9 @@ def process_batch_with_retry(
                 processor_obj.enqueue(batch)
             else:
                 logger.exception(
-                    f"Failed to enqueue {batch_name} batch of size {len(batch)} - Processor is shutting down"
+                    "Failed to enqueue %s batch of size %s - Processor is shutting down",
+                    batch_name,
+                    len(batch),
                 )
 
 

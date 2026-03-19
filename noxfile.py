@@ -204,7 +204,7 @@ def tests(session: nox.Session, shard: str):
             "tests/utils/",
             "tests/wandb_interface/",
         ],
-        "trace_no_server": ["tests/trace/"],
+        "trace_no_server": ["tests/trace/", "tests/durability/"],
         "otel_genai": ["tests/integrations/otel_genai/"],
     }
 

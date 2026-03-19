@@ -5,12 +5,15 @@ import sys
 import tempfile
 import time
 from typing import Any
+from unittest.mock import MagicMock
 
 import PIL
 
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
 from tests.trace.server_utils import find_server_layer
+from weave.trace import weave_client
+from weave.trace_server.service_interface import EnsureProjectExistsRes
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -50,6 +53,39 @@ def compare_datasets(ds1: weave.Dataset, ds2: weave.Dataset):
     for row1, row2 in zip(rows1, rows2, strict=False):
         compare_images(row1["image"], row2["image"])
         assert row1["label"] == row2["label"]
+
+
+def test_caching_middleware_delegates_ensure_project_exists(tmp_path):
+    """CachingMiddlewareTraceServer must delegate ensure_project_exists.
+
+    Regression test: when ensure_project_exists was not in delegated_methods,
+    __getattribute__ resolved the Protocol stub on the class itself (returning
+    None), causing 'NoneType' has no attribute 'project_name' in WeaveClient.__init__.
+    """
+    mock_server = MagicMock()
+    expected = EnsureProjectExistsRes(project_name="my-project")
+    mock_server.ensure_project_exists.return_value = expected
+
+    caching_server = CachingMiddlewareTraceServer(mock_server, str(tmp_path / "cache"))
+    result = caching_server.ensure_project_exists("entity", "project")
+
+    assert result is expected
+    assert result.project_name == "my-project"
+    mock_server.ensure_project_exists.assert_called_once_with("entity", "project")
+
+
+def test_weave_client_init_with_caching_middleware():
+    """WeaveClient.__init__ with ensure_project_exists=True must work through CachingMiddlewareTraceServer.
+
+    Regression test for the full init path: CachingMiddlewareTraceServer.from_env
+    wrapping a server, then passed to WeaveClient with ensure_project_exists=True.
+    """
+    mock_server = MagicMock()
+    caching_server = CachingMiddlewareTraceServer.from_env(mock_server)
+    client = weave_client.WeaveClient(
+        "entity", "project", caching_server, ensure_project_exists=True
+    )
+    mock_server.ensure_project_exists.assert_called_once_with("entity", "project")
 
 
 def test_server_caching(client):

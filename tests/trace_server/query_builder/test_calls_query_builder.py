@@ -2,11 +2,15 @@ import pytest
 import sqlparse
 
 from tests.trace_server.query_builder.utils import assert_sql, assert_stats_sql
+from weave.shared.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
     CallsQuery,
     HardCodedFilter,
+    ParamBuilder,
     _is_minimal_filter,
     _maybe_convert_datetime_operands,
     build_calls_complete_delete_query,
@@ -15,7 +19,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
 
 
@@ -2514,6 +2517,59 @@ def test_input_output_refs_filter():
     )
 
 
+def test_input_output_refs_filter_with_wildcards():
+    exact_input_ref = "weave-trace-internal:///project/object/my_input:abc"
+    wildcard_input_ref = (
+        "weave-trace-internal:///project/object/my_input"
+        f"{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
+    )
+    exact_output_ref = "weave-trace-internal:///project/object/my_output:xyz"
+    wildcard_output_ref = (
+        "weave-trace-internal:///project/object/my_output"
+        f"{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
+    )
+
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter=tsi.CallsFilter(
+            input_refs=[exact_input_ref, wildcard_input_ref],
+            output_refs=[exact_output_ref, wildcard_output_ref],
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_6:String}
+        WHERE (((((hasAny(calls_merged.input_refs, {pb_4:Array(String)}))
+                OR (arrayExists(x -> startsWith(x, {pb_1:String}), calls_merged.input_refs)))
+                OR length(calls_merged.input_refs) = 0)
+            AND (((hasAny(calls_merged.output_refs, {pb_5:Array(String)}))
+                OR (arrayExists(x -> startsWith(x, {pb_3:String}), calls_merged.output_refs)))
+                OR length(calls_merged.output_refs) = 0)))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (((((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)}))
+                    OR (arrayExists(x -> startsWith(x, {pb_1:String}), array_concat_agg(calls_merged.input_refs)))))
+                AND (((hasAny(array_concat_agg(calls_merged.output_refs), {pb_2:Array(String)}))
+                    OR (arrayExists(x -> startsWith(x, {pb_3:String}), array_concat_agg(calls_merged.output_refs))))))))
+        """,
+        {
+            "pb_0": [exact_input_ref],
+            "pb_1": "weave-trace-internal:///project/object/my_input:",
+            "pb_2": [exact_output_ref],
+            "pb_3": "weave-trace-internal:///project/object/my_output:",
+            "pb_4": [exact_input_ref],
+            "pb_5": [exact_output_ref],
+            "pb_6": "project",
+        },
+    )
+
+
 def test_all_optimization_filters():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -3166,7 +3222,11 @@ def test_calls_complete_with_refs_filter() -> None:
     cq.set_hardcoded_filter(
         HardCodedFilter(
             filter=tsi.CallsFilter(
-                input_refs=["weave-trace-internal:///project/object/my_input:abc"],
+                input_refs=[
+                    "weave-trace-internal:///project/object/my_input:abc",
+                    "weave-trace-internal:///project/object/my_input"
+                    f"{WILDCARD_ARTIFACT_VERSION_AND_PATH}",
+                ],
                 output_refs=["weave-trace-internal:///project/object/my_output:xyz"],
             )
         )
@@ -3178,24 +3238,25 @@ def test_calls_complete_with_refs_filter() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_5:String}
-        WHERE (((hasAny(calls_complete.input_refs, {pb_3:Array(String)})
+        PREWHERE calls_complete.project_id = {pb_6:String}
+        WHERE (((((hasAny(calls_complete.input_refs, {pb_4:Array(String)}))
+                OR (arrayExists(x -> startsWith(x, {pb_2:String}), calls_complete.input_refs)))
                 OR length(calls_complete.input_refs) = 0)
-            AND (hasAny(calls_complete.output_refs, {pb_4:Array(String)})
+            AND (hasAny(calls_complete.output_refs, {pb_5:Array(String)})
                 OR length(calls_complete.output_refs) = 0)))
-        AND (
-            ((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
-            AND (((hasAny(calls_complete.input_refs, {pb_1:Array(String)}))
-                AND (hasAny(calls_complete.output_refs, {pb_2:Array(String)}))))
-        )
+        AND (((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+            AND (((((hasAny(calls_complete.input_refs, {pb_1:Array(String)}))
+                    OR (arrayExists(x -> startsWith(x, {pb_2:String}), calls_complete.input_refs))))
+                AND (hasAny(calls_complete.output_refs, {pb_3:Array(String)})))))
         """,
         {
             "pb_0": SENTINEL_DATETIME,
             "pb_1": ["weave-trace-internal:///project/object/my_input:abc"],
-            "pb_2": ["weave-trace-internal:///project/object/my_output:xyz"],
-            "pb_3": ["weave-trace-internal:///project/object/my_input:abc"],
-            "pb_4": ["weave-trace-internal:///project/object/my_output:xyz"],
-            "pb_5": "project",
+            "pb_2": "weave-trace-internal:///project/object/my_input:",
+            "pb_3": ["weave-trace-internal:///project/object/my_output:xyz"],
+            "pb_4": ["weave-trace-internal:///project/object/my_input:abc"],
+            "pb_5": ["weave-trace-internal:///project/object/my_output:xyz"],
+            "pb_6": "project",
         },
     )
 
