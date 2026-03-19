@@ -1302,6 +1302,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 if col.split(".")[0] != "wb_username"
             ]
 
+            if req.include_usernames and "wb_username" in req.columns:
+                columns.append("wb_user_id")
+
             # If we are returning a summary object, make sure that all fields
             # required to compute the summary are in the columns
             if "summary" in columns or req.include_costs:
