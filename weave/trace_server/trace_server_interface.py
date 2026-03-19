@@ -510,6 +510,7 @@ class GenAIChatMessage(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     duration_ms: int = 0
+    started_at: str = ""
     status: str = "OK"
     content_refs: str = ""
     compaction_summary: str = ""

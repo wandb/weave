@@ -90,11 +90,17 @@ def normalize_cursor(payload: dict) -> AgentHookEvent | None:
         "model": model,
         "timestamp_ms": ts,
         "workspace_roots": roots,
+        "transcript_path": payload.get("transcript_path") or "",
+        "user_email": payload.get("user_email") or "",
         "raw": payload,
     }
 
     if hook == "beforeSubmitPrompt":
-        return AgentHookEvent(prompt_text=payload.get("prompt", ""), **base)
+        return AgentHookEvent(
+            prompt_text=payload.get("prompt", ""),
+            attachments=payload.get("attachments", []),
+            **base,
+        )
 
     if hook == "afterAgentResponse":
         return AgentHookEvent(response_text=payload.get("text", ""), **base)
@@ -111,6 +117,8 @@ def normalize_cursor(payload: dict) -> AgentHookEvent | None:
             tool_use_id=payload.get("tool_use_id", ""),
             tool_name=payload.get("tool_name", ""),
             tool_input=payload.get("tool_input", {}),
+            agent_message=payload.get("agent_message", ""),
+            cwd=payload.get("cwd", ""),
             **base,
         )
 
@@ -121,6 +129,7 @@ def normalize_cursor(payload: dict) -> AgentHookEvent | None:
             tool_input=payload.get("tool_input", {}),
             tool_output=_coerce_str(payload.get("tool_output", "")),
             tool_duration_ms=int(payload.get("duration", 0) * 1000),
+            cwd=payload.get("cwd", ""),
             **base,
         )
 
@@ -129,6 +138,8 @@ def normalize_cursor(payload: dict) -> AgentHookEvent | None:
             tool_use_id=payload.get("tool_use_id", ""),
             tool_name=payload.get("tool_name", ""),
             tool_error=payload.get("error_message", ""),
+            failure_type=payload.get("failure_type", ""),
+            is_interrupt=bool(payload.get("is_interrupt", False)),
             **base,
         )
 
@@ -171,6 +182,9 @@ def normalize_cursor(payload: dict) -> AgentHookEvent | None:
             subagent_task=payload.get("task", ""),
             subagent_model=payload.get("subagent_model", ""),
             parent_conversation_id=payload.get("parent_conversation_id", ""),
+            tool_call_id=payload.get("tool_call_id", ""),
+            is_parallel_worker=bool(payload.get("is_parallel_worker", False)),
+            git_branch=payload.get("git_branch", ""),
             **base,
         )
 
@@ -182,6 +196,9 @@ def normalize_cursor(payload: dict) -> AgentHookEvent | None:
             subagent_tool_call_count=payload.get("tool_call_count", 0),
             subagent_modified_files=payload.get("modified_files", []),
             subagent_summary=payload.get("summary", ""),
+            agent_transcript_path=payload.get("agent_transcript_path") or "",
+            subagent_message_count=payload.get("message_count", 0),
+            subagent_loop_count=payload.get("loop_count", 0),
             **base,
         )
 
@@ -189,10 +206,39 @@ def normalize_cursor(payload: dict) -> AgentHookEvent | None:
         return AgentHookEvent(
             context_tokens=payload.get("context_tokens", 0),
             context_window=payload.get("context_window_size", 0),
+            compact_trigger=payload.get("trigger", ""),
+            context_usage_percent=int(payload.get("context_usage_percent", 0)),
+            message_count=payload.get("message_count", 0),
+            messages_to_compact=payload.get("messages_to_compact", 0),
+            is_first_compaction=bool(payload.get("is_first_compaction", False)),
             **base,
         )
 
-    # sessionStart, sessionEnd, stop — no extra fields needed
+    if hook == "sessionStart":
+        return AgentHookEvent(
+            session_id=payload.get("session_id", ""),
+            is_background_agent=bool(payload.get("is_background_agent", False)),
+            composer_mode=payload.get("composer_mode", ""),
+            **base,
+        )
+
+    if hook == "sessionEnd":
+        return AgentHookEvent(
+            session_id=payload.get("session_id", ""),
+            end_reason=payload.get("reason", ""),
+            end_duration_ms=payload.get("duration_ms", 0),
+            final_status=payload.get("final_status", ""),
+            is_background_agent=bool(payload.get("is_background_agent", False)),
+            **base,
+        )
+
+    if hook == "stop":
+        return AgentHookEvent(
+            stop_status=payload.get("status", ""),
+            loop_count=payload.get("loop_count", 0),
+            **base,
+        )
+
     return AgentHookEvent(**base)
 
 

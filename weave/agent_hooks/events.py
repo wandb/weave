@@ -67,9 +67,15 @@ class AgentHookEvent:
     timestamp_ms: int = 0
     workspace_roots: list[str] = field(default_factory=list)
 
+    # --- base fields present on every hook ---
+    transcript_path: str = ""
+    user_email: str = ""
+
     # --- prompt / response ---
     prompt_text: str = ""
     response_text: str = ""
+    # Files/rules the user attached to the prompt (beforeSubmitPrompt.attachments)
+    attachments: list[dict] = field(default_factory=list)
 
     # --- agent thought / reasoning ---
     thought_text: str = ""
@@ -82,6 +88,12 @@ class AgentHookEvent:
     tool_output: str = ""
     tool_error: str = ""
     tool_duration_ms: int = 0
+    # Agent's stated reasoning for making this tool call (preToolUse.agent_message)
+    agent_message: str = ""
+    cwd: str = ""
+    # postToolUseFailure extra fields
+    failure_type: str = ""
+    is_interrupt: bool = False
 
     # --- shell execution ---
     shell_command: str = ""
@@ -109,10 +121,35 @@ class AgentHookEvent:
     subagent_modified_files: list[str] = field(default_factory=list)
     subagent_summary: str = ""
     parent_conversation_id: str = ""
+    # subagentStart extra fields
+    tool_call_id: str = ""
+    is_parallel_worker: bool = False
+    git_branch: str = ""
+    # subagentStop extra fields
+    agent_transcript_path: str = ""
+    subagent_message_count: int = 0
+    subagent_loop_count: int = 0
 
     # --- context compaction ---
     context_tokens: int = 0
     context_window: int = 0
+    compact_trigger: str = ""
+    context_usage_percent: int = 0
+    message_count: int = 0
+    messages_to_compact: int = 0
+    is_first_compaction: bool = False
+
+    # --- session lifecycle ---
+    is_background_agent: bool = False
+    composer_mode: str = ""
+    # sessionEnd fields
+    end_reason: str = ""
+    end_duration_ms: int = 0
+    final_status: str = ""
+
+    # --- stop hook ---
+    stop_status: str = ""
+    loop_count: int = 0
 
     # --- raw payload for debugging ---
     raw: dict = field(default_factory=dict)

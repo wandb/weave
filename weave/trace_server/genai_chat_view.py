@@ -187,6 +187,18 @@ def _looks_like_tool_call(text: str) -> bool:
     )
 
 
+def _dt_to_iso(dt: Any) -> str:
+    """Convert a datetime (or None / str) to an ISO 8601 string."""
+    if dt is None:
+        return ""
+    if isinstance(dt, str):
+        return dt
+    try:
+        return dt.isoformat()
+    except AttributeError:
+        return str(dt)
+
+
 def _compute_duration_ms(
     started_at: Any,
     ended_at: Any,
@@ -277,11 +289,15 @@ def build_span_tree(spans: list[GenAISpanSchema]) -> list[SpanNode]:
 # ---------------------------------------------------------------------------
 
 
-def find_user_prompt(spans: list[GenAISpanSchema]) -> str:
+def find_user_prompt(spans: list[GenAISpanSchema]) -> tuple[str, str]:
     """Pre-scan spans to find the user prompt for this trace.
 
     Uses last_only=True because multi-turn conversations send the full
     history as input_messages, and we only want the current turn's prompt.
+
+    Returns:
+        (prompt_text, started_at) — started_at is the ISO timestamp of the
+        span that carried the user prompt, or empty string if not found.
     """
     sorted_spans = sorted(spans, key=lambda s: s.started_at or "")
 
@@ -289,13 +305,13 @@ def find_user_prompt(spans: list[GenAISpanSchema]) -> str:
         if s.operation_name == "invoke_agent" and s.input_messages:
             text = _extract_user_text(_safe_parse_json(s.input_messages), last_only=True)
             if text and not _looks_like_tool_call(text):
-                return text
+                return text, _dt_to_iso(s.started_at)
 
     for s in sorted_spans:
         if s.input_messages:
             text = _extract_user_text(_safe_parse_json(s.input_messages), last_only=True)
             if text and not _looks_like_tool_call(text):
-                return text
+                return text, _dt_to_iso(s.started_at)
 
     for s in sorted_spans:
         if s.attributes_dump:
@@ -303,9 +319,9 @@ def find_user_prompt(spans: list[GenAISpanSchema]) -> str:
             if isinstance(attrs, dict):
                 prompt = attrs.get("gen_ai.prompt")
                 if prompt and isinstance(prompt, str):
-                    return prompt
+                    return prompt, _dt_to_iso(s.started_at)
 
-    return ""
+    return "", ""
 
 
 # ---------------------------------------------------------------------------
@@ -331,13 +347,14 @@ def build_chat_messages(
     messages: list[GenAIChatMessage] = []
     agent_response_emitted: set[str] = set()
 
-    user_prompt = find_user_prompt(spans)
+    user_prompt, user_started_at = find_user_prompt(spans)
     if user_prompt:
         messages.append(
             GenAIChatMessage(
                 type="user_message",
                 text=user_prompt,
                 agent_name="User",
+                started_at=_dt_to_iso(user_started_at),
             )
         )
 
@@ -364,6 +381,7 @@ def build_chat_messages(
                         status=span.status_code,
                         system_instructions=_extract_system_prompt(span.system_instructions),
                         tool_definitions=span.tool_definitions or "",
+                        started_at=_dt_to_iso(span.started_at),
                     )
                 )
 
@@ -391,6 +409,7 @@ def build_chat_messages(
                             input_tokens=agg_in or span.input_tokens,
                             output_tokens=agg_out or span.output_tokens,
                             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
+                            started_at=_dt_to_iso(span.started_at),
                             status=span.status_code,
                             content_refs=_parse_content_refs(span.content_refs),
                         )
@@ -406,6 +425,7 @@ def build_chat_messages(
                         compaction_summary=span.compaction_summary,
                         compaction_items_before=span.compaction_items_before,
                         compaction_items_after=span.compaction_items_after,
+                        started_at=_dt_to_iso(span.started_at),
                     )
                 )
             return
@@ -421,6 +441,7 @@ def build_chat_messages(
                         span_id=span.span_id,
                         text=tool_name.replace("transfer_to_", "→ "),
                         status=span.status_code,
+                        started_at=_dt_to_iso(span.started_at),
                     )
                 )
             elif tool_name not in _NOISE_TOOL_NAMES:
@@ -433,6 +454,7 @@ def build_chat_messages(
                         tool_arguments=span.tool_call_arguments,
                         tool_result=span.tool_call_result,
                         duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
+                        started_at=_dt_to_iso(span.started_at),
                         status=span.status_code,
                         content_refs=_parse_content_refs(span.content_refs),
                     )
@@ -451,6 +473,7 @@ def build_chat_messages(
                     agent_name=span.agent_name,
                     text=span.span_name.replace("agent_handoff ", "→ "),
                     status=span.status_code,
+                    started_at=_dt_to_iso(span.started_at),
                 )
             )
             for child in node.children:
@@ -475,6 +498,7 @@ def build_chat_messages(
                             input_tokens=span.input_tokens,
                             output_tokens=span.output_tokens,
                             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
+                            started_at=_dt_to_iso(span.started_at),
                             status=span.status_code,
                         )
                     )
@@ -505,6 +529,7 @@ def build_chat_messages(
                         input_tokens=span.input_tokens,
                         output_tokens=span.output_tokens,
                         duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
+                        started_at=_dt_to_iso(span.started_at),
                         status=span.status_code,
                     )
                 )
