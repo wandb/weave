@@ -6,11 +6,13 @@ import pytest
 import weave
 from weave.trace.call import Call
 from weave.trace.op import (
+    AsyncGeneratorOp,
     AsyncOp,
     AsyncOpDef,
     BoundOp,
     OpCallError,
     OpDef,
+    SyncGeneratorOp,
     SyncOp,
     as_op,
     is_op,
@@ -37,6 +39,24 @@ def afunc():
         return a + 1
 
     return _afunc
+
+
+@pytest.fixture
+def gfunc():
+    @op
+    def _gfunc(a: int):
+        yield a + 1
+
+    return _gfunc
+
+
+@pytest.fixture
+def agfunc():
+    @op
+    async def _agfunc(a: int):
+        yield a + 1
+
+    return _agfunc
 
 
 @pytest.fixture
@@ -233,6 +253,12 @@ def test_sync_sidecar_invoke(func):
     assert func.__op__.invoke(func, 1) == 2
 
 
+def test_sync_generator_uses_generator_sidecar(client, gfunc):
+    assert isinstance(gfunc.__op__, SyncGeneratorOp)
+    assert list(gfunc(1)) == [2]
+    assert list(gfunc.__op__.invoke(gfunc, 1)) == [2]
+
+
 def test_as_op_returns_sidecar_for_function(func):
     handle = as_op(func)
 
@@ -275,6 +301,13 @@ def test_as_op_bound_method_call_injects_self(weave_obj, py_obj):
 async def test_async_sidecar_invoke(afunc):
     assert isinstance(afunc.__op__, AsyncOp)
     assert await afunc.__op__.invoke(afunc, 1) == 2
+
+
+@pytest.mark.asyncio
+async def test_async_generator_uses_generator_sidecar(client, agfunc):
+    assert isinstance(agfunc.__op__, AsyncGeneratorOp)
+    assert [item async for item in agfunc(1)] == [2]
+    assert [item async for item in await agfunc.__op__.invoke(agfunc, 1)] == [2]
 
 
 @pytest.mark.asyncio

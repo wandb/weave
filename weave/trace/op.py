@@ -336,9 +336,7 @@ def _normalize_sidecar_invoke_target(
 
 @dataclass
 class SyncOp(BaseOp[P, R]):
-    """Sidecar for sync functions and sync generators."""
-
-    is_generator: bool = False
+    """Sidecar for sync functions."""
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         if self.op is None:
@@ -352,28 +350,43 @@ class SyncOp(BaseOp[P, R]):
         **kwargs: P.kwargs,
     ) -> R:
         fn, args = _normalize_sidecar_invoke_target(fn, args)
-        if self.is_generator:
-            res, _ = _call_sync_gen(
-                cast(Op, fn),
-                *args,
-                __should_raise=True,
-                **kwargs,
-            )
-        else:
-            res, _ = _call_sync_func(
-                cast(Op, fn),
-                *args,
-                __should_raise=True,
-                **kwargs,
-            )
+        res, _ = _call_sync_func(
+            cast(Op, fn),
+            *args,
+            __should_raise=True,
+            **kwargs,
+        )
+        return cast(R, res)
+
+
+@dataclass
+class SyncGeneratorOp(BaseOp[P, R]):
+    """Sidecar for sync generator functions."""
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        if self.op is None:
+            raise ValueError("SyncGeneratorOp is not attached to an opified callable")
+        return self.invoke(self.op, *args, **kwargs)
+
+    def invoke(
+        self,
+        fn: Opified[P, R] | MethodType | partial,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
+        fn, args = _normalize_sidecar_invoke_target(fn, args)
+        res, _ = _call_sync_gen(
+            cast(Op, fn),
+            *args,
+            __should_raise=True,
+            **kwargs,
+        )
         return cast(R, res)
 
 
 @dataclass
 class AsyncOp(BaseOp[P, R]):
-    """Sidecar for async functions and async generators."""
-
-    is_async_generator: bool = False
+    """Sidecar for async functions."""
 
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         if self.op is None:
@@ -387,26 +400,43 @@ class AsyncOp(BaseOp[P, R]):
         **kwargs: P.kwargs,
     ) -> R:
         fn, args = _normalize_sidecar_invoke_target(fn, args)
-        if self.is_async_generator:
-            res, _ = await _call_async_gen(
-                cast(Op, fn),
-                *args,
-                __should_raise=True,
-                **kwargs,
-            )
-        else:
-            res, _ = await _call_async_func(
-                cast(Op, fn),
-                *args,
-                __should_raise=True,
-                **kwargs,
-            )
+        res, _ = await _call_async_func(
+            cast(Op, fn),
+            *args,
+            __should_raise=True,
+            **kwargs,
+        )
+        return cast(R, res)
+
+
+@dataclass
+class AsyncGeneratorOp(BaseOp[P, R]):
+    """Sidecar for async generator functions."""
+
+    async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        if self.op is None:
+            raise ValueError("AsyncGeneratorOp is not attached to an opified callable")
+        return await self.invoke(self.op, *args, **kwargs)
+
+    async def invoke(
+        self,
+        fn: Opified[P, R] | MethodType | partial,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
+        fn, args = _normalize_sidecar_invoke_target(fn, args)
+        res, _ = await _call_async_gen(
+            cast(Op, fn),
+            *args,
+            __should_raise=True,
+            **kwargs,
+        )
         return cast(R, res)
 
 
 def _sync_op_runtime_state(
     oplike: Opified[P, R] | MethodType | partial,
-) -> tuple[Opified[P, R], SyncOp[P, R] | AsyncOp[P, R]]:
+) -> tuple[Opified[P, R], BaseOp[P, R]]:
     # Transitional while wrapper attrs can still diverge from the `__op__` sidecar.
     opified = _unwrap_opified(oplike)
     op_def = get_op_def(opified)
@@ -446,7 +476,7 @@ class BoundOp(Generic[P, R]):
     `BoundOp` is now reserved for bound callables like methods and partials.
     """
 
-    __op__: SyncOp[P, R] | AsyncOp[P, R]
+    __op__: BaseOp[P, R]
     __self__: Any
     __wrapped__: Opified[P, R] | MethodType | partial
 
@@ -1599,7 +1629,7 @@ def op(
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     return cast(
                         R,
-                        cast(SyncOp[P, R], wrapper.__op__)(*args, **kwargs),
+                        cast(SyncGeneratorOp[P, R], wrapper.__op__)(*args, **kwargs),
                     )
             elif is_async_generator:
 
@@ -1607,7 +1637,9 @@ def op(
                 async def wrapper(  # pyright: ignore[reportRedeclaration]
                     *args: P.args, **kwargs: P.kwargs
                 ) -> AsyncGenerator[R]:
-                    res = await cast(AsyncOp[P, R], wrapper.__op__)(*args, **kwargs)
+                    res = await cast(AsyncGeneratorOp[P, R], wrapper.__op__)(
+                        *args, **kwargs
+                    )
                     async for item in res:
                         yield item
             else:
@@ -1627,7 +1659,7 @@ def op(
             # this is noisy for us, so we strip it out
             inferred_name = inferred_name.split(".<locals>.")[-1]
 
-            op_def: SyncOp[P, R] | AsyncOp[P, R]
+            op_def: BaseOp[P, R]
             op_def_kwargs = {
                 "op": cast(Opified[P, R], wrapper),
                 "resolve_fn": func,
@@ -1648,12 +1680,14 @@ def op(
                 "color": color,
                 "eager_call_start": eager_call_start,
             }
-            if is_async or is_async_generator:
-                op_def = AsyncOp(
-                    is_async_generator=is_async_generator, **op_def_kwargs
-                )
+            if is_async_generator:
+                op_def = AsyncGeneratorOp(**op_def_kwargs)
+            elif is_async:
+                op_def = AsyncOp(**op_def_kwargs)
+            elif is_sync_generator:
+                op_def = SyncGeneratorOp(**op_def_kwargs)
             else:
-                op_def = SyncOp(is_generator=is_sync_generator, **op_def_kwargs)
+                op_def = SyncOp(**op_def_kwargs)
             wrapper.__op__ = op_def  # type: ignore
             op_def.mirror_to_wrapper(cast(Opified[P, R], wrapper))
 
@@ -1725,7 +1759,7 @@ def maybe_unbind_method(oplike: Op | MethodType | partial) -> Op:
     """
     if isinstance(oplike, BoundOp):
         op = oplike._opified
-    elif isinstance(oplike, (SyncOp, AsyncOp)):
+    elif isinstance(oplike, BaseOp):
         op = oplike.require_opified()
     elif isinstance(oplike, MethodType):
         op = oplike.__func__
@@ -1741,13 +1775,12 @@ def get_op_def(
     oplike: Opified[Any, Any]
     | MethodType
     | partial
-    | SyncOp[Any, Any]
-    | AsyncOp[Any, Any]
+    | BaseOp[Any, Any]
     | BoundOp[Any, Any],
-) -> SyncOp | AsyncOp:
+) -> BaseOp:
     if isinstance(oplike, BoundOp):
         return oplike.__op__
-    if isinstance(oplike, (SyncOp, AsyncOp)):
+    if isinstance(oplike, BaseOp):
         return oplike
 
     if isinstance(oplike, MethodType):
@@ -1758,7 +1791,7 @@ def get_op_def(
         maybe_opified = oplike
 
     op_def = getattr(maybe_opified, "__op__", None)
-    if not isinstance(op_def, (SyncOp, AsyncOp)):
+    if not isinstance(op_def, BaseOp):
         raise TypeError("Expected an opified callable with a __op__ sidecar")
     return op_def
 
@@ -1769,7 +1802,7 @@ def is_op(obj: Any) -> TypeIs[Op]:
         return is_op(obj.func)
 
     sidecar = getattr(obj, "__op__", None)
-    if isinstance(sidecar, (SyncOp, AsyncOp)):
+    if isinstance(sidecar, BaseOp):
         return True
 
     if sys.version_info < (3, 12):
@@ -1782,10 +1815,9 @@ def as_op(
     fn: Callable[P, R]
     | MethodType
     | partial
-    | SyncOp[P, R]
-    | AsyncOp[P, R]
+    | BaseOp[P, R]
     | BoundOp[P, R],
-) -> SyncOp[P, R] | AsyncOp[P, R] | BoundOp[P, R]:
+) -> BaseOp[P, R] | BoundOp[P, R]:
     """Given a @weave.op decorated value, return its nominal op view.
 
     Plain opified callables return their shared sidecar. Bound methods and
@@ -1793,7 +1825,7 @@ def as_op(
     """
     if isinstance(fn, BoundOp):
         return fn
-    if isinstance(fn, (SyncOp, AsyncOp)):
+    if isinstance(fn, BaseOp):
         return fn
     if isinstance(fn, (MethodType, partial)):
         if not is_op(fn):
