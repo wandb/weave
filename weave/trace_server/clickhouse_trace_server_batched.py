@@ -6046,15 +6046,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         except Exception as e:
             logger.exception("Failed to resolve prompt (streaming)")
             err = f"Failed to resolve and apply prompt: {e!s}"
+            weave_call_id: str | None = None
             if req.track_llm_call and start_time_tracked is not None:
-                self._record_tracked_completions_create_failure(
+                weave_call_id = self._record_tracked_completions_create_failure(
                     req,
                     start_time=start_time_tracked,
                     end_time=datetime.datetime.now(),
                     error_message=err,
                     initial_messages=initial_messages,
                 )
-            return iter([{"error": err}])
+            return _setup_error_chunks(weave_call_id, err)
 
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
@@ -6064,15 +6065,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         except Exception as e:
             err = str(e)
+            weave_call_id = None
             if req.track_llm_call and start_time_tracked is not None:
-                self._record_tracked_completions_create_failure(
+                weave_call_id = self._record_tracked_completions_create_failure(
                     req,
                     start_time=start_time_tracked,
                     end_time=datetime.datetime.now(),
                     error_message=err,
                     initial_messages=initial_messages,
                 )
-            return iter([{"error": err}])
+            return _setup_error_chunks(weave_call_id, err)
 
         model_name = completion_model_info.model_name
         api_key = completion_model_info.api_key
@@ -7449,6 +7451,25 @@ def _process_tool_call_delta(
                 ]
 
 
+def _setup_error_chunks(
+    weave_call_id: str | None,
+    error_message: str,
+) -> Iterator[dict[str, Any]]:
+    """Yield a single error chunk for setup failures (errors before streaming begins).
+
+    The error chunk is always the first (and only) chunk so that
+    StreamingResponseWithStatusCode can set HTTP 500 before committing response
+    headers.  When weave_call_id is available it is embedded directly in the
+    error chunk under ``_meta`` so that the client can extract it from the 500
+    response body without needing a separate 200-status _meta chunk (which would
+    irrecoverably commit the HTTP response as 200 before the error arrives).
+    """
+    chunk: dict[str, Any] = {"error": error_message}
+    if weave_call_id:
+        chunk["_meta"] = {"weave_call_id": weave_call_id}
+    yield chunk
+
+
 def _create_tracked_stream_wrapper(
     insert_call: Callable[[CallEndCHInsertable], None],
     chunk_iter: Iterator[dict[str, Any]],
@@ -7476,8 +7497,15 @@ def _create_tracked_stream_wrapper(
         ] = {}  # Track finish reasons by choice index
         aggregated_metadata: dict[str, Any] = {}
 
+        stream_exception: str | None = None
         try:
             for chunk in chunk_iter:
+                # Capture error dicts from the LLM provider so the finally block
+                # can persist the exception on the call record even when the
+                # provider signals errors as a yielded chunk rather than raising.
+                if isinstance(chunk, dict) and chunk.get("error"):
+                    stream_exception = str(chunk["error"])
+
                 yield chunk  # Yield to client immediately
 
                 if not isinstance(chunk, dict):
@@ -7526,6 +7554,9 @@ def _create_tracked_stream_wrapper(
                                     reasoning_content_delta
                                 )
 
+        except Exception as e:
+            stream_exception = str(e)
+            raise
         finally:
             # Build final aggregated output with all choices
             if choice_contents or choice_tool_calls or choice_reasoning_content:
@@ -7554,6 +7585,7 @@ def _create_tracked_stream_wrapper(
                 ended_at=datetime.datetime.now(),
                 output=aggregated_output,
                 summary=summary,
+                exception=stream_exception,
             )
             end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
             insert_call(end_call)
@@ -7675,6 +7707,9 @@ def _setup_completion_model_info(
             vertex_credentials=None,
         )
     elif model_info:
+        raise InvalidRequest(
+            f"No secret fetcher found, cannot fetch API key for model {model_name}"
+        )
         secret_name = model_info.get("api_key_name")
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
