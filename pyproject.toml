@@ -501,6 +501,9 @@ test = [
 # uv sync validates all environments, so we need to exclude PyPy which has many incompatibilities
 environments = ["platform_python_implementation == 'CPython'"]
 
+# Block diskcache; use diskcache-weave instead (patched fork with CVE fix)
+exclude-dependencies = ["diskcache"]
+
 # Declare conflicts between optional dependencies that have incompatible requirements
 # This allows uv sync to work correctly by not validating conflicting extras together
 conflicts = [
