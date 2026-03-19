@@ -139,6 +139,7 @@ class CallSchema(BaseModel):
 
     # WB Metadata
     wb_user_id: str | None = None
+    wb_username: str | None = None
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
@@ -581,6 +582,11 @@ class CallsQueryReq(BaseModelStrict):
         default=False,
         description="Beta, subject to change. If true, the response will"
         " include the total storage size for a trace.",
+    )
+    include_usernames: bool | None = Field(
+        default=False,
+        description="If true, the response will attempt to resolve each call's "
+        "wb_user_id to a username for the duration of this request.",
     )
 
     # TODO: type this with call schema columns, following the same rules as
