@@ -24,14 +24,16 @@ Architecture overview:
       ▼             ▼
     WALConsumer (reads + checkpoints) ──►  handler dispatch (drain)
 
-Three protocols, fully orthogonal:
+Four protocols, fully orthogonal:
 
     WALWriter           — append records to a file with fsync durability
     WALConsumer         — read unprocessed records + track progress
     WALDirectoryManager — create, discover, and clean up per-process WAL files
+    WALSender           — drain WAL files and forward records to handlers
 
 The directory manager creates writers (create_file) and discovers file paths
-(list_files) that the caller passes to consumers for draining.
+(list_files) that the caller passes to consumers for draining.  The sender
+orchestrates the drain loop, optionally running in a background thread.
 """
 
 from __future__ import annotations
@@ -251,6 +253,72 @@ class WALDirectoryManager(Protocol):
 
         Args:
             path: Absolute path to the WAL file to remove.
+        """
+        ...
+
+
+@runtime_checkable
+class WALSender(Protocol):
+    """Drains WAL files and forwards records to handlers.
+
+    The sender bridges the WAL (durable disk storage) and the destination
+    (e.g., a trace server).  It orchestrates the drain loop: discovering
+    WAL files, reading pending records, dispatching them to handlers, and
+    cleaning up fully-consumed files.
+
+    Implementations may run the drain loop in a background thread
+    (:meth:`start`/:meth:`stop`) or be driven manually via
+    :meth:`drain_once`.
+
+    File safety:
+        The sender must not delete a WAL file that a writer still has
+        open.  Two mechanisms are available:
+
+        - **Same-process**: The caller provides an ``active_paths``
+          callable that returns paths the local writer owns.
+        - **Cross-process**: The caller provides an ``is_file_active``
+          callable (e.g., PID lock check) that detects remote writers.
+
+        Both are pluggable — the protocol does not prescribe a specific
+        liveness-detection mechanism.
+    """
+
+    def start(self) -> None:
+        """Start sending (e.g., begin background polling).
+
+        Raises:
+            RuntimeError: If the sender is already running.
+        """
+        ...
+
+    def stop(self, timeout: float = 10.0) -> None:
+        """Stop sending and perform a final drain.
+
+        The caller should close the writer before stopping the sender
+        so that all files become eligible for cleanup.
+
+        Args:
+            timeout: Maximum seconds to wait for shutdown.
+        """
+        ...
+
+    def drain_once(self) -> int:
+        """Drain all WAL files once.
+
+        Reads pending records from every WAL file, dispatches them to
+        the registered handlers, and removes fully-consumed files that
+        are safe to delete.
+
+        Returns:
+            Number of records successfully processed.
+        """
+        ...
+
+    def flush(self) -> int:
+        """Drain all pending records synchronously.
+
+        Returns:
+            Number of records processed.
         """
         ...
 

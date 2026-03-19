@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -10,15 +11,8 @@ import pytest
 from weave.durability.wal import WALRecord
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
-from weave.durability.wal_sender import WALSender, _is_file_locked
-from weave.durability.wal_writer import JSONLWALWriter
-
-try:
-    import fcntl
-
-    _HAS_FLOCK = True
-except ImportError:
-    _HAS_FLOCK = False
+from weave.durability.wal_sender import BackgroundWALSender
+from weave.durability.wal_writer import JSONLWALWriter, is_writer_alive
 
 
 class TestDrainOnce:
@@ -33,7 +27,7 @@ class TestDrainOnce:
 
         received: list[WALRecord] = []
         handlers = {"call_start": received.append, "call_end": received.append}
-        sender = WALSender(mgr, handlers, JSONLWALConsumer)
+        sender = BackgroundWALSender(mgr, handlers, JSONLWALConsumer)
         count = sender.drain_once()
 
         assert count == 2
@@ -53,7 +47,7 @@ class TestDrainOnce:
         assert len(mgr.list_files()) == 2
 
         received: list[WALRecord] = []
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             {"obj_create": received.append},
             JSONLWALConsumer,
@@ -74,7 +68,7 @@ class TestDrainOnce:
         writer.write({"type": "obj_create", "seq": 0})
         writer.flush()
 
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             {"obj_create": lambda r: None},
             JSONLWALConsumer,
@@ -93,7 +87,7 @@ class TestDrainOnce:
         with mgr.create_file() as writer:
             writer.write({"type": "obj_create", "seq": 0})
 
-        sender = WALSender(mgr, {"obj_create": lambda r: None}, JSONLWALConsumer)
+        sender = BackgroundWALSender(mgr, {"obj_create": lambda r: None}, JSONLWALConsumer)
         sender.drain_once()
 
         assert mgr.list_files() == []
@@ -109,7 +103,7 @@ class TestDrainOnce:
         writer.write({"type": "obj_create", "seq": 0})
         writer.close()  # active_path is now None
 
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             {"obj_create": lambda r: None},
             JSONLWALConsumer,
@@ -123,7 +117,7 @@ class TestDrainOnce:
     def test_empty_directory_is_noop(self, tmp_path: str) -> None:
         """No WAL files means drain_once returns 0 without errors."""
         mgr = FileWALDirectoryManager(str(tmp_path))
-        sender = WALSender(mgr, {}, JSONLWALConsumer)
+        sender = BackgroundWALSender(mgr, {}, JSONLWALConsumer)
         assert sender.drain_once() == 0
 
     def test_multiple_drain_cycles(self, tmp_path: str) -> None:
@@ -132,7 +126,7 @@ class TestDrainOnce:
         writer = mgr.create_file()
 
         received: list[WALRecord] = []
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             {"obj_create": received.append},
             JSONLWALConsumer,
@@ -159,7 +153,7 @@ class TestDrainOnce:
             writer.write({"type": "obj_create", "seq": 0})
 
         received: list[WALRecord] = []
-        sender = WALSender(mgr, {"obj_create": received.append}, JSONLWALConsumer)
+        sender = BackgroundWALSender(mgr, {"obj_create": received.append}, JSONLWALConsumer)
 
         count = sender.flush()
         assert count == 1
@@ -172,7 +166,7 @@ class TestBackgroundThread:
     def test_start_and_stop(self, tmp_path: str) -> None:
         """Sender starts a thread and stops cleanly."""
         mgr = FileWALDirectoryManager(str(tmp_path))
-        sender = WALSender(mgr, {}, JSONLWALConsumer, poll_interval=0.05)
+        sender = BackgroundWALSender(mgr, {}, JSONLWALConsumer, poll_interval=0.05)
 
         sender.start()
         assert sender._thread is not None
@@ -184,7 +178,7 @@ class TestBackgroundThread:
     def test_start_twice_raises(self, tmp_path: str) -> None:
         """Starting the sender twice raises RuntimeError."""
         mgr = FileWALDirectoryManager(str(tmp_path))
-        sender = WALSender(mgr, {}, JSONLWALConsumer, poll_interval=0.05)
+        sender = BackgroundWALSender(mgr, {}, JSONLWALConsumer, poll_interval=0.05)
 
         sender.start()
         try:
@@ -199,7 +193,7 @@ class TestBackgroundThread:
         writer = mgr.create_file()
 
         received: list[WALRecord] = []
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             {"obj_create": received.append},
             JSONLWALConsumer,
@@ -229,7 +223,7 @@ class TestBackgroundThread:
         writer = JSONLWALWriter(mgr)
 
         received: list[WALRecord] = []
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             {"obj_create": received.append},
             JSONLWALConsumer,
@@ -258,7 +252,7 @@ class TestBackgroundThread:
             writer.write({"type": "obj_create", "seq": 0})
 
         received: list[WALRecord] = []
-        with WALSender(
+        with BackgroundWALSender(
             mgr, {"obj_create": received.append}, JSONLWALConsumer, poll_interval=0.05
         ):
             deadline = time.monotonic() + 2.0
@@ -285,7 +279,7 @@ class TestCrashRecovery:
         received: list[WALRecord] = []
         handlers = {"call_start": received.append, "call_end": received.append}
         # No active_paths — all files are orphans, safe to remove.
-        sender = WALSender(mgr, handlers, JSONLWALConsumer)
+        sender = BackgroundWALSender(mgr, handlers, JSONLWALConsumer)
         sender.drain_once()
 
         assert len(received) == 3
@@ -307,7 +301,7 @@ class TestCrashRecovery:
         writer.flush()
 
         received: list[WALRecord] = []
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             {"call_start": received.append},
             JSONLWALConsumer,
@@ -342,7 +336,7 @@ class TestErrorResilience:
                 raise ValueError("boom")
             results.append(record["seq"])
 
-        sender = WALSender(mgr, {"obj_create": handler}, JSONLWALConsumer)
+        sender = BackgroundWALSender(mgr, {"obj_create": handler}, JSONLWALConsumer)
         count = sender.drain_once()
 
         # Records 0 and 2 succeeded, record 1 went to dead-letter.
@@ -363,7 +357,7 @@ class TestErrorResilience:
 
         path = mgr.list_files()[0]
         # Protect the file so drain doesn't remove it (and its sidecars).
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             {"obj_create": handler},
             JSONLWALConsumer,
@@ -393,7 +387,7 @@ class TestErrorResilience:
                 raise ValueError("transient error")
             received.append(record)
 
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr, {"obj_create": handler}, JSONLWALConsumer, poll_interval=0.05
         )
         sender.start()
@@ -434,7 +428,7 @@ class TestWithRotatingWriter:
 
         # Writer is closed — no active paths to protect.
         received: list[WALRecord] = []
-        sender = WALSender(mgr, {"obj_create": received.append}, JSONLWALConsumer)
+        sender = BackgroundWALSender(mgr, {"obj_create": received.append}, JSONLWALConsumer)
         sender.drain_once()
 
         assert len(received) == 10
@@ -458,7 +452,7 @@ class TestWithRotatingWriter:
 
         # Sender protects only the current active file.
         received: list[WALRecord] = []
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             {"obj_create": received.append},
             JSONLWALConsumer,
@@ -480,7 +474,7 @@ class TestWithRotatingWriter:
         writer = JSONLWALWriter(mgr, max_file_size=100)
 
         received: list[WALRecord] = []
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             {"obj_create": received.append},
             JSONLWALConsumer,
@@ -518,7 +512,7 @@ class TestWithRotatingWriter:
             "call_end": calls.append,
             "obj_create": objs.append,
         }
-        sender = WALSender(
+        sender = BackgroundWALSender(
             mgr,
             handlers,
             JSONLWALConsumer,
@@ -550,29 +544,101 @@ class TestWithRotatingWriter:
         assert mgr.list_files() == []
 
 
-@pytest.mark.skipif(not _HAS_FLOCK, reason="flock not available on this platform")
 class TestCrossProcessProtection:
-    """Tests for flock-based cross-process file protection."""
+    """Tests for PID-lock-based cross-process file protection."""
 
-    def test_locked_file_not_deleted(self, tmp_path: str) -> None:
-        """Sender won't delete a file locked by another process."""
+    def test_writer_open_prevents_deletion(self, tmp_path: str) -> None:
+        """Sender won't delete a file whose writer is still open (same process)."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        writer = mgr.create_file()
+        writer.write({"type": "obj_create", "seq": 0})
+        writer.flush()
+
+        path = mgr.list_files()[0]
+
+        # Lock file exists and PID matches current process → alive.
+        assert is_writer_alive(path) is True
+
+        # Sender has NO active_paths — relies purely on is_file_active.
+        sender = BackgroundWALSender(
+            mgr, {"obj_create": lambda r: None}, JSONLWALConsumer,
+            is_file_active=is_writer_alive,
+        )
+        sender.drain_once()
+
+        # File should still exist — writer is alive.
+        assert len(mgr.list_files()) == 1
+
+        writer.close()
+
+        # After close, lock file is removed → not alive.
+        assert is_writer_alive(path) is False
+        sender.drain_once()
+        assert mgr.list_files() == []
+
+    def test_closed_writer_allows_deletion(self, tmp_path: str) -> None:
+        """After writer closes (removing lock file), file can be deleted."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with mgr.create_file() as writer:
+            writer.write({"type": "obj_create", "seq": 0})
+
+        path = mgr.list_files()[0]
+        assert is_writer_alive(path) is False
+
+        sender = BackgroundWALSender(
+            mgr, {"obj_create": lambda r: None}, JSONLWALConsumer,
+            is_file_active=is_writer_alive,
+        )
+        sender.drain_once()
+        assert mgr.list_files() == []
+
+    def test_missing_file_is_not_alive(self, tmp_path: str) -> None:
+        """is_writer_alive returns False for a nonexistent file."""
+        assert is_writer_alive(str(tmp_path / "nonexistent.jsonl")) is False
+
+    def test_stale_pid_allows_deletion(self, tmp_path: str) -> None:
+        """A lock file with a dead PID is treated as stale → file deletable."""
         mgr = FileWALDirectoryManager(str(tmp_path))
         with mgr.create_file() as writer:
             writer.write({"type": "obj_create", "seq": 0})
 
         path = mgr.list_files()[0]
 
-        # Spawn a subprocess that holds an exclusive flock on the file.
-        # It reads a line from stdin to stay alive, then exits.
+        # Manually create a lock file with a dead PID.
+        base, _ = os.path.splitext(path)
+        lock_path = base + ".lock"
+        with open(lock_path, "w", encoding="utf-8") as f:
+            f.write("999999999")  # PID that (almost certainly) doesn't exist
+
+        assert is_writer_alive(path) is False
+
+        sender = BackgroundWALSender(
+            mgr, {"obj_create": lambda r: None}, JSONLWALConsumer,
+            is_file_active=is_writer_alive,
+        )
+        sender.drain_once()
+        assert mgr.list_files() == []
+
+    def test_cross_process_writer_prevents_deletion(self, tmp_path: str) -> None:
+        """A subprocess writing to a WAL file prevents the sender from deleting it."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with mgr.create_file() as writer:
+            writer.write({"type": "obj_create", "seq": 0})
+
+        path = mgr.list_files()[0]
+
+        # Spawn a subprocess that creates a lock file and stays alive.
+        base, _ = os.path.splitext(path)
+        lock_path = base + ".lock"
         proc = subprocess.Popen(
             [
                 sys.executable,
                 "-c",
                 (
-                    "import fcntl, sys\n"
-                    f"f = open({path!r}, 'rb')\n"
-                    "fcntl.flock(f, fcntl.LOCK_EX)\n"
-                    "sys.stdout.write('locked\\n')\n"
+                    "import os, sys\n"
+                    f"with open({lock_path!r}, 'w') as f:\n"
+                    "    f.write(str(os.getpid()))\n"
+                    "sys.stdout.write('ready\\n')\n"
                     "sys.stdout.flush()\n"
                     "sys.stdin.readline()\n"  # block until parent signals
                 ),
@@ -581,85 +647,67 @@ class TestCrossProcessProtection:
             stdout=subprocess.PIPE,
         )
         try:
-            # Wait for the subprocess to confirm it holds the lock.
             assert proc.stdout is not None
             line = proc.stdout.readline()
-            assert line.strip() == b"locked"
+            assert line.strip() == b"ready"
 
-            assert _is_file_locked(path) is True
+            # Subprocess is alive and its PID is in the lock file.
+            assert is_writer_alive(path) is True
 
-            # Sender has NO active_paths — relies purely on flock.
-            sender = WALSender(
-                mgr, {"obj_create": lambda r: None}, JSONLWALConsumer
+            sender = BackgroundWALSender(
+                mgr, {"obj_create": lambda r: None}, JSONLWALConsumer,
+                is_file_active=is_writer_alive,
             )
             sender.drain_once()
 
-            # File should still exist — subprocess holds the lock.
+            # File should still exist — subprocess is alive.
             assert len(mgr.list_files()) == 1
         finally:
-            # Tell subprocess to exit, releasing the lock.
             assert proc.stdin is not None
             proc.stdin.write(b"done\n")
             proc.stdin.flush()
             proc.wait(timeout=5)
 
-        # Now that the lock is released, the file can be deleted.
-        assert _is_file_locked(path) is False
-        sender = WALSender(mgr, {"obj_create": lambda r: None}, JSONLWALConsumer)
+        # Subprocess exited — but lock file still has its (now dead) PID.
+        assert is_writer_alive(path) is False
+
+        sender = BackgroundWALSender(
+            mgr, {"obj_create": lambda r: None}, JSONLWALConsumer,
+            is_file_active=is_writer_alive,
+        )
         sender.drain_once()
         assert mgr.list_files() == []
 
-    def test_unlocked_file_is_deleted(self, tmp_path: str) -> None:
-        """After writer closes (releasing flock), file can be deleted."""
+    def test_crashed_subprocess_lock_becomes_stale(self, tmp_path: str) -> None:
+        """When a subprocess crashes, its PID lock becomes stale → file deletable."""
         mgr = FileWALDirectoryManager(str(tmp_path))
         with mgr.create_file() as writer:
             writer.write({"type": "obj_create", "seq": 0})
 
         path = mgr.list_files()[0]
+        base, _ = os.path.splitext(path)
+        lock_path = base + ".lock"
 
-        # Writer is closed — flock is released.
-        assert _is_file_locked(path) is False
-
-        sender = WALSender(mgr, {"obj_create": lambda r: None}, JSONLWALConsumer)
-        sender.drain_once()
-
-        assert mgr.list_files() == []
-
-    def test_missing_file_is_not_locked(self, tmp_path: str) -> None:
-        """_is_file_locked returns False for a nonexistent file."""
-        assert _is_file_locked(str(tmp_path / "nonexistent.jsonl")) is False
-
-    def test_crashed_process_releases_lock(self, tmp_path: str) -> None:
-        """When a process crashes, the OS releases its flock automatically."""
-        mgr = FileWALDirectoryManager(str(tmp_path))
-        with mgr.create_file() as writer:
-            writer.write({"type": "obj_create", "seq": 0})
-
-        path = mgr.list_files()[0]
-
-        # Spawn a subprocess that locks the file then exits abruptly.
+        # Spawn a subprocess that writes its PID and exits immediately.
         proc = subprocess.Popen(
             [
                 sys.executable,
                 "-c",
                 (
-                    "import fcntl, sys\n"
-                    f"f = open({path!r}, 'rb')\n"
-                    "fcntl.flock(f, fcntl.LOCK_EX)\n"
-                    "sys.stdout.write('locked\\n')\n"
-                    "sys.stdout.flush()\n"
-                    # Exit immediately — OS releases the lock.
+                    "import os\n"
+                    f"with open({lock_path!r}, 'w') as f:\n"
+                    "    f.write(str(os.getpid()))\n"
                 ),
             ],
-            stdout=subprocess.PIPE,
         )
-        assert proc.stdout is not None
-        proc.stdout.readline()  # wait for lock to be acquired
-        proc.wait(timeout=5)  # wait for process to exit
+        proc.wait(timeout=5)
 
-        # Process exited — lock should be released.
-        assert _is_file_locked(path) is False
+        # Process is dead — lock is stale.
+        assert is_writer_alive(path) is False
 
-        sender = WALSender(mgr, {"obj_create": lambda r: None}, JSONLWALConsumer)
+        sender = BackgroundWALSender(
+            mgr, {"obj_create": lambda r: None}, JSONLWALConsumer,
+            is_file_active=is_writer_alive,
+        )
         sender.drain_once()
         assert mgr.list_files() == []

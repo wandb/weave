@@ -7,6 +7,7 @@ import uuid
 from weave.durability.wal_writer import (
     DEFAULT_FSYNC_BATCH_SIZE,
     DEFAULT_FSYNC_TIMEOUT,
+    LOCK_EXT,
     _JSONLWALFileWriter,
 )
 
@@ -59,7 +60,12 @@ class FileWALDirectoryManager:
 
     def remove(self, path: str) -> None:
         base, _ = os.path.splitext(path)
-        for p in (path, base + self._checkpoint_ext, base + self._dead_letter_ext):
+        sidecars = (
+            self._checkpoint_ext,
+            self._dead_letter_ext,
+            LOCK_EXT,
+        )
+        for p in (path, *(base + ext for ext in sidecars)):
             try:
                 os.unlink(p)
             except FileNotFoundError:
