@@ -457,10 +457,27 @@ def build_chat_messages(
                 _walk(child, nearest_agent)
             return
 
-        # ---- chat (OpenAI): walk children only ----
+        # ---- chat: either walk children or emit leaf message ----
         if op == "chat":
-            for child in node.children:
-                _walk(child, nearest_agent)
+            if node.children:
+                for child in node.children:
+                    _walk(child, nearest_agent)
+            elif span.output_messages:
+                text = _extract_assistant_text(_safe_parse_json(span.output_messages))
+                if text and not _looks_like_tool_call(text):
+                    messages.append(
+                        GenAIChatMessage(
+                            type="agent_message",
+                            span_id=span.span_id,
+                            agent_name=nearest_agent or agent_name,
+                            model=span.response_model or span.request_model,
+                            text=text,
+                            input_tokens=span.input_tokens,
+                            output_tokens=span.output_tokens,
+                            duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
+                            status=span.status_code,
+                        )
+                    )
             return
 
         # ---- generate_content (Google): walk children ----

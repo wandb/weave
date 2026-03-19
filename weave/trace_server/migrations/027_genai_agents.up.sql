@@ -3,7 +3,7 @@
 -- Includes placeholder columns for future LLM-generated enrichment.
 CREATE TABLE IF NOT EXISTS genai_agents (
     project_id              String,
-    agent_name              String,
+    agent_name              LowCardinality(String),
 
     -- Aggregated stats (summed on merge)
     invocation_count        UInt64 DEFAULT 0,
