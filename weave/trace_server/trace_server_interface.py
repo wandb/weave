@@ -1921,6 +1921,25 @@ class CallsScoreRes(BaseModel):
     pass
 
 
+class TaskDetails(BaseModel):
+    """Details about a task's progress."""
+
+    id: str
+    total_items: int
+    successful_items: int
+    failed_items: int
+    created_at: str
+
+
+class TasksListReq(BaseModelStrict):
+    project_id: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class TasksListRes(BaseModel):
+    tasks: list[TaskDetails]
+
+
 class OpCreateBody(BaseModel):
     """Request body for creating an Op object via REST API.
 
@@ -2938,6 +2957,9 @@ class TraceServerInterface(Protocol):
 
     # Scoring API
     def calls_score(self, req: CallsScoreReq) -> CallsScoreRes: ...
+
+    # Task API
+    def tasks_list(self, req: TasksListReq) -> TasksListRes: ...
 
 
 class ObjectInterface(Protocol):

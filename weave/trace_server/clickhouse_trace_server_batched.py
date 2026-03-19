@@ -229,6 +229,7 @@ from weave.trace_server.trace_server_common import (
     make_feedback_query_req,
     set_nested_key,
 )
+from weave.trace_server.task_manager import TaskManager
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
     EvaluateModelDispatcher,
@@ -6195,6 +6196,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self.kafka_producer.produce_score_calls(req)
 
         return tsi.CallsScoreRes()
+
+    def tasks_list(self, req: tsi.TasksListReq) -> tsi.TasksListRes:
+        task_manager = TaskManager(req.project_id, req.wb_user_id)
+        tasks = task_manager.list_tasks()
+        return tsi.TasksListRes(tasks=[tsi.TaskDetails(**t) for t in tasks])
 
     # Private Methods
     @property
