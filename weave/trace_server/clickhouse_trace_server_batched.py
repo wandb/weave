@@ -7675,9 +7675,6 @@ def _setup_completion_model_info(
             vertex_credentials=None,
         )
     elif model_info:
-        raise InvalidRequest(
-            f"No secret fetcher found, cannot fetch API key for model {model_name}"
-        )
         secret_name = model_info.get("api_key_name")
         if not secret_name:
             raise InvalidRequest(f"No secret name found for model {model_name}")
