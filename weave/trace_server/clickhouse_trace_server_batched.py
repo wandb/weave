@@ -566,43 +566,44 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
             obj_id_idx_map.pop(op_name)
 
-        # We know that OTel will always use the placeholder source.
-        # We can instead just reuse the existing file if we know it is present
-        # and create it just once if we are not sure.
-        if len(existing_ops) == 0:
+        if obj_id_idx_map:
+            # We know that OTel will always use the placeholder source.
+            # We can instead just reuse the existing file if we know it is present
+            # and create it just once if we are not sure.
             digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=True
+                project_id=req.project_id, create=len(existing_ops) == 0
             )
-        else:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=False
-            )
-        obj_creation_batch = []
-        for op_obj_id in obj_id_idx_map.keys():
-            op_val = object_creation_utils.build_op_val(digest)
-            obj_creation_batch.append(
-                tsi.ObjSchemaForInsert(
-                    project_id=req.project_id,
-                    object_id=op_obj_id,
-                    val=op_val,
-                    wb_user_id=req.wb_user_id,
+            obj_creation_batch = []
+            for op_obj_id in obj_id_idx_map.keys():
+                op_val = object_creation_utils.build_op_val(digest)
+                obj_creation_batch.append(
+                    tsi.ObjSchemaForInsert(
+                        project_id=req.project_id,
+                        object_id=op_obj_id,
+                        val=op_val,
+                        wb_user_id=req.wb_user_id,
+                    )
                 )
-            )
-        res = self.obj_create_batch(obj_creation_batch)
+            res = self.obj_create_batch(obj_creation_batch)
 
-        for result in res:
-            if result.object_id is None:
-                raise RuntimeError("Otel Export - Expected object_id but got None")
+            cached_op_refs = {}
+            for result in res:
+                if result.object_id is None:
+                    raise RuntimeError("Otel Export - Expected object_id but got None")
 
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=result.object_id,
-                version=result.digest,
-            ).uri
-            for idx in obj_id_idx_map[result.object_id]:
-                calls[idx][0].op_name = op_ref_uri
-            # Cache newly created ops so subsequent batches skip the CH query
-            self._cache_op_ref(req.project_id, result.object_id, op_ref_uri)
+                op_ref_uri = ri.InternalOpRef(
+                    project_id=req.project_id,
+                    name=result.object_id,
+                    version=result.digest,
+                ).uri
+                for idx in obj_id_idx_map[result.object_id]:
+                    calls[idx][0].op_name = op_ref_uri
+                cached_op_refs[result.object_id] = op_ref_uri
+
+            # Cache newly created ops so subsequent batches skip the CH query.
+            with self._op_ref_cache_lock:
+                for op_name, op_ref_uri in cached_op_refs.items():
+                    self._op_ref_cache[req.project_id, op_name] = op_ref_uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,

@@ -479,7 +479,9 @@ def test_otel_and_calls_complete_api_interoperability(
 # =============================================================================
 
 
-def test_otel_op_ref_cached_across_batches(trace_server, clickhouse_trace_server):
+def test_otel_op_ref_cached_across_batches(
+    trace_server, clickhouse_trace_server, monkeypatch
+):
     """Op ref URIs are cached: the same op name across two batches resolves identically."""
     project_id = f"{TEST_ENTITY}/otel_cache_across_batches"
 
@@ -487,6 +489,11 @@ def test_otel_op_ref_cached_across_batches(trace_server, clickhouse_trace_server
     span1 = _create_otel_span("foo")
     req1 = _create_otel_export_req(project_id, [span1])
     trace_server.otel_export(req1)
+
+    def fail_obj_create_batch(_batch):
+        raise AssertionError("obj_create_batch should not be called for cached ops")
+
+    monkeypatch.setattr(clickhouse_trace_server, "obj_create_batch", fail_obj_create_batch)
 
     # Batch 2: export another span with op "foo"
     span2 = _create_otel_span("foo")
