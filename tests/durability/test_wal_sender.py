@@ -11,8 +11,9 @@ import pytest
 from weave.durability.wal import WALRecord
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
+from weave.durability.wal_lock import is_writer_alive
 from weave.durability.wal_sender import BackgroundWALSender
-from weave.durability.wal_writer import JSONLWALWriter, is_writer_alive
+from weave.durability.wal_writer import JSONLWALWriter
 
 
 class TestDrainOnce:

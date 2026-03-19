@@ -67,7 +67,8 @@ class BackgroundWALSender:
 
     Usage::
 
-        from weave.durability.wal_writer import JSONLWALWriter, is_writer_alive
+        from weave.durability.wal_lock import is_writer_alive
+        from weave.durability.wal_writer import JSONLWALWriter
 
         dir_mgr = FileWALDirectoryManager(wal_directory)
         writer = JSONLWALWriter(dir_mgr)
@@ -103,7 +104,7 @@ class BackgroundWALSender:
         is_file_active: Callable that takes a WAL file path and returns
             True if a writer (possibly in another process) still has it
             open.  Checked before deleting any file.  Pass
-            :func:`~weave.durability.wal_writer.is_writer_alive` for
+            :func:`~weave.durability.wal_lock.is_writer_alive` for
             PID-lock-based cross-process detection, or any custom check.
     """
 

@@ -6,6 +6,7 @@ import threading
 import time
 
 from weave.durability.wal import WALDirectoryManager, WALRecord
+from weave.durability.wal_lock import acquire_lock, release_lock
 
 # Default max file size before rotation.  64 MB keeps individual files
 # manageable while avoiding excessive rotation churn.  Drained bytes at
@@ -39,17 +40,10 @@ class _JSONLWALFileWriter:
         path: str,
         fsync_batch_size: int = DEFAULT_FSYNC_BATCH_SIZE,
         fsync_timeout: float = DEFAULT_FSYNC_TIMEOUT,
-        lock_ext: str = ".lock",
     ) -> None:
-        self._path = path
+        self.path = path
         self._file = open(path, "ab")
-        # Write a PID lock sidecar so the sender (even in another process)
-        # can check whether a writer is still alive for this file.
-        # The lock file is removed on close().  If the process crashes,
-        # the lock file survives but the sender detects the stale PID.
-        base, _ = os.path.splitext(path)
-        self._lock_path = base + lock_ext
-        _write_pid_lock(self._lock_path)
+        self._lock_path = acquire_lock(path)
         self._fsync_batch_size = fsync_batch_size
         self._fsync_timeout = fsync_timeout
         self._unsynced = 0
@@ -79,7 +73,7 @@ class _JSONLWALFileWriter:
         with self._lock:
             self._flush_unlocked()
             self._file.close()
-            _remove_pid_lock(self._lock_path)
+            release_lock(self._lock_path)
 
     def _should_fsync(self) -> bool:
         # Batch-count trigger: enough writes have accumulated.
@@ -104,11 +98,6 @@ class _JSONLWALFileWriter:
 
     def __exit__(self, *args: object) -> None:
         self.close()
-
-    @property
-    def path(self) -> str:
-        """Absolute path to the WAL file this writer is appending to."""
-        return self._path
 
     def _fsync(self) -> None:
         os.fsync(self._file.fileno())
@@ -235,57 +224,3 @@ class JSONLWALWriter:
         writer._fsync_batch_size = self._fsync_batch_size
         writer._fsync_timeout = self._fsync_timeout
         return writer
-
-
-# ---------------------------------------------------------------------------
-# PID lock helpers — portable cross-process writer detection
-# ---------------------------------------------------------------------------
-
-LOCK_EXT = ".lock"
-
-
-def _write_pid_lock(path: str) -> None:
-    """Write the current PID to a lock sidecar file."""
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(str(os.getpid()))
-
-
-def _remove_pid_lock(path: str) -> None:
-    """Remove the lock sidecar file (idempotent)."""
-    try:
-        os.unlink(path)
-    except FileNotFoundError:
-        pass
-
-
-def is_writer_alive(wal_path: str, lock_ext: str = LOCK_EXT) -> bool:
-    """Check if a WAL file has an active writer (cross-process safe).
-
-    Reads the PID from the lock sidecar file and checks whether that
-    process is still running.  Returns False if:
-    - The lock file doesn't exist (writer closed cleanly or never started).
-    - The lock file contains a PID for a dead process (writer crashed).
-
-    This works on all platforms (Windows, macOS, Linux).
-    """
-    base, _ = os.path.splitext(wal_path)
-    lock_path = base + lock_ext
-    try:
-        with open(lock_path, encoding="utf-8") as f:
-            pid = int(f.read().strip())
-    except (FileNotFoundError, ValueError):
-        return False
-    return _is_pid_alive(pid)
-
-
-def _is_pid_alive(pid: int) -> bool:
-    """Check if a process with the given PID is still running."""
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        # No such process.
-        return False
-    except PermissionError:
-        # Process exists but we don't have permission to signal it.
-        return True
-    return True

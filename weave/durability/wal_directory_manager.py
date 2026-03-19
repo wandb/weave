@@ -4,10 +4,10 @@ import os
 import time
 import uuid
 
+from weave.durability.wal_lock import LOCK_EXT
 from weave.durability.wal_writer import (
     DEFAULT_FSYNC_BATCH_SIZE,
     DEFAULT_FSYNC_TIMEOUT,
-    LOCK_EXT,
     _JSONLWALFileWriter,
 )
 
