@@ -608,7 +608,9 @@ def test_otel_op_ref_cached_across_batches(
     def fail_obj_create_batch(_batch):
         raise AssertionError("obj_create_batch should not be called for cached ops")
 
-    monkeypatch.setattr(clickhouse_trace_server, "obj_create_batch", fail_obj_create_batch)
+    monkeypatch.setattr(
+        clickhouse_trace_server, "obj_create_batch", fail_obj_create_batch
+    )
 
     # Batch 2: export another span with op "foo"
     span2 = _create_otel_span("foo")
