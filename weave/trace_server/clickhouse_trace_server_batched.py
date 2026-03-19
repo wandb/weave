@@ -5753,6 +5753,98 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.ActionsExecuteBatchRes()
 
+    def _record_tracked_completions_create_failure(
+        self,
+        req: tsi.CompletionsCreateReq,
+        *,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+        error_message: str,
+        initial_messages: list,
+    ) -> str:
+        """Persist a failed completions_create to ClickHouse when ``track_llm_call`` is enabled.
+
+        Mirrors the success-path insert (calls_complete vs calls_merged) so failures
+        before ``lite_llm_completion`` still produce a trace row with ``exception`` set.
+
+        Args:
+            req: The completions request (inputs are restored from ``initial_messages`` for storage).
+            start_time: When the completion attempt started.
+            end_time: When the failure was recorded.
+            error_message: String stored on the call as ``exception`` and in ``output.error``.
+            initial_messages: Original user messages to store in ``inputs`` (same as success path).
+
+        Returns:
+            The generated ``call_id`` for ``weave_call_id`` in the API response.
+        """
+        req.inputs.messages = initial_messages
+        write_target = self.table_routing_resolver.resolve_v2_write_target(
+            req.project_id,
+            self.ch_client,
+        )
+        call_id = generate_id()
+        trace_id = req.trace_id or generate_id()
+        parent_id = req.parent_id
+        summary: tsi.SummaryInsertMap = {}
+        response_payload: dict[str, Any] = {"error": error_message}
+
+        inputs_dump = {
+            **req.inputs.model_dump(exclude_none=True, exclude={"vertex_credentials"})
+        }
+
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            completed = tsi.CompletedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=call_id,
+                trace_id=trace_id,
+                parent_id=parent_id,
+                op_name=COMPLETIONS_CREATE_OP_NAME,
+                started_at=start_time,
+                ended_at=end_time,
+                attributes={},
+                inputs=inputs_dump,
+                output=response_payload,
+                summary=summary,
+                exception=error_message,
+                wb_user_id=req.wb_user_id,
+            )
+            ch_call = _complete_call_to_ch_insertable(completed)
+            self._insert_call_complete(ch_call)
+        else:
+            start = tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=call_id,
+                trace_id=trace_id,
+                parent_id=parent_id,
+                wb_user_id=req.wb_user_id,
+                op_name=COMPLETIONS_CREATE_OP_NAME,
+                started_at=start_time,
+                inputs=inputs_dump,
+                attributes={},
+            )
+            start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+            end = tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=start_call.id,
+                ended_at=end_time,
+                output=response_payload,
+                summary=summary,
+            )
+            end.exception = error_message
+            end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+            calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
+                start_call,
+                end_call,
+            ]
+            batch_data = []
+            for call in calls:
+                call_dict = call.model_dump()
+                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+                batch_data.append(values)
+            self._insert_call_batch(batch_data)
+
+        return call_id
+
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
@@ -5762,6 +5854,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Initialize initial_messages with the original messages
         initial_messages = getattr(req.inputs, "messages", None) or []
+
+        # When tracking is on, record wall time for early failures (prompt / setup).
+        start_time_tracked = datetime.datetime.now() if req.track_llm_call else None
 
         if prompt:
             try:
@@ -5777,8 +5872,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             except Exception as e:
                 logger.exception("Failed to resolve prompt")
+                err = f"Failed to resolve and apply prompt: {e!s}"
+                weave_call_id: str | None = None
+                if req.track_llm_call and start_time_tracked is not None:
+                    weave_call_id = self._record_tracked_completions_create_failure(
+                        req,
+                        start_time=start_time_tracked,
+                        end_time=datetime.datetime.now(),
+                        error_message=err,
+                        initial_messages=initial_messages,
+                    )
                 return tsi.CompletionsCreateRes(
-                    response={"error": f"Failed to resolve prompt: {e!s}"}
+                    response={"error": err},
+                    weave_call_id=weave_call_id,
                 )
 
         # Use shared setup logic
@@ -5788,7 +5894,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 model_info, req, self.obj_read
             )
         except Exception as e:
-            return tsi.CompletionsCreateRes(response={"error": str(e)})
+            err = str(e)
+            weave_call_id = None
+            if req.track_llm_call and start_time_tracked is not None:
+                weave_call_id = self._record_tracked_completions_create_failure(
+                    req,
+                    start_time=start_time_tracked,
+                    end_time=datetime.datetime.now(),
+                    error_message=err,
+                    initial_messages=initial_messages,
+                )
+            return tsi.CompletionsCreateRes(
+                response={"error": err},
+                weave_call_id=weave_call_id,
+            )
 
         model_name = completion_model_info.model_name
 
@@ -5913,23 +6032,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
 
-        # Use helper to resolve prompt, combine messages, and apply template vars.
-        # Raises on failure — callers (trace_server.py) let this propagate to
-        # FastAPI's exception handlers for a proper error response.
-        combined_messages, initial_messages = resolve_and_apply_prompt(
-            prompt=prompt,
-            messages=getattr(req.inputs, "messages", None),
-            template_vars=template_vars,
-            project_id=req.project_id,
-            obj_read_func=self.obj_read,
-        )
+        initial_messages = getattr(req.inputs, "messages", None) or []
+        start_time_tracked = datetime.datetime.now() if req.track_llm_call else None
+
+        try:
+            combined_messages, initial_messages = resolve_and_apply_prompt(
+                prompt=prompt,
+                messages=getattr(req.inputs, "messages", None),
+                template_vars=template_vars,
+                project_id=req.project_id,
+                obj_read_func=self.obj_read,
+            )
+        except Exception as e:
+            logger.exception("Failed to resolve prompt (streaming)")
+            err = f"Failed to resolve and apply prompt: {e!s}"
+            if req.track_llm_call and start_time_tracked is not None:
+                self._record_tracked_completions_create_failure(
+                    req,
+                    start_time=start_time_tracked,
+                    end_time=datetime.datetime.now(),
+                    error_message=err,
+                    initial_messages=initial_messages,
+                )
+            return iter([{"error": err}])
 
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
-        # Raises on failure (e.g. missing secret, unrecognised model).
-        completion_model_info = _setup_completion_model_info(
-            model_info, req, self.obj_read
-        )
+        try:
+            completion_model_info = _setup_completion_model_info(
+                model_info, req, self.obj_read
+            )
+        except Exception as e:
+            err = str(e)
+            if req.track_llm_call and start_time_tracked is not None:
+                self._record_tracked_completions_create_failure(
+                    req,
+                    start_time=start_time_tracked,
+                    end_time=datetime.datetime.now(),
+                    error_message=err,
+                    initial_messages=initial_messages,
+                )
+            return iter([{"error": err}])
 
         model_name = completion_model_info.model_name
         api_key = completion_model_info.api_key
