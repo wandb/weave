@@ -24,16 +24,14 @@ Architecture overview:
       ▼             ▼
     WALConsumer (reads + checkpoints) ──►  handler dispatch (drain)
 
-Four protocols, fully orthogonal:
+Three protocols, fully orthogonal:
 
     WALWriter           — append records to a file with fsync durability
     WALConsumer         — read unprocessed records + track progress
     WALDirectoryManager — create, discover, and clean up per-process WAL files
-    WALSender           — drain WAL files and forward records to handlers
 
 The directory manager creates writers (create_file) and discovers file paths
-(list_files) that the caller passes to consumers for draining.  The sender
-orchestrates the drain loop, optionally running in a background thread.
+(list_files) that the caller passes to consumers for draining.
 """
 
 from __future__ import annotations
@@ -42,7 +40,7 @@ import json
 import logging
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Literal, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from weave.telemetry.trace_sentry import log_error, log_warning
 
@@ -50,10 +48,6 @@ logger = logging.getLogger(__name__)
 
 # Opaque dict — the WAL layer is format-agnostic.  Schema defined by callers.
 WALRecord = dict
-
-WALRecordType = Literal[
-    "call_start", "call_end", "obj_create", "table_create", "file_create"
-]
 
 # Processes a single WAL record.  Must be idempotent — drain() replays the
 # entire batch on failure (at-least-once delivery).
@@ -263,59 +257,6 @@ class WALDirectoryManager(Protocol):
         ...
 
 
-@runtime_checkable
-class WALSender(Protocol):
-    """Drains WAL files and forwards records to handlers.
-
-    The sender bridges the WAL (durable disk storage) and the destination
-    (e.g., a trace server).  It orchestrates the drain loop: discovering
-    WAL files, reading pending records, dispatching them to handlers, and
-    cleaning up fully-consumed files.
-
-    Implementations may run the drain loop in a background thread
-    (:meth:`start`/:meth:`stop`) or be driven manually via
-    :meth:`drain_once`.
-
-    File safety:
-        The sender must not delete a WAL file that a writer (in another
-        process) still has open.  Implementations accept an
-        ``is_file_active`` callable that checks writer liveness (e.g.,
-        PID lock sidecar).  The protocol does not prescribe a specific
-        detection mechanism.
-    """
-
-    def start(self) -> None:
-        """Start the background drain thread.
-
-        Raises:
-            RuntimeError: If the sender is already running.
-        """
-        ...
-
-    def stop(self, timeout: float = 10.0) -> None:
-        """Stop the background drain thread and perform a final drain.
-
-        The caller should close the writer before stopping the sender
-        so that all files become eligible for cleanup.
-
-        Args:
-            timeout: Maximum seconds to wait for shutdown.
-        """
-        ...
-
-    def drain_once(self) -> int:
-        """Drain all WAL files once.
-
-        Reads pending records from every WAL file, dispatches them to
-        the registered handlers, and removes fully-consumed files that
-        are safe to delete.
-
-        Returns:
-            Number of records successfully processed.
-        """
-        ...
-
-
 # ---------------------------------------------------------------------------
 # Composition functions
 #
@@ -368,11 +309,6 @@ def drain(
             try:
                 handler(entry.record)
                 processed += 1
-                logger.debug(
-                    "WAL drain: dispatched %s at offset %d",
-                    record_type,
-                    entry.end_offset,
-                )
             except Exception:
                 log_error(
                     f"WAL handler failed for record type {record_type!r} "
@@ -412,28 +348,31 @@ def drain_all(
     directory_manager: WALDirectoryManager,
     handlers: WALHandlers,
     consumer_factory: Callable[[str], WALConsumer],
-    is_file_active: Callable[[str], bool] | None = None,
 ) -> int:
     """Drain every WAL file in the directory.  Remove fully-consumed files.
 
     Iterates all WAL files (oldest first), creates a consumer for each,
     drains it, and removes the file once fully consumed.  A file is only
-    removed when **both** conditions are met:
+    removed if read_pending() returns no more records after draining.
 
-    1. No pending records remain after draining.
-    2. ``is_file_active`` returns False (or is None, meaning no check).
+    IMPORTANT: Only call drain_all on files whose writers are closed.
+    If a writer is still open on a file that drain_all removes, subsequent
+    writes go to an unlinked inode and are silently lost.  In practice
+    this means drain_all is for crash recovery (processing files left by
+    *other* processes), not for draining the current process's active file.
 
-    If a single file fails (bad consumer, handler error, etc.), the error
-    is logged and draining continues with the next file.
+    Note: there is a narrow race between drain() completing and the
+    emptiness check — a concurrent writer could append records in that
+    window.  In the current single-threaded design this is safe (Python's
+    GIL serializes the operations).  If a background drain thread is
+    added, the writer must be closed before a file becomes eligible
+    for removal.
 
     Args:
         directory_manager: Manages the WAL directory for a project.
         handlers: Maps record type strings to handler callables.
         consumer_factory: Creates a WALConsumer for a given file path.
             Typically the JSONLWALConsumer class.
-        is_file_active: Optional callable that returns True if a writer
-            still has the file open.  When provided, files flagged as
-            active are never deleted even if fully consumed.
 
     Returns:
         Total number of records processed across all files.
@@ -447,8 +386,8 @@ def drain_all(
             continue
         try:
             total += drain(consumer, handlers)
-            if is_file_active is not None and is_file_active(path):
-                continue
+            # Check if fully consumed — any remaining records means we shouldn't
+            # delete yet (e.g., writer is still appending in the same process).
             if next(consumer.read_pending(), None) is None:
                 directory_manager.remove(path)
         except Exception:

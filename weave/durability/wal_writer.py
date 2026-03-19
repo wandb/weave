@@ -8,7 +8,6 @@ import time
 from typing_extensions import Self
 
 from weave.durability.wal import WALDirectoryManager, WALRecord
-from weave.durability.wal_lock import acquire_lock, release_lock
 
 # Default max file size before rotation.  64 MB keeps individual files
 # manageable while avoiding excessive rotation churn.  Drained bytes at
@@ -43,15 +42,8 @@ class _JSONLWALFileWriter:
         fsync_batch_size: int = DEFAULT_FSYNC_BATCH_SIZE,
         fsync_timeout: float = DEFAULT_FSYNC_TIMEOUT,
     ) -> None:
-        self.path = path
-        # Lock MUST exist before the .jsonl file so the sender never sees
-        # a discoverable WAL file without its liveness marker.
-        self._lock_path = acquire_lock(path)
-        try:
-            self._file = open(path, "ab")
-        except Exception:
-            release_lock(self._lock_path)
-            raise
+        self._path = path
+        self._file = open(path, "ab")
         self._fsync_batch_size = fsync_batch_size
         self._fsync_timeout = fsync_timeout
         self._unsynced = 0
@@ -81,7 +73,6 @@ class _JSONLWALFileWriter:
         with self._lock:
             self._flush_unlocked()
             self._file.close()
-            release_lock(self._lock_path)
 
     def _should_fsync(self) -> bool:
         # Batch-count trigger: enough writes have accumulated.
@@ -189,7 +180,6 @@ class JSONLWALWriter:
         self._fsync_timeout = fsync_timeout
         self._writer = self._new_file_writer()
         self._lock = threading.Lock()
-        self._closed = False
 
     def write(self, record: WALRecord) -> int:
         # Delegates to _JSONLWALFileWriter.write(), then checks rotation.
@@ -205,16 +195,10 @@ class JSONLWALWriter:
         with self._lock:
             self._writer.flush()
 
-    @property
-    def current_path(self) -> str:
-        """Path of the currently active WAL file."""
-        return self._writer.path
-
     def close(self) -> None:
         # Delegates to _JSONLWALFileWriter.close().
         with self._lock:
             self._writer.close()
-            self._closed = True
 
     def __enter__(self) -> Self:
         return self
