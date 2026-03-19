@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Literal
 
 from pydantic import BaseModel
 
 from weave.durability.wal import WALWriter
+
+WALRecordType = Literal["obj_create", "table_create", "file_create"]
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_writer import JSONLWALWriter
 
@@ -38,7 +41,7 @@ class WALManager:
     def enabled(self) -> bool:
         return self._writer is not None
 
-    def write(self, record_type: str, req: BaseModel) -> None:
+    def write(self, record_type: WALRecordType, req: BaseModel) -> None:
         """Write a request to the WAL.  No-op when disabled.  Never raises."""
         if self._writer is None:
             return
