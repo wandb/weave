@@ -21,6 +21,11 @@ from httpx import HTTPStatusError as HTTPError
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
+from weave.shared.digest import (
+    compute_object_digest,
+    compute_row_digest,
+    compute_table_digest,
+)
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -92,12 +97,14 @@ from weave.trace.wandb_run_context import (
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
+from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
+from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
 from weave.trace_server.trace_server_interface import (
     AliasesListReq,
     CallEndReq,
@@ -165,6 +172,18 @@ if TYPE_CHECKING:
 ALLOW_MIXED_PROJECT_REFS = False
 
 logger = logging.getLogger(__name__)
+
+
+class NoInternalProjectIDError(Exception):
+    """Raised when client-side digest computation cannot proceed because
+    no internal project ID has been resolved yet.
+    """
+
+
+class CrossProjectRefError(Exception):
+    """Raised when client-side digest computation encounters a ref to a
+    different project that cannot be resolved to an internal ID.
+    """
 
 
 # TODO: should be Call, not WeaveObject
@@ -362,6 +381,9 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+        # No-op when the feature flag is off (returns immediately).
+        self._warm_project_id_resolver()
 
     ################ High Level Convenience Methods ################
 
@@ -1843,6 +1865,92 @@ class WeaveClient:
             for v in obj.values():
                 self._save_nested_objects(v)
 
+    def _warm_project_id_resolver(self) -> None:
+        """Pre-populate the resolver cache for the current project.
+
+        Called at init and when the feature flag is toggled.
+        get_internal_project_id returns None immediately when the feature
+        flag is off (the default).  When on, it makes one projects_info
+        RPC, amortized over the session.
+
+        Graceful degradation: if the server doesn't support projects_info,
+        the resolver catches AttributeError and permanently disables itself.
+        Transient errors return None without caching so the next access
+        retries.  In all failure cases _should_compute_client_digests()
+        returns False and the client silently falls back to server-computed
+        digests.
+        """
+        self.project_id_resolver.get_internal_project_id(self._project_id())
+
+    def _handle_digest_mismatch(
+        self, e: DigestMismatchError | HTTPError, label: str
+    ) -> None:
+        """If *e* is a digest-mismatch error, disable client-side digests.
+
+        Raises the original exception if it is NOT a digest mismatch
+        (e.g. an HTTPError with a non-409 status code).
+        """
+        # DigestMismatchError: raised directly by local servers (SQLite, ClickHouse).
+        is_local_mismatch = isinstance(e, DigestMismatchError)
+        # HTTPError 409: raised by RemoteHTTPTraceServer when the remote
+        # server returns HTTP 409 Conflict for a digest mismatch.
+        is_remote_mismatch = (
+            isinstance(e, HTTPError)
+            and e.response is not None
+            and e.response.status_code == 409
+        )
+        is_mismatch = is_local_mismatch or is_remote_mismatch
+        if is_mismatch:
+            self.project_id_resolver.disable_after_validation_error(e, label)
+            return
+        raise e
+
+    def _should_compute_client_digests(self) -> bool:
+        """Return True if the client should compute digests locally."""
+        if not settings.should_enable_client_side_digests():
+            return False
+        # The resolver is disabled when the server doesn't support
+        # projects_info (e.g. old server versions) or after a digest
+        # mismatch forced a fallback to server-computed digests.
+        if self.project_id_resolver.is_disabled:
+            return False
+        return True
+
+    def _convert_refs_to_internal(self, json_val: Any) -> Any:
+        """Convert external weave:/// refs to weave-trace-internal:/// refs.
+
+        The server stores refs using internal project IDs.  To compute a digest
+        that matches what the server will compute, the client must first convert
+        its external-format refs (weave:///entity/project/...) to the internal
+        format (weave-trace-internal:///internal_project_id/...).
+
+        Uses the same ``universal_ext_to_int_ref_converter`` that the server's
+        ExternalToInternalTraceServerAdapter uses, so the two always agree.
+
+        Raises:
+            NoInternalProjectIDError: No cached internal project ID is available.
+            CrossProjectRefError: The value contains cross-project refs that
+                cannot be resolved without a server round-trip.
+        """
+        project_id = self._project_id()
+        internal_project_id = self.project_id_resolver.get_internal_project_id(
+            project_id
+        )
+        if internal_project_id is None:
+            raise NoInternalProjectIDError(
+                "No internal project ID available; cannot convert refs for digest"
+            )
+
+        def ext_to_int(ext_project_id: str) -> str:
+            if ext_project_id == project_id:
+                return internal_project_id
+            raise CrossProjectRefError(
+                f"Cannot resolve cross-project ref for '{ext_project_id}'; "
+                "skipping client-side digest computation"
+            )
+
+        return universal_ext_to_int_ref_converter(json_val, ext_to_int)
+
     @trace_sentry.global_trace_sentry.watch()
     def _save_object_basic(
         self, val: Any, name: str | None = None, branch: str = "latest"
@@ -1877,18 +1985,46 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
+        compute_digests = self._should_compute_client_digests()
+
         def send_obj_create() -> ObjCreateRes:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
+
+            # Fast path: compute the digest client-side so the server can
+            # validate it via expected_digest instead of the client waiting
+            # for the server-computed digest in the response.
+            expected_digest = None
+            if compute_digests:
+                try:
+                    json_val_internal = self._convert_refs_to_internal(json_val)
+                    expected_digest = compute_object_digest(json_val_internal)
+                except (
+                    NoInternalProjectIDError,
+                    CrossProjectRefError,
+                    InvalidExternalRef,
+                ) as e:
+                    logger.debug("Skipping client-side digest for obj %r: %s", name, e)
+
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
                     object_id=name,
                     val=json_val,
+                    expected_digest=expected_digest,
                 )
             )
-            return self.server.obj_create(req)
+            try:
+                return self.server.obj_create(req)
+            except (DigestMismatchError, HTTPError) as e:
+                if expected_digest is None:
+                    raise
+                self._handle_digest_mismatch(
+                    e, f"weave:///{self.entity}/{self.project}/object/{name}"
+                )
+                req.obj.expected_digest = None
+                return self.server.obj_create(req)
 
         res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
         digest_future: Future[str] = self.future_executor.then(
@@ -1922,11 +2058,37 @@ class WeaveClient:
         return self._save_object_basic(op, name)
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
+        compute_digests = self._should_compute_client_digests()
         json_rows = to_json(rows, self._project_id(), self)
+
+        expected_digest = None
+        if compute_digests:
+            try:
+                json_rows_internal = self._convert_refs_to_internal(json_rows)
+                row_digests = [compute_row_digest(row) for row in json_rows_internal]
+                expected_digest = compute_table_digest(row_digests)
+            except (
+                NoInternalProjectIDError,
+                CrossProjectRefError,
+                InvalidExternalRef,
+            ) as e:
+                logger.debug("Skipping client-side digest for table: %s", e)
+
         req = TableCreateReq(
-            table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
+            table=TableSchemaForInsert(
+                project_id=self._project_id(),
+                rows=json_rows,
+                expected_digest=expected_digest,
+            )
         )
-        return self.server.table_create(req)
+        try:
+            return self.server.table_create(req)
+        except (DigestMismatchError, HTTPError) as e:
+            if expected_digest is None:
+                raise
+            self._handle_digest_mismatch(e, f"table in {self._project_id()}")
+            req.table.expected_digest = None
+            return self.server.table_create(req)
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
@@ -2042,10 +2204,22 @@ class WeaveClient:
                 all_row_digests.extend(chunk_result.row_digests)
 
             # Create final table from digests
+            expected_digest = None
+            if self._should_compute_client_digests():
+                expected_digest = compute_table_digest(all_row_digests)
             create_req = TableCreateFromDigestsReq(
-                project_id=self._project_id(), row_digests=all_row_digests
+                project_id=self._project_id(),
+                row_digests=all_row_digests,
+                expected_digest=expected_digest,
             )
-            create_res = self.server.table_create_from_digests(create_req)
+            try:
+                create_res = self.server.table_create_from_digests(create_req)
+            except (DigestMismatchError, HTTPError) as e:
+                if expected_digest is None:
+                    raise
+                self._handle_digest_mismatch(e, "table_create_from_digests")
+                create_req.expected_digest = None
+                create_res = self.server.table_create_from_digests(create_req)
 
             return TableCreateRes(
                 digest=create_res.digest,
@@ -2185,11 +2359,20 @@ class WeaveClient:
         if cached_res:
             return cached_res
 
+        def file_create_with_fallback() -> FileCreateRes:
+            try:
+                return self.server.file_create(req)
+            except (DigestMismatchError, HTTPError) as e:
+                if req.expected_digest is None:
+                    raise
+                self._handle_digest_mismatch(e, f"file://{req.name}")
+                req.expected_digest = None
+                return self.server.file_create(req)
+
         if self.future_executor_fastlane:
-            # If we have a separate upload worker pool, use it
-            res = self.future_executor_fastlane.defer(self.server.file_create, req)
+            res = self.future_executor_fastlane.defer(file_create_with_fallback)
         else:
-            res = self.future_executor.defer(self.server.file_create, req)
+            res = self.future_executor.defer(file_create_with_fallback)
 
         self.send_file_cache.put(req, res)
         return res

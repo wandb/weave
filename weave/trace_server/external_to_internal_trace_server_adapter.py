@@ -490,6 +490,20 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         res.wb_user_id = original_user_id
         return res
 
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.feedback_stats, req, req.project_id
+        )
+
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.feedback_payload_schema, req, req.project_id
+        )
+
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(
@@ -1001,3 +1015,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._ref_apply(
             self._internal_trace_server.call_end_v2, req, req.end.project_id
         )
+
+    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
+        """Resolve external project IDs to internal project IDs."""
+        return [
+            tsi.ProjectsInfoRes(
+                external_project_id=pid,
+                internal_project_id=self._idc.ext_to_int_project_id(pid),
+            )
+            for pid in req.project_ids
+        ]

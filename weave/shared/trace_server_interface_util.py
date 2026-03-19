@@ -37,7 +37,7 @@ def wildcard_version_value_to_like_prefix(value: str) -> str:
 def extract_refs_from_values(
     vals: Any,
 ) -> list[str]:
-    refs = []
+    seen: dict[str, None] = {}
 
     def _visit(val: Any) -> Any:
         if isinstance(val, dict):
@@ -52,12 +52,12 @@ def extract_refs_from_values(
             try:
                 parsed = refs_internal.parse_internal_uri(val)
                 if parsed.uri == val:
-                    refs.append(val)
+                    seen[val] = None
             except Exception:
                 pass
 
     _visit(vals)
-    return refs
+    return list(seen)
 
 
 def assert_non_null_wb_user_id(obj: Any) -> None:

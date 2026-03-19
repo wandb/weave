@@ -43,7 +43,7 @@ dependencies = [
   "click",                                # Used for terminal/stdio printing
   "gql[httpx]>=3.0.0",                    # Used exclusively in wandb_api.py; httpx is used for HTTP requests throughout the codebase
   "jsonschema>=4.23.0",                   # Used by scorers for field validation
-  "diskcache==5.6.3",                     # Used for data caching
+  "diskcache-weave==5.6.3.post1",         # Used for data caching; patched fork fixes CVE https://github.com/grantjenks/python-diskcache/issues/357
   "tzdata; platform_system == 'Windows'", # Required for timezone support on Windows
   "cachetools>=6.2.4",                    # Used for TTLCache in call_batch_processor
 

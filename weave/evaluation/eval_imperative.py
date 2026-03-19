@@ -26,7 +26,7 @@ from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op, as_op, op
+from weave.trace.op import Op, as_op, is_tracing_setting_disabled, op
 from weave.trace.table import Table
 from weave.trace.util import Thread
 from weave.trace.view_utils import set_call_view
@@ -549,6 +549,11 @@ class ScoreLogger:
             raise ValueError("Cannot log score after finish has been called")
 
         scorer = self._prepare_scorer(scorer)
+
+        if is_tracing_setting_disabled():
+            scorer_name = cast(str, scorer.name)
+            self._captured_scores[scorer_name] = score
+            return
 
         @op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
