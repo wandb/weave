@@ -16,15 +16,12 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import pydantic
-from pydantic import BaseModel
 from httpx import HTTPStatusError as HTTPError
 
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
-from weave.durability.wal import WALWriter
-from weave.durability.wal_directory_manager import FileWALDirectoryManager
-from weave.durability.wal_writer import JSONLWALWriter
+from weave.durability.wal_manager import WALManager
 from weave.shared.digest import (
     compute_object_digest,
     compute_row_digest,
@@ -387,18 +384,9 @@ class WeaveClient:
         self.send_file_cache = WeaveClientSendFileCache()
 
         # WAL — durable persistence of requests before sending.
-        self.wal_dir: str | None = None
-        self._wal_writer: WALWriter | None = None
-        if settings.should_enable_wal():
-            self.wal_dir = os.path.join(
-                str(os.path.expanduser("~")),
-                ".weave",
-                "wal",
-                self.entity,
-                self.project,
-            )
-            dir_mgr = FileWALDirectoryManager(self.wal_dir)
-            self._wal_writer = JSONLWALWriter(dir_mgr)
+        self._wal = WALManager(
+            self.entity, self.project, enabled=settings.should_enable_wal()
+        )
 
         # No-op when the feature flag is off (returns immediately).
         self._warm_project_id_resolver()
@@ -2033,7 +2021,7 @@ class WeaveClient:
                     expected_digest=expected_digest,
                 )
             )
-            self._write_to_wal("obj_create", req)
+            self._wal.write("obj_create", req)
             try:
                 return self.server.obj_create(req)
             except (DigestMismatchError, HTTPError) as e:
@@ -2100,7 +2088,7 @@ class WeaveClient:
                 expected_digest=expected_digest,
             )
         )
-        self._write_to_wal("table_create", req)
+        self._wal.write("table_create", req)
         try:
             return self.server.table_create(req)
         except (DigestMismatchError, HTTPError) as e:
@@ -2323,21 +2311,6 @@ class WeaveClient:
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
 
-    def _write_to_wal(self, record_type: str, req: BaseModel) -> None:
-        """Write a request to the WAL if enabled.  Never raises.
-
-        Serialization (model_dump) is deferred until we know the WAL is
-        active, so there is zero overhead when the feature is off.
-        """
-        if self._wal_writer is None:
-            return
-        try:
-            self._wal_writer.write(
-                {"type": record_type, "req": req.model_dump(mode="json")}
-            )
-        except Exception:
-            logger.warning("Failed to write %s to WAL", record_type, exc_info=True)
-
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:
         op_ref = get_ref(op)
@@ -2394,7 +2367,7 @@ class WeaveClient:
         if cached_res:
             return cached_res
 
-        self._write_to_wal("file_create", req)
+        self._wal.write("file_create", req)
 
         def file_create_with_fallback() -> FileCreateRes:
             try:
@@ -2585,8 +2558,7 @@ class WeaveClient:
             self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
             # Restart feedback processor processing thread after flushing
             self._server_feedback_processor.accept_new_work()
-        if self._wal_writer:
-            self._wal_writer.flush()
+        self._wal.flush()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.

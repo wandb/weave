@@ -30,7 +30,7 @@ class TestWALClientWrites:
 
     def test_obj_create_writes_to_wal(self, client_creator):
         with client_creator(settings=UserSettings(enable_wal=True)) as client:
-            wal_dir = Path(client.wal_dir)
+            wal_dir = Path(client._wal.wal_dir)
 
             ref = weave.publish({"model": "gpt-4", "temp": 0.7}, name="my_obj")
             client._flush()
@@ -44,7 +44,7 @@ class TestWALClientWrites:
 
     def test_table_create_writes_to_wal(self, client_creator):
         with client_creator(settings=UserSettings(enable_wal=True)) as client:
-            wal_dir = Path(client.wal_dir)
+            wal_dir = Path(client._wal.wal_dir)
 
             ds = weave.Dataset(name="test_ds", rows=[{"x": 1}, {"x": 2}])
             weave.publish(ds, name="test_ds")
@@ -58,12 +58,12 @@ class TestWALClientWrites:
 
     def test_wal_disabled_by_default(self, client_creator):
         with client_creator() as client:
-            assert client.wal_dir is None
+            assert client._wal.wal_dir is None
 
     def test_wal_records_are_json_serializable(self, client_creator):
         """Ensure WAL records round-trip through JSON without error."""
         with client_creator(settings=UserSettings(enable_wal=True)) as client:
-            wal_dir = Path(client.wal_dir)
+            wal_dir = Path(client._wal.wal_dir)
 
             weave.publish({"nested": {"list": [1, 2, 3]}}, name="json_obj")
             client._flush()
@@ -81,7 +81,7 @@ class TestWALClientWrites:
     def test_flush_fsyncs_wal(self, client_creator):
         """flush() should fsync the WAL so records survive a process crash."""
         with client_creator(settings=UserSettings(enable_wal=True)) as client:
-            wal_dir = Path(client.wal_dir)
+            wal_dir = Path(client._wal.wal_dir)
 
             weave.publish({"a": 1}, name="fsync_obj")
             client.flush()
