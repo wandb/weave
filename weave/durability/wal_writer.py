@@ -5,6 +5,11 @@ import os
 import threading
 import time
 
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # type: ignore[assignment]
+
 from weave.durability.wal import WALDirectoryManager, WALRecord
 
 # Default max file size before rotation.  64 MB keeps individual files
@@ -42,6 +47,12 @@ class _JSONLWALFileWriter:
     ) -> None:
         self._path = path
         self._file = open(path, "ab")
+        # Advisory exclusive lock so the sender (even in another process)
+        # knows this file is still being written to.  The lock is released
+        # automatically when the file is closed — including on process crash.
+        # flock is advisory, so the consumer's reads are unaffected.
+        if fcntl is not None:
+            fcntl.flock(self._file.fileno(), fcntl.LOCK_EX)
         self._fsync_batch_size = fsync_batch_size
         self._fsync_timeout = fsync_timeout
         self._unsynced = 0
@@ -95,6 +106,11 @@ class _JSONLWALFileWriter:
 
     def __exit__(self, *args: object) -> None:
         self.close()
+
+    @property
+    def path(self) -> str:
+        """Absolute path to the WAL file this writer is appending to."""
+        return self._path
 
     def _fsync(self) -> None:
         os.fsync(self._file.fileno())
@@ -178,6 +194,15 @@ class JSONLWALWriter:
         self._fsync_timeout = fsync_timeout
         self._writer = self._new_file_writer()
         self._lock = threading.Lock()
+        self._closed = False
+
+    @property
+    def active_path(self) -> str | None:
+        """Path of the file currently being written to, or None if closed."""
+        with self._lock:
+            if self._closed:
+                return None
+            return self._writer.path
 
     def write(self, record: WALRecord) -> int:
         # Delegates to _JSONLWALFileWriter.write(), then checks rotation.
@@ -197,6 +222,7 @@ class JSONLWALWriter:
         # Delegates to _JSONLWALFileWriter.close().
         with self._lock:
             self._writer.close()
+            self._closed = True
 
     def __enter__(self) -> JSONLWALWriter:
         return self
