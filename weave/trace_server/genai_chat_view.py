@@ -289,15 +289,17 @@ def build_span_tree(spans: list[GenAISpanSchema]) -> list[SpanNode]:
 # ---------------------------------------------------------------------------
 
 
-def find_user_prompt(spans: list[GenAISpanSchema]) -> tuple[str, str]:
+def find_user_prompt(spans: list[GenAISpanSchema]) -> tuple[str, str, str]:
     """Pre-scan spans to find the user prompt for this trace.
 
     Uses last_only=True because multi-turn conversations send the full
     history as input_messages, and we only want the current turn's prompt.
 
     Returns:
-        (prompt_text, started_at) — started_at is the ISO timestamp of the
-        span that carried the user prompt, or empty string if not found.
+        (prompt_text, started_at, content_refs) — started_at is the ISO
+        timestamp of the span that carried the user prompt; content_refs is
+        the JSON-serialised list of uploaded attachment refs from the same
+        span (or empty string if none).
     """
     sorted_spans = sorted(spans, key=lambda s: s.started_at or "")
 
@@ -305,13 +307,13 @@ def find_user_prompt(spans: list[GenAISpanSchema]) -> tuple[str, str]:
         if s.operation_name == "invoke_agent" and s.input_messages:
             text = _extract_user_text(_safe_parse_json(s.input_messages), last_only=True)
             if text and not _looks_like_tool_call(text):
-                return text, _dt_to_iso(s.started_at)
+                return text, _dt_to_iso(s.started_at), _parse_content_refs(s.content_refs or "")
 
     for s in sorted_spans:
         if s.input_messages:
             text = _extract_user_text(_safe_parse_json(s.input_messages), last_only=True)
             if text and not _looks_like_tool_call(text):
-                return text, _dt_to_iso(s.started_at)
+                return text, _dt_to_iso(s.started_at), _parse_content_refs(s.content_refs or "")
 
     for s in sorted_spans:
         if s.attributes_dump:
@@ -319,9 +321,9 @@ def find_user_prompt(spans: list[GenAISpanSchema]) -> tuple[str, str]:
             if isinstance(attrs, dict):
                 prompt = attrs.get("gen_ai.prompt")
                 if prompt and isinstance(prompt, str):
-                    return prompt, _dt_to_iso(s.started_at)
+                    return prompt, _dt_to_iso(s.started_at), ""
 
-    return "", ""
+    return "", "", ""
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +349,7 @@ def build_chat_messages(
     messages: list[GenAIChatMessage] = []
     agent_response_emitted: set[str] = set()
 
-    user_prompt, user_started_at = find_user_prompt(spans)
+    user_prompt, user_started_at, user_content_refs = find_user_prompt(spans)
     if user_prompt:
         messages.append(
             GenAIChatMessage(
@@ -355,6 +357,7 @@ def build_chat_messages(
                 text=user_prompt,
                 agent_name="User",
                 started_at=_dt_to_iso(user_started_at),
+                content_refs=user_content_refs,
             )
         )
 

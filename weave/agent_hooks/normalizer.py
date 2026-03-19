@@ -13,8 +13,11 @@ Adding a new integration:
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from weave.agent_hooks.events import AgentHookEvent
 
@@ -96,9 +99,14 @@ def normalize_cursor(payload: dict) -> AgentHookEvent | None:
     }
 
     if hook == "beforeSubmitPrompt":
+        raw_attachments = payload.get("attachments", [])
+        logger.info(
+            "beforeSubmitPrompt: %d rule-attachments (screenshots scanned at turn-close)",
+            len(raw_attachments),
+        )
         return AgentHookEvent(
             prompt_text=payload.get("prompt", ""),
-            attachments=payload.get("attachments", []),
+            attachments=list(raw_attachments),
             **base,
         )
 

@@ -18,9 +18,14 @@ can be stitched together in the Conversations view.
 
 from __future__ import annotations
 
+import base64
+import io
 import json
 import logging
+import os
 import threading
+import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -34,6 +39,7 @@ logger = logging.getLogger(__name__)
 _TOOL_OUTPUT_TRUNCATE = 4096
 # Max bytes to store from a transcript file on a span attribute.
 _TRANSCRIPT_TRUNCATE = 32_768
+_CONTENT_REFS_ATTR = "weave.content_refs"
 
 
 class _TurnState:
@@ -46,6 +52,12 @@ class _TurnState:
         self.response: str = ""
         self.transcript_path: str = ""
         self.attachments: list[dict] = []
+        # Unix timestamp when the user prompt was received — used to find
+        # screenshots that Cursor saves to disk AFTER the hook fires.
+        self._prompt_timestamp: float = 0.0
+        # Populated by the background upload thread; read in _close_turn.
+        self._content_refs: list[dict] = []
+        self._upload_thread: threading.Thread | None = None
         # tool_use_id → (Span, ctx)
         self.tool_spans: dict[str, tuple[Span, Any]] = {}
         # subagent_id → Span
@@ -81,11 +93,20 @@ class SpanBuilder:
         >>> # events come in via builder.handle(event)
     """
 
-    def __init__(self, provider: TracerProvider) -> None:
+    def __init__(
+        self,
+        provider: TracerProvider,
+        project_id: str = "",
+        server_url: str = "",
+        api_key: str = "",
+    ) -> None:
         self._provider = provider
         self._tracer = provider.get_tracer("weave.agent_hooks")
         self._lock = threading.Lock()
         self._convs: dict[str, _ConvState] = {}
+        self._project_id = project_id
+        self._server_url = server_url
+        self._api_key = api_key
 
     # ------------------------------------------------------------------
     # Public API
@@ -208,6 +229,15 @@ class SpanBuilder:
         if turn is None:
             return
 
+        # Wait for any in-progress explicit attachment uploads.
+        if turn._upload_thread is not None:
+            turn._upload_thread.join(timeout=30)
+
+        # Scan for screenshots Cursor saved after the hook fired and upload them.
+        screenshot_refs = self._collect_cursor_screenshots(turn)
+        if screenshot_refs:
+            turn._content_refs = turn._content_refs + screenshot_refs
+
         # Attach user prompt (and any file attachments) to the root invoke_agent span
         if turn.prompt or turn.attachments:
             input_msgs = []
@@ -226,6 +256,12 @@ class SpanBuilder:
                 turn.agent_span.set_attribute(  # type: ignore[union-attr]
                     "gen_ai.input.messages", json.dumps(input_msgs)
                 )
+
+        # Attach content refs for uploaded attachments (images, files, etc.)
+        if turn._content_refs:
+            turn.agent_span.set_attribute(  # type: ignore[union-attr]
+                _CONTENT_REFS_ATTR, json.dumps(turn._content_refs)
+            )
 
         # Record turn completion metadata
         if stop_status:
@@ -286,6 +322,173 @@ class SpanBuilder:
         return span, ctx
 
     # ------------------------------------------------------------------
+    # Attachment upload helpers
+    # ------------------------------------------------------------------
+
+    def _upload_attachment(self, attachment: dict) -> dict | None:
+        """Upload a single attachment file to the Weave file store.
+
+        Reads the file at ``attachment["file_path"]``, detects its MIME type,
+        uploads it via ``POST {server_url}/file/create``, and returns a
+        content-ref dict compatible with ``weave.content_refs``.
+
+        Args:
+            attachment: A dict from ``beforeSubmitPrompt.attachments``, expected
+                to have a ``"file_path"`` key with an absolute path.
+
+        Returns:
+            A content-ref dict, or ``None`` if the upload cannot be performed
+            (missing config, missing file, or network error).
+        """
+        if not self._project_id or not self._server_url:
+            return None
+
+        file_path = attachment.get("file_path", "")
+        if not file_path:
+            return None
+
+        p = Path(file_path)
+        if not p.is_file():
+            logger.debug("Attachment not found on disk: %s", file_path)
+            return None
+
+        try:
+            content = p.read_bytes()
+        except OSError:
+            logger.debug("Could not read attachment: %s", file_path, exc_info=True)
+            return None
+
+        try:
+            from weave.otel._storage import detect_media_type
+            media_type = detect_media_type(content, p.name)
+        except Exception:
+            media_type = "application/octet-stream"
+
+        try:
+            from weave.shared.digest import bytes_digest
+            digest = bytes_digest(content)
+        except Exception:
+            import hashlib
+            digest = hashlib.sha256(content).hexdigest()
+
+        url = f"{self._server_url}/file/create"
+        headers: dict[str, str] = {}
+        if self._api_key:
+            creds = base64.b64encode(f"api:{self._api_key}".encode()).decode()
+            headers["Authorization"] = f"Basic {creds}"
+
+        try:
+            import requests
+            resp = requests.post(
+                url,
+                files={"file": (p.name, io.BytesIO(content), "application/octet-stream")},
+                data={"project_id": self._project_id},
+                headers=headers,
+                timeout=15,
+            )
+            resp.raise_for_status()
+        except Exception:
+            logger.debug(
+                "Failed to upload attachment %s to %s", file_path, url, exc_info=True
+            )
+
+        return {
+            "digest": digest,
+            "media_type": media_type,
+            "role": "input",
+            "size_bytes": len(content),
+            "key": p.name,
+        }
+
+    def _run_attachment_uploads(
+        self, turn: _TurnState, attachments: list[dict]
+    ) -> None:
+        """Upload all attachments and store refs on the turn (runs in a thread).
+
+        Args:
+            turn: The turn state to write ``_content_refs`` into.
+            attachments: List of attachment dicts from the prompt event.
+        """
+        refs = []
+        for att in attachments:
+            ref = self._upload_attachment(att)
+            if ref:
+                refs.append(ref)
+        turn._content_refs = refs
+
+    _SCREENSHOT_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"})
+
+    def _collect_cursor_screenshots(self, turn: _TurnState) -> list[dict]:
+        """Find and upload screenshots Cursor saved during this turn.
+
+        Cursor saves screenshot/pasted images to
+        ``~/.cursor/projects/<project>/assets/`` *after* the hook fires
+        (typically 1–10 seconds later).  We scan that directory at turn-close
+        time — well after ``stop`` fires — so all images are guaranteed to be
+        on disk.  We only pick up files whose mtime is ≥ the prompt timestamp
+        (minus a 2 s grace period) to avoid re-uploading screenshots from
+        earlier turns.
+
+        Args:
+            turn: The current turn whose prompt timestamp is used as the cutoff.
+
+        Returns:
+            List of content-ref dicts for the uploaded screenshots.
+        """
+        if not self._project_id or not self._server_url:
+            return []
+        if not turn._prompt_timestamp:
+            return []
+
+        # Derive the assets dir from the transcript path.
+        # transcript_path: ~/.cursor/projects/<proj>/agent-transcripts/<id>.jsonl
+        candidates: list[Path] = []
+        if turn.transcript_path:
+            p = Path(turn.transcript_path)
+            candidates.append(p.parent.parent / "assets")
+
+        # Fallback: scan all Cursor project assets dirs.
+        cursor_projects = Path(os.path.expanduser("~/.cursor/projects"))
+        if cursor_projects.is_dir():
+            try:
+                for proj_dir in cursor_projects.iterdir():
+                    a = proj_dir / "assets"
+                    if a.is_dir():
+                        candidates.append(a)
+            except OSError:
+                pass
+
+        cutoff = turn._prompt_timestamp - 2.0  # 2 s grace period
+        seen: set[str] = set()
+        refs: list[dict] = []
+
+        for assets_dir in candidates:
+            if not assets_dir.is_dir():
+                continue
+            try:
+                for entry in assets_dir.iterdir():
+                    path_str = str(entry)
+                    if path_str in seen:
+                        continue
+                    if entry.suffix.lower() not in self._SCREENSHOT_SUFFIXES:
+                        continue
+                    try:
+                        if entry.stat().st_mtime < cutoff:
+                            continue
+                    except OSError:
+                        continue
+                    seen.add(path_str)
+                    ref = self._upload_attachment({"file_path": path_str})
+                    if ref:
+                        refs.append(ref)
+            except OSError:
+                pass
+
+        if refs:
+            logger.info("Uploaded %d screenshot(s) for this turn", len(refs))
+        return refs
+
+    # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
 
@@ -317,8 +520,20 @@ class SpanBuilder:
         turn = self._open_turn(conv, ev)
         turn.prompt = ev.prompt_text
         turn.attachments = ev.attachments
+        turn._prompt_timestamp = time.time()
         if ev.transcript_path:
             turn.transcript_path = ev.transcript_path
+
+        # Kick off attachment uploads in the background so they run concurrently
+        # with the agent's processing.  Results are collected in _close_turn.
+        if ev.attachments and self._project_id and self._server_url:
+            t = threading.Thread(
+                target=self._run_attachment_uploads,
+                args=(turn, ev.attachments),
+                daemon=True,
+            )
+            t.start()
+            turn._upload_thread = t
 
         # Emit an instant child span carrying the user prompt so it is
         # exported immediately, even if the daemon is killed before stop fires.

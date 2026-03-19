@@ -30,6 +30,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, ClassVar
+from urllib.parse import urlparse, urlunparse
 
 from weave.agent_hooks.normalizer import normalize
 from weave.agent_hooks.span_builder import SpanBuilder
@@ -41,6 +42,26 @@ DEFAULT_ENDPOINT = "http://localhost:6345/otel/v1/genai/traces"
 DEFAULT_PROJECT = "cursor-sessions"
 PID_FILE = os.path.expanduser("~/.weave/agent-hooks.pid")
 LOG_FILE = os.path.expanduser("~/.weave/agent-hooks.log")
+
+
+def _derive_server_url(endpoint: str) -> str:
+    """Derive the Weave trace-server base URL for file uploads.
+
+    Checks ``WF_TRACE_SERVER_URL`` first, then strips the OTLP path from the
+    endpoint so that e.g. ``http://localhost:6345/otel/v1/genai/traces``
+    becomes ``http://localhost:6345``.
+
+    Args:
+        endpoint: The OTLP traces endpoint configured for the daemon.
+
+    Returns:
+        Base URL suitable for ``POST {url}/file/create``.
+    """
+    url = os.environ.get("WF_TRACE_SERVER_URL")
+    if url:
+        return url.rstrip("/")
+    p = urlparse(endpoint)
+    return urlunparse((p.scheme, p.netloc, "", "", "", ""))
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +208,15 @@ class DaemonServer:
     ) -> None:
         self._port = port
         provider = _build_provider(endpoint, project, entity)
-        self._builder = SpanBuilder(provider)
+        project_id = f"{entity}/{project}" if entity else project
+        server_url = _derive_server_url(endpoint)
+        api_key = os.environ.get("WANDB_API_KEY", "")
+        self._builder = SpanBuilder(
+            provider,
+            project_id=project_id,
+            server_url=server_url,
+            api_key=api_key,
+        )
         _HookHandler.builder = self._builder  # type: ignore[attr-defined]
 
     def start(self) -> None:
