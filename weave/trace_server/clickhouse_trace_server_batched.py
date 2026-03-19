@@ -1296,13 +1296,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if req.columns:
             # TODO: add support for json extract fields
             # Split out any nested column requests
-            columns = [
-                col.split(".")[0]
-                for col in req.columns
-                if col.split(".")[0] != "wb_username"
-            ]
+            columns = [col.split(".")[0] for col in req.columns]
 
-            if req.include_usernames and "wb_username" in req.columns:
+            if req.include_usernames and "wb_user_id" not in columns:
                 columns.append("wb_user_id")
 
             # If we are returning a summary object, make sure that all fields
