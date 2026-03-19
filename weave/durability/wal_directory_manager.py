@@ -24,7 +24,7 @@ class FileWALDirectoryManager:
         fsync_batch_size: int = DEFAULT_FSYNC_BATCH_SIZE,
         fsync_timeout: float = DEFAULT_FSYNC_TIMEOUT,
     ) -> None:
-        self._directory = directory
+        self.directory = directory
         self._file_ext = file_ext
         self._checkpoint_ext = checkpoint_ext
         self._dead_letter_ext = dead_letter_ext
@@ -32,13 +32,13 @@ class FileWALDirectoryManager:
         self._fsync_timeout = fsync_timeout
 
     def create_file(self) -> _JSONLWALFileWriter:
-        os.makedirs(self._directory, exist_ok=True)
+        os.makedirs(self.directory, exist_ok=True)
         # Timestamp prefix ensures deterministic oldest-first ordering
         # when sorted alphabetically.  UUID suffix avoids collisions
         # between files created in the same nanosecond.
         ts = f"{time.time_ns():020d}"
         filename = f"{ts}_{uuid.uuid4().hex}{self._file_ext}"
-        path = os.path.join(self._directory, filename)
+        path = os.path.join(self.directory, filename)
         return _JSONLWALFileWriter(
             path,
             fsync_batch_size=self._fsync_batch_size,
@@ -46,13 +46,13 @@ class FileWALDirectoryManager:
         )
 
     def list_files(self) -> list[str]:
-        if not os.path.isdir(self._directory):
+        if not os.path.isdir(self.directory):
             return []
         paths: list[str] = []
-        for name in os.listdir(self._directory):
+        for name in os.listdir(self.directory):
             if not name.endswith(self._file_ext):
                 continue
-            paths.append(os.path.join(self._directory, name))
+            paths.append(os.path.join(self.directory, name))
         # Filenames start with a zero-padded nanosecond timestamp,
         # so alphabetical sort == chronological sort.
         paths.sort()

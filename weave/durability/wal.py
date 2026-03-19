@@ -232,6 +232,11 @@ class WALDirectoryManager(Protocol):
         - create_file() should create the directory if it doesn't exist.
     """
 
+    @property
+    def directory(self) -> str:
+        """Return the directory path managed by this instance."""
+        ...
+
     def create_file(self) -> WALWriter:
         """Create a new WAL file for the current process.
 
