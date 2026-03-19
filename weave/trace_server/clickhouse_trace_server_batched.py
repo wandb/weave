@@ -572,6 +572,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ]
             self.obj_create_batch(obj_creation_batch)
 
+            cached_op_refs = {}
             for op_name, idxs in obj_id_idx_map.items():
                 op_ref_uri = ri.InternalOpRef(
                     project_id=req.project_id,
@@ -580,7 +581,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 ).uri
                 for idx in idxs:
                     calls[idx][0].op_name = op_ref_uri
-                self._cache_op_ref(req.project_id, op_name, op_ref_uri)
+                cached_op_refs[op_name] = op_ref_uri
+
+            with self._op_ref_cache_lock:
+                for op_name, op_ref_uri in cached_op_refs.items():
+                    self._op_ref_cache[req.project_id, op_name] = op_ref_uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
