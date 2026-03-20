@@ -611,111 +611,121 @@ class TestCrossProcessProtection:
         assert mgr.list_files() == []
 
 
-# Helper: inline Python script for the writer subprocess.
-_WRITER_SCRIPT = """\
-import json, sys
-from weave.durability.wal_directory_manager import FileWALDirectoryManager
-from weave.durability.wal_writer import JSONLWALWriter
+# Path to the helper script that runs a WAL writer in a subprocess.
+# See tests/durability/_wal_writer_subprocess.py for details.
+_WRITER_SUBPROCESS = "-m"
+_WRITER_MODULE = "tests.durability._wal_writer_subprocess"
 
-wal_dir = sys.argv[1]
-count = int(sys.argv[2])
 
-mgr = FileWALDirectoryManager(wal_dir)
-writer = JSONLWALWriter(mgr)
-for i in range(count):
-    writer.write({"type": "obj_create", "seq": i})
+@pytest.fixture
+def writer_subprocess():
+    """Fixture that manages a WAL writer running in a child process.
 
-# Signal that writes are done (but writer is still open).
-sys.stdout.write("written\\n")
-sys.stdout.flush()
+    Returns a factory function:
+        start(wal_dir, count, *, crash=False) -> subprocess.Popen
 
-# Wait for the test to tell us to close.
-sys.stdin.readline()
-writer.close()
+    The subprocess writes `count` records to the WAL directory.
 
-# Signal that close is done.
-sys.stdout.write("closed\\n")
-sys.stdout.flush()
-"""
+    In normal mode, it signals "written" on stdout, then waits for a
+    line on stdin before closing the writer and signaling "closed".
+
+    In crash mode (crash=True), it writes records and exits immediately
+    WITHOUT closing the writer, leaving a stale .lock file behind.
+
+    All spawned processes are cleaned up on fixture teardown.
+    """
+    procs: list[subprocess.Popen] = []
+
+    def start(
+        wal_dir: str, count: int, *, crash: bool = False
+    ) -> subprocess.Popen:
+        args = [sys.executable, _WRITER_SUBPROCESS, _WRITER_MODULE, wal_dir, str(count)]
+        if crash:
+            args.append("--crash")
+        proc = subprocess.Popen(
+            args,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        procs.append(proc)
+        return proc
+
+    yield start
+
+    for proc in procs:
+        if proc.poll() is None:
+            proc.kill()
+        proc.wait(timeout=5)
 
 
 class TestEndToEndCrossProcess:
-    """True cross-process tests: writer in a subprocess, sender in test process."""
+    """Cross-process tests: writer in a subprocess, sender in test process.
 
-    def test_sender_drains_records_from_writer_subprocess(self, tmp_path: str) -> None:
+    These tests use real separate processes (not multiprocessing.Process)
+    because PID lock detection requires a genuinely different OS PID that
+    becomes invalid when the process exits.  This is the standard pattern
+    for cross-process testing in Python — CPython's own test suite uses
+    subprocess.Popen for the same reason.
+
+    The writer logic lives in tests/durability/_wal_writer_subprocess.py
+    (a real .py file, not an inline string) so it gets syntax highlighting,
+    linting, and proper stack traces on failure.
+    """
+
+    def test_sender_drains_records_from_writer_subprocess(
+        self, tmp_path: str, writer_subprocess
+    ) -> None:
         """Sender in this process reads records written by a subprocess."""
         wal_dir = str(tmp_path)
         record_count = 5
 
-        # Start the writer subprocess.
-        proc = subprocess.Popen(
-            [sys.executable, "-c", _WRITER_SCRIPT, wal_dir, str(record_count)],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
+        proc = writer_subprocess(wal_dir, record_count)
+
+        # Wait for the writer to finish writing.
+        assert proc.stdout is not None
+        line = proc.stdout.readline()
+        assert line.strip() == b"written"
+
+        # Writer is still open → lock file protects the WAL file.
+        mgr = FileWALDirectoryManager(wal_dir)
+        files = mgr.list_files()
+        assert len(files) == 1
+        assert is_writer_alive(files[0]) is True
+
+        # Sender drains the records but can't delete the file.
+        received: list[WALRecord] = []
+        sender = BackgroundWALSender(
+            mgr, {"obj_create": received.append}, JSONLWALConsumer,
         )
-        try:
-            # Wait for the writer to finish writing.
-            assert proc.stdout is not None
-            line = proc.stdout.readline()
-            assert line.strip() == b"written"
+        sender.drain_once()
 
-            # Writer is still open → lock file protects the WAL file.
-            mgr = FileWALDirectoryManager(wal_dir)
-            files = mgr.list_files()
-            assert len(files) == 1
-            assert is_writer_alive(files[0]) is True
+        assert len(received) == record_count
+        assert [r["seq"] for r in received] == list(range(record_count))
+        # File still exists — writer subprocess is alive.
+        assert len(mgr.list_files()) == 1
 
-            # Sender drains the records but can't delete the file.
-            received: list[WALRecord] = []
-            sender = BackgroundWALSender(
-                mgr,
-                {"obj_create": received.append},
-                JSONLWALConsumer,
-            )
-            sender.drain_once()
-
-            assert len(received) == record_count
-            assert [r["seq"] for r in received] == list(range(record_count))
-            # File still exists — writer subprocess is alive.
-            assert len(mgr.list_files()) == 1
-
-            # Tell the writer to close.
-            assert proc.stdin is not None
-            proc.stdin.write(b"go\n")
-            proc.stdin.flush()
-            line = proc.stdout.readline()
-            assert line.strip() == b"closed"
-        finally:
-            proc.wait(timeout=5)
+        # Tell the writer to close.
+        assert proc.stdin is not None
+        proc.stdin.write(b"go\n")
+        proc.stdin.flush()
+        line = proc.stdout.readline()
+        assert line.strip() == b"closed"
+        proc.wait(timeout=5)
 
         # Writer closed → lock removed → sender can delete.
         assert is_writer_alive(mgr.list_files()[0]) is False
         sender.drain_once()
         assert mgr.list_files() == []
 
-    def test_sender_recovers_after_writer_crash(self, tmp_path: str) -> None:
-        """If the writer subprocess crashes, the sender detects the stale lock
-        and cleans up.
+    def test_sender_recovers_after_writer_crash(
+        self, tmp_path: str, writer_subprocess
+    ) -> None:
+        """Writer subprocess exits without closing → stale .lock file.
+        Sender detects the dead PID and cleans up.
         """
         wal_dir = str(tmp_path)
 
-        # Writer subprocess writes records then exits WITHOUT closing
-        # (simulating a crash — lock file left behind with dead PID).
-        crash_script = """\
-import sys
-from weave.durability.wal_directory_manager import FileWALDirectoryManager
-from weave.durability.wal_writer import JSONLWALWriter
-
-mgr = FileWALDirectoryManager(sys.argv[1])
-writer = JSONLWALWriter(mgr)
-for i in range(3):
-    writer.write({"type": "obj_create", "seq": i})
-# EXIT WITHOUT writer.close() — simulates crash.
-# The .lock file still has our PID, but we're about to die.
-"""
-        proc = subprocess.Popen(
-            [sys.executable, "-c", crash_script, wal_dir],
-        )
+        proc = writer_subprocess(wal_dir, 3, crash=True)
         proc.wait(timeout=5)
         assert proc.returncode == 0
 
@@ -728,9 +738,7 @@ for i in range(3):
         # Sender drains and cleans up.
         received: list[WALRecord] = []
         sender = BackgroundWALSender(
-            mgr,
-            {"obj_create": received.append},
-            JSONLWALConsumer,
+            mgr, {"obj_create": received.append}, JSONLWALConsumer,
         )
         sender.drain_once()
 
