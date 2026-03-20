@@ -1,5 +1,6 @@
 """Task manager for tracking long-running operations via Redis."""
 
+import json
 import uuid
 from datetime import datetime
 from typing import TypedDict
@@ -24,6 +25,7 @@ class TaskDetails(TypedDict):
     successful_items: int
     failed_items: int
     created_at: str
+    canceled_at: str | None
 
 
 class TaskManager:
@@ -48,16 +50,12 @@ class TaskManager:
     def _set_task(self, task_id: str, task_details: TaskDetails) -> None:
         if self._redis_client is None:
             return
-        import json
-
         key = self._make_task_key(task_id)
         self._redis_client.set(key, json.dumps(task_details), ex=TASK_TTL_SECONDS)
 
     def _get_task(self, task_id: str) -> TaskDetails | None:
         if self._redis_client is None:
             return None
-        import json
-
         data = self._redis_client.get(self._make_task_key(task_id))
         if data is None:
             return None
@@ -72,6 +70,7 @@ class TaskManager:
             successful_items=0,
             failed_items=0,
             created_at=datetime.now().isoformat(),
+            canceled_at=None,
         )
         self._set_task(task_id, task_details)
         return task_details
@@ -104,12 +103,19 @@ class TaskManager:
             return
         self._redis_client.delete(self._make_task_key(task_id))
 
+    def cancel_task(self, task_id: str) -> TaskDetails | None:
+        """Mark a task as canceled by setting canceled_at timestamp."""
+        task_details = self.get_task(task_id)
+        if task_details is None:
+            return None
+        task_details["canceled_at"] = datetime.now().isoformat()
+        self._set_task(task_id, task_details)
+        return task_details
+
     def list_tasks(self) -> list[TaskDetails]:
         """List all tasks for this project and user."""
         if self._redis_client is None:
             return []
-        import json
-
         tasks: list[TaskDetails] = []
         cursor = 0
         while True:

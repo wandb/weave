@@ -2362,6 +2362,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def tasks_list(self, req: tsi.TasksListReq) -> tsi.TasksListRes:
         raise NotImplementedError("Task listing is not supported in SQLite")
 
+    def task_cancel(self, req: tsi.TaskCancelReq) -> tsi.TaskCancelRes:
+        raise NotImplementedError("Task cancellation is not supported in SQLite")
+
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         """Create an op object by delegating to obj_create.
 

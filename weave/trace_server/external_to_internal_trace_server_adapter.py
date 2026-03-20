@@ -702,6 +702,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._internal_trace_server.tasks_list(req)
 
+    def task_cancel(self, req: tsi.TaskCancelReq) -> tsi.TaskCancelRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._internal_trace_server.task_cancel(req)
+
     # === V2 APIs ===
 
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:

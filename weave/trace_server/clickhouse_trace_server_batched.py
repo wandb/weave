@@ -6202,6 +6202,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         tasks = task_manager.list_tasks()
         return tsi.TasksListRes(tasks=[tsi.TaskDetails(**t) for t in tasks])
 
+    def task_cancel(self, req: tsi.TaskCancelReq) -> tsi.TaskCancelRes:
+        task_manager = TaskManager(req.project_id, req.wb_user_id)
+        task = task_manager.cancel_task(req.task_id)
+        if task is None:
+            raise ValueError(f"Task {req.task_id} not found")
+        return tsi.TaskCancelRes(task=tsi.TaskDetails(**task))
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:

@@ -1929,6 +1929,7 @@ class TaskDetails(BaseModel):
     successful_items: int
     failed_items: int
     created_at: str
+    canceled_at: str | None = None
 
 
 class TasksListReq(BaseModelStrict):
@@ -1938,6 +1939,16 @@ class TasksListReq(BaseModelStrict):
 
 class TasksListRes(BaseModel):
     tasks: list[TaskDetails]
+
+
+class TaskCancelReq(BaseModelStrict):
+    project_id: str
+    task_id: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class TaskCancelRes(BaseModel):
+    task: TaskDetails
 
 
 class OpCreateBody(BaseModel):
@@ -2960,6 +2971,7 @@ class TraceServerInterface(Protocol):
 
     # Task API
     def tasks_list(self, req: TasksListReq) -> TasksListRes: ...
+    def task_cancel(self, req: TaskCancelReq) -> TaskCancelRes: ...
 
 
 class ObjectInterface(Protocol):
