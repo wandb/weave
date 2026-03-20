@@ -199,9 +199,7 @@ class BackgroundWALSender:
                     try:
                         self._consumers[path] = self._consumer_factory(path)
                     except Exception:
-                        logger.exception(
-                            "Failed to create consumer for %s", path
-                        )
+                        logger.exception("Failed to create consumer for %s", path)
                         continue
                 consumer = self._consumers[path]
                 try:
@@ -215,7 +213,6 @@ class BackgroundWALSender:
                     logger.exception("Error draining WAL file %s", path)
 
             return total
-
 
     # -- Context manager ---------------------------------------------------
 
