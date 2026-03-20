@@ -2014,8 +2014,9 @@ class WeaveClient:
                 ) as e:
                     logger.debug("Skipping client-side digest for obj %r: %s", name, e)
 
-            # WAL path: compute a local digest (no ref conversion needed)
-            # and write to WAL instead of calling the server.
+            # WAL path: persist to disk; the background sender will replay
+            # to the server asynchronously.  Compute digest locally since we
+            # won't get one back from a server response.
             if self._wal is not None:
                 local_digest = expected_digest or compute_object_digest(json_val)
                 req = ObjCreateReq(
@@ -2028,6 +2029,8 @@ class WeaveClient:
                 self._wal.write("obj_create", req)
                 return ObjCreateRes(digest=local_digest)
 
+            # Standard path: send directly to the trace server and get
+            # back a server-computed digest.
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
@@ -2095,7 +2098,7 @@ class WeaveClient:
             ) as e:
                 logger.debug("Skipping client-side digest for table: %s", e)
 
-        # WAL path: compute a local digest and skip the server call.
+        # WAL path: persist to disk; digest computed locally.
         if self._wal is not None:
             local_digest = expected_digest or compute_table_digest(
                 [compute_row_digest(row) for row in json_rows]
@@ -2109,6 +2112,7 @@ class WeaveClient:
             self._wal.write("table_create", req)
             return TableCreateRes(digest=local_digest)
 
+        # Standard path: send directly to the trace server.
         req = TableCreateReq(
             table=TableSchemaForInsert(
                 project_id=self._project_id(),
@@ -2394,6 +2398,7 @@ class WeaveClient:
         if cached_res:
             return cached_res
 
+        # WAL path: persist to disk; return a resolved future immediately.
         if self._wal is not None:
             digest = req.expected_digest or ""
             self._wal.write("file_create", req)
@@ -2402,6 +2407,7 @@ class WeaveClient:
             self.send_file_cache.put(req, f)
             return f
 
+        # Standard path: send directly to the trace server.
         def file_create_with_fallback() -> FileCreateRes:
             try:
                 return self.server.file_create(req)

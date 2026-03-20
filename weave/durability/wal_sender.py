@@ -256,27 +256,40 @@ class BackgroundWALSender:
             logger.exception("Error in WAL sender final drain")
 
 
-# -- Production handler registry ------------------------------------------
+class TraceServerHandlers:
+    """Maps WAL record types to trace server method calls.
+
+    Derives the handler mapping from :data:`~weave.durability.wal.WAL_RECORD_TYPES`
+    (the single source of truth for record types).  For each type ``foo_bar``,
+    it resolves ``tsi.FooBarReq`` and ``server.foo_bar`` by naming convention.
+    """
+
+    def __init__(self, server: TraceServerClientInterface) -> None:
+        self._server = server
+        self._handlers: WALHandlers = {}
+        for record_type in WAL_RECORD_TYPES:
+            req_cls_name = (
+                "".join(w.capitalize() for w in record_type.split("_")) + "Req"
+            )
+            req_cls = getattr(tsi, req_cls_name)
+            method = getattr(server, record_type)
+
+            def _handler(record: WALRecord, _m=method, _rc=req_cls) -> None:
+                _m(_rc.model_validate(record["req"]))
+
+            self._handlers[record_type] = _handler
+
+    def as_dict(self) -> WALHandlers:
+        """Return the handlers as a dict for BackgroundWALSender."""
+        return dict(self._handlers)
 
 
 def build_trace_server_handlers(server: TraceServerClientInterface) -> WALHandlers:
     """Build WAL handlers that replay records to a trace server.
 
-    Derives the handler mapping from :data:`~weave.durability.wal_manager.WAL_RECORD_TYPES`
-    (the single source of truth for record types).  For each type ``foo_bar``,
-    it resolves ``tsi.FooBarReq`` and ``server.foo_bar`` by naming convention.
+    Convenience wrapper around :class:`TraceServerHandlers`.
     """
-    handlers: WALHandlers = {}
-    for record_type in WAL_RECORD_TYPES:
-        req_cls_name = "".join(w.capitalize() for w in record_type.split("_")) + "Req"
-        req_cls = getattr(tsi, req_cls_name)
-        method = getattr(server, record_type)
-
-        def _handler(record: WALRecord, _m=method, _rc=req_cls) -> None:
-            _m(_rc.model_validate(record["req"]))
-
-        handlers[record_type] = _handler
-    return handlers
+    return TraceServerHandlers(server).as_dict()
 
 
 def create_sender(
