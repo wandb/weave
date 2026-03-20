@@ -114,14 +114,11 @@ class TestDrainOnce:
         assert len(received) == 3
         assert mgr.list_files() == []
 
-
     @pytest.mark.skipif(
         sys.platform == "win32",
         reason="Windows locks open files — can't unlink while consumer holds a handle",
     )
-    def test_consumer_evicted_when_file_removed_externally(
-        self, tmp_path: str
-    ) -> None:
+    def test_consumer_evicted_when_file_removed_externally(self, tmp_path: str) -> None:
         """If a file disappears between drain cycles, its cached consumer
         is evicted without error.
         """
@@ -673,9 +670,7 @@ sys.stdout.flush()
 """
     procs: list[subprocess.Popen] = []
 
-    def start(
-        wal_dir: str, count: int, *, crash: bool = False
-    ) -> subprocess.Popen:
+    def start(wal_dir: str, count: int, *, crash: bool = False) -> subprocess.Popen:
         args = [sys.executable, "-c", script, wal_dir, str(count)]
         if crash:
             args.append("--crash")
@@ -732,7 +727,9 @@ class TestEndToEndCrossProcess:
         # Sender drains the records but can't delete the file.
         received: list[WALRecord] = []
         sender = BackgroundWALSender(
-            mgr, {"obj_create": received.append}, JSONLWALConsumer,
+            mgr,
+            {"obj_create": received.append},
+            JSONLWALConsumer,
         )
         sender.drain_once()
 
@@ -775,7 +772,9 @@ class TestEndToEndCrossProcess:
         # Sender drains and cleans up.
         received: list[WALRecord] = []
         sender = BackgroundWALSender(
-            mgr, {"obj_create": received.append}, JSONLWALConsumer,
+            mgr,
+            {"obj_create": received.append},
+            JSONLWALConsumer,
         )
         sender.drain_once()
 

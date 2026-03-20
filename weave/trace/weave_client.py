@@ -386,7 +386,9 @@ class WeaveClient:
         self._wal: WALManager | None = None
         if settings.should_enable_wal():
             self._wal = WALManager.with_sender(
-                self.entity, self.project, self.server,
+                self.entity,
+                self.project,
+                self.server,
             )
 
         # No-op when the feature flag is off (returns immediately).

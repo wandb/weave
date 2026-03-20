@@ -140,7 +140,9 @@ class TestWALClientWrites:
         image_obj = records[2]
         assert image_obj["type"] == "obj_create"
         assert image_obj["req"]["obj"]["object_id"] == "my_image"
-        assert image_obj["req"]["obj"]["val"]["weave_type"] == {"type": "PIL.Image.Image"}
+        assert image_obj["req"]["obj"]["val"]["weave_type"] == {
+            "type": "PIL.Image.Image"
+        }
 
     def test_wal_records_are_json_serializable(self, wal_client):
         """Ensure WAL records round-trip through JSON without loss."""

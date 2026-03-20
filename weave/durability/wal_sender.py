@@ -332,13 +332,13 @@ def create_sender(
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Run the WAL sender as a standalone process.
+    r"""Run the WAL sender as a standalone process.
 
     For in-process usage, see :func:`create_sender` instead.
 
     Usage::
 
-        python -m weave.durability.wal_sender \\
+        python -m weave.durability.wal_sender \
             --entity my-entity --project my-project
     """
     parser = argparse.ArgumentParser(
