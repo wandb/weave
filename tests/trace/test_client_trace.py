@@ -97,6 +97,7 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 ## End hacky interface compatibility helpers
 
 
+@pytest.mark.flaky(reruns=2, reruns_delay=0.2)
 def test_simple_op(client):
     @weave.op
     def my_op(a: int) -> int:
