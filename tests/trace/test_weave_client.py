@@ -4315,12 +4315,16 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
     assert calls[0].wb_run_id == mock_run_id
 
 
-def test_get_calls_include_usernames(client):
+def test_get_calls_include_usernames(client, monkeypatch):
     external_server = find_server_layer(client.server, UserInjectingExternalTraceServer)
     internal_user_id = external_server._idc.ext_to_int_user_id(client.entity)
-    external_server._username_resolver = lambda user_id: (
-        "resolved-user" if user_id == internal_user_id else None
-    )
+
+    # Username resolution happens in the external adapter after wb_user_id has
+    # been translated to the internal id, so stub that resolver directly.
+    def resolve_username(user_id: str) -> str | None:
+        return "resolved-user" if user_id == internal_user_id else None
+
+    monkeypatch.setattr(external_server, "_username_resolver", resolve_username)
 
     @weave.op
     def test_op(x: int) -> int:
