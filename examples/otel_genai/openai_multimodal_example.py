@@ -156,7 +156,7 @@ def main() -> None:
         genai_endpoint=args.genai_endpoint,
         otlp_endpoint=args.otlp_endpoint,
         processors=[
-            ConversationIdInjector("multimodal-session"),
+            ConversationIdInjector(name="multimodal-tools"),
         ],
     )
 

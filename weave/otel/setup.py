@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from collections.abc import Callable
+import uuid
 from typing import Any
 
 from opentelemetry import trace
@@ -89,34 +89,80 @@ class SystemPromptInjector:
 
 
 class ConversationIdInjector:
-    """SpanProcessor that sets ``gen_ai.conversation.id`` on every span.
+    """SpanProcessor that sets ``gen_ai.conversation.id`` and optionally
+    ``gen_ai.conversation.name`` on every span.
 
-    Many OTel GenAI instrumentations (e.g. OpenAI Agents SDK) do not emit
-    ``gen_ai.conversation.id``, which means traces won't appear in the
-    Weave Conversations view.  This processor fills that gap by injecting
-    the attribute on every span start.
-
-    The ``conversation_id`` can be a fixed string for a single session, or
-    a callable that returns a dynamic ID (e.g. from a session manager).
+    Ensures each conversation gets a globally unique ID (UUID4 by default)
+    and an optional human-readable display name. When a name is provided,
+    it is also written as an entity annotation to the Weave annotations API.
 
     Args:
-        conversation_id: A string or a zero-arg callable returning a string.
+        name: Human-readable conversation name (e.g. "trip-planning").
+            Set as ``gen_ai.conversation.name`` on every span.
+        id: Explicit conversation ID. When omitted a UUID4 is generated
+            automatically, guaranteeing uniqueness across runs.
 
     Examples:
         >>> from weave.otel import ConversationIdInjector
-        >>> injector = ConversationIdInjector("my-session-123")
-        >>> # Or with a dynamic ID:
-        >>> injector = ConversationIdInjector(lambda: session.current_id)
+        >>> ConversationIdInjector(name="trip-planning")
+        >>> ConversationIdInjector(id="my-uuid", name="trip-planning")
+        >>> ConversationIdInjector()
     """
 
-    def __init__(self, conversation_id: str | Callable[[], str]) -> None:
-        self._conversation_id = conversation_id
+    def __init__(self, *, name: str = "", id: str = "") -> None:
+        self._id = id or str(uuid.uuid4())
+        self._name = name
+        self._annotation_written = False
 
     def on_start(self, span: Any, parent_context: Any = None) -> None:
-        """Set gen_ai.conversation.id on every span."""
-        cid = self._conversation_id() if callable(self._conversation_id) else self._conversation_id
-        if cid:
-            span.set_attribute("gen_ai.conversation.id", cid)
+        """Set gen_ai.conversation.id and optionally gen_ai.conversation.name."""
+        span.set_attribute("gen_ai.conversation.id", self._id)
+        if self._name:
+            span.set_attribute("gen_ai.conversation.name", self._name)
+            if not self._annotation_written:
+                self._annotation_written = True
+                self._write_annotation()
+
+    def _write_annotation(self) -> None:
+        """Write conversation name as an annotation (fire-and-forget, background thread)."""
+        import threading
+
+        def _post() -> None:
+            try:
+                import requests as http_requests
+
+                endpoint = os.environ.get("WF_TRACE_SERVER_URL", "")
+                if not endpoint:
+                    return
+                api_key = os.environ.get("WANDB_API_KEY", "")
+                entity = os.environ.get("WANDB_ENTITY", "")
+                project = os.environ.get("WANDB_PROJECT", "")
+                if not entity or not project:
+                    return
+
+                url = f"{endpoint}/genai/annotations/upsert"
+                headers: dict[str, str] = {"Content-Type": "application/json"}
+                if api_key:
+                    headers["wandb-api-key"] = api_key
+                payload = {
+                    "project_id": f"{entity}/{project}",
+                    "annotations": [
+                        {
+                            "entity_type": "conversation",
+                            "entity_id": self._id,
+                            "namespace": "display",
+                            "key": "name",
+                            "string_value": self._name,
+                            "value_type": "string",
+                            "source": "sdk",
+                        }
+                    ],
+                }
+                http_requests.post(url, json=payload, headers=headers, timeout=5)
+            except Exception:
+                pass
+
+        threading.Thread(target=_post, daemon=True).start()
 
     def on_end(self, span: Any) -> None:
         """No-op."""

@@ -23,6 +23,8 @@ import io
 import json
 import logging
 import os
+import re
+import sqlite3
 import threading
 import time
 from pathlib import Path
@@ -37,9 +39,49 @@ from weave.agent_hooks.events import AgentHookEvent
 logger = logging.getLogger(__name__)
 
 _TOOL_OUTPUT_TRUNCATE = 4096
-# Max bytes to store from a transcript file on a span attribute.
 _TRANSCRIPT_TRUNCATE = 32_768
 _CONTENT_REFS_ATTR = "weave.content_refs"
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
+
+
+def _looks_like_uuid(s: str) -> bool:
+    """Return True if *s* is a UUID-formatted string."""
+    return bool(_UUID_RE.match(s))
+
+
+_CURSOR_DB_PATH = Path.home() / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
+
+
+def _read_cursor_session_name(conversation_id: str) -> str:
+    """Read the LLM-generated session title from Cursor's local SQLite DB.
+
+    Cursor stores conversation metadata in ``state.vscdb`` under
+    ``composerData:<conversation_id>`` keys.  The JSON value contains a
+    ``name`` field with the title shown in Cursor's sidebar.
+
+    Returns:
+        The session title, or empty string on any failure.
+    """
+    if not _CURSOR_DB_PATH.exists():
+        return ""
+    try:
+        uri = f"file:{_CURSOR_DB_PATH}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=1)
+        try:
+            row = conn.execute(
+                "SELECT value FROM cursorDiskKV WHERE key = ?",
+                (f"composerData:{conversation_id}",),
+            ).fetchone()
+            if not row:
+                return ""
+            data = json.loads(row[0])
+            return data.get("name", "")
+        finally:
+            conn.close()
+    except Exception:
+        return ""
 
 
 class _TurnState:
@@ -73,6 +115,7 @@ class _ConvState:
         self.workspace: str = ""
         self.is_background_agent: bool = False
         self.composer_mode: str = ""
+        self.conversation_name: str = ""
         self.current_turn: _TurnState | None = None
 
 
@@ -195,6 +238,8 @@ class SpanBuilder:
             conv.model = ev.model
         if conv.workspace == "" and ev.workspace_roots:
             conv.workspace = ev.workspace_roots[0]
+        if not conv.conversation_name and ev.prompt_text:
+            conv.conversation_name = ev.prompt_text[:60]
         return conv, conv.current_turn
 
     def _open_turn(self, conv: _ConvState, ev: AgentHookEvent) -> _TurnState:
@@ -209,6 +254,7 @@ class SpanBuilder:
             "gen_ai.system": conv.source or ev.source or "ide",
             "gen_ai.request.model": ev.model or conv.model,
             "gen_ai.conversation.id": ev.conversation_id,
+            "gen_ai.conversation.name": conv.conversation_name,
             "weave.agent_hooks.source": conv.source or ev.source or "ide",
             "weave.agent_hooks.workspace": workspace,
         }
@@ -489,6 +535,45 @@ class SpanBuilder:
         return refs
 
     # ------------------------------------------------------------------
+    # Annotation helpers
+    # ------------------------------------------------------------------
+
+    def _write_annotation(
+        self,
+        entity_type: str,
+        entity_id: str,
+        namespace: str,
+        key: str,
+        value: str,
+        source: str = "hook",
+    ) -> None:
+        """Write an annotation to the Weave annotations API (fire-and-forget)."""
+        if not self._server_url or not self._project_id:
+            return
+        try:
+            import requests as http_requests
+
+            url = f"{self._server_url}/genai/annotations/upsert"
+            headers: dict[str, str] = {"Content-Type": "application/json"}
+            if self._api_key:
+                headers["wandb-api-key"] = self._api_key
+            payload = {
+                "project_id": self._project_id,
+                "annotations": [{
+                    "entity_type": entity_type,
+                    "entity_id": entity_id,
+                    "namespace": namespace,
+                    "key": key,
+                    "string_value": value,
+                    "value_type": "string",
+                    "source": source,
+                }],
+            }
+            http_requests.post(url, json=payload, headers=headers, timeout=5)
+        except Exception:
+            logger.debug("Failed to write annotation", exc_info=True)
+
+    # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
 
@@ -499,6 +584,12 @@ class SpanBuilder:
         conv.workspace = ev.workspace_roots[0] if ev.workspace_roots else ""
         conv.is_background_agent = ev.is_background_agent
         conv.composer_mode = ev.composer_mode
+        if ev.session_id and not _looks_like_uuid(ev.session_id):
+            conv.conversation_name = ev.session_id
+            self._write_annotation(
+                "conversation", ev.conversation_id, "display", "name",
+                conv.conversation_name,
+            )
 
     def _on_session_end(self, ev: AgentHookEvent) -> None:
         conv = self._get_conv(ev.conversation_id)
@@ -514,6 +605,16 @@ class SpanBuilder:
 
     def _on_user_prompt(self, ev: AgentHookEvent) -> None:
         conv = self._get_conv(ev.conversation_id)
+        if not conv.conversation_name:
+            if ev.source == "cursor":
+                conv.conversation_name = _read_cursor_session_name(ev.conversation_id)
+            if not conv.conversation_name and ev.prompt_text:
+                conv.conversation_name = ev.prompt_text[:60]
+            if conv.conversation_name:
+                self._write_annotation(
+                    "conversation", ev.conversation_id, "display", "name",
+                    conv.conversation_name,
+                )
         # Close any previous turn that wasn't closed by stop
         self._close_turn(conv)
         # Open a new turn

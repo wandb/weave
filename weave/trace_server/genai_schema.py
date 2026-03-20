@@ -58,6 +58,7 @@ class GenAISpanCHInsertable(BaseModel):
 
     # Conversation / session
     conversation_id: str = ""
+    conversation_name: str = ""
 
     # Tool info
     tool_name: str = ""

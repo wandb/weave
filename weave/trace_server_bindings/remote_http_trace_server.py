@@ -674,6 +674,30 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, "/genai/spans/active")
         return tsi.GenAIActiveSpansRes.model_validate(r.json())
 
+    def genai_annotations_upsert(
+        self, req: tsi.GenAIAnnotationsUpsertReq
+    ) -> tsi.GenAIAnnotationsUpsertRes:
+        """Upsert annotations on entities."""
+        r = self._post_request_executor("/genai/annotations/upsert", req)
+        handle_response_error(r, "/genai/annotations/upsert")
+        return tsi.GenAIAnnotationsUpsertRes.model_validate(r.json())
+
+    def genai_annotations_delete(
+        self, req: tsi.GenAIAnnotationsDeleteReq
+    ) -> tsi.GenAIAnnotationsDeleteRes:
+        """Soft-delete annotations."""
+        r = self._post_request_executor("/genai/annotations/delete", req)
+        handle_response_error(r, "/genai/annotations/delete")
+        return tsi.GenAIAnnotationsDeleteRes.model_validate(r.json())
+
+    def genai_annotations_query(
+        self, req: tsi.GenAIAnnotationsQueryReq
+    ) -> tsi.GenAIAnnotationsQueryRes:
+        """Query annotations for entities."""
+        r = self._post_request_executor("/genai/annotations/query", req)
+        handle_response_error(r, "/genai/annotations/query")
+        return tsi.GenAIAnnotationsQueryRes.model_validate(r.json())
+
     # Call API
     @validate_call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

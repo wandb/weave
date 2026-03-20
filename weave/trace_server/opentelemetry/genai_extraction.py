@@ -206,6 +206,17 @@ def extract_conversation_id(attrs: dict[str, Any]) -> str:
     return str(val) if val else ""
 
 
+def extract_conversation_name(attrs: dict[str, Any]) -> str:
+    """Extract conversation display name.
+
+    Fallback chain:
+    1. gen_ai.conversation.name
+    2. weave.conversation.name
+    """
+    val = _get(attrs, "gen_ai.conversation.name", "weave.conversation.name")
+    return str(val) if val else ""
+
+
 def extract_input_tokens(attrs: dict[str, Any]) -> int:
     """Extract input token count.
 
@@ -502,6 +513,7 @@ def extract_genai_fields(
         reasoning_tokens=reasoning_t,
         reasoning_content=reasoning_content,
         conversation_id=extract_conversation_id(attrs),
+        conversation_name=extract_conversation_name(attrs),
         tool_name=tool_name,
         tool_type=str(_get(attrs, "gen_ai.tool.type") or ""),
         tool_call_id=tool_call_id,

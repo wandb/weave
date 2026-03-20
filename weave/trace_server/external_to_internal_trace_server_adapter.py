@@ -229,6 +229,27 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.genai_active_spans, req, req.project_id
         )
 
+    def genai_annotations_upsert(
+        self, req: tsi.GenAIAnnotationsUpsertReq
+    ) -> tsi.GenAIAnnotationsUpsertRes:
+        """Upsert annotations on entities."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.genai_annotations_upsert(req)
+
+    def genai_annotations_delete(
+        self, req: tsi.GenAIAnnotationsDeleteReq
+    ) -> tsi.GenAIAnnotationsDeleteRes:
+        """Soft-delete annotations."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.genai_annotations_delete(req)
+
+    def genai_annotations_query(
+        self, req: tsi.GenAIAnnotationsQueryReq
+    ) -> tsi.GenAIAnnotationsQueryRes:
+        """Query annotations for entities."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.genai_annotations_query(req)
+
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
         if req.start.wb_run_id is not None:

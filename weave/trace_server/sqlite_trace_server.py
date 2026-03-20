@@ -2279,6 +2279,24 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             "genai_active_spans is not implemented for SQLite trace server"
         )
 
+    def genai_annotations_upsert(
+        self, req: tsi.GenAIAnnotationsUpsertReq
+    ) -> tsi.GenAIAnnotationsUpsertRes:
+        """Upsert annotations on entities."""
+        raise NotImplementedError("genai_annotations_upsert not supported on SQLite")
+
+    def genai_annotations_delete(
+        self, req: tsi.GenAIAnnotationsDeleteReq
+    ) -> tsi.GenAIAnnotationsDeleteRes:
+        """Soft-delete annotations."""
+        raise NotImplementedError("genai_annotations_delete not supported on SQLite")
+
+    def genai_annotations_query(
+        self, req: tsi.GenAIAnnotationsQueryReq
+    ) -> tsi.GenAIAnnotationsQueryRes:
+        """Query annotations for entities."""
+        raise NotImplementedError("genai_annotations_query not supported on SQLite")
+
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         raise NotImplementedError(
             "project_stats is not implemented for SQLite trace server"

@@ -380,6 +380,7 @@ class GenAISpanSchema(BaseModel):
     reasoning_tokens: int = 0
     reasoning_content: str = ""
     conversation_id: str = ""
+    conversation_name: str = ""
     tool_name: str = ""
     tool_type: str = ""
     tool_call_id: str = ""
@@ -541,6 +542,7 @@ class GenAIConversationSchema(BaseModel):
     """Metadata for a single multi-turn conversation, keyed by conversation_id."""
 
     conversation_id: str
+    conversation_name: str = ""
     project_id: str
     turn_count: int = 0
     span_count: int = 0
@@ -659,6 +661,93 @@ class GenAIAgentMetricsRes(BaseModel):
 
     agent_name: str
     buckets: list[GenAIAgentMetricsBucket] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# GenAI entity annotations
+# ---------------------------------------------------------------------------
+
+
+class GenAIAnnotationValue(BaseModel):
+    """A single annotation entry for an entity."""
+
+    entity_type: str
+    entity_id: str
+    namespace: str
+    key: str
+    string_value: str = ""
+    float_value: float = 0.0
+    int_value: int = 0
+    json_value: str = ""
+    value_type: Literal["string", "float", "int", "json"] = "string"
+    source: str = ""
+    source_id: str = ""
+
+
+class GenAIAnnotationRow(BaseModel):
+    """A stored annotation row, including server-managed fields."""
+
+    project_id: str
+    entity_type: str
+    entity_id: str
+    namespace: str
+    key: str
+    string_value: str = ""
+    float_value: float = 0.0
+    int_value: int = 0
+    json_value: str = ""
+    value_type: str = "string"
+    source: str = ""
+    source_id: str = ""
+    updated_at: str = ""
+    deleted_at: str = ""
+
+
+class GenAIAnnotationsUpsertReq(BaseModel):
+    """Upsert one or more annotations on entities."""
+
+    project_id: str
+    annotations: list[GenAIAnnotationValue]
+
+
+class GenAIAnnotationsUpsertRes(BaseModel):
+    """Response for annotation upsert."""
+
+    inserted: int = 0
+
+
+class GenAIAnnotationsDeleteReq(BaseModel):
+    """Soft-delete annotations matching the given filters."""
+
+    project_id: str
+    entity_type: str
+    entity_id: str
+    namespace: str | None = None
+    key: str | None = None
+
+
+class GenAIAnnotationsDeleteRes(BaseModel):
+    """Response for annotation delete."""
+
+    deleted: int = 0
+
+
+class GenAIAnnotationsQueryReq(BaseModel):
+    """Query annotations for entities."""
+
+    project_id: str
+    entity_type: str | None = None
+    entity_ids: list[str] | None = None
+    namespace: str | None = None
+    key: str | None = None
+    limit: int = 1000
+    offset: int = 0
+
+
+class GenAIAnnotationsQueryRes(BaseModel):
+    """Response containing matching annotations."""
+
+    annotations: list[GenAIAnnotationRow]
 
 
 class CallStartReq(BaseModelStrict):
@@ -3129,6 +3218,15 @@ class TraceServerInterface(Protocol):
     def genai_active_spans(
         self, req: GenAIActiveSpansReq
     ) -> GenAIActiveSpansRes: ...
+    def genai_annotations_upsert(
+        self, req: GenAIAnnotationsUpsertReq
+    ) -> GenAIAnnotationsUpsertRes: ...
+    def genai_annotations_delete(
+        self, req: GenAIAnnotationsDeleteReq
+    ) -> GenAIAnnotationsDeleteRes: ...
+    def genai_annotations_query(
+        self, req: GenAIAnnotationsQueryReq
+    ) -> GenAIAnnotationsQueryRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

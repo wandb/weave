@@ -274,7 +274,7 @@ def main() -> None:
         genai_endpoint=args.genai_endpoint,
         otlp_endpoint=args.otlp_endpoint,
         processors=[
-            ConversationIdInjector("trip-planning-session"),
+            ConversationIdInjector(name="trip-planning"),
             SystemPromptInjector(AGENT_INSTRUCTIONS),
             ToolDefinitionsInjector(AGENT_TOOL_DEFS),
         ],

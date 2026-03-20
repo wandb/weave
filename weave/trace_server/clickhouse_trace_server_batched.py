@@ -271,6 +271,30 @@ def _genai_span_to_row(span: GenAISpanCHInsertable) -> list[Any]:
     return [params.get(col) for col in ALL_GENAI_SPAN_INSERT_COLUMNS]
 
 
+_ADJECTIVES = [
+    "amber", "bold", "calm", "deft", "eager", "fair", "glad", "hale",
+    "keen", "lush", "neat", "pale", "quick", "rare", "sage", "tame",
+    "vast", "warm", "zest", "airy", "brave", "crisp", "dusk", "epic",
+    "fern", "glow", "haze", "iron", "jade", "knit", "lime", "moss",
+]
+
+_ANIMALS = [
+    "ant", "bat", "cat", "doe", "elk", "fox", "gnu", "hen",
+    "ibis", "jay", "koi", "lynx", "mole", "newt", "owl", "pug",
+    "quail", "ram", "seal", "toad", "urchin", "vole", "wren", "yak",
+    "asp", "bee", "cod", "dab", "eel", "fly", "gar", "hawk",
+]
+
+
+def _auto_conversation_name(conversation_id: str) -> str:
+    """Generate a deterministic human-readable name from a conversation_id."""
+    h = hashlib.md5(conversation_id.encode()).digest()
+    adj = _ADJECTIVES[h[0] % len(_ADJECTIVES)]
+    animal = _ANIMALS[h[1] % len(_ANIMALS)]
+    num = (h[2] << 8 | h[3]) % 100
+    return f"{adj}-{animal}-{num}"
+
+
 def _query_result_to_genai_spans(
     query_result: QueryResult,
 ) -> list[tsi.GenAISpanSchema]:
@@ -836,6 +860,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = """
             SELECT
                 conversation_id,
+                anyLast(conversation_name) AS conversation_name,
                 project_id,
                 countDistinct(trace_id)   AS turn_count,
                 count()                   AS span_count,
@@ -859,6 +884,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             conversations.append(
                 tsi.GenAIConversationSchema(
                     conversation_id=str(row_dict.get("conversation_id", "")),
+                    conversation_name=str(row_dict.get("conversation_name", "") or ""),
                     project_id=str(row_dict.get("project_id", req.project_id)),
                     turn_count=int(row_dict.get("turn_count", 0)),
                     span_count=int(row_dict.get("span_count", 0)),
@@ -869,6 +895,32 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     last_seen=row_dict.get("last_seen"),
                 )
             )
+        # Fetch display names from entity_annotations
+        conv_ids = [c.conversation_id for c in conversations]
+        if conv_ids:
+            name_query = """
+                SELECT entity_id, argMax(string_value, updated_at) AS display_name
+                FROM entity_annotations FINAL
+                WHERE project_id = {project_id:String}
+                  AND entity_type = 'conversation'
+                  AND namespace = 'display'
+                  AND key = 'name'
+                  AND deleted_at = toDateTime64(0, 3)
+                  AND entity_id IN {conv_ids:Array(String)}
+                GROUP BY entity_id
+            """
+            name_result = self.ch_client.query(
+                name_query,
+                parameters={"project_id": req.project_id, "conv_ids": conv_ids},
+            )
+            name_map = {row[0]: row[1] for row in name_result.result_rows}
+            for conv in conversations:
+                if conv.conversation_id in name_map and name_map[conv.conversation_id]:
+                    conv.conversation_name = name_map[conv.conversation_id]
+
+        for conv in conversations:
+            if not conv.conversation_name:
+                conv.conversation_name = _auto_conversation_name(conv.conversation_id)
         return tsi.GenAIConversationsQueryRes(conversations=conversations)
 
     @ddtrace.tracer.wrap(
@@ -1149,6 +1201,167 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             row_dict["status_code"] = "UNSET"
             spans.append(tsi.GenAISpanSchema(**row_dict))
         return tsi.GenAIActiveSpansRes(spans=spans)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_annotations_upsert"
+    )
+    def genai_annotations_upsert(
+        self, req: tsi.GenAIAnnotationsUpsertReq
+    ) -> tsi.GenAIAnnotationsUpsertRes:
+        """Upsert annotations on entities."""
+        if not req.annotations:
+            return tsi.GenAIAnnotationsUpsertRes(inserted=0)
+
+        rows = []
+        for ann in req.annotations:
+            rows.append([
+                req.project_id,
+                ann.entity_type,
+                ann.entity_id,
+                ann.namespace,
+                ann.key,
+                ann.string_value,
+                ann.float_value,
+                ann.int_value,
+                ann.json_value,
+                ann.value_type,
+                ann.source,
+                ann.source_id,
+            ])
+
+        self.ch_client.insert(
+            "entity_annotations",
+            rows,
+            column_names=[
+                "project_id", "entity_type", "entity_id", "namespace", "key",
+                "string_value", "float_value", "int_value", "json_value",
+                "value_type", "source", "source_id",
+            ],
+        )
+        return tsi.GenAIAnnotationsUpsertRes(inserted=len(rows))
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_annotations_delete"
+    )
+    def genai_annotations_delete(
+        self, req: tsi.GenAIAnnotationsDeleteReq
+    ) -> tsi.GenAIAnnotationsDeleteRes:
+        """Soft-delete annotations matching filters."""
+        conditions = [
+            "project_id = {project_id:String}",
+            "entity_type = {entity_type:String}",
+            "entity_id = {entity_id:String}",
+            "deleted_at = toDateTime64(0, 3)",
+        ]
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "entity_type": req.entity_type,
+            "entity_id": req.entity_id,
+        }
+        if req.namespace:
+            conditions.append("namespace = {namespace:String}")
+            parameters["namespace"] = req.namespace
+        if req.key:
+            conditions.append("key = {key:String}")
+            parameters["key"] = req.key
+
+        where = " AND ".join(conditions)
+
+        query = f"""
+            SELECT project_id, entity_type, entity_id, namespace, key,
+                   string_value, float_value, int_value, json_value, value_type,
+                   source, source_id
+            FROM entity_annotations FINAL
+            WHERE {where}
+        """
+        result = self.ch_client.query(query, parameters=parameters)
+        if not result.result_rows:
+            return tsi.GenAIAnnotationsDeleteRes(deleted=0)
+
+        now = datetime.datetime.now()
+        delete_rows = []
+        for row in result.result_rows:
+            delete_rows.append([
+                row[0], row[1], row[2], row[3], row[4],
+                row[5], row[6], row[7], row[8], row[9],
+                row[10], row[11], now,
+            ])
+
+        self.ch_client.insert(
+            "entity_annotations",
+            delete_rows,
+            column_names=[
+                "project_id", "entity_type", "entity_id", "namespace", "key",
+                "string_value", "float_value", "int_value", "json_value",
+                "value_type", "source", "source_id", "deleted_at",
+            ],
+        )
+        return tsi.GenAIAnnotationsDeleteRes(deleted=len(delete_rows))
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_annotations_query"
+    )
+    def genai_annotations_query(
+        self, req: tsi.GenAIAnnotationsQueryReq
+    ) -> tsi.GenAIAnnotationsQueryRes:
+        """Query annotations for entities."""
+        conditions = [
+            "project_id = {project_id:String}",
+            "deleted_at = toDateTime64(0, 3)",
+        ]
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "limit": min(req.limit, 10000),
+            "offset": req.offset,
+        }
+
+        if req.entity_type:
+            conditions.append("entity_type = {entity_type:String}")
+            parameters["entity_type"] = req.entity_type
+        if req.entity_ids:
+            conditions.append("entity_id IN {entity_ids:Array(String)}")
+            parameters["entity_ids"] = req.entity_ids
+        if req.namespace:
+            conditions.append("namespace = {namespace:String}")
+            parameters["namespace"] = req.namespace
+        if req.key:
+            conditions.append("key = {key:String}")
+            parameters["key"] = req.key
+
+        where = " AND ".join(conditions)
+
+        query = f"""
+            SELECT project_id, entity_type, entity_id, namespace, key,
+                   string_value, float_value, int_value, json_value, value_type,
+                   source, source_id,
+                   toString(updated_at) AS updated_at,
+                   toString(deleted_at) AS deleted_at
+            FROM entity_annotations FINAL
+            WHERE {where}
+            ORDER BY entity_type, entity_id, namespace, key
+            LIMIT {{limit:UInt64}} OFFSET {{offset:UInt64}}
+        """
+        result = self.ch_client.query(query, parameters=parameters)
+
+        annotations = []
+        for row in result.result_rows:
+            annotations.append(tsi.GenAIAnnotationRow(
+                project_id=row[0],
+                entity_type=row[1],
+                entity_id=row[2],
+                namespace=row[3],
+                key=row[4],
+                string_value=row[5],
+                float_value=row[6],
+                int_value=row[7],
+                json_value=row[8],
+                value_type=row[9],
+                source=row[10],
+                source_id=row[11],
+                updated_at=row[12],
+                deleted_at=row[13],
+            ))
+        return tsi.GenAIAnnotationsQueryRes(annotations=annotations)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:

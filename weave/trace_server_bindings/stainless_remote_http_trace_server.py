@@ -512,6 +512,24 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """List currently in-progress spans."""
         raise NotImplementedError("GenAI active spans is not yet supported.")
 
+    def genai_annotations_upsert(
+        self, req: tsi.GenAIAnnotationsUpsertReq
+    ) -> tsi.GenAIAnnotationsUpsertRes:
+        """Upsert annotations on entities."""
+        raise NotImplementedError("genai_annotations_upsert")
+
+    def genai_annotations_delete(
+        self, req: tsi.GenAIAnnotationsDeleteReq
+    ) -> tsi.GenAIAnnotationsDeleteRes:
+        """Soft-delete annotations."""
+        raise NotImplementedError("genai_annotations_delete")
+
+    def genai_annotations_query(
+        self, req: tsi.GenAIAnnotationsQueryReq
+    ) -> tsi.GenAIAnnotationsQueryRes:
+        """Query annotations for entities."""
+        raise NotImplementedError("genai_annotations_query")
+
     # Call API
     @validate_call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
