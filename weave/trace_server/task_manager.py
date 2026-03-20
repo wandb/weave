@@ -50,12 +50,15 @@ class TaskManager:
     def _set_task(self, task_id: str, task_details: TaskDetails) -> None:
         if self._redis_client is None:
             return
+
         key = self._make_task_key(task_id)
+
         self._redis_client.set(key, json.dumps(task_details), ex=TASK_TTL_SECONDS)
 
     def create_task(self, total_items: int) -> TaskDetails:
         """Create a new task with the given total number of items."""
         task_id = TaskID()
+
         task_details = TaskDetails(
             id=task_id,
             total_items=total_items,
@@ -64,79 +67,108 @@ class TaskManager:
             created_at=datetime.now().isoformat(),
             canceled_at=None,
         )
+
         self._set_task(task_id, task_details)
+
         return task_details
 
     def get_task(self, task_id: str) -> TaskDetails | None:
         """Get task details by ID."""
         if self._redis_client is None:
             return None
-        data = self._redis_client.get(self._make_task_key(task_id))
-        if data is None:
+
+        task_details = self._redis_client.get(self._make_task_key(task_id))
+
+        if task_details is None:
             return None
-        return json.loads(data)
+
+        return json.loads(task_details)
 
     def increment_successful_items(self, task_id: str) -> TaskDetails | None:
         """Increment the successful items count for a task."""
         task_details = self.get_task(task_id)
+
         if task_details is None:
             return None
+
         task_details["successful_items"] += 1
+
         self._set_task(task_id, task_details)
+
         return task_details
 
     def increment_failed_items(self, task_id: str) -> TaskDetails | None:
         """Increment the failed items count for a task."""
         task_details = self.get_task(task_id)
+
         if task_details is None:
             return None
+
         task_details["failed_items"] += 1
+
         self._set_task(task_id, task_details)
+
         return task_details
 
     def complete_task(self, task_id: str) -> None:
         """Mark a task as complete by removing it from Redis."""
         if self._redis_client is None:
             return
+
         self._redis_client.delete(self._make_task_key(task_id))
 
     def cancel_task(self, task_id: str) -> TaskDetails | None:
         """Mark a task as canceled by setting canceled_at timestamp."""
         task_details = self.get_task(task_id)
+
         if task_details is None:
             return None
+
         task_details["canceled_at"] = datetime.now().isoformat()
+
         self._set_task(task_id, task_details)
+
         return task_details
 
     def list_tasks(self) -> list[TaskDetails]:
         """List all tasks for this project and user."""
         if self._redis_client is None:
             return []
+
         tasks: list[TaskDetails] = []
+
         cursor = 0
+
         while True:
             cursor, keys = self._redis_client.scan(
                 cursor=cursor, match=f"{self._task_key_prefix}*"
             )
+
             for key in keys:
                 data = self._redis_client.get(key)
+
                 if data:
                     tasks.append(json.loads(data))
+
             if cursor == 0:
                 break
+
         return tasks
 
     def clear_tasks(self) -> None:
         """Delete all task keys for this project and user from Redis."""
         if self._redis_client is None:
             return
+
         cursor = 0
+
         while True:
             cursor, keys = self._redis_client.scan(
                 cursor=cursor, match=f"{self._task_key_prefix}*"
             )
+
             if keys:
                 self._redis_client.delete(*keys)
+
             if cursor == 0:
                 break
