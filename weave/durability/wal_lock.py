@@ -31,7 +31,11 @@ def lock_path_for(wal_path: str, lock_ext: str = LOCK_EXT) -> str:
 def acquire_lock(wal_path: str, lock_ext: str = LOCK_EXT) -> str:
     """Create a PID lock sidecar for a WAL file.
 
-    Writes the current process's PID to the lock file.
+    Uses ``O_CREAT | O_EXCL`` for atomic creation — if the lock file
+    already exists, we check the PID inside:
+
+    - **PID alive** → another writer genuinely holds the file → raise.
+    - **PID dead** → stale lock from a crashed writer → warn and overwrite.
 
     Args:
         wal_path: Path to the WAL file being opened for writing.
@@ -39,17 +43,41 @@ def acquire_lock(wal_path: str, lock_ext: str = LOCK_EXT) -> str:
 
     Returns:
         The path to the lock file (for later release).
+
+    Raises:
+        FileExistsError: If the lock is held by a living process.
     """
     path = lock_path_for(wal_path, lock_ext)
-    if os.path.exists(path):
+    try:
+        # Atomic exclusive create — fails if the file already exists.
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode("utf-8"))
+        os.close(fd)
+    except FileExistsError as exc:
+        # Lock file exists — check if the holder is still alive.
+        existing_pid = _read_lock_pid(path)
+        if existing_pid is not None and _is_pid_alive(existing_pid):
+            raise FileExistsError(
+                f"Lock file {path} is held by living process {existing_pid}"
+            ) from exc
+        # Stale lock from a crashed writer — safe to overwrite.
         logger.warning(
-            "Lock file %s already exists — overwriting. This likely means "
-            "a previous writer crashed without cleanup.",
+            "Lock file %s contains stale PID %s — overwriting.",
             path,
+            existing_pid,
         )
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(str(os.getpid()))
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
     return path
+
+
+def _read_lock_pid(path: str) -> int | None:
+    """Read the PID from a lock file.  Returns None if unreadable."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return int(f.read().strip())
+    except (FileNotFoundError, ValueError):
+        return None
 
 
 def release_lock(lock_path: str) -> None:
@@ -77,17 +105,8 @@ def is_writer_alive(wal_path: str, lock_ext: str = LOCK_EXT) -> bool:
     :class:`~weave.durability.wal_sender.BackgroundWALSender`.
     """
     path = lock_path_for(wal_path, lock_ext)
-    try:
-        with open(path, encoding="utf-8") as f:
-            pid = int(f.read().strip())
-    except FileNotFoundError:
-        return False
-    except ValueError:
-        logger.warning(
-            "Lock file %s contains non-integer content — treating as stale. "
-            "This indicates file corruption or external tampering.",
-            path,
-        )
+    pid = _read_lock_pid(path)
+    if pid is None:
         return False
     return _is_pid_alive(pid)
 
