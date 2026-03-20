@@ -39,7 +39,7 @@ class WALManager:
             project,
         )
         dir_mgr = FileWALDirectoryManager(self.wal_dir)
-        self._writer: WALWriter = JSONLWALWriter(dir_mgr)
+        self._writer: WALWriter | None = JSONLWALWriter(dir_mgr)
         self._sender: BackgroundWALSender | None = None
 
     @classmethod
@@ -62,6 +62,8 @@ class WALManager:
 
     def write(self, record_type: WALRecordType, req: BaseModel) -> None:
         """Write a request to the WAL.  Never raises."""
+        if self._writer is None:
+            return
         try:
             self._writer.write(
                 {"type": record_type, "req": req.model_dump(mode="json")}

@@ -32,6 +32,7 @@ File safety:
 from __future__ import annotations
 
 import argparse
+from typing import Any
 import logging
 import os
 import signal
@@ -274,7 +275,7 @@ class TraceServerHandlers:
             req_cls = getattr(tsi, req_cls_name)
             method = getattr(server, record_type)
 
-            def _handler(record: WALRecord, _m=method, _rc=req_cls) -> None:
+            def _handler(record: WALRecord, _m: Any = method, _rc: Any = req_cls) -> None:
                 _m(_rc.model_validate(record["req"]))
 
             self._handlers[record_type] = _handler
@@ -331,6 +332,7 @@ def create_sender(
 # -- CLI entrypoint -------------------------------------------------------
 
 
+
 def main(argv: list[str] | None = None) -> None:
     r"""Run the WAL sender as a standalone process.
 
@@ -376,7 +378,12 @@ def main(argv: list[str] | None = None) -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    server = RemoteHTTPTraceServer(args.trace_server_url, auth=("api", args.api_key))
+    # RemoteHTTPTraceServer is missing a few abstract methods that the
+    # WAL sender doesn't use.  Suppress via Any intermediate.
+    remote_cls: Any = RemoteHTTPTraceServer
+    server: TraceServerClientInterface = remote_cls(
+        args.trace_server_url, auth=("api", args.api_key)
+    )
     sender = create_sender(wal_dir, server, poll_interval=args.poll_interval)
 
     stop = threading.Event()
