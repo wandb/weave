@@ -56,3 +56,9 @@ class WALManager:
         """Flush the WAL to disk.  No-op when disabled."""
         if self._writer is not None:
             self._writer.flush()
+
+    def close(self) -> None:
+        """Close the WAL writer.  No-op when disabled."""
+        if self._writer is not None:
+            self._writer.close()
+            self._writer = None
