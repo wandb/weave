@@ -85,26 +85,40 @@ class TestWALClientWrites:
         wal_client._flush()
 
         records = _read_all_wal_records(wal_client)
-        obj_records = [r for r in records if r["type"] == "obj_create"]
-        assert len(obj_records) == 1
-        req = obj_records[0]["req"]
-        assert req["obj"]["object_id"] == "my_obj"
-        assert req["obj"]["project_id"] == f"{wal_client.entity}/{wal_client.project}"
-        assert req["obj"]["val"] == {"model": "gpt-4", "temp": 0.7}
+        assert len(records) == 1
+        project_id = f"{wal_client.entity}/{wal_client.project}"
+        assert records[0] == {
+            "type": "obj_create",
+            "req": {
+                "obj": {
+                    "project_id": project_id,
+                    "object_id": "my_obj",
+                    "val": {"model": "gpt-4", "temp": 0.7},
+                    "builtin_object_class": None,
+                    "expected_digest": None,
+                    "wb_user_id": None,
+                }
+            },
+        }
 
     def test_table_create(self, wal_client):
-        ds = weave.Dataset(name="test_ds", rows=[{"x": 1}, {"x": 2}])
-        weave.publish(ds, name="test_ds")
+        wal_client._send_table_create([{"x": 1}, {"x": 2}])
         wal_client._flush()
 
         records = _read_all_wal_records(wal_client)
-        table_records = [r for r in records if r["type"] == "table_create"]
-        assert len(table_records) == 1
-        req = table_records[0]["req"]
-        assert req["table"]["project_id"] == f"{wal_client.entity}/{wal_client.project}"
-        rows = req["table"]["rows"]
-        assert len(rows) == 2
-        assert rows == [{"x": 1}, {"x": 2}]
+        project_id = f"{wal_client.entity}/{wal_client.project}"
+
+        assert len(records) == 1
+        assert records[0] == {
+            "type": "table_create",
+            "req": {
+                "table": {
+                    "project_id": project_id,
+                    "rows": [{"x": 1}, {"x": 2}],
+                    "expected_digest": None,
+                }
+            },
+        }
 
     def test_file_create(self, wal_client):
         img = Image.new("RGB", (2, 2), color="red")
@@ -112,10 +126,21 @@ class TestWALClientWrites:
         wal_client._flush()
 
         records = _read_all_wal_records(wal_client)
-        file_records = [r for r in records if r["type"] == "file_create"]
-        assert len(file_records) == 1
-        req = file_records[0]["req"]
-        assert req["project_id"] == f"{wal_client.entity}/{wal_client.project}"
+        project_id = f"{wal_client.entity}/{wal_client.project}"
+
+        # Image publish produces: 1 file_create (op code) + 1 obj_create (load op)
+        # + 1 obj_create (image object).  The file_create for the image.png
+        # binary is embedded within the image obj_create's val.files.
+        assert len(records) == 3
+        file_rec = records[0]
+        assert file_rec["type"] == "file_create"
+        assert file_rec["req"]["project_id"] == project_id
+        assert file_rec["req"]["name"] == "obj.py"
+
+        image_obj = records[2]
+        assert image_obj["type"] == "obj_create"
+        assert image_obj["req"]["obj"]["object_id"] == "my_image"
+        assert image_obj["req"]["obj"]["val"]["weave_type"] == {"type": "PIL.Image.Image"}
 
     def test_wal_records_are_json_serializable(self, wal_client):
         """Ensure WAL records round-trip through JSON without loss."""
@@ -124,9 +149,8 @@ class TestWALClientWrites:
 
         records = _read_all_wal_records(wal_client)
         assert len(records) == 1
-        for record in records:
-            roundtripped = json.loads(json.dumps(record))
-            assert roundtripped == record
+        roundtripped = json.loads(json.dumps(records[0]))
+        assert roundtripped == records[0]
 
     def test_flush_fsyncs_wal(self, wal_client):
         """flush() should fsync the WAL so records survive a process crash."""
@@ -135,6 +159,7 @@ class TestWALClientWrites:
 
         records = _read_all_wal_records(wal_client)
         assert len(records) == 1
+        assert records[0]["type"] == "obj_create"
 
 
 class TestWALDisabled:
@@ -192,7 +217,6 @@ class TestWALManagerLifecycle:
     def test_write_only_manager(self, tmp_path):
         """WALManager without sender writes records but doesn't drain them."""
         mgr = WALManager("test-entity", "test-project")
-        # Override wal_dir to use tmp_path for isolation.
         mgr.wal_dir = str(tmp_path)
         dir_mgr = FileWALDirectoryManager(str(tmp_path))
         mgr._writer = JSONLWALWriter(dir_mgr)
@@ -219,9 +243,21 @@ class TestWALManagerLifecycle:
                 consumer.close()
 
         assert len(records) == 1
-        assert records[0]["type"] == "obj_create"
+        assert records[0] == {
+            "type": "obj_create",
+            "req": {
+                "obj": {
+                    "project_id": "test-entity/test-project",
+                    "object_id": "test_obj",
+                    "val": {"hello": "world"},
+                    "builtin_object_class": None,
+                    "expected_digest": None,
+                    "wb_user_id": None,
+                }
+            },
+        }
 
-        # No sender — files should still be on disk.
+        # No sender — file should still be on disk.
         assert len(list(tmp_path.glob("*.jsonl"))) == 1
         mgr.close()
 
