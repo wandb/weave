@@ -2015,10 +2015,21 @@ class WeaveClient:
                     logger.debug("Skipping client-side digest for obj %r: %s", name, e)
 
             # WAL path: persist to disk; the background sender will replay
-            # to the server asynchronously.  Compute digest locally since we
-            # won't get one back from a server response.
+            # to the server asynchronously.  Compute digest locally using
+            # internal refs so it matches the server-computed digest.
             if self._wal is not None:
-                local_digest = expected_digest or compute_object_digest(json_val)
+                if expected_digest is not None:
+                    local_digest = expected_digest
+                else:
+                    try:
+                        internal_val = self._convert_refs_to_internal(json_val)
+                        local_digest = compute_object_digest(internal_val)
+                    except (
+                        NoInternalProjectIDError,
+                        CrossProjectRefError,
+                        InvalidExternalRef,
+                    ):
+                        local_digest = compute_object_digest(json_val)
                 req = ObjCreateReq(
                     obj=ObjSchemaForInsert(
                         project_id=self.entity + "/" + self.project,
@@ -2100,9 +2111,8 @@ class WeaveClient:
 
         # WAL path: persist to disk; digest computed locally.
         if self._wal is not None:
-            local_digest = expected_digest or compute_table_digest(
-                [compute_row_digest(row) for row in json_rows]
-            )
+            row_digests = [compute_row_digest(row) for row in json_rows]
+            local_digest = expected_digest or compute_table_digest(row_digests)
             req = TableCreateReq(
                 table=TableSchemaForInsert(
                     project_id=self._project_id(),
@@ -2110,7 +2120,7 @@ class WeaveClient:
                 )
             )
             self._wal.write("table_create", req)
-            return TableCreateRes(digest=local_digest)
+            return TableCreateRes(digest=local_digest, row_digests=row_digests)
 
         # Standard path: send directly to the trace server.
         req = TableCreateReq(
