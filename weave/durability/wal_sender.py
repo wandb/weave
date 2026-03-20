@@ -39,7 +39,7 @@ from weave.durability.wal import (
     WALConsumer,
     WALDirectoryManager,
     WALHandlers,
-    drain,
+    drain_all,
 )
 from weave.durability.wal_lock import is_writer_alive
 
@@ -200,26 +200,9 @@ class BackgroundWALSender:
 
     def _drain_unlocked(self) -> int:
         """Drain all WAL files.  Caller must hold ``self._lock``."""
-        total = 0
-
-        for path in self._mgr.list_files():
-            try:
-                consumer = self._consumer_factory(path)
-            except Exception:
-                logger.exception("Failed to create consumer for %s", path)
-                continue
-            try:
-                total += drain(consumer, self._handlers)
-                # Don't remove a file whose writer process is still alive —
-                # it may still be appending records.
-                if self._is_file_active(path):
-                    continue
-                # Remove the file only if fully consumed.
-                if next(consumer.read_pending(), None) is None:
-                    self._mgr.remove(path)
-            except Exception:
-                logger.exception("Error draining WAL file %s", path)
-            finally:
-                consumer.close()
-
-        return total
+        return drain_all(
+            self._mgr,
+            self._handlers,
+            self._consumer_factory,
+            is_file_active=self._is_file_active,
+        )
