@@ -271,16 +271,11 @@ class WALSender(Protocol):
     :meth:`drain_once`.
 
     File safety:
-        The sender must not delete a WAL file that a writer still has
-        open.  Two mechanisms are available:
-
-        - **Same-process**: The caller provides an ``active_paths``
-          callable that returns paths the local writer owns.
-        - **Cross-process**: The caller provides an ``is_file_active``
-          callable (e.g., PID lock check) that detects remote writers.
-
-        Both are pluggable — the protocol does not prescribe a specific
-        liveness-detection mechanism.
+        The sender must not delete a WAL file that a writer (in another
+        process) still has open.  Implementations accept an
+        ``is_file_active`` callable that checks writer liveness (e.g.,
+        PID lock sidecar).  The protocol does not prescribe a specific
+        detection mechanism.
     """
 
     def start(self) -> None:

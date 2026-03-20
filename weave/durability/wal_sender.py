@@ -1,29 +1,32 @@
 """WAL sender — background thread that drains WAL records to handlers.
 
 Complements the WAL writer: the writer persists requests to disk for
-durability, and the sender reads them back and forwards them to their
-destination (typically a trace server).
+durability, and the sender (in a separate process) reads them back and
+forwards them to their destination (typically a trace server).
 
 Architecture::
 
-    WALWriter ──► disk ──► BackgroundWALSender ──► handlers (server calls)
-                              │
-                         background thread
-                         polls on interval
+    Process A (writer):
+        WALWriter ──► disk (.jsonl + .lock files)
+
+    Process B (sender):
+        BackgroundWALSender ──► reads disk ──► handlers (server calls)
+                                    │
+                               background thread
+                               polls on interval
 
 The sender runs a background thread that periodically:
 
 1. Discovers all WAL files via the directory manager.
 2. Drains each file through the registered handlers via :func:`drain`.
-3. Removes fully-consumed files that have no active writer.
+3. Removes fully-consumed files whose writer is no longer alive.
 
-File safety — two pluggable layers of protection:
-    1. **Same-process** (``active_paths``): A callable returning paths
-       the local writer owns.  Fast, no I/O.
-    2. **Cross-process** (``is_file_active``): A callable that checks
-       whether another process has a file open (e.g., PID lock check).
-       The default implementation is :func:`is_writer_alive` from
-       ``wal_writer``, but any ``Callable[[str], bool]`` works.
+File safety:
+    The writer creates a ``.lock`` sidecar containing its PID.  Before
+    deleting any file, the sender calls ``is_file_active`` to check
+    whether the writer process is still alive.  By default this uses
+    :func:`~weave.durability.wal_lock.is_writer_alive` (PID lock check),
+    but any ``Callable[[str], bool]`` can be substituted.
 """
 
 from __future__ import annotations
@@ -38,6 +41,7 @@ from weave.durability.wal import (
     WALHandlers,
     drain,
 )
+from weave.durability.wal_lock import is_writer_alive
 
 logger = logging.getLogger(__name__)
 
@@ -55,39 +59,29 @@ class BackgroundWALSender:
     File cleanup:
         After draining a file, the sender removes it only if:
 
-        1. The file is fully consumed (no pending records remain),
-        2. The file's path is not in the ``active_paths`` set
-           (same-process protection), **and**
-        3. ``is_file_active`` returns False for the path
-           (cross-process protection).
+        1. The file is fully consumed (no pending records remain), **and**
+        2. ``is_file_active`` returns False for the path (i.e., the
+           writer process is no longer alive).
 
-        When the caller closes the writer before calling :meth:`stop`,
-        the writer's path leaves the active set *and* the lock file is
-        removed, so the final drain cleans it up automatically.
+        When the writer process closes the file, the ``.lock`` sidecar
+        is removed and ``is_file_active`` returns False.  If the writer
+        crashes, the ``.lock`` file contains a stale PID which
+        ``is_file_active`` detects as dead.
 
     Usage::
 
-        from weave.durability.wal_lock import is_writer_alive
-        from weave.durability.wal_writer import JSONLWALWriter
-
+        # Process A (writer)
         dir_mgr = FileWALDirectoryManager(wal_directory)
         writer = JSONLWALWriter(dir_mgr)
+        writer.write({"type": "call_start", ...})
+        writer.close()
 
-        handlers = {
-            "call_start": lambda r: server.call_start(make_req(r)),
-            "call_end": lambda r: server.call_end(make_req(r)),
-        }
-        sender = BackgroundWALSender(
-            dir_mgr, handlers, JSONLWALConsumer,
-            active_paths=lambda: {writer.active_path},
-            is_file_active=is_writer_alive,
-        )
+        # Process B (sender)
+        dir_mgr = FileWALDirectoryManager(wal_directory)
+        sender = BackgroundWALSender(dir_mgr, handlers, JSONLWALConsumer)
         sender.start()
-
-        # ... write records via writer ...
-
-        writer.close()         # active_path is now None → active set empty
-        sender.stop()          # final drain removes all consumed files
+        # ... sender drains and cleans up files ...
+        sender.stop()
 
     Args:
         directory_manager: Manages WAL file discovery and cleanup.
@@ -95,17 +89,10 @@ class BackgroundWALSender:
         consumer_factory: Creates a :class:`WALConsumer` for a given
             file path.  Typically :class:`JSONLWALConsumer`.
         poll_interval: Seconds between drain cycles.
-        active_paths: Callable returning the set of file paths that
-            must not be deleted (because a writer still has them open).
-            The callable is invoked on every drain cycle so it always
-            reflects current state.  ``None`` values in the returned
-            set are ignored (convenient when ``writer.active_path``
-            returns ``None`` after close).
         is_file_active: Callable that takes a WAL file path and returns
-            True if a writer (possibly in another process) still has it
-            open.  Checked before deleting any file.  Pass
-            :func:`~weave.durability.wal_lock.is_writer_alive` for
-            PID-lock-based cross-process detection, or any custom check.
+            True if a writer still has it open.  Defaults to
+            :func:`~weave.durability.wal_lock.is_writer_alive` which
+            checks the PID lock sidecar.
     """
 
     def __init__(
@@ -115,14 +102,12 @@ class BackgroundWALSender:
         consumer_factory: Callable[[str], WALConsumer],
         *,
         poll_interval: float = 1.0,
-        active_paths: Callable[[], set[str | None]] | None = None,
-        is_file_active: Callable[[str], bool] | None = None,
+        is_file_active: Callable[[str], bool] = is_writer_alive,
     ) -> None:
         self._mgr = directory_manager
         self._handlers = handlers
         self._consumer_factory = consumer_factory
         self._poll_interval = poll_interval
-        self._active_paths_fn = active_paths
         self._is_file_active = is_file_active
 
         self._lock = threading.Lock()
@@ -152,10 +137,6 @@ class BackgroundWALSender:
     def stop(self, timeout: float = 10.0) -> None:
         """Stop the background thread and perform a final drain.
 
-        The caller must close the writer before calling :meth:`stop`
-        so that the writer's path leaves the active set and the final
-        drain can clean it up.
-
         Args:
             timeout: Maximum seconds to wait for the thread to finish.
         """
@@ -170,7 +151,7 @@ class BackgroundWALSender:
 
         Each file is read from its checkpoint forward.  Records are
         dispatched to the matching handler.  Fully-consumed files are
-        removed unless protected by ``active_paths`` or ``is_file_active``.
+        removed unless ``is_file_active`` returns True.
 
         Returns:
             Number of records successfully processed.
@@ -210,24 +191,16 @@ class BackgroundWALSender:
             self._wake_event.wait(self._poll_interval)
             self._wake_event.clear()
 
-        # Final drain — writer should be closed, so its path is no longer
-        # in the active set and fully-consumed files get cleaned up.
+        # Final drain — writer process should have exited, so lock files
+        # are either removed (clean close) or stale (crash).
         try:
             self.drain_once()
         except Exception:
             logger.exception("Error in WAL sender final drain")
 
-    def _get_active_paths(self) -> set[str]:
-        """Return the current set of active file paths (None values filtered)."""
-        if self._active_paths_fn is None:
-            return set()
-        raw = self._active_paths_fn()
-        return {p for p in raw if p is not None}
-
     def _drain_unlocked(self) -> int:
         """Drain all WAL files.  Caller must hold ``self._lock``."""
         total = 0
-        active = self._get_active_paths()
 
         for path in self._mgr.list_files():
             try:
@@ -237,15 +210,9 @@ class BackgroundWALSender:
                 continue
             try:
                 total += drain(consumer, self._handlers)
-                # Never remove a file that a writer still has open —
-                # writes to an unlinked inode are silently lost.
-                # Layer 1: same-process check via active_paths callable.
-                if path in active:
-                    continue
-                # Layer 2: cross-process check via pluggable callable.
-                if self._is_file_active is not None and self._is_file_active(
-                    path
-                ):
+                # Don't remove a file whose writer process is still alive —
+                # it may still be appending records.
+                if self._is_file_active(path):
                     continue
                 # Remove the file only if fully consumed.
                 if next(consumer.read_pending(), None) is None:
