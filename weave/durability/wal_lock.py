@@ -72,11 +72,24 @@ def acquire_lock(wal_path: str, lock_ext: str = LOCK_EXT) -> str:
 
 
 def _read_lock_pid(path: str) -> int | None:
-    """Read the PID from a lock file.  Returns None if unreadable."""
+    """Read the PID from a lock file.  Returns None if unreadable.
+
+    ValueError occurs when the file exists but doesn't contain a valid
+    integer — most commonly because the writer crashed between creating
+    the lock file (os.open with O_CREAT|O_EXCL) and writing its PID
+    (os.write), leaving an empty file.
+    """
     try:
         with open(path, encoding="utf-8") as f:
             return int(f.read().strip())
-    except (FileNotFoundError, ValueError):
+    except FileNotFoundError:
+        return None
+    except ValueError:
+        logger.warning(
+            "Lock file %s exists but contains no valid PID — likely a "
+            "crash during lock acquisition. Treating as stale.",
+            path,
+        )
         return None
 
 
