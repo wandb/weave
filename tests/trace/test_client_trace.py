@@ -151,6 +151,7 @@ def test_simple_op(client):
         started_at=DatetimeMatcher(),
         ended_at=DatetimeMatcher(),
         deleted_at=None,
+        wb_user_id=client.entity,
     )
 
 

@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import datetime
 import json
 import platform
@@ -366,7 +365,7 @@ def test_call_create(client):
     expected = weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
-        trace_id=RegexStringMatcher(".*"),
+        trace_id=call.trace_id,
         parent_id=None,
         inputs={"a": 5, "b": 10},
         id=call.id,
@@ -397,8 +396,9 @@ def test_call_create(client):
         started_at=DatetimeMatcher(),
         ended_at=DatetimeMatcher(),
         deleted_at=None,
+        wb_user_id=client.entity,
     )
-    assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
+    assert result == expected
 
 
 def test_calls_query(client):
@@ -410,7 +410,7 @@ def test_calls_query(client):
     assert result[0] == weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
-        trace_id=RegexStringMatcher(".*"),
+        trace_id=result[0].trace_id,
         parent_id=None,
         inputs={"a": 5, "b": 10},
         id=call0.id,
@@ -432,11 +432,12 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
+        wb_user_id=client.entity,
     )
     assert result[1] == weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
-        trace_id=RegexStringMatcher(".*"),
+        trace_id=result[1].trace_id,
         parent_id=call0.id,
         inputs={"a": 6, "b": 11},
         id=call1.id,
@@ -458,6 +459,7 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
+        wb_user_id=client.entity,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
