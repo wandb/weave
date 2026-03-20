@@ -203,6 +203,11 @@ class JSONLWALWriter:
         with self._lock:
             self._writer.flush()
 
+    @property
+    def current_path(self) -> str:
+        """Path of the currently active WAL file."""
+        return self._writer.path
+
     def close(self) -> None:
         # Delegates to _JSONLWALFileWriter.close().
         with self._lock:

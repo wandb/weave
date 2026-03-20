@@ -115,6 +115,53 @@ class TestDrainOnce:
         assert mgr.list_files() == []
 
 
+    def test_consumer_evicted_when_file_removed_externally(
+        self, tmp_path: str
+    ) -> None:
+        """If a file disappears between drain cycles, its cached consumer
+        is evicted without error.
+        """
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with mgr.create_file() as w1:
+            w1.write({"type": "obj_create", "seq": 0})
+        with mgr.create_file() as w2:
+            w2.write({"type": "obj_create", "seq": 1})
+
+        received: list[WALRecord] = []
+        sender = BackgroundWALSender(
+            mgr, {"obj_create": received.append}, JSONLWALConsumer
+        )
+
+        # First drain — caches consumers for both files.
+        sender.drain_once()
+        assert len(received) == 2
+
+        # Externally delete one of the files (simulates another process
+        # cleaning up, or filesystem error).
+        files = mgr.list_files()
+        assert len(files) == 0  # both were fully consumed and removed
+
+        # Write new files and remove one externally before next drain.
+        with mgr.create_file() as w3:
+            w3.write({"type": "obj_create", "seq": 2})
+        w4 = mgr.create_file()
+        w4.write({"type": "obj_create", "seq": 3})
+        w4.flush()
+        w4_path = w4.path
+
+        # First drain caches both.
+        sender.drain_once()
+        assert len(received) == 4
+
+        # Externally remove w4's file while the sender has a cached consumer.
+        os.unlink(w4_path)
+
+        # Second drain should evict the cached consumer for the missing file
+        # without raising.
+        sender.drain_once()
+        w4.close()
+
+
 class TestBackgroundThread:
     """Tests for the background drain thread."""
 
@@ -349,7 +396,7 @@ class TestWithRotatingWriter:
         # Multiple files exist; only the current one has a live lock.
         files = mgr.list_files()
         assert len(files) > 1
-        active = writer._writer.path
+        active = writer.current_path
         for f in files:
             if f == active:
                 assert is_writer_alive(f) is True
@@ -373,30 +420,34 @@ class TestWithRotatingWriter:
         """Writer and sender operating concurrently (simulated cross-process)."""
         mgr = FileWALDirectoryManager(str(tmp_path))
         writer = JSONLWALWriter(mgr, max_file_size=100)
+        total_records = 20
 
         received: list[WALRecord] = []
+        all_received = threading.Event()
+
+        def tracking_handler(record: WALRecord) -> None:
+            received.append(record)
+            if len(received) >= total_records:
+                all_received.set()
+
         sender = BackgroundWALSender(
             mgr,
-            {"obj_create": received.append},
+            {"obj_create": tracking_handler},
             JSONLWALConsumer,
             poll_interval=0.05,
         )
         sender.start()
 
         try:
-            for i in range(20):
+            for i in range(total_records):
                 writer.write({"type": "obj_create", "seq": i})
-                time.sleep(0.01)
 
             writer.close()
 
-            # Wait for the sender to catch up.
-            deadline = time.monotonic() + 5.0
-            while len(received) < 20 and time.monotonic() < deadline:
-                time.sleep(0.05)
-
-            assert len(received) == 20
-            assert [r["seq"] for r in received] == list(range(20))
+            assert all_received.wait(timeout=5.0), (
+                f"Sender only received {len(received)}/{total_records} records"
+            )
+            assert [r["seq"] for r in received] == list(range(total_records))
         finally:
             sender.stop()
 
