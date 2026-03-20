@@ -100,6 +100,10 @@ class GenAISpanCHInsertable(BaseModel):
     wb_user_id: str = ""
 
 
+# INSERT and SELECT column lists are defined separately so they can diverge
+# independently — e.g. SELECT may later include computed/materialised columns
+# that don't appear in INSERT, or INSERT may drop columns that are server-
+# generated.  For now they are identical.
 ALL_GENAI_SPAN_INSERT_COLUMNS: list[str] = sorted(
     GenAISpanCHInsertable.model_fields.keys()
 )

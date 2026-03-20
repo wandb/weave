@@ -618,6 +618,62 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, "/genai/spans/trace")
         return tsi.GenAISpansTraceRes.model_validate(r.json())
 
+    def genai_traces_chat(
+        self, req: tsi.GenAITraceChatReq
+    ) -> tsi.GenAITraceChatRes:
+        """Get the structured chat view for a trace."""
+        r = self._post_request_executor("/genai/traces/chat", req)
+        handle_response_error(r, "/genai/traces/chat")
+        return tsi.GenAITraceChatRes.model_validate(r.json())
+
+    def genai_agents_query(
+        self, req: tsi.GenAIAgentsQueryReq
+    ) -> tsi.GenAIAgentsQueryRes:
+        """Query agents with aggregated stats."""
+        r = self._post_request_executor("/genai/agents/query", req)
+        handle_response_error(r, "/genai/agents/query")
+        return tsi.GenAIAgentsQueryRes.model_validate(r.json())
+
+    def genai_agent_metrics(
+        self, req: tsi.GenAIAgentMetricsReq
+    ) -> tsi.GenAIAgentMetricsRes:
+        """Get time-bucketed metrics for an agent."""
+        r = self._post_request_executor("/genai/agents/metrics", req)
+        handle_response_error(r, "/genai/agents/metrics")
+        return tsi.GenAIAgentMetricsRes.model_validate(r.json())
+
+    def genai_conversations_query(
+        self, req: tsi.GenAIConversationsQueryReq
+    ) -> tsi.GenAIConversationsQueryRes:
+        """Query conversations with aggregate stats."""
+        r = self._post_request_executor("/genai/conversations/query", req)
+        handle_response_error(r, "/genai/conversations/query")
+        return tsi.GenAIConversationsQueryRes.model_validate(r.json())
+
+    def genai_conversation_chat(
+        self, req: tsi.GenAIConversationChatReq
+    ) -> tsi.GenAIConversationChatRes:
+        """Get the multi-turn chat view for a conversation."""
+        r = self._post_request_executor("/genai/conversations/chat", req)
+        handle_response_error(r, "/genai/conversations/chat")
+        return tsi.GenAIConversationChatRes.model_validate(r.json())
+
+    def genai_span_start(
+        self, req: tsi.GenAISpanStartReq
+    ) -> tsi.GenAISpanStartRes:
+        """Notify the server that a span has started."""
+        r = self._post_request_executor("/genai/span/start", req)
+        handle_response_error(r, "/genai/span/start")
+        return tsi.GenAISpanStartRes.model_validate(r.json())
+
+    def genai_active_spans(
+        self, req: tsi.GenAIActiveSpansReq
+    ) -> tsi.GenAIActiveSpansRes:
+        """List currently in-progress spans."""
+        r = self._post_request_executor("/genai/spans/active", req)
+        handle_response_error(r, "/genai/spans/active")
+        return tsi.GenAIActiveSpansRes.model_validate(r.json())
+
     # Call API
     @validate_call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

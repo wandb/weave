@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Callable
 from typing import Any
 
 from opentelemetry import trace
@@ -29,6 +30,8 @@ from opentelemetry.sdk.trace.export import (
     ConsoleSpanExporter,
     SimpleSpanProcessor,
 )
+
+from weave.version import VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +73,50 @@ class SystemPromptInjector:
                     json.dumps([{"role": "system", "content": instructions}]),
                 )
                 break
+
+    def on_end(self, span: Any) -> None:
+        """No-op."""
+
+    def _on_ending(self, span: Any) -> None:
+        """No-op — required by some OTel SDK versions."""
+
+    def shutdown(self) -> None:
+        """No-op."""
+
+    def force_flush(self, timeout_millis: int | None = None) -> bool:
+        """No-op."""
+        return True
+
+
+class ConversationIdInjector:
+    """SpanProcessor that sets ``gen_ai.conversation.id`` on every span.
+
+    Many OTel GenAI instrumentations (e.g. OpenAI Agents SDK) do not emit
+    ``gen_ai.conversation.id``, which means traces won't appear in the
+    Weave Conversations view.  This processor fills that gap by injecting
+    the attribute on every span start.
+
+    The ``conversation_id`` can be a fixed string for a single session, or
+    a callable that returns a dynamic ID (e.g. from a session manager).
+
+    Args:
+        conversation_id: A string or a zero-arg callable returning a string.
+
+    Examples:
+        >>> from weave.otel import ConversationIdInjector
+        >>> injector = ConversationIdInjector("my-session-123")
+        >>> # Or with a dynamic ID:
+        >>> injector = ConversationIdInjector(lambda: session.current_id)
+    """
+
+    def __init__(self, conversation_id: str | Callable[[], str]) -> None:
+        self._conversation_id = conversation_id
+
+    def on_start(self, span: Any, parent_context: Any = None) -> None:
+        """Set gen_ai.conversation.id on every span."""
+        cid = self._conversation_id() if callable(self._conversation_id) else self._conversation_id
+        if cid:
+            span.set_attribute("gen_ai.conversation.id", cid)
 
     def on_end(self, span: Any) -> None:
         """No-op."""
@@ -137,7 +184,7 @@ def setup_tracing(
     resource = Resource.create(
         {
             "service.name": service_name,
-            "service.version": "0.1.0",
+            "service.version": VERSION,
             "wandb.entity": resolved_entity,
             "wandb.project": project,
         }

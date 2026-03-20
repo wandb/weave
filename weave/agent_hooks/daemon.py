@@ -84,13 +84,15 @@ def _build_provider(endpoint: str, project: str, entity: str) -> Any:
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+    from weave.version import VERSION
+
     api_key = os.environ.get("WANDB_API_KEY", "")
     headers = {"wandb-api-key": api_key} if api_key else {}
 
     resource = Resource.create(
         {
             "service.name": "weave-agent-hooks",
-            "service.version": "0.1.0",
+            "service.version": VERSION,
             "wandb.entity": entity,
             "wandb.project": project,
         }

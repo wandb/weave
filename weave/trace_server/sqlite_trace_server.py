@@ -2223,6 +2223,62 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             "genai_spans_trace is not implemented for SQLite trace server"
         )
 
+    def genai_traces_chat(
+        self, req: tsi.GenAITraceChatReq
+    ) -> tsi.GenAITraceChatRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_traces_chat is not implemented for SQLite trace server"
+        )
+
+    def genai_agents_query(
+        self, req: tsi.GenAIAgentsQueryReq
+    ) -> tsi.GenAIAgentsQueryRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_agents_query is not implemented for SQLite trace server"
+        )
+
+    def genai_agent_metrics(
+        self, req: tsi.GenAIAgentMetricsReq
+    ) -> tsi.GenAIAgentMetricsRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_agent_metrics is not implemented for SQLite trace server"
+        )
+
+    def genai_conversations_query(
+        self, req: tsi.GenAIConversationsQueryReq
+    ) -> tsi.GenAIConversationsQueryRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_conversations_query is not implemented for SQLite trace server"
+        )
+
+    def genai_conversation_chat(
+        self, req: tsi.GenAIConversationChatReq
+    ) -> tsi.GenAIConversationChatRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_conversation_chat is not implemented for SQLite trace server"
+        )
+
+    def genai_span_start(
+        self, req: tsi.GenAISpanStartReq
+    ) -> tsi.GenAISpanStartRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_span_start is not implemented for SQLite trace server"
+        )
+
+    def genai_active_spans(
+        self, req: tsi.GenAIActiveSpansReq
+    ) -> tsi.GenAIActiveSpansRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_active_spans is not implemented for SQLite trace server"
+        )
+
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         raise NotImplementedError(
             "project_stats is not implemented for SQLite trace server"

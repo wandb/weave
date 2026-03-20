@@ -24,6 +24,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 
+import requests
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 
@@ -112,8 +113,6 @@ class LiveSpanProcessor(SpanProcessor):
         return True
 
     def _send(self, payload: dict[str, Any]) -> None:
-        import requests
-
         try:
             requests.post(
                 self._endpoint,

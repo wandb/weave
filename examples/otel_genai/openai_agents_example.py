@@ -6,7 +6,7 @@
 #     "opentelemetry-sdk",
 #     "opentelemetry-exporter-otlp-proto-grpc",
 #     "opentelemetry-exporter-otlp-proto-http",
-#     "weave @ file:///Users/ben/repos/core/services/weave-python/weave-public",
+#     "weave",
 # ]
 # ///
 """OpenAI Agents SDK — multi-turn conversation with compaction, all OTel traced.
@@ -46,6 +46,7 @@ from agents import Agent, Runner, SQLiteSession, function_tool
 from agents.memory import OpenAIResponsesCompactionSession
 
 from weave.otel import (
+    ConversationIdInjector,
     SystemPromptInjector,
     ToolDefinitionsInjector,
     patch_openai_reasoning,
@@ -273,6 +274,7 @@ def main() -> None:
         genai_endpoint=args.genai_endpoint,
         otlp_endpoint=args.otlp_endpoint,
         processors=[
+            ConversationIdInjector("trip-planning-session"),
             SystemPromptInjector(AGENT_INSTRUCTIONS),
             ToolDefinitionsInjector(AGENT_TOOL_DEFS),
         ],

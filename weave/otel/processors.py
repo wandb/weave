@@ -167,30 +167,3 @@ def _extract_reasoning_from_response(response: Any) -> None:
             _set_reasoning_tokens_on_span(reasoning_tokens)
     except Exception:
         pass
-
-
-# Keep ReasoningTokenExtractor as a no-op shim for backwards compatibility
-# (it is exported from weave.otel.__init__ and may be imported by user code)
-class ReasoningTokenExtractor:
-    """Deprecated: use ``patch_openai_reasoning()`` instead.
-
-    This class is kept for backwards compatibility but is a no-op.
-    The actual reasoning token extraction for OpenAI is now done via
-    ``patch_openai_reasoning()``, which patches the Responses API directly.
-    """
-
-    def on_start(self, span: Any, parent_context: Any = None) -> None:
-        """No-op."""
-
-    def on_end(self, span: Any) -> None:
-        """No-op."""
-
-    def _on_ending(self, span: Any) -> None:
-        """No-op."""
-
-    def shutdown(self) -> None:
-        """No-op."""
-
-    def force_flush(self, timeout_millis: int | None = None) -> bool:
-        """No-op."""
-        return True

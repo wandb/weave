@@ -6,7 +6,7 @@
 #     "opentelemetry-exporter-otlp-proto-grpc",
 #     "opentelemetry-exporter-otlp-proto-http",
 #     "Pillow",
-#     "weave @ file:///Users/ben/repos/core/services/weave-python/weave-public",
+#     "weave",
 # ]
 # ///
 """Google ADK — multi-turn conversation with subagent delegation, all OTel traced.

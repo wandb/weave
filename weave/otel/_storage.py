@@ -7,8 +7,10 @@ WeaveClient.
 
 from __future__ import annotations
 
+import base64
 import io
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -130,8 +132,6 @@ def resolve_project_id() -> str | None:
 
 def resolve_trace_server_url() -> str | None:
     """Resolve the trace server URL for file uploads."""
-    import os
-
     url = os.environ.get("WF_TRACE_SERVER_URL")
     if url:
         return url
@@ -150,8 +150,6 @@ def resolve_trace_server_url() -> str | None:
 
 def resolve_api_key() -> str | None:
     """Resolve the W&B API key for authentication."""
-    import os
-
     key = os.environ.get("WANDB_API_KEY")
     if key:
         return key
@@ -190,8 +188,6 @@ def upload_content(content: bytes, project_id: str) -> str:
         return digest
 
     url = f"{server_url}/file/create"
-    import base64
-
     headers: dict[str, str] = {}
     if api_key:
         creds = base64.b64encode(f"api:{api_key}".encode()).decode()

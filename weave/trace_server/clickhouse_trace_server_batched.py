@@ -168,10 +168,15 @@ from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
+from weave.trace_server.genai_chat_view import build_trace_chat
 from weave.trace_server.genai_schema import (
     ALL_GENAI_SPAN_INSERT_COLUMNS,
+    ALL_GENAI_SPAN_SELECT_COLUMNS,
     GenAISpanCHInsertable,
 )
+
+_GENAI_SPAN_COLS = ", ".join(ALL_GENAI_SPAN_SELECT_COLUMNS)
+
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_fields
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
@@ -772,7 +777,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         parameters["offset"] = req.offset
 
         query = f"""
-            SELECT *
+            SELECT {_GENAI_SPAN_COLS}
             FROM genai_spans
             WHERE {where_clause}
             ORDER BY started_at DESC
@@ -788,11 +793,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.GenAISpansTraceReq
     ) -> tsi.GenAISpansTraceRes:
         """Get all genai_spans for a specific trace, ordered by start time."""
-        query = """
-            SELECT *
+        query = f"""
+            SELECT {_GENAI_SPAN_COLS}
             FROM genai_spans
-            WHERE project_id = {project_id:String}
-              AND trace_id = {trace_id:String}
+            WHERE project_id = {{project_id:String}}
+              AND trace_id = {{trace_id:String}}
             ORDER BY started_at ASC
         """
         parameters = {
@@ -808,8 +813,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.GenAITraceChatReq
     ) -> tsi.GenAITraceChatRes:
         """Build a structured chat view for a GenAI trace."""
-        from weave.trace_server.genai_chat_view import build_trace_chat
-
         trace_res = self.genai_spans_trace(
             tsi.GenAISpansTraceReq(
                 project_id=req.project_id,
@@ -875,8 +878,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.GenAIConversationChatReq
     ) -> tsi.GenAIConversationChatRes:
         """Build a multi-turn chat view for all traces in a conversation."""
-        from weave.trace_server.genai_chat_view import build_trace_chat
-
         spans_res = self.genai_spans_query(
             tsi.GenAISpansQueryReq(
                 project_id=req.project_id,
@@ -1000,8 +1001,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     output_tokens=out,
                     total_tokens=inp + out,
                 ))
-                agent.total_input_tokens += inp
-                agent.total_output_tokens += out
 
         return tsi.GenAIAgentsQueryRes(
             agents=[agents_by_name[n] for n in agent_order]

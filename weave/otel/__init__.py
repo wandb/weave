@@ -39,13 +39,12 @@ def __getattr__(name: str) -> Any:
         from weave.otel.live_processor import LiveSpanProcessor
 
         return LiveSpanProcessor
-    if name in {"SystemPromptInjector", "setup_tracing"}:
+    if name in {"SystemPromptInjector", "ConversationIdInjector", "setup_tracing"}:
         from weave.otel import setup as _setup
 
         return getattr(_setup, name)
     if name in {
         "ToolDefinitionsInjector",
-        "ReasoningTokenExtractor",
         "patch_openai_reasoning",
         "unpatch_openai_reasoning",
     }:

@@ -7,7 +7,7 @@
 #     "opentelemetry-sdk",
 #     "opentelemetry-exporter-otlp-proto-grpc",
 #     "opentelemetry-exporter-otlp-proto-http",
-#     "weave @ file:///Users/ben/repos/core/services/weave-python/weave-public",
+#     "weave",
 # ]
 # ///
 """OpenAI Agents with multimodal tools + weave.otel media capture.
@@ -34,7 +34,7 @@ import openai
 import requests as http_requests
 from agents import Agent, Runner, function_tool
 
-from weave.otel import log_content, setup_tracing
+from weave.otel import ConversationIdInjector, log_content, setup_tracing
 
 # ---------------------------------------------------------------------------
 # Tools
@@ -155,6 +155,9 @@ def main() -> None:
         project="genai-otel-test",
         genai_endpoint=args.genai_endpoint,
         otlp_endpoint=args.otlp_endpoint,
+        processors=[
+            ConversationIdInjector("multimodal-session"),
+        ],
     )
 
     from opentelemetry.instrumentation.openai_agents import OpenAIAgentsInstrumentor

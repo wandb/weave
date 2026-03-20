@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from weave.trace_server.trace_server_interface import (
@@ -38,7 +39,15 @@ def _safe_parse_json(s: str) -> Any:
 
 
 def _parse_content_refs(raw: str) -> str:
-    """Validate content_refs is well-formed JSON; pass through or empty."""
+    """Validate content_refs is well-formed JSON; pass through or empty.
+
+    The fallback branch with .replace() exists because some OTel
+    instrumentors (or intermediate serialisation layers) store span
+    attributes as Python ``repr()`` strings instead of proper JSON —
+    e.g. single-quoted keys, ``True``/``False``/``None`` literals.
+    We normalise those to valid JSON so downstream consumers always
+    receive a well-formed list.
+    """
     if not raw:
         return ""
     parsed = _safe_parse_json(raw)
@@ -207,8 +216,6 @@ def _compute_duration_ms(
     if not started_at or not ended_at:
         return 0
     try:
-        from datetime import datetime
-
         if isinstance(started_at, str):
             started_at = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
         if isinstance(ended_at, str):

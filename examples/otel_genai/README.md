@@ -9,6 +9,7 @@ data so you can inspect the exact semantic conventions each SDK emits.
 - [uv](https://docs.astral.sh/uv/) installed
 - Python 3.12+ available (the repo `.python-version` is 3.10, so we override with `--python 3.12`)
 - API keys set as environment variables:
+  - `WANDB_API_KEY` — for Weave authentication ([get yours here](https://wandb.ai/authorize))
   - `OPENAI_API_KEY` — for the OpenAI Agents examples
   - `GOOGLE_API_KEY` — for the Google ADK examples
 
@@ -36,14 +37,17 @@ Pass `--genai-endpoint` to send spans to the Weave trace server's GenAI
 normalized ingest endpoint via OTLP HTTP:
 
 ```bash
-# Send to local dev server (use devall alias for auth env vars)
-devall uv run --python 3.12 openai_agents_example.py \
+# Make sure WANDB_API_KEY is set (https://wandb.ai/authorize)
+export WANDB_API_KEY=<your-api-key>
+
+# Send to local dev server
+uv run --python 3.12 openai_agents_example.py \
     --genai-endpoint http://localhost:6345/otel/v1/genai/traces
 
-devall uv run --python 3.12 openai_multimodal_example.py \
+uv run --python 3.12 openai_multimodal_example.py \
     --genai-endpoint http://localhost:6345/otel/v1/genai/traces
 
-devall uv run --python 3.12 google_adk_example.py \
+uv run --python 3.12 google_adk_example.py \
     --genai-endpoint http://localhost:6345/otel/v1/genai/traces
 ```
 
