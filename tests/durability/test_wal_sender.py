@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 
 import pytest
@@ -35,7 +36,9 @@ class TestDrainOnce:
         assert received[0] == {"type": "call_start", "id": "c1"}
         assert received[1] == {"type": "call_end", "id": "c1"}
 
-    def test_removes_closed_files_keeps_open(self, tmp_path: str) -> None:
+    def test_deletes_closed_writer_file_but_keeps_open_writer_file(
+        self, tmp_path: str
+    ) -> None:
         """Closed files are removed; files with a live writer are kept."""
         mgr = FileWALDirectoryManager(str(tmp_path))
         # First file: writer closed → lock removed → deletable.
@@ -43,6 +46,7 @@ class TestDrainOnce:
             w1.write({"type": "obj_create", "seq": 0})
         # Second file: writer still open → lock has our PID → protected.
         w2 = mgr.create_file()
+        w2_path = w2.path
         w2.write({"type": "obj_create", "seq": 1})
         w2.flush()
 
@@ -55,7 +59,7 @@ class TestDrainOnce:
         sender.drain_once()
 
         # First file removed; second file kept (writer alive).
-        assert len(mgr.list_files()) == 1
+        assert mgr.list_files() == [w2_path]
         assert len(received) == 2
 
         w2.close()
@@ -119,22 +123,6 @@ class TestDrainOnce:
         assert [r["seq"] for r in received] == [0, 1]
         writer.close()
 
-    def test_flush_is_synchronous(self, tmp_path: str) -> None:
-        """flush() drains records synchronously on the caller's thread."""
-        mgr = FileWALDirectoryManager(str(tmp_path))
-        with mgr.create_file() as writer:
-            writer.write({"type": "obj_create", "seq": 0})
-
-        received: list[WALRecord] = []
-        sender = BackgroundWALSender(
-            mgr, {"obj_create": received.append}, JSONLWALConsumer
-        )
-
-        count = sender.drain_once()
-        assert count == 1
-        assert len(received) == 1
-
-
 class TestBackgroundThread:
     """Tests for the background drain thread."""
 
@@ -167,10 +155,16 @@ class TestBackgroundThread:
         mgr = FileWALDirectoryManager(str(tmp_path))
         writer = mgr.create_file()
 
+        got_record = threading.Event()
         received: list[WALRecord] = []
+
+        def handler(record: WALRecord) -> None:
+            received.append(record)
+            got_record.set()
+
         sender = BackgroundWALSender(
             mgr,
-            {"obj_create": received.append},
+            {"obj_create": handler},
             JSONLWALConsumer,
             poll_interval=0.05,
         )
@@ -180,11 +174,7 @@ class TestBackgroundThread:
             writer.write({"type": "obj_create", "seq": 0})
             writer.flush()
 
-            # Wait for the background thread to pick it up.
-            deadline = time.monotonic() + 2.0
-            while not received and time.monotonic() < deadline:
-                time.sleep(0.02)
-
+            assert got_record.wait(timeout=2.0), "background thread did not drain"
             assert len(received) == 1
             assert received[0]["seq"] == 0
         finally:
@@ -237,11 +227,17 @@ class TestBackgroundThread:
 class TestCrashRecovery:
     """Tests simulating crash recovery scenarios."""
 
-    def test_drains_orphaned_files(self, tmp_path: str) -> None:
-        """Files from crashed processes are drained and cleaned up."""
+    def test_drains_unprocessed_files_from_previous_run(self, tmp_path: str) -> None:
+        """Files left by a previous process that shut down cleanly (lock removed)
+        but whose records were never drained are picked up and cleaned up.
+
+        This is NOT a crash scenario — the writers closed normally (removing
+        their .lock files).  The files just weren't drained before the process
+        exited.  The sender in a new process discovers and processes them.
+        """
         mgr = FileWALDirectoryManager(str(tmp_path))
 
-        # Simulate two crashed processes that left WAL files.
+        # Two files from a previous run — writers closed, no lock files.
         with mgr.create_file() as w1:
             w1.write({"type": "call_start", "id": "orphan-1"})
         with mgr.create_file() as w2:
@@ -857,8 +853,6 @@ class TestRegressions:
         Regression: previously stop() cleared _thread unconditionally,
         allowing a second start() while the first thread was still alive.
         """
-        import threading
-
         block = threading.Event()
 
         def blocking_handler(record: WALRecord) -> None:
