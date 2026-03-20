@@ -9,8 +9,7 @@ decide whether a file is safe to delete:
 - Lock file exists, PID dead → writer crashed → stale lock → safe.
 
 This mechanism is portable (works on Windows, macOS, Linux) and requires
-no platform-specific APIs.  It complements the same-process
-``active_paths`` check in the sender.
+no platform-specific APIs.
 """
 
 from __future__ import annotations

@@ -189,14 +189,6 @@ class JSONLWALWriter:
         self._lock = threading.Lock()
         self._closed = False
 
-    @property
-    def active_path(self) -> str | None:
-        """Path of the file currently being written to, or None if closed."""
-        with self._lock:
-            if self._closed:
-                return None
-            return self._writer.path
-
     def write(self, record: WALRecord) -> int:
         # Delegates to _JSONLWALFileWriter.write(), then checks rotation.
         with self._lock:

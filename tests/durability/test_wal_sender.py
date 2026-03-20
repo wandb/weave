@@ -396,7 +396,7 @@ class TestWithRotatingWriter:
         # Multiple files exist; only the current one has a live lock.
         files = mgr.list_files()
         assert len(files) > 1
-        active = writer.active_path
+        active = writer._writer.path
         for f in files:
             if f == active:
                 assert is_writer_alive(f) is True
