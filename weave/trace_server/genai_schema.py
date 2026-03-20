@@ -1,10 +1,42 @@
-"""ClickHouse schema and column definitions for the genai_spans table."""
+"""ClickHouse schema and column definitions for the genai_spans and genai_span_attributes tables."""
 
 import datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 _EPOCH = datetime.datetime(1970, 1, 1)
+
+# Tuple field order must match the ClickHouse Tuple definition exactly.
+MSG_TUPLE_FIELDS = ("role", "content", "tool_call_id", "tool_name")
+
+
+class NormalizedMessage(BaseModel):
+    """A single message normalized from any provider format.
+
+    Maps to ClickHouse ``Tuple(role, content, tool_call_id, tool_name)``.
+    """
+
+    role: str = ""
+    content: str = ""
+    tool_call_id: str = ""
+    tool_name: str = ""
+
+    def to_ch_tuple(self) -> tuple[str, str, str, str]:
+        """Convert to a positional tuple matching the ClickHouse column order."""
+        return (self.role, self.content, self.tool_call_id, self.tool_name)
+
+    @classmethod
+    def from_ch_tuple(cls, t: tuple[str, ...] | dict[str, Any]) -> "NormalizedMessage":
+        """Construct from a ClickHouse tuple (positional or named)."""
+        if isinstance(t, dict):
+            return cls(**{k: t.get(k, "") for k in MSG_TUPLE_FIELDS})
+        return cls(
+            role=t[0] if len(t) > 0 else "",
+            content=t[1] if len(t) > 1 else "",
+            tool_call_id=t[2] if len(t) > 2 else "",
+            tool_name=t[3] if len(t) > 3 else "",
+        )
 
 
 class GenAISpanCHInsertable(BaseModel):
@@ -75,10 +107,14 @@ class GenAISpanCHInsertable(BaseModel):
     request_max_tokens: int = 0
     request_top_p: float = 0.0
 
-    # Content (JSON blobs)
-    input_messages: str = ""
-    output_messages: str = ""
-    system_instructions: str = ""
+    # Normalized messages (all provider formats resolved at extraction time)
+    input_messages: list[NormalizedMessage] = []
+    output_messages: list[NormalizedMessage] = []
+
+    # System instructions as plain text array
+    system_instructions: list[str] = []
+
+    # Tool call data (single invocation per span, kept as JSON)
     tool_call_arguments: str = ""
     tool_call_result: str = ""
 
@@ -87,10 +123,10 @@ class GenAISpanCHInsertable(BaseModel):
     compaction_items_before: int = 0
     compaction_items_after: int = 0
 
-    # Weave refs (JSON arrays from weave.otel utilities)
-    content_refs: str = ""
-    artifact_refs: str = ""
-    object_refs: str = ""
+    # Weave refs (native arrays for ClickHouse hasAny/arrayExists queries)
+    content_refs: list[str] = []
+    artifact_refs: list[str] = []
+    object_refs: list[str] = []
 
     # Raw dumps
     attributes_dump: str = ""
@@ -101,14 +137,113 @@ class GenAISpanCHInsertable(BaseModel):
     wb_user_id: str = ""
 
 
-# INSERT and SELECT column lists are defined separately so they can diverge
-# independently — e.g. SELECT may later include computed/materialised columns
-# that don't appear in INSERT, or INSERT may drop columns that are server-
-# generated.  For now they are identical.
 ALL_GENAI_SPAN_INSERT_COLUMNS: list[str] = sorted(
     GenAISpanCHInsertable.model_fields.keys()
 )
 
 ALL_GENAI_SPAN_SELECT_COLUMNS: list[str] = sorted(
     GenAISpanCHInsertable.model_fields.keys()
+)
+
+
+# ---------------------------------------------------------------------------
+# EAV attribute row — one per non-semconv attribute per span
+# ---------------------------------------------------------------------------
+
+AttrValueType = Literal["string", "int", "float", "bool", "json"]
+AttrSource = Literal["span", "resource"]
+
+
+class GenAISpanAttributeRow(BaseModel):
+    """A single attribute row for the genai_span_attributes EAV table."""
+
+    project_id: str
+    started_at: datetime.datetime
+    span_id: str
+    attr_source: AttrSource = "span"
+    attr_key: str
+
+    value_type: AttrValueType
+    string_value: str = ""
+    int_value: int = 0
+    float_value: float = 0.0
+    bool_value: int = 0
+    json_value: str = ""
+
+
+ALL_GENAI_ATTR_INSERT_COLUMNS: list[str] = sorted(
+    GenAISpanAttributeRow.model_fields.keys()
+)
+
+
+# Attribute keys that are already extracted into dedicated genai_spans columns.
+# These are excluded from the EAV table to avoid duplication.
+KNOWN_SEMCONV_ATTR_KEYS: frozenset[str] = frozenset(
+    {
+        # GenAI classification
+        "gen_ai.operation.name",
+        "gen_ai.provider.name",
+        "gen_ai.system",
+        # Agent info
+        "gen_ai.agent.name",
+        "gen_ai.agent.id",
+        "gen_ai.agent.description",
+        "gen_ai.agent.version",
+        "agent.name",
+        "agent.span.type",
+        # Model info
+        "gen_ai.request.model",
+        "gen_ai.response.model",
+        "gen_ai.response.id",
+        # Token usage
+        "gen_ai.usage.input_tokens",
+        "gen_ai.usage.output_tokens",
+        "gen_ai.usage.prompt_tokens",
+        "gen_ai.usage.completion_tokens",
+        "gen_ai.usage.reasoning_tokens",
+        "gen_ai.usage.output_tokens_details.reasoning_tokens",
+        "llm.usage.total_tokens",
+        "llm.token_count.prompt",
+        "llm.token_count.completion",
+        "llm.token_count.total",
+        # Conversation
+        "gen_ai.conversation.id",
+        "gen_ai.conversation.name",
+        "weave.conversation.name",
+        "gcp.vertex.agent.session_id",
+        # Tool info
+        "gen_ai.tool.name",
+        "gen_ai.tool.type",
+        "gen_ai.tool.call.id",
+        "gen_ai.tool.description",
+        "gen_ai.tool.definitions",
+        "gen_ai.tool.call.arguments",
+        "gen_ai.tool.call.result",
+        # Request params
+        "gen_ai.request.temperature",
+        "gen_ai.request.max_tokens",
+        "gen_ai.request.top_p",
+        # Messages (large blobs, already in dedicated columns)
+        "gen_ai.input.messages",
+        "gen_ai.output.messages",
+        "gen_ai.system_instructions",
+        "gen_ai.prompt",
+        "gen_ai.completion",
+        # Response
+        "gen_ai.response.finish_reasons",
+        # Vendor-specific equivalents already extracted
+        "gcp.vertex.agent.tool_call_args",
+        "gcp.vertex.agent.tool_response",
+        "gcp.vertex.agent.llm_request",
+        "gcp.vertex.agent.llm_response",
+        "llm.request.type",
+        # Compaction (Weave-specific)
+        "weave.compaction.summary",
+        "weave.compaction.items_before",
+        "weave.compaction.items_after",
+        # Refs (already in dedicated columns)
+        "weave.content_refs",
+        "weave.artifact_refs",
+        "weave.object_refs",
+    }
 )

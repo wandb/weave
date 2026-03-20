@@ -390,17 +390,17 @@ class GenAISpanSchema(BaseModel):
     request_temperature: float = 0.0
     request_max_tokens: int = 0
     request_top_p: float = 0.0
-    input_messages: str = ""
-    output_messages: str = ""
-    system_instructions: str = ""
+    input_messages: list[dict] = Field(default_factory=list)
+    output_messages: list[dict] = Field(default_factory=list)
+    system_instructions: list[str] = Field(default_factory=list)
     tool_call_arguments: str = ""
     tool_call_result: str = ""
     compaction_summary: str = ""
     compaction_items_before: int = 0
     compaction_items_after: int = 0
-    content_refs: str = ""
-    artifact_refs: str = ""
-    object_refs: str = ""
+    content_refs: list[str] = Field(default_factory=list)
+    artifact_refs: list[str] = Field(default_factory=list)
+    object_refs: list[str] = Field(default_factory=list)
     attributes_dump: str = ""
     events_dump: str = ""
     resource_dump: str = ""
@@ -523,7 +523,7 @@ class GenAIChatMessage(BaseModel):
     duration_ms: int = 0
     started_at: str = ""
     status: str = "OK"
-    content_refs: str = ""
+    content_refs: list[str] = Field(default_factory=list)
     compaction_summary: str = ""
     compaction_items_before: int = 0
     compaction_items_after: int = 0
@@ -558,23 +558,25 @@ class GenAIConversationSchema(BaseModel):
     span_count: int = 0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
+    total_duration_ms: int = 0
+    error_count: int = 0
+    agent_name: str = ""
     provider_name: str = ""
     first_seen: datetime.datetime | None = None
     last_seen: datetime.datetime | None = None
 
 
 class GenAIConversationsQueryFilters(BaseModel):
-    """Optional filters for querying conversations.
+    """Filters for querying the genai_conversations materialized table."""
 
-    When ``agent_name`` is set, aggregates include only spans matching that
-    agent (and ``operation_name`` when provided). Conversations with no such
-    spans are omitted.
-    """
-
-    provider_name: str | None = None
     conversation_id: str | None = None
     agent_name: str | None = None
-    operation_name: str | None = None
+    provider_name: str | None = None
+    has_errors: bool | None = None
+    min_turns: int | None = None
+    max_turns: int | None = None
+    started_after: datetime.datetime | None = None
+    started_before: datetime.datetime | None = None
 
 
 class GenAIConversationsQueryReq(BaseModel):

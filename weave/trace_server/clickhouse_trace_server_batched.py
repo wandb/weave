@@ -170,14 +170,19 @@ from weave.trace_server.model_providers.model_providers import (
 )
 from weave.trace_server.genai_chat_view import build_trace_chat
 from weave.trace_server.genai_schema import (
+    ALL_GENAI_ATTR_INSERT_COLUMNS,
     ALL_GENAI_SPAN_INSERT_COLUMNS,
     ALL_GENAI_SPAN_SELECT_COLUMNS,
+    GenAISpanAttributeRow,
     GenAISpanCHInsertable,
 )
 
 _GENAI_SPAN_COLS = ", ".join(ALL_GENAI_SPAN_SELECT_COLUMNS)
 
-from weave.trace_server.opentelemetry.genai_extraction import extract_genai_fields
+from weave.trace_server.opentelemetry.genai_extraction import (
+    extract_genai_fields,
+    extract_genai_span,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
@@ -268,7 +273,23 @@ _CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
 def _genai_span_to_row(span: GenAISpanCHInsertable) -> list[Any]:
     """Convert a GenAISpanCHInsertable to a row list matching ALL_GENAI_SPAN_INSERT_COLUMNS order."""
     params = span.model_dump()
+    # Convert NormalizedMessage lists to ClickHouse Array(Tuple) format
+    for key in ("input_messages", "output_messages"):
+        msgs = params.get(key)
+        if msgs and isinstance(msgs, list):
+            params[key] = [
+                (m["role"], m["content"], m["tool_call_id"], m["tool_name"])
+                if isinstance(m, dict)
+                else m
+                for m in msgs
+            ]
     return [params.get(col) for col in ALL_GENAI_SPAN_INSERT_COLUMNS]
+
+
+def _genai_attr_to_row(attr: GenAISpanAttributeRow) -> list[Any]:
+    """Convert a GenAISpanAttributeRow to a row list matching ALL_GENAI_ATTR_INSERT_COLUMNS order."""
+    params = attr.model_dump()
+    return [params.get(col) for col in ALL_GENAI_ATTR_INSERT_COLUMNS]
 
 
 _ADJECTIVES = [
@@ -706,9 +727,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_otel_export")
     def genai_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
-        """Ingest OTel spans into the genai_spans table with normalized GenAI fields."""
+        """Ingest OTel spans into genai_spans and genai_span_attributes tables."""
         assert_non_null_wb_user_id(req)
         rows: list[list[Any]] = []
+        attr_rows: list[list[Any]] = []
         rejected_spans = 0
         error_messages: list[str] = []
 
@@ -724,12 +746,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(str(e))
                         continue
                     try:
-                        genai_row = extract_genai_fields(
+                        result = extract_genai_span(
                             span,
                             project_id=req.project_id,
                             wb_user_id=req.wb_user_id,
                         )
-                        rows.append(_genai_span_to_row(genai_row))
+                        rows.append(_genai_span_to_row(result.span))
+                        attr_rows.extend(
+                            _genai_attr_to_row(a) for a in result.attributes
+                        )
                     except Exception as e:
                         rejected_spans += 1
                         error_messages.append(f"Failed to extract genai fields: {e}")
@@ -737,6 +762,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if rows:
             self._insert_genai_span_batch(rows)
+        if attr_rows:
+            self._insert_genai_attr_batch(attr_rows)
 
         if rejected_spans > 0:
             joined_errors = "; ".join(error_messages[:20]) + (
@@ -762,6 +789,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "genai_spans",
             data=batch,
             column_names=ALL_GENAI_SPAN_INSERT_COLUMNS,
+            settings=settings,
+        )
+
+    def _insert_genai_attr_batch(
+        self,
+        batch: list[list[Any]],
+        settings: dict[str, Any] | None = None,
+    ) -> None:
+        """Insert a batch of rows into the genai_span_attributes EAV table."""
+        if not batch:
+            return
+        self._insert(
+            "genai_span_attributes",
+            data=batch,
+            column_names=ALL_GENAI_ATTR_INSERT_COLUMNS,
             settings=settings,
         )
 
@@ -886,11 +928,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def genai_conversations_query(
         self, req: tsi.GenAIConversationsQueryReq
     ) -> tsi.GenAIConversationsQueryRes:
-        """List conversations grouped by conversation_id with aggregate stats."""
-        span_conditions = [
-            "project_id = {project_id:String}",
-            "conversation_id != ''",
-        ]
+        """List conversations from the materialized genai_conversations table."""
+        conditions = ["project_id = {project_id:String}"]
+        having: list[str] = []
         parameters: dict[str, Any] = {
             "project_id": req.project_id,
             "limit": min(req.limit, 1000),
@@ -898,61 +938,79 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         }
 
         if req.filters:
-            if req.filters.provider_name:
-                span_conditions.append("provider_name = {filter_provider:String}")
-                parameters["filter_provider"] = req.filters.provider_name
             if req.filters.conversation_id:
-                span_conditions.append("conversation_id = {filter_conv:String}")
+                conditions.append("conversation_id = {filter_conv:String}")
                 parameters["filter_conv"] = req.filters.conversation_id
             if req.filters.agent_name:
-                span_conditions.append("agent_name = {filter_agent_name:String}")
-                parameters["filter_agent_name"] = req.filters.agent_name
-            if req.filters.operation_name:
-                span_conditions.append("operation_name = {filter_operation_name:String}")
-                parameters["filter_operation_name"] = req.filters.operation_name
+                conditions.append("agent_name = {filter_agent:String}")
+                parameters["filter_agent"] = req.filters.agent_name
+            if req.filters.provider_name:
+                conditions.append("provider_name = {filter_provider:String}")
+                parameters["filter_provider"] = req.filters.provider_name
+            if req.filters.started_after is not None:
+                having.append("max(last_seen) >= {filter_after:DateTime64(6)}")
+                parameters["filter_after"] = req.filters.started_after
+            if req.filters.started_before is not None:
+                having.append("min(first_seen) <= {filter_before:DateTime64(6)}")
+                parameters["filter_before"] = req.filters.started_before
+            if req.filters.has_errors is True:
+                having.append("sum(error_count) > 0")
+            elif req.filters.has_errors is False:
+                having.append("sum(error_count) = 0")
+            if req.filters.min_turns is not None:
+                having.append("sum(turn_count) >= {filter_min_turns:UInt64}")
+                parameters["filter_min_turns"] = req.filters.min_turns
+            if req.filters.max_turns is not None:
+                having.append("sum(turn_count) <= {filter_max_turns:UInt64}")
+                parameters["filter_max_turns"] = req.filters.max_turns
 
-        span_where = " AND ".join(span_conditions)
+        where_clause = " AND ".join(conditions)
+        having_clause = (" HAVING " + " AND ".join(having)) if having else ""
 
         _CONV_SORT_COLS = {
             "last_seen", "first_seen", "turn_count", "span_count",
-            "total_input_tokens", "total_output_tokens",
-            "conversation_id", "provider_name",
+            "total_input_tokens", "total_output_tokens", "total_duration_ms",
+            "error_count", "conversation_id", "agent_name", "provider_name",
         }
         order_by = self._build_genai_order_by(
             req.sort_by, _CONV_SORT_COLS, "last_seen DESC"
         )
 
+        select_cols = """
+                conversation_id,
+                any(conversation_name)      AS conversation_name,
+                project_id,
+                sum(turn_count)             AS turn_count,
+                sum(span_count)             AS span_count,
+                sum(total_input_tokens)     AS total_input_tokens,
+                sum(total_output_tokens)    AS total_output_tokens,
+                sum(total_duration_ms)      AS total_duration_ms,
+                sum(error_count)            AS error_count,
+                any(agent_name)             AS agent_name,
+                any(provider_name)          AS provider_name,
+                min(first_seen)             AS first_seen,
+                max(last_seen)              AS last_seen
+        """
+
         count_params = {k: v for k, v in parameters.items() if k not in ("limit", "offset")}
         count_query = f"""
             SELECT count() FROM (
                 SELECT conversation_id
-                FROM genai_spans
-                WHERE {span_where}
+                FROM genai_conversations
+                WHERE {where_clause}
                 GROUP BY conversation_id, project_id
+                {having_clause}
             )
         """
         count_result = self.ch_client.query(count_query, parameters=count_params)
         total_count = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
 
-        # ``anyLast(conversation_name)`` is nondeterministic and usually picks
-        # arbitrary rows — most child spans have an empty ``conversation_name``,
-        # so the aggregate flips between empty (→ adjective-animal fallback) and
-        # the root span's name.  Use the latest *non-empty* name by time instead.
         query = f"""
-            SELECT
-                conversation_id,
-                argMaxIf(conversation_name, started_at, conversation_name != '') AS conversation_name,
-                project_id,
-                countDistinct(trace_id)   AS turn_count,
-                count()                   AS span_count,
-                sum(input_tokens)         AS total_input_tokens,
-                sum(output_tokens)        AS total_output_tokens,
-                any(provider_name)        AS provider_name,
-                min(started_at)           AS first_seen,
-                max(ended_at)             AS last_seen
-            FROM genai_spans
-            WHERE {span_where}
+            SELECT {select_cols}
+            FROM genai_conversations
+            WHERE {where_clause}
             GROUP BY conversation_id, project_id
+            {having_clause}
             ORDER BY {order_by}
             LIMIT {{limit:UInt64}} OFFSET {{offset:UInt64}}
         """
@@ -960,22 +1018,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         col_names = list(result.column_names)
         conversations: list[tsi.GenAIConversationSchema] = []
         for row in result.result_rows:
-            row_dict = dict(zip(col_names, row))
+            d = dict(zip(col_names, row))
             conversations.append(
                 tsi.GenAIConversationSchema(
-                    conversation_id=str(row_dict.get("conversation_id", "")),
-                    conversation_name=str(row_dict.get("conversation_name", "") or ""),
-                    project_id=str(row_dict.get("project_id", req.project_id)),
-                    turn_count=int(row_dict.get("turn_count", 0)),
-                    span_count=int(row_dict.get("span_count", 0)),
-                    total_input_tokens=int(row_dict.get("total_input_tokens", 0)),
-                    total_output_tokens=int(row_dict.get("total_output_tokens", 0)),
-                    provider_name=str(row_dict.get("provider_name", "") or ""),
-                    first_seen=row_dict.get("first_seen"),
-                    last_seen=row_dict.get("last_seen"),
+                    conversation_id=str(d.get("conversation_id", "")),
+                    conversation_name=str(d.get("conversation_name", "") or ""),
+                    project_id=str(d.get("project_id", req.project_id)),
+                    turn_count=int(d.get("turn_count", 0)),
+                    span_count=int(d.get("span_count", 0)),
+                    total_input_tokens=int(d.get("total_input_tokens", 0)),
+                    total_output_tokens=int(d.get("total_output_tokens", 0)),
+                    total_duration_ms=int(d.get("total_duration_ms", 0)),
+                    error_count=int(d.get("error_count", 0)),
+                    agent_name=str(d.get("agent_name", "") or ""),
+                    provider_name=str(d.get("provider_name", "") or ""),
+                    first_seen=d.get("first_seen"),
+                    last_seen=d.get("last_seen"),
                 )
             )
-        # Fetch display names from entity_annotations
+
         conv_ids = [c.conversation_id for c in conversations]
         if conv_ids:
             name_query = """

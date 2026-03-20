@@ -169,9 +169,9 @@ The span tree model is the right abstraction: it preserves hierarchy, timing, ca
 | `gen_ai.usage.input_tokens`      | `input_tokens`        | Prompt token count.                                                                              |
 | `gen_ai.usage.output_tokens`     | `output_tokens`       | Completion token count.                                                                          |
 | `gen_ai.usage.reasoning_tokens`  | `reasoning_tokens`    | Reasoning/thinking token count.                                                                  |
-| `gen_ai.input.messages`          | `input_messages`      | JSON-serialized input messages.                                                                  |
-| `gen_ai.output.messages`         | `output_messages`     | JSON-serialized output messages.                                                                 |
-| `gen_ai.system_instructions`     | `system_instructions` | System prompt.                                                                                   |
+| `gen_ai.input.messages`          | `input_messages`      | Normalized `Array(Tuple(role, content, tool_call_id, tool_name))`.                               |
+| `gen_ai.output.messages`         | `output_messages`     | Normalized `Array(Tuple(role, content, tool_call_id, tool_name))`.                               |
+| `gen_ai.system_instructions`     | `system_instructions` | Plain text array: `Array(String)`.                                                               |
 | `gen_ai.tool.name`               | `tool_name`           | Tool being called.                                                                               |
 | `gen_ai.tool.call.id`            | `tool_call_id`        | Individual call identifier.                                                                      |
 | `gen_ai.tool.call.arguments`     | `tool_call_arguments` | Serialized arguments.                                                                            |
@@ -248,14 +248,14 @@ Some instrumentations place completion data on OTel span events rather than span
 
 These optional attributes enhance Weave-native features but are not part of the OTel spec:
 
-| Attribute                       | Purpose                                           |
-| ------------------------------- | ------------------------------------------------- |
-| `weave.content_refs`            | JSON array of content references (images, files). |
-| `weave.artifact_refs`           | JSON array of artifact references.                |
-| `weave.object_refs`             | JSON array of object references.                  |
-| `weave.compaction.summary`      | Human-readable context compaction summary.        |
-| `weave.compaction.items_before` | Item count before compaction.                     |
-| `weave.compaction.items_after`  | Item count after compaction.                      |
+| Attribute                       | Column type       | Purpose                                      |
+| ------------------------------- | ----------------- | -------------------------------------------- |
+| `weave.content_refs`            | `Array(String)`   | Content references (images, files).          |
+| `weave.artifact_refs`           | `Array(String)`   | Artifact references.                         |
+| `weave.object_refs`             | `Array(String)`   | Object references.                           |
+| `weave.compaction.summary`      | `String`          | Human-readable context compaction summary.   |
+| `weave.compaction.items_before` | `UInt32`          | Item count before compaction.                |
+| `weave.compaction.items_after`  | `UInt32`          | Item count after compaction.                 |
 
 ---
 
@@ -371,22 +371,35 @@ Strings matching these patterns are suppressed from user/assistant visible text 
 - `{"tool_calls"`
 - `[{"tool_calls"`
 
-### 4.8 Message JSON parsing
+### 4.8 Message normalization
 
-Normalized spans store `input_messages` and `output_messages` as JSON strings. The parsers support multiple shapes:
+Messages are normalized at **write time** during extraction, not at read time. All provider formats (OpenAI parts, Google ADK `{contents: [{parts}]}`, Traceloop indexed format, plain strings) are resolved into a standard `Array(Tuple(role, content, tool_call_id, tool_name))` by `_normalize_raw_messages()` in `genai_extraction.py`.
 
-**User text (`last_only=True`):**
+The chat view operates directly on this normalized structure:
 
-- Google-style: `{ "contents": [{ "role": "user", "parts": [{ "text": "..." }] }] }` — concatenate user parts, return only the last user segment.
-- OpenAI-style: `[{ "role": "user", "content": "..." }]` — same rule.
-- Plain string: returned as-is.
+- **User text:** `[m.content for m in input_messages if m.role == 'user']`
+- **Assistant text:** `[m.content for m in output_messages if m.role != 'user']`
+- **System prompt:** `"\n".join(system_instructions)` (already `Array(String)`)
 
-**Assistant text:**
+No JSON parsing or format-sniffing happens at read time. This means:
+1. The extraction code is the single place that handles provider-specific formats.
+2. Adding support for a new provider format only requires updating `_normalize_raw_messages()`.
+3. ClickHouse can filter/aggregate on message roles natively: `arrayFilter(x -> x.role = 'user', input_messages)`.
 
-- Google-style: `{ "content": { "parts": [...] } }` or string `content`.
-- OpenAI-style: non-user roles, concatenate parts/content.
+### 4.9 Custom span attributes (EAV)
 
-**System prompt:** Parsed as JSON or plain text; list of dicts with `content`/`text` joined.
+Attributes from OTel spans that don't map to dedicated `genai_spans` columns are stored in the `genai_span_attributes` table — a typed EAV (Entity-Attribute-Value) table.
+
+During extraction, `_extract_eav_rows()` walks all span attributes and resource attributes, skipping keys in `KNOWN_SEMCONV_ATTR_KEYS` (which already have dedicated columns). Each remaining attribute becomes a row with a typed value in the appropriate column (`string_value`, `int_value`, `float_value`, `bool_value`, or `json_value`).
+
+This enables queries on arbitrary user-supplied attributes without parsing JSON:
+
+```sql
+SELECT span_id FROM genai_span_attributes
+WHERE project_id = 'my-project'
+  AND attr_key = 'deployment.region'
+  AND string_value = 'us-east-1'
+```
 
 ---
 
@@ -400,10 +413,12 @@ Normalized spans store `input_messages` and `output_messages` as JSON strings. T
 
 ## 6. Source map
 
-| Component                   | File                                                    |
-| --------------------------- | ------------------------------------------------------- |
-| Chat trajectory projection  | `weave/trace_server/genai_chat_view.py`                 |
-| Field extraction (OTel → row)| `weave/trace_server/opentelemetry/genai_extraction.py` |
-| Insert schema               | `weave/trace_server/genai_schema.py`                    |
-| API types                   | `weave/trace_server/trace_server_interface.py`          |
-| Conversation turns          | `weave/trace_server/clickhouse_trace_server_batched.py` |
+| Component                         | File                                                    |
+| --------------------------------- | ------------------------------------------------------- |
+| Chat trajectory projection        | `weave/trace_server/genai_chat_view.py`                 |
+| Field extraction + normalization  | `weave/trace_server/opentelemetry/genai_extraction.py`  |
+| Insert schema + EAV model         | `weave/trace_server/genai_schema.py`                    |
+| API types                         | `weave/trace_server/trace_server_interface.py`          |
+| ClickHouse ingest + queries       | `weave/trace_server/clickhouse_trace_server_batched.py` |
+| Migration (all tables)            | `weave/trace_server/migrations/026_genai.up.sql`        |
+| Migration runner                  | `weave/trace_server/clickhouse_trace_server_migrator.py`|

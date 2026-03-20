@@ -6,9 +6,15 @@ fallback chains for each field.
 """
 
 import json
+from dataclasses import dataclass, field
 from typing import Any
 
-from weave.trace_server.genai_schema import GenAISpanCHInsertable
+from weave.trace_server.genai_schema import (
+    GenAISpanAttributeRow,
+    GenAISpanCHInsertable,
+    KNOWN_SEMCONV_ATTR_KEYS,
+    NormalizedMessage,
+)
 from weave.trace_server.opentelemetry.helpers import get_attribute, to_json_serializable
 from weave.trace_server.opentelemetry.python_spans import Span
 
@@ -75,6 +81,28 @@ def _json_str(val: Any) -> str:
         return json.dumps(to_json_serializable(val))
     except (TypeError, ValueError):
         return str(val)
+
+
+def _str_list(val: Any) -> list[str]:
+    """Coerce an attribute value to a list of strings.
+
+    Handles raw lists, JSON-encoded lists, and single strings.
+    """
+    if val is None:
+        return []
+    if isinstance(val, list):
+        return [str(v) for v in val if v is not None]
+    if isinstance(val, str):
+        if not val:
+            return []
+        try:
+            parsed = json.loads(val)
+            if isinstance(parsed, list):
+                return [str(v) for v in parsed if v is not None]
+        except (json.JSONDecodeError, TypeError):
+            pass
+        return [val]
+    return []
 
 
 def extract_provider(attrs: dict[str, Any], span_name: str) -> str:
@@ -277,24 +305,28 @@ def extract_reasoning_tokens(attrs: dict[str, Any]) -> int:
     )
 
 
-def extract_reasoning_content(output_messages_str: str) -> str:
-    """Extract reasoning/thinking text from output messages ReasoningPart entries.
+def extract_reasoning_content(
+    raw_output: Any,
+) -> str:
+    """Extract reasoning/thinking text from raw output message data.
 
     The OTel semconv output messages schema includes a ``ReasoningPart`` with
     ``{"type": "reasoning", "content": "..."}`` for models like o1/o3/Gemini
-    with thinking enabled.
+    with thinking enabled.  We extract from the raw provider data (before
+    normalization) since reasoning parts are lost during normalization.
     """
-    if not output_messages_str:
+    if raw_output is None:
         return ""
-    try:
-        messages = json.loads(output_messages_str)
-    except (json.JSONDecodeError, TypeError):
-        return ""
-    if not isinstance(messages, list):
+    if isinstance(raw_output, str):
+        try:
+            raw_output = json.loads(raw_output)
+        except (json.JSONDecodeError, TypeError):
+            return ""
+    if not isinstance(raw_output, list):
         return ""
 
     reasoning_parts: list[str] = []
-    for msg in messages:
+    for msg in raw_output:
         if not isinstance(msg, dict):
             continue
         for part in msg.get("parts", []):
@@ -385,10 +417,144 @@ def extract_tool_call_result(
     return ""
 
 
-def extract_input_messages(
+def _text_from_parts(parts: list[Any]) -> str:
+    """Concatenate text from a list of message parts (OpenAI or Google format)."""
+    texts: list[str] = []
+    for p in parts:
+        if isinstance(p, str):
+            texts.append(p)
+        elif isinstance(p, dict):
+            if "content" in p and isinstance(p["content"], str):
+                texts.append(p["content"])
+            elif "text" in p and isinstance(p["text"], str):
+                texts.append(p["text"])
+    return "\n".join(texts)
+
+
+def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
+    """Normalize provider-specific message data into standard NormalizedMessage list.
+
+    Handles:
+    - OpenAI format: [{role, content, parts, tool_calls}]
+    - Google ADK format: {contents: [{role, parts: [{text}]}]}
+    - Traceloop indexed format: {0: {role, content}}
+    - Plain string (treated as single user message)
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        if not raw:
+            return []
+        try:
+            raw = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return [NormalizedMessage(role="user", content=raw)]
+
+    # Google ADK: {contents: [{role, parts}]} or {content: {parts}}
+    if isinstance(raw, dict):
+        if "contents" in raw and isinstance(raw["contents"], list):
+            return _normalize_raw_messages(raw["contents"])
+        if "content" in raw:
+            content = raw["content"]
+            if isinstance(content, dict) and isinstance(content.get("parts"), list):
+                return [
+                    NormalizedMessage(
+                        role=raw.get("role", "assistant"),
+                        content=_text_from_parts(content["parts"]),
+                    )
+                ]
+            if isinstance(content, str):
+                return [NormalizedMessage(role=raw.get("role", "assistant"), content=content)]
+        # Traceloop indexed: {"0": {role, content}, "1": ...}
+        if all(k.isdigit() for k in raw.keys()):
+            items = sorted(raw.items(), key=lambda kv: int(kv[0]))
+            return _normalize_raw_messages([v for _, v in items])
+        # Single message dict with role+content
+        if "role" in raw:
+            return [_normalize_single_message(raw)]
+        return []
+
+    if isinstance(raw, list):
+        result: list[NormalizedMessage] = []
+        for item in raw:
+            if isinstance(item, str):
+                result.append(NormalizedMessage(role="user", content=item))
+            elif isinstance(item, dict):
+                result.append(_normalize_single_message(item))
+        return result
+
+    return []
+
+
+def _normalize_single_message(msg: dict[str, Any]) -> NormalizedMessage:
+    """Normalize a single message dict into a NormalizedMessage."""
+    role = str(msg.get("role", "user"))
+
+    # Content: try parts first, then content string
+    content = ""
+    if isinstance(msg.get("parts"), list):
+        content = _text_from_parts(msg["parts"])
+    elif isinstance(msg.get("content"), str):
+        content = msg["content"]
+    elif isinstance(msg.get("content"), list):
+        content = _text_from_parts(msg["content"])
+
+    # Tool call info (present on assistant messages that invoke tools)
+    tool_call_id = str(msg.get("tool_call_id", ""))
+    tool_name = ""
+
+    # OpenAI tool_calls array — take the first tool call's name
+    tool_calls = msg.get("tool_calls")
+    if isinstance(tool_calls, list) and tool_calls:
+        first = tool_calls[0] if isinstance(tool_calls[0], dict) else {}
+        tool_name = str(first.get("name", ""))
+        if not tool_call_id:
+            tool_call_id = str(first.get("id", ""))
+        fn = first.get("function")
+        if isinstance(fn, dict):
+            tool_name = tool_name or str(fn.get("name", ""))
+
+    return NormalizedMessage(
+        role=role,
+        content=content,
+        tool_call_id=tool_call_id,
+        tool_name=tool_name,
+    )
+
+
+def _normalize_system_instructions(raw: Any) -> list[str]:
+    """Normalize system instructions into a plain text list.
+
+    Handles string, JSON string, array of strings, and array of part objects.
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        if not raw:
+            return []
+        try:
+            raw = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return [raw]
+    if isinstance(raw, list):
+        result: list[str] = []
+        for item in raw:
+            if isinstance(item, str) and item:
+                result.append(item)
+            elif isinstance(item, dict):
+                text = item.get("content") or item.get("text") or ""
+                if text:
+                    result.append(str(text))
+        return result
+    if isinstance(raw, str):
+        return [raw] if raw else []
+    return []
+
+
+def _extract_raw_input(
     attrs: dict[str, Any], events: list[dict[str, Any]]
-) -> str:
-    """Extract input messages.
+) -> Any:
+    """Extract raw input message data from provider-specific attributes.
 
     Fallback chain:
     1. gen_ai.input.messages (standard)
@@ -397,31 +563,31 @@ def extract_input_messages(
     4. gcp.vertex.agent.llm_request (Google ADK)
     """
     val = _get(attrs, "gen_ai.input.messages")
-    if val:
-        return _json_str(val)
+    if val is not None:
+        return val
 
     val = _get(attrs, "gen_ai.prompt")
-    if val:
-        return _json_str(val)
+    if val is not None:
+        return val
 
     for event in events:
         if event.get("name") == "gen_ai.content.prompt":
             event_attrs = event.get("attributes", {})
             val = get_attribute(event_attrs, "gen_ai.prompt")
-            if val:
-                return _json_str(val)
+            if val is not None:
+                return val
 
     val = _get(attrs, "gcp.vertex.agent.llm_request")
-    if val:
-        return _json_str(val)
+    if val is not None:
+        return val
 
-    return ""
+    return None
 
 
-def extract_output_messages(
+def _extract_raw_output(
     attrs: dict[str, Any], events: list[dict[str, Any]]
-) -> str:
-    """Extract output messages.
+) -> Any:
+    """Extract raw output message data from provider-specific attributes.
 
     Fallback chain:
     1. gen_ai.output.messages (standard)
@@ -430,25 +596,106 @@ def extract_output_messages(
     4. gcp.vertex.agent.llm_response (Google ADK)
     """
     val = _get(attrs, "gen_ai.output.messages")
-    if val:
-        return _json_str(val)
+    if val is not None:
+        return val
 
     val = _get(attrs, "gen_ai.completion")
-    if val:
-        return _json_str(val)
+    if val is not None:
+        return val
 
     for event in events:
         if event.get("name") == "gen_ai.content.completion":
             event_attrs = event.get("attributes", {})
             val = get_attribute(event_attrs, "gen_ai.completion")
-            if val:
-                return _json_str(val)
+            if val is not None:
+                return val
 
     val = _get(attrs, "gcp.vertex.agent.llm_response")
-    if val:
-        return _json_str(val)
+    if val is not None:
+        return val
 
-    return ""
+    return None
+
+
+def extract_input_messages(
+    attrs: dict[str, Any], events: list[dict[str, Any]]
+) -> list[NormalizedMessage]:
+    """Extract and normalize input messages from all provider formats."""
+    return _normalize_raw_messages(_extract_raw_input(attrs, events))
+
+
+def extract_output_messages(
+    attrs: dict[str, Any], events: list[dict[str, Any]]
+) -> list[NormalizedMessage]:
+    """Extract and normalize output messages from all provider formats."""
+    return _normalize_raw_messages(_extract_raw_output(attrs, events))
+
+
+@dataclass
+class GenAIExtractionResult:
+    """Result of extracting GenAI fields from an OTel span.
+
+    Contains both the main span row and the EAV attribute rows.
+    """
+
+    span: GenAISpanCHInsertable
+    attributes: list[GenAISpanAttributeRow] = field(default_factory=list)
+
+
+def _classify_value(val: Any) -> tuple[str, dict[str, Any]]:
+    """Determine the EAV value_type and typed column values for an attribute value."""
+    if isinstance(val, bool):
+        return "bool", {"bool_value": int(val)}
+    if isinstance(val, int):
+        return "int", {"int_value": val}
+    if isinstance(val, float):
+        return "float", {"float_value": val}
+    if isinstance(val, str):
+        return "string", {"string_value": val}
+    return "json", {"json_value": _json_str(val)}
+
+
+def _flatten_attrs(
+    attrs: dict[str, Any], prefix: str = ""
+) -> list[tuple[str, Any]]:
+    """Flatten a nested attribute dict into dot-separated key-value pairs."""
+    result: list[tuple[str, Any]] = []
+    for key, val in attrs.items():
+        full_key = f"{prefix}{key}" if not prefix else f"{prefix}.{key}"
+        if isinstance(val, dict):
+            result.extend(_flatten_attrs(val, full_key))
+        else:
+            result.append((full_key, val))
+    return result
+
+
+def _extract_eav_rows(
+    attrs: dict[str, Any],
+    project_id: str,
+    span_id: str,
+    started_at: Any,
+    source: str = "span",
+) -> list[GenAISpanAttributeRow]:
+    """Extract EAV rows from attributes, excluding known semconv keys."""
+    rows: list[GenAISpanAttributeRow] = []
+    for key, val in _flatten_attrs(attrs):
+        if key in KNOWN_SEMCONV_ATTR_KEYS:
+            continue
+        if val is None:
+            continue
+        value_type, typed_vals = _classify_value(val)
+        rows.append(
+            GenAISpanAttributeRow(
+                project_id=project_id,
+                started_at=started_at,
+                span_id=span_id,
+                attr_source=source,
+                attr_key=key,
+                value_type=value_type,
+                **typed_vals,
+            )
+        )
+    return rows
 
 
 def extract_genai_fields(
@@ -480,8 +727,9 @@ def extract_genai_fields(
     tool_name = str(_get(attrs, "gen_ai.tool.name") or "") or tl_tool_name
     tool_call_id = str(_get(attrs, "gen_ai.tool.call.id") or "") or tl_tool_id
 
-    output_msgs_str = extract_output_messages(attrs, events_dicts)
-    reasoning_content = extract_reasoning_content(output_msgs_str)
+    raw_output = _extract_raw_output(attrs, events_dicts)
+    output_msgs = extract_output_messages(attrs, events_dicts)
+    reasoning_content = extract_reasoning_content(raw_output)
 
     return GenAISpanCHInsertable(
         project_id=project_id,
@@ -524,8 +772,8 @@ def extract_genai_fields(
         request_max_tokens=_safe_int(_get(attrs, "gen_ai.request.max_tokens")),
         request_top_p=_safe_float(_get(attrs, "gen_ai.request.top_p")),
         input_messages=extract_input_messages(attrs, events_dicts),
-        output_messages=output_msgs_str,
-        system_instructions=_json_str(
+        output_messages=output_msgs,
+        system_instructions=_normalize_system_instructions(
             _get(attrs, "gen_ai.system_instructions")
         ),
         tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts) or tl_tool_args,
@@ -537,9 +785,9 @@ def extract_genai_fields(
         compaction_items_after=_safe_int(
             _get(attrs, "weave.compaction.items_after")
         ),
-        content_refs=_json_str(_get(attrs, "weave.content_refs")),
-        artifact_refs=_json_str(_get(attrs, "weave.artifact_refs")),
-        object_refs=_json_str(_get(attrs, "weave.object_refs")),
+        content_refs=_str_list(_get(attrs, "weave.content_refs")),
+        artifact_refs=_str_list(_get(attrs, "weave.artifact_refs")),
+        object_refs=_str_list(_get(attrs, "weave.object_refs")),
         attributes_dump=_json_str(attrs),
         events_dump=_json_str(events_dicts) if events_dicts else "",
         resource_dump=_json_str(
@@ -547,3 +795,41 @@ def extract_genai_fields(
         ),
         wb_user_id=wb_user_id or "",
     )
+
+
+def extract_genai_span(
+    span: Span,
+    project_id: str,
+    wb_user_id: str | None = None,
+) -> GenAIExtractionResult:
+    """Extract GenAI fields and typed EAV attribute rows from an OTel span.
+
+    Returns:
+        GenAIExtractionResult containing the span row and attribute EAV rows.
+    """
+    genai_row = extract_genai_fields(span, project_id, wb_user_id)
+
+    # Build EAV rows from span attributes (excluding known semconv keys)
+    eav_rows = _extract_eav_rows(
+        span.attributes,
+        project_id=project_id,
+        span_id=span.span_id,
+        started_at=span.start_time,
+        source="span",
+    )
+
+    # Also extract resource attributes with source='resource'
+    if span.resource:
+        resource_attrs = span.resource.as_dict()
+        if resource_attrs:
+            eav_rows.extend(
+                _extract_eav_rows(
+                    resource_attrs,
+                    project_id=project_id,
+                    span_id=span.span_id,
+                    started_at=span.start_time,
+                    source="resource",
+                )
+            )
+
+    return GenAIExtractionResult(span=genai_row, attributes=eav_rows)

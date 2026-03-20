@@ -38,29 +38,28 @@ def _safe_parse_json(s: str) -> Any:
         return None
 
 
-def _parse_content_refs(raw: str) -> str:
-    """Validate content_refs is well-formed JSON; pass through or empty.
+def _normalize_content_refs(raw: Any) -> list[str]:
+    """Normalize content_refs into a list of strings.
 
-    The fallback branch with .replace() exists because some OTel
-    instrumentors (or intermediate serialisation layers) store span
-    attributes as Python ``repr()`` strings instead of proper JSON —
-    e.g. single-quoted keys, ``True``/``False``/``None`` literals.
-    We normalise those to valid JSON so downstream consumers always
-    receive a well-formed list.
+    Handles both native list[str] (from Array(String) columns) and legacy
+    JSON-encoded strings for backward compatibility.
     """
     if not raw:
-        return ""
-    parsed = _safe_parse_json(raw)
-    if isinstance(parsed, list):
-        return raw
-    try:
-        fixed = raw.replace("'", '"').replace("True", "true").replace("False", "false").replace("None", "null")
-        parsed = json.loads(fixed)
+        return []
+    if isinstance(raw, list):
+        return [str(r) for r in raw if r]
+    if isinstance(raw, str):
+        parsed = _safe_parse_json(raw)
         if isinstance(parsed, list):
-            return json.dumps(parsed)
-    except (json.JSONDecodeError, TypeError):
-        pass
-    return ""
+            return [str(r) for r in parsed if r]
+        try:
+            fixed = raw.replace("'", '"').replace("True", "true").replace("False", "false").replace("None", "null")
+            parsed = json.loads(fixed)
+            if isinstance(parsed, list):
+                return [str(r) for r in parsed if r]
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -68,121 +67,47 @@ def _parse_content_refs(raw: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _extract_text_from_parts(parts: list[Any]) -> str:
-    """Extract text from message parts (OpenAI and Google formats)."""
-    texts: list[str] = []
-    for p in parts:
-        if isinstance(p, str):
-            texts.append(p)
-        elif isinstance(p, dict):
-            if "content" in p and isinstance(p["content"], str):
-                texts.append(p["content"])
-            elif "text" in p and isinstance(p["text"], str):
-                texts.append(p["text"])
+def _extract_user_text(
+    messages: list[dict[str, Any]], *, last_only: bool = False
+) -> str:
+    """Extract user text from normalized input_messages.
+
+    Args:
+        messages: Normalized message list (each has role, content, etc.).
+        last_only: If True, return only the last user message (multi-turn).
+    """
+    if not messages:
+        return ""
+    texts = [m.get("content", "") for m in messages if m.get("role") == "user" and m.get("content")]
+    if not texts:
+        texts = [m.get("content", "") for m in messages if m.get("content")]
+    if last_only and texts:
+        return texts[-1]
     return "\n".join(texts)
 
 
-def _extract_user_text(raw: Any, *, last_only: bool = False) -> str:
-    """Extract user text from input_messages.
-
-    Args:
-        raw: Parsed JSON from input_messages.
-        last_only: If True, return only the last user message (multi-turn).
-    """
-    if not raw:
+def _extract_assistant_text(messages: list[dict[str, Any]]) -> str:
+    """Extract assistant text from normalized output_messages."""
+    if not messages:
         return ""
-    if isinstance(raw, str):
-        return raw
-
-    texts: list[str] = []
-
-    # Google format: {contents: [{role: "user", parts: [{text: "..."}]}]}
-    if isinstance(raw, dict) and "contents" in raw and isinstance(raw["contents"], list):
-        for c in raw["contents"]:
-            if isinstance(c, dict) and c.get("role") == "user" and isinstance(c.get("parts"), list):
-                t = _extract_text_from_parts(c["parts"])
-                if t:
-                    texts.append(t)
-        if last_only and texts:
-            return texts[-1]
-        return "\n".join(texts) if texts else ""
-
-    # OpenAI format: [{role: "user", parts: [{content: "..."}]}]
-    if isinstance(raw, list):
-        for msg in raw:
-            if isinstance(msg, str):
-                texts.append(msg)
-                continue
-            if not isinstance(msg, dict):
-                continue
-            role = msg.get("role", "user")
-            if role != "user":
-                continue
-            if isinstance(msg.get("parts"), list):
-                t = _extract_text_from_parts(msg["parts"])
-                if t:
-                    texts.append(t)
-            elif isinstance(msg.get("content"), str):
-                texts.append(msg["content"])
-        if last_only and texts:
-            return texts[-1]
-        return "\n".join(texts) if texts else ""
-
-    return ""
+    texts = [
+        m.get("content", "")
+        for m in messages
+        if m.get("role") != "user" and m.get("content")
+    ]
+    return "\n".join(texts)
 
 
-def _extract_assistant_text(raw: Any) -> str:
-    """Extract assistant (non-user) text from output_messages."""
-    if not raw:
+def _extract_system_prompt(instructions: list[str] | str) -> str:
+    """Extract readable system prompt from normalized system_instructions."""
+    if not instructions:
         return ""
-    if isinstance(raw, str):
-        return raw
-
-    # Google format: {content: {parts: [{text: "..."}]}}
-    if isinstance(raw, dict) and "content" in raw:
-        content = raw["content"]
-        if isinstance(content, dict) and isinstance(content.get("parts"), list):
-            return _extract_text_from_parts(content["parts"])
-        if isinstance(content, str):
-            return content
-        return ""
-
-    # OpenAI format: [{role: "assistant", parts: [...]}]
-    if isinstance(raw, list):
-        texts: list[str] = []
-        for msg in raw:
-            if isinstance(msg, str):
-                texts.append(msg)
-                continue
-            if not isinstance(msg, dict):
-                continue
-            if msg.get("role") == "user":
-                continue
-            if isinstance(msg.get("parts"), list):
-                texts.append(_extract_text_from_parts(msg["parts"]))
-            elif isinstance(msg.get("content"), str):
-                texts.append(msg["content"])
-        return "\n".join(t for t in texts if t)
-
-    return ""
-
-
-def _extract_system_prompt(raw: str) -> str:
-    """Extract readable system prompt from system_instructions JSON."""
-    if not raw:
-        return ""
-    parsed = _safe_parse_json(raw)
-    if parsed is None:
-        return raw
-    if isinstance(parsed, str):
-        return parsed
-    if isinstance(parsed, list):
-        return "\n".join(
-            m.get("content", "") or m.get("text", "")
-            for m in parsed
-            if isinstance(m, dict) and (m.get("content") or m.get("text"))
-        )
-    return ""
+    if isinstance(instructions, str):
+        parsed = _safe_parse_json(instructions)
+        if isinstance(parsed, list):
+            return "\n".join(str(i) for i in parsed if i)
+        return instructions
+    return "\n".join(instructions)
 
 
 def _looks_like_tool_call(text: str) -> bool:
@@ -296,7 +221,9 @@ def build_span_tree(spans: list[GenAISpanSchema]) -> list[SpanNode]:
 # ---------------------------------------------------------------------------
 
 
-def find_user_prompt(spans: list[GenAISpanSchema]) -> tuple[str, str, str]:
+def find_user_prompt(
+    spans: list[GenAISpanSchema],
+) -> tuple[str, str, list[str]]:
     """Pre-scan spans to find the user prompt for this trace.
 
     Uses last_only=True because multi-turn conversations send the full
@@ -305,22 +232,24 @@ def find_user_prompt(spans: list[GenAISpanSchema]) -> tuple[str, str, str]:
     Returns:
         (prompt_text, started_at, content_refs) — started_at is the ISO
         timestamp of the span that carried the user prompt; content_refs is
-        the JSON-serialised list of uploaded attachment refs from the same
-        span (or empty string if none).
+        the list of uploaded attachment refs from the same span.
     """
     sorted_spans = sorted(spans, key=lambda s: s.started_at or "")
 
+    msgs_field = "input_messages"
     for s in sorted_spans:
-        if s.operation_name == "invoke_agent" and s.input_messages:
-            text = _extract_user_text(_safe_parse_json(s.input_messages), last_only=True)
+        msgs = getattr(s, msgs_field, None) or []
+        if s.operation_name == "invoke_agent" and msgs:
+            text = _extract_user_text(msgs, last_only=True)
             if text and not _looks_like_tool_call(text):
-                return text, _dt_to_iso(s.started_at), _parse_content_refs(s.content_refs or "")
+                return text, _dt_to_iso(s.started_at), _normalize_content_refs(s.content_refs)
 
     for s in sorted_spans:
-        if s.input_messages:
-            text = _extract_user_text(_safe_parse_json(s.input_messages), last_only=True)
+        msgs = getattr(s, msgs_field, None) or []
+        if msgs:
+            text = _extract_user_text(msgs, last_only=True)
             if text and not _looks_like_tool_call(text):
-                return text, _dt_to_iso(s.started_at), _parse_content_refs(s.content_refs or "")
+                return text, _dt_to_iso(s.started_at), _normalize_content_refs(s.content_refs)
 
     for s in sorted_spans:
         if s.attributes_dump:
@@ -328,9 +257,9 @@ def find_user_prompt(spans: list[GenAISpanSchema]) -> tuple[str, str, str]:
             if isinstance(attrs, dict):
                 prompt = attrs.get("gen_ai.prompt")
                 if prompt and isinstance(prompt, str):
-                    return prompt, _dt_to_iso(s.started_at), ""
+                    return prompt, _dt_to_iso(s.started_at), []
 
-    return "", "", ""
+    return "", "", []
 
 
 # ---------------------------------------------------------------------------
@@ -399,7 +328,7 @@ def build_chat_messages(
                 _walk(child, name)
 
             if span.output_messages and span.span_id not in agent_response_emitted:
-                text = _extract_assistant_text(_safe_parse_json(span.output_messages))
+                text = _extract_assistant_text(span.output_messages)
                 if text and not _looks_like_tool_call(text):
                     agent_response_emitted.add(span.span_id)
                     # Tokens live on child chat spans, not on the invoke_agent
@@ -421,7 +350,7 @@ def build_chat_messages(
                             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
                             started_at=_dt_to_iso(span.started_at),
                             status=span.status_code,
-                            content_refs=_parse_content_refs(span.content_refs),
+                            content_refs=_normalize_content_refs(span.content_refs),
                         )
                     )
 
@@ -466,7 +395,7 @@ def build_chat_messages(
                         duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
                         started_at=_dt_to_iso(span.started_at),
                         status=span.status_code,
-                        content_refs=_parse_content_refs(span.content_refs),
+                        content_refs=_normalize_content_refs(span.content_refs),
                     )
                 )
 
@@ -496,7 +425,7 @@ def build_chat_messages(
                 for child in node.children:
                     _walk(child, nearest_agent)
             elif span.output_messages:
-                text = _extract_assistant_text(_safe_parse_json(span.output_messages))
+                text = _extract_assistant_text(span.output_messages)
                 if text and not _looks_like_tool_call(text):
                     messages.append(
                         GenAIChatMessage(
@@ -525,7 +454,7 @@ def build_chat_messages(
             _walk(child, nearest_agent)
 
         if span.output_messages:
-            text = _extract_assistant_text(_safe_parse_json(span.output_messages))
+            text = _extract_assistant_text(span.output_messages)
             if text and not _looks_like_tool_call(text):
                 messages.append(
                     GenAIChatMessage(
