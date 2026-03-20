@@ -115,6 +115,10 @@ class TestDrainOnce:
         assert mgr.list_files() == []
 
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows locks open files — can't unlink while consumer holds a handle",
+    )
     def test_consumer_evicted_when_file_removed_externally(
         self, tmp_path: str
     ) -> None:
@@ -122,44 +126,33 @@ class TestDrainOnce:
         is evicted without error.
         """
         mgr = FileWALDirectoryManager(str(tmp_path))
-        with mgr.create_file() as w1:
-            w1.write({"type": "obj_create", "seq": 0})
-        with mgr.create_file() as w2:
-            w2.write({"type": "obj_create", "seq": 1})
+
+        # Create a file that stays open (writer alive → sender caches
+        # a consumer but won't delete the file).
+        writer = mgr.create_file()
+        writer.write({"type": "obj_create", "seq": 0})
+        writer.flush()
+        wal_path = writer.path
 
         received: list[WALRecord] = []
         sender = BackgroundWALSender(
             mgr, {"obj_create": received.append}, JSONLWALConsumer
         )
 
-        # First drain — caches consumers for both files.
+        # First drain — caches a consumer for the file.
         sender.drain_once()
-        assert len(received) == 2
+        assert len(received) == 1
+        assert len(mgr.list_files()) == 1  # kept because writer is alive
 
-        # Externally delete one of the files (simulates another process
-        # cleaning up, or filesystem error).
-        files = mgr.list_files()
-        assert len(files) == 0  # both were fully consumed and removed
+        # Close the writer (releases the lock) then externally unlink the
+        # file.  On Unix, unlink succeeds even though the sender's cached
+        # consumer still has an open fd.
+        writer.close()
+        os.unlink(wal_path)
 
-        # Write new files and remove one externally before next drain.
-        with mgr.create_file() as w3:
-            w3.write({"type": "obj_create", "seq": 2})
-        w4 = mgr.create_file()
-        w4.write({"type": "obj_create", "seq": 3})
-        w4.flush()
-        w4_path = w4.path
-
-        # First drain caches both.
+        # Next drain: list_files() returns nothing, so the cached consumer
+        # for the now-missing file must be evicted without error.
         sender.drain_once()
-        assert len(received) == 4
-
-        # Externally remove w4's file while the sender has a cached consumer.
-        os.unlink(w4_path)
-
-        # Second drain should evict the cached consumer for the missing file
-        # without raising.
-        sender.drain_once()
-        w4.close()
 
 
 class TestBackgroundThread:
