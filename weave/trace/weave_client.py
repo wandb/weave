@@ -383,10 +383,11 @@ class WeaveClient:
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
-        self._wal = WALManager.with_sender(
-            self.entity, self.project, self.server,
-            enabled=settings.should_enable_wal(),
-        )
+        self._wal: WALManager | None = None
+        if settings.should_enable_wal():
+            self._wal = WALManager.with_sender(
+                self.entity, self.project, self.server,
+            )
 
         # No-op when the feature flag is off (returns immediately).
         self._warm_project_id_resolver()
@@ -2015,7 +2016,7 @@ class WeaveClient:
 
             # WAL path: compute a local digest (no ref conversion needed)
             # and write to WAL instead of calling the server.
-            if self._wal.enabled:
+            if self._wal is not None:
                 local_digest = expected_digest or compute_object_digest(json_val)
                 req = ObjCreateReq(
                     obj=ObjSchemaForInsert(
@@ -2095,7 +2096,7 @@ class WeaveClient:
                 logger.debug("Skipping client-side digest for table: %s", e)
 
         # WAL path: compute a local digest and skip the server call.
-        if self._wal.enabled:
+        if self._wal is not None:
             local_digest = expected_digest or compute_table_digest(
                 [compute_row_digest(row) for row in json_rows]
             )
@@ -2393,7 +2394,7 @@ class WeaveClient:
         if cached_res:
             return cached_res
 
-        if self._wal.enabled:
+        if self._wal is not None:
             digest = req.expected_digest or ""
             self._wal.write("file_create", req)
             f: Future[FileCreateRes] = Future()
@@ -2590,7 +2591,8 @@ class WeaveClient:
             self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
             # Restart feedback processor processing thread after flushing
             self._server_feedback_processor.accept_new_work()
-        self._wal.flush()
+        if self._wal is not None:
+            self._wal.flush()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.

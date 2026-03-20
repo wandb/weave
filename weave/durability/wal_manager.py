@@ -21,9 +21,6 @@ class WALManager:
     Manages the writer (appends records to disk) and optionally a sender
     (background thread that drains records to the trace server).
 
-    When *enabled* is False the manager is a no-op: write() and flush()
-    return immediately with zero overhead.
-
     Use :meth:`with_sender` to create a manager that also starts a
     background sender thread for draining records to a server.
 
@@ -33,21 +30,17 @@ class WALManager:
            consumed files.
     """
 
-    def __init__(self, entity: str, project: str, *, enabled: bool) -> None:
-        self.wal_dir: str | None = None
-        self._writer: WALWriter | None = None
+    def __init__(self, entity: str, project: str) -> None:
+        self.wal_dir = os.path.join(
+            os.path.expanduser("~"),
+            ".weave",
+            "wal",
+            entity,
+            project,
+        )
+        dir_mgr = FileWALDirectoryManager(self.wal_dir)
+        self._writer: WALWriter = JSONLWALWriter(dir_mgr)
         self._sender: BackgroundWALSender | None = None
-
-        if enabled:
-            self.wal_dir = os.path.join(
-                os.path.expanduser("~"),
-                ".weave",
-                "wal",
-                entity,
-                project,
-            )
-            dir_mgr = FileWALDirectoryManager(self.wal_dir)
-            self._writer = JSONLWALWriter(dir_mgr)
 
     @classmethod
     def with_sender(
@@ -55,29 +48,20 @@ class WALManager:
         entity: str,
         project: str,
         server: TraceServerClientInterface,
-        *,
-        enabled: bool,
     ) -> WALManager:
         """Create a WAL manager with a background sender thread.
 
         The sender drains WAL records to *server* on a polling interval.
         An atexit handler is registered to ensure clean shutdown.
         """
-        mgr = cls(entity, project, enabled=enabled)
-        if mgr.enabled and mgr.wal_dir is not None:
-            mgr._sender = create_sender(mgr.wal_dir, server)
-            mgr._sender.start()
-            atexit.register(mgr.close)
+        mgr = cls(entity, project)
+        mgr._sender = create_sender(mgr.wal_dir, server)
+        mgr._sender.start()
+        atexit.register(mgr.close)
         return mgr
 
-    @property
-    def enabled(self) -> bool:
-        return self._writer is not None
-
     def write(self, record_type: WALRecordType, req: BaseModel) -> None:
-        """Write a request to the WAL.  No-op when disabled.  Never raises."""
-        if self._writer is None:
-            return
+        """Write a request to the WAL.  Never raises."""
         try:
             self._writer.write(
                 {"type": record_type, "req": req.model_dump(mode="json")}
@@ -86,9 +70,8 @@ class WALManager:
             logger.warning("Failed to write %s to WAL", record_type, exc_info=True)
 
     def flush(self) -> None:
-        """Flush the WAL to disk.  No-op when disabled."""
-        if self._writer is not None:
-            self._writer.flush()
+        """Flush the WAL to disk."""
+        self._writer.flush()
 
     def close(self) -> None:
         """Close the writer then stop the sender.
