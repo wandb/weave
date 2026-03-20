@@ -279,7 +279,7 @@ class WALSender(Protocol):
     """
 
     def start(self) -> None:
-        """Start sending (e.g., begin background polling).
+        """Start the background drain thread.
 
         Raises:
             RuntimeError: If the sender is already running.
@@ -287,7 +287,7 @@ class WALSender(Protocol):
         ...
 
     def stop(self, timeout: float = 10.0) -> None:
-        """Stop sending and perform a final drain.
+        """Stop the background drain thread and perform a final drain.
 
         The caller should close the writer before stopping the sender
         so that all files become eligible for cleanup.
@@ -306,14 +306,6 @@ class WALSender(Protocol):
 
         Returns:
             Number of records successfully processed.
-        """
-        ...
-
-    def flush(self) -> int:
-        """Drain all pending records synchronously.
-
-        Returns:
-            Number of records processed.
         """
         ...
 

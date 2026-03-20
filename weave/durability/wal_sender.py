@@ -216,16 +216,6 @@ class BackgroundWALSender:
 
             return total
 
-    def flush(self) -> int:
-        """Drain all pending records synchronously.  Thread-safe.
-
-        Safe to call while the background thread is running — the lock
-        serializes access.
-
-        Returns:
-            Number of records processed.
-        """
-        return self.drain_once()
 
     # -- Context manager ---------------------------------------------------
 

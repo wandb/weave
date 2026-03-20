@@ -120,7 +120,7 @@ class TestDrainOnce:
         received: list[WALRecord] = []
         sender = BackgroundWALSender(mgr, {"obj_create": received.append}, JSONLWALConsumer)
 
-        count = sender.flush()
+        count = sender.drain_once()
         assert count == 1
         assert len(received) == 1
 
