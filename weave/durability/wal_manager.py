@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel
 
 from weave.durability.wal import WALWriter
 
 WALRecordType = Literal["obj_create", "table_create", "file_create"]
+WAL_RECORD_TYPES: tuple[str, ...] = get_args(WALRecordType)
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_writer import JSONLWALWriter
 

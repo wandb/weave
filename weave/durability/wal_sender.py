@@ -46,8 +46,15 @@ from weave.durability.wal import (
     WALRecord,
     drain,
 )
+from weave.durability.wal_consumer import JSONLWALConsumer
+from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_lock import is_writer_alive
+from weave.durability.wal_manager import WAL_RECORD_TYPES
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -255,25 +262,57 @@ class BackgroundWALSender:
 def build_trace_server_handlers(server: TraceServerClientInterface) -> WALHandlers:
     """Build WAL handlers that replay records to a trace server.
 
-    Each handler deserializes the ``req`` payload from the WAL record
-    and calls the corresponding method on *server*.
+    Derives the handler mapping from :data:`~weave.durability.wal_manager.WAL_RECORD_TYPES`
+    (the single source of truth for record types).  For each type ``foo_bar``,
+    it resolves ``tsi.FooBarReq`` and ``server.foo_bar`` by naming convention.
     """
-    from weave.trace_server import trace_server_interface as tsi
+    handlers: WALHandlers = {}
+    for record_type in WAL_RECORD_TYPES:
+        req_cls_name = "".join(w.capitalize() for w in record_type.split("_")) + "Req"
+        req_cls = getattr(tsi, req_cls_name)
+        method = getattr(server, record_type)
 
-    def handle_obj_create(record: WALRecord) -> None:
-        server.obj_create(tsi.ObjCreateReq.model_validate(record["req"]))
+        def _handler(record: WALRecord, _m=method, _rc=req_cls) -> None:
+            _m(_rc.model_validate(record["req"]))
 
-    def handle_table_create(record: WALRecord) -> None:
-        server.table_create(tsi.TableCreateReq.model_validate(record["req"]))
+        handlers[record_type] = _handler
+    return handlers
 
-    def handle_file_create(record: WALRecord) -> None:
-        server.file_create(tsi.FileCreateReq.model_validate(record["req"]))
 
-    return {
-        "obj_create": handle_obj_create,
-        "table_create": handle_table_create,
-        "file_create": handle_file_create,
-    }
+def create_sender(
+    wal_dir: str,
+    server: TraceServerClientInterface,
+    *,
+    poll_interval: float = 1.0,
+) -> BackgroundWALSender:
+    """Create a WAL sender that runs in-process as a background thread.
+
+    This is the in-process alternative to ``main()`` (which runs as a
+    standalone process).  Use as a context manager::
+
+        sender = create_sender(wal_dir, server)
+        sender.start()
+        # ... do work ...
+        sender.stop()
+
+    Or::
+
+        with create_sender(wal_dir, server) as sender:
+            ...
+
+    Args:
+        wal_dir: Path to the WAL directory (e.g. ``~/.weave/wal/entity/project``).
+        server: Trace server to replay records to.
+        poll_interval: Seconds between drain cycles.
+    """
+    dir_mgr = FileWALDirectoryManager(wal_dir)
+    handlers = build_trace_server_handlers(server)
+    return BackgroundWALSender(
+        dir_mgr,
+        handlers,
+        JSONLWALConsumer,
+        poll_interval=poll_interval,
+    )
 
 
 # -- CLI entrypoint -------------------------------------------------------
@@ -281,6 +320,8 @@ def build_trace_server_handlers(server: TraceServerClientInterface) -> WALHandle
 
 def main(argv: list[str] | None = None) -> None:
     """Run the WAL sender as a standalone process.
+
+    For in-process usage, see :func:`create_sender` instead.
 
     Usage::
 
@@ -322,22 +363,8 @@ def main(argv: list[str] | None = None) -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    from weave.durability.wal_consumer import JSONLWALConsumer
-    from weave.durability.wal_directory_manager import FileWALDirectoryManager
-    from weave.trace_server_bindings.remote_http_trace_server import (
-        RemoteHTTPTraceServer,
-    )
-
     server = RemoteHTTPTraceServer(args.trace_server_url, auth=("api", args.api_key))
-    dir_mgr = FileWALDirectoryManager(wal_dir)
-    handlers = build_trace_server_handlers(server)
-
-    sender = BackgroundWALSender(
-        dir_mgr,
-        handlers,
-        JSONLWALConsumer,
-        poll_interval=args.poll_interval,
-    )
+    sender = create_sender(wal_dir, server, poll_interval=args.poll_interval)
 
     stop = threading.Event()
 
