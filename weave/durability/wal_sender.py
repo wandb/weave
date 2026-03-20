@@ -140,13 +140,26 @@ class BackgroundWALSender:
 
         Args:
             timeout: Maximum seconds to wait for the thread to finish.
+
+        Raises:
+            TimeoutError: If the thread is still alive after *timeout*
+                seconds.  ``_thread`` is left intact so :meth:`start`
+                correctly rejects a second launch.
         """
-        self._stop_event.set()
-        self._wake_event.set()  # unblock the sleep
-        if self._thread is not None:
-            self._thread.join(timeout)
+        thread = self._thread
+        if thread is not None:
+            self._stop_event.set()
+            self._wake_event.set()  # unblock the sleep
+            thread.join(timeout)
+
+            if thread.is_alive():
+                raise TimeoutError(
+                    f"BackgroundWALSender did not stop within {timeout}s"
+                )
+
             self._thread = None
-        # Close any remaining cached consumers (thread is stopped).
+
+        # Close any remaining cached consumers.
         for path, consumer in self._consumers.items():
             try:
                 consumer.close()

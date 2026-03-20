@@ -42,8 +42,14 @@ class _JSONLWALFileWriter:
         fsync_timeout: float = DEFAULT_FSYNC_TIMEOUT,
     ) -> None:
         self.path = path
-        self._file = open(path, "ab")
+        # Lock MUST exist before the .jsonl file so the sender never sees
+        # a discoverable WAL file without its liveness marker.
         self._lock_path = acquire_lock(path)
+        try:
+            self._file = open(path, "ab")
+        except Exception:
+            release_lock(self._lock_path)
+            raise
         self._fsync_batch_size = fsync_batch_size
         self._fsync_timeout = fsync_timeout
         self._unsynced = 0

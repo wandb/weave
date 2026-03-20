@@ -762,3 +762,90 @@ for i in range(3):
         assert len(received) == 3
         assert [r["seq"] for r in received] == [0, 1, 2]
         assert mgr.list_files() == []
+
+
+class TestRegressions:
+    """Regression tests for specific bugs."""
+
+    def test_lock_exists_before_wal_file_is_discoverable(
+        self, tmp_path: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Lock sidecar must exist before the .jsonl file so the sender
+        never sees a WAL file without its liveness marker.
+
+        Regression: previously the writer opened the .jsonl first and
+        created the lock second.  A sender polling in between would see
+        an "inactive" file and delete it.
+        """
+        from unittest.mock import patch
+
+        from weave.durability import wal_writer as wmod
+        from weave.durability.wal_lock import acquire_lock
+
+        call_order: list[str] = []
+        original_open = open
+
+        # Patch open() to record when the .jsonl is opened.
+        def tracking_open(path: str, *args, **kwargs):  # type: ignore[no-untyped-def]
+            if isinstance(path, str) and path.endswith(".jsonl"):
+                call_order.append("open_jsonl")
+            return original_open(path, *args, **kwargs)
+
+        # Patch acquire_lock to record when the lock is created.
+        def tracking_acquire(path: str) -> str:
+            call_order.append("acquire_lock")
+            return acquire_lock(path)
+
+        with (
+            patch("builtins.open", side_effect=tracking_open),
+            patch.object(wmod, "acquire_lock", side_effect=tracking_acquire),
+        ):
+            mgr = FileWALDirectoryManager(str(tmp_path))
+            writer = mgr.create_file()
+            writer.close()
+
+        assert call_order.index("acquire_lock") < call_order.index("open_jsonl"), (
+            f"Lock must be acquired before .jsonl is opened, "
+            f"but got: {call_order}"
+        )
+
+    def test_stop_raises_on_timeout(self, tmp_path: str) -> None:
+        """stop() raises TimeoutError if the thread doesn't die in time,
+        and leaves _thread intact so start() still rejects.
+
+        Regression: previously stop() cleared _thread unconditionally,
+        allowing a second start() while the first thread was still alive.
+        """
+        import threading
+
+        block = threading.Event()
+
+        def blocking_handler(record: WALRecord) -> None:
+            block.wait(timeout=10)
+
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with mgr.create_file() as writer:
+            writer.write({"type": "obj_create", "seq": 0})
+
+        sender = BackgroundWALSender(
+            mgr,
+            {"obj_create": blocking_handler},
+            JSONLWALConsumer,
+            is_file_active=lambda _: False,
+        )
+        sender.start()
+        # Give the thread time to enter the blocking handler.
+        time.sleep(0.1)
+
+        with pytest.raises(TimeoutError, match="did not stop"):
+            sender.stop(timeout=0.01)
+
+        # _thread is still set — start() must reject.
+        assert sender._thread is not None
+        with pytest.raises(RuntimeError, match="already running"):
+            sender.start()
+
+        # Unblock and let it finish cleanly.
+        block.set()
+        sender._thread.join(timeout=5)
+        sender._thread = None
