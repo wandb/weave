@@ -92,6 +92,21 @@ def test_cancel_task_returns_none_for_unknown_id(manager: TaskManager) -> None:
     assert manager.cancel_task("nonexistent-id") is None
 
 
+def test_is_canceled_false_for_new_task(manager: TaskManager) -> None:
+    task = manager.create_task(total_items=1)
+    assert manager.is_canceled(task["id"]) is False
+
+
+def test_is_canceled_true_after_cancel(manager: TaskManager) -> None:
+    task = manager.create_task(total_items=1)
+    manager.cancel_task(task["id"])
+    assert manager.is_canceled(task["id"]) is True
+
+
+def test_is_canceled_false_for_unknown_id(manager: TaskManager) -> None:
+    assert manager.is_canceled("nonexistent-id") is False
+
+
 def test_list_tasks_empty(manager: TaskManager) -> None:
     assert manager.list_tasks() == []
 

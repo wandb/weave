@@ -117,6 +117,13 @@ class TaskManager:
 
         self._redis_client.delete(self._make_task_key(task_id))
 
+    def is_canceled(self, task_id: str) -> bool:
+        """Return True if the task has been canceled."""
+        task_details = self.get_task(task_id)
+        if task_details is None:
+            return False
+        return task_details["canceled_at"] is not None
+
     def cancel_task(self, task_id: str) -> TaskDetails | None:
         """Mark a task as canceled by setting canceled_at timestamp."""
         task_details = self.get_task(task_id)
