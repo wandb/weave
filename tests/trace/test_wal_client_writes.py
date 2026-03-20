@@ -9,6 +9,7 @@ import pytest
 
 import weave
 from weave.durability.wal_consumer import JSONLWALConsumer
+from weave.durability.wal_sender import send_wal
 from weave.trace.settings import UserSettings
 
 
@@ -72,7 +73,6 @@ class TestWALClientWrites:
 
         records = _read_all_wal_records(wal_dir)
         for record in records:
-            # Should not raise — all records must be JSON-serializable
             roundtripped = json.loads(json.dumps(record))
             assert roundtripped["type"] in {
                 "obj_create",
@@ -87,6 +87,35 @@ class TestWALClientWrites:
         weave.publish({"a": 1}, name="fsync_obj")
         client.flush()
 
-        # After flush, records should be readable
         records = _read_all_wal_records(wal_dir)
         assert len(records) >= 1
+
+
+class TestWALSender:
+    """Verify that the sender replays WAL records to the server."""
+
+    def test_sender_replays_obj_create(self, wal_client):
+        client, wal_dir = wal_client
+
+        weave.publish({"k": "v"}, name="sender_obj")
+        client._flush()
+        client._wal.flush()
+
+        # The WAL has records; replay them to the same server.
+        total = send_wal(client.server, str(wal_dir))
+        assert total >= 1
+
+        # After sending, the WAL files should be cleaned up.
+        remaining = list(wal_dir.glob("*.jsonl"))
+        assert len(remaining) == 0
+
+    def test_sender_replays_table_create(self, wal_client):
+        client, wal_dir = wal_client
+
+        ds = weave.Dataset(name="sender_ds", rows=[{"x": 1}])
+        weave.publish(ds, name="sender_ds")
+        client._flush()
+        client._wal.flush()
+
+        total = send_wal(client.server, str(wal_dir))
+        assert total >= 1

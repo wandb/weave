@@ -2012,6 +2012,20 @@ class WeaveClient:
                 ) as e:
                     logger.debug("Skipping client-side digest for obj %r: %s", name, e)
 
+            # WAL path: compute a local digest (no ref conversion needed)
+            # and write to WAL instead of calling the server.
+            if self._wal.enabled:
+                local_digest = expected_digest or compute_object_digest(json_val)
+                req = ObjCreateReq(
+                    obj=ObjSchemaForInsert(
+                        project_id=self.entity + "/" + self.project,
+                        object_id=name,
+                        val=json_val,
+                    )
+                )
+                self._wal.write("obj_create", req)
+                return ObjCreateRes(digest=local_digest)
+
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
@@ -2020,7 +2034,6 @@ class WeaveClient:
                     expected_digest=expected_digest,
                 )
             )
-            self._wal.write("obj_create", req)
             try:
                 return self.server.obj_create(req)
             except (DigestMismatchError, HTTPError) as e:
@@ -2080,6 +2093,20 @@ class WeaveClient:
             ) as e:
                 logger.debug("Skipping client-side digest for table: %s", e)
 
+        # WAL path: compute a local digest and skip the server call.
+        if self._wal.enabled:
+            local_digest = expected_digest or compute_table_digest(
+                [compute_row_digest(row) for row in json_rows]
+            )
+            req = TableCreateReq(
+                table=TableSchemaForInsert(
+                    project_id=self._project_id(),
+                    rows=json_rows,
+                )
+            )
+            self._wal.write("table_create", req)
+            return TableCreateRes(digest=local_digest)
+
         req = TableCreateReq(
             table=TableSchemaForInsert(
                 project_id=self._project_id(),
@@ -2087,7 +2114,6 @@ class WeaveClient:
                 expected_digest=expected_digest,
             )
         )
-        self._wal.write("table_create", req)
         try:
             return self.server.table_create(req)
         except (DigestMismatchError, HTTPError) as e:
@@ -2366,7 +2392,13 @@ class WeaveClient:
         if cached_res:
             return cached_res
 
-        self._wal.write("file_create", req)
+        if self._wal.enabled:
+            digest = req.expected_digest or ""
+            self._wal.write("file_create", req)
+            f: Future[FileCreateRes] = Future()
+            f.set_result(FileCreateRes(digest=digest))
+            self.send_file_cache.put(req, f)
+            return f
 
         def file_create_with_fallback() -> FileCreateRes:
             try:
