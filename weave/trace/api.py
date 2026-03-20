@@ -75,7 +75,7 @@ def init(
                     before sending to the server. Requires presidio-analyzer and presidio-anonymizer packages.
                     Default: `False`
                 - `redact_pii_fields` (list[str]): Specifies which PII entity types to redact when `redact_pii` 
-                    is `True`. If empty, uses Presidio's default set. Examples: ['EMAIL','PHONE_NUMBER','CREDIT_CARD','US_SSN']. 
+                    is `True`. If empty, uses Presidio's default set. Examples: ['EMAIL','PHONE_NUMBER','CREDIT_CARD','US_SSN'].
                     See full list at: https://microsoft.github.io/presidio/supported_entities/
                     Default: `[]`
                 - `redact_pii_exclude_fields` (list[str]): PII entity types to exclude. Default: `[]`
