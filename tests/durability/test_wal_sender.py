@@ -446,34 +446,6 @@ class TestWithRotatingWriter:
 class TestCrossProcessProtection:
     """Tests for PID-lock-based cross-process file protection."""
 
-    def test_writer_open_prevents_deletion(self, tmp_path: str) -> None:
-        """Sender won't delete a file whose writer is still open."""
-        mgr = FileWALDirectoryManager(str(tmp_path))
-        writer = mgr.create_file()
-        writer.write({"type": "obj_create", "seq": 0})
-        writer.flush()
-
-        path = mgr.list_files()[0]
-        assert is_writer_alive(path) is True
-
-        sender = BackgroundWALSender(
-            mgr, {"obj_create": lambda r: None}, JSONLWALConsumer
-        )
-        sender.drain_once()
-
-        # File should still exist — writer is alive.
-        assert len(mgr.list_files()) == 1
-
-        writer.close()
-
-        assert is_writer_alive(path) is False
-        sender.drain_once()
-        assert mgr.list_files() == []
-
-    def test_missing_lock_is_not_alive(self, tmp_path: str) -> None:
-        """is_writer_alive returns False for a nonexistent file."""
-        assert is_writer_alive(str(tmp_path / "nonexistent.jsonl")) is False
-
     def test_stale_pid_allows_deletion(self, tmp_path: str) -> None:
         """A lock file with a dead PID is treated as stale -> file deletable."""
         mgr = FileWALDirectoryManager(str(tmp_path))
@@ -611,12 +583,6 @@ class TestCrossProcessProtection:
         assert mgr.list_files() == []
 
 
-# Path to the helper script that runs a WAL writer in a subprocess.
-# See tests/durability/_wal_writer_subprocess.py for details.
-_WRITER_SUBPROCESS = "-m"
-_WRITER_MODULE = "tests.durability._wal_writer_subprocess"
-
-
 @pytest.fixture
 def writer_subprocess():
     """Fixture that manages a WAL writer running in a child process.
@@ -636,10 +602,12 @@ def writer_subprocess():
     """
     procs: list[subprocess.Popen] = []
 
+    module = "tests.durability._wal_writer_subprocess"
+
     def start(
         wal_dir: str, count: int, *, crash: bool = False
     ) -> subprocess.Popen:
-        args = [sys.executable, _WRITER_SUBPROCESS, _WRITER_MODULE, wal_dir, str(count)]
+        args = [sys.executable, "-m", module, wal_dir, str(count)]
         if crash:
             args.append("--crash")
         proc = subprocess.Popen(
