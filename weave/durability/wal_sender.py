@@ -113,7 +113,7 @@ class BackgroundWALSender:
         self._consumers: dict[str, WALConsumer] = {}
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
-        self._wake_event = threading.Event()
+        self._drain_event = threading.Event()
         self._thread: threading.Thread | None = None
 
     # -- Public API --------------------------------------------------------
@@ -127,7 +127,7 @@ class BackgroundWALSender:
         if self._thread is not None and self._thread.is_alive():
             raise RuntimeError("BackgroundWALSender is already running")
         self._stop_event.clear()
-        self._wake_event.clear()
+        self._drain_event.clear()
         self._thread = threading.Thread(
             target=self._run,
             name="wal-sender",
@@ -149,7 +149,7 @@ class BackgroundWALSender:
         thread = self._thread
         if thread is not None:
             self._stop_event.set()
-            self._wake_event.set()  # unblock the sleep
+            self._drain_event.set()  # unblock the sleep
             thread.join(timeout)
 
             if thread.is_alive():
@@ -166,6 +166,19 @@ class BackgroundWALSender:
             except Exception:
                 logger.exception("Failed to close consumer for %s", path)
         self._consumers.clear()
+
+    def notify(self) -> None:
+        """Signal that new records are available for draining.
+
+        Wakes the background thread so it drains immediately instead of
+        waiting for the next poll interval.  Safe to call from any thread.
+
+        If a wake signal is lost (race with the thread's clear()),
+        the next poll-interval drain picks up the records — the WAL
+        guarantees durability, so a missed wake is a latency blip,
+        not data loss.
+        """
+        self._drain_event.set()
 
     def drain_once(self) -> int:
         """Drain all WAL files once.  Thread-safe.
@@ -226,14 +239,25 @@ class BackgroundWALSender:
     # -- Internals ---------------------------------------------------------
 
     def _run(self) -> None:
-        """Background loop: drain → sleep → repeat → final drain on exit."""
+        """Background loop: drain → sleep → repeat → final drain on exit.
+
+        Sleeps on ``drain_event.wait(poll_interval)``.  Woken early by
+        :meth:`notify` (new records available) or :meth:`stop` (shutdown).
+        After waking, checks ``stop_event`` to decide whether to continue
+        or exit.
+
+        The ``drain_event.clear()`` after each wait creates a small race
+        window where a concurrent ``notify()`` call could be lost.  This
+        is acceptable: the WAL guarantees durability, so a missed wake
+        just delays sending by at most one poll interval.
+        """
         while not self._stop_event.is_set():
             try:
                 self.drain_once()
             except Exception:
                 logger.exception("Error in WAL sender drain cycle")
-            self._wake_event.wait(self._poll_interval)
-            self._wake_event.clear()
+            self._drain_event.wait(self._poll_interval)
+            self._drain_event.clear()
 
         # Final drain — writer process should have exited, so lock files
         # are either removed (clean close) or stale (crash).

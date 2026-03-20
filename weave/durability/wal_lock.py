@@ -14,7 +14,10 @@ no platform-specific APIs.
 
 from __future__ import annotations
 
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 LOCK_EXT = ".lock"
 
@@ -38,6 +41,12 @@ def acquire_lock(wal_path: str, lock_ext: str = LOCK_EXT) -> str:
         The path to the lock file (for later release).
     """
     path = lock_path_for(wal_path, lock_ext)
+    if os.path.exists(path):
+        logger.warning(
+            "Lock file %s already exists — overwriting. This likely means "
+            "a previous writer crashed without cleanup.",
+            path,
+        )
     with open(path, "w", encoding="utf-8") as f:
         f.write(str(os.getpid()))
     return path
@@ -48,7 +57,11 @@ def release_lock(lock_path: str) -> None:
     try:
         os.unlink(lock_path)
     except FileNotFoundError:
-        pass
+        logger.warning(
+            "Lock file %s was already missing on release. This may indicate "
+            "external tampering or a logic error.",
+            lock_path,
+        )
 
 
 def is_writer_alive(wal_path: str, lock_ext: str = LOCK_EXT) -> bool:
@@ -67,7 +80,14 @@ def is_writer_alive(wal_path: str, lock_ext: str = LOCK_EXT) -> bool:
     try:
         with open(path, encoding="utf-8") as f:
             pid = int(f.read().strip())
-    except (FileNotFoundError, ValueError):
+    except FileNotFoundError:
+        return False
+    except ValueError:
+        logger.warning(
+            "Lock file %s contains non-integer content — treating as stale. "
+            "This indicates file corruption or external tampering.",
+            path,
+        )
         return False
     return _is_pid_alive(pid)
 
@@ -75,6 +95,8 @@ def is_writer_alive(wal_path: str, lock_ext: str = LOCK_EXT) -> bool:
 def _is_pid_alive(pid: int) -> bool:
     """Check if a process with the given PID is still running."""
     try:
+        # Signal 0 doesn't deliver a signal — it just checks whether the
+        # process exists and we have permission to signal it.
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
