@@ -1,46 +1,23 @@
-"""Unit tests for TaskManager using an in-memory Redis mock."""
+"""Unit tests for TaskManager using fakeredis."""
 
-import fnmatch
 import json
 from unittest.mock import patch
 
+import fakeredis
 import pytest
 
 from weave.trace_server.task_manager import TaskManager
 
 
-class InMemoryRedis:
-    """Minimal in-memory Redis mock implementing the operations used by TaskManager."""
-
-    def __init__(self) -> None:
-        self._store: dict[str, str] = {}
-
-    def set(self, key: str, value: str, ex: int | None = None) -> None:
-        # TTL is intentionally ignored — not relevant to unit tests
-        self._store[key] = value
-
-    def get(self, key: str) -> str | None:
-        return self._store.get(key)
-
-    def delete(self, *keys: str) -> None:
-        for key in keys:
-            self._store.pop(key, None)
-
-    def scan(self, cursor: int, match: str) -> tuple[int, list[str]]:
-        # Return all matching keys in one shot (cursor=0 signals done)
-        matched = [k for k in self._store if fnmatch.fnmatch(k, match)]
-        return 0, matched
+@pytest.fixture
+def fake_redis() -> fakeredis.FakeRedis:
+    return fakeredis.FakeRedis(decode_responses=True)
 
 
 @pytest.fixture
-def redis_mock() -> InMemoryRedis:
-    return InMemoryRedis()
-
-
-@pytest.fixture
-def manager(redis_mock: InMemoryRedis) -> TaskManager:
+def manager(fake_redis: fakeredis.FakeRedis) -> TaskManager:
     with patch(
-        "weave.trace_server.task_manager.get_redis_client", return_value=redis_mock
+        "weave.trace_server.task_manager.get_redis_client", return_value=fake_redis
     ):
         return TaskManager(project_id="entity/project", wb_user_id="user123")
 
@@ -106,7 +83,6 @@ def test_cancel_task_sets_canceled_at(manager: TaskManager) -> None:
 
     assert canceled is not None
     assert canceled["canceled_at"] is not None
-    # Should still be readable from Redis
     fetched = manager.get_task(task["id"])
     assert fetched is not None
     assert fetched["canceled_at"] == canceled["canceled_at"]
@@ -130,9 +106,11 @@ def test_list_tasks_returns_all_tasks(manager: TaskManager) -> None:
     assert ids == {t1["id"], t2["id"]}
 
 
-def test_list_tasks_isolated_by_project_and_user(redis_mock: InMemoryRedis) -> None:
+def test_list_tasks_isolated_by_project_and_user(
+    fake_redis: fakeredis.FakeRedis,
+) -> None:
     with patch(
-        "weave.trace_server.task_manager.get_redis_client", return_value=redis_mock
+        "weave.trace_server.task_manager.get_redis_client", return_value=fake_redis
     ):
         manager_a = TaskManager(project_id="proj/a", wb_user_id="alice")
         manager_b = TaskManager(project_id="proj/b", wb_user_id="alice")
@@ -169,16 +147,31 @@ def test_task_data_survives_increments(manager: TaskManager) -> None:
     assert final["canceled_at"] is None
 
 
-def test_task_key_includes_project_and_user(redis_mock: InMemoryRedis) -> None:
+def test_task_key_includes_project_and_user(
+    fake_redis: fakeredis.FakeRedis,
+) -> None:
     with patch(
-        "weave.trace_server.task_manager.get_redis_client", return_value=redis_mock
+        "weave.trace_server.task_manager.get_redis_client", return_value=fake_redis
     ):
         manager = TaskManager(project_id="myentity/myproject", wb_user_id="myuser")
 
     task = manager.create_task(total_items=1)
     expected_prefix = "weave:task:myentity/myproject:myuser:"
-    matching_keys = [k for k in redis_mock._store if k.startswith(expected_prefix)]
+    matching_keys = [k for k in fake_redis.keys("*") if k.startswith(expected_prefix)]
 
     assert len(matching_keys) == 1
-    stored = json.loads(redis_mock._store[matching_keys[0]])
+    stored = json.loads(fake_redis.get(matching_keys[0]))
     assert stored["id"] == task["id"]
+
+
+def test_task_ttl_is_set(fake_redis: fakeredis.FakeRedis) -> None:
+    with patch(
+        "weave.trace_server.task_manager.get_redis_client", return_value=fake_redis
+    ):
+        manager = TaskManager(project_id="entity/project", wb_user_id="user123")
+
+    task = manager.create_task(total_items=1)
+    key = f"weave:task:entity/project:user123:{task['id']}"
+    ttl = fake_redis.ttl(key)
+
+    assert ttl > 0
