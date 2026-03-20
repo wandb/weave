@@ -212,6 +212,7 @@ from weave.trace_server.table_query_builder import (
     make_standard_table_query,
     make_table_stats_query_with_storage_size,
 )
+from weave.trace_server.task_manager import TaskManager
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -229,7 +230,6 @@ from weave.trace_server.trace_server_common import (
     make_feedback_query_req,
     set_nested_key,
 )
-from weave.trace_server.task_manager import TaskManager
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
     EvaluateModelDispatcher,
