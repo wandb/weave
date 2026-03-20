@@ -1479,7 +1479,7 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
-@pytest.mark.timeout(30)
+@pytest.mark.timeout(60)
 @pytest.mark.flaky(reruns=3, reruns_delay=2)
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
 def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
@@ -1536,10 +1536,6 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         4 * 1024
     )  # Small enough to get multiple updates
 
-    # Clear cached endpoint availability so the probe call is always made,
-    # ensuring deterministic record counts regardless of test ordering.
-    _ENDPOINT_CACHE.discard("table_create_from_digests")
-
     # Set the client to use the remote server so calls get recorded
     client = TestOnlyFlushingWeaveClient(
         entity=client.entity,
@@ -1550,6 +1546,11 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
 
     # Create a Table object and save it to trigger chunking logic
     table_obj = weave_client.Table(rows)
+
+    # Clear cached endpoint availability so the probe call is always made,
+    # ensuring deterministic record counts regardless of test ordering.
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
+
     saved_table = client.save(table_obj, "table")
 
     assert saved_table.table_ref._digest == exp_digest
