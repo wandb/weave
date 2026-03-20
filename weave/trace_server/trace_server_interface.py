@@ -1921,7 +1921,7 @@ class CallsScoreRes(BaseModel):
     pass
 
 
-class TaskDetails(BaseModel):
+class TaskDetails(TypedDict):
     """Details about a task's progress."""
 
     id: str
@@ -1929,7 +1929,7 @@ class TaskDetails(BaseModel):
     successful_items: int
     failed_items: int
     created_at: str
-    canceled_at: str | None = None
+    canceled_at: str | None
 
 
 class TasksListReq(BaseModelStrict):

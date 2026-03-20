@@ -3,9 +3,9 @@
 import json
 import uuid
 from datetime import datetime
-from typing import TypedDict
 
 from .redis_client import get_redis_client
+from .trace_server_interface import TaskDetails
 
 TASK_TTL_SECONDS = 3600  # 1 hour - prevents orphaned tasks from persisting indefinitely
 
@@ -15,17 +15,6 @@ class TaskID(str):
 
     def __new__(cls) -> "TaskID":
         return super().__new__(cls, str(uuid.uuid4()))
-
-
-class TaskDetails(TypedDict):
-    """Details about a task's progress."""
-
-    id: str
-    total_items: int
-    successful_items: int
-    failed_items: int
-    created_at: str
-    canceled_at: str | None
 
 
 class TaskManager:
