@@ -71,7 +71,8 @@ class WALManager:
 
     def flush(self) -> None:
         """Flush the WAL to disk."""
-        self._writer.flush()
+        if self._writer is not None:
+            self._writer.flush()
 
     def close(self) -> None:
         """Close the writer then stop the sender.
