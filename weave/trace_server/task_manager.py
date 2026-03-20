@@ -53,14 +53,6 @@ class TaskManager:
         key = self._make_task_key(task_id)
         self._redis_client.set(key, json.dumps(task_details), ex=TASK_TTL_SECONDS)
 
-    def _get_task(self, task_id: str) -> TaskDetails | None:
-        if self._redis_client is None:
-            return None
-        data = self._redis_client.get(self._make_task_key(task_id))
-        if data is None:
-            return None
-        return json.loads(data)
-
     def create_task(self, total_items: int) -> TaskDetails:
         """Create a new task with the given total number of items."""
         task_id = TaskID()
@@ -77,7 +69,12 @@ class TaskManager:
 
     def get_task(self, task_id: str) -> TaskDetails | None:
         """Get task details by ID."""
-        return self._get_task(task_id)
+        if self._redis_client is None:
+            return None
+        data = self._redis_client.get(self._make_task_key(task_id))
+        if data is None:
+            return None
+        return json.loads(data)
 
     def increment_successful_items(self, task_id: str) -> TaskDetails | None:
         """Increment the successful items count for a task."""
