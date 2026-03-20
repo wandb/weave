@@ -16,10 +16,11 @@ Architecture::
                                polls on interval
 
 The sender runs a background thread that periodically:
-
 1. Discovers all WAL files via the directory manager.
 2. Drains each file through the registered handlers via :func:`drain`.
 3. Removes fully-consumed files whose writer is no longer alive.
+   Files whose writer is still alive are drained but kept on disk;
+   they will be removed on a subsequent cycle after the writer closes.
 
 File safety:
     The writer creates a ``.lock`` sidecar containing its PID.  Before
@@ -159,7 +160,12 @@ class BackgroundWALSender:
 
             self._thread = None
 
-        # Close any remaining cached consumers.
+        # Close any remaining cached consumers.  If a close() fails, the
+        # consumer's file handle leaks but the dict is still cleared below,
+        # so the sender's internal state is clean and start() can be called
+        # again.  The leaked fd does NOT prevent file cleanup on Unix (unlink
+        # works on open fds), but on Windows the file cannot be deleted until
+        # the process exits and the handle is reclaimed.
         for path, consumer in self._consumers.items():
             try:
                 consumer.close()
@@ -223,7 +229,9 @@ class BackgroundWALSender:
                         self._consumers.pop(path).close()
                         self._mgr.remove(path)
                 except Exception:
-                    logger.exception("Error draining WAL file %s", path)
+                    logger.exception(
+                        "Error draining or cleaning up WAL file %s", path
+                    )
 
             return total
 

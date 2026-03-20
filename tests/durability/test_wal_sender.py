@@ -62,7 +62,11 @@ class TestDrainOnce:
         assert mgr.list_files() == [w2_path]
         assert len(received) == 2
 
+        # Writer closes between drain cycles → lock removed.
+        # Next drain should clean up the now-inactive file.
         w2.close()
+        sender.drain_once()
+        assert mgr.list_files() == []
 
     def test_empty_directory_is_noop(self, tmp_path: str) -> None:
         """No WAL files means drain_once returns 0 without errors."""
