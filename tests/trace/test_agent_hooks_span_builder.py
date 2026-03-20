@@ -77,12 +77,16 @@ class TestBasicTurnStructure:
         builder.handle(_event("stop"))
 
         spans = exporter.get_finished_spans()
-        # 3 spans: invoke_agent root + execute_tool Read + chat (response)
-        assert len(spans) == 3, f"Expected 3 spans, got {len(spans)}: {[s.name for s in spans]}"
+        # 4 spans: invoke_agent root + execute_tool Read + chat (user prompt) + chat (response)
+        assert len(spans) == 4, f"Expected 4 spans, got {len(spans)}: {[s.name for s in spans]}"
 
         tool_span = next(s for s in spans if "Read" in s.name)
         agent_span = next(s for s in spans if "invoke_agent" in s.name)
-        response_span = next(s for s in spans if s.name == "chat")
+        response_span = next(
+            s
+            for s in spans
+            if s.name == "chat" and "gen_ai.output.messages" in s.attributes
+        )
 
         # Tool is child of agent
         assert tool_span.parent is not None
@@ -315,9 +319,9 @@ class TestAgentThoughtsAndResponses:
         chat_spans = [s for s in spans if s.name == "chat"]
         tool_spans = [s for s in spans if "Read" in s.name]
 
-        # 3 child chat spans: 2 thoughts + 1 response
-        assert len(chat_spans) == 3, (
-            f"Expected 3 chat spans, got {len(chat_spans)}: {[s.name for s in spans]}"
+        # 4 chat spans: user prompt + 2 thoughts + 1 response
+        assert len(chat_spans) == 4, (
+            f"Expected 4 chat spans, got {len(chat_spans)}: {[s.name for s in spans]}"
         )
         assert len(tool_spans) == 1
 
@@ -326,9 +330,13 @@ class TestAgentThoughtsAndResponses:
             assert cs.parent is not None
             assert cs.parent.span_id == agent_span.context.span_id
 
-        # Chat spans have output_messages with the thought/response content
+        # Chat spans with model output (thoughts + final response)
+        output_chats = [
+            s for s in chat_spans if "gen_ai.output.messages" in s.attributes
+        ]
+        assert len(output_chats) == 3
         texts = []
-        for cs in chat_spans:
+        for cs in output_chats:
             msgs = json.loads(cs.attributes["gen_ai.output.messages"])
             texts.append(msgs[0]["content"])
         assert "Let me consider" in texts[0]
@@ -356,4 +364,4 @@ class TestAgentThoughtsAndResponses:
             key=lambda s: s.start_time,
         )
         names = [s.name for s in child_spans]
-        assert names == ["chat", "execute_tool Shell", "chat", "chat"]
+        assert names == ["chat", "chat", "execute_tool Shell", "chat", "chat"]

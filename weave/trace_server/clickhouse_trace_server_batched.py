@@ -765,6 +765,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings=settings,
         )
 
+    @staticmethod
+    def _build_genai_order_by(
+        sort_by: list[tsi.GenAISortBy] | None,
+        allowed_columns: set[str],
+        default_order: str,
+    ) -> str:
+        """Build a safe ORDER BY clause from sort_by specs."""
+        if not sort_by:
+            return default_order
+        clauses: list[str] = []
+        for s in sort_by:
+            if s.field in allowed_columns:
+                direction = "ASC" if s.direction == "asc" else "DESC"
+                clauses.append(f"{s.field} {direction}")
+        return ", ".join(clauses) if clauses else default_order
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_spans_query")
     def genai_spans_query(
         self, req: tsi.GenAISpansQueryReq
@@ -795,22 +811,41 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if req.filters.conversation_id:
                 conditions.append("conversation_id = {filter_conv:String}")
                 parameters["filter_conv"] = req.filters.conversation_id
+            if req.filters.status_code:
+                conditions.append("status_code = {filter_status:String}")
+                parameters["filter_status"] = req.filters.status_code
 
         where_clause = " AND ".join(conditions)
         parameters["limit"] = min(req.limit, 1000)
         parameters["offset"] = req.offset
 
+        _SPANS_SORT_COLS = {
+            "started_at", "span_name", "operation_name", "provider_name",
+            "agent_name", "request_model", "input_tokens", "output_tokens",
+            "status_code",
+        }
+        order_by = self._build_genai_order_by(
+            req.sort_by, _SPANS_SORT_COLS, "started_at DESC"
+        )
+
+        count_params = {k: v for k, v in parameters.items() if k not in ("limit", "offset")}
+        count_query = f"""
+            SELECT count() FROM genai_spans WHERE {where_clause}
+        """
+        count_result = self.ch_client.query(count_query, parameters=count_params)
+        total_count = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
+
         query = f"""
             SELECT {_GENAI_SPAN_COLS}
             FROM genai_spans
             WHERE {where_clause}
-            ORDER BY started_at DESC
+            ORDER BY {order_by}
             LIMIT {{limit:UInt64}} OFFSET {{offset:UInt64}}
         """
 
         query_result = self.ch_client.query(query, parameters=parameters)
         spans = _query_result_to_genai_spans(query_result)
-        return tsi.GenAISpansQueryRes(spans=spans)
+        return tsi.GenAISpansQueryRes(spans=spans, total_count=total_count)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_spans_trace")
     def genai_spans_trace(
@@ -852,15 +887,61 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.GenAIConversationsQueryReq
     ) -> tsi.GenAIConversationsQueryRes:
         """List conversations grouped by conversation_id with aggregate stats."""
+        span_conditions = [
+            "project_id = {project_id:String}",
+            "conversation_id != ''",
+        ]
         parameters: dict[str, Any] = {
             "project_id": req.project_id,
             "limit": min(req.limit, 1000),
             "offset": req.offset,
         }
-        query = """
+
+        if req.filters:
+            if req.filters.provider_name:
+                span_conditions.append("provider_name = {filter_provider:String}")
+                parameters["filter_provider"] = req.filters.provider_name
+            if req.filters.conversation_id:
+                span_conditions.append("conversation_id = {filter_conv:String}")
+                parameters["filter_conv"] = req.filters.conversation_id
+            if req.filters.agent_name:
+                span_conditions.append("agent_name = {filter_agent_name:String}")
+                parameters["filter_agent_name"] = req.filters.agent_name
+            if req.filters.operation_name:
+                span_conditions.append("operation_name = {filter_operation_name:String}")
+                parameters["filter_operation_name"] = req.filters.operation_name
+
+        span_where = " AND ".join(span_conditions)
+
+        _CONV_SORT_COLS = {
+            "last_seen", "first_seen", "turn_count", "span_count",
+            "total_input_tokens", "total_output_tokens",
+            "conversation_id", "provider_name",
+        }
+        order_by = self._build_genai_order_by(
+            req.sort_by, _CONV_SORT_COLS, "last_seen DESC"
+        )
+
+        count_params = {k: v for k, v in parameters.items() if k not in ("limit", "offset")}
+        count_query = f"""
+            SELECT count() FROM (
+                SELECT conversation_id
+                FROM genai_spans
+                WHERE {span_where}
+                GROUP BY conversation_id, project_id
+            )
+        """
+        count_result = self.ch_client.query(count_query, parameters=count_params)
+        total_count = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
+
+        # ``anyLast(conversation_name)`` is nondeterministic and usually picks
+        # arbitrary rows — most child spans have an empty ``conversation_name``,
+        # so the aggregate flips between empty (→ adjective-animal fallback) and
+        # the root span's name.  Use the latest *non-empty* name by time instead.
+        query = f"""
             SELECT
                 conversation_id,
-                anyLast(conversation_name) AS conversation_name,
+                argMaxIf(conversation_name, started_at, conversation_name != '') AS conversation_name,
                 project_id,
                 countDistinct(trace_id)   AS turn_count,
                 count()                   AS span_count,
@@ -870,11 +951,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 min(started_at)           AS first_seen,
                 max(ended_at)             AS last_seen
             FROM genai_spans
-            WHERE project_id = {project_id:String}
-              AND conversation_id != ''
+            WHERE {span_where}
             GROUP BY conversation_id, project_id
-            ORDER BY last_seen DESC
-            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+            ORDER BY {order_by}
+            LIMIT {{limit:UInt64}} OFFSET {{offset:UInt64}}
         """
         result = self.ch_client.query(query, parameters=parameters)
         col_names = list(result.column_names)
@@ -921,7 +1001,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for conv in conversations:
             if not conv.conversation_name:
                 conv.conversation_name = _auto_conversation_name(conv.conversation_id)
-        return tsi.GenAIConversationsQueryRes(conversations=conversations)
+        return tsi.GenAIConversationsQueryRes(
+            conversations=conversations, total_count=total_count
+        )
 
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched.genai_conversation_chat"
@@ -971,27 +1053,52 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.GenAIAgentsQueryReq
     ) -> tsi.GenAIAgentsQueryRes:
         """List agents with aggregated stats, including per-model token rollup."""
+        agent_conditions = [
+            "project_id = {project_id:String}",
+            "invocation_count > 0",
+        ]
         parameters: dict[str, Any] = {
             "project_id": req.project_id,
             "limit": min(req.limit, 1000),
             "offset": req.offset,
         }
 
-        # 1) Agent metadata from the pre-aggregated genai_agents table.
-        #    Filter out agents with 0 invocations — these are ghost entries
-        #    from chat/tool spans that carry a generic agent_name (e.g.
-        #    "OpenAI Agent") but have no invoke_agent boundary span.
-        meta_query = """
+        if req.filters:
+            if req.filters.agent_name:
+                agent_conditions.append("agent_name ILIKE {filter_agent:String}")
+                parameters["filter_agent"] = f"%{req.filters.agent_name}%"
+            if req.filters.provider_name:
+                agent_conditions.append("provider_name = {filter_provider:String}")
+                parameters["filter_provider"] = req.filters.provider_name
+
+        agent_where = " AND ".join(agent_conditions)
+
+        _AGENTS_SORT_COLS = {
+            "invocation_count", "last_seen", "first_seen", "agent_name",
+            "total_input_tokens", "total_output_tokens", "total_duration_ms",
+            "error_count", "span_count",
+        }
+        order_by = self._build_genai_order_by(
+            req.sort_by, _AGENTS_SORT_COLS, "invocation_count DESC"
+        )
+
+        count_params = {k: v for k, v in parameters.items() if k not in ("limit", "offset")}
+        count_query = f"""
+            SELECT count() FROM genai_agents FINAL WHERE {agent_where}
+        """
+        count_result = self.ch_client.query(count_query, parameters=count_params)
+        total_count = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
+
+        meta_query = f"""
             SELECT
                 project_id, agent_name, invocation_count, span_count,
                 total_input_tokens, total_output_tokens, total_duration_ms,
                 error_count, agent_description, agent_id, provider_name,
                 system_instructions, first_seen, last_seen, llm_summary
             FROM genai_agents FINAL
-            WHERE project_id = {project_id:String}
-              AND invocation_count > 0
-            ORDER BY invocation_count DESC
-            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+            WHERE {agent_where}
+            ORDER BY {order_by}
+            LIMIT {{limit:UInt64}} OFFSET {{offset:UInt64}}
         """
         meta_result = self.ch_client.query(meta_query, parameters=parameters)
         col_names = list(meta_result.column_names)
@@ -1055,7 +1162,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 ))
 
         return tsi.GenAIAgentsQueryRes(
-            agents=[agents_by_name[n] for n in agent_order]
+            agents=[agents_by_name[n] for n in agent_order],
+            total_count=total_count,
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_agent_metrics")

@@ -407,6 +407,13 @@ class GenAISpanSchema(BaseModel):
     wb_user_id: str = ""
 
 
+class GenAISortBy(BaseModel):
+    """Sort specification for GenAI query endpoints."""
+
+    field: str
+    direction: Literal["asc", "desc"] = "desc"
+
+
 class GenAISpansQueryFilters(BaseModel):
     """Optional filters for querying genai_spans."""
 
@@ -417,6 +424,7 @@ class GenAISpansQueryFilters(BaseModel):
     tool_name: str | None = None
     request_model: str | None = None
     conversation_id: str | None = None
+    status_code: str | None = None
 
 
 class GenAISpansQueryReq(BaseModel):
@@ -424,6 +432,7 @@ class GenAISpansQueryReq(BaseModel):
 
     project_id: str
     filters: GenAISpansQueryFilters | None = None
+    sort_by: list[GenAISortBy] | None = None
     limit: int = 100
     offset: int = 0
 
@@ -432,6 +441,7 @@ class GenAISpansQueryRes(BaseModel):
     """Response containing a list of GenAI spans."""
 
     spans: list[GenAISpanSchema]
+    total_count: int = 0
 
 
 class GenAISpansTraceReq(BaseModel):
@@ -553,10 +563,26 @@ class GenAIConversationSchema(BaseModel):
     last_seen: datetime.datetime | None = None
 
 
+class GenAIConversationsQueryFilters(BaseModel):
+    """Optional filters for querying conversations.
+
+    When ``agent_name`` is set, aggregates include only spans matching that
+    agent (and ``operation_name`` when provided). Conversations with no such
+    spans are omitted.
+    """
+
+    provider_name: str | None = None
+    conversation_id: str | None = None
+    agent_name: str | None = None
+    operation_name: str | None = None
+
+
 class GenAIConversationsQueryReq(BaseModel):
     """Request to list conversations for a project, ordered by most recent."""
 
     project_id: str
+    filters: GenAIConversationsQueryFilters | None = None
+    sort_by: list[GenAISortBy] | None = None
     limit: int = 100
     offset: int = 0
 
@@ -565,6 +591,7 @@ class GenAIConversationsQueryRes(BaseModel):
     """Response containing a list of conversations."""
 
     conversations: list[GenAIConversationSchema]
+    total_count: int = 0
 
 
 class GenAIConversationChatReq(BaseModel):
@@ -620,10 +647,19 @@ class GenAIAgentSchema(BaseModel):
     llm_summary: str = ""
 
 
+class GenAIAgentsQueryFilters(BaseModel):
+    """Optional filters for querying agents."""
+
+    agent_name: str | None = None
+    provider_name: str | None = None
+
+
 class GenAIAgentsQueryReq(BaseModel):
     """Request to list agents with aggregated stats for a project."""
 
     project_id: str
+    filters: GenAIAgentsQueryFilters | None = None
+    sort_by: list[GenAISortBy] | None = None
     limit: int = 100
     offset: int = 0
 
@@ -632,6 +668,7 @@ class GenAIAgentsQueryRes(BaseModel):
     """Response containing aggregated agent stats."""
 
     agents: list[GenAIAgentSchema]
+    total_count: int = 0
 
 
 class GenAIAgentMetricsReq(BaseModel):

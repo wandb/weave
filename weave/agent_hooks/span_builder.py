@@ -25,10 +25,13 @@ import logging
 import os
 import re
 import sqlite3
+import sys
 import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import requests
 
 if TYPE_CHECKING:
     from opentelemetry.sdk.trace import TracerProvider
@@ -51,37 +54,170 @@ def _looks_like_uuid(s: str) -> bool:
     return bool(_UUID_RE.match(s))
 
 
-_CURSOR_DB_PATH = Path.home() / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
+def _cursor_global_state_vscdb_path() -> Path:
+    """Return the path to Cursor's global ``state.vscdb`` for this OS."""
+    home = Path.home()
+    if sys.platform == "darwin":
+        return (
+            home
+            / "Library"
+            / "Application Support"
+            / "Cursor"
+            / "User"
+            / "globalStorage"
+            / "state.vscdb"
+        )
+    if sys.platform == "win32":
+        return home / "AppData" / "Roaming" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
+    return home / ".config" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
 
 
-def _read_cursor_session_name(conversation_id: str) -> str:
+def _composer_lookup_ids(
+    conversation_id: str,
+    transcript_path: str = "",
+    extra_ids: tuple[str, ...] = (),
+) -> list[str]:
+    """Return distinct candidate ids used in ``composerData:<id>`` keys.
+
+    Cursor versions differ on whether hooks send ``composerId``, ``chatId``,
+    or only the transcript filename stem — we try every hint.
+    """
+    out: list[str] = []
+
+    def add(s: str) -> None:
+        s = (s or "").strip()
+        if s and s not in out:
+            out.append(s)
+
+    add(conversation_id)
+    for x in extra_ids:
+        add(str(x))
+    if transcript_path:
+        stem = Path(transcript_path).name
+        for suffix in (".jsonl", ".json"):
+            if stem.endswith(suffix):
+                stem = stem[: -len(suffix)]
+                break
+        add(stem)
+    for cid in list(out):
+        if _looks_like_uuid(cid):
+            add(cid.lower())
+            add(cid.upper())
+    return out
+
+
+def _ids_match(a: str, b: str) -> bool:
+    """Return True if *a* and *b* refer to the same Cursor id."""
+    a, b = (a or "").strip(), (b or "").strip()
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    if _looks_like_uuid(a) and _looks_like_uuid(b) and a.lower() == b.lower():
+        return True
+    return False
+
+
+def _name_from_composer_json(data: Any, match_id: str) -> str:
+    """Extract a display title from a composer JSON blob."""
+    if not isinstance(data, dict):
+        return ""
+    ac = data.get("allComposers")
+    if isinstance(ac, list):
+        for c in ac:
+            if not isinstance(c, dict):
+                continue
+            cids = (
+                str(c.get("composerId") or ""),
+                str(c.get("composer_id") or ""),
+                str(c.get("chatId") or ""),
+                str(c.get("conversationId") or ""),
+                str(c.get("sessionId") or ""),
+            )
+            if any(x and _ids_match(x, match_id) for x in cids):
+                n = c.get("name", "")
+                if isinstance(n, str) and n.strip():
+                    return n.strip()
+        return ""
+    n = data.get("name", "")
+    if isinstance(n, str) and n.strip():
+        return n.strip()
+    return ""
+
+
+def _read_kv_value(conn: sqlite3.Connection, table: str, key: str) -> str | None:
+    """Read a single key from *table* if the table exists."""
+    try:
+        row = conn.execute(f"SELECT value FROM {table} WHERE key = ?", (key,)).fetchone()
+    except sqlite3.Error:
+        return None
+    if not row:
+        return None
+    return row[0]
+
+
+def _read_cursor_session_name(
+    conversation_id: str,
+    *,
+    transcript_path: str = "",
+    extra_ids: tuple[str, ...] = (),
+) -> str:
     """Read the LLM-generated session title from Cursor's local SQLite DB.
 
-    Cursor stores conversation metadata in ``state.vscdb`` under
-    ``composerData:<conversation_id>`` keys.  The JSON value contains a
-    ``name`` field with the title shown in Cursor's sidebar.
+    Cursor stores composer metadata in the global ``state.vscdb``.  Newer
+    builds may use ``composerData:<composerId>`` rows, ``allComposers``
+    index blobs, or ``ItemTable`` instead of ``cursorDiskKV``.  Titles are
+    often written *after* the model responds, so callers should re-query on
+    ``afterAgentResponse`` / ``stop``, not only on ``beforeSubmitPrompt``.
+
+    Args:
+        conversation_id: Primary id from hook payloads (``conversation_id``).
+        transcript_path: Optional path whose basename may match ``composerId``.
+        extra_ids: Optional ids from the raw payload (e.g. ``composerId``).
 
     Returns:
         The session title, or empty string on any failure.
     """
-    if not _CURSOR_DB_PATH.exists():
+    db_path = _cursor_global_state_vscdb_path()
+    if not db_path.exists():
+        return ""
+    candidates = _composer_lookup_ids(
+        conversation_id,
+        transcript_path=transcript_path,
+        extra_ids=extra_ids,
+    )
+    if not candidates:
         return ""
     try:
-        uri = f"file:{_CURSOR_DB_PATH}?mode=ro"
-        conn = sqlite3.connect(uri, uri=True, timeout=1)
-        try:
-            row = conn.execute(
-                "SELECT value FROM cursorDiskKV WHERE key = ?",
-                (f"composerData:{conversation_id}",),
-            ).fetchone()
-            if not row:
-                return ""
-            data = json.loads(row[0])
-            return data.get("name", "")
-        finally:
-            conn.close()
-    except Exception:
+        uri = f"file:{db_path}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=3)
+    except sqlite3.Error as e:
+        logger.debug("cursor session name: could not open %s: %s", db_path, e)
         return ""
+    try:
+        tables = ("cursorDiskKV", "ItemTable")
+        for cid in candidates:
+            for table in tables:
+                for key in (f"composerData:{cid}", f"composerData:{cid.lower()}"):
+                    raw = _read_kv_value(conn, table, key)
+                    if not raw:
+                        continue
+                    try:
+                        data = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    name = _name_from_composer_json(data, conversation_id)
+                    if name:
+                        return name
+
+        # Intentionally no broad ``value LIKE`` scan: Cursor's global DB can be
+        # very large and unindexed substring scans would stall the daemon.
+    except Exception as e:
+        logger.debug("cursor session name read failed: %s", e)
+        return ""
+    finally:
+        conn.close()
+    return ""
 
 
 class _TurnState:
@@ -238,8 +374,6 @@ class SpanBuilder:
             conv.model = ev.model
         if conv.workspace == "" and ev.workspace_roots:
             conv.workspace = ev.workspace_roots[0]
-        if not conv.conversation_name and ev.prompt_text:
-            conv.conversation_name = ev.prompt_text[:60]
         return conv, conv.current_turn
 
     def _open_turn(self, conv: _ConvState, ev: AgentHookEvent) -> _TurnState:
@@ -551,8 +685,6 @@ class SpanBuilder:
         if not self._server_url or not self._project_id:
             return
         try:
-            import requests as http_requests
-
             url = f"{self._server_url}/genai/annotations/upsert"
             headers: dict[str, str] = {"Content-Type": "application/json"}
             if self._api_key:
@@ -569,9 +701,50 @@ class SpanBuilder:
                     "source": source,
                 }],
             }
-            http_requests.post(url, json=payload, headers=headers, timeout=5)
+            requests.post(url, json=payload, headers=headers, timeout=5)
         except Exception:
             logger.debug("Failed to write annotation", exc_info=True)
+
+    def _maybe_sync_cursor_conversation_title(self, ev: AgentHookEvent) -> None:
+        """Update ``conversation_name`` from Cursor's local DB when available.
+
+        Cursor often persists the sidebar title only after the model responds,
+        so this must run on ``afterAgentResponse`` / ``stop`` as well as
+        ``beforeSubmitPrompt``.
+        """
+        if ev.source != "cursor" or not ev.conversation_id:
+            return
+        raw = ev.raw or {}
+        extra = tuple(
+            str(raw[k])
+            for k in ("composer_id", "composerId", "chatId", "composerSessionId")
+            if raw.get(k)
+        )
+        title = _read_cursor_session_name(
+            ev.conversation_id,
+            transcript_path=ev.transcript_path or "",
+            extra_ids=extra,
+        )
+        if not title:
+            return
+        conv = self._get_conv(ev.conversation_id)
+        if title == conv.conversation_name:
+            return
+        conv.conversation_name = title
+        self._write_annotation(
+            "conversation",
+            ev.conversation_id,
+            "display",
+            "name",
+            conv.conversation_name,
+        )
+        # Keep the open root span aligned so OTLP exports don't reintroduce
+        # empty names that break ClickHouse aggregates.
+        if conv.current_turn and conv.current_turn.agent_span is not None:
+            conv.current_turn.agent_span.set_attribute(
+                "gen_ai.conversation.name",
+                title,
+            )
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -600,21 +773,26 @@ class SpanBuilder:
 
     def _on_stop(self, ev: AgentHookEvent) -> None:
         """Agent loop ended for one turn — close turn with status, export spans."""
+        if ev.source == "cursor":
+            self._maybe_sync_cursor_conversation_title(ev)
         conv = self._get_conv(ev.conversation_id)
         self._close_turn(conv, stop_status=ev.stop_status, loop_count=ev.loop_count)
 
     def _on_user_prompt(self, ev: AgentHookEvent) -> None:
         conv = self._get_conv(ev.conversation_id)
-        if not conv.conversation_name:
-            if ev.source == "cursor":
-                conv.conversation_name = _read_cursor_session_name(ev.conversation_id)
-            if not conv.conversation_name and ev.prompt_text:
-                conv.conversation_name = ev.prompt_text[:60]
-            if conv.conversation_name:
-                self._write_annotation(
-                    "conversation", ev.conversation_id, "display", "name",
-                    conv.conversation_name,
-                )
+        self._maybe_sync_cursor_conversation_title(ev)
+        # Cursor: do not persist truncated prompts as display names — they fight
+        # the real sidebar title and cause visible flapping vs annotations.
+        if (
+            not conv.conversation_name
+            and ev.prompt_text
+            and ev.source != "cursor"
+        ):
+            conv.conversation_name = ev.prompt_text[:60]
+            self._write_annotation(
+                "conversation", ev.conversation_id, "display", "name",
+                conv.conversation_name,
+            )
         # Close any previous turn that wasn't closed by stop
         self._close_turn(conv)
         # Open a new turn
@@ -658,6 +836,8 @@ class SpanBuilder:
             user_span.end()
 
     def _on_agent_response(self, ev: AgentHookEvent) -> None:
+        if ev.source == "cursor":
+            self._maybe_sync_cursor_conversation_title(ev)
         _, turn = self._get_turn(ev)
         if turn is None:
             return
