@@ -157,7 +157,12 @@ class BackgroundWALSender:
             Number of records successfully processed.
         """
         with self._lock:
-            return self._drain_unlocked()
+            return drain_all(
+                self._mgr,
+                self._handlers,
+                self._consumer_factory,
+                is_file_active=self._is_file_active,
+            )
 
     def flush(self) -> int:
         """Drain all pending records synchronously.  Thread-safe.
@@ -197,12 +202,3 @@ class BackgroundWALSender:
             self.drain_once()
         except Exception:
             logger.exception("Error in WAL sender final drain")
-
-    def _drain_unlocked(self) -> int:
-        """Drain all WAL files.  Caller must hold ``self._lock``."""
-        return drain_all(
-            self._mgr,
-            self._handlers,
-            self._consumer_factory,
-            is_file_active=self._is_file_active,
-        )
