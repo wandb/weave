@@ -2776,9 +2776,9 @@ class EvalResultsScorerStats(BaseModel):
             "token_distance.passed. None for root-level scalar scorers."
         ),
     )
-    value_type: Literal["binary", "continuous"] | None = Field(
+    value_type: Literal["binary", "continuous", "text"] | None = Field(
         default=None,
-        description="Type of the leaf value: binary (bool) or continuous (number).",
+        description="Type of the leaf value: binary (bool), continuous (number), or text (string).",
     )
     trial_count: int = 0
     numeric_count: int = 0
