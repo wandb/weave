@@ -6207,7 +6207,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         task = task_manager.cancel_task(req.task_id)
         if task is None:
             raise ValueError(f"Task {req.task_id} not found")
-        return tsi.TaskCancelRes(task=tsi.TaskDetails(**task))
+        return tsi.TaskCancelRes(task=task)
 
     # Private Methods
     @property
