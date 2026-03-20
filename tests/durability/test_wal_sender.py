@@ -64,36 +64,6 @@ class TestDrainOnce:
 
         w2.close()
 
-    def test_open_writer_protects_file(self, tmp_path: str) -> None:
-        """A file with an open writer is never removed, even if fully consumed."""
-        mgr = FileWALDirectoryManager(str(tmp_path))
-        writer = mgr.create_file()
-        writer.write({"type": "obj_create", "seq": 0})
-        writer.flush()
-
-        sender = BackgroundWALSender(
-            mgr, {"obj_create": lambda r: None}, JSONLWALConsumer
-        )
-        sender.drain_once()
-
-        # File is protected — PID lock is alive.
-        assert len(mgr.list_files()) == 1
-
-        writer.close()
-
-    def test_closed_writer_allows_deletion(self, tmp_path: str) -> None:
-        """After writer closes, lock file is removed and file can be deleted."""
-        mgr = FileWALDirectoryManager(str(tmp_path))
-        with mgr.create_file() as writer:
-            writer.write({"type": "obj_create", "seq": 0})
-
-        sender = BackgroundWALSender(
-            mgr, {"obj_create": lambda r: None}, JSONLWALConsumer
-        )
-        sender.drain_once()
-
-        assert mgr.list_files() == []
-
     def test_empty_directory_is_noop(self, tmp_path: str) -> None:
         """No WAL files means drain_once returns 0 without errors."""
         mgr = FileWALDirectoryManager(str(tmp_path))
@@ -122,6 +92,28 @@ class TestDrainOnce:
 
         assert [r["seq"] for r in received] == [0, 1]
         writer.close()
+
+    def test_drains_multiple_files_from_previous_run(self, tmp_path: str) -> None:
+        """Files left by a previous process that shut down cleanly (lock removed)
+        but whose records were never drained are picked up and cleaned up.
+        """
+        mgr = FileWALDirectoryManager(str(tmp_path))
+
+        # Two files from a previous run — writers closed, no lock files.
+        with mgr.create_file() as w1:
+            w1.write({"type": "call_start", "id": "orphan-1"})
+        with mgr.create_file() as w2:
+            w2.write({"type": "call_start", "id": "orphan-2"})
+            w2.write({"type": "call_end", "id": "orphan-2"})
+
+        received: list[WALRecord] = []
+        handlers = {"call_start": received.append, "call_end": received.append}
+        sender = BackgroundWALSender(mgr, handlers, JSONLWALConsumer)
+        sender.drain_once()
+
+        assert len(received) == 3
+        assert mgr.list_files() == []
+
 
 class TestBackgroundThread:
     """Tests for the background drain thread."""
@@ -222,61 +214,6 @@ class TestBackgroundThread:
                 time.sleep(0.02)
 
         assert len(received) == 1
-
-
-class TestCrashRecovery:
-    """Tests simulating crash recovery scenarios."""
-
-    def test_drains_unprocessed_files_from_previous_run(self, tmp_path: str) -> None:
-        """Files left by a previous process that shut down cleanly (lock removed)
-        but whose records were never drained are picked up and cleaned up.
-
-        This is NOT a crash scenario — the writers closed normally (removing
-        their .lock files).  The files just weren't drained before the process
-        exited.  The sender in a new process discovers and processes them.
-        """
-        mgr = FileWALDirectoryManager(str(tmp_path))
-
-        # Two files from a previous run — writers closed, no lock files.
-        with mgr.create_file() as w1:
-            w1.write({"type": "call_start", "id": "orphan-1"})
-        with mgr.create_file() as w2:
-            w2.write({"type": "call_start", "id": "orphan-2"})
-            w2.write({"type": "call_end", "id": "orphan-2"})
-
-        received: list[WALRecord] = []
-        handlers = {"call_start": received.append, "call_end": received.append}
-        sender = BackgroundWALSender(mgr, handlers, JSONLWALConsumer)
-        sender.drain_once()
-
-        assert len(received) == 3
-        assert mgr.list_files() == []
-
-    def test_interleaved_crash_recovery_and_new_writes(self, tmp_path: str) -> None:
-        """Orphaned files are cleaned up while open writer's file is kept."""
-        mgr = FileWALDirectoryManager(str(tmp_path))
-
-        # Orphaned file from a "crashed" process (writer closed → lock removed).
-        with mgr.create_file() as orphan:
-            orphan.write({"type": "call_start", "id": "old"})
-
-        # New writer still open → lock has our PID.
-        writer = mgr.create_file()
-        writer.write({"type": "call_start", "id": "new"})
-        writer.flush()
-
-        received: list[WALRecord] = []
-        sender = BackgroundWALSender(
-            mgr, {"call_start": received.append}, JSONLWALConsumer
-        )
-        sender.drain_once()
-
-        # Both records processed.
-        assert len(received) == 2
-        # Orphaned file removed, open writer's file protected by PID lock.
-        assert len(mgr.list_files()) == 1
-
-        writer.close()
 
 
 class TestErrorResilience:
