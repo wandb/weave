@@ -11,9 +11,8 @@ import pytest
 import weave
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
-from weave.durability.wal_sender import BackgroundWALSender
+from weave.durability.wal_sender import BackgroundWALSender, build_trace_server_handlers
 from weave.trace.settings import UserSettings
-from weave.trace_server import trace_server_interface as tsi
 
 
 def _read_all_wal_records(wal_dir: Path) -> list[dict]:
@@ -29,28 +28,6 @@ def _read_all_wal_records(wal_dir: Path) -> list[dict]:
         finally:
             consumer.close()
     return records
-
-
-def _build_handlers(server):
-    """Build WAL record handlers that replay requests to the server."""
-
-    def handle_obj_create(record):
-        req = tsi.ObjCreateReq.model_validate(record["req"])
-        server.obj_create(req)
-
-    def handle_table_create(record):
-        req = tsi.TableCreateReq.model_validate(record["req"])
-        server.table_create(req)
-
-    def handle_file_create(record):
-        req = tsi.FileCreateReq.model_validate(record["req"])
-        server.file_create(req)
-
-    return {
-        "obj_create": handle_obj_create,
-        "table_create": handle_table_create,
-        "file_create": handle_file_create,
-    }
 
 
 @pytest.fixture
@@ -132,7 +109,7 @@ class TestWALSender:
         client._wal.close()
 
         dir_mgr = FileWALDirectoryManager(str(wal_dir))
-        handlers = _build_handlers(client.server)
+        handlers = build_trace_server_handlers(client.server)
         sender = BackgroundWALSender(
             dir_mgr, handlers, JSONLWALConsumer, poll_interval=0.1
         )
@@ -151,7 +128,7 @@ class TestWALSender:
         client._wal.close()
 
         dir_mgr = FileWALDirectoryManager(str(wal_dir))
-        handlers = _build_handlers(client.server)
+        handlers = build_trace_server_handlers(client.server)
         sender = BackgroundWALSender(
             dir_mgr, handlers, JSONLWALConsumer, poll_interval=0.1
         )

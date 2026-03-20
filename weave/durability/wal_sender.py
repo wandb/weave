@@ -31,7 +31,11 @@ File safety:
 
 from __future__ import annotations
 
+import argparse
 import logging
+import os
+import signal
+import sys
 import threading
 from collections.abc import Callable
 
@@ -39,9 +43,11 @@ from weave.durability.wal import (
     WALConsumer,
     WALDirectoryManager,
     WALHandlers,
+    WALRecord,
     drain,
 )
 from weave.durability.wal_lock import is_writer_alive
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 logger = logging.getLogger(__name__)
 
@@ -241,3 +247,121 @@ class BackgroundWALSender:
             self.drain_once()
         except Exception:
             logger.exception("Error in WAL sender final drain")
+
+
+# -- Production handler registry ------------------------------------------
+
+
+def build_trace_server_handlers(server: TraceServerClientInterface) -> WALHandlers:
+    """Build WAL handlers that replay records to a trace server.
+
+    Each handler deserializes the ``req`` payload from the WAL record
+    and calls the corresponding method on *server*.
+    """
+    from weave.trace_server import trace_server_interface as tsi
+
+    def handle_obj_create(record: WALRecord) -> None:
+        server.obj_create(tsi.ObjCreateReq.model_validate(record["req"]))
+
+    def handle_table_create(record: WALRecord) -> None:
+        server.table_create(tsi.TableCreateReq.model_validate(record["req"]))
+
+    def handle_file_create(record: WALRecord) -> None:
+        server.file_create(tsi.FileCreateReq.model_validate(record["req"]))
+
+    return {
+        "obj_create": handle_obj_create,
+        "table_create": handle_table_create,
+        "file_create": handle_file_create,
+    }
+
+
+# -- CLI entrypoint -------------------------------------------------------
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Run the WAL sender as a standalone process.
+
+    Usage::
+
+        python -m weave.durability.wal_sender \\
+            --entity my-entity --project my-project
+    """
+    parser = argparse.ArgumentParser(
+        description="Drain WAL files and send records to the trace server."
+    )
+    parser.add_argument("--entity", required=True)
+    parser.add_argument("--project", required=True)
+    parser.add_argument(
+        "--wal-dir",
+        help="Override WAL directory (default: ~/.weave/wal/<entity>/<project>)",
+    )
+    parser.add_argument(
+        "--trace-server-url",
+        default=os.environ.get("WF_TRACE_SERVER_URL", "https://trace.wandb.ai"),
+    )
+    parser.add_argument(
+        "--api-key",
+        default=os.environ.get("WANDB_API_KEY"),
+    )
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=1.0,
+        help="Seconds between drain cycles (default: 1.0)",
+    )
+    args = parser.parse_args(argv)
+
+    if not args.api_key:
+        print("Error: --api-key or WANDB_API_KEY required", file=sys.stderr)
+        sys.exit(1)
+
+    wal_dir = args.wal_dir or os.path.join(
+        os.path.expanduser("~"), ".weave", "wal", args.entity, args.project
+    )
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+
+    from weave.durability.wal_consumer import JSONLWALConsumer
+    from weave.durability.wal_directory_manager import FileWALDirectoryManager
+    from weave.trace_server_bindings.remote_http_trace_server import (
+        RemoteHTTPTraceServer,
+    )
+
+    server = RemoteHTTPTraceServer(args.trace_server_url, auth=("api", args.api_key))
+    dir_mgr = FileWALDirectoryManager(wal_dir)
+    handlers = build_trace_server_handlers(server)
+
+    sender = BackgroundWALSender(
+        dir_mgr,
+        handlers,
+        JSONLWALConsumer,
+        poll_interval=args.poll_interval,
+    )
+
+    stop = threading.Event()
+
+    def _on_signal(signum: int, frame: object) -> None:
+        logger.info("Received signal %s, stopping…", signal.Signals(signum).name)
+        stop.set()
+
+    signal.signal(signal.SIGINT, _on_signal)
+    signal.signal(signal.SIGTERM, _on_signal)
+
+    logger.info(
+        "WAL sender started for %s/%s (dir=%s, poll=%.1fs)",
+        args.entity,
+        args.project,
+        wal_dir,
+        args.poll_interval,
+    )
+
+    sender.start()
+    stop.wait()
+    sender.stop()
+
+    logger.info("WAL sender stopped.")
+
+
+if __name__ == "__main__":
+    main()
