@@ -558,6 +558,7 @@ class TestCrossProcessProtection:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
         )
+        sender = BackgroundWALSender(mgr, {"obj_create": lambda r: None}, JSONLWALConsumer)
         try:
             assert proc.stdout is not None
             line = proc.stdout.readline()
@@ -565,7 +566,6 @@ class TestCrossProcessProtection:
 
             assert is_writer_alive(path) is True
 
-            sender = BackgroundWALSender(mgr, {"obj_create": lambda r: None}, JSONLWALConsumer)
             sender.drain_once()
 
             # File should still exist — subprocess is alive.
@@ -579,7 +579,7 @@ class TestCrossProcessProtection:
         # Subprocess exited — lock file has stale PID.
         assert is_writer_alive(path) is False
 
-        sender = BackgroundWALSender(mgr, {"obj_create": lambda r: None}, JSONLWALConsumer)
+        # Same sender, second drain — consumer is cached, file now deletable.
         sender.drain_once()
         assert mgr.list_files() == []
 
@@ -621,19 +621,20 @@ class TestCrossProcessProtection:
             writer.write({"type": "obj_create", "seq": 0})
 
         # Custom check that always says "active" → file never deleted.
-        sender = BackgroundWALSender(
+        sender1 = BackgroundWALSender(
             mgr, {"obj_create": lambda r: None}, JSONLWALConsumer,
             is_file_active=lambda path: True,
         )
-        sender.drain_once()
+        sender1.drain_once()
         assert len(mgr.list_files()) == 1
+        sender1.stop()  # release cached consumers
 
         # Custom check that always says "not active" → file deleted.
-        sender = BackgroundWALSender(
+        sender2 = BackgroundWALSender(
             mgr, {"obj_create": lambda r: None}, JSONLWALConsumer,
             is_file_active=lambda path: False,
         )
-        sender.drain_once()
+        sender2.drain_once()
         assert mgr.list_files() == []
 
 

@@ -39,7 +39,7 @@ from weave.durability.wal import (
     WALConsumer,
     WALDirectoryManager,
     WALHandlers,
-    drain_all,
+    drain,
 )
 from weave.durability.wal_lock import is_writer_alive
 
@@ -110,6 +110,7 @@ class BackgroundWALSender:
         self._poll_interval = poll_interval
         self._is_file_active = is_file_active
 
+        self._consumers: dict[str, WALConsumer] = {}
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._wake_event = threading.Event()
@@ -145,24 +146,62 @@ class BackgroundWALSender:
         if self._thread is not None:
             self._thread.join(timeout)
             self._thread = None
+        # Close any remaining cached consumers (thread is stopped).
+        for path, consumer in self._consumers.items():
+            try:
+                consumer.close()
+            except Exception:
+                logger.exception("Failed to close consumer for %s", path)
+        self._consumers.clear()
 
     def drain_once(self) -> int:
         """Drain all WAL files once.  Thread-safe.
 
-        Each file is read from its checkpoint forward.  Records are
-        dispatched to the matching handler.  Fully-consumed files are
-        removed unless ``is_file_active`` returns True.
+        Consumers are cached across calls so that repeated poll cycles
+        avoid re-reading the checkpoint file and re-opening the WAL.
+        A consumer is evicted (and its file removed) only when fully
+        consumed and no longer active.
 
         Returns:
             Number of records successfully processed.
         """
         with self._lock:
-            return drain_all(
-                self._mgr,
-                self._handlers,
-                self._consumer_factory,
-                is_file_active=self._is_file_active,
-            )
+            total = 0
+            current_paths = self._mgr.list_files()
+            current_set = set(current_paths)
+
+            # Evict consumers for files that disappeared from disk.
+            # Snapshot keys because the loop may pop() entries.
+            for path in list(self._consumers):
+                if path not in current_set:
+                    try:
+                        self._consumers.pop(path).close()
+                    except Exception:
+                        logger.exception(
+                            "Failed to close evicted consumer for %s", path
+                        )
+
+            for path in current_paths:
+                if path not in self._consumers:
+                    try:
+                        self._consumers[path] = self._consumer_factory(path)
+                    except Exception:
+                        logger.exception(
+                            "Failed to create consumer for %s", path
+                        )
+                        continue
+                consumer = self._consumers[path]
+                try:
+                    total += drain(consumer, self._handlers)
+                    if self._is_file_active(path):
+                        continue
+                    if next(consumer.read_pending(), None) is None:
+                        self._consumers.pop(path).close()
+                        self._mgr.remove(path)
+                except Exception:
+                    logger.exception("Error draining WAL file %s", path)
+
+            return total
 
     def flush(self) -> int:
         """Drain all pending records synchronously.  Thread-safe.
