@@ -32,13 +32,13 @@ File safety:
 from __future__ import annotations
 
 import argparse
-from typing import Any
 import logging
 import os
 import signal
 import sys
 import threading
 from collections.abc import Callable
+from typing import Any
 
 from weave.durability.wal import (
     WAL_RECORD_TYPES,
@@ -275,7 +275,9 @@ class TraceServerHandlers:
             req_cls = getattr(tsi, req_cls_name)
             method = getattr(server, record_type)
 
-            def _handler(record: WALRecord, _m: Any = method, _rc: Any = req_cls) -> None:
+            def _handler(
+                record: WALRecord, _m: Any = method, _rc: Any = req_cls
+            ) -> None:
                 _m(_rc.model_validate(record["req"]))
 
             self._handlers[record_type] = _handler
@@ -330,7 +332,6 @@ def create_sender(
 
 
 # -- CLI entrypoint -------------------------------------------------------
-
 
 
 def main(argv: list[str] | None = None) -> None:
