@@ -283,9 +283,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
         self._op_ref_cache: TTLCache[tuple[str, str], str] = TTLCache(
-            maxsize=50_000, ttl=86_400
+            maxsize=50_000, ttl=300
         )
         self._op_ref_cache_lock = threading.Lock()
+        self._placeholder_file_projects: set[str] = set()
         self._database_ensured = False
 
     def __del__(self) -> None:
@@ -481,21 +482,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         with self._op_ref_cache_lock:
             self._op_ref_cache[project_id, op_name] = uri
 
-    def _create_or_get_placeholder_ops_digest(
-        self, project_id: str, create: bool
-    ) -> str:
-        if not create:
-            return compute_file_digest(
-                (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
-            )
+    def _ensure_placeholder_file_exists(self, project_id: str) -> None:
+        """Write the OTEL placeholder source file at most once per project per process."""
+        with self._op_ref_cache_lock:
+            if project_id in self._placeholder_file_projects:
+                return
+            self._placeholder_file_projects.add(project_id)
 
-        source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
-        source_file_req = tsi.FileCreateReq(
-            project_id=project_id,
-            name=object_creation_utils.OP_SOURCE_FILE_NAME,
-            content=source_code.encode("utf-8"),
+        self.file_create(
+            tsi.FileCreateReq(
+                project_id=project_id,
+                name=object_creation_utils.OP_SOURCE_FILE_NAME,
+                content=object_creation_utils.PLACEHOLDER_OP_SOURCE.encode("utf-8"),
+            )
         )
-        return self.file_create(source_file_req).digest
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
@@ -566,43 +566,33 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
             obj_id_idx_map.pop(op_name)
 
-        # We know that OTel will always use the placeholder source.
-        # We can instead just reuse the existing file if we know it is present
-        # and create it just once if we are not sure.
-        if len(existing_ops) == 0:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=True
-            )
-        else:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=False
-            )
-        obj_creation_batch = []
-        for op_obj_id in obj_id_idx_map.keys():
-            op_val = object_creation_utils.build_op_val(digest)
-            obj_creation_batch.append(
+        if obj_id_idx_map:
+            self._ensure_placeholder_file_exists(req.project_id)
+            obj_creation_batch = [
                 tsi.ObjSchemaForInsert(
                     project_id=req.project_id,
-                    object_id=op_obj_id,
-                    val=op_val,
+                    object_id=op_name,
+                    val=object_creation_utils._OTEL_PLACEHOLDER_OP_VAL,
                     wb_user_id=req.wb_user_id,
                 )
-            )
-        res = self.obj_create_batch(obj_creation_batch)
+                for op_name in obj_id_idx_map.keys()
+            ]
+            self.obj_create_batch(obj_creation_batch)
 
-        for result in res:
-            if result.object_id is None:
-                raise RuntimeError("Otel Export - Expected object_id but got None")
+            cached_op_refs = {}
+            for op_name, idxs in obj_id_idx_map.items():
+                op_ref_uri = ri.InternalOpRef(
+                    project_id=req.project_id,
+                    name=op_name,
+                    version=object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST,
+                ).uri
+                for idx in idxs:
+                    calls[idx][0].op_name = op_ref_uri
+                cached_op_refs[op_name] = op_ref_uri
 
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=result.object_id,
-                version=result.digest,
-            ).uri
-            for idx in obj_id_idx_map[result.object_id]:
-                calls[idx][0].op_name = op_ref_uri
-            # Cache newly created ops so subsequent batches skip the CH query
-            self._cache_op_ref(req.project_id, result.object_id, op_ref_uri)
+            with self._op_ref_cache_lock:
+                for op_name, op_ref_uri in cached_op_refs.items():
+                    self._op_ref_cache[req.project_id, op_name] = op_ref_uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
