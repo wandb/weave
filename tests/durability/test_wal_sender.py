@@ -600,14 +600,39 @@ def writer_subprocess():
 
     All spawned processes are cleaned up on fixture teardown.
     """
-    procs: list[subprocess.Popen] = []
+    # Inline script executed via `python -c`.  We need a real subprocess
+    # (not multiprocessing) because PID lock detection requires a
+    # genuinely different OS PID.
+    script = """\
+import sys
+from weave.durability.wal_directory_manager import FileWALDirectoryManager
+from weave.durability.wal_writer import JSONLWALWriter
 
-    module = "tests.durability._wal_writer_subprocess"
+wal_dir = sys.argv[1]
+count = int(sys.argv[2])
+crash = len(sys.argv) > 3 and sys.argv[3] == "--crash"
+
+mgr = FileWALDirectoryManager(wal_dir)
+writer = JSONLWALWriter(mgr)
+for i in range(count):
+    writer.write({"type": "obj_create", "seq": i})
+
+if crash:
+    sys.exit(0)
+
+sys.stdout.write("written\\n")
+sys.stdout.flush()
+sys.stdin.readline()
+writer.close()
+sys.stdout.write("closed\\n")
+sys.stdout.flush()
+"""
+    procs: list[subprocess.Popen] = []
 
     def start(
         wal_dir: str, count: int, *, crash: bool = False
     ) -> subprocess.Popen:
-        args = [sys.executable, "-m", module, wal_dir, str(count)]
+        args = [sys.executable, "-c", script, wal_dir, str(count)]
         if crash:
             args.append("--crash")
         proc = subprocess.Popen(
