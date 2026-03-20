@@ -63,7 +63,6 @@ def init(
         settings: Configuration for the Weave client generally. Can be a UserSettings instance or a dict
             with any of the following keys (all optional). All settings can also be configured
             via environment variables using the prefix WEAVE_ (e.g., WEAVE_DISABLED=true).
-            
             Available settings:
                 - `disabled` (bool): Disables traces on all functions. Default: `False`
                 - `print_call_link` (bool): Prints links in terminal to Weave UI for ops. Default: `True`
@@ -107,7 +106,6 @@ def init(
                     call data (start and end) into a single request instead of separate start/end requests.
                     This reduces server load and improves performance, especially for short-lived ops.
                     Default: `False`
-        
         autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
