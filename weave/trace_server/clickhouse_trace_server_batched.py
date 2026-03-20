@@ -6200,7 +6200,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def tasks_list(self, req: tsi.TasksListReq) -> tsi.TasksListRes:
         task_manager = TaskManager(req.project_id, req.wb_user_id)
         tasks = task_manager.list_tasks()
-        return tsi.TasksListRes(tasks=[tsi.TaskDetails(**t) for t in tasks])
+        return tsi.TasksListRes(tasks=tasks)
 
     def task_cancel(self, req: tsi.TaskCancelReq) -> tsi.TaskCancelRes:
         task_manager = TaskManager(req.project_id, req.wb_user_id)
