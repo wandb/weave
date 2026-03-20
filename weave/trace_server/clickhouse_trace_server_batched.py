@@ -111,6 +111,7 @@ from weave.trace_server.constants import (
     IMAGE_GENERATION_CREATE_OP_NAME,
 )
 from weave.trace_server.datadog import (
+    generator_trace,
     set_current_span_dd_tags,
     set_root_span_dd_tags,
 )
@@ -1268,7 +1269,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             unfinished_call_ids=sorted(unfinished_call_ids),
         )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
+    @generator_trace("clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         read_table = self.table_routing_resolver.resolve_read_table(
@@ -6339,7 +6340,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         migrator.apply_migrations(self._database)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query_stream")
+    @generator_trace("clickhouse_trace_server_batched._query_stream")
     def _query_stream(
         self,
         query: str,
