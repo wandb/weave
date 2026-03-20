@@ -27,7 +27,7 @@ from weave.integrations.integration_utilities import op_name_from_call
 
 
 @pytest.fixture(autouse=True)
-def patch_claude_agent_sdk() -> Generator[None]:
+def patch_claude_agent_sdk() -> Generator[None, None, None]:
     import weave.integrations.claude_agent_sdk.claude_agent_sdk_integration as mod
 
     mod._claude_agent_sdk_patcher = None
