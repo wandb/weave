@@ -42,12 +42,15 @@ import json
 import logging
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, get_args, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
 # Opaque dict — the WAL layer is format-agnostic.  Schema defined by callers.
 WALRecord = dict
+
+WALRecordType = Literal["obj_create", "table_create", "file_create"]
+WAL_RECORD_TYPES: tuple[str, ...] = get_args(WALRecordType)
 
 # Processes a single WAL record.  Must be idempotent — drain() replays the
 # entire batch on failure (at-least-once delivery).

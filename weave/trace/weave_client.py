@@ -383,8 +383,9 @@ class WeaveClient:
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
-        self._wal = WALManager(
-            self.entity, self.project, enabled=settings.should_enable_wal()
+        self._wal = WALManager.with_sender(
+            self.entity, self.project, self.server,
+            enabled=settings.should_enable_wal(),
         )
 
         # No-op when the feature flag is off (returns immediately).

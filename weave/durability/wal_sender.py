@@ -40,6 +40,7 @@ import threading
 from collections.abc import Callable
 
 from weave.durability.wal import (
+    WAL_RECORD_TYPES,
     WALConsumer,
     WALDirectoryManager,
     WALHandlers,
@@ -49,7 +50,6 @@ from weave.durability.wal import (
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_lock import is_writer_alive
-from weave.durability.wal_manager import WAL_RECORD_TYPES
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import (

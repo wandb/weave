@@ -10,8 +10,6 @@ import pytest
 
 import weave
 from weave.durability.wal_consumer import JSONLWALConsumer
-from weave.durability.wal_directory_manager import FileWALDirectoryManager
-from weave.durability.wal_sender import BackgroundWALSender, build_trace_server_handlers
 from weave.trace.settings import UserSettings
 
 
@@ -32,8 +30,24 @@ def _read_all_wal_records(wal_dir: Path) -> list[dict]:
 
 @pytest.fixture
 def wal_client(client_creator):
-    """Create a client with WAL enabled and yield (client, wal_dir)."""
-    # Pre-clean any stale WAL files from previous runs.
+    """Create a client with WAL enabled but sender stopped (write-only).
+
+    Stops the background sender so records stay on disk for inspection.
+    """
+    stale_dir = Path.home() / ".weave" / "wal" / "shawn" / "test-project"
+    if stale_dir.is_dir():
+        shutil.rmtree(stale_dir)
+
+    with client_creator(settings=UserSettings(enable_wal=True)) as client:
+        # Stop the sender so it doesn't drain records while we inspect them.
+        client._wal._sender.stop()
+        client._wal._sender = None
+        yield client, Path(client._wal.wal_dir)
+
+
+@pytest.fixture
+def wal_client_with_sender(client_creator):
+    """Create a client with WAL enabled and sender running."""
     stale_dir = Path.home() / ".weave" / "wal" / "shawn" / "test-project"
     if stale_dir.is_dir():
         shutil.rmtree(stale_dir)
@@ -99,38 +113,27 @@ class TestWALClientWrites:
 
 
 class TestWALSender:
-    """Verify that the BackgroundWALSender replays WAL records to the server."""
+    """Verify that the in-process sender drains WAL records automatically."""
 
-    def test_sender_replays_obj_create(self, wal_client):
-        client, wal_dir = wal_client
+    def test_sender_drains_on_close(self, wal_client_with_sender):
+        """After close(), the sender's final drain should consume all records."""
+        client, wal_dir = wal_client_with_sender
 
         weave.publish({"k": "v"}, name="sender_obj")
         client._flush()
         client._wal.close()
 
-        dir_mgr = FileWALDirectoryManager(str(wal_dir))
-        handlers = build_trace_server_handlers(client.server)
-        sender = BackgroundWALSender(
-            dir_mgr, handlers, JSONLWALConsumer, poll_interval=0.1
-        )
-        total = sender.drain_once()
-        assert total >= 1
-
         remaining = list(wal_dir.glob("*.jsonl"))
         assert len(remaining) == 0
 
-    def test_sender_replays_table_create(self, wal_client):
-        client, wal_dir = wal_client
+    def test_sender_drains_table_create(self, wal_client_with_sender):
+        """Table-create records should be drained and files cleaned up."""
+        client, wal_dir = wal_client_with_sender
 
         ds = weave.Dataset(name="sender_ds", rows=[{"x": 1}])
         weave.publish(ds, name="sender_ds")
         client._flush()
         client._wal.close()
 
-        dir_mgr = FileWALDirectoryManager(str(wal_dir))
-        handlers = build_trace_server_handlers(client.server)
-        sender = BackgroundWALSender(
-            dir_mgr, handlers, JSONLWALConsumer, poll_interval=0.1
-        )
-        total = sender.drain_once()
-        assert total >= 1
+        remaining = list(wal_dir.glob("*.jsonl"))
+        assert len(remaining) == 0
