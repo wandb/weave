@@ -4,7 +4,7 @@ Covers:
 - Client writes to WAL when enabled
 - Client works normally when WAL is disabled (default)
 - WALManager lifecycle (write-only and with sender)
-- build_trace_server_handlers and create_sender
+- TraceServerHandlers and create_sender
 """
 
 from __future__ import annotations
@@ -20,17 +20,22 @@ from PIL import Image
 import weave
 from weave.durability.wal import WAL_RECORD_TYPES
 from weave.durability.wal_consumer import JSONLWALConsumer
+from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_manager import WALManager
 from weave.durability.wal_sender import (
+    BackgroundWALSender,
     TraceServerHandlers,
     build_trace_server_handlers,
     create_sender,
 )
+from weave.durability.wal_writer import JSONLWALWriter
 from weave.trace.settings import UserSettings
+from weave.trace_server import trace_server_interface as tsi
 
 
-def _read_all_wal_records(wal_dir: Path) -> list[dict]:
-    """Read all records from all WAL files in a directory."""
+def _read_all_wal_records(client: weave.WeaveClient) -> list[dict]:
+    """Read all records from a client's WAL directory."""
+    wal_dir = Path(client._wal.wal_dir)
     records: list[dict] = []
     if not wal_dir.is_dir():
         return records
@@ -62,87 +67,74 @@ def wal_client(client_creator, _clean_wal_dir):
         # Stop the sender so it doesn't drain records while we inspect them.
         client._wal._sender.stop()
         client._wal._sender = None
-        yield client, Path(client._wal.wal_dir)
+        yield client
 
 
 @pytest.fixture
 def wal_client_with_sender(client_creator, _clean_wal_dir):
     """Create a client with WAL enabled and sender running."""
     with client_creator(settings=UserSettings(enable_wal=True)) as client:
-        yield client, Path(client._wal.wal_dir)
+        yield client
 
 
 class TestWALClientWrites:
     """Verify that client operations produce WAL records when enabled."""
 
     def test_obj_create(self, wal_client):
-        client, wal_dir = wal_client
-
         weave.publish({"model": "gpt-4", "temp": 0.7}, name="my_obj")
-        client._flush()
+        wal_client._flush()
 
-        records = _read_all_wal_records(wal_dir)
+        records = _read_all_wal_records(wal_client)
         obj_records = [r for r in records if r["type"] == "obj_create"]
         assert len(obj_records) == 1
         req = obj_records[0]["req"]
         assert req["obj"]["object_id"] == "my_obj"
-        assert req["obj"]["project_id"] == f"{client.entity}/{client.project}"
+        assert req["obj"]["project_id"] == f"{wal_client.entity}/{wal_client.project}"
         assert req["obj"]["val"] == {"model": "gpt-4", "temp": 0.7}
 
     def test_table_create(self, wal_client):
-        client, wal_dir = wal_client
-
         ds = weave.Dataset(name="test_ds", rows=[{"x": 1}, {"x": 2}])
         weave.publish(ds, name="test_ds")
-        client._flush()
+        wal_client._flush()
 
-        records = _read_all_wal_records(wal_dir)
+        records = _read_all_wal_records(wal_client)
         table_records = [r for r in records if r["type"] == "table_create"]
         assert len(table_records) == 1
         req = table_records[0]["req"]
-        assert req["table"]["project_id"] == f"{client.entity}/{client.project}"
+        assert req["table"]["project_id"] == f"{wal_client.entity}/{wal_client.project}"
         rows = req["table"]["rows"]
         assert len(rows) == 2
         assert rows == [{"x": 1}, {"x": 2}]
 
     def test_file_create(self, wal_client):
-        client, wal_dir = wal_client
-
         img = Image.new("RGB", (2, 2), color="red")
         weave.publish(img, name="my_image")
-        client._flush()
+        wal_client._flush()
 
-        records = _read_all_wal_records(wal_dir)
+        records = _read_all_wal_records(wal_client)
         file_records = [r for r in records if r["type"] == "file_create"]
         assert len(file_records) == 1
         req = file_records[0]["req"]
-        assert req["project_id"] == f"{client.entity}/{client.project}"
+        assert req["project_id"] == f"{wal_client.entity}/{wal_client.project}"
 
     def test_wal_records_are_json_serializable(self, wal_client):
-        """Ensure WAL records round-trip through JSON without error."""
-        client, wal_dir = wal_client
-
+        """Ensure WAL records round-trip through JSON without loss."""
         weave.publish({"nested": {"list": [1, 2, 3]}}, name="json_obj")
-        client._flush()
+        wal_client._flush()
 
-        records = _read_all_wal_records(wal_dir)
+        records = _read_all_wal_records(wal_client)
+        assert len(records) == 1
         for record in records:
             roundtripped = json.loads(json.dumps(record))
-            assert roundtripped["type"] in {
-                "obj_create",
-                "table_create",
-                "file_create",
-            }
+            assert roundtripped == record
 
     def test_flush_fsyncs_wal(self, wal_client):
         """flush() should fsync the WAL so records survive a process crash."""
-        client, wal_dir = wal_client
-
         weave.publish({"a": 1}, name="fsync_obj")
-        client.flush()
+        wal_client.flush()
 
-        records = _read_all_wal_records(wal_dir)
-        assert len(records) >= 1
+        records = _read_all_wal_records(wal_client)
+        assert len(records) == 1
 
 
 class TestWALDisabled:
@@ -174,23 +166,21 @@ class TestWALSender:
 
     def test_sender_drains_on_close(self, wal_client_with_sender):
         """After close(), the sender's final drain should consume all records."""
-        client, wal_dir = wal_client_with_sender
-
         weave.publish({"k": "v"}, name="sender_obj")
-        client._flush()
-        client._wal.close()
+        wal_client_with_sender._flush()
+        wal_dir = Path(wal_client_with_sender._wal.wal_dir)
+        wal_client_with_sender._wal.close()
 
         remaining = list(wal_dir.glob("*.jsonl"))
         assert len(remaining) == 0
 
     def test_sender_drains_table_create(self, wal_client_with_sender):
         """Table-create records should be drained and files cleaned up."""
-        client, wal_dir = wal_client_with_sender
-
         ds = weave.Dataset(name="sender_ds", rows=[{"x": 1}])
         weave.publish(ds, name="sender_ds")
-        client._flush()
-        client._wal.close()
+        wal_client_with_sender._flush()
+        wal_dir = Path(wal_client_with_sender._wal.wal_dir)
+        wal_client_with_sender._wal.close()
 
         remaining = list(wal_dir.glob("*.jsonl"))
         assert len(remaining) == 0
@@ -204,13 +194,8 @@ class TestWALManagerLifecycle:
         mgr = WALManager("test-entity", "test-project")
         # Override wal_dir to use tmp_path for isolation.
         mgr.wal_dir = str(tmp_path)
-        from weave.durability.wal_directory_manager import FileWALDirectoryManager
-        from weave.durability.wal_writer import JSONLWALWriter
-
         dir_mgr = FileWALDirectoryManager(str(tmp_path))
         mgr._writer = JSONLWALWriter(dir_mgr)
-
-        from weave.trace_server import trace_server_interface as tsi
 
         mgr.write(
             "obj_create",
@@ -224,12 +209,20 @@ class TestWALManagerLifecycle:
         )
         mgr.flush()
 
-        records = _read_all_wal_records(tmp_path)
-        assert len(records) >= 1
+        records: list[dict] = []
+        for path in sorted(tmp_path.glob("*.jsonl")):
+            consumer = JSONLWALConsumer(str(path))
+            try:
+                for entry in consumer.read_pending():
+                    records.append(entry.record)
+            finally:
+                consumer.close()
+
+        assert len(records) == 1
         assert records[0]["type"] == "obj_create"
 
         # No sender — files should still be on disk.
-        assert len(list(tmp_path.glob("*.jsonl"))) >= 1
+        assert len(list(tmp_path.glob("*.jsonl"))) == 1
         mgr.close()
 
     def test_close_is_idempotent(self, tmp_path):
@@ -240,9 +233,8 @@ class TestWALManagerLifecycle:
 
     def test_close_with_sender_is_idempotent(self, wal_client_with_sender):
         """close() on a manager with sender should be safe to call twice."""
-        client, _wal_dir = wal_client_with_sender
-        client._wal.close()
-        client._wal.close()  # should not raise
+        wal_client_with_sender._wal.close()
+        wal_client_with_sender._wal.close()  # should not raise
 
 
 class TestTraceServerHandlers:
@@ -260,8 +252,6 @@ class TestTraceServerHandlers:
         """Each handler should call the matching method on the server."""
         mock_server = MagicMock()
         handlers = TraceServerHandlers(mock_server).as_dict()
-
-        from weave.trace_server import trace_server_interface as tsi
 
         req = tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
@@ -282,8 +272,6 @@ class TestTraceServerHandlers:
         """table_create handler should call server.table_create."""
         mock_server = MagicMock()
         handlers = TraceServerHandlers(mock_server).as_dict()
-
-        from weave.trace_server import trace_server_interface as tsi
 
         req = tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
@@ -312,8 +300,6 @@ class TestCreateSender:
         """create_sender should return a BackgroundWALSender ready to start."""
         mock_server = MagicMock()
         sender = create_sender(str(tmp_path), mock_server, poll_interval=0.5)
-
-        from weave.durability.wal_sender import BackgroundWALSender
 
         assert isinstance(sender, BackgroundWALSender)
         assert sender._poll_interval == 0.5
