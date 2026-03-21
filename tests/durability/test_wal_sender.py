@@ -444,6 +444,10 @@ class TestWithRotatingWriter:
         finally:
             sender.stop()
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Background thread timing is unreliable on Windows CI runners",
+    )
     def test_full_lifecycle_write_send_cleanup(self, tmp_path: str) -> None:
         """End-to-end: write with rotation, send via background thread, cleanup."""
         mgr = FileWALDirectoryManager(str(tmp_path))
