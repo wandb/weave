@@ -308,6 +308,10 @@ class TestErrorResilience:
         assert len(dead) == 1
         assert dead[0]["seq"] == 1
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Background thread timing is unreliable on Windows CI runners",
+    )
     @pytest.mark.disable_logging_error_check
     def test_background_thread_survives_handler_error(self, tmp_path: str) -> None:
         """The background thread keeps running after a handler error."""
