@@ -18,11 +18,11 @@ import pytest
 from PIL import Image
 
 import weave
-from weave.durability.wal import WAL_RECORD_TYPES
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_manager import WALManager
 from weave.durability.wal_sender import (
+    _RECORD_TYPE_TO_REQ,
     BackgroundWALSender,
     TraceServerHandlers,
     build_trace_server_handlers,
@@ -279,12 +279,12 @@ class TestTraceServerHandlers:
     """Verify TraceServerHandlers and build_trace_server_handlers."""
 
     def test_builds_handler_for_every_record_type(self):
-        """Should produce a handler for each type in WAL_RECORD_TYPES."""
+        """Should produce a handler for each type in _RECORD_TYPE_TO_REQ."""
         mock_server = MagicMock()
         h = TraceServerHandlers(mock_server)
         handlers = h.as_dict()
 
-        assert set(handlers.keys()) == set(WAL_RECORD_TYPES)
+        assert set(handlers.keys()) == set(_RECORD_TYPE_TO_REQ.keys())
 
     def test_handler_calls_correct_server_method(self):
         """Each handler should call the matching method on the server."""

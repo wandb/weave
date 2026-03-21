@@ -41,7 +41,6 @@ from collections.abc import Callable
 from typing import Any
 
 from weave.durability.wal import (
-    WAL_RECORD_TYPES,
     WALConsumer,
     WALDirectoryManager,
     WALHandlers,
@@ -257,26 +256,29 @@ class BackgroundWALSender:
             logger.exception("Error in WAL sender final drain")
 
 
-class TraceServerHandlers:
-    """Maps WAL record types to trace server method calls.
+# Static mapping from WAL record type to its request class.
+# Prefer this over dynamic getattr — type checkers and humans can
+# verify correctness at a glance.
+_RECORD_TYPE_TO_REQ: dict[str, type[tsi.BaseModel]] = {
+    "obj_create": tsi.ObjCreateReq,
+    "table_create": tsi.TableCreateReq,
+    "file_create": tsi.FileCreateReq,
+}
 
-    Derives the handler mapping from :data:`~weave.durability.wal.WAL_RECORD_TYPES`
-    (the single source of truth for record types).  For each type ``foo_bar``,
-    it resolves ``tsi.FooBarReq`` and ``server.foo_bar`` by naming convention.
-    """
+
+class TraceServerHandlers:
+    """Maps WAL record types to trace server method calls."""
 
     def __init__(self, server: TraceServerClientInterface) -> None:
         self._server = server
         self._handlers: WALHandlers = {}
-        for record_type in WAL_RECORD_TYPES:
-            req_cls_name = (
-                "".join(w.capitalize() for w in record_type.split("_")) + "Req"
-            )
-            req_cls = getattr(tsi, req_cls_name)
+        for record_type, req_cls in _RECORD_TYPE_TO_REQ.items():
             method = getattr(server, record_type)
 
             def _handler(
-                record: WALRecord, _m: Any = method, _rc: Any = req_cls
+                record: WALRecord,
+                _m: Callable = method,
+                _rc: type[tsi.BaseModel] = req_cls,
             ) -> None:
                 _m(_rc.model_validate(record["req"]))
 
