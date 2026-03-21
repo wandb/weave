@@ -151,7 +151,9 @@ def _is_pid_alive(pid: int) -> bool:
 def _is_pid_alive_win32(pid: int) -> bool:
     """Windows-specific PID liveness check using OpenProcess."""
     kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-    handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    handle = kernel32.OpenProcess(
+        0x1000, False, pid
+    )  # PROCESS_QUERY_LIMITED_INFORMATION
     if handle == 0:
         # Process doesn't exist or access denied with no handle.
         return False
