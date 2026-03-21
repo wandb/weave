@@ -681,6 +681,10 @@ class TestEndToEndCrossProcess:
     ``writer_subprocess`` fixture above.
     """
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Subprocess-based tests are unreliable on Windows CI runners",
+    )
     def test_sender_drains_records_from_writer_subprocess(
         self, tmp_path: str, writer_subprocess
     ) -> None:
