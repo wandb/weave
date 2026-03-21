@@ -51,15 +51,18 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
     _internal_trace_server: tsi.FullTraceServerInterface
     _idc: IdConverter
+    _username_resolver: Callable[[str], str | None] | None
 
     def __init__(
         self,
         internal_trace_server: tsi.FullTraceServerInterface,
         id_converter: IdConverter,
+        username_resolver: Callable[[str], str | None] | None = None,
     ):
         super().__init__()
         self._internal_trace_server = internal_trace_server
         self._idc = id_converter
+        self._username_resolver = username_resolver
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._internal_trace_server, name)
@@ -210,8 +213,17 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             call.project_id = original_project_id
             if call.wb_run_id is not None:
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
-            if call.wb_user_id is not None:
-                call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
+            internal_user_id = call.wb_user_id
+            if (
+                req.include_usernames
+                and self._username_resolver is not None
+                and internal_user_id is not None
+            ):
+                # Resolve the username from the internal ID before we convert
+                # wb_user_id back to its external representation.
+                call.wb_username = self._username_resolver(internal_user_id)
+            if internal_user_id is not None:
+                call.wb_user_id = self._idc.int_to_ext_user_id(internal_user_id)
         return res
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
@@ -231,7 +243,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 ]
             # TODO: How do we correctly process user_id for the query filters?
         res = self._stream_ref_apply(
-            self._internal_trace_server.calls_query_stream, req, req.project_id
+            self._internal_trace_server.calls_query_stream,
+            req,
+            req.project_id,
         )
         for call in res:
             if call.project_id != req.project_id:
@@ -239,8 +253,17 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             call.project_id = original_project_id
             if call.wb_run_id is not None:
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
-            if call.wb_user_id is not None:
-                call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
+            internal_user_id = call.wb_user_id
+            if (
+                req.include_usernames
+                and self._username_resolver is not None
+                and internal_user_id is not None
+            ):
+                # Resolve the username from the internal ID before we convert
+                # wb_user_id back to its external representation.
+                call.wb_username = self._username_resolver(internal_user_id)
+            if internal_user_id is not None:
+                call.wb_user_id = self._idc.int_to_ext_user_id(internal_user_id)
             yield call
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -552,7 +575,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         )
         return res
 
-    # Streaming completions – simply proxy through after converting project ID.
+    # Streaming completions - simply proxy through after converting project ID.
     def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:

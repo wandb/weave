@@ -71,6 +71,8 @@ class Call:
     deleted_at: datetime.datetime | None = None
     thread_id: str | None = None
     turn_id: str | None = None
+    wb_user_id: str | None = None
+    wb_username: str | None = None
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
@@ -286,6 +288,8 @@ class Call:
             deleted_at=self.deleted_at,
             thread_id=self.thread_id,
             turn_id=self.turn_id,
+            wb_user_id=self.wb_user_id,
+            wb_username=self.wb_username,
             wb_run_id=self.wb_run_id,
             wb_run_step=self.wb_run_step,
             wb_run_step_end=self.wb_run_step_end,
@@ -318,6 +322,8 @@ class CallDict(TypedDict):
     deleted_at: datetime.datetime | None
     thread_id: str | None
     turn_id: str | None
+    wb_user_id: str | None
+    wb_username: str | None
     wb_run_id: str | None
     wb_run_step: int | None
     wb_run_step_end: int | None
@@ -350,6 +356,7 @@ def _make_calls_iterator(
     include_feedback: bool = False,
     include_storage_size: bool = False,
     include_total_storage_size: bool = False,
+    include_usernames: bool = False,
     columns: list[str] | None = None,
     expand_columns: list[str] | None = None,
     return_expanded_column_values: bool = True,
@@ -373,6 +380,7 @@ def _make_calls_iterator(
                     include_feedback=include_feedback,
                     include_storage_size=include_storage_size,
                     include_total_storage_size=include_total_storage_size,
+                    include_usernames=include_usernames,
                     query=query,
                     sort_by=sort_by,
                     columns=columns,
@@ -439,6 +447,8 @@ def make_client_call(
         deleted_at=server_call.deleted_at,
         thread_id=server_call.thread_id,
         turn_id=server_call.turn_id,
+        wb_user_id=server_call.wb_user_id,
+        wb_username=server_call.wb_username,
         wb_run_id=server_call.wb_run_id,
         wb_run_step=server_call.wb_run_step,
         wb_run_step_end=server_call.wb_run_step_end,

@@ -698,11 +698,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         select_columns = [
             key
             for key in tsi.CallSchema.model_fields.keys()
-            if key not in {"storage_size_bytes", "total_storage_size_bytes"}
+            if key
+            not in {"storage_size_bytes", "total_storage_size_bytes", "wb_username"}
         ]
         if req.columns:
             # TODO(gst): allow json fields to be selected
             simple_columns = list({x.split(".")[0] for x in req.columns})
+            if req.include_usernames and "wb_user_id" not in simple_columns:
+                simple_columns.append("wb_user_id")
             if "summary" in simple_columns or req.include_costs:
                 simple_columns += ["ended_at", "exception", "display_name"]
 

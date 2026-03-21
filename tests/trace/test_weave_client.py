@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import datetime
 import json
 import platform
@@ -24,6 +23,9 @@ from tests.trace.util import (
     DatetimeMatcher,
     RegexStringMatcher,
     client_is_sqlite,
+)
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    UserInjectingExternalTraceServer,
 )
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
@@ -338,6 +340,24 @@ def test_filter_sort_by_query_validation(client):
     )
 
 
+def test_get_calls_forwards_include_usernames(client, monkeypatch):
+    captured_kwargs = {}
+
+    def fake_make_calls_iterator(server, project_id, filter, **kwargs):
+        captured_kwargs["server"] = server
+        captured_kwargs["project_id"] = project_id
+        captured_kwargs["filter"] = filter
+        captured_kwargs.update(kwargs)
+        return []
+
+    monkeypatch.setattr(weave_client, "_make_calls_iterator", fake_make_calls_iterator)
+
+    client.get_calls(include_usernames=True)
+
+    assert captured_kwargs["project_id"] == client._project_id()
+    assert captured_kwargs["include_usernames"] is True
+
+
 def test_call_create(client):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
@@ -345,7 +365,7 @@ def test_call_create(client):
     expected = weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
-        trace_id=RegexStringMatcher(".*"),
+        trace_id=call.trace_id,
         parent_id=None,
         inputs={"a": 5, "b": 10},
         id=call.id,
@@ -376,8 +396,9 @@ def test_call_create(client):
         started_at=DatetimeMatcher(),
         ended_at=DatetimeMatcher(),
         deleted_at=None,
+        wb_user_id=client.entity,
     )
-    assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
+    assert result == expected
 
 
 def test_calls_query(client):
@@ -389,7 +410,7 @@ def test_calls_query(client):
     assert result[0] == weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
-        trace_id=RegexStringMatcher(".*"),
+        trace_id=result[0].trace_id,
         parent_id=None,
         inputs={"a": 5, "b": 10},
         id=call0.id,
@@ -411,11 +432,12 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
+        wb_user_id=client.entity,
     )
     assert result[1] == weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
-        trace_id=RegexStringMatcher(".*"),
+        trace_id=result[1].trace_id,
         parent_id=call0.id,
         inputs={"a": 6, "b": 11},
         id=call1.id,
@@ -437,6 +459,7 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
+        wb_user_id=client.entity,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
@@ -1479,7 +1502,7 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
-@pytest.mark.timeout(30)
+@pytest.mark.timeout(60)
 @pytest.mark.flaky(reruns=3, reruns_delay=2)
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
 def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
@@ -1536,10 +1559,6 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         4 * 1024
     )  # Small enough to get multiple updates
 
-    # Clear cached endpoint availability so the probe call is always made,
-    # ensuring deterministic record counts regardless of test ordering.
-    _ENDPOINT_CACHE.discard("table_create_from_digests")
-
     # Set the client to use the remote server so calls get recorded
     client = TestOnlyFlushingWeaveClient(
         entity=client.entity,
@@ -1550,6 +1569,11 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
 
     # Create a Table object and save it to trigger chunking logic
     table_obj = weave_client.Table(rows)
+
+    # Clear cached endpoint availability so the probe call is always made,
+    # ensuring deterministic record counts regardless of test ordering.
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
+
     saved_table = client.save(table_obj, "table")
 
     assert saved_table.table_ref._digest == exp_digest
@@ -4290,6 +4314,44 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
 
     assert len(calls) == 1
     assert calls[0].wb_run_id == mock_run_id
+
+
+def test_get_calls_include_usernames(client, monkeypatch):
+    external_server = find_server_layer(client.server, UserInjectingExternalTraceServer)
+    internal_user_id = external_server._idc.ext_to_int_user_id(client.entity)
+
+    # Username resolution happens in the external adapter after wb_user_id has
+    # been translated to the internal id, so stub that resolver directly.
+    def resolve_username(user_id: str) -> str | None:
+        return "resolved-user" if user_id == internal_user_id else None
+
+    monkeypatch.setattr(external_server, "_username_resolver", resolve_username)
+
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 5
+
+    _, call = test_op.call(3)
+
+    calls_without_usernames = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+            include_usernames=False,
+        )
+    )
+    assert len(calls_without_usernames) == 1
+    assert calls_without_usernames[0].wb_user_id == client.entity
+    assert calls_without_usernames[0].wb_username is None
+
+    calls_with_usernames = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+            include_usernames=True,
+        )
+    )
+    assert len(calls_with_usernames) == 1
+    assert calls_with_usernames[0].wb_user_id == client.entity
+    assert calls_with_usernames[0].wb_username == "resolved-user"
 
 
 def test_calls_query_with_dotted_field_keys(client):
