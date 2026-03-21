@@ -282,6 +282,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install nox uv
       - name: Run nox (Non Trace Server)
+        env:
+          DD_TRACE_ENABLED: "false"
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "not trace_server"
       - name: Upload coverage reports to Codecov
