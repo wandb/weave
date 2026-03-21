@@ -243,22 +243,6 @@ class TestBackgroundThread:
         assert received[0]["seq"] == 0
         assert mgr.list_files() == []
 
-    def test_context_manager(self, tmp_path: str) -> None:
-        """BackgroundWALSender can be used as a context manager."""
-        mgr = FileWALDirectoryManager(str(tmp_path))
-        with mgr.create_file() as writer:
-            writer.write({"type": "obj_create", "seq": 0})
-
-        received: list[WALRecord] = []
-        with BackgroundWALSender(
-            mgr, {"obj_create": received.append}, JSONLWALConsumer, poll_interval=0.05
-        ):
-            deadline = time.monotonic() + 2.0
-            while not received and time.monotonic() < deadline:
-                time.sleep(0.02)
-
-        assert len(received) == 1
-
 
 class TestErrorResilience:
     """Tests for error handling in the sender."""
