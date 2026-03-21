@@ -23,6 +23,7 @@ from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
 from weave.shared.digest import (
+    compute_file_digest,
     compute_object_digest,
     compute_row_digest,
     compute_table_digest,
@@ -2412,7 +2413,7 @@ class WeaveClient:
 
         # WAL path: persist to disk; return a resolved future immediately.
         if self._wal is not None:
-            digest = req.expected_digest or ""
+            digest = req.expected_digest or compute_file_digest(req.content)
             self._wal.write("file_create", req)
             f: Future[FileCreateRes] = Future()
             f.set_result(FileCreateRes(digest=digest))
