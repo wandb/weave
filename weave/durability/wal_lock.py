@@ -14,6 +14,7 @@ no platform-specific APIs.
 
 from __future__ import annotations
 
+import ctypes
 import logging
 import os
 import sys
@@ -149,11 +150,8 @@ def _is_pid_alive(pid: int) -> bool:
 
 def _is_pid_alive_win32(pid: int) -> bool:
     """Windows-specific PID liveness check using OpenProcess."""
-    import ctypes
-
     kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
     if handle == 0:
         # Process doesn't exist or access denied with no handle.
         return False
