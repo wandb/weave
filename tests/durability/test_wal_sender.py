@@ -162,13 +162,13 @@ class TestDrainOnce:
         sender.drain_once()
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Background thread timing is unreliable on Windows CI runners",
+)
 class TestBackgroundThread:
     """Tests for the background drain thread."""
 
-    @pytest.mark.skipif(
-        sys.platform == "win32",
-        reason="Background thread timing is unreliable on Windows CI runners",
-    )
     def test_start_and_stop(self, tmp_path: str) -> None:
         """Sender starts a thread and stops cleanly."""
         mgr = FileWALDirectoryManager(str(tmp_path))
