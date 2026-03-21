@@ -16,6 +16,9 @@ from weave.durability.wal_lock import is_writer_alive
 from weave.durability.wal_sender import BackgroundWALSender
 from weave.durability.wal_writer import JSONLWALWriter
 
+# Number of records written by the writer subprocess in cross-process tests.
+_SUBPROCESS_RECORD_COUNT = 5
+
 
 class TestDrainOnce:
     """Tests for BackgroundWALSender.drain_once() without the background thread."""
@@ -554,39 +557,6 @@ class TestCrossProcessProtection:
         sender.drain_once()
         assert mgr.list_files() == []
 
-    def test_crashed_subprocess_lock_becomes_stale(self, tmp_path: str) -> None:
-        """When a subprocess crashes, its PID lock becomes stale -> file deletable."""
-        mgr = FileWALDirectoryManager(str(tmp_path))
-        with mgr.create_file() as writer:
-            writer.write({"type": "obj_create", "seq": 0})
-
-        path = mgr.list_files()[0]
-        base, _ = os.path.splitext(path)
-        lock_path = base + ".lock"
-
-        # Spawn a subprocess that writes its PID and exits immediately.
-        proc = subprocess.Popen(
-            [
-                sys.executable,
-                "-c",
-                (
-                    "import os\n"
-                    f"with open({lock_path!r}, 'w') as f:\n"
-                    "    f.write(str(os.getpid()))\n"
-                ),
-            ],
-        )
-        proc.wait(timeout=5)
-
-        # Process is dead — lock is stale.
-        assert is_writer_alive(path) is False
-
-        sender = BackgroundWALSender(
-            mgr, {"obj_create": lambda r: None}, JSONLWALConsumer
-        )
-        sender.drain_once()
-        assert mgr.list_files() == []
-
     def test_custom_is_file_active(self, tmp_path: str) -> None:
         """A custom is_file_active callable overrides the default PID lock check."""
         mgr = FileWALDirectoryManager(str(tmp_path))
@@ -692,9 +662,8 @@ class TestEndToEndCrossProcess:
     for cross-process testing in Python — CPython's own test suite uses
     subprocess.Popen for the same reason.
 
-    The writer logic lives in tests/durability/_wal_writer_subprocess.py
-    (a real .py file, not an inline string) so it gets syntax highlighting,
-    linting, and proper stack traces on failure.
+    The writer subprocess logic is defined as an inline script in the
+    ``writer_subprocess`` fixture above.
     """
 
     def test_sender_drains_records_from_writer_subprocess(
@@ -702,9 +671,8 @@ class TestEndToEndCrossProcess:
     ) -> None:
         """Sender in this process reads records written by a subprocess."""
         wal_dir = str(tmp_path)
-        record_count = 5
 
-        proc = writer_subprocess(wal_dir, record_count)
+        proc = writer_subprocess(wal_dir, _SUBPROCESS_RECORD_COUNT)
 
         # Wait for the writer to finish writing.
         assert proc.stdout is not None
@@ -724,8 +692,8 @@ class TestEndToEndCrossProcess:
         )
         sender.drain_once()
 
-        assert len(received) == record_count
-        assert [r["seq"] for r in received] == list(range(record_count))
+        assert len(received) == _SUBPROCESS_RECORD_COUNT
+        assert [r["seq"] for r in received] == list(range(_SUBPROCESS_RECORD_COUNT))
         # File still exists — writer subprocess is alive.
         assert len(mgr.list_files()) == 1
 
@@ -750,7 +718,7 @@ class TestEndToEndCrossProcess:
         """
         wal_dir = str(tmp_path)
 
-        proc = writer_subprocess(wal_dir, 3, crash=True)
+        proc = writer_subprocess(wal_dir, _SUBPROCESS_RECORD_COUNT, crash=True)
         proc.wait(timeout=5)
         assert proc.returncode == 0
 
@@ -767,8 +735,8 @@ class TestEndToEndCrossProcess:
         )
         sender.drain_once()
 
-        assert len(received) == 3
-        assert [r["seq"] for r in received] == [0, 1, 2]
+        assert len(received) == _SUBPROCESS_RECORD_COUNT
+        assert [r["seq"] for r in received] == list(range(_SUBPROCESS_RECORD_COUNT))
         assert mgr.list_files() == []
 
 
