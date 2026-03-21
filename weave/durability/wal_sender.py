@@ -40,6 +40,8 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
+from pydantic import BaseModel
+
 from weave.durability.wal import (
     WALConsumer,
     WALDirectoryManager,
@@ -278,7 +280,7 @@ class TraceServerHandlers:
             def _handler(
                 record: WALRecord,
                 _m: Callable = method,
-                _rc: type[tsi.BaseModel] = req_cls,
+                _rc: type[BaseModel] = req_cls,
             ) -> None:
                 _m(_rc.model_validate(record["req"]))
 
