@@ -32,6 +32,7 @@ File safety:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import signal
@@ -282,7 +283,10 @@ class TraceServerHandlers:
                 _m: Callable = method,
                 _rc: type[BaseModel] = req_cls,
             ) -> None:
-                _m(_rc.model_validate(record["req"]))
+                # model_validate_json (not model_validate) so that bytes
+                # fields like FileCreateReq.content are base64-decoded
+                # correctly during the WAL round-trip.
+                _m(_rc.model_validate_json(json.dumps(record["req"])))
 
             self._handlers[record_type] = _handler
 
