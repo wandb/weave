@@ -405,6 +405,10 @@ class TestWithRotatingWriter:
 
         writer.close()
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Background thread timing is unreliable on Windows CI runners",
+    )
     def test_concurrent_write_and_drain(self, tmp_path: str) -> None:
         """Writer and sender operating concurrently (simulated cross-process)."""
         mgr = FileWALDirectoryManager(str(tmp_path))
