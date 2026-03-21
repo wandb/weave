@@ -229,9 +229,7 @@ class BackgroundWALSender:
                         self._consumers.pop(path).close()
                         self._mgr.remove(path)
                 except Exception:
-                    logger.exception(
-                        "Error draining or cleaning up WAL file %s", path
-                    )
+                    logger.exception("Error draining or cleaning up WAL file %s", path)
 
             return total
 
