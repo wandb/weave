@@ -2704,7 +2704,10 @@ class TestEvalResultsReadAPI:
                     project_id=project_id,
                     id=score_call_id,
                     ended_at=datetime.datetime.now(datetime.timezone.utc),
-                    output={"reasoning": "the model answered correctly", "passed": True},
+                    output={
+                        "reasoning": "the model answered correctly",
+                        "passed": True,
+                    },
                     summary={},
                 )
             )
