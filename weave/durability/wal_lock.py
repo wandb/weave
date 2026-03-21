@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +126,15 @@ def is_writer_alive(wal_path: str, lock_ext: str = LOCK_EXT) -> bool:
 
 
 def _is_pid_alive(pid: int) -> bool:
-    """Check if a process with the given PID is still running."""
+    """Check if a process with the given PID is still running.
+
+    On Unix, sends signal 0 (no-op) to probe the process.
+    On Windows, os.kill(pid, 0) is unreliable (raises OSError with
+    varying error codes across Python versions), so we use the
+    Win32 OpenProcess API directly.
+    """
+    if sys.platform == "win32":
+        return _is_pid_alive_win32(pid)
     try:
         # Signal 0 doesn't deliver a signal — it just checks whether the
         # process exists and we have permission to signal it.
@@ -135,4 +144,18 @@ def _is_pid_alive(pid: int) -> bool:
     except PermissionError:
         # Process exists but we don't have permission to signal it.
         return True
+    return True
+
+
+def _is_pid_alive_win32(pid: int) -> bool:
+    """Windows-specific PID liveness check using OpenProcess."""
+    import ctypes
+
+    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if handle == 0:
+        # Process doesn't exist or access denied with no handle.
+        return False
+    kernel32.CloseHandle(handle)
     return True

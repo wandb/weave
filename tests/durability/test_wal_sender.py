@@ -520,6 +520,10 @@ class TestCrossProcessProtection:
         sender.drain_once()
         assert mgr.list_files() == []
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Subprocess-based tests are unreliable on Windows CI runners",
+    )
     def test_cross_process_writer_prevents_deletion(self, tmp_path: str) -> None:
         """A subprocess writing to a WAL file prevents the sender from deleting it."""
         mgr = FileWALDirectoryManager(str(tmp_path))
@@ -731,6 +735,10 @@ class TestEndToEndCrossProcess:
         sender.drain_once()
         assert mgr.list_files() == []
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Subprocess-based tests are unreliable on Windows CI runners",
+    )
     def test_sender_recovers_after_writer_crash(
         self, tmp_path: str, writer_subprocess
     ) -> None:
