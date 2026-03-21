@@ -494,6 +494,10 @@ class TestWithRotatingWriter:
 class TestCrossProcessProtection:
     """Tests for PID-lock-based cross-process file protection."""
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="PID reuse on Windows makes stale-PID detection unreliable",
+    )
     def test_stale_pid_allows_deletion(self, tmp_path: str) -> None:
         """A lock file with a dead PID is treated as stale -> file deletable."""
         mgr = FileWALDirectoryManager(str(tmp_path))
