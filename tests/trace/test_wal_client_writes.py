@@ -157,8 +157,8 @@ class TestWALClientWrites:
             "type": "PIL.Image.Image"
         }
 
-    def test_call_start_and_end(self, wal_client):
-        """Calling an op should produce call_start and call_end WAL records."""
+    def test_call_start(self, wal_client):
+        """Calling an op should produce a call_start WAL record with all fields."""
 
         @weave.op
         def add(a: int, b: int) -> int:
@@ -170,21 +170,105 @@ class TestWALClientWrites:
         records = _read_all_wal_records(wal_client)
         project_id = f"{wal_client.entity}/{wal_client.project}"
 
-        # Op publish produces obj_create + file_create for the op code,
-        # then call_start + call_end for the invocation.
         call_starts = [r for r in records if r["type"] == "call_start"]
-        call_ends = [r for r in records if r["type"] == "call_end"]
         assert len(call_starts) == 1
+
+        start = call_starts[0]["req"]["start"]
+        assert start["project_id"] == project_id
+        assert "/op/add:" in start["op_name"]
+        assert start["inputs"] == {"a": 1, "b": 2}
+        assert start["id"] is not None
+        assert start["trace_id"] is not None
+        assert start["started_at"] is not None
+        assert isinstance(start["attributes"], dict)
+        assert start["parent_id"] is None  # root call
+
+    def test_call_end(self, wal_client):
+        """Calling an op should produce a call_end WAL record with all fields."""
+
+        @weave.op
+        def add(a: int, b: int) -> int:
+            return a + b
+
+        add(1, 2)
+        wal_client._flush()
+
+        records = _read_all_wal_records(wal_client)
+        project_id = f"{wal_client.entity}/{wal_client.project}"
+
+        call_ends = [r for r in records if r["type"] == "call_end"]
         assert len(call_ends) == 1
 
-        start_req = call_starts[0]["req"]["start"]
-        assert start_req["project_id"] == project_id
-        assert start_req["inputs"]["a"] == 1
-        assert start_req["inputs"]["b"] == 2
+        end = call_ends[0]["req"]["end"]
+        assert end["project_id"] == project_id
+        assert end["id"] is not None
+        assert end["output"] == 3
+        assert end["ended_at"] is not None
+        assert end["exception"] is None
+        assert isinstance(end["summary"], dict)
 
-        end_req = call_ends[0]["req"]["end"]
-        assert end_req["project_id"] == project_id
-        assert end_req["output"] == 3
+    def test_call_with_exception(self, wal_client):
+        """A failing op should record the exception in call_end."""
+
+        @weave.op
+        def fail() -> None:
+            raise ValueError("boom")
+
+        with pytest.raises(ValueError, match="boom"):
+            fail()
+        wal_client._flush()
+
+        records = _read_all_wal_records(wal_client)
+
+        call_ends = [r for r in records if r["type"] == "call_end"]
+        assert len(call_ends) == 1
+        assert "boom" in call_ends[0]["req"]["end"]["exception"]
+
+    def test_nested_calls(self, wal_client):
+        """Nested op calls should produce parent-child call_start records."""
+
+        @weave.op
+        def inner(x: int) -> int:
+            return x * 2
+
+        @weave.op
+        def outer(x: int) -> int:
+            return inner(x)
+
+        outer(5)
+        wal_client._flush()
+
+        records = _read_all_wal_records(wal_client)
+
+        call_starts = [r for r in records if r["type"] == "call_start"]
+        call_ends = [r for r in records if r["type"] == "call_end"]
+        assert len(call_starts) == 2
+        assert len(call_ends) == 2
+
+        # Find outer and inner by op_name
+        outer_start = next(
+            s for s in call_starts if "outer" in s["req"]["start"]["op_name"]
+        )
+        inner_start = next(
+            s for s in call_starts if "inner" in s["req"]["start"]["op_name"]
+        )
+
+        # Inner call's parent_id should match outer call's id
+        assert inner_start["req"]["start"]["parent_id"] == outer_start["req"]["start"]["id"]
+        # Both should share the same trace_id
+        assert inner_start["req"]["start"]["trace_id"] == outer_start["req"]["start"]["trace_id"]
+
+        # Verify outputs
+        outer_end = next(
+            e for e in call_ends
+            if e["req"]["end"]["id"] == outer_start["req"]["start"]["id"]
+        )
+        inner_end = next(
+            e for e in call_ends
+            if e["req"]["end"]["id"] == inner_start["req"]["start"]["id"]
+        )
+        assert inner_end["req"]["end"]["output"] == 10
+        assert outer_end["req"]["end"]["output"] == 10
 
     def test_wal_records_are_json_serializable(self, wal_client):
         """Ensure WAL records round-trip through JSON without loss."""
