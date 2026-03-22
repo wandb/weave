@@ -386,12 +386,16 @@ class WeaveClient:
 
         self._wal: WALManager | None = None
         if settings.should_enable_wal():
-            self._wal = WALManager.with_sender(
-                self.entity,
-                self.project,
-                self.server,
-            )
-            logger.info("WAL enabled: %s", self._wal.wal_dir)
+            if settings.should_disable_wal_sender():
+                self._wal = WALManager(self.entity, self.project)
+                logger.info("WAL enabled (sender disabled): %s", self._wal.wal_dir)
+            else:
+                self._wal = WALManager.with_sender(
+                    self.entity,
+                    self.project,
+                    self.server,
+                )
+                logger.info("WAL enabled: %s", self._wal.wal_dir)
 
         # No-op when the feature flag is off (returns immediately).
         self._warm_project_id_resolver()
@@ -2032,7 +2036,6 @@ class WeaveClient:
             # WAL path: persist to disk; the background sender will replay
             # to the server asynchronously.  Compute digest locally using
             # internal refs so it matches the server-computed digest.
-            logger.info("obj_create WAL check: _wal=%s, _writer=%s", self._wal, self._wal._writer if self._wal else "N/A")
             if self._wal is not None:
                 if expected_digest is not None:
                     local_digest = expected_digest
