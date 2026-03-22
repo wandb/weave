@@ -2190,6 +2190,12 @@ class WeaveClient:
 
     def _should_use_chunking(self, table: Table | WeaveTable) -> ChunkingConfig:
         """Determine if we should use chunking and parallel chunks for a table."""
+        # WAL path writes the full table to disk as a single record.
+        # Chunking requires follow-up server calls (table_create_from_digests,
+        # table_update) that reference data the server hasn't received yet.
+        if self._wal is not None:
+            return ChunkingConfig(use_chunking=False, use_parallel_chunks=False)
+
         remote_request_bytes_limit = getattr(
             self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
         )
