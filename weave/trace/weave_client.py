@@ -2032,6 +2032,7 @@ class WeaveClient:
             # WAL path: persist to disk; the background sender will replay
             # to the server asynchronously.  Compute digest locally using
             # internal refs so it matches the server-computed digest.
+            logger.info("obj_create WAL check: _wal=%s, _writer=%s", self._wal, self._wal._writer if self._wal else "N/A")
             if self._wal is not None:
                 if expected_digest is not None:
                     local_digest = expected_digest

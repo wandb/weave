@@ -68,7 +68,7 @@ class WALManager:
             self._writer.write(
                 {"type": record_type, "req": req.model_dump(mode="json")}
             )
-            logger.debug("WAL write: %s -> %s", record_type, self.wal_dir)
+            logger.info("WAL write: %s -> %s", record_type, self.wal_dir)
         except Exception:
             logger.warning("Failed to write %s to WAL", record_type, exc_info=True)
 

@@ -244,7 +244,7 @@ class BackgroundWALSender:
                     if next(consumer.read_pending(), None) is None:
                         self._consumers.pop(path).close()
                         self._mgr.remove(path)
-                        logger.debug("WAL removed fully-consumed file: %s", path)
+                        logger.info("WAL removed fully-consumed file: %s", path)
                 except Exception:
                     logger.exception("Error draining or cleaning up WAL file %s", path)
 

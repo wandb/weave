@@ -370,7 +370,7 @@ def drain(
             try:
                 handler(entry.record)
                 processed += 1
-                logger.debug(
+                logger.info(
                     "WAL drain: dispatched %s at offset %d",
                     record_type,
                     entry.end_offset,
