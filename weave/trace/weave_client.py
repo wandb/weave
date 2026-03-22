@@ -391,6 +391,7 @@ class WeaveClient:
                 self.project,
                 self.server,
             )
+            logger.info("WAL enabled: %s", self._wal.wal_dir)
 
         # No-op when the feature flag is off (returns immediately).
         self._warm_project_id_resolver()
