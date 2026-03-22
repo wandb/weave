@@ -388,14 +388,14 @@ class WeaveClient:
         if settings.should_enable_wal():
             if settings.should_disable_wal_sender():
                 self._wal = WALManager(self.entity, self.project)
-                logger.info("WAL enabled (sender disabled): %s", self._wal.wal_dir)
+                logger.debug("WAL enabled (sender disabled): %s", self._wal.wal_dir)
             else:
                 self._wal = WALManager.with_sender(
                     self.entity,
                     self.project,
                     self.server,
                 )
-                logger.info("WAL enabled: %s", self._wal.wal_dir)
+                logger.debug("WAL enabled: %s", self._wal.wal_dir)
 
         # No-op when the feature flag is off (returns immediately).
         self._warm_project_id_resolver()
