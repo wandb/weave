@@ -240,10 +240,9 @@ class BackgroundWALSender:
                 try:
                     drained = drain(consumer, self._handlers)
                     if drained:
-                        logger.info(
-                            "WAL drain: sent %d record(s) from %s",
-                            drained,
-                            os.path.basename(path),
+                        print(
+                            f"[WAL] drain: sent {drained} record(s)"
+                            f" from {os.path.basename(path)}"
                         )
                     total += drained
                     if self._is_file_active(path):
@@ -251,8 +250,8 @@ class BackgroundWALSender:
                     if next(consumer.read_pending(), None) is None:
                         self._consumers.pop(path).close()
                         self._mgr.remove(path)
-                        logger.info(
-                            "WAL cleanup: removed %s", os.path.basename(path)
+                        print(
+                            f"[WAL] cleanup: removed {os.path.basename(path)}"
                         )
                 except Exception:
                     logger.exception("Error draining or cleaning up WAL file %s", path)
