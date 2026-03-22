@@ -68,6 +68,7 @@ class WALManager:
             self._writer.write(
                 {"type": record_type, "req": req.model_dump(mode="json")}
             )
+            logger.info("WAL write: %s", record_type)
         except Exception:
             logger.warning("Failed to write %s to WAL", record_type, exc_info=True)
 
