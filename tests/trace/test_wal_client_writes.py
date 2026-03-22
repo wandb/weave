@@ -53,8 +53,7 @@ def _read_all_wal_records(client: weave.WeaveClient) -> list[dict]:
 def _clean_wal_dir():
     """Remove stale WAL files before each test."""
     stale_dir = Path.home() / ".weave" / "wal" / "shawn" / "test-project"
-    if stale_dir.is_dir():
-        shutil.rmtree(stale_dir)
+    shutil.rmtree(stale_dir, ignore_errors=True)
 
 
 @pytest.fixture
