@@ -254,17 +254,25 @@ class TestWALClientWrites:
         )
 
         # Inner call's parent_id should match outer call's id
-        assert inner_start["req"]["start"]["parent_id"] == outer_start["req"]["start"]["id"]
+        assert (
+            inner_start["req"]["start"]["parent_id"]
+            == outer_start["req"]["start"]["id"]
+        )
         # Both should share the same trace_id
-        assert inner_start["req"]["start"]["trace_id"] == outer_start["req"]["start"]["trace_id"]
+        assert (
+            inner_start["req"]["start"]["trace_id"]
+            == outer_start["req"]["start"]["trace_id"]
+        )
 
         # Verify outputs
         outer_end = next(
-            e for e in call_ends
+            e
+            for e in call_ends
             if e["req"]["end"]["id"] == outer_start["req"]["start"]["id"]
         )
         inner_end = next(
-            e for e in call_ends
+            e
+            for e in call_ends
             if e["req"]["end"]["id"] == inner_start["req"]["start"]["id"]
         )
         assert inner_end["req"]["end"]["output"] == 10
