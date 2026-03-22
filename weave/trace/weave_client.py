@@ -2504,6 +2504,11 @@ class WeaveClient:
         else:
             self._flush()
 
+        # Close the WAL (stops the background sender thread) so that
+        # re-calling weave.init() doesn't leak orphaned threads.
+        if self._wal is not None:
+            self._wal.close()
+
     def flush(self) -> None:
         """Flushes background asynchronous tasks, safe to call multiple times."""
         self._flush()
