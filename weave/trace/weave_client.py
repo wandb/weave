@@ -386,6 +386,7 @@ class WeaveClient:
 
         self._wal: WALManager | None = None
         if settings.should_enable_wal():
+            # Use WALManager(entity, project) for write-only (no sender).
             self._wal = WALManager.with_sender(
                 self.entity,
                 self.project,
