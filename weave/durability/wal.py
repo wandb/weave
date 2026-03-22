@@ -370,6 +370,11 @@ def drain(
             try:
                 handler(entry.record)
                 processed += 1
+                logger.debug(
+                    "WAL drain: dispatched %s at offset %d",
+                    record_type,
+                    entry.end_offset,
+                )
             except Exception:
                 logger.exception(
                     "Handler failed for record type %r at offset %d; "
