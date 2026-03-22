@@ -386,12 +386,14 @@ class WeaveClient:
 
         self._wal: WALManager | None = None
         if settings.should_enable_wal():
-            # Use WALManager(entity, project) for write-only (no sender).
-            self._wal = WALManager.with_sender(
-                self.entity,
-                self.project,
-                self.server,
-            )
+            if os.environ.get("WEAVE_DISABLE_SENDER", "").lower() in ("1", "true"):
+                self._wal = WALManager(self.entity, self.project)
+            else:
+                self._wal = WALManager.with_sender(
+                    self.entity,
+                    self.project,
+                    self.server,
+                )
 
         # No-op when the feature flag is off (returns immediately).
         self._warm_project_id_resolver()
