@@ -157,6 +157,35 @@ class TestWALClientWrites:
             "type": "PIL.Image.Image"
         }
 
+    def test_call_start_and_end(self, wal_client):
+        """Calling an op should produce call_start and call_end WAL records."""
+
+        @weave.op
+        def add(a: int, b: int) -> int:
+            return a + b
+
+        add(1, 2)
+        wal_client._flush()
+
+        records = _read_all_wal_records(wal_client)
+        project_id = f"{wal_client.entity}/{wal_client.project}"
+
+        # Op publish produces obj_create + file_create for the op code,
+        # then call_start + call_end for the invocation.
+        call_starts = [r for r in records if r["type"] == "call_start"]
+        call_ends = [r for r in records if r["type"] == "call_end"]
+        assert len(call_starts) == 1
+        assert len(call_ends) == 1
+
+        start_req = call_starts[0]["req"]["start"]
+        assert start_req["project_id"] == project_id
+        assert start_req["inputs"]["a"] == 1
+        assert start_req["inputs"]["b"] == 2
+
+        end_req = call_ends[0]["req"]["end"]
+        assert end_req["project_id"] == project_id
+        assert end_req["output"] == 3
+
     def test_wal_records_are_json_serializable(self, wal_client):
         """Ensure WAL records round-trip through JSON without loss."""
         weave.publish({"nested": {"list": [1, 2, 3]}}, name="json_obj")

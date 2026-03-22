@@ -49,7 +49,9 @@ logger = logging.getLogger(__name__)
 # Opaque dict — the WAL layer is format-agnostic.  Schema defined by callers.
 WALRecord = dict
 
-WALRecordType = Literal["obj_create", "table_create", "file_create"]
+WALRecordType = Literal[
+    "call_start", "call_end", "obj_create", "table_create", "file_create"
+]
 
 # Processes a single WAL record.  Must be idempotent — drain() replays the
 # entire batch on failure (at-least-once delivery).

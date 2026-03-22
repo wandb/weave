@@ -866,18 +866,22 @@ class WeaveClient:
                     MAX_TRACE_PAYLOAD_SIZE,
                 )
 
-            # eager_call_start is a client-side hint that tells the batch processor
-            # to send this call's start immediately (for long-running ops like evals)
-            # Ugly that we have to reach down to the processor level here, but otherwise
-            # we need to change the interface itself.
-            call_processor = _get_call_processor(self.server)
-            if call_processor is not None:
-                eager = op.eager_call_start
-                call_processor.enqueue_start(
-                    StartBatchItem(req=call_start_req), eager_call_start=eager
-                )
+            # WAL path: persist to disk; the sender replays to the server.
+            if self._wal is not None:
+                self._wal.write("call_start", call_start_req)
             else:
-                self.server.call_start(call_start_req)
+                # eager_call_start is a client-side hint that tells the batch processor
+                # to send this call's start immediately (for long-running ops like evals)
+                # Ugly that we have to reach down to the processor level here, but otherwise
+                # we need to change the interface itself.
+                call_processor = _get_call_processor(self.server)
+                if call_processor is not None:
+                    eager = op.eager_call_start
+                    call_processor.enqueue_start(
+                        StartBatchItem(req=call_start_req), eager_call_start=eager
+                    )
+                else:
+                    self.server.call_start(call_start_req)
 
             return True
 
@@ -1049,7 +1053,11 @@ class WeaveClient:
                     bytes_size,
                     MAX_TRACE_PAYLOAD_SIZE,
                 )
-            self.server.call_end(call_end_req)
+            # WAL path: persist to disk; the sender replays to the server.
+            if self._wal is not None:
+                self._wal.write("call_end", call_end_req)
+            else:
+                self.server.call_end(call_end_req)
 
         # For calls_complete path (non-eager CallBatchProcessor), print the call link
         # after finish_call, when the complete call is queued to the batch processor.

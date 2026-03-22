@@ -293,6 +293,8 @@ class BackgroundWALSender:
 # Prefer this over dynamic getattr — type checkers and humans can
 # verify correctness at a glance.
 _RECORD_TYPE_TO_REQ: dict[str, type[BaseModel]] = {
+    "call_start": tsi.CallStartReq,
+    "call_end": tsi.CallEndReq,
     "obj_create": tsi.ObjCreateReq,
     "table_create": tsi.TableCreateReq,
     "file_create": tsi.FileCreateReq,
