@@ -4,6 +4,7 @@ import os
 import time
 import uuid
 
+from weave.durability.wal_lock import LOCK_EXT
 from weave.durability.wal_writer import (
     DEFAULT_FSYNC_BATCH_SIZE,
     DEFAULT_FSYNC_TIMEOUT,
@@ -59,7 +60,17 @@ class FileWALDirectoryManager:
 
     def remove(self, path: str) -> None:
         base, _ = os.path.splitext(path)
-        for p in (path, base + self._checkpoint_ext, base + self._dead_letter_ext):
+        # Sidecar extensions that accompany each WAL file:
+        #   .checkpoint  — consumer read-offset tracker
+        #   .deadletter  — records that failed all retry attempts
+        #   .lock        — PID lock written by the active writer
+        sidecars = (
+            self._checkpoint_ext,
+            self._dead_letter_ext,
+            LOCK_EXT,
+        )
+        all_paths = [path] + [base + ext for ext in sidecars]
+        for p in all_paths:
             try:
                 os.unlink(p)
             except FileNotFoundError:
