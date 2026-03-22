@@ -10,7 +10,6 @@ Covers:
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -49,30 +48,45 @@ def _read_all_wal_records(client: weave.WeaveClient) -> list[dict]:
     return records
 
 
-@pytest.fixture
-def _clean_wal_dir():
-    """Remove stale WAL files before each test."""
-    stale_dir = Path.home() / ".weave" / "wal" / "shawn" / "test-project"
-    shutil.rmtree(stale_dir, ignore_errors=True)
+def _redirect_wal_to(client: weave.WeaveClient, wal_dir: str) -> None:
+    """Replace the client's WAL writer (and optionally sender) to use *wal_dir*.
+
+    This gives each test an isolated WAL directory so parallel xdist
+    workers never interfere with each other.
+    """
+    wal = client._wal
+    # Tear down whatever was created during init.
+    wal.close()
+    # Re-create writer (and optionally sender) in the isolated directory.
+    wal.wal_dir = wal_dir
+    dir_mgr = FileWALDirectoryManager(wal_dir)
+    wal._writer = JSONLWALWriter(dir_mgr)
 
 
 @pytest.fixture
-def wal_client(client_creator, _clean_wal_dir):
+def wal_client(client_creator, tmp_path):
     """Create a client with WAL enabled but sender stopped (write-only).
 
-    Stops the background sender so records stay on disk for inspection.
+    Redirects the WAL to ``tmp_path`` for test isolation.
     """
+    wal_dir = str(tmp_path / "wal")
     with client_creator(settings=UserSettings(enable_wal=True)) as client:
-        # Stop the sender so it doesn't drain records while we inspect them.
-        client._wal._sender.stop()
-        client._wal._sender = None
+        _redirect_wal_to(client, wal_dir)
         yield client
 
 
 @pytest.fixture
-def wal_client_with_sender(client_creator, _clean_wal_dir):
-    """Create a client with WAL enabled and sender running."""
+def wal_client_with_sender(client_creator, tmp_path):
+    """Create a client with WAL enabled and sender running.
+
+    Redirects the WAL to ``tmp_path`` for test isolation.
+    """
+    wal_dir = str(tmp_path / "wal")
     with client_creator(settings=UserSettings(enable_wal=True)) as client:
+        _redirect_wal_to(client, wal_dir)
+        # Re-create sender pointing at the isolated directory.
+        client._wal._sender = create_sender(wal_dir, client.server)
+        client._wal._sender.start()
         yield client
 
 
