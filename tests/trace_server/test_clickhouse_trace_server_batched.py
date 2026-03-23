@@ -13,8 +13,13 @@ from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_schema import (
+    ALL_CALL_INSERT_COLUMNS,
+    CallEndCHInsertable,
+)
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
+from weave.trace_server.ttl_settings import _EXPIRE_AT_NEVER
 
 
 class MockObjectReadError(Exception):
@@ -1112,6 +1117,49 @@ def test_call_end_v2_flushes_kafka_immediately(server_with_mock_kafka):
 
     mock_producer.produce_call_end.assert_called_once()
     assert mock_producer.produce_call_end.call_args[0][1] is True
+
+
+def test_insert_call_end_without_started_at_keeps_default_expire_at(
+    server_with_mock_kafka,
+):
+    """End-only writes should not stamp expire_at from ingest time."""
+    server, _ = server_with_mock_kafka
+    ch_end = CallEndCHInsertable(
+        project_id=base64.b64encode(b"test_entity/test_project").decode("utf-8"),
+        id=str(uuid.uuid4()),
+        ended_at=dt.datetime.now(dt.timezone.utc),
+        output_dump="{}",
+        summary_dump="{}",
+    )
+
+    with patch.object(
+        chts, "get_project_retention_days", return_value=30
+    ) as get_retention_days:
+        server._insert_call(ch_end)
+
+    expire_index = ALL_CALL_INSERT_COLUMNS.index("expire_at")
+    assert server._call_batch[-1][expire_index] == _EXPIRE_AT_NEVER
+    get_retention_days.assert_not_called()
+
+
+def test_insert_call_end_with_started_at_computes_expire_at(server_with_mock_kafka):
+    """End writes with started_at should stamp the same expire_at as the start row."""
+    server, _ = server_with_mock_kafka
+    started_at = dt.datetime(2026, 3, 1, tzinfo=dt.timezone.utc)
+    ch_end = CallEndCHInsertable(
+        project_id=base64.b64encode(b"test_entity/test_project").decode("utf-8"),
+        id=str(uuid.uuid4()),
+        started_at=started_at,
+        ended_at=started_at + dt.timedelta(seconds=1),
+        output_dump="{}",
+        summary_dump="{}",
+    )
+
+    with patch.object(chts, "get_project_retention_days", return_value=30):
+        server._insert_call(ch_end)
+
+    expire_index = ALL_CALL_INSERT_COLUMNS.index("expire_at")
+    assert server._call_batch[-1][expire_index] == started_at + dt.timedelta(days=30)
 
 
 def test_call_batch_flushes_kafka_once_not_per_call_end(server_with_mock_kafka):

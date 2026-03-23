@@ -270,7 +270,7 @@ from weave.trace_server.trace_server_common import (
     try_parse_json,
 )
 from weave.trace_server.ttl_settings import (
-    compute_ttl_at,
+    compute_expire_at,
     get_project_retention_days,
     invalidate_ttl_cache,
 )
@@ -6815,14 +6815,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        retention_days = get_project_retention_days(ch_call.project_id, self.ch_client)
-        started_at = (
-            ch_call.started_at
-            if isinstance(ch_call, (CallStartCHInsertable, CallEndCHInsertable))
-            else None
-        )
-        ref_time = started_at or datetime.datetime.now(datetime.UTC)
-        ch_call.ttl_at = compute_ttl_at(retention_days, ref_time)
+        ttl_anchor = None
+        if isinstance(ch_call, CallStartCHInsertable):
+            ttl_anchor = ch_call.started_at
+        elif isinstance(ch_call, CallEndCHInsertable):
+            ttl_anchor = ch_call.started_at
+
+        # End-only updates without started_at should not stamp a new expire_at. The
+        # start row already carries the authoritative expire_at for merged calls.
+        if ttl_anchor is not None:
+            retention_days = get_project_retention_days(
+                ch_call.project_id, self.ch_client
+            )
+            ch_call.expire_at = compute_expire_at(retention_days, ttl_anchor)
         parameters = ch_call.model_dump()
         row = []
         for key in ALL_CALL_INSERT_COLUMNS:
@@ -6852,7 +6857,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ch_call: The complete call to insert.
         """
         retention_days = get_project_retention_days(ch_call.project_id, self.ch_client)
-        ch_call.ttl_at = compute_ttl_at(retention_days, ch_call.started_at)
+        ch_call.expire_at = compute_expire_at(retention_days, ch_call.started_at)
         parameters = ch_call.model_dump()
         row = []
         for key in ALL_CALL_COMPLETE_INSERT_COLUMNS:
@@ -6873,7 +6878,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ch_call: The complete call to insert.
         """
         retention_days = get_project_retention_days(ch_call.project_id, self.ch_client)
-        ch_call.ttl_at = compute_ttl_at(retention_days, ch_call.started_at)
+        ch_call.expire_at = compute_expire_at(retention_days, ch_call.started_at)
         parameters = ch_call.model_dump()
         row = []
         for key in ALL_CALL_INSERT_COLUMNS:
