@@ -110,7 +110,7 @@ library_cases = [
             "trials": 1,
             "metadata": None,
             "evaluation_name": None,
-            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:YX1LHRCfMQoUADiL4qkOb5cZNf6rSPfRiaxx0nGY6ZU",
+            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:vvs7uu17cnFTlOPIrYnneU8AVfSihXwDk0kMHf6w6cU",
             "predict_and_score": "weave:///shawn/test-project/op/Evaluation.predict_and_score:jd4m1EJuNnrGmHeiGY1T2CUngsk9x7knOgRJ2sYpU2g",
             "summarize": "weave:///shawn/test-project/op/Evaluation.summarize:Y0s05NYTuqlmXieehHPogfq2JXKl4Y1Xgy8CKumdmjI",
             "_class_name": "Evaluation",
@@ -131,12 +131,12 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.evaluate",
-                "digest": "YX1LHRCfMQoUADiL4qkOb5cZNf6rSPfRiaxx0nGY6ZU",
+                "digest": "vvs7uu17cnFTlOPIrYnneU8AVfSihXwDk0kMHf6w6cU",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    # Updated with eager_call_start=True
-                    "files": {"obj.py": "fRY5WjYY6bLcWxTHn3ymVTCU1OUC4I19qKMwPdYp9k8"},
+                    # Updated with G004 lint fix (f-string -> %s formatting in logging)
+                    "files": {"obj.py": "qmkYo6tZ2imoZbCzmOJlpsZq0T3mTOQAm5NJVYnXYHQ"},
                 },
             },
             {
@@ -272,8 +272,8 @@ library_cases = [
         ],
         exp_files=[
             {
-                "digest": "fRY5WjYY6bLcWxTHn3ymVTCU1OUC4I19qKMwPdYp9k8",
-                "exp_content": b'import weave\nfrom weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        try:\n            summary_str = str(summary)\n        except Exception:\n            pass\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (DEBUG)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@weave.op\n@op(call_display_name=default_evaluation_display_name, eager_call_start=True)\nasync def evaluate(self, model: Op | Model) -> dict:\n    eval_results = await self.get_eval_results(model)\n    summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info(f"Evaluation summary {summary_str}")\n\n    return summary\n',
+                "digest": "qmkYo6tZ2imoZbCzmOJlpsZq0T3mTOQAm5NJVYnXYHQ",
+                "exp_content": b'import weave\nfrom weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        try:\n            summary_str = str(summary)\n        except Exception:\n            pass\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (DEBUG)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@weave.op\n@op(call_display_name=default_evaluation_display_name, eager_call_start=True)\nasync def evaluate(self, model: Op | Model) -> dict:\n    eval_results = await self.get_eval_results(model)\n    summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info("Evaluation summary %s", summary_str)\n\n    return summary\n',
             },
             {
                 "digest": "Y7lSNR7UXFYVtxWyD8GOE3CFXRWfdLX2n1mcYfbSErs",

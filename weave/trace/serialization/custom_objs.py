@@ -114,8 +114,9 @@ def encode_custom_obj(obj: Any) -> EncodedCustomObjDict | None:
         # If a serializer fails, we log a warning and return None,
         # which will cause the caller to fall back to stringify().
         logger.warning(
-            f"Failed to serialize object of type {type(obj).__name__}. "
+            "Failed to serialize object of type %s. "
             "Falling back to string representation.",
+            type(obj).__name__,
             exc_info=True,
         )
         return None

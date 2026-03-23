@@ -206,10 +206,12 @@ class BaseClickHouseTraceServerMigrator(ABC):
             target_version: The target version to migrate to (None = latest)
         """
         status = self._get_migration_status(target_db)
-        logger.info(f"""`{target_db}` migration status: {status}""")
+        logger.info("""`%s` migration status: %s""", target_db, status)
         if status["partially_applied_version"]:
             logger.info(
-                f"Unable to apply migrations to `{target_db}`. Found partially applied migration version {status['partially_applied_version']}. Please fix the database manually and try again."
+                "Unable to apply migrations to `%s`. Found partially applied migration version %s. Please fix the database manually and try again.",
+                target_db,
+                status["partially_applied_version"],
             )
             return
         migration_map = self._get_migrations()
@@ -217,12 +219,12 @@ class BaseClickHouseTraceServerMigrator(ABC):
             status["curr_version"], migration_map, target_version
         )
         if len(migrations_to_apply) == 0:
-            logger.info(f"No migrations to apply to `{target_db}`")
+            logger.info("No migrations to apply to `%s`", target_db)
             self._run_post_migration_hook(
                 target_db, status["curr_version"], target_version
             )
             return
-        logger.info(f"Migrations to apply: {migrations_to_apply}")
+        logger.info("Migrations to apply: %s", migrations_to_apply)
         if status["curr_version"] == 0:
             db_sql = self._create_db_sql(target_db)
             self.ch_client.command(db_sql)
@@ -344,7 +346,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
             # Do not run down migrations if not explicitly requesting target_version
             if current_version > target_version:
                 logger.warning(
-                    f"Found current version ({current_version}) greater than known versions ({len(migration_map)}). Will not run any migrations."
+                    "Found current version (%s) greater than known versions (%s). Will not run any migrations.",
+                    current_version,
+                    len(migration_map),
                 )
                 return []
         if target_version < 0 or target_version > len(migration_map):
@@ -359,7 +363,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
             return res
         if target_version < current_version:
             logger.warning(
-                f"Automatically running down migrations is disabled and should be done manually. Current version ({current_version}) is greater than target version ({target_version})."
+                "Automatically running down migrations is disabled and should be done manually. Current version (%s) is greater than target version (%s).",
+                current_version,
+                target_version,
             )
             # res = []
             # for i in range(current_version, target_version, -1):
@@ -373,7 +379,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
     def _apply_migration(
         self, target_db: str, target_version: int, migration_file: str
     ) -> None:
-        logger.info(f"Applying migration {migration_file} to `{target_db}`")
+        logger.info("Applying migration %s to `%s`", migration_file, target_db)
         migration_file_path = os.path.join(self.migration_dir, migration_file)
 
         with open(migration_file_path, encoding="utf-8") as f:
@@ -390,7 +396,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         # Mark migration as fully applied
         self._update_migration_status(target_db, target_version, is_start=False)
 
-        logger.info(f"Migration {migration_file} applied to `{target_db}`")
+        logger.info("Migration %s applied to `%s`", migration_file, target_db)
 
     def _update_migration_status(
         self, target_db: str, target_version: int, is_start: bool = True
@@ -481,11 +487,14 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             raise MigrationError(f"Invalid cluster name: {self.replicated_cluster}")
 
         logger.info(
-            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
-            f"ReplicatedClickHouseTraceServerMigrator initialized with: "
-            f"replicated_cluster={self.replicated_cluster}, "
-            f"replicated_path={self.replicated_path}, "
-            f"management_db={management_db}"
+            "%s ReplicatedClickHouseTraceServerMigrator initialized with: "
+            "replicated_cluster=%s, "
+            "replicated_path=%s, "
+            "management_db=%s",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            self.replicated_cluster,
+            self.replicated_path,
+            management_db,
         )
 
         super().__init__(
@@ -685,8 +694,8 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         post_migration_hook: PostMigrationHook | None = None,
     ):
         logger.info(
-            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
-            f"DistributedClickHouseTraceServerMigrator initialized"
+            "%s DistributedClickHouseTraceServerMigrator initialized",
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
         super().__init__(
             ch_client,
@@ -729,7 +738,8 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         # Skip MATERIALIZE commands (not supported by distributed tables)
         if SQLPatterns.MATERIALIZE.search(command_for_match):
             logger.warning(
-                f"Skipping MATERIALIZE command (not supported in distributed mode): {command}"
+                "Skipping MATERIALIZE command (not supported in distributed mode): %s",
+                command,
             )
             self.ch_client.database = curr_db
             return
@@ -737,7 +747,8 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         # Skip INSERT commands (backfill not supported in distributed mode)
         if SQLPatterns.INSERT_STMT.search(command_for_match):
             logger.warning(
-                f"Skipping INSERT command (not supported in distributed mode): {command[:100]}..."
+                "Skipping INSERT command (not supported in distributed mode): %s...",
+                command[:100],
             )
             self.ch_client.database = curr_db
             return
@@ -1112,14 +1123,21 @@ def get_clickhouse_trace_server_migrator(
     use_distributed = False if use_distributed is None else use_distributed
 
     logger.info(
-        f"ClickHouseTraceServerMigrator initialized with: "
-        f"replicated={replicated}, "
-        f"use_distributed={use_distributed}, "
-        f"replicated_cluster={replicated_cluster}, "
-        f"replicated_path={replicated_path}, "
-        f"management_db={management_db}, "
-        f"migration_dir={migration_dir}, "
-        f"post_migration_hook={'none' if post_migration_hook is None else 'callable'}"
+        "ClickHouseTraceServerMigrator initialized with: "
+        "replicated=%s, "
+        "use_distributed=%s, "
+        "replicated_cluster=%s, "
+        "replicated_path=%s, "
+        "management_db=%s, "
+        "migration_dir=%s, "
+        "post_migration_hook=%s",
+        replicated,
+        use_distributed,
+        replicated_cluster,
+        replicated_path,
+        management_db,
+        migration_dir,
+        "none" if post_migration_hook is None else "callable",
     )
 
     # Validate configuration

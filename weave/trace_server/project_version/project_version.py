@@ -61,7 +61,7 @@ class TableRoutingResolver:
         # calls_merged OR calls_complete, not both. This is handled gracefully but
         # indicates an unexpected state that should be investigated.
         if residence == ProjectDataResidence.BOTH:
-            logger.warning(f"Detected dual call residency for project {project_id}. ")
+            logger.warning("Detected dual call residency for project %s. ", project_id)
             set_current_span_dd_tags(
                 {
                     "project_version.dual_residency": "true",

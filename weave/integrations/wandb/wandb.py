@@ -16,14 +16,14 @@ def wandb_init_hook() -> None:
     except (ImportError, ModuleNotFoundError):
         return  # wandb not available
     except Exception as e:
-        logger.debug(f"Unexpected wandb error: {e}")
+        logger.debug("Unexpected wandb error: %s", e)
         return
     if not (run_path := active_run_path()):
         return
 
     project_path = f"{run_path.entity}/{run_path.project}"
     logger.info(
-        f"Active wandb run detected. Using project name from wandb: {project_path}"
+        "Active wandb run detected. Using project name from wandb: %s", project_path
     )
 
     init(project_path)
