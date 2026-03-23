@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 import uuid
+
+logger = logging.getLogger(__name__)
 
 from weave.durability.wal_lock import LOCK_EXT
 from weave.durability.wal_writer import (
@@ -75,3 +78,8 @@ class FileWALDirectoryManager:
                 os.unlink(p)
             except FileNotFoundError:
                 pass
+            except PermissionError:
+                # On Windows, file handles may linger after close() due to
+                # GC timing or antivirus scans.  The file will be retried
+                # on the next drain cycle.
+                logger.debug("Cannot remove %s (still locked), will retry later", p)
