@@ -42,6 +42,7 @@ from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
+from weave.trace.urls import redirect_call
 from weave.trace.feedback import FeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -394,11 +395,29 @@ class WeaveClient:
                     self.entity,
                     self.project,
                     self.server,
+                    on_send=self._on_wal_send,
                 )
                 logger.debug("WAL enabled: %s", self._wal.wal_dir)
 
         # No-op when the feature flag is off (returns immediately).
         self._warm_project_id_resolver()
+
+    def _on_wal_send(self, record_type: str, record: dict) -> None:
+        """Callback fired by the WAL sender after a record reaches the server."""
+        if record_type != "call_start" or not should_print_call_link():
+            return
+        try:
+            start = record.get("req", {}).get("start", {})
+            parent_id = start.get("parent_id")
+            if parent_id is not None:
+                return  # only print links for root calls
+            project_id = start.get("project_id", "")
+            call_id = start.get("id", "")
+            entity, project = from_project_id(project_id)
+            url = redirect_call(entity, project, call_id)
+            logger.info("%s %s", TRACE_CALL_EMOJI, url)
+        except Exception:
+            pass
 
     ################ High Level Convenience Methods ################
 
@@ -899,6 +918,7 @@ class WeaveClient:
                     root_call_did_not_error
                     and should_print_call_link_
                     and not uses_calls_complete_path
+                    and self._wal is None
                 ):
                     print_call_link(call)
             except Exception:
@@ -1078,6 +1098,7 @@ class WeaveClient:
                     is_root_call
                     and uses_calls_complete_path
                     and should_print_call_link()
+                    and self._wal is None
                 ):
                     print_call_link(call)
             except Exception:

@@ -305,7 +305,11 @@ _RECORD_TYPE_TO_REQ: dict[str, type[BaseModel]] = {
 class TraceServerHandlers:
     """Maps WAL record types to trace server method calls."""
 
-    def __init__(self, server: TraceServerClientInterface) -> None:
+    def __init__(
+        self,
+        server: TraceServerClientInterface,
+        on_success: Callable[[str, WALRecord], None] | None = None,
+    ) -> None:
         self._server = server
         self._handlers: WALHandlers = {}
         for record_type, req_cls in _RECORD_TYPE_TO_REQ.items():
@@ -315,11 +319,14 @@ class TraceServerHandlers:
                 record: WALRecord,
                 _m: Callable = method,
                 _rc: type[BaseModel] = req_cls,
+                _rt: str = record_type,
             ) -> None:
                 # model_validate_json (not model_validate) so that bytes
                 # fields like FileCreateReq.content are base64-decoded
                 # correctly during the WAL round-trip.
                 _m(_rc.model_validate_json(json.dumps(record["req"])))
+                if on_success is not None:
+                    on_success(_rt, record)
 
             self._handlers[record_type] = _handler
 
@@ -328,12 +335,15 @@ class TraceServerHandlers:
         return dict(self._handlers)
 
 
-def build_trace_server_handlers(server: TraceServerClientInterface) -> WALHandlers:
+def build_trace_server_handlers(
+    server: TraceServerClientInterface,
+    on_success: Callable[[str, WALRecord], None] | None = None,
+) -> WALHandlers:
     """Build WAL handlers that replay records to a trace server.
 
     Convenience wrapper around :class:`TraceServerHandlers`.
     """
-    return TraceServerHandlers(server).as_dict()
+    return TraceServerHandlers(server, on_success=on_success).as_dict()
 
 
 def create_sender(
@@ -341,6 +351,7 @@ def create_sender(
     server: TraceServerClientInterface,
     *,
     poll_interval: float = 1.0,
+    on_success: Callable[[str, WALRecord], None] | None = None,
 ) -> BackgroundWALSender:
     """Create a WAL sender that runs in-process as a background thread.
 
@@ -361,9 +372,11 @@ def create_sender(
         wal_dir: Path to the WAL directory (e.g. ``~/.weave/wal/entity/project``).
         server: Trace server to replay records to.
         poll_interval: Seconds between drain cycles.
+        on_success: Optional callback invoked after a record is successfully
+            sent.  Called with ``(record_type, record)``.
     """
     dir_mgr = FileWALDirectoryManager(wal_dir)
-    handlers = build_trace_server_handlers(server)
+    handlers = build_trace_server_handlers(server, on_success=on_success)
     return BackgroundWALSender(
         dir_mgr,
         handlers,

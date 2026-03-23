@@ -3,10 +3,11 @@ from __future__ import annotations
 import atexit
 import logging
 import os
+from collections.abc import Callable
 
 from pydantic import BaseModel
 
-from weave.durability.wal import WALRecordType, WALWriter
+from weave.durability.wal import WALRecord, WALRecordType, WALWriter
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_sender import BackgroundWALSender, create_sender
 from weave.durability.wal_writer import JSONLWALWriter
@@ -48,14 +49,20 @@ class WALManager:
         entity: str,
         project: str,
         server: TraceServerClientInterface,
+        *,
+        on_send: Callable[[str, WALRecord], None] | None = None,
     ) -> WALManager:
         """Create a WAL manager with a background sender thread.
 
         The sender drains WAL records to *server* on a polling interval.
         An atexit handler is registered to ensure clean shutdown.
+
+        Args:
+            on_send: Optional callback invoked after a record is successfully
+                sent to the server.  Called with ``(record_type, record)``.
         """
         mgr = cls(entity, project)
-        mgr._sender = create_sender(mgr.wal_dir, server)
+        mgr._sender = create_sender(mgr.wal_dir, server, on_success=on_send)
         mgr._sender.start()
         atexit.register(mgr.close)
         return mgr
