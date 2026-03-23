@@ -68,7 +68,7 @@ def init(
                 - `print_call_link` (bool): Prints links in terminal to Weave UI for ops. Default: `True`
                 - `log_level` (str): Sets what type of information to log (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). Default: `INFO`
                 - `display_viewer` (str): Controls how Weave displays objects in the console (`auto`, `rich`, `print`). Default: `auto`
-                - `capture_code` (bool): Saves the code used to make calls to your Weave project. Default: `True`
+                - `capture_code` (bool): Captures code of traced ops to your Weave project. Default: `True`
                 - `implicitly_patch_integrations` (bool): Auto-patches supported libraries. Default: `True`
                 - `redact_pii` (bool): Scans all trace data for sensitive information,
                     like emails, phone numbers, and credit cards, and replaces them with placeholder values
