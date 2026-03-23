@@ -178,6 +178,25 @@ async def test_async_method_call(client, weave_obj, py_obj):
         res2, call2 = await py_obj.amethod.call(1)
 
 
+def test_input_binding_error_creates_error_call(client):
+    @weave.op
+    def my_tool(*, issue_id: str) -> dict[str, str]:
+        return {"id": issue_id}
+
+    with pytest.raises(OpCallError, match="ticket_number"):
+        my_tool(**{"ticket_number": "123"})
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+
+    failed_call = calls[0]
+    assert failed_call.inputs == {"ticket_number": "123"}
+    assert failed_call.exception is not None
+    assert "OpCallError" in failed_call.exception
+    assert "ticket_number" in failed_call.exception
+    assert failed_call.summary.get("weave", {}).get("status") == "error"
+
+
 def test_sync_func_patching_passes_inspection(func):
     assert is_op(func)
     assert inspect.isfunction(func)
