@@ -386,6 +386,7 @@ class WeaveClient:
         self.send_file_cache = WeaveClientSendFileCache()
 
         self._wal: WALManager | None = None
+        self._wal_pending_call_ids: set[str] = set()
         if settings.should_enable_wal():
             if settings.should_disable_wal_sender():
                 self._wal = WALManager(self.entity, self.project)
@@ -408,11 +409,11 @@ class WeaveClient:
             return
         try:
             start = record.get("req", {}).get("start", {})
-            parent_id = start.get("parent_id")
-            if parent_id is not None:
-                return  # only print links for root calls
-            project_id = start.get("project_id", "")
             call_id = start.get("id", "")
+            if call_id not in self._wal_pending_call_ids:
+                return  # not our call or already printed
+            self._wal_pending_call_ids.discard(call_id)
+            project_id = start.get("project_id", "")
             entity, project = from_project_id(project_id)
             url = redirect_call(entity, project, call_id)
             logger.info("%s %s", TRACE_CALL_EMOJI, url)
@@ -893,6 +894,8 @@ class WeaveClient:
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_start", call_start_req)
+                if not current_call:  # root call
+                    self._wal_pending_call_ids.add(call_id)
             else:
                 # eager_call_start is a client-side hint that tells the batch processor
                 # to send this call's start immediately (for long-running ops like evals)
