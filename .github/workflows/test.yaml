@@ -242,8 +242,6 @@ jobs:
   trace-server-migrator-tests:
     name: Trace server migrator tests
     timeout-minutes: 10
-    needs: check-which-tests-to-run
-    if: ${{ needs.check-which-tests-to-run.outputs.trace_server_tests == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
