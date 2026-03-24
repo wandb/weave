@@ -38,7 +38,7 @@ from weave.shared.trace_server_interface_util import (
     split_exact_and_wildcard_values,
     wildcard_version_value_to_ref_prefix,
 )
-from weave.trace_server import ch_sentinel_values
+from weave.trace_server import ch_sentinel_values, constants
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
@@ -507,6 +507,7 @@ class WhereFilters(BaseModel):
     parent_ids: str = ""
     op_name: str = ""
     trace_id: str = ""
+    children_of_eval_ids: str = ""
     thread_id: str = ""
     turn_id: str = ""
     heavy_filter: str = ""
@@ -527,6 +528,7 @@ class WhereFilters(BaseModel):
             self.parent_ids,
             self.op_name,
             self.trace_id,
+            self.children_of_eval_ids,
             self.thread_id,
             self.turn_id,
             self.heavy_filter,
@@ -789,6 +791,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.wb_run_ids,
                 self.filter.turn_ids,
                 self.filter.thread_ids is not None,
+                self.filter.children_of_eval_ids,
             ]
         )
 
@@ -1266,6 +1269,9 @@ class CallsQuery(BaseModel):
         trace_id = process_trace_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias
         )
+        children_of_eval_ids = process_children_of_eval_ids_to_sql(
+            self.hardcoded_filter, pb, table_alias, self.project_id
+        )
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
         )
@@ -1321,6 +1327,7 @@ class CallsQuery(BaseModel):
             id_subquery=id_subquery,
             op_name=op_name,
             trace_id=trace_id,
+            children_of_eval_ids=children_of_eval_ids,
             thread_id=thread_id,
             turn_id=turn_id,
             wb_run_id=wb_run_id,
@@ -2230,6 +2237,56 @@ def process_trace_id_filter_to_sql(
         return ""
 
     return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
+
+
+def process_children_of_eval_ids_to_sql(
+    hardcoded_filter: HardCodedFilter | None,
+    param_builder: ParamBuilder,
+    table_alias: str,
+    project_id: str = "",
+) -> str:
+    """Fetch PredictandScore calls and their children (scorers/predict) for given eval root IDs."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.children_of_eval_ids:
+        return ""
+
+    eval_root_ids = hardcoded_filter.filter.children_of_eval_ids
+    assert_parameter_length_less_than_max("children_of_eval_ids", len(eval_root_ids))
+
+    parent_id_field = get_field_by_name("parent_id")
+    if not isinstance(parent_id_field, CallsMergedAggField):
+        raise TypeError("parent_id is not an aggregate field")
+    parent_id_field_sql = parent_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    eval_root_ids_param = param_slot(
+        param_builder.add_param(eval_root_ids), "Array(String)"
+    )
+    project_id_param = param_slot(param_builder.add_param(project_id), "String")
+    predict_and_score_op_name_param = param_slot(
+        param_builder.add_param(
+            f"%{constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME}:%"
+        ),
+        "String",
+    )
+
+    parent_null = parent_id_field.null_check_sql(
+        param_builder, table_alias, ReadTable.CALLS_MERGED, use_agg_fn=False
+    )
+
+    predict_and_score_subquery = (
+        f"SELECT id FROM calls_merged "
+        f"WHERE project_id = {project_id_param} "
+        f"GROUP BY project_id, id "
+        f"HAVING any(parent_id) IN {eval_root_ids_param} "
+        f"AND any(op_name) LIKE {predict_and_score_op_name_param}"
+    )
+
+    return (
+        f" AND ({parent_id_field_sql} IN {eval_root_ids_param}"
+        f" OR {parent_id_field_sql} IN ({predict_and_score_subquery})"
+        f" OR {parent_null})"
+    )
 
 
 def process_thread_id_filter_to_sql(

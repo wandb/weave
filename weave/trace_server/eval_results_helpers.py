@@ -79,25 +79,13 @@ def extract_eval_root_metadata_from_calls(
     return metadata
 
 
-def build_pas_calls_query_req(
+def build_trace_calls_query_req(
     project_id: str, eval_root_ids: list[str]
 ) -> tsi.CallsQueryReq:
-    """Build CallsQueryReq for predict-and-score child calls of eval roots."""
+    """Fetch predict-and-score calls and their children"""
     return tsi.CallsQueryReq(
         project_id=project_id,
-        filter=tsi.CallsFilter(parent_ids=eval_root_ids),
-        columns=["id", "parent_id", "op_name", "inputs", "output"],
-        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
-    )
-
-
-def build_child_calls_query_req(
-    project_id: str, pas_ids: list[str]
-) -> tsi.CallsQueryReq:
-    """Build CallsQueryReq for child calls of predict-and-score calls."""
-    return tsi.CallsQueryReq(
-        project_id=project_id,
-        filter=tsi.CallsFilter(parent_ids=pas_ids),
+        filter=tsi.CallsFilter(children_of_eval_ids=eval_root_ids),
         columns=[
             "id",
             "parent_id",
@@ -109,6 +97,7 @@ def build_child_calls_query_req(
             "started_at",
             "ended_at",
         ],
+        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
     )
 
 
@@ -421,16 +410,17 @@ def eval_results_grouped_rows(
     if not eval_root_ids:
         return [], 0, []
 
-    pas_req = build_pas_calls_query_req(req.project_id, eval_root_ids)
-    predict_and_score_calls = filter_predict_and_score_calls(
-        server.calls_query_stream(pas_req), eval_root_ids
+    all_calls = list(
+        server.calls_query_stream(
+            build_trace_calls_query_req(req.project_id, eval_root_ids)
+        )
     )
+    predict_and_score_calls = filter_predict_and_score_calls(all_calls, eval_root_ids)
     if not predict_and_score_calls:
         return [], 0, []
 
-    pas_ids = [call.id for call in predict_and_score_calls]
-    child_req = build_child_calls_query_req(req.project_id, pas_ids)
-    child_calls = list(server.calls_query_stream(child_req))
+    predict_and_score_calls_set = {call.id for call in predict_and_score_calls}
+    child_calls = [c for c in all_calls if c.parent_id in predict_and_score_calls_set]
     child_by_parent = build_child_by_parent(child_calls)
 
     row_map, row_eval_map = build_eval_rows_from_calls(

@@ -557,6 +557,7 @@ class CallsFilter(BaseModelStrict):
     trace_roots_only: bool | None = None
     wb_user_ids: list[str] | None = None
     wb_run_ids: list[str] | None = None
+    children_of_eval_ids: list[str] | None = None
 
 
 class CallsQueryReq(BaseModelStrict):
