@@ -265,7 +265,7 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
                 or error_data.get("detail")
                 or error_data.get("reason")
             )
-    except (json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError, httpx.StreamError):
         pass
 
     # Handle calls_complete mode requirement for automatic SDK upgrade
