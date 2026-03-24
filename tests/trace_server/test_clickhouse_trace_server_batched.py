@@ -1178,9 +1178,7 @@ def _make_project_id(prefix: str) -> str:
 def _obj_create(server, project_id, obj_id, val):
     return server.obj_create(
         tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id=project_id, object_id=obj_id, val=val
-            )
+            obj=tsi.ObjSchemaForInsert(project_id=project_id, object_id=obj_id, val=val)
         )
     )
 
@@ -1231,9 +1229,7 @@ def test_obj_create_dedup_allows_after_delete(trace_server):
 
     r1 = _obj_create(server, project_id, obj_id, val)
     server.obj_delete(
-        tsi.ObjDeleteReq(
-            project_id=project_id, object_id=obj_id, digests=[r1.digest]
-        )
+        tsi.ObjDeleteReq(project_id=project_id, object_id=obj_id, digests=[r1.digest])
     )
 
     r2 = _obj_create(server, project_id, obj_id, val)
@@ -1272,9 +1268,7 @@ def test_obj_digest_exists_non_deleted_returns_false_after_delete(trace_server):
 
     r = _obj_create(server, project_id, obj_id, {"x": 1})
     server.obj_delete(
-        tsi.ObjDeleteReq(
-            project_id=project_id, object_id=obj_id, digests=[r.digest]
-        )
+        tsi.ObjDeleteReq(project_id=project_id, object_id=obj_id, digests=[r.digest])
     )
     assert server._obj_digest_exists_non_deleted(project_id, obj_id, r.digest) is False
 
@@ -1331,9 +1325,7 @@ def test_delete_preserves_version_index_gaps(trace_server):
         digests.append(r.digest)
 
     server.obj_delete(
-        tsi.ObjDeleteReq(
-            project_id=project_id, object_id=obj_id, digests=[digests[1]]
-        )
+        tsi.ObjDeleteReq(project_id=project_id, object_id=obj_id, digests=[digests[1]])
     )
 
     non_deleted = [
