@@ -169,14 +169,14 @@ FROM (
             PARTITION BY project_id,
             kind,
             object_id
-            ORDER BY created_at ASC
+            ORDER BY _first_created_at ASC, digest ASC
         ) - 1 AS version_index,
         count(*) OVER (
             PARTITION BY project_id, kind, object_id
         ) as version_count,
         row_number() OVER (
             PARTITION BY project_id, kind, object_id
-            ORDER BY (deleted_at IS NULL) DESC, created_at DESC
+            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
     FROM (
@@ -198,7 +198,13 @@ FROM (
                 object_id,
                 digest
                 ORDER BY created_at DESC, (deleted_at IS NULL) ASC
-            ) AS rn
+            ) AS rn,
+            min(created_at) OVER (
+                PARTITION BY project_id,
+                kind,
+                object_id,
+                digest
+            ) AS _first_created_at
         FROM object_versions"""
 
 
