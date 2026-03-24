@@ -79,26 +79,6 @@ def extract_eval_root_metadata_from_calls(
     return metadata
 
 
-def build_trace_calls_query_req(
-    project_id: str, eval_root_ids: list[str]
-) -> tsi.CallsQueryReq:
-    """Fetch predict-and-score calls and their children"""
-    return tsi.CallsQueryReq(
-        project_id=project_id,
-        filter=tsi.CallsFilter(children_of_eval_ids=eval_root_ids),
-        columns=[
-            "id",
-            "parent_id",
-            "op_name",
-            "attributes",
-            "inputs",
-            "output",
-            "summary",
-            "started_at",
-            "ended_at",
-        ],
-        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
-    )
 
 
 def filter_predict_and_score_calls(
@@ -411,9 +391,7 @@ def eval_results_grouped_rows(
         return [], 0, []
 
     all_calls = list(
-        server.calls_query_stream(
-            build_trace_calls_query_req(req.project_id, eval_root_ids)
-        )
+        server.calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
     )
     predict_and_score_calls = filter_predict_and_score_calls(all_calls, eval_root_ids)
     if not predict_and_score_calls:

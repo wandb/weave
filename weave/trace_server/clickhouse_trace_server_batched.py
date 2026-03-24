@@ -1406,6 +1406,51 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if hasattr(raw_res, "close"):
                 raw_res.close()
 
+    def calls_query_stream_for_eval_subtree(
+        self, project_id: str, eval_root_ids: list[str]
+    ) -> Iterator[tsi.CallSchema]:
+        """Fetch PAS calls and their children for the given eval root IDs in one query."""
+        read_table = self.table_routing_resolver.resolve_read_table(
+            project_id, self.ch_client
+        )
+        columns = sorted(
+            set(
+                REQUIRED_CALL_COLUMNS
+                + [
+                    "id",
+                    "parent_id",
+                    "op_name",
+                    "attributes",
+                    "inputs",
+                    "output",
+                    "summary",
+                    "started_at",
+                    "ended_at",
+                ]
+            )
+        )
+        cq = CallsQuery(project_id=project_id, read_table=read_table)
+        for col in columns:
+            cq.add_field(col)
+        cq.set_hardcoded_filter(
+            HardCodedFilter(filter=tsi.CallsFilter(), eval_root_ids=eval_root_ids)
+        )
+        cq.add_order("started_at", "asc")
+        cq.add_order("id", "asc")
+        pb = ParamBuilder()
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
+        select_columns = [c.field for c in cq.select_fields]
+        try:
+            for row in raw_res:
+                yield tsi.CallSchema.model_validate(
+                    _ch_call_dict_to_call_schema_dict(
+                        dict(zip(select_columns, row, strict=False))
+                    )
+                )
+        finally:
+            if hasattr(raw_res, "close"):
+                raw_res.close()
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
         self, project_id: str, calls: list[dict[str, Any]]

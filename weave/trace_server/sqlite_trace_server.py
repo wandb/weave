@@ -964,6 +964,42 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
 
+    def calls_query_stream_for_eval_subtree(
+        self, project_id: str, eval_root_ids: list[str]
+    ) -> Iterator[tsi.CallSchema]:
+        columns = [
+            "id",
+            "parent_id",
+            "op_name",
+            "attributes",
+            "inputs",
+            "output",
+            "summary",
+            "started_at",
+            "ended_at",
+        ]
+        pas_calls = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    filter=tsi.CallsFilter(parent_ids=eval_root_ids),
+                    columns=columns,
+                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                )
+            )
+        )
+        yield from pas_calls
+        pas_ids = [c.id for c in pas_calls]
+        if pas_ids:
+            yield from self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    filter=tsi.CallsFilter(parent_ids=pas_ids),
+                    columns=columns,
+                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                )
+            )
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         if req.limit is not None and req.limit < 1:
             raise ValueError("Limit must be a positive integer")

@@ -773,6 +773,7 @@ class Condition(BaseModel):
 
 class HardCodedFilter(BaseModel):
     filter: tsi.CallsFilter
+    eval_root_ids: list[str] | None = None
 
     def is_useful(self) -> bool:
         """Returns True if the filter is useful - i.e. it has any non-null fields
@@ -791,7 +792,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.wb_run_ids,
                 self.filter.turn_ids,
                 self.filter.thread_ids is not None,
-                self.filter.children_of_eval_ids,
+                self.eval_root_ids,
             ]
         )
 
@@ -2246,11 +2247,11 @@ def process_children_of_eval_ids_to_sql(
     project_id: str = "",
 ) -> str:
     """Fetch PredictandScore calls and their children (scorers/predict) for given eval root IDs."""
-    if hardcoded_filter is None or not hardcoded_filter.filter.children_of_eval_ids:
+    if hardcoded_filter is None or not hardcoded_filter.eval_root_ids:
         return ""
 
-    eval_root_ids = hardcoded_filter.filter.children_of_eval_ids
-    assert_parameter_length_less_than_max("children_of_eval_ids", len(eval_root_ids))
+    eval_root_ids = hardcoded_filter.eval_root_ids
+    assert_parameter_length_less_than_max("eval_root_ids", len(eval_root_ids))
 
     parent_id_field = get_field_by_name("parent_id")
     if not isinstance(parent_id_field, CallsMergedAggField):
