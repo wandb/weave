@@ -41,9 +41,7 @@ def _get_latest(client: WeaveClient, object_id: str) -> tsi.ObjSchema | None:
     resp = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
-            filter=tsi.ObjectVersionFilter(
-                object_ids=[object_id], latest_only=True
-            ),
+            filter=tsi.ObjectVersionFilter(object_ids=[object_id], latest_only=True),
         )
     )
     return resp.objs[0] if resp.objs else None
@@ -121,9 +119,12 @@ def test_republish_latest_version_index_stable(client: WeaveClient):
     objs = _objs_query(client, "idx_stable_3")
     assert len(objs) == 3
 
-    assert objs[0].version_index == 0 and objs[0].digest == v0.digest
-    assert objs[1].version_index == 1 and objs[1].digest == v1.digest
-    assert objs[2].version_index == 2 and objs[2].digest == v2.digest
+    assert objs[0].version_index == 0
+    assert objs[0].digest == v0.digest
+    assert objs[1].version_index == 1
+    assert objs[1].digest == v1.digest
+    assert objs[2].version_index == 2
+    assert objs[2].digest == v2.digest
 
 
 # ── P1-T4: Delete middle, re-publish middle ─────────────────────────
@@ -191,9 +192,12 @@ def test_republish_two_versions_indices_stable(client: WeaveClient):
     objs = _objs_query(client, "idx_stable_6")
     assert len(objs) == 3
 
-    assert objs[0].version_index == 0 and objs[0].digest == v0.digest
-    assert objs[1].version_index == 1 and objs[1].digest == v1.digest
-    assert objs[2].version_index == 2 and objs[2].digest == v2.digest
+    assert objs[0].version_index == 0
+    assert objs[0].digest == v0.digest
+    assert objs[1].version_index == 1
+    assert objs[1].digest == v1.digest
+    assert objs[2].version_index == 2
+    assert objs[2].digest == v2.digest
 
     latest = _get_latest(client, "idx_stable_6")
     assert latest.digest == v2.digest

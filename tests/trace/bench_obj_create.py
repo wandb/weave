@@ -15,10 +15,7 @@ Usage:
 After implementing the min(created_at) change, re-run and compare output.
 """
 
-import json
 import time
-
-import pytest
 
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -101,8 +98,10 @@ def test_bench_obj_create(client: WeaveClient):
     t_create = time.perf_counter() - t0
     total_versions = NUM_OBJECTS * NUM_VERSIONS_PER_OBJECT
 
-    print(f"\n{'='*60}")
-    print(f"CREATE: {total_versions} versions ({NUM_OBJECTS} objects x {NUM_VERSIONS_PER_OBJECT} versions)")
+    print(f"\n{'=' * 60}")
+    print(
+        f"CREATE: {total_versions} versions ({NUM_OBJECTS} objects x {NUM_VERSIONS_PER_OBJECT} versions)"
+    )
     print(f"  Total time:   {t_create:.2f}s")
     print(f"  Per version:  {t_create / total_versions * 1000:.2f}ms")
     print(f"  Throughput:   {total_versions / t_create:.0f} versions/s")
@@ -169,14 +168,14 @@ def test_bench_obj_create(client: WeaveClient):
     print(f"  Time: {t_query_after * 1000:.1f}ms")
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("SUMMARY")
     print(f"  obj_create rate:    {total_versions / t_create:.0f}/s")
     print(f"  republish rate:     {num_republish / t_republish:.0f}/s")
     print(f"  query single:       {t_query_single * 1000:.1f}ms")
     print(f"  query all latest:   {t_query_latest * 1000:.1f}ms")
     print(f"  query after repub:  {t_query_after * 1000:.1f}ms")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 # ── Benchmark: query-heavy workload ─────────────────────────────────
@@ -191,7 +190,7 @@ def test_bench_query_versions(client: WeaveClient):
     project_id = client._project_id()
     version_counts = [1, 10, 50, 100, 250, 500, 1000]
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("QUERY SCALING BY VERSION COUNT")
 
     for n_versions in version_counts:
@@ -225,7 +224,7 @@ def test_bench_query_versions(client: WeaveClient):
     all_latest = _objs_query_all(client)
     t_all = time.perf_counter() - t0
     print(f"\n  All latest ({len(all_latest)} objects): {t_all * 1000:.1f}ms")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 # ── Benchmark: concurrent-style object creation ─────────────────────
@@ -256,8 +255,10 @@ def test_bench_obj_create_many_objects_few_versions(client: WeaveClient):
     t_create = time.perf_counter() - t0
     total = n_objects * n_versions
 
-    print(f"\n{'='*60}")
-    print(f"WIDE CREATE: {total} versions ({n_objects} objects x {n_versions} versions)")
+    print(f"\n{'=' * 60}")
+    print(
+        f"WIDE CREATE: {total} versions ({n_objects} objects x {n_versions} versions)"
+    )
     print(f"  Total time:  {t_create:.2f}s")
     print(f"  Per version: {t_create / total * 1000:.2f}ms")
     print(f"  Throughput:  {total / t_create:.0f} versions/s")
@@ -267,4 +268,4 @@ def test_bench_obj_create_many_objects_few_versions(client: WeaveClient):
     latest = _objs_query_all(client)
     t_query = time.perf_counter() - t0
     print(f"\n  Query all latest ({len(latest)} objects): {t_query * 1000:.1f}ms")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")

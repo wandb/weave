@@ -1336,3 +1336,91 @@ def test_delete_preserves_version_index_gaps(trace_server):
     by_digest = {o.digest: o for o in non_deleted}
     assert by_digest[digests[0]].version_index == 0
     assert by_digest[digests[2]].version_index == 2
+
+
+# ── Explicit "latest" alias on obj_create ────────────────────────────
+
+
+def test_obj_create_writes_latest_alias(trace_server):
+    """obj_create should write a 'latest' alias pointing to the new digest."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("alias")
+    obj_id = "alias_obj"
+
+    r = _obj_create(server, project_id, obj_id, {"v": 1})
+
+    resolved = server._maybe_resolve_alias(project_id, obj_id, "latest")
+    assert resolved == r.digest
+
+
+def test_obj_create_moves_latest_alias_on_new_version(trace_server):
+    """Each new version should move the 'latest' alias."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("alias")
+    obj_id = "alias_move"
+
+    r1 = _obj_create(server, project_id, obj_id, {"v": 1})
+    r2 = _obj_create(server, project_id, obj_id, {"v": 2})
+
+    resolved = server._maybe_resolve_alias(project_id, obj_id, "latest")
+    assert resolved == r2.digest
+    assert resolved != r1.digest
+
+
+def test_obj_create_moves_latest_alias_on_dedup(trace_server):
+    """Re-publishing old content should move 'latest' to the re-published digest."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("alias")
+    obj_id = "alias_dedup"
+
+    r1 = _obj_create(server, project_id, obj_id, {"v": "A"})
+    r2 = _obj_create(server, project_id, obj_id, {"v": "B"})
+
+    # latest should point to B
+    assert server._maybe_resolve_alias(project_id, obj_id, "latest") == r2.digest
+
+    # Re-publish A (dedup hit) — latest should move to A
+    _obj_create(server, project_id, obj_id, {"v": "A"})
+    assert server._maybe_resolve_alias(project_id, obj_id, "latest") == r1.digest
+
+
+def test_resolve_latest_falls_back_to_computed(trace_server):
+    """If no explicit 'latest' alias exists, fall back to computed is_latest."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("alias")
+    obj_id = "alias_fallback"
+
+    # Insert directly bypassing obj_create to avoid writing the alias
+    from weave.trace_server.clickhouse_schema import ObjCHInsertable
+    from weave.trace_server.object_creation_utils import compute_object_digest_result
+
+    val = {"v": "no_alias"}
+    digest_result = compute_object_digest_result(val, None)
+    ch_obj = ObjCHInsertable(
+        project_id=project_id,
+        object_id=obj_id,
+        wb_user_id="",
+        kind="object",
+        base_object_class=digest_result.base_object_class,
+        leaf_object_class=digest_result.leaf_object_class,
+        refs=[],
+        val_dump=digest_result.json_val,
+        digest=digest_result.digest,
+    )
+    server._insert(
+        "object_versions",
+        data=[list(ch_obj.model_dump().values())],
+        column_names=list(ch_obj.model_fields.keys()),
+    )
+
+    # No alias written — _maybe_resolve_alias should fall back to computed latest
+    resolved = server._maybe_resolve_alias(project_id, obj_id, "latest")
+    assert resolved == digest_result.digest
+
+
+def test_resolve_computed_latest_returns_none_for_missing(trace_server):
+    """_resolve_computed_latest should return None for nonexistent object."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("alias")
+    result = server._resolve_computed_latest(project_id, "nonexistent_obj")
+    assert result is None
