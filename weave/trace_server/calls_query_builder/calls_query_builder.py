@@ -33,6 +33,7 @@ from typing import Any, Literal, NamedTuple, cast
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
+from weave.shared import refs_internal as ri
 from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     split_exact_and_wildcard_values,
@@ -2260,16 +2261,16 @@ def process_children_of_eval_ids_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
+    pas_op_prefix = (
+        f"{ri.WEAVE_INTERNAL_SCHEME}:///{project_id}/op/"
+        f"{constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME}:%"
+    )
+
     eval_root_ids_param = param_slot(
         param_builder.add_param(eval_root_ids), "Array(String)"
     )
     project_id_param = param_slot(param_builder.add_param(project_id), "String")
-    predict_and_score_op_name_param = param_slot(
-        param_builder.add_param(
-            f"%{constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME}:%"
-        ),
-        "String",
-    )
+    pas_op_name_param = param_slot(param_builder.add_param(pas_op_prefix), "String")
 
     parent_null = parent_id_field.null_check_sql(
         param_builder, table_alias, ReadTable.CALLS_MERGED, use_agg_fn=False
@@ -2278,9 +2279,9 @@ def process_children_of_eval_ids_to_sql(
     predict_and_score_subquery = (
         f"SELECT id FROM calls_merged "
         f"WHERE project_id = {project_id_param} "
-        f"GROUP BY project_id, id "
-        f"HAVING any(parent_id) IN {eval_root_ids_param} "
-        f"AND any(op_name) LIKE {predict_and_score_op_name_param}"
+        f"AND parent_id IN {eval_root_ids_param} "
+        f"AND op_name LIKE {pas_op_name_param} "
+        f"GROUP BY project_id, id"
     )
 
     return (
