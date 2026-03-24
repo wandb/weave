@@ -12,11 +12,11 @@ from typing_extensions import Self
 from weave.object.obj import Object
 from weave.trace.call import Call
 from weave.trace.isinstance import weave_isinstance
+from weave.trace.object_record import ObjectRecord
 from weave.trace.op import OpCallError, as_op, is_op, op
 from weave.trace.op_caller import async_call_op
 from weave.trace.op_protocol import Op
-from weave.trace.refs import ObjectRef
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import Traceable, WeaveObject
 from weave.trace.weave_client import sanitize_object_name
 
 # Metadata keys injected by weave serialization that are not real model fields.
@@ -487,9 +487,12 @@ def _sanitize_field_for_pydantic(val: Any) -> Any:
     This is required for pydantic to deserialize json representations of `Traceable` objects.
     These dicts have extra fields like "_class_name" and "_bases" that raise when extra='forbid'.
     """
-    # The base Object class has builtin handling for deserializing WeaveObjects and ObjectRefs.
-    if isinstance(val, (WeaveObject, ObjectRef)):
+    # Traceable objects have builtin handling for deserialization
+    if isinstance(val, Traceable):
         return val
+    # ObjectRecords must be unwrapped into dicts before being deserialized
+    if isinstance(val, ObjectRecord):
+        return _sanitize_field_for_pydantic(val.unwrap())
     # Remove metadata from dicts
     if isinstance(val, dict):
         return {
