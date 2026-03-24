@@ -1626,6 +1626,42 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         self._command(update_query, parameters=pb.get_params())
 
+    def _obj_digest_exists_non_deleted(
+        self, project_id: str, object_id: str, digest: str
+    ) -> bool:
+        """Check if a non-deleted row with the same digest already exists.
+
+        Uses argMax(deleted_at, created_at) to handle pre-merge state where
+        multiple rows may exist for the same digest.  Best-effort: async
+        inserts mean a small race window, but the read-path dedup and
+        ReplacingMergeTree handle duplicates correctly.
+        """
+        query = """
+            SELECT count() > 0
+            FROM (
+                SELECT
+                    argMax(deleted_at, created_at) AS latest_deleted_at
+                FROM object_versions
+                WHERE project_id = {project_id: String}
+                    AND object_id = {object_id: String}
+                    AND digest = {digest: String}
+                GROUP BY project_id, object_id, digest
+            )
+            WHERE latest_deleted_at IS NULL
+                OR latest_deleted_at = toDateTime64(0, 3)
+        """
+        result = self._query(
+            query,
+            parameters={
+                "project_id": project_id,
+                "object_id": object_id,
+                "digest": digest,
+            },
+        )
+        if result.result_rows and result.result_rows[0]:
+            return bool(result.result_rows[0][0])
+        return False
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         digest_result = compute_object_digest_result(
@@ -1640,6 +1676,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             actual=digest,
             label=f"obj {req.obj.object_id!r}",
         )
+
+        # Dedup-before-insert: skip if a non-deleted row with this digest
+        # already exists.  This keeps min(created_at) stable for the
+        # version_index window function (see Problem 1 design doc).
+        if self._obj_digest_exists_non_deleted(
+            req.obj.project_id, req.obj.object_id, digest
+        ):
+            return tsi.ObjCreateRes(
+                digest=digest,
+                object_id=req.obj.object_id,
+            )
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
