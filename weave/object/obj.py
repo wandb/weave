@@ -99,11 +99,7 @@ class Object(BaseModel):
         if isinstance(data, dict):
             # Only strip metadata keys that aren't explicitly declared as model fields.
             keys_to_strip = _WEAVE_SERIALIZATION_METADATA_KEYS - cls.model_fields.keys()
-            return {
-                k: v
-                for k, v in data.items()
-                if k not in keys_to_strip
-            }
+            return {k: v for k, v in data.items() if k not in keys_to_strip}
         return data
 
     @model_validator(mode="wrap")
