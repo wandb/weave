@@ -12,15 +12,11 @@ from typing_extensions import Self
 from weave.object.obj import Object
 from weave.trace.call import Call
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.object_record import ObjectRecord
 from weave.trace.op import OpCallError, as_op, is_op, op
 from weave.trace.op_caller import async_call_op
 from weave.trace.op_protocol import Op
-from weave.trace.vals import Traceable, WeaveObject
+from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import sanitize_object_name
-
-# Metadata keys injected by weave serialization that are not real model fields.
-_WEAVE_METADATA_KEYS = {"_type", "_class_name", "_bases"}
 
 
 def _import_numpy() -> Any | None:
@@ -55,15 +51,10 @@ class Scorer(Object):
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
-        """Instantiate a Scorer from a WeaveObject."""
         field_values = {}
         for field_name in cls.model_fields:
             if hasattr(obj, field_name):
-                # Sanitize values before loading into pydantic:
-                # Manually remove extra metadata that would fail validation
-                field_values[field_name] = _sanitize_field_for_pydantic(
-                    getattr(obj, field_name)
-                )
+                field_values[field_name] = getattr(obj, field_name)
 
         return cls(**field_values)
 
@@ -480,27 +471,3 @@ class WeaveScorerResult(BaseModel):
     metadata: dict[str, Any] = Field(
         description="Any extra information from the scorer like numerical scores, model outputs, etc."
     )
-
-
-def _sanitize_field_for_pydantic(val: Any) -> Any:
-    """Recursively strip weave metadata from dicts.
-    This is required for pydantic to deserialize json representations of `Traceable` objects.
-    These dicts have extra fields like "_class_name" and "_bases" that raise when extra='forbid'.
-    """
-    # Traceable objects have builtin handling for deserialization
-    if isinstance(val, Traceable):
-        return val
-    # ObjectRecords must be unwrapped into dicts before being deserialized
-    if isinstance(val, ObjectRecord):
-        return _sanitize_field_for_pydantic(val.unwrap())
-    # Remove metadata from dicts
-    if isinstance(val, dict):
-        return {
-            k: _sanitize_field_for_pydantic(v)
-            for k, v in val.items()
-            if k not in _WEAVE_METADATA_KEYS
-        }
-    # Recurse into lists
-    if isinstance(val, list):
-        return [_sanitize_field_for_pydantic(v) for v in val]
-    return val
