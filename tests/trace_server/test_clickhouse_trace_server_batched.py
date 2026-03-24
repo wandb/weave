@@ -1157,3 +1157,190 @@ def test_file_batch_clears_on_insert_failure():
             f"Memory leak: _file_batch retained {len(server._file_batch)} items "
             f"after failed insert. Batch should be cleared on any exception."
         )
+
+
+# ── obj_create dedup-before-insert ───────────────────────────────────
+
+
+def _get_ch_server(trace_server):
+    """Extract ClickHouseTraceServer from the test fixture, or skip."""
+    server = trace_server._internal_trace_server
+    if not isinstance(server, chts.ClickHouseTraceServer):
+        pytest.skip("ClickHouse-only test")
+    return server
+
+
+def _make_project_id(prefix: str) -> str:
+    raw = f"test/{prefix}_{uuid.uuid4().hex[:8]}"
+    return base64.b64encode(raw.encode()).decode()
+
+
+def _obj_create(server, project_id, obj_id, val):
+    return server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=project_id, object_id=obj_id, val=val
+            )
+        )
+    )
+
+
+def _objs_query(server, project_id, obj_id):
+    return server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[obj_id]),
+        )
+    ).objs
+
+
+def test_obj_create_dedup_skips_insert(trace_server):
+    """obj_create with an existing non-deleted digest should skip the INSERT."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("dedup")
+    obj_id = "dedup_obj"
+    val = {"key": "same_content"}
+
+    r1 = _obj_create(server, project_id, obj_id, val)
+    r2 = _obj_create(server, project_id, obj_id, val)
+
+    assert r1.digest == r2.digest
+    assert r2.object_id == obj_id
+    assert len(_objs_query(server, project_id, obj_id)) == 1
+
+
+def test_obj_create_dedup_allows_different_content(trace_server):
+    """Different content should always create separate versions."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("dedup")
+    obj_id = "dedup_diff"
+
+    r1 = _obj_create(server, project_id, obj_id, {"v": 1})
+    r2 = _obj_create(server, project_id, obj_id, {"v": 2})
+
+    assert r1.digest != r2.digest
+    assert len(_objs_query(server, project_id, obj_id)) == 2
+
+
+def test_obj_create_dedup_allows_after_delete(trace_server):
+    """obj_create should insert if the same digest was deleted."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("dedup")
+    obj_id = "dedup_del"
+    val = {"key": "delete_me"}
+
+    r1 = _obj_create(server, project_id, obj_id, val)
+    server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=project_id, object_id=obj_id, digests=[r1.digest]
+        )
+    )
+
+    r2 = _obj_create(server, project_id, obj_id, val)
+    assert r2.digest == r1.digest
+
+    non_deleted = [
+        o for o in _objs_query(server, project_id, obj_id) if o.deleted_at is None
+    ]
+    assert len(non_deleted) >= 1
+
+
+# ── _obj_digest_exists_non_deleted ───────────────────────────────────
+
+
+def test_obj_digest_exists_non_deleted_returns_false_for_missing(trace_server):
+    """Should return False for a digest that has never been inserted."""
+    server = _get_ch_server(trace_server)
+    assert server._obj_digest_exists_non_deleted("nonexistent", "x", "x") is False
+
+
+def test_obj_digest_exists_non_deleted_returns_true_after_insert(trace_server):
+    """Should return True after inserting a version."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("exists")
+    obj_id = "exists_obj"
+
+    r = _obj_create(server, project_id, obj_id, {"x": 1})
+    assert server._obj_digest_exists_non_deleted(project_id, obj_id, r.digest) is True
+
+
+def test_obj_digest_exists_non_deleted_returns_false_after_delete(trace_server):
+    """Should return False after the digest has been soft-deleted."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("exists")
+    obj_id = "exists_del"
+
+    r = _obj_create(server, project_id, obj_id, {"x": 1})
+    server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=project_id, object_id=obj_id, digests=[r.digest]
+        )
+    )
+    assert server._obj_digest_exists_non_deleted(project_id, obj_id, r.digest) is False
+
+
+# ── version_index ordering with _first_created_at ────────────────────
+
+
+def test_version_index_stable_on_republish(trace_server):
+    """Republishing old content should not shift version indices."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("vidx")
+    obj_id = "vidx_obj"
+
+    r0 = _obj_create(server, project_id, obj_id, {"v": "A"})
+    r1 = _obj_create(server, project_id, obj_id, {"v": "B"})
+    r2 = _obj_create(server, project_id, obj_id, {"v": "C"})
+
+    # Re-publish A — dedup no-op
+    _obj_create(server, project_id, obj_id, {"v": "A"})
+
+    objs = _objs_query(server, project_id, obj_id)
+    assert len(objs) == 3
+
+    by_digest = {o.digest: o for o in objs}
+    assert by_digest[r0.digest].version_index == 0
+    assert by_digest[r1.digest].version_index == 1
+    assert by_digest[r2.digest].version_index == 2
+
+
+def test_version_index_sequential(trace_server):
+    """Version indices should be 0..N-1 for N unique versions."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("vidx")
+    obj_id = "vidx_seq"
+    n = 10
+
+    for i in range(n):
+        _obj_create(server, project_id, obj_id, {"i": i})
+
+    objs = _objs_query(server, project_id, obj_id)
+    assert len(objs) == n
+    assert sorted(o.version_index for o in objs) == list(range(n))
+
+
+def test_delete_preserves_version_index_gaps(trace_server):
+    """Deleting a version should leave a gap, not shift indices."""
+    server = _get_ch_server(trace_server)
+    project_id = _make_project_id("vidx")
+    obj_id = "vidx_gap"
+
+    digests = []
+    for i in range(3):
+        r = _obj_create(server, project_id, obj_id, {"i": i})
+        digests.append(r.digest)
+
+    server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=project_id, object_id=obj_id, digests=[digests[1]]
+        )
+    )
+
+    non_deleted = [
+        o for o in _objs_query(server, project_id, obj_id) if o.deleted_at is None
+    ]
+    assert len(non_deleted) == 2
+
+    by_digest = {o.digest: o for o in non_deleted}
+    assert by_digest[digests[0]].version_index == 0
+    assert by_digest[digests[2]].version_index == 2
