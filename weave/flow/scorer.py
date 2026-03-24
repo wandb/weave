@@ -15,7 +15,8 @@ from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import OpCallError, as_op, is_op, op
 from weave.trace.op_caller import async_call_op
 from weave.trace.op_protocol import Op
-from weave.trace.vals import WeaveObject, unwrap
+from weave.trace.refs import ObjectRef
+from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import sanitize_object_name
 
 # Metadata keys injected by weave serialization that are not real model fields.
@@ -54,10 +55,15 @@ class Scorer(Object):
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
+        """Instantiate a Scorer from a WeaveObject."""
         field_values = {}
         for field_name in cls.model_fields:
             if hasattr(obj, field_name):
-                field_values[field_name] = _unwrap_field(getattr(obj, field_name))
+                # Sanitize values before loading into pydantic:
+                # Manually remove extra metadata that would fail validation
+                field_values[field_name] = _sanitize_field_for_pydantic(
+                    getattr(obj, field_name)
+                )
 
         return cls(**field_values)
 
@@ -476,22 +482,22 @@ class WeaveScorerResult(BaseModel):
     )
 
 
-def _unwrap_field(val: Any) -> Any:
-    """Convert a WeaveObject field value to a plain Python value for use with Pydantic."""
-    val = unwrap(val)
-    return _strip_weave_metadata(val)
-
-
-def _strip_weave_metadata(val: Any) -> Any:
-    """Recursively strip weave serialization metadata from dicts.
-    This is required for pydantic to deserialize WeaveObjects with metadata fields like _class_name when extra='forbid'.
+def _sanitize_field_for_pydantic(val: Any) -> Any:
+    """Recursively strip weave metadata from dicts.
+    This is required for pydantic to deserialize json representations of `Traceable` objects.
+    These dicts have extra fields like "_class_name" and "_bases" that raise when extra='forbid'.
     """
+    # The base Object class has builtin handling for deserializing WeaveObjects and ObjectRefs.
+    if isinstance(val, (WeaveObject, ObjectRef)):
+        return val
+    # Remove metadata from dicts
     if isinstance(val, dict):
         return {
-            k: _strip_weave_metadata(v)
+            k: _sanitize_field_for_pydantic(v)
             for k, v in val.items()
             if k not in _WEAVE_METADATA_KEYS
         }
+    # Recurse into lists
     if isinstance(val, list):
-        return [_strip_weave_metadata(v) for v in val]
+        return [_sanitize_field_for_pydantic(v) for v in val]
     return val
