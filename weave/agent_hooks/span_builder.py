@@ -445,7 +445,13 @@ class SpanBuilder:
         # Scan for screenshots Cursor saved after the hook fired and upload them.
         screenshot_refs = self._collect_cursor_screenshots(turn)
         if screenshot_refs:
-            turn._content_refs = turn._content_refs + screenshot_refs
+            turn._content_refs += screenshot_refs
+
+        # Extract images from Claude Code transcript (pasted/attached images).
+        if conv.source == "claude-code":
+            transcript_refs = self._collect_claude_code_images(turn)
+            if transcript_refs:
+                turn._content_refs += transcript_refs
 
         # Attach user prompt (and any file attachments) to the root invoke_agent span
         if turn.prompt or turn.attachments:
@@ -632,6 +638,142 @@ class SpanBuilder:
             if ref:
                 refs.append(ref)
         turn._content_refs = refs
+
+    def _collect_claude_code_images(self, turn: _TurnState) -> list[dict]:
+        """Extract and upload base64 images from a Claude Code transcript.
+
+        Claude Code stores full conversation history (including pasted images)
+        in JSONL transcript files.  User messages may contain content blocks
+        with ``type: "image"`` whose ``source.data`` holds base64-encoded
+        bytes.  We parse the most recent user message's image blocks and
+        upload them so they appear in the Weave chat view.
+
+        Args:
+            turn: The current turn whose ``transcript_path`` points to the
+                Claude Code JSONL transcript.
+
+        Returns:
+            List of content-ref dicts for the uploaded images.
+        """
+        if not self._project_id or not self._server_url:
+            return []
+        if not turn.transcript_path:
+            return []
+
+        transcript = Path(turn.transcript_path)
+        if not transcript.is_file():
+            return []
+
+        refs: list[dict] = []
+        try:
+            lines = transcript.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return []
+
+        # Walk lines in reverse to find the most recent user message with images.
+        for raw_line in reversed(lines):
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            msg = entry.get("message") if isinstance(entry, dict) else None
+            if not isinstance(msg, dict):
+                continue
+            if msg.get("role") != "user":
+                continue
+
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+
+            idx = 0
+            for block in content:
+                if not isinstance(block, dict) or block.get("type") != "image":
+                    continue
+                source = block.get("source", {})
+                if not isinstance(source, dict) or source.get("type") != "base64":
+                    continue
+                data_b64 = source.get("data", "")
+                media_type = source.get("media_type", "image/png")
+                if not data_b64:
+                    continue
+                try:
+                    image_bytes = base64.b64decode(data_b64)
+                except Exception:
+                    continue
+                ref = self._upload_image_bytes(
+                    image_bytes,
+                    media_type=media_type,
+                    key=f"user_image_{idx}" if idx > 0 else "user_image",
+                )
+                if ref:
+                    refs.append(ref)
+                idx += 1
+
+            # Only process the most recent user message
+            if refs or idx > 0:
+                break
+
+        if refs:
+            logger.info("Uploaded %d image(s) from Claude Code transcript", len(refs))
+        return refs
+
+    def _upload_image_bytes(
+        self,
+        content: bytes,
+        *,
+        media_type: str = "image/png",
+        key: str = "image",
+    ) -> dict | None:
+        """Upload raw image bytes to the Weave file store.
+
+        Args:
+            content: Raw image bytes.
+            media_type: MIME type of the image.
+            key: Human-readable label for the content ref.
+
+        Returns:
+            A content-ref dict, or ``None`` on failure.
+        """
+        if not self._project_id or not self._server_url:
+            return None
+
+        try:
+            from weave.shared.digest import bytes_digest
+            digest = bytes_digest(content)
+        except Exception:
+            import hashlib
+            digest = hashlib.sha256(content).hexdigest()
+
+        url = f"{self._server_url}/file/create"
+        headers: dict[str, str] = {}
+        if self._api_key:
+            creds = base64.b64encode(f"api:{self._api_key}".encode()).decode()
+            headers["Authorization"] = f"Basic {creds}"
+
+        try:
+            resp = requests.post(
+                url,
+                files={"file": (f"{key}.bin", io.BytesIO(content), media_type)},
+                data={"project_id": self._project_id},
+                headers=headers,
+                timeout=15,
+            )
+            resp.raise_for_status()
+        except Exception:
+            logger.debug("Failed to upload image bytes to %s", url, exc_info=True)
+
+        return {
+            "digest": digest,
+            "media_type": media_type,
+            "role": "input",
+            "size_bytes": len(content),
+            "key": key,
+        }
 
     _SCREENSHOT_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"})
 
@@ -883,6 +1025,17 @@ class SpanBuilder:
         if turn is None:
             return
         turn.response = ev.response_text
+
+        # Claude Code fires Notification (→ agent_response) during a turn and
+        # also provides last_assistant_message on the Stop hook.  Creating an
+        # instant chat span here would produce a duplicate assistant bubble in
+        # the chat view because the Stop-derived text on the root invoke_agent
+        # span usually differs (full response vs brief notification).  Skip
+        # the child span for Claude Code; the root span gets the final text
+        # via _close_turn when Stop fires.
+        if ev.source == "claude-code":
+            return
+
         if ev.response_text:
             span, _ = self._start_span(
                 "chat",
