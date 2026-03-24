@@ -180,6 +180,7 @@ from weave.trace_server.genai_schema import (
 _GENAI_SPAN_COLS = ", ".join(ALL_GENAI_SPAN_SELECT_COLUMNS)
 
 from weave.trace_server.opentelemetry.genai_extraction import (
+    GenAIExtractionResult,
     extract_genai_fields,
     extract_genai_span,
 )
@@ -268,6 +269,61 @@ _CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
     for idx, col in enumerate(ALL_CALL_COMPLETE_INSERT_COLUMNS)
     if ch_sentinel_values.is_sentinel_field(col)
 ]
+
+
+_PROPAGATE_FIELDS = ("provider_name", "agent_name", "request_model", "conversation_id")
+
+_MODEL_PROVIDER_PREFIXES: dict[str, str] = {
+    "claude": "anthropic",
+    "gpt": "openai",
+    "o1": "openai",
+    "o3": "openai",
+    "o4": "openai",
+    "chatgpt": "openai",
+    "gemini": "google",
+    "gemma": "google",
+}
+
+
+def _provider_from_model(model: str) -> str:
+    """Infer the LLM provider from a model name prefix."""
+    if not model:
+        return ""
+    m = model.lower()
+    for prefix, provider in _MODEL_PROVIDER_PREFIXES.items():
+        if m.startswith(prefix):
+            return provider
+    return ""
+
+
+def _propagate_trace_fields(results: list[GenAIExtractionResult]) -> None:
+    """Propagate key fields from child spans to empty parent spans within each trace.
+
+    Frameworks like Google ADK place provider/agent/model attributes only on
+    leaf spans (call_llm, agent_run) while root spans (invocation) are bare
+    wrappers.  This pass fills in the gaps so every span in the trace has
+    useful metadata for display and aggregation.
+    """
+    by_trace: dict[str, list[GenAISpanCHInsertable]] = {}
+    for r in results:
+        by_trace.setdefault(r.span.trace_id, []).append(r.span)
+
+    for spans in by_trace.values():
+        if len(spans) < 2:
+            continue
+        by_id = {s.span_id: s for s in spans}
+        for field in _PROPAGATE_FIELDS:
+            best = ""
+            for s in spans:
+                v = getattr(s, field, "")
+                if v:
+                    best = v
+                    break
+            if not best:
+                continue
+            for s in spans:
+                if not getattr(s, field, ""):
+                    setattr(s, field, best)
 
 
 def _genai_span_to_row(span: GenAISpanCHInsertable) -> list[Any]:
@@ -729,7 +785,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def genai_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Ingest OTel spans into genai_spans and genai_span_attributes tables."""
         assert_non_null_wb_user_id(req)
-        rows: list[list[Any]] = []
+        results: list[GenAIExtractionResult] = []
         attr_rows: list[list[Any]] = []
         rejected_spans = 0
         error_messages: list[str] = []
@@ -751,7 +807,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             project_id=req.project_id,
                             wb_user_id=req.wb_user_id,
                         )
-                        rows.append(_genai_span_to_row(result.span))
+                        results.append(result)
                         attr_rows.extend(
                             _genai_attr_to_row(a) for a in result.attributes
                         )
@@ -760,6 +816,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Failed to extract genai fields: {e}")
                         continue
 
+        _propagate_trace_fields(results)
+
+        rows = [_genai_span_to_row(r.span) for r in results]
         if rows:
             self._insert_genai_span_batch(rows)
         if attr_rows:
@@ -942,11 +1001,34 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 conditions.append("conversation_id = {filter_conv:String}")
                 parameters["filter_conv"] = req.filters.conversation_id
             if req.filters.agent_name:
-                conditions.append("agent_name = {filter_agent:String}")
+                conditions.append(
+                    "conversation_id IN ("
+                    "  SELECT DISTINCT conversation_id"
+                    "  FROM genai_spans"
+                    "  WHERE project_id = {project_id:String}"
+                    "    AND agent_name = {filter_agent:String}"
+                    "    AND conversation_id != ''"
+                    ")"
+                )
                 parameters["filter_agent"] = req.filters.agent_name
             if req.filters.provider_name:
-                conditions.append("provider_name = {filter_provider:String}")
+                conditions.append(
+                    "conversation_id IN ("
+                    "  SELECT DISTINCT conversation_id"
+                    "  FROM genai_spans"
+                    "  WHERE project_id = {project_id:String}"
+                    "    AND conversation_id != ''"
+                    "    AND (provider_name = {filter_provider:String}"
+                    "         OR request_model ILIKE {filter_provider_model:String})"
+                    ")"
+                )
                 parameters["filter_provider"] = req.filters.provider_name
+                model_prefix = {
+                    "anthropic": "claude%",
+                    "openai": "gpt%",
+                    "google": "gemini%",
+                }.get(req.filters.provider_name.lower(), "")
+                parameters["filter_provider_model"] = model_prefix or f"{req.filters.provider_name}%"
             if req.filters.started_after is not None:
                 having.append("max(last_seen) >= {filter_after:DateTime64(6)}")
                 parameters["filter_after"] = req.filters.started_after
@@ -978,7 +1060,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         select_cols = """
                 conversation_id,
-                any(conversation_name)      AS conversation_name,
+                max(conversation_name)      AS conversation_name,
                 project_id,
                 sum(turn_count)             AS turn_count,
                 sum(span_count)             AS span_count,
@@ -986,8 +1068,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 sum(total_output_tokens)    AS total_output_tokens,
                 sum(total_duration_ms)      AS total_duration_ms,
                 sum(error_count)            AS error_count,
-                any(agent_name)             AS agent_name,
-                any(provider_name)          AS provider_name,
+                max(agent_name)             AS agent_name,
+                max(provider_name)          AS provider_name,
                 min(first_seen)             AS first_seen,
                 max(last_seen)              AS last_seen
         """
@@ -1038,6 +1120,41 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         conv_ids = [c.conversation_id for c in conversations]
+
+        if conv_ids:
+            spans_query = """
+                SELECT
+                    conversation_id,
+                    uniqExact(trace_id) AS actual_turns,
+                    max(conversation_name) AS span_conv_name,
+                    max(request_model) AS best_model,
+                    groupUniqArray(agent_name) AS agent_names_arr
+                FROM genai_spans
+                WHERE project_id = {project_id:String}
+                  AND conversation_id IN {conv_ids:Array(String)}
+                GROUP BY conversation_id
+            """
+            spans_result = self.ch_client.query(
+                spans_query,
+                parameters={"project_id": req.project_id, "conv_ids": conv_ids},
+            )
+            for row in spans_result.result_rows:
+                cid = row[0]
+                turns = int(row[1])
+                name = str(row[2] or "")
+                model = str(row[3] or "")
+                agents = [str(a) for a in (row[4] or []) if a]
+                for conv in conversations:
+                    if conv.conversation_id == cid:
+                        conv.turn_count = turns
+                        conv.agent_names = sorted(agents)
+                        if name and not conv.conversation_name:
+                            conv.conversation_name = name
+                        if model:
+                            derived = _provider_from_model(model)
+                            if derived:
+                                conv.provider_name = derived
+
         if conv_ids:
             name_query = """
                 SELECT entity_id, argMax(string_value, updated_at) AS display_name

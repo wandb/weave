@@ -561,6 +561,7 @@ class GenAIConversationSchema(BaseModel):
     total_duration_ms: int = 0
     error_count: int = 0
     agent_name: str = ""
+    agent_names: list[str] = []
     provider_name: str = ""
     first_seen: datetime.datetime | None = None
     last_seen: datetime.datetime | None = None

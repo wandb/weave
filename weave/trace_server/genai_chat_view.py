@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -111,14 +112,32 @@ def _extract_system_prompt(instructions: list[str] | str) -> str:
 
 
 def _looks_like_tool_call(text: str) -> bool:
-    """Detect text that is tool-call metadata rather than human-readable content."""
+    """Detect text that is SDK metadata rather than human-readable content.
+
+    Filters out OpenAI Agents SDK Python repr strings
+    (ResponseReasoningItem, ResponseFunctionToolCall, etc.) and
+    serialized tool-call JSON that shouldn't appear as assistant text.
+    """
     t = text.strip()
-    return (
+    if not t:
+        return False
+    if (
         t.startswith("ResponseFunctionToolCall(")
         or t.startswith("transfer_to_")
         or t.startswith('{"tool_calls"')
         or t.startswith('[{"tool_calls"')
+    ):
+        return True
+    lines = t.split("\n")
+    return all(
+        line.strip() == "" or _RESPONSE_REPR_RE.match(line.strip())
+        for line in lines
     )
+
+
+_RESPONSE_REPR_RE = re.compile(
+    r"^Response[A-Z][A-Za-z]*\(.+\)$", re.DOTALL
+)
 
 
 def _dt_to_iso(dt: Any) -> str:
@@ -284,6 +303,7 @@ def build_chat_messages(
     tree = build_span_tree(spans)
     messages: list[GenAIChatMessage] = []
     agent_response_emitted: set[str] = set()
+    emitted_agent_texts: set[str] = set()
 
     user_prompt, user_started_at, user_content_refs = find_user_prompt(spans)
     if user_prompt:
@@ -329,10 +349,9 @@ def build_chat_messages(
 
             if span.output_messages and span.span_id not in agent_response_emitted:
                 text = _extract_assistant_text(span.output_messages)
-                if text and not _looks_like_tool_call(text):
+                if text and not _looks_like_tool_call(text) and text not in emitted_agent_texts:
                     agent_response_emitted.add(span.span_id)
-                    # Tokens live on child chat spans, not on the invoke_agent
-                    # span itself, so aggregate across the whole subtree.
+                    emitted_agent_texts.add(text)
                     agg_in, agg_out, agg_reasoning, agg_reasoning_text = (
                         _sum_descendant_tokens(node)
                     )
@@ -426,7 +445,8 @@ def build_chat_messages(
                     _walk(child, nearest_agent)
             elif span.output_messages:
                 text = _extract_assistant_text(span.output_messages)
-                if text and not _looks_like_tool_call(text):
+                if text and not _looks_like_tool_call(text) and text not in emitted_agent_texts:
+                    emitted_agent_texts.add(text)
                     messages.append(
                         GenAIChatMessage(
                             type="agent_message",
@@ -455,7 +475,8 @@ def build_chat_messages(
 
         if span.output_messages:
             text = _extract_assistant_text(span.output_messages)
-            if text and not _looks_like_tool_call(text):
+            if text and not _looks_like_tool_call(text) and text not in emitted_agent_texts:
+                emitted_agent_texts.add(text)
                 messages.append(
                     GenAIChatMessage(
                         type="agent_message",

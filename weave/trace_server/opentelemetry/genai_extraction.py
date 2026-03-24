@@ -145,6 +145,10 @@ def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
     for prefix in _KNOWN_OP_PREFIXES:
         if name_lower.startswith(prefix):
             return prefix
+    if name_lower == "call_llm":
+        return "chat"
+    if name_lower.startswith("agent_run") or name_lower == "invocation":
+        return "invoke_agent"
     if name_lower.startswith("agent:"):
         return "invoke_agent"
     if name_lower.startswith("workflow:"):
@@ -211,7 +215,10 @@ def extract_agent_name(attrs: dict[str, Any], span_name: str) -> str:
     Fallback chain:
     1. gen_ai.agent.name (standard, Google ADK)
     2. agent.name (OpenAI Agents bridge)
-    3. Parse from span name "agent: WeatherBot" -> "WeatherBot"
+    3. Parse from span name patterns:
+       - "agent: WeatherBot" -> "WeatherBot"
+       - "invoke_agent WeatherBot" -> "WeatherBot"
+       - "agent_run [Coordinator]" -> "Coordinator" (Google ADK)
     """
     val = _get(attrs, "gen_ai.agent.name", "agent.name")
     if val:
@@ -220,6 +227,8 @@ def extract_agent_name(attrs: dict[str, Any], span_name: str) -> str:
         return span_name[7:].strip()
     if span_name.lower().startswith("invoke_agent "):
         return span_name[13:].strip()
+    if span_name.startswith("agent_run [") and span_name.endswith("]"):
+        return span_name[len("agent_run ["):-1]
     return ""
 
 

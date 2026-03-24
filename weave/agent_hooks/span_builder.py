@@ -49,6 +49,29 @@ _UUID_RE = re.compile(
 )
 
 
+_MODEL_PROVIDER_PREFIXES: dict[str, str] = {
+    "claude": "anthropic",
+    "gpt": "openai",
+    "o1": "openai",
+    "o3": "openai",
+    "o4": "openai",
+    "chatgpt": "openai",
+    "gemini": "google",
+    "gemma": "google",
+}
+
+
+def _provider_from_model(model: str) -> str:
+    """Infer the LLM provider from a model name prefix."""
+    if not model:
+        return ""
+    m = model.lower()
+    for prefix, provider in _MODEL_PROVIDER_PREFIXES.items():
+        if m.startswith(prefix):
+            return provider
+    return ""
+
+
 def _looks_like_uuid(s: str) -> bool:
     """Return True if *s* is a UUID-formatted string."""
     return bool(_UUID_RE.match(s))
@@ -386,11 +409,13 @@ class SpanBuilder:
         workspace = conv.workspace or (ev.workspace_roots[0] if ev.workspace_roots else "")
 
         turn = _TurnState()
+        model = ev.model or conv.model
+        llm_provider = _provider_from_model(model) or conv.source or ev.source or "ide"
         attrs: dict[str, Any] = {
             "gen_ai.operation.name": "invoke_agent",
             "gen_ai.agent.name": agent_label,
-            "gen_ai.system": conv.source or ev.source or "ide",
-            "gen_ai.request.model": ev.model or conv.model,
+            "gen_ai.system": llm_provider,
+            "gen_ai.request.model": model,
             "gen_ai.conversation.id": ev.conversation_id,
             "gen_ai.conversation.name": conv.conversation_name,
             "weave.agent_hooks.source": conv.source or ev.source or "ide",
