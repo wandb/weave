@@ -66,7 +66,7 @@ def agent_hooks() -> None:
     "--project",
     default=None,
     envvar="WEAVE_AGENT_HOOKS_PROJECT",
-    help="W&B project name.  Default: cursor-sessions",
+    help="W&B project name.  Default: agent-sessions",
 )
 @click.option(
     "--entity",

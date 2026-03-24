@@ -253,33 +253,43 @@ def normalize_cursor(payload: dict) -> AgentHookEvent | None:
 # ---------------------------------------------------------------------------
 # Claude Code
 # ---------------------------------------------------------------------------
-# Claude Code hooks use PascalCase event names and a slightly different schema.
+# Claude Code hooks use PascalCase event names in ``hook_event_name`` and a
+# slightly different payload schema from Cursor.
 # Ref: https://docs.anthropic.com/en/docs/claude-code/hooks
 
 _CLAUDE_EVENT_MAP: dict[str, str] = {
+    "SessionStart": "session_start",
+    "SessionEnd": "session_end",
+    "UserPromptSubmit": "user_prompt",
     "PreToolUse": "tool_use_start",
     "PostToolUse": "tool_use_end",
+    "PostToolUseFailure": "tool_use_failed",
     "Notification": "agent_response",
-    "Stop": "stop",
+    "SubagentStart": "subagent_start",
     "SubagentStop": "subagent_stop",
+    "Stop": "stop",
+    "StopFailure": "stop_failure",
+    "PreCompact": "context_compacted",
+    "PostCompact": "post_compact",
 }
 
 
 def normalize_claude_code(payload: dict) -> AgentHookEvent | None:
     """Convert a Claude Code hook payload to a normalized ``AgentHookEvent``.
 
-    Claude Code hooks are invoked with the event type in a ``hook_type`` field
-    (or passed as an environment variable ``CLAUDE_HOOK_TYPE``).
+    Claude Code hooks send the event type in ``hook_event_name`` using
+    PascalCase names (e.g. ``"PreToolUse"``).  Common fields include
+    ``session_id``, ``transcript_path``, and ``cwd``.
 
     Args:
-        payload: Raw JSON object received on stdin by the Claude Code hook.
+        payload: Raw JSON object received from a Claude Code hook.
 
     Returns:
         Normalized event, or ``None`` if this hook should be ignored.
 
     Examples:
         >>> ev = normalize_claude_code({
-        ...     "hook_type": "PreToolUse",
+        ...     "hook_event_name": "PreToolUse",
         ...     "session_id": "sess-123",
         ...     "tool_name": "Read",
         ...     "tool_input": {"path": "/foo/bar.py"},
@@ -287,13 +297,12 @@ def normalize_claude_code(payload: dict) -> AgentHookEvent | None:
         >>> ev.event_kind
         'tool_use_start'
     """
-    hook = payload.get("hook_type", "")
+    hook = payload.get("hook_event_name", "")
     event_kind = _CLAUDE_EVENT_MAP.get(hook)
     if event_kind is None:
         return None
 
     session_id = payload.get("session_id", "")
-    # Claude Code doesn't have conversation_id — use session_id as the key
     conv_id = session_id
     ts = int(time.time() * 1000)
 
@@ -304,20 +313,105 @@ def normalize_claude_code(payload: dict) -> AgentHookEvent | None:
         "session_id": session_id,
         "model": payload.get("model", ""),
         "timestamp_ms": ts,
+        "transcript_path": payload.get("transcript_path", ""),
+        "cwd": payload.get("cwd", ""),
         "raw": payload,
     }
 
-    if hook in {"PreToolUse", "PostToolUse"}:
-        tool_result = payload.get("tool_response", {})
+    if hook == "SessionStart":
         return AgentHookEvent(
+            composer_mode=payload.get("source", ""),
+            **base,
+        )
+
+    if hook == "SessionEnd":
+        return AgentHookEvent(
+            end_reason=payload.get("reason", ""),
+            **base,
+        )
+
+    if hook == "UserPromptSubmit":
+        return AgentHookEvent(
+            prompt_text=payload.get("prompt", ""),
+            **base,
+        )
+
+    if hook == "PreToolUse":
+        return AgentHookEvent(
+            tool_use_id=payload.get("tool_use_id", ""),
             tool_name=payload.get("tool_name", ""),
             tool_input=payload.get("tool_input", {}),
-            tool_output=_coerce_str(tool_result) if hook == "PostToolUse" else "",
+            **base,
+        )
+
+    if hook == "PostToolUse":
+        tool_result = payload.get("tool_response", {})
+        return AgentHookEvent(
+            tool_use_id=payload.get("tool_use_id", ""),
+            tool_name=payload.get("tool_name", ""),
+            tool_input=payload.get("tool_input", {}),
+            tool_output=_coerce_str(tool_result),
+            **base,
+        )
+
+    if hook == "PostToolUseFailure":
+        return AgentHookEvent(
+            tool_use_id=payload.get("tool_use_id", ""),
+            tool_name=payload.get("tool_name", ""),
+            tool_input=payload.get("tool_input", {}),
+            tool_error=payload.get("error", ""),
+            is_interrupt=bool(payload.get("is_interrupt", False)),
             **base,
         )
 
     if hook == "Notification":
-        return AgentHookEvent(response_text=payload.get("message", ""), **base)
+        return AgentHookEvent(
+            response_text=payload.get("message", ""),
+            **base,
+        )
+
+    if hook == "SubagentStart":
+        return AgentHookEvent(
+            subagent_id=payload.get("agent_id", ""),
+            subagent_type=payload.get("agent_type", ""),
+            **base,
+        )
+
+    if hook == "SubagentStop":
+        return AgentHookEvent(
+            subagent_id=payload.get("agent_id", ""),
+            subagent_type=payload.get("agent_type", ""),
+            agent_transcript_path=payload.get("agent_transcript_path", ""),
+            subagent_summary=payload.get("last_assistant_message", ""),
+            **base,
+        )
+
+    if hook == "Stop":
+        return AgentHookEvent(
+            response_text=payload.get("last_assistant_message", ""),
+            **base,
+        )
+
+    if hook == "StopFailure":
+        return AgentHookEvent(
+            stop_error=payload.get("error", ""),
+            stop_error_details=payload.get("error_details", ""),
+            response_text=payload.get("last_assistant_message", ""),
+            **base,
+        )
+
+    if hook == "PreCompact":
+        return AgentHookEvent(
+            compact_trigger=payload.get("trigger", ""),
+            **base,
+        )
+
+    if hook == "PostCompact":
+        return AgentHookEvent(
+            compact_trigger=payload.get("trigger", ""),
+            compact_summary=payload.get("compact_summary", ""),
+            **base,
+        )
 
     return AgentHookEvent(**base)
 
@@ -353,8 +447,10 @@ def normalize_codex(payload: dict) -> AgentHookEvent | None:
 def normalize(payload: dict) -> AgentHookEvent | None:
     """Detect the source and normalize a raw hook payload.
 
-    Source is detected by the presence of a ``hook_event_name`` key (Cursor /
-    Codex) or ``hook_type`` key (Claude Code).  Falls back to Cursor.
+    Claude Code uses PascalCase event names in ``hook_event_name`` (e.g.
+    ``"PreToolUse"``); Cursor uses camelCase (e.g. ``"preToolUse"``).
+    Detection checks whether the event name appears in the Claude Code
+    event map first, then falls back to Codex/Cursor.
 
     Args:
         payload: Raw JSON object received from any supported IDE hook.
@@ -368,7 +464,8 @@ def normalize(payload: dict) -> AgentHookEvent | None:
         >>> ev.source
         'cursor'
     """
-    if "hook_type" in payload:
+    hook_name = payload.get("hook_event_name", "")
+    if hook_name in _CLAUDE_EVENT_MAP:
         return normalize_claude_code(payload)
     # Check for Codex-specific marker (set by Codex hooks.json)
     if payload.get("_source") == "codex":

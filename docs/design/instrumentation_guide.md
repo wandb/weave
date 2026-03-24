@@ -2,7 +2,7 @@
 
 **Status:** normative  
 **Audience:** (A) End users instrumenting their own agent code, (B) library/integration authors building instrumentations for third-party frameworks  
-**See also:** [architecture.md](architecture.md) (system overview), [trajectory_model.md](trajectory_model.md) (data model & algorithm), [format_interoperability.md](format_interoperability.md) (cross-format adapters)
+**See also:** [architecture.md](architecture.md) (system overview), [data_model.md](data_model.md) (normalized schema & span patterns), [chat_view_algorithm.md](chat_view_algorithm.md) (trajectory projection), [format_interoperability.md](format_interoperability.md) (cross-format adapters)
 
 ---
 
@@ -200,7 +200,7 @@ Set attributes so that after `extract_operation_name()` the stored `operation_na
 | `generate_content`  | Google ADK-style container; children carry detail.                                               |
 | Other / empty       | Generic: walk children, then `agent_message` if `output_messages` present.                       |
 
-Populate `gen_ai.operation.name` where possible. For OpenAI Agents, `agent.span.type` is mapped automatically (e.g. `agent` → `invoke_agent`, `function` → `execute_tool`). See `genai_extraction.extract_operation_name` for the full fallback chain.
+Populate `gen_ai.operation.name` where possible. For OpenAI Agents, `agent.span.type` is mapped automatically (e.g. `agent` → `invoke_agent`, `function` → `execute_tool`). See [data_model.md §3.2](data_model.md#32-vendor-fallback-chains) and `genai_extraction.extract_operation_name` for the full fallback chain.
 
 ### 7.4 Required attributes for each trajectory element
 
@@ -215,7 +215,7 @@ Populate `gen_ai.operation.name` where possible. For OpenAI Agents, `agent.span.
 | Attachments      | `weave.content_refs` (JSON array string).                                                             |
 | Compaction       | `weave.compaction.summary`, `weave.compaction.items_before`, `weave.compaction.items_after`.          |
 
-Full attribute fallback chains are documented in [trajectory_model.md §3.2](trajectory_model.md#32-vendor-fallback-chains) and implemented in `weave/trace_server/opentelemetry/genai_extraction.py`.
+Full attribute fallback chains are documented in [data_model.md §3.2](data_model.md#32-vendor-fallback-chains) and implemented in `weave/trace_server/opentelemetry/genai_extraction.py`.
 
 ### 7.5 Integration checklist
 
@@ -288,14 +288,23 @@ The daemon's normalizer converts IDE-specific hook payloads into a standard `Age
 
 The SpanBuilder maps events to span lifecycle:
 
-| Event            | Span action                                                 |
-| ---------------- | ----------------------------------------------------------- |
-| `user_prompt`    | Start root `invoke_agent` span; set `gen_ai.input.messages` |
-| `tool_use_start` | Start child `execute_tool` span                             |
-| `tool_use_end`   | End tool span; set `gen_ai.tool.call.result`                |
-| `subagent_start` | Start child `invoke_agent` span                             |
-| `subagent_stop`  | End subagent span                                           |
-| `stop`           | Set `gen_ai.output.messages` on root; end root span         |
+| Event               | Span action                                                  |
+| ------------------- | ------------------------------------------------------------ |
+| `session_start`     | Initialize conversation state                                |
+| `session_end`       | Close active turn, drop conversation state, flush            |
+| `user_prompt`       | Start root `invoke_agent` span; set `gen_ai.input.messages`  |
+| `agent_response`    | Record assistant output on root span                         |
+| `agent_thought`     | Record reasoning/thinking content                            |
+| `tool_use_start`    | Start child `execute_tool` span                              |
+| `tool_use_end`      | End tool span; set `gen_ai.tool.call.result`                 |
+| `tool_use_failed`   | End tool span with error status                              |
+| `shell_exec`        | Instant `execute_tool` span for shell commands               |
+| `mcp_call`          | `execute_tool` span for MCP tool invocations                 |
+| `file_edit`         | `execute_tool` span for file edits                           |
+| `subagent_start`    | Start child `invoke_agent` span                              |
+| `subagent_stop`     | End subagent span                                            |
+| `context_compacted` | Set `weave.compaction.*` attributes on root span             |
+| `stop`              | Set `gen_ai.output.messages` on root; end root span          |
 
 ### 8.4 Configuration
 
@@ -337,6 +346,8 @@ In all cases, the trace server only sees OTLP + attributes. The semantic contrac
 | SDK OTel setup                   | `weave/otel/setup.py`                                   |
 | SystemPromptInjector             | `weave/otel/setup.py`                                   |
 | ConversationIdInjector           | `weave/otel/setup.py`                                   |
+| ToolDefinitionsInjector          | `weave/otel/processors.py`                              |
+| LiveSpanProcessor                | `weave/otel/live_processor.py`                          |
 | Agent hooks daemon               | `weave/agent_hooks/daemon.py`                           |
 | Agent hooks relay                | `weave/agent_hooks/relay.py`                            |
 | Agent hooks span builder         | `weave/agent_hooks/span_builder.py`                     |

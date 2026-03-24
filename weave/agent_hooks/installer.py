@@ -31,13 +31,26 @@ _CURSOR_HOOKS = [
     "stop",
 ]
 
-# Claude Code hooks (PostToolUse + Stop + SubagentStop are the useful ones)
-_CLAUDE_HOOKS = [
+# Claude Code hooks that support all handler types (command, http, prompt, agent).
+# These can use HTTP hooks for zero-overhead direct POSTs to the daemon.
+_CLAUDE_HTTP_HOOKS = [
+    "UserPromptSubmit",
     "PreToolUse",
     "PostToolUse",
-    "Notification",
-    "Stop",
+    "PostToolUseFailure",
     "SubagentStop",
+    "Stop",
+]
+
+# Claude Code hooks that ONLY support type: "command" handlers.
+# These must use the relay command, not HTTP.
+_CLAUDE_COMMAND_HOOKS = [
+    "SessionStart",
+    "SessionEnd",
+    "Notification",
+    "SubagentStart",
+    "PreCompact",
+    "PostCompact",
 ]
 
 
@@ -115,10 +128,24 @@ def _install_cursor(port: int) -> None:
         print("   Relay was already configured for all hooks.")
 
 
+def _has_weave_hook(matcher_group: dict) -> bool:
+    """Return True if a Claude Code matcher group already contains a weave hook."""
+    for handler in matcher_group.get("hooks", []):
+        cmd = handler.get("command", "")
+        url = handler.get("url", "")
+        if "agent-hooks relay" in cmd or "/event" in url:
+            return True
+    return False
+
+
 def _install_claude_code(port: int) -> None:
     settings_path = Path.home() / ".claude" / "settings.json"
+
+    daemon_url = f"http://127.0.0.1:{port}/event"
+    http_handler: dict = {"type": "http", "url": daemon_url, "timeout": 5}
+
     cmd = _relay_command(port)
-    hook_entry = {"command": cmd, "timeout": 5}
+    cmd_handler: dict = {"type": "command", "command": cmd, "timeout": 5}
 
     existing: dict = {}
     if settings_path.exists():
@@ -129,12 +156,20 @@ def _install_claude_code(port: int) -> None:
 
     hooks: dict = existing.get("hooks", {})
     added = []
-    for hook_name in _CLAUDE_HOOKS:
-        entries: list = hooks.get(hook_name, [])
-        if not any(e.get("command", "").endswith("agent-hooks relay") for e in entries):
-            entries.append(hook_entry)
+
+    for hook_name in _CLAUDE_HTTP_HOOKS:
+        matcher_groups: list = hooks.get(hook_name, [])
+        if not any(_has_weave_hook(mg) for mg in matcher_groups):
+            matcher_groups.append({"hooks": [http_handler]})
             added.append(hook_name)
-        hooks[hook_name] = entries
+        hooks[hook_name] = matcher_groups
+
+    for hook_name in _CLAUDE_COMMAND_HOOKS:
+        matcher_groups = hooks.get(hook_name, [])
+        if not any(_has_weave_hook(mg) for mg in matcher_groups):
+            matcher_groups.append({"hooks": [cmd_handler]})
+            added.append(hook_name)
+        hooks[hook_name] = matcher_groups
 
     existing["hooks"] = hooks
     settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -142,9 +177,9 @@ def _install_claude_code(port: int) -> None:
 
     print(f"✅  Claude Code hooks installed at {settings_path}")
     if added:
-        print(f"   Added relay to: {', '.join(added)}")
+        print(f"   Added hooks to: {', '.join(added)}")
     else:
-        print("   Relay was already configured for all hooks.")
+        print("   Hooks were already configured for all events.")
 
 
 def _install_codex(port: int) -> None:

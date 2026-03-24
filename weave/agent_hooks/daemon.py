@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PORT = 6346
 DEFAULT_ENDPOINT = "http://localhost:6345/otel/v1/genai/traces"
-DEFAULT_PROJECT = "cursor-sessions"
+DEFAULT_PROJECT = "agent-sessions"
 PID_FILE = os.path.expanduser("~/.weave/agent-hooks.pid")
 LOG_FILE = os.path.expanduser("~/.weave/agent-hooks.log")
 

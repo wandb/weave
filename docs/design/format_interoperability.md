@@ -2,7 +2,7 @@
 
 **Status:** design document — describes the architecture for format adapters, with one implemented reference (ATIF)  
 **Audience:** Anyone extending Weave to ingest or emit agent traces in non-OTel formats  
-**See also:** [architecture.md](architecture.md) (system overview), [trajectory_model.md](trajectory_model.md) (normalized schema), [instrumentation_guide.md](instrumentation_guide.md) (how to emit OTel data)
+**See also:** [architecture.md](architecture.md) (system overview), [data_model.md](data_model.md) (normalized schema & span patterns), [chat_view_algorithm.md](chat_view_algorithm.md) (trajectory projection), [instrumentation_guide.md](instrumentation_guide.md) (how to emit OTel data)
 
 ---
 
@@ -66,7 +66,7 @@ An adapter is a pure function: `external_format → list[span_dict]` (ingest) or
 - A server-side plugin
 - A user-space script
 
-The important constraint: the adapter must produce spans with the correct `operation_name` classification and message formats so the trajectory algorithm renders them correctly. The contract is specified in [instrumentation_guide.md §7](instrumentation_guide.md#7-instrumentation-contract).
+The important constraint: the adapter must produce spans with the correct `operation_name` classification and message formats so the trajectory algorithm renders them correctly. The contract is specified in [instrumentation_guide.md §7](instrumentation_guide.md#7-instrumentation-contract) and [chat_view_algorithm.md §5](chat_view_algorithm.md#5-depth-first-tree-walk).
 
 ---
 
@@ -133,7 +133,7 @@ To ingest into Weave, convert these dicts to OTLP protobuf and POST, or insert d
 
 2. **Assign `operation_name` correctly.** This is the single most important field — it controls how the trajectory algorithm renders each span. See [trajectory_model.md §4.4](trajectory_model.md#44-depth-first-tree-walk) for what each operation triggers.
 
-3. **Populate messages.** `input_messages` and `output_messages` must be JSON strings in one of the supported shapes (OpenAI-style list or Google-style object). See [trajectory_model.md §4.8](trajectory_model.md#48-message-json-parsing).
+3. **Populate messages.** Set `gen_ai.input.messages` and `gen_ai.output.messages` as span attributes containing JSON strings in one of the shapes that `_normalize_raw_messages()` handles (OpenAI-style list, Google ADK `{contents: [{parts}]}`, Traceloop indexed format, or plain strings). The extraction pipeline normalizes these at write time into `Array(Tuple(role, content, tool_call_id, tool_name))` for storage. See [chat_view_algorithm.md §9](chat_view_algorithm.md#9-message-normalization).
 
 4. **Set identity fields.** Every span needs `trace_id`, `span_id`, `parent_span_id`. Use deterministic hashing from the source format's IDs for reproducibility.
 
@@ -149,7 +149,7 @@ To ingest into Weave, convert these dicts to OTLP protobuf and POST, or insert d
 
 2. **Map `operation_name` to the target's concept of step types.** `invoke_agent` → agent boundary, `chat` → LLM call, `execute_tool` → tool use, etc.
 
-3. **Handle the JSON message formats.** The `input_messages` and `output_messages` columns contain JSON strings. Parse them and convert to the target format's message representation.
+3. **Handle the message formats.** The `input_messages` and `output_messages` columns are `Array(Tuple(role, content, tool_call_id, tool_name))` — normalized at write time, not JSON strings. The `/genai/spans/trace` API returns these as structured data. Parse the tuples and convert to the target format's message representation.
 
 4. **Reconstruct sequential order.** The span tree is hierarchical; many target formats (like ATIF) want a flat step list. The trajectory projection already linearizes, so use `/genai/traces/chat` if needed.
 

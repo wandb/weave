@@ -2,7 +2,7 @@
 
 **Status:** normative — describes the system as implemented  
 **Audience:** backend engineers, frontend engineers, anyone needing to understand the system end-to-end  
-**See also:** [trajectory_model.md](trajectory_model.md) (data model & algorithm), [instrumentation_guide.md](instrumentation_guide.md) (how to emit data), [format_interoperability.md](format_interoperability.md) (cross-format compatibility)
+**See also:** [data_model.md](data_model.md) (normalized schema & span patterns), [chat_view_algorithm.md](chat_view_algorithm.md) (trajectory projection), [instrumentation_guide.md](instrumentation_guide.md) (how to emit data), [format_interoperability.md](format_interoperability.md) (cross-format compatibility)
 
 ---
 
@@ -116,7 +116,7 @@ The server groups spans by `{entity}/{project}`, creating one batch per project.
 
 For each span in the batch, `extract_genai_span(span, project_id, wb_user_id)` produces a `GenAIExtractionResult` containing:
 
-1. **`span`** — a `GenAISpanCHInsertable` row for `genai_spans`. The extraction applies ordered fallback chains across OTel GenAI semantic conventions and vendor-specific attributes (OpenAI Agents SDK, Google ADK, Traceloop/OpenInference). Messages are normalized from provider-specific formats into standard `(role, content, tool_call_id, tool_name)` tuples. See [trajectory_model.md §3](trajectory_model.md#3-normalized-schema-genai_spans-columns) for the full schema and fallback chains.
+1. **`span`** — a `GenAISpanCHInsertable` row for `genai_spans`. The extraction applies ordered fallback chains across OTel GenAI semantic conventions and vendor-specific attributes (OpenAI Agents SDK, Google ADK, Traceloop/OpenInference). Messages are normalized from provider-specific formats into standard `(role, content, tool_call_id, tool_name)` tuples. See [data_model.md §3](data_model.md#3-normalized-schema-genai_spans-columns) for the full schema and fallback chains.
 2. **`attributes`** — a list of `GenAISpanAttributeRow` for the `genai_span_attributes` EAV table. Every span attribute and resource attribute that isn't a known semconv key gets a typed row (string, int, float, bool, or json).
 
 Both are batch-inserted after the extraction loop. The `genai_agents_mv` and `genai_conversations_mv` materialized views fire automatically on the `genai_spans` insert.
@@ -159,6 +159,7 @@ Key column groups:
 | Agent | `agent_name`, `agent_id`, `agent_description`, `agent_version` | String |
 | Model | `request_model`, `response_model`, `response_id` | String |
 | Tokens | `input_tokens`, `output_tokens`, `total_tokens`, `reasoning_tokens` | UInt64 |
+| Reasoning | `reasoning_content` | String |
 | Session | `conversation_id`, `conversation_name` | String |
 | Tool | `tool_name`, `tool_type`, `tool_call_id`, `tool_description`, `tool_definitions` | String, LowCardinality |
 | Messages | `input_messages`, `output_messages` | **Array(Tuple(role, content, tool_call_id, tool_name))** |
@@ -256,18 +257,22 @@ The entity_annotations table is written separately via dedicated annotation APIs
 
 All read APIs are POST JSON unless the deployment gateway maps them differently. The frontend uses `traceServerDirectClient` methods.
 
-| Endpoint                     | Response type                | Purpose                                                                   |
-| ---------------------------- | ---------------------------- | ------------------------------------------------------------------------- |
-| `/genai/spans/query`         | `GenAISpansQueryRes`         | Paginated span search with filters on any column.                         |
-| `/genai/spans/trace`         | `GenAISpansTraceRes`         | All spans for one `trace_id`.                                             |
-| `/genai/spans/active`        | `GenAISpansActiveRes`        | Currently in-progress spans (for live UI).                                |
-| `/genai/traces/chat`         | `GenAITraceChatRes`          | Trajectory projection for one trace — ordered `GenAIChatMessage[]`.       |
-| `/genai/agents/query`        | `GenAIAgentsQueryRes`        | Agent list with aggregate stats (invocations, tokens, errors, last seen). |
-| `/genai/agents/metrics`      | `GenAIAgentsMetricsRes`      | Time-bucketed metrics for one agent.                                      |
-| `/genai/conversations/query` | `GenAIConversationsQueryRes` | Conversations by `conversation_id`.                                       |
-| `/genai/conversations/chat`  | `GenAIConversationChatRes`   | Multi-turn chat view — `turns: GenAITraceChatRes[]`.                      |
+| Endpoint                       | Response type                | Purpose                                                                   |
+| ------------------------------ | ---------------------------- | ------------------------------------------------------------------------- |
+| `/genai/spans/query`           | `GenAISpansQueryRes`         | Paginated span search with filters on any column.                         |
+| `/genai/spans/trace`           | `GenAISpansTraceRes`         | All spans for one `trace_id`.                                             |
+| `/genai/spans/active`          | `GenAIActiveSpansRes`        | Currently in-progress spans (for live UI).                                |
+| `/genai/traces/chat`           | `GenAITraceChatRes`          | Trajectory projection for one trace — ordered `GenAIChatMessage[]`.       |
+| `/genai/agents/query`          | `GenAIAgentsQueryRes`        | Agent list with aggregate stats (invocations, tokens, errors, last seen). |
+| `/genai/agents/metrics`        | `GenAIAgentMetricsRes`       | Time-bucketed metrics for one agent.                                      |
+| `/genai/conversations/query`   | `GenAIConversationsQueryRes` | Conversations by `conversation_id`.                                       |
+| `/genai/conversations/chat`    | `GenAIConversationChatRes`   | Multi-turn chat view — `turns: GenAITraceChatRes[]`.                      |
+| `/genai/annotations/upsert`    | `GenAIAnnotationsUpsertRes`  | Upsert typed annotations on any entity (span, agent, conversation).       |
+| `/genai/annotations/delete`    | `GenAIAnnotationsDeleteRes`  | Delete annotations by entity and key.                                     |
+| `/genai/annotations/query`     | `GenAIAnnotationsQueryRes`   | Query annotations with filters.                                           |
+| `/otel/v1/genai/span/start`   | `GenAISpanStartRes`          | Live span-start notification for real-time UI updates.                    |
 
-The `/genai/traces/chat` and `/genai/conversations/chat` endpoints run the trajectory algorithm (see [trajectory_model.md §4](trajectory_model.md#4-trajectory-algorithm)) at query time. No materialized trajectory is stored.
+The `/genai/traces/chat` and `/genai/conversations/chat` endpoints run the trajectory algorithm (see [chat_view_algorithm.md](chat_view_algorithm.md)) at query time. No materialized trajectory is stored.
 
 ---
 

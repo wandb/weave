@@ -28,7 +28,9 @@ EventKind = Literal[
     "subagent_start",
     "subagent_stop",
     "context_compacted",
-    "stop",  # agent loop ended for one turn
+    "post_compact",
+    "stop",
+    "stop_failure",
 ]
 
 
@@ -138,6 +140,7 @@ class AgentHookEvent:
     message_count: int = 0
     messages_to_compact: int = 0
     is_first_compaction: bool = False
+    compact_summary: str = ""
 
     # --- session lifecycle ---
     is_background_agent: bool = False
@@ -150,6 +153,9 @@ class AgentHookEvent:
     # --- stop hook ---
     stop_status: str = ""
     loop_count: int = 0
+    # StopFailure fields
+    stop_error: str = ""
+    stop_error_details: str = ""
 
     # --- raw payload for debugging ---
     raw: dict = field(default_factory=dict)

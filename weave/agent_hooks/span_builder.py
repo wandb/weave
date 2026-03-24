@@ -346,8 +346,12 @@ class SpanBuilder:
             self._on_subagent_stop(ev)
         elif kind == "context_compacted":
             self._on_context_compacted(ev)
+        elif kind == "post_compact":
+            self._on_post_compact(ev)
         elif kind == "stop":
             self._on_stop(ev)
+        elif kind == "stop_failure":
+            self._on_stop_failure(ev)
 
     # ------------------------------------------------------------------
     # State helpers
@@ -436,6 +440,14 @@ class SpanBuilder:
                 turn.agent_span.set_attribute(  # type: ignore[union-attr]
                     "gen_ai.input.messages", json.dumps(input_msgs)
                 )
+
+        # Attach final assistant response to the root span (e.g. from
+        # Claude Code's Stop.last_assistant_message or Cursor agent_response).
+        if turn.response:
+            turn.agent_span.set_attribute(  # type: ignore[union-attr]
+                "gen_ai.output.messages",
+                json.dumps([{"role": "assistant", "content": turn.response}]),
+            )
 
         # Attach content refs for uploaded attachments (images, files, etc.)
         if turn._content_refs:
@@ -776,6 +788,10 @@ class SpanBuilder:
         if ev.source == "cursor":
             self._maybe_sync_cursor_conversation_title(ev)
         conv = self._get_conv(ev.conversation_id)
+        # Claude Code provides last_assistant_message on Stop — capture it as
+        # the turn response so it appears on the root invoke_agent span.
+        if ev.response_text and conv.current_turn:
+            conv.current_turn.response = ev.response_text
         self._close_turn(conv, stop_status=ev.stop_status, loop_count=ev.loop_count)
 
     def _on_user_prompt(self, ev: AgentHookEvent) -> None:
@@ -1081,6 +1097,33 @@ class SpanBuilder:
             # Always record is_first_compaction (False is informative too)
             event_attrs["is_first_compaction"] = ev.is_first_compaction
             turn.agent_span.add_event("context_compacted", event_attrs)
+
+    def _on_post_compact(self, ev: AgentHookEvent) -> None:
+        _, turn = self._get_turn(ev)
+        if turn is None:
+            return
+        if turn.agent_span and ev.compact_summary:
+            turn.agent_span.add_event(
+                "post_compact",
+                {
+                    "trigger": ev.compact_trigger,
+                    "summary_length": len(ev.compact_summary),
+                },
+            )
+
+    def _on_stop_failure(self, ev: AgentHookEvent) -> None:
+        """Turn ended due to an API error — close with error status."""
+        conv = self._get_conv(ev.conversation_id)
+        if conv.current_turn and conv.current_turn.agent_span:
+            span = conv.current_turn.agent_span
+            if ev.stop_error:
+                span.set_attribute("weave.turn.stop_error", ev.stop_error)
+            if ev.stop_error_details:
+                span.set_attribute("weave.turn.stop_error_details", ev.stop_error_details)
+            from opentelemetry.trace import StatusCode
+
+            span.set_status(StatusCode.ERROR, ev.stop_error or "api_error")
+        self._close_turn(conv, stop_status="error")
 
 
 # ---------------------------------------------------------------------------
