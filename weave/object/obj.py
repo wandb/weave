@@ -19,6 +19,7 @@ from weave.trace.vals import WeaveObject, pydantic_getattribute
 
 # Metadata keys added by weave serialization that are not real model fields.
 # These must be stripped before Pydantic validation since Object uses extra="forbid".
+# Pydantic forbids underscore-prefixed fields by default, so there's no risk of collision.
 _WEAVE_SERIALIZATION_METADATA_KEYS = {"_type", "_class_name", "_bases"}
 
 
@@ -97,9 +98,11 @@ class Object(BaseModel):
         removed before Pydantic validation, which uses extra="forbid".
         """
         if isinstance(data, dict):
-            # Only strip metadata keys that aren't explicitly declared as model fields.
-            keys_to_strip = _WEAVE_SERIALIZATION_METADATA_KEYS - cls.model_fields.keys()
-            return {k: v for k, v in data.items() if k not in keys_to_strip}
+            return {
+                k: v
+                for k, v in data.items()
+                if k not in _WEAVE_SERIALIZATION_METADATA_KEYS
+            }
         return data
 
     @model_validator(mode="wrap")
