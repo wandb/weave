@@ -1677,9 +1677,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             label=f"obj {req.obj.object_id!r}",
         )
 
-        # Dedup-before-insert: skip if a non-deleted row with this digest
-        # already exists.  This keeps min(created_at) stable for the
-        # version_index window function (see Problem 1 design doc).
+        # Dedup: skip insert if a non-deleted row with this digest exists.
         if self._obj_digest_exists_non_deleted(
             req.obj.project_id, req.obj.object_id, digest
         ):
