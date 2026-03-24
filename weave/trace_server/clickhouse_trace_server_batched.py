@@ -1272,6 +1272,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @generator_trace("clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
+        stream_start = time.monotonic()
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
@@ -1377,10 +1378,45 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 dict(zip(select_columns, row, strict=False))
             )
 
+        time_to_first_row_ms: float | None = None
+        time_to_first_call_ms: float | None = None
+        row_to_dict_ms = 0.0
+        model_validate_ms = 0.0
+        expand_ms = 0.0
+        feedback_ms = 0.0
+        rows_yielded = 0
+        batches_processed = 0
+
+        def iter_raw_rows() -> Iterator[tuple[Any, ...]]:
+            nonlocal time_to_first_row_ms
+            for row in raw_res:
+                if time_to_first_row_ms is None:
+                    time_to_first_row_ms = round(
+                        (time.monotonic() - stream_start) * 1000, 1
+                    )
+                yield row
+
+        def convert_row_to_call_schema(row: tuple[Any, ...]) -> tsi.CallSchema:
+            nonlocal row_to_dict_ms, model_validate_ms, rows_yielded, time_to_first_call_ms
+            row_to_dict_start = time.monotonic()
+            call_dict = row_to_call_schema_dict(row)
+            row_to_dict_ms += (time.monotonic() - row_to_dict_start) * 1000
+
+            model_validate_start = time.monotonic()
+            call_schema = tsi.CallSchema.model_validate(call_dict)
+            model_validate_ms += (time.monotonic() - model_validate_start) * 1000
+
+            rows_yielded += 1
+            if time_to_first_call_ms is None:
+                time_to_first_call_ms = round(
+                    (time.monotonic() - stream_start) * 1000, 1
+                )
+            return call_schema
+
         try:
             if not expand_columns and not include_feedback:
-                for row in raw_res:
-                    yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+                for row in iter_raw_rows():
+                    yield convert_row_to_call_schema(row)
                 return
 
             ref_cache = LRUCache(max_size=1000)
@@ -1390,18 +1426,49 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 growth_factor=10,
             )
 
-            for batch in batch_processor.make_batches(raw_res):
+            for batch in batch_processor.make_batches(iter_raw_rows()):
+                batches_processed += 1
+                batch_row_to_dict_start = time.monotonic()
                 call_dicts = [row_to_call_schema_dict(row) for row in batch]
+                row_to_dict_ms += (time.monotonic() - batch_row_to_dict_start) * 1000
                 if expand_columns and req.return_expanded_column_values:
+                    expand_start = time.monotonic()
                     self._expand_call_refs(
                         req.project_id, call_dicts, expand_columns, ref_cache
                     )
+                    expand_ms += (time.monotonic() - expand_start) * 1000
                 if include_feedback:
+                    feedback_start = time.monotonic()
                     self._add_feedback_to_calls(req.project_id, call_dicts)
+                    feedback_ms += (time.monotonic() - feedback_start) * 1000
 
                 for call in call_dicts:
-                    yield tsi.CallSchema.model_validate(call)
+                    model_validate_start = time.monotonic()
+                    call_schema = tsi.CallSchema.model_validate(call)
+                    model_validate_ms += (time.monotonic() - model_validate_start) * 1000
+                    rows_yielded += 1
+                    if time_to_first_call_ms is None:
+                        time_to_first_call_ms = round(
+                            (time.monotonic() - stream_start) * 1000, 1
+                        )
+                    yield call_schema
         finally:
+            tags: dict[str, str | float | int] = {
+                "calls_stream.rows_yielded": rows_yielded,
+                "calls_stream.row_to_dict_ms": round(row_to_dict_ms, 1),
+                "calls_stream.model_validate_ms": round(model_validate_ms, 1),
+            }
+            if time_to_first_row_ms is not None:
+                tags["calls_stream.time_to_first_row_ms"] = time_to_first_row_ms
+            if time_to_first_call_ms is not None:
+                tags["calls_stream.time_to_first_call_ms"] = time_to_first_call_ms
+            if batches_processed:
+                tags["calls_stream.batches_processed"] = batches_processed
+            if expand_ms:
+                tags["calls_stream.expand_ms"] = round(expand_ms, 1)
+            if feedback_ms:
+                tags["calls_stream.feedback_ms"] = round(feedback_ms, 1)
+            set_root_span_dd_tags(tags)
             # Ensure upstream _query_stream is closed on any exit
             if hasattr(raw_res, "close"):
                 raw_res.close()
