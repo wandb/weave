@@ -1,11 +1,12 @@
 /**
- * Utility for parsing Weave ref URIs.
+ * Utility for parsing Weave and Registry ref URIs.
  *
- * Supports parsing different types of Weave refs:
+ * Supports parsing different types of refs with either weave:/// or registry:/// prefix:
  * - Table refs: weave:///entity/project/table/digest
  * - Object refs: weave:///entity/project/object/name:digest
  * - Op refs: weave:///entity/project/op/name:digest
  * - Call refs: weave:///entity/project/call/id
+ * - Registry refs: registry:///entity/project/object/name:digest
  */
 
 export type ParsedWeaveUri =
@@ -37,22 +38,21 @@ export type ParsedWeaveUri =
     };
 
 /**
- * Parse a Weave URI into its components.
+ * Parse a Weave or Registry URI into its components.
  *
- * @param uri - The weave:/// URI string to parse
+ * Accepts both `weave:///` and `registry:///` prefixes.
+ *
+ * @param uri - A weave:/// or registry:/// URI string to parse
  * @returns Parsed URI components or null if invalid
  *
  * @example
  * ```typescript
- * const parsed = parseWeaveUri('weave:///wandb/project/table/abc123...');
- * if (parsed && parsed.type === 'table') {
- *   console.log(parsed.digest);  // 'abc123...'
- * }
+ * const parsed = parseWeaveUri('weave:///wandb/project/object/my-prompt:abc123');
+ * const parsed2 = parseWeaveUri('registry:///wandb/project/object/my-prompt:v0');
  * ```
  */
 export function parseWeaveUri(uri: string): ParsedWeaveUri | null {
-  // Format: weave:///entity/project/type/...
-  const match = uri.match(/^weave:\/\/\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/);
+  const match = uri.match(/^(?:weave|registry):\/\/\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/);
 
   if (!match) {
     return null;

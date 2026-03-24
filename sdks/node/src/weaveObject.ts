@@ -32,21 +32,22 @@ export class ObjectRef {
   // TODO: Add extra
 
   /**
-   * Creates an ObjectRef from a Weave URI string.
+   * Creates an ObjectRef from a Weave or Registry URI string.
    *
-   * @param uri - A Weave URI in the format: weave:///entity/project/object/name:digest
+   * @param uri - A URI in the format: weave:///entity/project/object/name:digest or registry:///entity/project/object/name:digest
    * @returns A new ObjectRef instance
    * @throws Error if the URI format is invalid or not an object ref
    *
    * @example
    * const ref = ObjectRef.fromUri('weave:///my-entity/my-project/object/my-dataset:abc123');
+   * const ref2 = ObjectRef.fromUri('registry:///my-org/my-collection/object/my-prompt:v0');
    */
   public static fromUri(uri: string): ObjectRef {
     const parsed = parseWeaveUri(uri);
 
     if (!parsed || parsed.type !== 'object') {
       throw new Error(
-        `Invalid object ref URI: ${uri}. Expected format: weave:///entity/project/object/name:digest`
+        `Invalid object ref URI: ${uri}. Expected format: weave:///entity/project/object/name:digest or registry:///entity/project/object/name:digest`
       );
     }
 
