@@ -15,8 +15,11 @@ from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import OpCallError, as_op, is_op, op
 from weave.trace.op_caller import async_call_op
 from weave.trace.op_protocol import Op
-from weave.trace.vals import WeaveObject
+from weave.trace.vals import WeaveObject, unwrap
 from weave.trace.weave_client import sanitize_object_name
+
+# Metadata keys injected by weave serialization that are not real model fields.
+_WEAVE_METADATA_KEYS = {"_type", "_class_name", "_bases"}
 
 
 def _import_numpy() -> Any | None:
@@ -54,7 +57,7 @@ class Scorer(Object):
         field_values = {}
         for field_name in cls.model_fields:
             if hasattr(obj, field_name):
-                field_values[field_name] = getattr(obj, field_name)
+                field_values[field_name] = _unwrap_field(getattr(obj, field_name))
 
         return cls(**field_values)
 
@@ -471,3 +474,24 @@ class WeaveScorerResult(BaseModel):
     metadata: dict[str, Any] = Field(
         description="Any extra information from the scorer like numerical scores, model outputs, etc."
     )
+
+
+def _unwrap_field(val: Any) -> Any:
+    """Convert a WeaveObject field value to a plain Python value for use with Pydantic."""
+    val = unwrap(val)
+    return _strip_weave_metadata(val)
+
+
+def _strip_weave_metadata(val: Any) -> Any:
+    """Recursively strip weave serialization metadata from dicts.
+    This is required for pydantic to deserialize WeaveObjects with metadata fields like _class_name when extra='forbid'.
+    """
+    if isinstance(val, dict):
+        return {
+            k: _strip_weave_metadata(v)
+            for k, v in val.items()
+            if k not in _WEAVE_METADATA_KEYS
+        }
+    if isinstance(val, list):
+        return [_strip_weave_metadata(v) for v in val]
+    return val
