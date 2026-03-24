@@ -35,11 +35,13 @@ def _make_weave_object(attrs: dict) -> WeaveObject:
 
 def test_from_obj_rejects_metadata_keys():
     """_class_name and _bases from ObjectRecord cause extra_forbidden errors."""
-    obj = _make_weave_object({
-        "name": "s",
-        "_class_name": "ScorerWithNestedModel",
-        "_bases": ["Scorer", "Object", "BaseModel"],
-    })
+    obj = _make_weave_object(
+        {
+            "name": "s",
+            "_class_name": "ScorerWithNestedModel",
+            "_bases": ["Scorer", "Object", "BaseModel"],
+        }
+    )
     scorer = ScorerWithNestedModel.from_obj(obj)
     assert scorer.name == "s"
 
@@ -69,12 +71,14 @@ def test_from_obj_unwraps_nested_weave_object():
     """
     server = MagicMock()
     inner = WeaveObject(
-        ObjectRecord({
-            "_class_name": "NestedParams",
-            "_bases": ["BaseModel"],
-            "temperature": 0.9,
-            "top_p": 0.8,
-        }),
+        ObjectRecord(
+            {
+                "_class_name": "NestedParams",
+                "_bases": ["BaseModel"],
+                "temperature": 0.9,
+                "top_p": 0.8,
+            }
+        ),
         ref=None,
         server=server,
         root=None,
