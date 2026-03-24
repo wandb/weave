@@ -2152,6 +2152,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self._query(query, parameters)
         if result.result_rows:
             return result.result_rows[0][0]
+        # Fallback for "latest": if no explicit alias row exists (legacy
+        # objects created before the alias write, or alias INSERT failed),
+        # resolve via the computed is_latest window function so that
+        # obj_read("latest") stays consistent with objs_query(latest_only).
+        if digest == "latest":
+            return self._resolve_computed_latest(project_id, object_id)
+        return None
+
+    def _resolve_computed_latest(
+        self,
+        project_id: str,
+        object_id: str,
+    ) -> str | None:
+        """Fallback: resolve "latest" via the computed is_latest property."""
+        object_query_builder = ObjectMetadataQueryBuilder(project_id)
+        object_query_builder.add_object_ids_condition([object_id])
+        object_query_builder.add_is_latest_condition()
+        objs = self._select_objs_query(object_query_builder, metadata_only=True)
+        if objs:
+            return objs[0].digest
         return None
 
     def _enrich_objs_with_tags_and_aliases(
