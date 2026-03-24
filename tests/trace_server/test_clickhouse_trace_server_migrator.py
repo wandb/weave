@@ -1026,9 +1026,11 @@ def test_replicated_db_engine_skips_on_cluster(replicated_migrator):
     )
 
     call_sql = replicated_migrator.ch_client.command.call_args_list[0][0][0]
-    # Should have ReplicatedMergeTree but NO ON CLUSTER
-    assert "ReplicatedMergeTree" in call_sql
+    # When the DB uses ENGINE = Replicated, the SQL should be passed through as-is:
+    # no ReplicatedMergeTree conversion (DB handles it) and no ON CLUSTER (auto-replicated).
+    assert "ReplicatedMergeTree" not in call_sql
     assert "ON CLUSTER" not in call_sql
+    assert "MergeTree" in call_sql
 
 
 def test_replicated_db_engine_skips_on_cluster_distributed(distributed_migrator):

@@ -561,13 +561,17 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         curr_db = self.ch_client.database
         self.ch_client.database = target_db
 
-        # Format for replicated tables
-        formatted_command = self._format_replicated_sql(command)
-        formatted_command = self._add_on_cluster_clause(
-            formatted_command, target_db=target_db
-        )
+        # When the database uses ENGINE = Replicated, it auto-converts MergeTree
+        # to ReplicatedMergeTree and handles DDL replication. Skip explicit conversion.
+        if self._uses_replicated_db_engine(target_db):
+            self.ch_client.command(command)
+        else:
+            formatted_command = self._format_replicated_sql(command)
+            formatted_command = self._add_on_cluster_clause(
+                formatted_command, target_db=target_db
+            )
+            self.ch_client.command(formatted_command)
 
-        self.ch_client.command(formatted_command)
         self.ch_client.database = curr_db
 
     def _format_replicated_sql(self, sql_query: str) -> str:
@@ -786,16 +790,27 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         if SQLPatterns.CREATE_VIEW_STMT.search(
             command_for_match
         ) or SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
-            formatted_command = self._format_replicated_sql(command)
-            formatted_command = self._add_on_cluster_clause(
-                formatted_command, target_db=target_db
-            )
+            # When the DB uses ENGINE = Replicated, it auto-converts MergeTree
+            # and handles DDL replication — skip explicit engine conversion and ON CLUSTER.
+            if self._uses_replicated_db_engine(target_db):
+                formatted_command = command
+            else:
+                formatted_command = self._format_replicated_sql(command)
+                formatted_command = self._add_on_cluster_clause(
+                    formatted_command, target_db=target_db
+                )
             self.ch_client.command(formatted_command)
             self.ch_client.database = curr_db
             return
 
-        # Format for replicated tables with distributed-specific paths
-        formatted_command = self._format_replicated_sql_distributed(command, target_db)
+        # When the DB uses ENGINE = Replicated, skip explicit ReplicatedMergeTree
+        # conversion — the DB engine auto-converts MergeTree tables.
+        if self._uses_replicated_db_engine(target_db):
+            formatted_command = command
+        else:
+            formatted_command = self._format_replicated_sql_distributed(
+                command, target_db
+            )
 
         # Handle ALTER TABLE
         if SQLPatterns.ALTER_TABLE_STMT.search(command_for_match):
