@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from weave import publish
 from weave.prompt.prompt import MessagesPrompt
+from weave.trace import object_record, vals
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
@@ -787,10 +788,7 @@ def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
 
 def test_cast_to_llm_structured_model_params_handles_weave_object():
     """Regression: default_params passed as a WeaveObject should be cast correctly."""
-    from weave.trace.object_record import ObjectRecord
-    from weave.trace.vals import WeaveObject
-
-    record = ObjectRecord(
+    record = object_record.ObjectRecord(
         {
             "_class_name": "LLMStructuredCompletionModelDefaultParams",
             "_bases": [],
@@ -807,7 +805,7 @@ def test_cast_to_llm_structured_model_params_handles_weave_object():
             "prompt": None,
         }
     )
-    weave_obj = WeaveObject(record, ref=None, server=MagicMock(), root=None)
+    weave_obj = vals.WeaveObject(record, ref=None, server=MagicMock(), root=None)
 
     result = cast_to_llm_structured_model_params(weave_obj)
     assert isinstance(result, LLMStructuredCompletionModelDefaultParams)
