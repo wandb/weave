@@ -460,7 +460,7 @@ verifiers_test = [
 pandas_test = ["pandas>=2.2.3"]
 otel-genai = [
   "openai-agents; python_version >= '3.11'",
-  "openai-agents-opentelemetry; python_version >= '3.11'",
+  "claude-agent-sdk>=0.1.0",
   "anthropic",
   "opentelemetry-instrumentation-anthropic",
   "opentelemetry-sdk",

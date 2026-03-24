@@ -3,7 +3,6 @@
 # dependencies = [
 #     "openai-agents",
 #     "openai",
-#     "opentelemetry-instrumentation-openai-agents-v2",
 #     "opentelemetry-sdk",
 #     "opentelemetry-exporter-otlp-proto-grpc",
 #     "opentelemetry-exporter-otlp-proto-http",
@@ -19,6 +18,10 @@ Creates an agent with:
 Demonstrates weave.otel.log_content(): upload media bytes to the Weave
 file store and attach content-addressed references to the active OTel span.
 
+The OTel span is automatically made "current" during tool execution by the
+Weave instrumentor, so log_content() calls inside tools attach to the
+correct span without any extra wiring.
+
 Usage:
     uv run --python 3.12 openai_multimodal_example.py
     uv run --python 3.12 openai_multimodal_example.py --genai-endpoint http://localhost:6345/otel/v1/genai/traces
@@ -27,14 +30,14 @@ Usage:
 import argparse
 import asyncio
 import base64
-import os
 import tempfile
 
 import openai
 import requests as http_requests
 from agents import Agent, Runner, function_tool
 
-from weave.otel import ConversationIdInjector, log_content, setup_tracing
+from weave.otel import log_content, setup_tracing
+from weave.otel.instrumentors.openai_agents import instrument
 
 # ---------------------------------------------------------------------------
 # Tools
@@ -146,23 +149,14 @@ def main() -> None:
     parser.add_argument("--genai-endpoint", type=str, default=None)
     args = parser.parse_args()
 
-    os.environ.setdefault(
-        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "span_and_event"
-    )
-
     provider = setup_tracing(
         service_name="openai-multimodal-otel-example",
         project="genai-otel-test",
         genai_endpoint=args.genai_endpoint,
         otlp_endpoint=args.otlp_endpoint,
-        processors=[
-            ConversationIdInjector(name="multimodal-tools"),
-        ],
     )
 
-    from opentelemetry.instrumentation.openai_agents import OpenAIAgentsInstrumentor
-
-    OpenAIAgentsInstrumentor().instrument(tracer_provider=provider)
+    instrument(provider, agents=[creative_agent], conversation="multimodal-tools")
 
     asyncio.run(run_agents())
     provider.force_flush()

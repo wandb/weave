@@ -34,42 +34,32 @@ Auth headers (`wandb-api-key`) are derived from `WANDB_API_KEY`.
 ### 2. OpenAI Agents SDK
 
 ```python
-import os
 from agents import Agent, Runner, function_tool
-from weave.otel import (
-    ConversationIdInjector,
-    SystemPromptInjector,
-    ToolDefinitionsInjector,
-    setup_tracing,
-)
-
-os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "span_and_event"
+from weave.otel import setup_tracing
+from weave.otel.instrumentors.openai_agents import instrument
 
 @function_tool
 def get_weather(city: str) -> str:
     """Get the current weather for a city."""
     return f"Sunny, 75°F in {city}"
 
-INSTRUCTIONS = {"WeatherBot": "You report weather using the get_weather tool."}
-TOOL_DEFS = {
-    "WeatherBot": [{"type": "function", "name": "get_weather", "description": "Get weather"}],
-}
-
 provider = setup_tracing(
     service_name="openai-agents-example",
     project="my-project",
     genai_endpoint="https://trace.wandb.ai/otel/v1/genai/traces",
-    processors=[
-        ConversationIdInjector(name="weather-chat"),
-        SystemPromptInjector(INSTRUCTIONS),
-        ToolDefinitionsInjector(TOOL_DEFS),
-    ],
 )
 
-from opentelemetry.instrumentation.openai_agents import OpenAIAgentsInstrumentor
-OpenAIAgentsInstrumentor().instrument(tracer_provider=provider)
+agent = Agent(
+    name="WeatherBot",
+    instructions="You report weather using the get_weather tool.",
+    tools=[get_weather],
+)
 
-agent = Agent(name="WeatherBot", instructions=INSTRUCTIONS["WeatherBot"], tools=[get_weather])
+# One call: auto-discovers instructions, tools, handoffs from agent objects.
+# Also patches reasoning token capture, compaction tracking, media capture,
+# and sets up conversation stitching.
+instrument(provider, agents=[agent], conversation="weather-chat")
+
 result = Runner.run_sync(agent, "What's the weather in Tokyo?")
 
 provider.force_flush()
@@ -77,49 +67,92 @@ provider.shutdown()
 ```
 
 Key points:
-- The `opentelemetry-instrumentation-openai-agents-v2` package creates spans with `agent.span.type`, which Weave maps to `operation_name` (e.g. `agent` → `invoke_agent`, `function` → `execute_tool`).
-- `SystemPromptInjector` adds `gen_ai.system_instructions` because no instrumentor emits it yet.
-- `ConversationIdInjector` sets `gen_ai.conversation.id` on every span for multi-turn stitching.
-- `ToolDefinitionsInjector` sets `gen_ai.tool.definitions` on `invoke_agent` spans.
+- `instrument()` replaces the community `opentelemetry-instrumentation-openai-agents-v2` package and all gap-closing processors (`SystemPromptInjector`, `ToolDefinitionsInjector`, `ConversationIdInjector`, `patch_openai_reasoning`, `patch_openai_compaction`).
+- System prompts, tool definitions, and handoff descriptions are auto-discovered from the Agent objects passed via `agents=`.
+- Sets `gen_ai.operation.name` directly on each span (`invoke_agent`, `chat`, `execute_tool`, `handoff`, `guardrail`).
+- Conversation stitching via `gen_ai.conversation.id` is built in when `conversation=` is set.
+- Images from `image_generation_call` response items are auto-captured via `weave.otel.log_content`.
+- Reasoning tokens are captured from `usage.output_tokens_details.reasoning_tokens` on Response spans.
 
 ### 3. Google ADK
 
 ```python
 from google.adk.agents import LlmAgent
-from weave.otel import SystemPromptInjector, ToolDefinitionsInjector, setup_tracing
-
-INSTRUCTIONS = {"Coordinator": "You route requests to specialists."}
-TOOL_DEFS = {"Coordinator": [{"type": "sub_agent", "name": "WeatherAgent", "description": "Weather"}]}
+from weave.otel import setup_tracing
+from weave.otel.instrumentors.google_adk import instrument
 
 provider = setup_tracing(
     service_name="google-adk-example",
     project="my-project",
     genai_endpoint="https://trace.wandb.ai/otel/v1/genai/traces",
-    processors=[
-        SystemPromptInjector(INSTRUCTIONS),
-        ToolDefinitionsInjector(TOOL_DEFS),
-    ],
 )
 
 coordinator = LlmAgent(
     name="Coordinator",
     model="gemini-2.0-flash",
-    instruction=INSTRUCTIONS["Coordinator"],
-    sub_agents=[...],
+    instruction="You route requests to specialists.",
+    sub_agents=[weather_agent, math_agent],
 )
+
+# One call: auto-discovers instructions, tools, sub_agents from agent objects.
+# Also patches Gemini media capture and sets up conversation stitching.
+instrument(provider, agents=[coordinator], conversation="my-chat")
+
 # ... run with InMemoryRunner ...
 
 provider.force_flush()
 provider.shutdown()
 ```
 
-Google ADK natively emits `gen_ai.operation.name` (`invoke_agent`, `execute_tool`, `generate_content`), so no operation name mapping is needed.
+Key points:
+- `instrument()` replaces `SystemPromptInjector`, `ToolDefinitionsInjector`, and `ConversationIdInjector` with a single call.
+- System prompts, tool definitions, and sub-agent descriptions are auto-discovered from the `LlmAgent` objects passed via `agents=`.
+- Google ADK natively emits `gen_ai.operation.name` (`invoke_agent`, `execute_tool`, `generate_content`), so no operation name mapping is needed. The instrumentor enriches these native spans with attributes ADK does not yet emit.
+- Conversation stitching via `gen_ai.conversation.id` is built in when `conversation=` is set.
+- Gemini `inline_data` media capture is auto-applied when `capture_media=True` (default).
 
-### 4. Anthropic / Traceloop
+### 4. Claude Agent SDK
 
-Anthropic calls are instrumented by Traceloop's OpenInference instrumentation. The key difference is that completions arrive as `gen_ai.completion.*` indexed attributes rather than `gen_ai.output.messages`. Weave's extraction handles this via the Traceloop fallback chain.
+```python
+from claude_agent_sdk import ClaudeAgentOptions, query
+from weave.otel import setup_tracing
+from weave.otel.instrumentors.claude_agent_sdk import instrument
 
-### 5. Multi-turn conversations
+provider = setup_tracing(
+    service_name="claude-agent-example",
+    project="my-project",
+    genai_endpoint="https://trace.wandb.ai/otel/v1/genai/traces",
+)
+
+# One call — system prompt and allowed tools are extracted from
+# ClaudeAgentOptions at call time (no agents= parameter needed).
+instrument(provider, conversation="coding-session")
+
+options = ClaudeAgentOptions(
+    system_prompt="You are a helpful coding assistant.",
+    allowed_tools=["Bash", "Read", "Write"],
+)
+
+async for msg in query(prompt="Check my Python version", options=options):
+    print(msg)
+
+provider.force_flush()
+provider.shutdown()
+```
+
+Key points:
+- `instrument()` monkey-patches `InternalClient.process_query` — the core async generator that both `query()` and `ClaudeSDKClient` delegate to — so one patch covers everything.
+- Unlike OpenAI/ADK, there is no `agents=` parameter. The Claude Agent SDK configures agents via `ClaudeAgentOptions` at call time; system prompts and allowed tools are extracted from the `options` argument inside the patched generator.
+- Each `query()` / `receive_response()` call produces an `invoke_agent` root span with `execute_tool` child spans for tool calls.
+- Thinking blocks are captured as reasoning content parts in `gen_ai.output.messages`.
+- Token usage (including cache read/creation tokens) is extracted from `ResultMessage.usage`.
+- Conversation stitching via `gen_ai.conversation.id` is built in when `conversation=` is set.
+
+### 5. Anthropic Messages API (Traceloop)
+
+For direct Anthropic Messages API calls (not the Agent SDK), Traceloop's instrumentation captures `messages.create` spans. Completions arrive as `gen_ai.completion.*` indexed attributes rather than `gen_ai.output.messages`. Weave's extraction handles this via the Traceloop fallback chain.
+
+### 6. Multi-turn conversations
 
 To get multi-turn conversation stitching in the Weave UI:
 

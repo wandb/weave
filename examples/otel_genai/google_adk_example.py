@@ -16,7 +16,10 @@ Demonstrates:
   - LLM-driven delegation to specialist sub_agents
   - Tool calls within a conversation that builds on prior context
   - Media capture via weave.otel.log_content()
-  - Tool definitions injection (gen_ai.tool.definitions on invoke_agent spans)
+  - Automatic system prompt, tool definition, and conversation tracking
+
+All of this is set up with a single ``instrument()`` call — agent metadata
+(instructions, tools, sub_agents) is auto-discovered from the LlmAgent objects.
 
 The conversation is designed so each turn builds on prior context:
   1. Ask about weather in Tokyo and Paris
@@ -24,11 +27,6 @@ The conversation is designed so each turn builds on prior context:
   3. Ask for the temperature in Fahrenheit converted to Celsius
   4. Generate an image of the warmer city at sunset
   5. Summarize the conversation
-
-NOTE: System prompts / agent instructions are manually injected because
-Google ADK's native OTel tracing does not emit gen_ai.system_instructions:
-  - https://github.com/open-telemetry/semantic-conventions/pull/2179
-  - https://github.com/google/adk-python/pull/2575
 
 Usage:
     uv run --python 3.12 google_adk_example.py
@@ -39,90 +37,8 @@ import argparse
 import asyncio
 import tempfile
 
-from weave.otel import (
-    SystemPromptInjector,
-    ToolDefinitionsInjector,
-    log_content,
-    setup_tracing,
-)
-
-# ---------------------------------------------------------------------------
-# Agent instructions (defined before OTel setup for the injector)
-# ---------------------------------------------------------------------------
-
-COORDINATOR_INSTRUCTIONS = (
-    "You are a helpful coordinator. Based on the user's request, "
-    "delegate to the appropriate specialist:\n"
-    "  - WeatherAgent for weather questions\n"
-    "  - MathAgent for calculations and math\n"
-    "  - CreativeAgent for image generation and visual content\n\n"
-    "Always delegate — do not answer directly."
-)
-
-WEATHER_INSTRUCTIONS = (
-    "You are a weather specialist. Use the get_weather tool to look "
-    "up weather for cities. Give a short, friendly answer."
-)
-
-MATH_INSTRUCTIONS = (
-    "You are a math specialist. Use the calculator tool to evaluate "
-    "arithmetic expressions. Show your work briefly."
-)
-
-CREATIVE_INSTRUCTIONS = (
-    "You are a creative image specialist. Use the generate_image tool "
-    "to create images from descriptions. After generating, briefly "
-    "describe what was created."
-)
-
-AGENT_INSTRUCTIONS = {
-    "Coordinator": COORDINATOR_INSTRUCTIONS,
-    "WeatherAgent": WEATHER_INSTRUCTIONS,
-    "MathAgent": MATH_INSTRUCTIONS,
-    "CreativeAgent": CREATIVE_INSTRUCTIONS,
-}
-
-AGENT_TOOL_DEFS: dict[str, list[dict]] = {
-    "Coordinator": [
-        {
-            "type": "sub_agent",
-            "name": "WeatherAgent",
-            "description": "Specialist for weather forecasts",
-        },
-        {
-            "type": "sub_agent",
-            "name": "MathAgent",
-            "description": "Specialist for arithmetic calculations",
-        },
-        {
-            "type": "sub_agent",
-            "name": "CreativeAgent",
-            "description": "Specialist for generating images",
-        },
-    ],
-    "WeatherAgent": [
-        {
-            "type": "function",
-            "name": "get_weather",
-            "description": "Get the current weather for a city",
-        },
-    ],
-    "MathAgent": [
-        {
-            "type": "function",
-            "name": "calculator",
-            "description": "Evaluate an arithmetic expression",
-        },
-    ],
-    "CreativeAgent": [
-        {
-            "type": "function",
-            "name": "generate_image",
-            "description": "Generate an image from a text description",
-        },
-    ],
-}
-
+from weave.otel import log_content, setup_tracing
+from weave.otel.instrumentors.google_adk import instrument
 
 # ---------------------------------------------------------------------------
 # Tools
@@ -221,19 +137,22 @@ def generate_image(prompt: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Agent construction
+# Agents
 # ---------------------------------------------------------------------------
 
 
 def build_agents():
-    """Build the multi-agent hierarchy. Call after OTel is configured."""
+    """Build the multi-agent hierarchy."""
     from google.adk.agents import LlmAgent
 
     weather_agent = LlmAgent(
         name="WeatherAgent",
         model="gemini-2.0-flash",
         description="Specialist for weather forecasts and conditions in any city.",
-        instruction=WEATHER_INSTRUCTIONS,
+        instruction=(
+            "You are a weather specialist. Use the get_weather tool to look "
+            "up weather for cities. Give a short, friendly answer."
+        ),
         tools=[get_weather],
     )
 
@@ -241,7 +160,10 @@ def build_agents():
         name="MathAgent",
         model="gemini-2.0-flash",
         description="Specialist for arithmetic calculations and math questions.",
-        instruction=MATH_INSTRUCTIONS,
+        instruction=(
+            "You are a math specialist. Use the calculator tool to evaluate "
+            "arithmetic expressions. Show your work briefly."
+        ),
         tools=[calculator],
     )
 
@@ -249,7 +171,11 @@ def build_agents():
         name="CreativeAgent",
         model="gemini-2.0-flash",
         description="Specialist for generating images from text descriptions.",
-        instruction=CREATIVE_INSTRUCTIONS,
+        instruction=(
+            "You are a creative image specialist. Use the generate_image tool "
+            "to create images from descriptions. After generating, briefly "
+            "describe what was created."
+        ),
         tools=[generate_image],
     )
 
@@ -257,7 +183,14 @@ def build_agents():
         name="Coordinator",
         model="gemini-2.0-flash",
         description="Routes requests to the appropriate specialist agent.",
-        instruction=COORDINATOR_INSTRUCTIONS,
+        instruction=(
+            "You are a helpful coordinator. Based on the user's request, "
+            "delegate to the appropriate specialist:\n"
+            "  - WeatherAgent for weather questions\n"
+            "  - MathAgent for calculations and math\n"
+            "  - CreativeAgent for image generation and visual content\n\n"
+            "Always delegate — do not answer directly."
+        ),
         sub_agents=[weather_agent, math_agent, creative_agent],
     )
 
@@ -281,7 +214,6 @@ async def run_conversation(coordinator) -> None:
 
     runner = InMemoryRunner(agent=coordinator, app_name="multi_agent_app")
 
-    # Create ONE session and reuse it — this is how ADK maintains multi-turn context
     session = await runner.session_service.create_session(
         app_name="multi_agent_app",
         user_id="user1",
@@ -308,7 +240,6 @@ async def run_conversation(coordinator) -> None:
                     if hasattr(part, "text") and part.text:
                         print(f"\nAgent: {part.text.strip()}\n")
 
-    # Show session event count to demonstrate context accumulation
     final_session = await runner.session_service.get_session(
         app_name="multi_agent_app",
         user_id="user1",
@@ -334,13 +265,15 @@ def main() -> None:
         project="genai-otel-test",
         genai_endpoint=args.genai_endpoint,
         otlp_endpoint=args.otlp_endpoint,
-        processors=[
-            SystemPromptInjector(AGENT_INSTRUCTIONS),
-            ToolDefinitionsInjector(AGENT_TOOL_DEFS),
-        ],
     )
 
     coordinator = build_agents()
+
+    # One call: auto-discovers instructions, tools, sub_agents from the
+    # agent tree. Also patches Gemini media capture and sets up
+    # conversation stitching.
+    instrument(provider, agents=[coordinator], conversation="adk-multi-agent")
+
     asyncio.run(run_conversation(coordinator))
 
     provider.force_flush()

@@ -2,7 +2,6 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "openai-agents",
-#     "opentelemetry-instrumentation-openai-agents-v2",
 #     "opentelemetry-sdk",
 #     "opentelemetry-exporter-otlp-proto-grpc",
 #     "opentelemetry-exporter-otlp-proto-http",
@@ -16,8 +15,12 @@ Demonstrates:
   - Automatic context compaction via OpenAIResponsesCompactionSession
   - Subagent handoffs: TriageAgent routes to WeatherBot, TravelAdvisor, Translator
   - Tool calls within a persistent conversation
-  - Tool definitions injection (gen_ai.tool.definitions on invoke_agent spans)
+  - Automatic system prompt, tool definition, and reasoning token capture
   - Compaction tracking (weave.compaction.* attributes)
+  - Conversation stitching via gen_ai.conversation.id
+
+All of this is set up with a single ``instrument()`` call — agent metadata
+(instructions, tools, handoffs) is auto-discovered from the Agent objects.
 
 The conversation is designed so each turn builds on prior context:
   1. Ask about weather in Tokyo
@@ -28,11 +31,6 @@ The conversation is designed so each turn builds on prior context:
   6. Translate the recommendation to Japanese (handoff to Translator)
   7. Summarize everything discussed (tests full context recall / compaction)
 
-NOTE: System prompts / agent instructions are manually attached via
-gen_ai.system_instructions because no instrumentor emits them yet:
-  - https://github.com/open-telemetry/semantic-conventions/pull/2179
-  - https://github.com/open-telemetry/opentelemetry-python-contrib/issues/4038
-
 Usage:
     uv run --python 3.12 openai_agents_example.py
     uv run --python 3.12 openai_agents_example.py --genai-endpoint http://localhost:6345/otel/v1/genai/traces
@@ -40,19 +38,12 @@ Usage:
 
 import argparse
 import asyncio
-import os
 
 from agents import Agent, Runner, SQLiteSession, function_tool
 from agents.memory import OpenAIResponsesCompactionSession
 
-from weave.otel import (
-    ConversationIdInjector,
-    SystemPromptInjector,
-    ToolDefinitionsInjector,
-    patch_openai_reasoning,
-    setup_tracing,
-)
-from weave.otel.compaction import patch_openai_compaction
+from weave.otel import setup_tracing
+from weave.otel.instrumentors.openai_agents import instrument
 
 # ---------------------------------------------------------------------------
 # Tools
@@ -94,91 +85,15 @@ def search_hotels(city: str, checkin: str, checkout: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Agent instructions
-# ---------------------------------------------------------------------------
-
-TRIAGE_INSTRUCTIONS = (
-    "You are a helpful concierge. Based on the user's request, hand off "
-    "to the appropriate specialist:\n"
-    "  - WeatherBot for weather questions\n"
-    "  - TravelAdvisor for flight/hotel/trip planning\n"
-    "  - Translator for translation requests\n\n"
-    "If the request spans multiple domains, handle the most relevant one "
-    "first. Always hand off — do not answer directly."
-)
-
-WEATHER_INSTRUCTIONS = (
-    "You are a weather specialist. Use the get_weather tool to look up "
-    "weather for any city the user asks about. Give a short, friendly answer."
-)
-
-TRAVEL_INSTRUCTIONS = (
-    "You are a travel planning specialist. Use search_flights and "
-    "search_hotels to help the user plan trips. Summarize options clearly. "
-    "If the user hasn't specified dates, suggest reasonable ones."
-)
-
-TRANSLATOR_INSTRUCTIONS = (
-    "You are a translation specialist. Translate the user's text into "
-    "the requested language. If no target language is specified, translate "
-    "to Spanish. Only output the translation, nothing else."
-)
-
-AGENT_INSTRUCTIONS = {
-    "TriageAgent": TRIAGE_INSTRUCTIONS,
-    "WeatherBot": WEATHER_INSTRUCTIONS,
-    "TravelAdvisor": TRAVEL_INSTRUCTIONS,
-    "Translator": TRANSLATOR_INSTRUCTIONS,
-}
-
-# Tool definitions for ToolDefinitionsInjector (gen_ai.tool.definitions)
-AGENT_TOOL_DEFS: dict[str, list[dict]] = {
-    "TriageAgent": [
-        {
-            "type": "handoff",
-            "name": "WeatherBot",
-            "description": "Specialist for weather forecasts and conditions",
-        },
-        {
-            "type": "handoff",
-            "name": "TravelAdvisor",
-            "description": "Specialist for flight and hotel bookings",
-        },
-        {
-            "type": "handoff",
-            "name": "Translator",
-            "description": "Specialist for translating text between languages",
-        },
-    ],
-    "WeatherBot": [
-        {
-            "type": "function",
-            "name": "get_weather",
-            "description": "Get the current weather for a city",
-        },
-    ],
-    "TravelAdvisor": [
-        {
-            "type": "function",
-            "name": "search_flights",
-            "description": "Search for available flights between two cities",
-        },
-        {
-            "type": "function",
-            "name": "search_hotels",
-            "description": "Search for available hotels in a city",
-        },
-    ],
-    "Translator": [],
-}
-
-# ---------------------------------------------------------------------------
-# Specialist agents
+# Agents
 # ---------------------------------------------------------------------------
 
 weather_agent = Agent(
     name="WeatherBot",
-    instructions=WEATHER_INSTRUCTIONS,
+    instructions=(
+        "You are a weather specialist. Use the get_weather tool to look up "
+        "weather for any city the user asks about. Give a short, friendly answer."
+    ),
     tools=[get_weather],
     model="gpt-4o-mini",
     handoff_description="Specialist for weather forecasts and conditions",
@@ -186,7 +101,11 @@ weather_agent = Agent(
 
 travel_agent = Agent(
     name="TravelAdvisor",
-    instructions=TRAVEL_INSTRUCTIONS,
+    instructions=(
+        "You are a travel planning specialist. Use search_flights and "
+        "search_hotels to help the user plan trips. Summarize options clearly. "
+        "If the user hasn't specified dates, suggest reasonable ones."
+    ),
     tools=[search_flights, search_hotels],
     model="gpt-4o-mini",
     handoff_description="Specialist for flight and hotel bookings",
@@ -194,17 +113,27 @@ travel_agent = Agent(
 
 translator_agent = Agent(
     name="Translator",
-    instructions=TRANSLATOR_INSTRUCTIONS,
+    instructions=(
+        "You are a translation specialist. Translate the user's text into "
+        "the requested language. If no target language is specified, translate "
+        "to Spanish. Only output the translation, nothing else."
+    ),
     model="gpt-4o-mini",
     handoff_description="Specialist for translating text between languages",
 )
 
 triage_agent = Agent(
     name="TriageAgent",
-    instructions=TRIAGE_INSTRUCTIONS,
+    instructions=(
+        "You are a helpful concierge. Based on the user's request, hand off "
+        "to the appropriate specialist:\n"
+        "  - WeatherBot for weather questions\n"
+        "  - TravelAdvisor for flight/hotel/trip planning\n"
+        "  - Translator for translation requests\n\n"
+        "If the request spans multiple domains, handle the most relevant one "
+        "first. Always hand off — do not answer directly."
+    ),
     handoffs=[weather_agent, travel_agent, translator_agent],
-    # o4-mini is a reasoning model — it produces chain-of-thought reasoning
-    # tokens and content that we can capture and display in Weave.
     model="o4-mini",
 )
 
@@ -227,11 +156,8 @@ CONVERSATION = [
 
 async def run_conversation() -> None:
     """Run a multi-turn conversation with context carryover and compaction."""
-    # SQLiteSession stores conversation history in-memory across turns
     underlying = SQLiteSession("trip-planning-session")
 
-    # OpenAIResponsesCompactionSession wraps it to automatically compact
-    # context when the history grows large (triggers after 10+ items by default)
     session = OpenAIResponsesCompactionSession(
         session_id="trip-planning-session",
         underlying_session=underlying,
@@ -246,7 +172,6 @@ async def run_conversation() -> None:
         result = await Runner.run(triage_agent, query, session=session)
         print(f"\nAgent: {result.final_output}\n")
 
-    # Show final session state
     items = await session.get_items()
     print(f"\n{'=' * 60}")
     print(f"Session has {len(items)} items after {len(CONVERSATION)} turns")
@@ -261,28 +186,17 @@ def main() -> None:
     parser.add_argument("--genai-endpoint", type=str, default=None)
     args = parser.parse_args()
 
-    os.environ.setdefault(
-        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "span_and_event"
-    )
-
-    patch_openai_compaction()
-    patch_openai_reasoning()
-
     provider = setup_tracing(
         service_name="openai-agents-otel-example",
         project="genai-otel-test",
         genai_endpoint=args.genai_endpoint,
         otlp_endpoint=args.otlp_endpoint,
-        processors=[
-            ConversationIdInjector(name="trip-planning"),
-            SystemPromptInjector(AGENT_INSTRUCTIONS),
-            ToolDefinitionsInjector(AGENT_TOOL_DEFS),
-        ],
     )
 
-    from opentelemetry.instrumentation.openai_agents import OpenAIAgentsInstrumentor
-
-    OpenAIAgentsInstrumentor().instrument(tracer_provider=provider)
+    # One call: auto-discovers instructions, tools, handoffs from the agent
+    # tree. Also patches reasoning token capture, compaction tracking, and
+    # sets up conversation stitching.
+    instrument(provider, agents=[triage_agent], conversation="trip-planning")
 
     asyncio.run(run_conversation())
     provider.force_flush()

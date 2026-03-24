@@ -5,15 +5,22 @@ collect OTel spans via the ADK's built-in OTel tracing, run them through
 the full extraction + normalization pipeline, and assert the resulting
 chat view is correct.
 
+Uses ``weave.otel.instrumentors.google_adk.instrument()`` to enrich
+ADK's native spans with system instructions, tool definitions, and
+conversation tracking.
+
 To record cassettes:
     GOOGLE_API_KEY=... pytest tests/integrations/otel_genai/test_google_adk_chat.py --vcr-record=all
 """
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
 
 from tests.integrations.otel_genai.conftest import otel_spans_to_genai_schemas
+from weave.otel.instrumentors.google_adk import instrument, uninstrument
 from weave.trace_server.genai_chat_view import build_chat_messages
 
 
@@ -67,35 +74,40 @@ async def test_single_turn_with_tool(otel_setup):
         sub_agents=[weather_agent],
     )
 
-    runner = InMemoryRunner(agent=coordinator, app_name="test_app")
-    session = await runner.session_service.create_session(
-        app_name="test_app", user_id="user1"
-    )
+    proc = instrument(provider, agents=[coordinator], capture_media=False)
 
-    user_msg = types.Content(
-        role="user", parts=[types.Part(text="What's the weather in Tokyo?")]
-    )
+    try:
+        runner = InMemoryRunner(agent=coordinator, app_name="test_app")
+        session = await runner.session_service.create_session(
+            app_name="test_app", user_id="user1"
+        )
 
-    final_text = ""
-    async for event in runner.run_async(
-        user_id="user1", session_id=session.id, new_message=user_msg
-    ):
-        if event.is_final_response() and event.content:
-            for part in event.content.parts:
-                if hasattr(part, "text") and part.text:
-                    final_text = part.text
+        user_msg = types.Content(
+            role="user", parts=[types.Part(text="What's the weather in Tokyo?")]
+        )
 
-    assert final_text, "Agent should produce a response"
+        final_text = ""
+        async for event in runner.run_async(
+            user_id="user1", session_id=session.id, new_message=user_msg
+        ):
+            if event.is_final_response() and event.content:
+                for part in event.content.parts:
+                    if hasattr(part, "text") and part.text:
+                        final_text = part.text
 
-    provider.force_flush()
-    schemas = otel_spans_to_genai_schemas(exporter)
-    assert len(schemas) > 0, "Should have collected OTel spans"
+        assert final_text, "Agent should produce a response"
 
-    msgs = build_chat_messages(schemas)
-    types_found = [m.type for m in msgs]
+        provider.force_flush()
+        schemas = otel_spans_to_genai_schemas(exporter)
+        assert len(schemas) > 0, "Should have collected OTel spans"
 
-    assert "user_message" in types_found, "Should have a user message"
-    assert any(t in {"agent_message"} for t in types_found), "Should have an agent response"
+        msgs = build_chat_messages(schemas)
+        types_found = [m.type for m in msgs]
+
+        assert "user_message" in types_found, "Should have a user message"
+        assert any(t in {"agent_message"} for t in types_found), "Should have an agent response"
+    finally:
+        uninstrument(proc)
 
 
 @pytest.mark.vcr(
@@ -119,38 +131,43 @@ async def test_multi_turn_session(otel_setup):
         tools=[_get_weather],
     )
 
-    runner = InMemoryRunner(agent=agent, app_name="test_app")
-    session = await runner.session_service.create_session(
-        app_name="test_app", user_id="user1"
-    )
+    proc = instrument(provider, agents=[agent], capture_media=False)
 
-    msg1 = types.Content(
-        role="user", parts=[types.Part(text="Weather in Tokyo?")]
-    )
-    async for _event in runner.run_async(
-        user_id="user1", session_id=session.id, new_message=msg1
-    ):
-        pass
+    try:
+        runner = InMemoryRunner(agent=agent, app_name="test_app")
+        session = await runner.session_service.create_session(
+            app_name="test_app", user_id="user1"
+        )
 
-    provider.force_flush()
-    exporter.clear()
+        msg1 = types.Content(
+            role="user", parts=[types.Part(text="Weather in Tokyo?")]
+        )
+        async for _event in runner.run_async(
+            user_id="user1", session_id=session.id, new_message=msg1
+        ):
+            pass
 
-    msg2 = types.Content(
-        role="user", parts=[types.Part(text="How about London?")]
-    )
-    async for _event in runner.run_async(
-        user_id="user1", session_id=session.id, new_message=msg2
-    ):
-        pass
+        provider.force_flush()
+        exporter.clear()
 
-    provider.force_flush()
-    schemas = otel_spans_to_genai_schemas(exporter)
-    msgs = build_chat_messages(schemas)
+        msg2 = types.Content(
+            role="user", parts=[types.Part(text="How about London?")]
+        )
+        async for _event in runner.run_async(
+            user_id="user1", session_id=session.id, new_message=msg2
+        ):
+            pass
 
-    user_msgs = [m for m in msgs if m.type == "user_message"]
-    assert len(user_msgs) == 1, "Should have exactly one user message for this turn"
-    assert "london" in user_msgs[0].text.lower(), \
-        f"Should be about London, got: {user_msgs[0].text}"
+        provider.force_flush()
+        schemas = otel_spans_to_genai_schemas(exporter)
+        msgs = build_chat_messages(schemas)
+
+        user_msgs = [m for m in msgs if m.type == "user_message"]
+        assert len(user_msgs) == 1, "Should have exactly one user message for this turn"
+        assert "london" in user_msgs[0].text.lower(), \
+            f"Should be about London, got: {user_msgs[0].text}"
+    finally:
+        uninstrument(proc)
 
 
 @pytest.mark.vcr(
@@ -188,23 +205,28 @@ async def test_subagent_delegation(otel_setup):
         sub_agents=[weather_agent, math_agent],
     )
 
-    runner = InMemoryRunner(agent=coordinator, app_name="test_app")
-    session = await runner.session_service.create_session(
-        app_name="test_app", user_id="user1"
-    )
+    proc = instrument(provider, agents=[coordinator], capture_media=False)
 
-    user_msg = types.Content(
-        role="user", parts=[types.Part(text="What is 42 * 17?")]
-    )
-    async for _event in runner.run_async(
-        user_id="user1", session_id=session.id, new_message=user_msg
-    ):
-        pass
+    try:
+        runner = InMemoryRunner(agent=coordinator, app_name="test_app")
+        session = await runner.session_service.create_session(
+            app_name="test_app", user_id="user1"
+        )
 
-    provider.force_flush()
-    schemas = otel_spans_to_genai_schemas(exporter)
-    msgs = build_chat_messages(schemas)
+        user_msg = types.Content(
+            role="user", parts=[types.Part(text="What is 42 * 17?")]
+        )
+        async for _event in runner.run_async(
+            user_id="user1", session_id=session.id, new_message=user_msg
+        ):
+            pass
 
-    assert any(m.type == "user_message" for m in msgs), "Should have user message"
-    assert any(m.type in {"tool_call", "agent_message"} for m in msgs), \
-        "Should have either a tool call or agent response"
+        provider.force_flush()
+        schemas = otel_spans_to_genai_schemas(exporter)
+        msgs = build_chat_messages(schemas)
+
+        assert any(m.type == "user_message" for m in msgs), "Should have user message"
+        assert any(m.type in {"tool_call", "agent_message"} for m in msgs), \
+            "Should have either a tool call or agent response"
+    finally:
+        uninstrument(proc)

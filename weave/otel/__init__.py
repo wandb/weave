@@ -55,6 +55,18 @@ def __getattr__(name: str) -> Any:
         from weave.otel import compaction as _comp
 
         return getattr(_comp, name)
+    if name == "instrument_openai_agents":
+        from weave.otel.instrumentors.openai_agents import instrument
+
+        return instrument
+    if name == "instrument_google_adk":
+        from weave.otel.instrumentors.google_adk import instrument
+
+        return instrument
+    if name == "instrument_claude_agent_sdk":
+        from weave.otel.instrumentors.claude_agent_sdk import instrument
+
+        return instrument
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 _CONTENT_REFS_ATTR = "weave.content_refs"

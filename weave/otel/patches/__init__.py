@@ -28,9 +28,9 @@ def patch_all() -> None:
     except Exception:
         logger.debug("Google media patch skipped", exc_info=True)
 
-    # Anthropic patch omitted — official OTel Claude Agent SDK instrumentation
-    # is still in development:
-    # https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation-genai/opentelemetry-instrumentation-claude-agent-sdk
+    # Claude Agent SDK: no media patch needed here — the Weave instrumentor
+    # (weave.otel.instrumentors.claude_agent_sdk) handles tracing directly
+    # via monkey-patching InternalClient.process_query.
 
 
 def unpatch_all() -> None:

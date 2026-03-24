@@ -5,19 +5,23 @@ responses, collect OTel spans via InMemorySpanExporter, run them through
 the full extraction + normalization pipeline, and assert the resulting
 chat view is correct.
 
+Uses ``weave.otel.instrumentors.openai_agents.instrument()`` — the Weave-
+native instrumentor that replaces the community
+``opentelemetry-instrumentation-openai-agents-v2`` package.
+
 To record cassettes:
     OPENAI_API_KEY=sk-... pytest tests/integrations/otel_genai/test_openai_agents_chat.py --vcr-record=all
 """
 
 from __future__ import annotations
 
-import os
+from collections.abc import Generator
 
 import pytest
 from agents import Agent, Runner, function_tool
-from opentelemetry.instrumentation.openai_agents import OpenAIAgentsInstrumentor
 
 from tests.integrations.otel_genai.conftest import otel_spans_to_genai_schemas
+from weave.otel.instrumentors.openai_agents import instrument, uninstrument
 from weave.trace_server.genai_chat_view import build_chat_messages
 
 
@@ -40,14 +44,17 @@ def search_flights(origin: str, destination: str, date: str) -> str:
 
 
 @pytest.fixture(autouse=True)
-def _instrument_openai_agents(otel_setup):
-    """Instrument the OpenAI Agents SDK for OTel tracing."""
+def _instrument_openai_agents(otel_setup: tuple) -> Generator[None, None, None]:
+    """Instrument the OpenAI Agents SDK using the Weave instrumentor."""
     provider, _ = otel_setup
-    os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "span_and_event")
-    instrumentor = OpenAIAgentsInstrumentor()
-    instrumentor.instrument(tracer_provider=provider)
+    proc = instrument(
+        provider,
+        capture_media=False,
+        capture_reasoning=False,
+        capture_compaction=False,
+    )
     yield
-    instrumentor.uninstrument()
+    uninstrument(proc)
 
 
 @pytest.mark.vcr(
