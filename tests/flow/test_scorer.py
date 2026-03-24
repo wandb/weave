@@ -1,11 +1,3 @@
-"""Regression tests for Scorer.from_obj with deserialized nested objects.
-
-The scoring worker deserializes scorers into WeaveObjects whose fields may
-contain weave metadata keys (_type, _class_name, _bases), WeaveDict wrappers,
-and nested WeaveObjects. Scorer.from_obj must unwrap and strip these before
-passing values to Pydantic validation.
-"""
-
 from unittest.mock import MagicMock
 
 from pydantic import BaseModel
