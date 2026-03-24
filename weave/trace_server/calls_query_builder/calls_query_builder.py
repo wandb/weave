@@ -1721,6 +1721,7 @@ ALLOWED_CALL_FIELDS = {
     "id": CallsMergedField(field="id"),
     "trace_id": CallsMergedAggField(field="trace_id", agg_fn="any"),
     "parent_id": CallsMergedAggField(field="parent_id", agg_fn="any"),
+    "parent_ids": CallsMergedAggField(field="parent_id", agg_fn="any"),
     "thread_id": CallsMergedAggField(field="thread_id", agg_fn="any"),
     "turn_id": CallsMergedAggField(field="turn_id", agg_fn="any"),
     "op_name": CallsMergedAggField(field="op_name", agg_fn="any"),
