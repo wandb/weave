@@ -60,7 +60,51 @@ def init(
         project_name: The name of the Weights & Biases team and project to log to. If you don't
             specify a team, your default entity is used.
             To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
-        settings: Configuration for the Weave client generally.
+        settings: Configuration for the Weave client generally. Can be a UserSettings instance or a dict
+            with any of the following keys (all optional). All settings can also be configured
+            via environment variables using the prefix WEAVE_ (e.g., WEAVE_DISABLED=true).
+            Available settings:
+                - `disabled` (bool): Disables traces on all functions. Default: `False`
+                - `print_call_link` (bool): Prints links in terminal to Weave UI for ops. Default: `True`
+                - `log_level` (str): Sets what type of information to log (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). Default: `INFO`
+                - `display_viewer` (str): Controls how Weave displays objects in the console (`auto`, `rich`, `print`). Default: `auto`
+                - `capture_code` (bool): Captures code of traced ops to your Weave project. Default: `True`
+                - `implicitly_patch_integrations` (bool): Auto-patches supported libraries. Default: `True`
+                - `redact_pii` (bool): Scans all trace data for sensitive information,
+                    like emails, phone numbers, and credit cards, and replaces them with placeholder values
+                    before sending to the server. Requires presidio-analyzer and presidio-anonymizer packages.
+                    Default: `False`
+                - `redact_pii_fields` (list[str]): Specifies which PII entity types to redact when `redact_pii`
+                    is `True`. If empty, uses Presidio's default set. Examples: ['EMAIL','PHONE_NUMBER','CREDIT_CARD','US_SSN'].
+                    See full list at: https://microsoft.github.io/presidio/supported_entities/
+                    Default: `[]`
+                - `redact_pii_exclude_fields` (list[str]): PII entity types to exclude. Default: `[]`
+                - `capture_client_info` (bool): Captures Python/SDK version info. Default: `True`
+                - `capture_system_info` (bool): Captures OS information. Default: `True`
+                - `client_parallelism` (int): Number of workers for background ops. Default: `auto`
+                - `use_server_cache` (bool): Enables local disk caching of server responses.
+                - `server_cache_size_limit` (int): Cache size limit in bytes. Default: `1_000_000_000`
+                - `server_cache_dir` (str): Directory for server cache. Default: `temporary`
+                - `scorers_dir` (str): Directory for scorer model checkpoints. Default: `~/.cache/wandb/weave-scorers`
+                - `max_calls_queue_size` (int): Maximum queue size (0 = unbounded). Default: `100_000`
+                - `retry_max_interval` (float): Maximum retry interval in seconds. Default: `300`
+                - `retry_max_attempts` (int): Maximum number of retries. Default: `3`
+                - `enable_disk_fallback` (bool): Writes dropped items to disk. Default: `True`
+                - `use_parallel_table_upload` (bool): Enables parallel chunked upload for large tables. If False,
+                    tables are uploaded sequentially in smaller chunks.
+                    Default: `True`
+                - `http_timeout` (float): Maximum time in seconds to wait for HTTP requests to complete.
+                    This includes connection time, data transfer, and server processing. Increase for
+                    slow networks or when working with large payloads.
+                    Default: `30.0`
+                - `use_stainless_server` (bool): Uses the Stainless-generated HTTP client which
+                    provides better type safety, automatic retries, and improved error handling. This is
+                    experimental and may become the default in future versions.
+                    Default: `False`
+                - `use_calls_complete` (bool): Uses an optimized write path that batches complete
+                    call data (start and end) into a single request instead of separate start/end requests.
+                    This reduces server load and improves performance, especially for short-lived ops.
+                    Default: `False`
         autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.

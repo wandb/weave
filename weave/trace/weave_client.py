@@ -21,7 +21,9 @@ from httpx import HTTPStatusError as HTTPError
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
+from weave.durability.wal_manager import WALManager
 from weave.shared.digest import (
+    compute_file_digest,
     compute_object_digest,
     compute_row_digest,
     compute_table_digest,
@@ -88,6 +90,7 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
+from weave.trace.urls import redirect_call
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.wandb_run_context import (
@@ -382,8 +385,40 @@ class WeaveClient:
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
+        self._wal: WALManager | None = None
+        self._wal_pending_call_ids: set[str] = set()
+        if settings.should_enable_wal():
+            if settings.should_disable_wal_sender():
+                self._wal = WALManager(self.entity, self.project)
+                logger.debug("WAL enabled (sender disabled): %s", self._wal.wal_dir)
+            else:
+                self._wal = WALManager.with_sender(
+                    self.entity,
+                    self.project,
+                    self.server,
+                    on_send=self._on_wal_send,
+                )
+                logger.debug("WAL enabled: %s", self._wal.wal_dir)
+
         # No-op when the feature flag is off (returns immediately).
         self._warm_project_id_resolver()
+
+    def _on_wal_send(self, record_type: str, record: dict) -> None:
+        """Callback fired by the WAL sender after a record reaches the server."""
+        if record_type != "call_start" or not should_print_call_link():
+            return
+        try:
+            start = record.get("req", {}).get("start", {})
+            call_id = start.get("id", "")
+            if call_id not in self._wal_pending_call_ids:
+                return  # not our call or already printed
+            self._wal_pending_call_ids.discard(call_id)
+            project_id = start.get("project_id", "")
+            entity, project = from_project_id(project_id)
+            url = redirect_call(entity, project, call_id)
+            logger.info("%s %s", TRACE_CALL_EMOJI, url)
+        except Exception:
+            pass
 
     ################ High Level Convenience Methods ################
 
@@ -566,6 +601,7 @@ class WeaveClient:
         include_feedback: bool = False,
         include_storage_size: bool = False,
         include_total_storage_size: bool = False,
+        include_usernames: bool = False,
         columns: list[str] | None = None,
         expand_columns: list[str] | None = None,
         return_expanded_column_values: bool = True,
@@ -590,6 +626,7 @@ class WeaveClient:
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
             `include_storage_size`: If True, includes the storage size for a call.
             `include_total_storage_size`: If True, includes the total storage size for a trace.
+            `include_usernames`: If True, attempts to resolve each call's `wb_user_id` to a `wb_username`.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
@@ -626,6 +663,7 @@ class WeaveClient:
             include_feedback=include_feedback,
             include_storage_size=include_storage_size,
             include_total_storage_size=include_total_storage_size,
+            include_usernames=include_usernames,
             columns=columns,
             expand_columns=expand_columns,
             return_expanded_column_values=return_expanded_column_values,
@@ -853,18 +891,24 @@ class WeaveClient:
                     MAX_TRACE_PAYLOAD_SIZE,
                 )
 
-            # eager_call_start is a client-side hint that tells the batch processor
-            # to send this call's start immediately (for long-running ops like evals)
-            # Ugly that we have to reach down to the processor level here, but otherwise
-            # we need to change the interface itself.
-            call_processor = _get_call_processor(self.server)
-            if call_processor is not None:
-                eager = op.eager_call_start
-                call_processor.enqueue_start(
-                    StartBatchItem(req=call_start_req), eager_call_start=eager
-                )
+            # WAL path: persist to disk; the sender replays to the server.
+            if self._wal is not None:
+                self._wal.write("call_start", call_start_req)
+                if not current_call:  # root call
+                    self._wal_pending_call_ids.add(call_id)
             else:
-                self.server.call_start(call_start_req)
+                # eager_call_start is a client-side hint that tells the batch processor
+                # to send this call's start immediately (for long-running ops like evals)
+                # Ugly that we have to reach down to the processor level here, but otherwise
+                # we need to change the interface itself.
+                call_processor = _get_call_processor(self.server)
+                if call_processor is not None:
+                    eager = op.eager_call_start
+                    call_processor.enqueue_start(
+                        StartBatchItem(req=call_start_req), eager_call_start=eager
+                    )
+                else:
+                    self.server.call_start(call_start_req)
 
             return True
 
@@ -877,6 +921,7 @@ class WeaveClient:
                     root_call_did_not_error
                     and should_print_call_link_
                     and not uses_calls_complete_path
+                    and self._wal is None
                 ):
                     print_call_link(call)
             except Exception:
@@ -1036,7 +1081,11 @@ class WeaveClient:
                     bytes_size,
                     MAX_TRACE_PAYLOAD_SIZE,
                 )
-            self.server.call_end(call_end_req)
+            # WAL path: persist to disk; the sender replays to the server.
+            if self._wal is not None:
+                self._wal.write("call_end", call_end_req)
+            else:
+                self.server.call_end(call_end_req)
 
         # For calls_complete path (non-eager CallBatchProcessor), print the call link
         # after finish_call, when the complete call is queued to the batch processor.
@@ -1052,6 +1101,7 @@ class WeaveClient:
                     is_root_call
                     and uses_calls_complete_path
                     and should_print_call_link()
+                    and self._wal is None
                 ):
                     print_call_link(call)
             except Exception:
@@ -2007,6 +2057,34 @@ class WeaveClient:
                 ) as e:
                     logger.debug("Skipping client-side digest for obj %r: %s", name, e)
 
+            # WAL path: persist to disk; the background sender will replay
+            # to the server asynchronously.  Compute digest locally using
+            # internal refs so it matches the server-computed digest.
+            if self._wal is not None:
+                if expected_digest is not None:
+                    local_digest = expected_digest
+                else:
+                    try:
+                        internal_val = self._convert_refs_to_internal(json_val)
+                        local_digest = compute_object_digest(internal_val)
+                    except (
+                        NoInternalProjectIDError,
+                        CrossProjectRefError,
+                        InvalidExternalRef,
+                    ):
+                        local_digest = compute_object_digest(json_val)
+                req = ObjCreateReq(
+                    obj=ObjSchemaForInsert(
+                        project_id=self.entity + "/" + self.project,
+                        object_id=name,
+                        val=json_val,
+                    )
+                )
+                self._wal.write("obj_create", req)
+                return ObjCreateRes(digest=local_digest)
+
+            # Standard path: send directly to the trace server and get
+            # back a server-computed digest.
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
@@ -2074,6 +2152,20 @@ class WeaveClient:
             ) as e:
                 logger.debug("Skipping client-side digest for table: %s", e)
 
+        # WAL path: persist to disk; digest computed locally.
+        if self._wal is not None:
+            row_digests = [compute_row_digest(row) for row in json_rows]
+            local_digest = expected_digest or compute_table_digest(row_digests)
+            req = TableCreateReq(
+                table=TableSchemaForInsert(
+                    project_id=self._project_id(),
+                    rows=json_rows,
+                )
+            )
+            self._wal.write("table_create", req)
+            return TableCreateRes(digest=local_digest, row_digests=row_digests)
+
+        # Standard path: send directly to the trace server.
         req = TableCreateReq(
             table=TableSchemaForInsert(
                 project_id=self._project_id(),
@@ -2135,6 +2227,12 @@ class WeaveClient:
 
     def _should_use_chunking(self, table: Table | WeaveTable) -> ChunkingConfig:
         """Determine if we should use chunking and parallel chunks for a table."""
+        # WAL path writes the full table to disk as a single record.
+        # Chunking requires follow-up server calls (table_create_from_digests,
+        # table_update) that reference data the server hasn't received yet.
+        if self._wal is not None:
+            return ChunkingConfig(use_chunking=False, use_parallel_chunks=False)
+
         remote_request_bytes_limit = getattr(
             self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
         )
@@ -2359,6 +2457,16 @@ class WeaveClient:
         if cached_res:
             return cached_res
 
+        # WAL path: persist to disk; return a resolved future immediately.
+        if self._wal is not None:
+            digest = req.expected_digest or compute_file_digest(req.content)
+            self._wal.write("file_create", req)
+            f: Future[FileCreateRes] = Future()
+            f.set_result(FileCreateRes(digest=digest))
+            self.send_file_cache.put(req, f)
+            return f
+
+        # Standard path: send directly to the trace server.
         def file_create_with_fallback() -> FileCreateRes:
             try:
                 return self.server.file_create(req)
@@ -2438,6 +2546,12 @@ class WeaveClient:
             self._flush_with_callback(callback=callback)
         else:
             self._flush()
+
+        # Close the WAL (stops the background sender thread) so that
+        # re-calling weave.init() doesn't leak orphaned threads.
+        if self._wal is not None:
+            self._wal.close()
+            self._wal = None
 
     def flush(self) -> None:
         """Flushes background asynchronous tasks, safe to call multiple times."""
@@ -2548,6 +2662,8 @@ class WeaveClient:
             self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
             # Restart feedback processor processing thread after flushing
             self._server_feedback_processor.accept_new_work()
+        if self._wal is not None:
+            self._wal.flush()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.

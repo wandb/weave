@@ -242,6 +242,30 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_ENABLE_CLIENT_SIDE_DIGESTS`
     """
 
+    enable_wal: bool = False
+    """
+    Toggles the Write-Ahead Log (WAL) for durable request persistence.
+
+    If True, all requests to the trace server are written to a local JSONL
+    WAL file before being sent.  This makes requests durable across process
+    crashes — a background consumer can replay unflushed records on restart.
+
+    If False (default), requests are only held in memory before sending.
+
+    Can be overridden with the environment variable `WEAVE_ENABLE_WAL`
+    """
+
+    disable_wal_sender: bool = False
+    """
+    Disables the background WAL sender thread.
+
+    When True and WAL is enabled, records are written to disk but never
+    drained automatically.  Useful for testing the WAL write path in
+    isolation or for scenarios where a separate process handles draining.
+
+    Can be overridden with the environment variable `WEAVE_DISABLE_WAL_SENDER`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -384,6 +408,16 @@ def should_use_calls_complete() -> bool:
 def should_enable_client_side_digests() -> bool:
     """Returns whether client-side digest computation should be used."""
     return _should("enable_client_side_digests")
+
+
+def should_enable_wal() -> bool:
+    """Returns whether the Write-Ahead Log should be used."""
+    return _should("enable_wal")
+
+
+def should_disable_wal_sender() -> bool:
+    """Returns whether the WAL sender thread should be disabled."""
+    return _should("disable_wal_sender")
 
 
 def parse_and_apply_settings(
