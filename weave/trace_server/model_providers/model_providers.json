@@ -2875,6 +2875,10 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "gpt-4-0314": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-4-0613": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -3222,6 +3226,14 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-5.4-pro-2026-03-05": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5.4-mini": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5.4-nano": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
