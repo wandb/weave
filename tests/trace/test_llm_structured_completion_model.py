@@ -1,5 +1,5 @@
 import json
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -13,6 +13,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
     LLMStructuredCompletionModelDefaultParams,
     Message,
     _prepare_llm_messages,
+    cast_to_llm_structured_model_params,
     cast_to_message,
     cast_to_message_list,
     parse_params_to_litellm_params,
@@ -782,3 +783,33 @@ def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
             }
         )
     )
+
+
+def test_cast_to_llm_structured_model_params_handles_weave_object():
+    """Regression: default_params passed as a WeaveObject should be cast correctly."""
+    from weave.trace.object_record import ObjectRecord
+    from weave.trace.vals import WeaveObject
+
+    record = ObjectRecord(
+        {
+            "_class_name": "LLMStructuredCompletionModelDefaultParams",
+            "_bases": [],
+            "response_format": "json_object",
+            "temperature": 0.5,
+            "top_p": None,
+            "max_tokens": None,
+            "presence_penalty": None,
+            "frequency_penalty": None,
+            "stop": None,
+            "n_times": None,
+            "functions": None,
+            "messages_template": None,
+            "prompt": None,
+        }
+    )
+    weave_obj = WeaveObject(record, ref=None, server=MagicMock(), root=None)
+
+    result = cast_to_llm_structured_model_params(weave_obj)
+    assert isinstance(result, LLMStructuredCompletionModelDefaultParams)
+    assert result.response_format == "json_object"
+    assert result.temperature == 0.5
