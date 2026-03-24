@@ -79,8 +79,6 @@ def extract_eval_root_metadata_from_calls(
     return metadata
 
 
-
-
 def filter_predict_and_score_calls(
     calls: Iterable[tsi.CallSchema],
     eval_root_ids: list[str],
