@@ -96,6 +96,13 @@ DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 # Constants for table naming conventions
 VIEW_SUFFIX = "_view"
 
+# Schema for the migration tracking table (shared across all migrator variants)
+_MIGRATIONS_TABLE_COLUMNS = """
+    db_name String,
+    curr_version UInt64,
+    partially_applied_version UInt64 NULL,
+"""
+
 # Tables that use ID-based sharding (sipHash64(field)) instead of random sharding
 # in distributed mode. Maps table name to the field used for sharding.
 # calls_complete: shard key is configurable via WF_CLICKHOUSE_CALLS_SHARD_KEY env var
@@ -431,11 +438,7 @@ class CloudClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator):
         """Generate SQL to create the management table in cloud mode."""
         return f"""
             CREATE TABLE IF NOT EXISTS {self.management_db}.migrations
-            (
-                db_name String,
-                curr_version UInt64,
-                partially_applied_version UInt64 NULL,
-            )
+            ({_MIGRATIONS_TABLE_COLUMNS})
             ENGINE = MergeTree()
             ORDER BY (db_name)
         """
@@ -539,11 +542,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         """Generate SQL to create the management table in replicated mode."""
         create_table_sql = f"""
             CREATE TABLE IF NOT EXISTS {self.management_db}.migrations
-            (
-                db_name String,
-                curr_version UInt64,
-                partially_applied_version UInt64 NULL,
-            )
+            ({_MIGRATIONS_TABLE_COLUMNS})
             ENGINE = MergeTree()
             ORDER BY (db_name)
         """
@@ -706,21 +705,45 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             post_migration_hook=post_migration_hook,
         )
 
+    def _create_db_sql(self, db_name: str) -> str:
+        """Generate SQL to create a database in distributed mode.
+
+        The management database uses ENGINE = Atomic (not Replicated) so that the
+        migrations table can use explicit ReplicatedMergeTree with a shared ZK path
+        across all shards. Data databases still use ENGINE = Replicated.
+        """
+        if db_name == self.management_db:
+            if not self._is_safe_identifier(db_name):
+                raise MigrationError(f"Invalid database name: {db_name}")
+            return (
+                f"CREATE DATABASE IF NOT EXISTS {db_name}"
+                f" ON CLUSTER {self.replicated_cluster}"
+                f" ENGINE = Atomic"
+            )
+        return super()._create_db_sql(db_name)
+
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in distributed mode.
 
-        Unlike data tables (which use {shard} in the ZK path to separate data per shard),
-        the management table uses a shared path so all nodes replicate the same state.
-        We use {shard}-{replica} for the replica ID since {replica} alone repeats across shards.
+        If the management DB uses Replicated engine, use MergeTree() (auto-converted
+        by the DB engine) and skip ON CLUSTER. Otherwise, use explicit
+        ReplicatedMergeTree with a shared ZK path so all shards share migration state.
         """
-        on_cluster = self._get_on_cluster_clause(self.management_db)
+        if self._uses_replicated_db_engine(self.management_db):
+            # Legacy path: existing deployments where db_management was created with
+            # ENGINE = Replicated. Migration state is tracked per-shard, not shared.
+            # This is safe only because the migrator runs from a single node. Do not
+            # change this assumption without migrating db_management to Atomic first.
+            return f"""
+                CREATE TABLE IF NOT EXISTS {self.management_db}.migrations
+                ({_MIGRATIONS_TABLE_COLUMNS})
+                ENGINE = MergeTree()
+                ORDER BY (db_name)
+            """
         return f"""
-            CREATE TABLE IF NOT EXISTS {self.management_db}.migrations{on_cluster}
-            (
-                db_name String,
-                curr_version UInt64,
-                partially_applied_version UInt64 NULL,
-            )
+            CREATE TABLE IF NOT EXISTS {self.management_db}.migrations
+            ON CLUSTER {self.replicated_cluster}
+            ({_MIGRATIONS_TABLE_COLUMNS})
             ENGINE = ReplicatedMergeTree('/clickhouse/tables/shared/{self.management_db}/migrations', '{{shard}}-{{replica}}')
             ORDER BY (db_name)
         """
