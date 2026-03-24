@@ -1335,7 +1335,8 @@ def test_aliases_list_returns_distinct(client: WeaveClient):
     res = client.server.aliases_list(
         tsi.AliasesListReq(project_id=client._project_id())
     )
-    assert res.aliases == ["canary", "production"]
+    # "latest" appears because obj_create now writes an explicit "latest" alias.
+    assert res.aliases == ["canary", "latest", "production"]
 
 
 def test_aliases_list_excludes_removed(client: WeaveClient):
@@ -1369,7 +1370,8 @@ def test_aliases_list_excludes_removed(client: WeaveClient):
     res = client.server.aliases_list(
         tsi.AliasesListReq(project_id=client._project_id())
     )
-    assert res.aliases == ["keep-alias"]
+    # "latest" appears because obj_create now writes an explicit "latest" alias.
+    assert res.aliases == ["keep-alias", "latest"]
 
 
 # --- SDK list_tags / list_aliases ---

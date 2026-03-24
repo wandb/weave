@@ -1680,6 +1680,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._obj_digest_exists_non_deleted(
             req.obj.project_id, req.obj.object_id, digest
         ):
+            # Even on dedup: move "latest" alias to this digest.
+            # This matches Artifacts behavior where re-publish promotes
+            # the version to latest (see Problem 2 design doc).
+            self._insert_aliases(
+                req.obj.project_id,
+                req.obj.object_id,
+                ["latest"],
+                digest,
+                wb_user_id=req.obj.wb_user_id or "",
+            )
             return tsi.ObjCreateRes(
                 digest=digest,
                 object_id=req.obj.object_id,
@@ -1701,6 +1711,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "object_versions",
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
+        )
+
+        # Set "latest" alias on every new version.
+        self._insert_aliases(
+            req.obj.project_id,
+            req.obj.object_id,
+            ["latest"],
+            digest,
+            wb_user_id=req.obj.wb_user_id or "",
         )
 
         return tsi.ObjCreateRes(
@@ -2117,20 +2136,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         object_id: str,
         digest: str,
     ) -> str | None:
-        """If digest looks like an alias name (not a hash, not version-like, not 'latest'),
+        """If digest looks like an alias name (not a hash, not version-like),
         resolve it to the actual digest via the aliases table. Returns None if not an alias.
         """
-        # Return None for digests that are not alias names, so the caller
-        # falls through to normal digest-based lookup.  "latest" and version
-        # patterns (v0, v1, …) are handled by the existing obj_read logic;
-        # content hashes are real digests that don't need resolution.
-        if digest == "latest":
-            return None
+        # Version patterns (v0, v1, …) are handled by the existing obj_read
+        # logic; content hashes are real digests that don't need resolution.
         (is_version, _) = tsc.digest_is_version_like(digest)
         if is_version:
             return None
         if tsc.digest_is_content_hash(digest):
             return None
+        # "latest" is now an explicit alias written on every obj_create.
+        # Resolve it from the aliases table like any other alias.
         query, parameters = make_resolve_alias_query(project_id, object_id, digest)
         result = self._query(query, parameters)
         if result.result_rows:
@@ -2150,12 +2167,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
 
+        # Build a set of object_ids that have an explicit "latest" alias
+        # so we only fall back to computed is_latest for legacy objects.
+        objects_with_explicit_latest: set[str] = set()
+        for (object_id, _digest), aliases in aliases_map.items():
+            if "latest" in aliases:
+                objects_with_explicit_latest.add(object_id)
+
         for obj in objs:
             key = (obj.object_id, obj.digest)
             obj.tags = sorted(tags_map.get(key, []))
             aliases = aliases_map.get(key, [])
-            # "latest" is virtual — synthesized from the is_latest window function
-            if obj.is_latest == 1 and "latest" not in aliases:
+            # Fallback: synthesize "latest" from is_latest for objects
+            # that don't have an explicit "latest" alias (legacy objects
+            # created before the explicit alias write was added).
+            if (
+                obj.is_latest == 1
+                and "latest" not in aliases
+                and obj.object_id not in objects_with_explicit_latest
+            ):
                 aliases = ["latest"] + aliases
             obj.aliases = aliases
 
