@@ -120,7 +120,19 @@ def is_writer_alive(wal_path: str, lock_ext: str = LOCK_EXT) -> bool:
     :class:`~weave.durability.wal_sender.BackgroundWALSender`.
     """
     path = lock_path_for(wal_path, lock_ext)
-    pid = _read_lock_pid(path)
+    try:
+        pid = _read_lock_pid(path)
+    except PermissionError:
+        # On Windows the lock file may be temporarily inaccessible while
+        # another process holds an open handle.  Conservatively assume the
+        # writer is still alive so the sender skips deletion and retries
+        # on the next drain cycle.
+        logger.debug(
+            "Lock file %s is not readable (PermissionError) — "
+            "assuming writer is alive.",
+            path,
+        )
+        return True
     if pid is None:
         return False
     return _is_pid_alive(pid)
