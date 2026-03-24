@@ -77,7 +77,7 @@ trace_server = [
   # BYOB - GCP
   "google-cloud-storage>=2.7.0",
   # LLM Support
-  "litellm>=1.36.1,<1.82.8",
+  "litellm>=1.36.1,<1.82.7",
   # OTEL trace support
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
@@ -431,7 +431,7 @@ trace_server = [
   # BYOB - GCP
   "google-cloud-storage>=2.7.0",
   # LLM Support
-  "litellm>=1.36.1,<1.82.8",
+  "litellm>=1.36.1,<1.82.7",
   # OTEL trace support
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
