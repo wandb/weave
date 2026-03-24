@@ -106,7 +106,7 @@ def cast_to_llm_structured_model_params(
         return LLMStructuredCompletionModelDefaultParams.model_validate(obj)
     elif isinstance(obj, vals.Traceable):
         return LLMStructuredCompletionModelDefaultParams.model_validate(
-            vals.unwrap(obj)
+            vals.unwrap(obj)  # Recursively "unwrap" to a dict with plain python types
         )
 
     raise TypeError("Unable to cast to LLMStructuredCompletionModelDefaultParams")
