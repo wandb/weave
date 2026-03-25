@@ -226,6 +226,21 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 call.wb_user_id = self._idc.int_to_ext_user_id(internal_user_id)
         return res
 
+    def calls_query_stream_for_eval_subtree(
+        self, project_id: str, eval_root_ids: list[str]
+    ) -> Iterator[tsi.CallSchema]:
+        internal_project_id = self._idc.ext_to_int_project_id(project_id)
+        res = self._internal_trace_server.calls_query_stream_for_eval_subtree(
+            internal_project_id, eval_root_ids
+        )
+        for call in res:
+            call.project_id = project_id
+            if call.wb_run_id is not None:
+                call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
+            if call.wb_user_id is not None:
+                call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
+            yield call
+
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)

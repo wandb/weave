@@ -2288,6 +2288,7 @@ def process_children_of_eval_ids_to_sql(
         f" AND ({parent_id_field_sql} IN {eval_root_ids_param}"
         f" OR {parent_id_field_sql} IN ({predict_and_score_subquery})"
         f" OR {parent_null})"
+        f" AND {table_alias}.id NOT IN {eval_root_ids_param}"
     )
 
 
