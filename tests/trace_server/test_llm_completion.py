@@ -452,6 +452,9 @@ class TestLLMCompletionStreaming(unittest.TestCase):
                 "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(
+                self.server.table_routing_resolver, "resolve_v2_write_target"
+            ) as mock_resolve,
+            patch.object(
                 chts.ClickHouseTraceServer, "_insert_call"
             ) as mock_insert_call,
         ):
@@ -459,6 +462,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             mock_stream = MagicMock()
             mock_stream.__iter__.return_value = mock_chunks
             mock_litellm.return_value = mock_stream
+            mock_resolve.return_value = WriteTarget.CALLS_MERGED
 
             # Create test request
             req = tsi.CompletionsCreateReq(
@@ -1509,6 +1513,180 @@ def test_completions_usage_captured_in_summary(
         assert usage["prompt_tokens"] == 10
         assert usage["completion_tokens"] == 5
         assert usage["total_tokens"] == 15
+
+
+@pytest.mark.parametrize(
+    (
+        "write_target",
+        "expect_complete_called",
+        "expect_update_end_called",
+        "expect_insert_call_called",
+    ),
+    [
+        pytest.param(
+            "CALLS_COMPLETE",
+            True,
+            True,
+            False,
+            id="stream_routes_to_calls_complete",
+        ),
+        pytest.param(
+            "CALLS_MERGED",
+            False,
+            False,
+            True,
+            id="stream_routes_to_calls_merged",
+        ),
+    ],
+)
+def test_streaming_completions_write_target_routing(
+    completions_mock_server,
+    completions_secret_fetcher,
+    write_target,
+    expect_complete_called,
+    expect_update_end_called,
+    expect_insert_call_called,
+):
+    """Verify completions_create_stream routes writes to the correct table based on write target."""
+    target = getattr(WriteTarget, write_target)
+
+    mock_chunks = [
+        {
+            "choices": [
+                {"delta": {"content": "Hi"}, "finish_reason": None, "index": 0}
+            ],
+            "id": "test-id",
+            "model": "gpt-3.5-turbo",
+            "created": 1234567890,
+        },
+        {
+            "choices": [{"delta": {}, "finish_reason": "stop", "index": 0}],
+            "id": "test-id",
+            "model": "gpt-3.5-turbo",
+            "created": 1234567890,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11},
+        },
+    ]
+
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+        ) as mock_litellm,
+        patch.object(
+            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
+        ) as mock_resolve,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+        ) as mock_update_end,
+        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+    ):
+        mock_stream = MagicMock()
+        mock_stream.__iter__.return_value = mock_chunks
+        mock_litellm.return_value = mock_stream
+        mock_resolve.return_value = target
+
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say hello"}],
+            ),
+            track_llm_call=True,
+        )
+
+        stream = completions_mock_server.completions_create_stream(req)
+        chunks = list(stream)
+
+        mock_resolve.assert_called_once()
+
+        # First chunk is always the meta chunk with call id
+        assert "_meta" in chunks[0]
+        assert "weave_call_id" in chunks[0]["_meta"]
+
+        assert mock_insert_complete.called == expect_complete_called
+        assert mock_update_end.called == expect_update_end_called
+        assert mock_insert_call.called == expect_insert_call_called
+
+        if expect_complete_called:
+            # Start was written to calls_complete
+            ch_start = mock_insert_complete.call_args[0][0]
+            assert ch_start.op_name == "weave.completions_create"
+            assert ch_start.ended_at is None  # start-only row
+
+            # End was updated via lightweight UPDATE
+            end_call = mock_update_end.call_args[0][0]
+            assert end_call.ended_at is not None
+
+        if expect_insert_call_called:
+            # calls_merged: start + end via _insert_call
+            assert mock_insert_call.call_count == 2
+
+
+@pytest.mark.parametrize(
+    ("write_target", "expect_complete_called", "expect_update_end_called"),
+    [
+        pytest.param("CALLS_COMPLETE", True, True, id="stream_error_calls_complete"),
+        pytest.param("CALLS_MERGED", False, False, id="stream_error_calls_merged"),
+    ],
+)
+def test_streaming_completions_error_routes_correctly(
+    completions_mock_server,
+    completions_secret_fetcher,
+    write_target,
+    expect_complete_called,
+    expect_update_end_called,
+):
+    """Verify streaming errors are captured in both write paths."""
+    target = getattr(WriteTarget, write_target)
+
+    def _error_stream():
+        yield {
+            "choices": [
+                {"delta": {"content": "Hi"}, "finish_reason": None, "index": 0}
+            ],
+            "id": "test-id",
+            "model": "gpt-3.5-turbo",
+            "created": 1234567890,
+        }
+        raise RuntimeError("stream died")
+
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+        ) as mock_litellm,
+        patch.object(
+            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
+        ) as mock_resolve,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+        ) as mock_update_end,
+        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+    ):
+        mock_litellm.return_value = _error_stream()
+        mock_resolve.return_value = target
+
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say hello"}],
+            ),
+            track_llm_call=True,
+        )
+
+        stream = completions_mock_server.completions_create_stream(req)
+        # Consume — the wrapper records end call in finally before re-raising
+        with pytest.raises(RuntimeError, match="stream died"):
+            list(stream)
+
+        assert mock_insert_complete.called == expect_complete_called
+        assert mock_update_end.called == expect_update_end_called
 
 
 if __name__ == "__main__":
