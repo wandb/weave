@@ -3,6 +3,7 @@
 import datetime
 import json
 import logging
+import re
 import sqlite3
 import threading
 from collections.abc import Iterator
@@ -55,7 +56,7 @@ from weave.trace_server.methods.sqlite_feedback_stats import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import quote_json_path
+from weave.trace_server.orm import quote_json_path, quote_json_path_parts
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
@@ -653,6 +654,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 if isinstance(operand, tsi_query.LiteralOperation):
                     return json.dumps(operand.literal_)
                 elif isinstance(operand, tsi_query.GetFieldOperator):
+                    if operand.get_field_.startswith("feedback."):
+                        return _build_feedback_subquery(operand.get_field_)
                     field = _transform_external_calls_field_to_internal_calls_field(
                         operand.get_field_, None
                     )
@@ -845,6 +848,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         if sort_field.startswith("summary."):
                             json_path = sort_field[len("summary.") :]
                             sort_field = "summary"
+                elif sort_field.startswith("feedback."):
+                    sort_field = _build_feedback_subquery(sort_field)
+                    json_path = None
 
                 assert direction in {
                     "ASC",
@@ -4422,3 +4428,63 @@ def _transform_external_calls_field_to_internal_calls_field(
         )
 
     return field
+
+
+def _build_feedback_subquery(field: str) -> str:
+    """Build a SQLite subquery for a feedback field reference.
+
+    Handles fields like:
+      feedback.[*].payload.output.label  (wildcard - search all feedback types)
+      feedback.[wandb.runnable.my_scorer_a].payload.output.label  (specific type)
+    """
+    path = field[len("feedback."):]
+    match = re.match(r"^(\[.+?\])\.(.+)$", path)
+    if not match:
+        raise ValueError(f"Invalid feedback field path: {field}")
+    feedback_type_bracket, rest = match.groups()
+    feedback_type = feedback_type_bracket[1:-1]
+
+    parts = rest.split(".")
+    if parts[0] == "payload":
+        db_column = "payload_dump"
+        extra_parts = parts[1:]
+    elif parts[0] in ("runnable_ref", "trigger_ref"):
+        db_column = parts[0]
+        extra_parts = []
+    else:
+        raise ValueError(f"Invalid feedback field path: {field}")
+
+    if extra_parts:
+        json_path = quote_json_path_parts(extra_parts)
+        # Use a CASE expression to convert SQLite's json_extract results to
+        # string representations matching ClickHouse's JSON_VALUE behavior,
+        # where booleans are returned as "true"/"false" strings.
+        raw = f"json_extract({db_column}, '{json_path}')"
+        value_expr = (
+            f"CASE json_type({db_column}, '{json_path}')"
+            f" WHEN 'true' THEN 'true'"
+            f" WHEN 'false' THEN 'false'"
+            f" ELSE {raw} END"
+        )
+    else:
+        value_expr = db_column
+
+    type_filter = ""
+    if feedback_type != "*":
+        escaped = feedback_type.replace("'", "''")
+        type_filter = f" AND feedback_type = '{escaped}'"
+
+    if feedback_type == "*":
+        # For wildcard, concatenate values from all feedback rows so filters
+        # can search across every entry.
+        return (
+            f"(SELECT GROUP_CONCAT({value_expr}, ',') FROM feedback"
+            f" WHERE feedback.weave_ref = 'weave-trace-internal:///' || calls.project_id || '/call/' || calls.id"
+            f"{type_filter})"
+        )
+    else:
+        return (
+            f"(SELECT {value_expr} FROM feedback"
+            f" WHERE feedback.weave_ref = 'weave-trace-internal:///' || calls.project_id || '/call/' || calls.id"
+            f"{type_filter} LIMIT 1)"
+        )

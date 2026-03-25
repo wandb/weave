@@ -384,10 +384,6 @@ async def populate_feedback(client: WeaveClient) -> None:
 
 @pytest.mark.asyncio
 async def test_sort_by_feedback(client: WeaveClient) -> None:
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        return pytest.skip()
-
     """Test sorting by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
 
@@ -449,10 +445,6 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
 
 @pytest.mark.asyncio
 async def test_filter_by_feedback(client: WeaveClient) -> None:
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        return pytest.skip()
-
     """Test filtering by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
     for field, value, eq_ids, gt_ids in [
@@ -523,11 +515,7 @@ class MatchAnyDatetime:  # noqa: PLW1641
 
 @pytest.mark.asyncio
 async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        return pytest.skip()
-
-    """Test filtering by feedback."""
+    """Test filtering and sorting by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
@@ -568,8 +556,6 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     any() which only checked one arbitrary feedback row, missing matches in other
     feedback entries on the same call.
     """
-    if client_is_sqlite(client):
-        return pytest.skip()
 
     @weave.op
     def my_scorer_a(x: int, output: str) -> dict:
