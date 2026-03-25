@@ -2247,7 +2247,7 @@ def process_children_of_eval_ids_to_sql(
     project_id: str = "",
     read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
-    """Fetch PredictandScore calls and their children (scorers/predict) for given eval root IDs."""
+    """Fetch direct children of eval root IDs and their children for the eval results dataset."""
     if not eval_root_ids:
         return ""
     assert_parameter_length_less_than_max("eval_root_ids", len(eval_root_ids))
@@ -2263,16 +2263,16 @@ def process_children_of_eval_ids_to_sql(
         param_builder.add_param(eval_root_ids), "Array(String)"
     )
 
-    predict_and_score_cq = CallsQuery(project_id=project_id, read_table=read_table)
-    predict_and_score_cq.add_field("id")
-    predict_and_score_cq.set_hardcoded_filter(
+    eval_root_children_cq = CallsQuery(project_id=project_id, read_table=read_table)
+    eval_root_children_cq.add_field("id")
+    eval_root_children_cq.set_hardcoded_filter(
         HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
     )
-    predict_and_score_subquery = predict_and_score_cq.as_sql(param_builder)
+    eval_root_children_subquery = eval_root_children_cq.as_sql(param_builder)
 
     return (
         f" AND ({parent_id_field_sql} IN {eval_root_ids_param}"
-        f" OR {parent_id_field_sql} IN ({predict_and_score_subquery}))"
+        f" OR {parent_id_field_sql} IN ({eval_root_children_subquery}))"
         f" AND {table_alias}.id NOT IN {eval_root_ids_param}"
     )
 

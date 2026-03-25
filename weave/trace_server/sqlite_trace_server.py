@@ -978,7 +978,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             "started_at",
             "ended_at",
         ]
-        predict_and_score_calls = list(
+        eval_root_children = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=project_id,
@@ -988,13 +988,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 )
             )
         )
-        yield from predict_and_score_calls
-        predict_and_score_ids = [c.id for c in predict_and_score_calls]
-        if predict_and_score_ids:
+        yield from eval_root_children
+        eval_root_children_ids = [c.id for c in eval_root_children]
+        if eval_root_children_ids:
             yield from self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=project_id,
-                    filter=tsi.CallsFilter(parent_ids=predict_and_score_ids),
+                    filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
                     columns=columns,
                     sort_by=[tsi.SortBy(field="started_at", direction="asc")],
                 )

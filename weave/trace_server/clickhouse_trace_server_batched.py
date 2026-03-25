@@ -1409,7 +1409,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _calls_query_stream_for_eval_subtree(
         self, project_id: str, eval_root_ids: list[str]
     ) -> Iterator[tsi.CallSchema]:
-        """Fetch PredictandScore calls and their children for the given eval root IDs in one query."""
+        """Fetch direct children of eval root IDs and their children in one query."""
         read_table = self.table_routing_resolver.resolve_read_table(
             project_id, self.ch_client
         )
