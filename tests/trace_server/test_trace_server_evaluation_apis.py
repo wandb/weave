@@ -473,11 +473,13 @@ def test_calls_query_stream_for_eval_subtree_returns_correct_fields(client):
         )
     )
 
-    assert len(calls) > 0
-    for call in calls:
-        assert call.id is not None
-        assert call.op_name is not None
-        assert call.started_at is not None
+    calls_by_id = {c.id: c for c in calls}
+
+    prediction_call = calls_by_id[pred.prediction_id]
+    assert prediction_call.ended_at is not None
+    assert prediction_call.started_at < prediction_call.ended_at
+    assert prediction_call.inputs.get("inputs") == {"q": "what"}
+    assert prediction_call.output == "answer"
 
 
 def test_calls_query_stream_for_eval_subtree_multiple_eval_roots(client):
