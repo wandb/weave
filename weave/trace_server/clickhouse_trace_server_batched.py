@@ -238,7 +238,6 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-
 # Create a shared connection pool manager for all ClickHouse connections
 # maxsize: Maximum connections per pool (set higher than thread count to avoid blocking)
 # num_pools: Number of distinct connection pools (for different hosts/configs)
