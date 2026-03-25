@@ -93,6 +93,15 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, int | str] = {
 }
 
 
+def merge_default_query_settings(
+    overrides: dict[str, int | str] | None = None,
+) -> dict[str, int | str]:
+    """Merge caller-provided settings on top of CLICKHOUSE_DEFAULT_QUERY_SETTINGS."""
+    if not overrides:
+        return CLICKHOUSE_DEFAULT_QUERY_SETTINGS
+    return {**CLICKHOUSE_DEFAULT_QUERY_SETTINGS, **overrides}
+
+
 def update_settings_for_async_insert(
     settings: dict[str, int | str] | None = None,
 ) -> dict[str, int | str]:

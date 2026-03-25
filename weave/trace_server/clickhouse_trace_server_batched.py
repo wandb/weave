@@ -6382,7 +6382,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, int | str] | None = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
-        merged = _merge_ch_settings(settings)
+        merged = ch_settings.merge_default_query_settings(settings)
 
         summary = None
         parameters = _process_parameters(parameters)
@@ -6431,7 +6431,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, int | str] | None = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
-        merged = _merge_ch_settings(settings)
+        merged = ch_settings.merge_default_query_settings(settings)
 
         parameters = _process_parameters(parameters)
         start = time.monotonic()
@@ -6484,7 +6484,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters: Optional dictionary of query parameters.
             settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
-        merged = _merge_ch_settings(settings)
+        merged = ch_settings.merge_default_query_settings(settings)
 
         processed_params = _process_parameters(parameters) if parameters else None
         start = time.monotonic()
@@ -7199,14 +7199,6 @@ def _complete_call_to_ch_insertable(
         wb_run_step=complete_call.wb_run_step,
         wb_run_step_end=complete_call.wb_run_step_end,
     )
-
-
-def _merge_ch_settings(
-    overrides: dict[str, int | str] | None = None,
-) -> dict[str, int | str]:
-    if not overrides:
-        return ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS
-    return {**ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS, **overrides}
 
 
 def _process_parameters(
