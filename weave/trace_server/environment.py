@@ -232,6 +232,19 @@ def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
         return 100
 
 
+def wf_clickhouse_disable_lightweight_update() -> bool:
+    """Disable ClickHouse lightweight UPDATE/DELETE support.
+
+    Set to 'true' for old ClickHouse versions that do not support the
+    allow_experimental_lightweight_update setting. When disabled, endpoints
+    that rely on lightweight updates will return a 502 error.
+    """
+    return (
+        os.environ.get("WF_CLICKHOUSE_DISABLE_LIGHTWEIGHT_UPDATE", "false").lower()
+        == "true"
+    )
+
+
 def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
     """The maximum async insert busy timeout in milliseconds for ClickHouse.
 

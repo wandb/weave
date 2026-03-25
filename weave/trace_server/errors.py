@@ -296,9 +296,11 @@ class ErrorRegistry:
         self.register(InsertTooLarge, 413)
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
 
+        # 501
+        self.register(LightweightUpdateNotAllowedError, 501)
+
         # 502
         self.register(QueryMemoryLimitExceededError, 502)
-        self.register(LightweightUpdateNotAllowedError, 502)
 
         # 504
         self.register(QueryTimeoutExceededError, 504)
