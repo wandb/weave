@@ -10,7 +10,7 @@ refs_read_batch.
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any, TypeVar
 
 from weave.shared import refs_internal as ri
@@ -381,16 +381,16 @@ def resolve_eval_row_refs(
 
 @_trace_wrap("eval_results_helpers.eval_results_grouped_rows")
 def eval_results_grouped_rows(
-    server: tsi.TraceServerInterface, req: tsi.EvalResultsQueryReq
+    server: tsi.TraceServerInterface,
+    req: tsi.EvalResultsQueryReq,
+    fetch_subtree_calls: Callable[[str, list[str]], Iterator[tsi.CallSchema]],
 ) -> tuple[list[tsi.EvalResultsRow], int, list[str]]:
     """Build grouped eval rows before pagination. Performs DB access via server."""
     eval_root_ids = resolve_eval_root_ids(req)
     if not eval_root_ids:
         return [], 0, []
 
-    all_calls = list(
-        server.calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
-    )
+    all_calls = list(fetch_subtree_calls(req.project_id, eval_root_ids))
     predict_and_score_calls = filter_predict_and_score_calls(all_calls, eval_root_ids)
     if not predict_and_score_calls:
         return [], 0, []
@@ -437,7 +437,9 @@ def fetch_eval_root_metadata(
 
 @_trace_wrap("eval_results_helpers.eval_results_query")
 def eval_results_query(
-    server: tsi.TraceServerInterface, req: tsi.EvalResultsQueryReq
+    server: tsi.TraceServerInterface,
+    req: tsi.EvalResultsQueryReq,
+    fetch_subtree_calls: Callable[[str, list[str]], Iterator[tsi.CallSchema]],
 ) -> tsi.EvalResultsQueryRes:
     """Return grouped prediction/trial/score data for evaluation results."""
     eval_root_ids = resolve_eval_root_ids(req)
@@ -460,7 +462,9 @@ def eval_results_query(
         limit=None,
         offset=0,
     )
-    all_rows, _, warnings = eval_results_grouped_rows(server, all_rows_req)
+    all_rows, _, warnings = eval_results_grouped_rows(
+        server, all_rows_req, fetch_subtree_calls
+    )
 
     rows: list[tsi.EvalResultsRow] = []
     total_rows = 0

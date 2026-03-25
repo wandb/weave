@@ -964,7 +964,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
 
-    def calls_query_stream_for_eval_subtree(
+    def _calls_query_stream_for_eval_subtree(
         self, project_id: str, eval_root_ids: list[str]
     ) -> Iterator[tsi.CallSchema]:
         columns = [
@@ -978,7 +978,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             "started_at",
             "ended_at",
         ]
-        pas_calls = list(
+        predict_and_score_calls = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=project_id,
@@ -988,13 +988,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 )
             )
         )
-        yield from pas_calls
-        pas_ids = [c.id for c in pas_calls]
-        if pas_ids:
+        yield from predict_and_score_calls
+        predict_and_score_ids = [c.id for c in predict_and_score_calls]
+        if predict_and_score_ids:
             yield from self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=project_id,
-                    filter=tsi.CallsFilter(parent_ids=pas_ids),
+                    filter=tsi.CallsFilter(parent_ids=predict_and_score_ids),
                     columns=columns,
                     sort_by=[tsi.SortBy(field="started_at", direction="asc")],
                 )

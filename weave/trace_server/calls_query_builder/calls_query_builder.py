@@ -2278,7 +2278,7 @@ def process_children_of_eval_ids_to_sql(
 
     predict_and_score_subquery = (
         f"SELECT id FROM calls_merged "
-        f"WHERE project_id = {project_id_param} "
+        f"PREWHERE project_id = {project_id_param} "
         f"AND parent_id IN {eval_root_ids_param} "
         f"AND op_name LIKE {pas_op_name_param} "
         f"GROUP BY project_id, id"

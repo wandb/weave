@@ -1372,12 +1372,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if expand_columns:
             set_current_span_dd_tags({"expand_columns": "true"})
 
+        def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
+            return _ch_call_dict_to_call_schema_dict(
+                dict(zip(select_columns, row, strict=False))
+            )
+
         try:
             if not expand_columns and not include_feedback:
                 for row in raw_res:
-                    yield tsi.CallSchema.model_validate(
-                        _ch_row_to_call_schema_dict(row, select_columns)
-                    )
+                    yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
                 return
 
             ref_cache = LRUCache(max_size=1000)
@@ -1388,9 +1391,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
             for batch in batch_processor.make_batches(raw_res):
-                call_dicts = [
-                    _ch_row_to_call_schema_dict(row, select_columns) for row in batch
-                ]
+                call_dicts = [row_to_call_schema_dict(row) for row in batch]
                 if expand_columns and req.return_expanded_column_values:
                     self._expand_call_refs(
                         req.project_id, call_dicts, expand_columns, ref_cache
@@ -1405,7 +1406,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if hasattr(raw_res, "close"):
                 raw_res.close()
 
-    def calls_query_stream_for_eval_subtree(
+    def _calls_query_stream_for_eval_subtree(
         self, project_id: str, eval_root_ids: list[str]
     ) -> Iterator[tsi.CallSchema]:
         """Fetch PredictandScore calls and their children for the given eval root IDs in one query."""
@@ -1442,7 +1443,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         try:
             for row in raw_res:
                 yield tsi.CallSchema.model_validate(
-                    _ch_row_to_call_schema_dict(row, select_columns)
+                    _ch_call_dict_to_call_schema_dict(
+                        dict(zip(select_columns, row, strict=False))
+                    )
                 )
         finally:
             if hasattr(raw_res, "close"):
@@ -5052,7 +5055,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         """Return grouped prediction/trial/score data for evaluation results."""
-        return eval_helpers.eval_results_query(self, req)
+        return eval_helpers.eval_results_query(
+            self, req, self._calls_query_stream_for_eval_subtree
+        )
 
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
@@ -6863,13 +6868,6 @@ def _nullable_any_dump_to_any(
 ) -> Any | None:
     return _any_dump_to_any(val) if val else None
 
-
-def _ch_row_to_call_schema_dict(
-    row: tuple[Any, ...], select_columns: list[str]
-) -> dict:
-    return _ch_call_dict_to_call_schema_dict(
-        dict(zip(select_columns, row, strict=False))
-    )
 
 
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
