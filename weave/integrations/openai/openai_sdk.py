@@ -8,6 +8,8 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+import httpx
+
 # Do not import this module directly, it should only be invoked
 from openai._legacy_response import LegacyAPIResponse
 from openai._response import APIResponse
@@ -59,9 +61,8 @@ def maybe_unwrap_api_response(value: Any) -> Any:
 
         if isinstance(value, APIResponse):
             maybe_value = value.parse()
-    except Exception:
-        # Streaming responses may not have their body read yet
-        # (httpx.ResponseNotRead). Return the original value.
+    except httpx.ResponseNotRead:
+        # Streaming responses may not have their body read yet.
         return value
 
     if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
