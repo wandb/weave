@@ -66,9 +66,7 @@ class TestUpdateCosts(unittest.TestCase):
         }
         mock_get.return_value = mock_response
         frozen_time = datetime(2025, 1, 1, 12, 0, 0)
-        with patch(
-            "weave.trace_server.costs.update_costs.datetime"
-        ) as mock_datetime:
+        with patch("weave.trace_server.costs.update_costs.datetime") as mock_datetime:
             mock_datetime.now.return_value = frozen_time
             mock_datetime.side_effect = datetime
             costs = fetch_new_costs()
