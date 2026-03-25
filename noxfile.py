@@ -65,6 +65,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
+    "trace_server_migrator",
     "openai_realtime",
     "autogen_tests",
     "verifiers_test",
@@ -85,6 +86,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "flow",
         "trace_server",
         "trace_server_bindings",
+        "trace_server_migrator",
         "anthropic",
         "cerebras",
         "cohere",
@@ -136,8 +138,8 @@ def tests(session: nox.Session, shard: str):
         sync_args.extend(["--extra", shard])
     elif shard in {"autogen_tests", "verifiers_test", "pandas_test"}:
         sync_args.extend(["--group", shard])
-    elif shard == "trace_server":
-        # trace_server shard needs both trace_server dependency group and trace_server_tests
+    elif shard in {"trace_server", "trace_server_migrator"}:
+        # trace_server shards need both trace_server dependency group and trace_server_tests
         sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
 
     session.run(*sync_args)
@@ -179,6 +181,7 @@ def tests(session: nox.Session, shard: str):
         "flow": ["tests/flow/"],
         "trace_server": ["tests/trace_server/", "tests/shared/"],
         "trace_server_bindings": ["tests/trace_server_bindings/"],
+        "trace_server_migrator": ["tests/trace_server_migrator/"],
         "stainless": ["tests/trace_server_bindings/"],
         "scorers": ["tests/scorers/"],
         "autogen_tests": ["tests/integrations/autogen/"],
