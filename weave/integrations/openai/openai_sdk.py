@@ -53,11 +53,16 @@ def maybe_unwrap_api_response(value: Any) -> Any:
     """
     maybe_value: Any = None
 
-    if isinstance(value, LegacyAPIResponse):
-        maybe_value = value.parse()
+    try:
+        if isinstance(value, LegacyAPIResponse):
+            maybe_value = value.parse()
 
-    if isinstance(value, APIResponse):
-        maybe_value = value.parse()
+        if isinstance(value, APIResponse):
+            maybe_value = value.parse()
+    except Exception:
+        # Streaming responses may not have their body read yet
+        # (httpx.ResponseNotRead). Return the original value.
+        return value
 
     if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
         return maybe_value
