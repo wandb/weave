@@ -1749,6 +1749,27 @@ ALLOWED_CALL_FIELDS = {
         join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
     ),
     "otel_dump": CallsMergedAggField(field="otel_dump", agg_fn="any"),
+    # GenAI typed columns (calls_complete only)
+    "operation_name": CallsMergedAggField(field="operation_name", agg_fn="any"),
+    "provider_name": CallsMergedAggField(field="provider_name", agg_fn="any"),
+    "request_model": CallsMergedAggField(field="request_model", agg_fn="any"),
+    "response_model": CallsMergedAggField(field="response_model", agg_fn="any"),
+    "response_id": CallsMergedAggField(field="response_id", agg_fn="any"),
+    "input_tokens": CallsMergedAggField(field="input_tokens", agg_fn="any"),
+    "output_tokens": CallsMergedAggField(field="output_tokens", agg_fn="any"),
+    "total_tokens": CallsMergedAggField(field="total_tokens", agg_fn="any"),
+    "reasoning_tokens": CallsMergedAggField(field="reasoning_tokens", agg_fn="any"),
+    "request_temperature": CallsMergedAggField(field="request_temperature", agg_fn="any"),
+    "request_max_tokens": CallsMergedAggField(field="request_max_tokens", agg_fn="any"),
+    "request_top_p": CallsMergedAggField(field="request_top_p", agg_fn="any"),
+    "conversation_id": CallsMergedAggField(field="conversation_id", agg_fn="any"),
+    "agent_name": CallsMergedAggField(field="agent_name", agg_fn="any"),
+    "tool_name": CallsMergedAggField(field="tool_name", agg_fn="any"),
+    "input_messages": CallsMergedAggField(field="input_messages", agg_fn="any"),
+    "output_messages": CallsMergedAggField(field="output_messages", agg_fn="any"),
+    "finish_reasons": CallsMergedAggField(field="finish_reasons", agg_fn="any"),
+    "system_instructions": CallsMergedAggField(field="system_instructions", agg_fn="any"),
+    "tool_call_arguments": CallsMergedAggField(field="tool_call_arguments", agg_fn="any"),
 }
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
@@ -2560,6 +2581,39 @@ def process_calls_filter_to_conditions(
     if filter.wb_run_ids:
         conditions.append(
             f"{get_field_sql('wb_run_id')} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
+        )
+
+    # GenAI typed column filters (calls_complete only — these columns don't
+    # exist on calls_merged so they are only effective when read_table is
+    # CALLS_COMPLETE).
+    if filter.request_models:
+        assert_parameter_length_less_than_max("request_models", len(filter.request_models))
+        conditions.append(
+            f"{table_alias}.request_model IN {param_slot(param_builder.add_param(filter.request_models), 'Array(String)')}"
+        )
+
+    if filter.operation_names:
+        assert_parameter_length_less_than_max("operation_names", len(filter.operation_names))
+        conditions.append(
+            f"{table_alias}.operation_name IN {param_slot(param_builder.add_param(filter.operation_names), 'Array(String)')}"
+        )
+
+    if filter.provider_names:
+        assert_parameter_length_less_than_max("provider_names", len(filter.provider_names))
+        conditions.append(
+            f"{table_alias}.provider_name IN {param_slot(param_builder.add_param(filter.provider_names), 'Array(String)')}"
+        )
+
+    if filter.conversation_ids:
+        assert_parameter_length_less_than_max("conversation_ids", len(filter.conversation_ids))
+        conditions.append(
+            f"{table_alias}.conversation_id IN {param_slot(param_builder.add_param(filter.conversation_ids), 'Array(String)')}"
+        )
+
+    if filter.agent_names:
+        assert_parameter_length_less_than_max("agent_names", len(filter.agent_names))
+        conditions.append(
+            f"{table_alias}.agent_name IN {param_slot(param_builder.add_param(filter.agent_names), 'Array(String)')}"
         )
 
     return conditions

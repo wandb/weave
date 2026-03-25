@@ -52,6 +52,53 @@ class CallWBMetadataCHMixin(BaseModel):
     _wb_run_step_v = field_validator("wb_run_step")(validation.wb_run_step_validator)
 
 
+class GenAIColumnsCHMixin(BaseModel):
+    """Mixin for typed GenAI columns on calls_complete.
+
+    These columns are populated at ingest time from OTel span attributes or
+    by extracting structured fields from SDK call dumps for known integrations.
+    All fields default to empty/zero so they are safe to omit for non-GenAI calls.
+    """
+
+    # Classification
+    operation_name: str = ""
+    provider_name: str = ""
+
+    # Model info
+    request_model: str = ""
+    response_model: str = ""
+    response_id: str = ""
+
+    # Token usage
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    reasoning_tokens: int = 0
+
+    # Request parameters
+    request_temperature: float = 0.0
+    request_max_tokens: int = 0
+    request_top_p: float = 0.0
+
+    # Session / conversation
+    conversation_id: str = ""
+
+    # Agent info
+    agent_name: str = ""
+
+    # Tool info
+    tool_name: str = ""
+
+    # Normalized messages
+    input_messages: list[tuple[str, str, str, str]] = Field(default_factory=list)
+    output_messages: list[tuple[str, str, str, str]] = Field(default_factory=list)
+
+    # Additional metadata
+    finish_reasons: list[str] = Field(default_factory=list)
+    system_instructions: list[str] = Field(default_factory=list)
+    tool_call_arguments: str = ""
+
+
 # =============================================================================
 # Call Insert Schemas
 # =============================================================================
@@ -105,7 +152,10 @@ class CallUpdateCHInsertable(CallBaseCHInsertable):
 
 
 class CallCompleteCHInsertable(
-    CallBaseCHInsertable, CallTraceMetadataCHMixin, CallWBMetadataCHMixin
+    CallBaseCHInsertable,
+    CallTraceMetadataCHMixin,
+    CallWBMetadataCHMixin,
+    GenAIColumnsCHMixin,
 ):
     """Schema for inserting a complete call directly into the calls_complete table.
 
@@ -171,6 +221,28 @@ class SelectableCHCallSchema(BaseModel):
     wb_run_step_end: int | None = None
 
     deleted_at: datetime.datetime | None = None
+
+    # GenAI typed columns (empty/zero when not populated)
+    operation_name: str = ""
+    provider_name: str = ""
+    request_model: str = ""
+    response_model: str = ""
+    response_id: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    reasoning_tokens: int = 0
+    request_temperature: float = 0.0
+    request_max_tokens: int = 0
+    request_top_p: float = 0.0
+    conversation_id: str = ""
+    agent_name: str = ""
+    tool_name: str = ""
+    input_messages: list[tuple[str, str, str, str]] = Field(default_factory=list)
+    output_messages: list[tuple[str, str, str, str]] = Field(default_factory=list)
+    finish_reasons: list[str] = Field(default_factory=list)
+    system_instructions: list[str] = Field(default_factory=list)
+    tool_call_arguments: str = ""
 
 
 class ObjCHInsertable(BaseModel):

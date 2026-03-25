@@ -156,6 +156,18 @@ class CallSchema(BaseModel):
     # Total size of metadata storage for the entire trace
     total_storage_size_bytes: int | None = None
 
+    # GenAI typed columns (populated when available, empty/zero otherwise)
+    operation_name: str | None = Field(default=None, exclude_if=_exclude_if_none)
+    provider_name: str | None = Field(default=None, exclude_if=_exclude_if_none)
+    request_model: str | None = Field(default=None, exclude_if=_exclude_if_none)
+    response_model: str | None = Field(default=None, exclude_if=_exclude_if_none)
+    input_tokens: int | None = Field(default=None, exclude_if=_exclude_if_none)
+    output_tokens: int | None = Field(default=None, exclude_if=_exclude_if_none)
+    total_tokens: int | None = Field(default=None, exclude_if=_exclude_if_none)
+    request_temperature: float | None = Field(default=None, exclude_if=_exclude_if_none)
+    conversation_id: str | None = Field(default=None, exclude_if=_exclude_if_none)
+    agent_name: str | None = Field(default=None, exclude_if=_exclude_if_none)
+
     @field_serializer("attributes", "summary", when_used="unless-none")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
@@ -557,6 +569,13 @@ class CallsFilter(BaseModelStrict):
     trace_roots_only: bool | None = None
     wb_user_ids: list[str] | None = None
     wb_run_ids: list[str] | None = None
+
+    # GenAI typed column filters
+    request_models: list[str] | None = None
+    operation_names: list[str] | None = None
+    provider_names: list[str] | None = None
+    conversation_ids: list[str] | None = None
+    agent_names: list[str] | None = None
 
 
 class CallsQueryReq(BaseModelStrict):

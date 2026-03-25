@@ -353,7 +353,12 @@ class Span:
             display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
 
         thread_id = wandb_attributes.get("thread_id") or None
-        if thread_id is not None and (wandb_attributes.get("is_turn")):
+        is_turn = wandb_attributes.get("is_turn")
+        # Auto-detect turns for OTel GenAI spans: root spans (no parent) with
+        # a thread_id are conversation turns.
+        if not is_turn and thread_id is not None and self.parent_id is None:
+            is_turn = True
+        if thread_id is not None and is_turn:
             turn_id = self.span_id
         else:
             turn_id = None

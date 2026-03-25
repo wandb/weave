@@ -169,6 +169,11 @@ from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
+from weave.trace_server.genai_call_extraction import extract_genai_from_call
+from weave.trace_server.opentelemetry.genai_fields import (
+    GenAIFields,
+    extract_genai_fields,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
@@ -502,7 +507,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
         calls: list[
-            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+            tuple[
+                tsi.StartedCallSchemaForInsert,
+                tsi.EndedCallSchemaForInsert,
+                GenAIFields,
+            ]
         ] = []
         rejected_spans = 0
         error_messages: list[str] = []
@@ -539,18 +548,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
-                        )
+                    genai = extract_genai_fields(span.attributes, span.name)
+                    start_call, end_call = span.to_call(
+                        req.project_id,
+                        wb_user_id=req.wb_user_id,
+                        wb_run_id=wb_run_id,
                     )
+                    calls.append((start_call, end_call, genai))
 
         set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
 
         obj_id_idx_map = defaultdict(list)
-        for idx, (start_call, _) in enumerate(calls):
+        for idx, (start_call, _, _) in enumerate(calls):
             op_name = object_creation_utils.make_safe_name(start_call.op_name)
             obj_id_idx_map[op_name].append(idx)
 
@@ -610,21 +619,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 end_call.ended_at,
                 False,
             )
-            for _, end_call in calls
+            for _, end_call, _ in calls
         ]
 
         # Convert and insert based on write target
         if write_target == WriteTarget.CALLS_COMPLETE:
             rows = [
                 _ch_complete_call_to_row(
-                    _start_end_calls_to_ch_complete_insertable(start, end)
+                    _start_end_calls_to_ch_complete_insertable(
+                        start, end, genai_fields=genai
+                    )
                 )
-                for start, end in calls
+                for start, end, genai in calls
             ]
             self._insert_call_complete_batch(rows)
         else:
             rows = []
-            for start, end in calls:
+            for start, end, _ in calls:
                 rows.append(
                     _ch_call_to_row(
                         _start_call_for_insert_to_ch_insertable_start_call(start)
@@ -6880,6 +6891,17 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
         "total_storage_size_bytes": ch_call_dict.get("total_storage_size_bytes"),
+        # GenAI typed columns (populated when available)
+        "operation_name": ch_call_dict.get("operation_name") or None,
+        "provider_name": ch_call_dict.get("provider_name") or None,
+        "request_model": ch_call_dict.get("request_model") or None,
+        "response_model": ch_call_dict.get("response_model") or None,
+        "input_tokens": ch_call_dict.get("input_tokens") or None,
+        "output_tokens": ch_call_dict.get("output_tokens") or None,
+        "total_tokens": ch_call_dict.get("total_tokens") or None,
+        "request_temperature": ch_call_dict.get("request_temperature") or None,
+        "conversation_id": ch_call_dict.get("conversation_id") or None,
+        "agent_name": ch_call_dict.get("agent_name") or None,
     }
 
 
@@ -7034,6 +7056,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
 def _start_end_calls_to_ch_complete_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
     end_call: tsi.EndedCallSchemaForInsert,
+    genai_fields: GenAIFields | None = None,
 ) -> CallCompleteCHInsertable:
     """Combine start and end call data into a CallCompleteCHInsertable.
 
@@ -7042,6 +7065,7 @@ def _start_end_calls_to_ch_complete_insertable(
     Args:
         start_call: The start call data.
         end_call: The end call data.
+        genai_fields: Optional extracted GenAI typed column values.
 
     Returns:
         CallCompleteCHInsertable: A complete call ready for insertion.
@@ -7058,6 +7082,31 @@ def _start_end_calls_to_ch_complete_insertable(
     otel_dump_str = None
     if start_call.otel_dump is not None:
         otel_dump_str = _dict_value_to_dump(start_call.otel_dump)
+
+    genai_kwargs: dict[str, Any] = {}
+    if genai_fields is not None:
+        genai_kwargs = {
+            "operation_name": genai_fields.operation_name,
+            "provider_name": genai_fields.provider_name,
+            "request_model": genai_fields.request_model,
+            "response_model": genai_fields.response_model,
+            "response_id": genai_fields.response_id,
+            "input_tokens": genai_fields.input_tokens,
+            "output_tokens": genai_fields.output_tokens,
+            "total_tokens": genai_fields.total_tokens,
+            "reasoning_tokens": genai_fields.reasoning_tokens,
+            "request_temperature": genai_fields.request_temperature,
+            "request_max_tokens": genai_fields.request_max_tokens,
+            "request_top_p": genai_fields.request_top_p,
+            "conversation_id": genai_fields.conversation_id,
+            "agent_name": genai_fields.agent_name,
+            "tool_name": genai_fields.tool_name,
+            "input_messages": genai_fields.input_messages,
+            "output_messages": genai_fields.output_messages,
+            "finish_reasons": genai_fields.finish_reasons,
+            "system_instructions": genai_fields.system_instructions,
+            "tool_call_arguments": genai_fields.tool_call_arguments,
+        }
 
     return CallCompleteCHInsertable(
         project_id=start_call.project_id,
@@ -7082,6 +7131,7 @@ def _start_end_calls_to_ch_complete_insertable(
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
         wb_run_step_end=end_call.wb_run_step_end,
+        **genai_kwargs,
     )
 
 
@@ -7148,6 +7198,38 @@ def _complete_call_to_ch_insertable(
     if complete_call.otel_dump is not None:
         otel_dump_str = _dict_value_to_dump(complete_call.otel_dump)
 
+    inputs_dump = _dict_value_to_dump(inputs)
+    output_dump = _any_value_to_dump(output)
+    summary_dump = _dict_value_to_dump(dict(complete_call.summary))
+
+    genai_kwargs: dict[str, Any] = {}
+    genai = extract_genai_from_call(
+        complete_call.op_name, inputs_dump, output_dump, summary_dump
+    )
+    if genai is not None:
+        genai_kwargs = {
+            "operation_name": genai.operation_name,
+            "provider_name": genai.provider_name,
+            "request_model": genai.request_model,
+            "response_model": genai.response_model,
+            "response_id": genai.response_id,
+            "input_tokens": genai.input_tokens,
+            "output_tokens": genai.output_tokens,
+            "total_tokens": genai.total_tokens,
+            "reasoning_tokens": genai.reasoning_tokens,
+            "request_temperature": genai.request_temperature,
+            "request_max_tokens": genai.request_max_tokens,
+            "request_top_p": genai.request_top_p,
+            "conversation_id": genai.conversation_id,
+            "agent_name": genai.agent_name,
+            "tool_name": genai.tool_name,
+            "input_messages": genai.input_messages,
+            "output_messages": genai.output_messages,
+            "finish_reasons": genai.finish_reasons,
+            "system_instructions": genai.system_instructions,
+            "tool_call_arguments": genai.tool_call_arguments,
+        }
+
     return CallCompleteCHInsertable(
         project_id=complete_call.project_id,
         id=complete_call.id,
@@ -7161,16 +7243,17 @@ def _complete_call_to_ch_insertable(
         ended_at=complete_call.ended_at,
         exception=complete_call.exception,
         attributes_dump=_dict_value_to_dump(complete_call.attributes),
-        inputs_dump=_dict_value_to_dump(inputs),
+        inputs_dump=inputs_dump,
         input_refs=input_refs,
-        output_dump=_any_value_to_dump(output),
-        summary_dump=_dict_value_to_dump(dict(complete_call.summary)),
+        output_dump=output_dump,
+        summary_dump=summary_dump,
         otel_dump=otel_dump_str,
         output_refs=output_refs,
         wb_user_id=complete_call.wb_user_id,
         wb_run_id=complete_call.wb_run_id,
         wb_run_step=complete_call.wb_run_step,
         wb_run_step_end=complete_call.wb_run_step_end,
+        **genai_kwargs,
     )
 
 
