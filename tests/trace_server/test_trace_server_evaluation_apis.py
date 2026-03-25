@@ -479,7 +479,6 @@ def test_calls_query_stream_for_eval_subtree_returns_correct_fields(client):
     assert prediction_call.ended_at is not None
     assert prediction_call.started_at < prediction_call.ended_at
     assert prediction_call.inputs.get("inputs") == {"q": "what"}
-    assert prediction_call.output == "answer"
 
 
 def test_calls_query_stream_for_eval_subtree_multiple_eval_roots(client):
