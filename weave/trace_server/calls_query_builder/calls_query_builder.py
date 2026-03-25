@@ -33,13 +33,12 @@ from typing import Any, Literal, NamedTuple, cast
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
-from weave.shared import refs_internal as ri
 from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     split_exact_and_wildcard_values,
     wildcard_version_value_to_ref_prefix,
 )
-from weave.trace_server import ch_sentinel_values, constants
+from weave.trace_server import ch_sentinel_values
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
@@ -773,8 +772,8 @@ class Condition(BaseModel):
 
 
 class HardCodedFilter(BaseModel):
+    # serves as a sql-generation utility for CallsFilter, and should stay in sync with the CallsFilter class.
     filter: tsi.CallsFilter
-    eval_root_ids: list[str] | None = None
 
     def is_useful(self) -> bool:
         """Returns True if the filter is useful - i.e. it has any non-null fields
@@ -793,7 +792,6 @@ class HardCodedFilter(BaseModel):
                 self.filter.wb_run_ids,
                 self.filter.turn_ids,
                 self.filter.thread_ids is not None,
-                self.eval_root_ids,
             ]
         )
 
@@ -831,6 +829,7 @@ class CallsQuery(BaseModel):
     include_storage_size: bool = False
     include_total_storage_size: bool = False
     read_table: ReadTable = ReadTable.CALLS_MERGED
+    eval_root_ids: list[str] | None = None
 
     @property
     def use_agg_fn(self) -> bool:
@@ -1272,7 +1271,7 @@ class CallsQuery(BaseModel):
             self.hardcoded_filter, pb, table_alias
         )
         children_of_eval_ids = process_children_of_eval_ids_to_sql(
-            self.hardcoded_filter, pb, table_alias, self.project_id
+            self.eval_root_ids, pb, table_alias, self.project_id, self.read_table
         )
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
@@ -2242,16 +2241,15 @@ def process_trace_id_filter_to_sql(
 
 
 def process_children_of_eval_ids_to_sql(
-    hardcoded_filter: HardCodedFilter | None,
+    eval_root_ids: list[str] | None,
     param_builder: ParamBuilder,
     table_alias: str,
     project_id: str = "",
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Fetch PredictandScore calls and their children (scorers/predict) for given eval root IDs."""
-    if hardcoded_filter is None or not hardcoded_filter.eval_root_ids:
+    if not eval_root_ids:
         return ""
-
-    eval_root_ids = hardcoded_filter.eval_root_ids
     assert_parameter_length_less_than_max("eval_root_ids", len(eval_root_ids))
 
     parent_id_field = get_field_by_name("parent_id")
@@ -2261,33 +2259,20 @@ def process_children_of_eval_ids_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
-    pas_op_prefix = (
-        f"{ri.WEAVE_INTERNAL_SCHEME}:///{project_id}/op/"
-        f"{constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME}:%"
-    )
-
     eval_root_ids_param = param_slot(
         param_builder.add_param(eval_root_ids), "Array(String)"
     )
-    project_id_param = param_slot(param_builder.add_param(project_id), "String")
-    pas_op_name_param = param_slot(param_builder.add_param(pas_op_prefix), "String")
 
-    parent_null = parent_id_field.null_check_sql(
-        param_builder, table_alias, ReadTable.CALLS_MERGED, use_agg_fn=False
+    predict_and_score_cq = CallsQuery(project_id=project_id, read_table=read_table)
+    predict_and_score_cq.add_field("id")
+    predict_and_score_cq.set_hardcoded_filter(
+        HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
     )
-
-    predict_and_score_subquery = (
-        f"SELECT id FROM calls_merged "
-        f"PREWHERE project_id = {project_id_param} "
-        f"AND parent_id IN {eval_root_ids_param} "
-        f"AND op_name LIKE {pas_op_name_param} "
-        f"GROUP BY project_id, id"
-    )
+    predict_and_score_subquery = predict_and_score_cq.as_sql(param_builder)
 
     return (
         f" AND ({parent_id_field_sql} IN {eval_root_ids_param}"
-        f" OR {parent_id_field_sql} IN ({predict_and_score_subquery})"
-        f" OR {parent_null})"
+        f" OR {parent_id_field_sql} IN ({predict_and_score_subquery}))"
         f" AND {table_alias}.id NOT IN {eval_root_ids_param}"
     )
 

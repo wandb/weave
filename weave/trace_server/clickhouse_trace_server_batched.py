@@ -1432,9 +1432,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         cq = CallsQuery(project_id=project_id, read_table=read_table)
         for col in columns:
             cq.add_field(col)
-        cq.set_hardcoded_filter(
-            HardCodedFilter(filter=tsi.CallsFilter(), eval_root_ids=eval_root_ids)
-        )
+        cq.eval_root_ids = eval_root_ids
         cq.add_order("started_at", "asc")
         cq.add_order("id", "asc")
         pb = ParamBuilder()
@@ -5055,9 +5053,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         """Return grouped prediction/trial/score data for evaluation results."""
-        return eval_helpers.eval_results_query(
-            self, req, self._calls_query_stream_for_eval_subtree
-        )
+        eval_root_ids = eval_helpers.resolve_eval_root_ids(req)
+        if not eval_root_ids:
+            empty_summary = tsi.EvalResultsSummaryRes() if req.include_summary else None
+            return tsi.EvalResultsQueryRes(
+                rows=[], total_rows=0, summary=empty_summary, warnings=[]
+            )
+        all_calls = list(self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids))
+        return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
 
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
@@ -6867,7 +6870,6 @@ def _nullable_any_dump_to_any(
     val: str | None,
 ) -> Any | None:
     return _any_dump_to_any(val) if val else None
-
 
 
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
