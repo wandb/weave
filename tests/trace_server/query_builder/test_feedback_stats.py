@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import re
 import textwrap
 from unittest.mock import MagicMock
 
@@ -266,9 +267,12 @@ def _make_pb() -> ParamBuilder:
 
 
 def _normalize_sql(sql: str) -> str:
-    return "\n".join(
-        line.rstrip() for line in textwrap.dedent(sql).strip().splitlines()
-    )
+    # Normalize whitespace before closing parens to be resilient to
+    # sqlglot formatting differences across versions.
+    lines = []
+    for line in textwrap.dedent(sql).strip().splitlines():
+        lines.append(re.sub(r"\s+\)", ")", line.rstrip()))
+    return "\n".join(lines)
 
 
 def _assert_sql_equal(actual: str, expected: str) -> None:
@@ -304,7 +308,7 @@ class TestBuildFeedbackStatsQuery:
             WITH all_buckets AS
               (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), toIntervalSecond({pb_4:Int64}), {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
                FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), toIntervalSecond({pb_4:Int64}), {pb_3:String}))) / {pb_4:Float64})))
-               WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+               WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String})),
                  aggregated_data AS
               (SELECT bucket,
                       avgOrNull(m_output_score) AS avg_output_score,
@@ -318,7 +322,7 @@ class TestBuildFeedbackStatsQuery:
                   FROM feedback
                   WHERE project_id = {pb_0:String}
                     AND created_at >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND created_at < toDateTime({pb_2:Float64}, {pb_3:String}) )
+                    AND created_at < toDateTime({pb_2:Float64}, {pb_3:String}))
                GROUP BY bucket)
             SELECT all_buckets.bucket AS timestamp,
                    COALESCE(aggregated_data.avg_output_score, 0) AS avg_output_score,
@@ -377,7 +381,7 @@ class TestBuildFeedbackStatsQuery:
             WITH all_buckets AS
               (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), toIntervalSecond({pb_5:Int64}), {pb_3:String}) + toIntervalSecond(number * {pb_5:Int64}) AS bucket
                FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), toIntervalSecond({pb_5:Int64}), {pb_3:String}))) / {pb_5:Float64})))
-               WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+               WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String})),
                  aggregated_data AS
               (SELECT bucket,
                       avgOrNull(m_output_score) AS avg_output_score,
@@ -392,7 +396,7 @@ class TestBuildFeedbackStatsQuery:
                   WHERE project_id = {pb_0:String}
                     AND created_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                     AND created_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND feedback_type = {pb_4:String} )
+                    AND feedback_type = {pb_4:String})
                GROUP BY bucket)
             SELECT all_buckets.bucket AS timestamp,
                    COALESCE(aggregated_data.avg_output_score, 0) AS avg_output_score,
@@ -417,7 +421,7 @@ class TestBuildFeedbackStatsQuery:
             WITH all_buckets AS
               (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), toIntervalSecond({pb_5:Int64}), {pb_3:String}) + toIntervalSecond(number * {pb_5:Int64}) AS bucket
                FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), toIntervalSecond({pb_5:Int64}), {pb_3:String}))) / {pb_5:Float64})))
-               WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+               WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String})),
                  aggregated_data AS
               (SELECT bucket,
                       avgOrNull(m_output_score) AS avg_output_score,
@@ -432,7 +436,7 @@ class TestBuildFeedbackStatsQuery:
                   WHERE project_id = {pb_0:String}
                     AND created_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                     AND created_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND trigger_ref = {pb_4:String} )
+                    AND trigger_ref = {pb_4:String})
                GROUP BY bucket)
             SELECT all_buckets.bucket AS timestamp,
                    COALESCE(aggregated_data.avg_output_score, 0) AS avg_output_score,
@@ -457,7 +461,7 @@ class TestBuildFeedbackStatsQuery:
             WITH all_buckets AS
               (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), toIntervalSecond({pb_5:Int64}), {pb_3:String}) + toIntervalSecond(number * {pb_5:Int64}) AS bucket
                FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), toIntervalSecond({pb_5:Int64}), {pb_3:String}))) / {pb_5:Float64})))
-               WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+               WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String})),
                  aggregated_data AS
               (SELECT bucket,
                       avgOrNull(m_output_score) AS avg_output_score,
@@ -472,7 +476,7 @@ class TestBuildFeedbackStatsQuery:
                   WHERE project_id = {pb_0:String}
                     AND created_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                     AND created_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND startsWith(trigger_ref, {pb_4:String}) )
+                    AND startsWith(trigger_ref, {pb_4:String}))
                GROUP BY bucket)
             SELECT all_buckets.bucket AS timestamp,
                    COALESCE(aggregated_data.avg_output_score, 0) AS avg_output_score,
@@ -517,7 +521,7 @@ class TestBuildFeedbackStatsQuery:
             WITH all_buckets AS
               (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), toIntervalSecond({pb_4:Int64}), {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
                FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), toIntervalSecond({pb_4:Int64}), {pb_3:String}))) / {pb_4:Float64})))
-               WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+               WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String})),
                  aggregated_data AS
               (SELECT bucket,
                       countIf(m_passed = 1) AS count_true_passed,
@@ -529,7 +533,7 @@ class TestBuildFeedbackStatsQuery:
                   FROM feedback
                   WHERE project_id = {pb_0:String}
                     AND created_at >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND created_at < toDateTime({pb_2:Float64}, {pb_3:String}) )
+                    AND created_at < toDateTime({pb_2:Float64}, {pb_3:String}))
                GROUP BY bucket)
             SELECT all_buckets.bucket AS timestamp,
                    COALESCE(aggregated_data.count_true_passed, 0) AS count_true_passed,
@@ -598,7 +602,7 @@ class TestBuildFeedbackStatsWindowQuery:
                FROM feedback
                WHERE project_id = {pb_0:String}
                  AND created_at >= toDateTime({pb_1:Float64}, {pb_3:String})
-                 AND created_at < toDateTime({pb_2:Float64}, {pb_3:String}) )
+                 AND created_at < toDateTime({pb_2:Float64}, {pb_3:String}))
             """,
         )
         assert pb.get_params() == {
@@ -627,7 +631,7 @@ class TestBuildFeedbackStatsWindowQuery:
                  AND created_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                  AND created_at < toDateTime({pb_2:Float64}, {pb_3:String})
                  AND feedback_type = {pb_4:String}
-                 AND trigger_ref = {pb_5:String} )
+                 AND trigger_ref = {pb_5:String})
             """,
         )
         assert pb.get_params() == {
