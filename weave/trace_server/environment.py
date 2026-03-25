@@ -57,6 +57,11 @@ def wf_enable_online_eval() -> bool:
     return os.environ.get("WEAVE_ENABLE_ONLINE_EVAL", "false").lower() == "true"
 
 
+def wf_enable_genai_online_eval() -> bool:
+    """Whether to enable online evaluation for GenAI sink spans."""
+    return os.environ.get("WEAVE_ENABLE_GENAI_ONLINE_EVAL", "false").lower() == "true"
+
+
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
     return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", "100"))

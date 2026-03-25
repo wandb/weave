@@ -824,6 +824,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if attr_rows:
             self._insert_genai_attr_batch(attr_rows)
 
+        if results and wf_env.wf_enable_genai_online_eval():
+            self._maybe_enqueue_genai_span_ends(results, req.project_id)
+
         if rejected_spans > 0:
             joined_errors = "; ".join(error_messages[:20]) + (
                 "; ..." if len(error_messages) > 20 else ""
@@ -835,6 +838,39 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
             )
         return tsi.OTelExportRes()
+
+    def _maybe_enqueue_genai_span_ends(
+        self,
+        results: list[Any],
+        project_id: str,
+    ) -> None:
+        """Enqueue GenAI span ended events to Kafka for sink scoring."""
+        producer = self.kafka_producer
+        if producer is None:
+            return
+
+        for r in results:
+            span = r.span
+            event = tsi.GenAISpanEndedEvent(
+                project_id=span.project_id,
+                span_id=span.span_id,
+                trace_id=span.trace_id,
+                operation_name=span.operation_name,
+                conversation_id=span.conversation_id,
+                agent_name=span.agent_name,
+                started_at=span.started_at,
+            )
+            try:
+                producer.produce_genai_span_end(
+                    message_json=event.model_dump_json(),
+                    project_id=project_id,
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to enqueue genai_span_ended event",
+                    exc_info=True,
+                    extra={"span_id": span.span_id, "project_id": project_id},
+                )
 
     def _insert_genai_span_batch(
         self,
@@ -1593,7 +1629,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Query annotations for entities."""
         conditions = [
             "project_id = {project_id:String}",
-            "deleted_at = toDateTime64(0, 3)",
+            "toString(deleted_at) = '1970-01-01 00:00:00.000'",
         ]
         parameters: dict[str, Any] = {
             "project_id": req.project_id,

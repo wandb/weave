@@ -352,6 +352,18 @@ class OTelExportRes(BaseModel):
     )
 
 
+class GenAISpanEndedEvent(BaseModel):
+    """Minimal event published to Kafka when a GenAI span is inserted."""
+
+    project_id: str
+    span_id: str
+    trace_id: str
+    operation_name: str = ""
+    conversation_id: str = ""
+    agent_name: str = ""
+    started_at: datetime.datetime
+
+
 class GenAISpanSchema(BaseModel):
     """A normalized GenAI span returned by query APIs."""
 

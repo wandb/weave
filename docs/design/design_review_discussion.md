@@ -270,16 +270,24 @@ Stepping back from the implementation details — here's what stands out about t
 
 ## What exists today (all on branch, not shipped)
 
+The system is called **Sink** in the UI (sidebar, routes, page headers). Backend endpoints remain at `/otel/v1/genai/*`.
+
 | Component                                                                   | Status      |
 | --------------------------------------------------------------------------- | ----------- |
 | `genai_spans` ClickHouse table + MVs + EAV + annotations                    | Implemented |
 | OTel GenAI ingest endpoint (`/otel/v1/genai/traces`)                        | Implemented |
 | Field extraction + normalization (OpenAI, Google ADK, Traceloop, Anthropic) | Implemented |
 | Chat trajectory projection (single-trace + multi-turn)                      | Implemented |
-| Agent + Conversation list pages in UI                                       | Implemented |
+| Agent + Conversation + Traces tabs in Sink UI                               | Implemented |
 | Daemon for Cursor / Claude Code                                             | Implemented |
 | ATIF format adapter (reference)                                             | Implemented |
 | SDK `instrument()` for OpenAI Agents + Google ADK                           | Implemented |
+| Kafka trigger (`weave.genai_span_ended`) on span ingest                     | Implemented |
+| `SinkMonitor` / `SinkClassifierMonitor` object model                        | Implemented |
+| Sink scoring worker (span + conversation scoring with debounce)             | Implemented |
+| Signals tab in Sink page (create, list, preset groups)                      | Implemented |
+| Signal score display (badges in Traces + Conversations tabs)                | Implemented |
+| Default classifier presets (conversation quality, safety, response quality, tool use) | Implemented |
 
 ---
 
@@ -291,7 +299,7 @@ The call model and the GenAI schema serve different needs. The call model with `
 
 The GenAI schema brings things like backend queryability, schema stability across provider changes, semantic operation names, and first-class agent concepts. The call model brings things the GenAI schema doesn't attempt — particularly code versioning and evaluation/dataset integration.
 
-**My leaning:** All new GenAI and agent investment should go into the GenAI schema. The call model continues to serve `@weave.op()` users and the evaluation pipeline. Over time we should be clear with users about when to use which:
+**Decision:** All new GenAI and agent investment goes into the GenAI schema (Sink). The call model continues to serve `@weave.op()` users and the evaluation pipeline. When to use which:
 
 | If you're doing...                                            | Use...                   |
 | ------------------------------------------------------------- | ------------------------ |
@@ -304,17 +312,17 @@ The GenAI schema brings things like backend queryability, schema stability acros
 
 Today Weave's patched integrations send to `/otel/v1/traces` → calls pipeline. The new endpoint is `/otel/v1/genai/traces` → genai_spans.
 
-**My leaning:** Redirect at the integration layer for new work. No dual-write — it adds complexity (which table is authoritative? dedup? consistency?) for limited benefit. Historical data stays in calls.
+**Decision:** No dual-write. Redirect at the integration layer for new work. Historical data stays in calls. This is implemented — new GenAI/agent workloads use the Sink endpoint directly.
 
 ### How do evaluations connect?
 
-The `genai_spans` table has `content_refs`, `artifact_refs`, and `object_refs` columns that can hold references to datasets and artifacts, providing a bridge. An open design question is what evaluations look like for GenAI data — one possibility is "run a scorer over these spans and store results as annotations," which could complement the existing evaluation model.
+The `genai_spans` table has `content_refs`, `artifact_refs`, and `object_refs` columns that can hold references to datasets and artifacts, providing a bridge. The initial answer is taking shape: the **Signals** system (see Phase 2 below) runs LLM-as-judge scorers over spans and conversations and writes results to `entity_annotations`. This is the foundation — evals on GenAI data are "run a scorer over these entities and store results as annotations," which complements the existing call-based evaluation model.
 
-**My leaning:** Getting structured ingestion right at scale is the priority. The eval story can follow — happy to brainstorm what that looks like once we've landed the core schema.
+**Status:** Signals infrastructure is implemented. Full eval pipeline (batch scoring over historical data, dataset integration) is next.
 
 ### What's the confusion surface?
 
-Two endpoints, two tables, "which do I use?". The UI already routes to the right view based on data source (OtelChatView vs CallPage). The decision tree above keeps it simple. Over time, as more GenAI workloads move to the new schema, the split becomes less relevant.
+Two systems: Calls (Traces tab) and Sink. The UI presents them as separate sections in the sidebar — Sink at the top for GenAI/agent workloads, Traces below for `@weave.op()`. Each has its own data shape, its own UI, and its own feature set (Sink has Signals; Calls has evals and op versioning). The decision tree above keeps it simple. Over time, as more GenAI workloads move to Sink, the split becomes less relevant.
 
 ---
 
@@ -395,13 +403,22 @@ This is the MVP. Existing Weave users keep working as-is. New agent/OTel workloa
 
 The gap: existing Weave integration users (OpenAI/Anthropic patching) are stuck in calls-world with JSON dumps. No path for them to get GenAI queryability without switching to the OTel SDK path.
 
-### Phase 2: Scoring worker + evals on GenAI data
+### Phase 2: Scoring worker + signals on GenAI data (in progress)
 
-The scoring worker already runs LLM-powered analysis over calls in the background — generating summaries, extracting metadata, computing quality signals. Extending this to GenAI data is the most important bridge between the two systems, and the GenAI schema actually makes it _easier_: the worker gets typed columns (messages, model, tokens, agent name, conversation ID) instead of having to parse JSON dumps to figure out what it's looking at.
+The scoring worker already runs LLM-powered analysis over calls in the background — generating summaries, extracting metadata, computing quality signals. We've extended this to GenAI data with a dedicated **sink scoring worker** (`sink_scoring_worker.py`) that consumes `weave.genai_span_ended` events from Kafka, loads active `SinkMonitor` objects, and runs LLM-as-judge scorers.
 
-The same worker infrastructure should be able to process spans, conversations, and agents — summarizing a multi-turn conversation, scoring an agent's tool-use accuracy, flagging anomalous traces. The `entity_annotations` table is designed for exactly this: the worker reads structured GenAI data, runs scorers/LLMs, and writes typed annotations back to spans, agents, or conversations. This is the foundation for evals, dashboards, and alerting on GenAI data.
+The GenAI schema makes this _easier_ than calls scoring: the worker gets typed columns (messages, model, tokens, agent name, conversation ID) instead of having to parse JSON dumps. Results are written to `entity_annotations` with `namespace='signal'`.
 
-Evals follow naturally from the scoring worker. The model: run a scorer over spans and store results as annotations. The `entity_annotations` table can attach typed key-value metadata to any entity. An eval pipeline that reads GenAI spans, runs scorers, and writes annotations gives you eval-over-GenAI without moving data to calls.
+**What's implemented:**
+
+- **Kafka trigger** — `genai_otel_export` publishes `GenAISpanEndedEvent` to `weave.genai_span_ended` on every span insert, gated by `WEAVE_ENABLE_GENAI_ONLINE_EVAL`
+- **SinkMonitor model** — `SinkMonitor` and `SinkClassifierMonitor` in `monitor.py`, with typed filters (`operation_names`, `agent_names`, `provider_names`, `model_names`) instead of the calls `Query` DSL. `SinkClassifierMonitor` stores the LLM judge prompt inline via a `scoring_prompt` field — no separate scorer object required, unlike the calls `ClassifierMonitor`.
+- **Sink scoring worker** — span scoring (load span, build scorer input from typed columns, run scorer) and conversation scoring (debounce by `conversation_id`, load full conversation via chat projection, score). Currently writes structured evaluation metadata to `entity_annotations`; actual LLM proxy call is the next step.
+- **Signals tab** — fourth tab in the Sink page (alongside Agents, Conversations, Traces) with signal creation, preset group cards, and signal list
+- **Score display** — `SignalScoreBadges` component showing pass/fail badges in the Traces and Conversations tables, reading from `entity_annotations`
+- **Preset classifiers** — four groups (Conversation Quality, Safety & Compliance, Response Quality, Tool Use) with 10 classifiers, one-click enable
+
+**What's next:** Evals follow naturally from the scoring worker — run a scorer over spans and store results as annotations. The `entity_annotations` table can attach typed key-value metadata to any entity.
 
 **Datasets.** GenAI spans have `content_refs`, `artifact_refs`, and `object_refs` columns that can reference Weave datasets and artifacts. A span can reference the dataset row that prompted it, or the artifact it produced.
 
@@ -421,15 +438,15 @@ The existing integrations already have all the information — the OpenAI patche
 
 The question is whether this is worth the SDK complexity. If new users default to GenAI mode and existing users are fine with calls, maintaining two emission modes in every integration might be cost without clear payoff. It could make sense as a migration path if we eventually want all LLM data in `genai_spans`, but it's not obvious we need to force that. Worth revisiting once we see how adoption of the GenAI schema plays out.
 
-### UI implications and user experience
+### Separate UIs, not unified
 
-The two tables have separate UIs, and that's fine — they present fundamentally different data shapes. Calls show function-call detail with nested input/output JSON columns. GenAI spans show flat, typed columns (model, tokens, messages, agent name) with chat trajectory views, agent dashboards, and conversation pages. Trying to unify these into one view would mean compromising both.
+The two tables have separate UIs, and that's the right call — they present fundamentally different data shapes. Calls show function-call detail with nested input/output JSON columns. The Sink shows flat, typed columns (model, tokens, messages, agent name) with chat trajectory views, agent dashboards, conversation pages, and a Signals tab for configuring LLM-powered analysis. Trying to unify these into one view would mean compromising both.
 
 ### Summary
 
-| Phase                            | What                                                                 | Unblocks                                                                       |
-| -------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| **1. Ship parallel**             | `genai_spans` for OTel/agent workloads, calls for `@weave.op()`      | GenAI features, agent frameworks, daemon, OTel ecosystem                       |
-| **2. Scoring + evals**           | Scoring worker on GenAI data, evals-via-annotations, dataset refs    | Background LLM analysis across spans/conversations/agents; full feature parity |
-| **3. Maybe: OTel emitting mode** | Weave integrations emit structured GenAI spans instead of JSON blobs | Migration path for existing users to GenAI queryability (if needed)            |
-| **UI convergence**               | Unified trace view regardless of backend table                       | Users stop thinking about which table their data is in                         |
+| Phase                            | What                                                                                         | Status                                |
+| -------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------- |
+| **1. Ship parallel**             | `genai_spans` for OTel/agent workloads, calls for `@weave.op()`                              | Implemented (on branch)               |
+| **2. Signals + scoring**         | Sink scoring worker, Signals tab, preset classifiers, score display across Sink tabs          | Implemented (on branch)               |
+| **3. Evals on GenAI data**       | Eval pipelines reading GenAI spans, scoring, writing annotations                             | Next — builds on signals worker       |
+| **4. Maybe: OTel emitting mode** | Weave integrations emit structured GenAI spans instead of JSON blobs                         | Revisit based on adoption             |
