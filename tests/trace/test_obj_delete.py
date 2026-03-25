@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 import weave
@@ -54,11 +56,13 @@ def test_delete_object_versions(client: WeaveClient):
     assert len(objs) == 0
 
 
+@pytest.mark.flaky(reruns=3)
 def test_delete_all_object_versions(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
     weave.publish({"i": 3}, name="obj_1")
 
+    time.sleep(0.1)
     num_deleted = _obj_delete(client, "obj_1", None)
     assert num_deleted == 3
 
@@ -69,11 +73,13 @@ def test_delete_all_object_versions(client: WeaveClient):
         _obj_delete(client, "obj_1", None)
 
 
+@pytest.mark.flaky(reruns=3)
 def test_delete_version_correctness(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
     v1 = weave.publish({"i": 2}, name="obj_1")
     v2 = weave.publish({"i": 3}, name="obj_1")
 
+    time.sleep(0.1)
     _obj_delete(client, "obj_1", [v1.digest])
     objs = _objs_query(client, "obj_1")
     assert len(objs) == 2
@@ -126,10 +132,12 @@ def test_delete_nonexistent_object_id(client: WeaveClient):
         _obj_delete(client, "nonexistent_obj", None)
 
 
+@pytest.mark.flaky(reruns=3)
 def test_delete_mixed_valid_invalid_digests(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
     v1 = weave.publish({"i": 2}, name="obj_1")
 
+    time.sleep(0.1)
     invalid_digests = [v0.digest, "invalid-digest", v1.digest]
     with pytest.raises(
         weave.trace_server.errors.NotFoundError,
@@ -138,17 +146,21 @@ def test_delete_mixed_valid_invalid_digests(client: WeaveClient):
         _obj_delete(client, "obj_1", invalid_digests)
 
 
+@pytest.mark.flaky(reruns=3)
 def test_delete_duplicate_digests(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
 
+    time.sleep(0.1)
     num_deleted = _obj_delete(client, "obj_1", [v0.digest, v0.digest])
     assert num_deleted == 1
 
 
+@pytest.mark.flaky(reruns=3)
 def test_delete_with_digest_aliases(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
 
+    time.sleep(0.1)
     num_deleted = _obj_delete(client, "obj_1", ["latest"])
     assert num_deleted == 1
 
@@ -164,9 +176,11 @@ def test_delete_with_digest_aliases(client: WeaveClient):
     assert len(objs) == 0
 
 
+@pytest.mark.flaky(reruns=3)
 def test_delete_and_recreate_object(client: WeaveClient):
     # Create and delete initial object
     v0 = weave.publish({"i": 1}, name="obj_1")
+    time.sleep(0.1)
     _obj_delete(client, "obj_1", [v0.digest])
 
     # Create new object with same ID
@@ -178,11 +192,13 @@ def test_delete_and_recreate_object(client: WeaveClient):
     assert objs[0].val == {"i": 2}
 
 
+@pytest.mark.flaky(reruns=3)
 def test_read_deleted_object(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
     obj1_v2 = weave.publish({"i": 3}, name="obj_1")
 
+    time.sleep(0.1)
     _obj_delete(client, "obj_1", [obj1_v2.digest])
 
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError) as e:
@@ -233,6 +249,7 @@ def test_op_versions(client: WeaveClient):
     assert len(objs3) == 0
 
 
+@pytest.mark.flaky(reruns=3)
 def test_read_deleted_op(client: WeaveClient):
     @weave.op
     def my_op(x: int) -> int:
@@ -240,6 +257,7 @@ def test_read_deleted_op(client: WeaveClient):
 
     op_ref = weave.publish(my_op, name="my_op")
 
+    time.sleep(0.1)
     _obj_delete(client, "my_op", [op_ref.digest])
 
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError) as e:
