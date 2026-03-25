@@ -1391,8 +1391,8 @@ def test_resolve_latest_falls_back_to_computed(trace_server):
     obj_id = "alias_fallback"
 
     # Insert directly bypassing obj_create to avoid writing the alias
+    from weave.shared.digest import compute_object_digest_result
     from weave.trace_server.clickhouse_schema import ObjCHInsertable
-    from weave.trace_server.object_creation_utils import compute_object_digest_result
 
     val = {"v": "no_alias"}
     digest_result = compute_object_digest_result(val, None)
