@@ -5976,16 +5976,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 req.project_id,
                 self.ch_client,
             )
-            if write_target == WriteTarget.CALLS_COMPLETE:
-                # TODO: Once the SDK ships calls_complete support for streaming
-                # completions, route start/end via calls_complete.
-                # Example future path (sketch):
-                # ch_complete_start = _start_call_insertable_to_complete_start(start_call)
-                # self._insert_call_complete(ch_complete_start)
-                # insert_call = self._update_call_end_in_calls_complete
-                # REMOVE ME: (for now always default to CALLS_MERGED)
-                write_target = WriteTarget.CALLS_MERGED
-
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
             tracked_inputs = req.inputs.model_dump(
@@ -6010,7 +6000,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
             # Insert immediately so that callers can see the call in progress
-            if write_target == WriteTarget.CALLS_MERGED:
+            if write_target == WriteTarget.CALLS_COMPLETE:
+                ch_complete_start = _start_call_insertable_to_complete_start(start_call)
+                self._insert_call_complete(ch_complete_start)
+            else:
                 self._insert_call(start_call)
 
         # Set the combined messages (with template vars replaced) for LiteLLM
@@ -6039,12 +6032,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return chunk_iter
 
         # Otherwise, wrap the iterator with tracking
+        end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            end_call_handler = lambda end: self._update_call_end_in_calls_complete(
+                tsi.EndedCallSchemaForInsertWithStartedAt(
+                    **end.model_dump(),
+                    started_at=start_call.started_at,
+                )
+            )
         return _create_tracked_stream_wrapper(
             self._insert_call,
             chunk_iter,
             start_call,
             model_name,
             req.project_id,
+            end_call_handler=end_call_handler,
         )
 
     def image_create(
@@ -7341,6 +7343,7 @@ def _create_tracked_stream_wrapper(
     start_call: CallStartCHInsertable,
     model_name: str,
     project_id: str,
+    end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Create a wrapper that tracks streaming completion and emits call records."""
 
@@ -7441,8 +7444,11 @@ def _create_tracked_stream_wrapper(
                 output=aggregated_output,
                 summary=summary,
             )
-            end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
-            insert_call(end_call)
+            if end_call_handler is not None:
+                end_call_handler(end)
+            else:
+                end_call_ch = _end_call_for_insert_to_ch_insertable_end_call(end)
+                insert_call(end_call_ch)
 
     return _stream_wrapper()
 
