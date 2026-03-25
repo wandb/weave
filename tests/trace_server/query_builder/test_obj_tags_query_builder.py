@@ -178,16 +178,29 @@ WHERE (((main.project_id,
 
 
 def test_add_aliases_condition_latest_only():
-    """Filtering by only 'latest' should produce a simple is_latest = 1 condition."""
+    """Filtering by 'latest' checks both computed is_latest and the explicit alias."""
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_aliases_condition(["latest"])
 
     expected_query = """
-WHERE ((is_latest = 1)
+WHERE (((is_latest = 1
+         OR (main.project_id,
+             main.object_id,
+             main.digest) IN
+           (SELECT project_id,
+                   object_id,
+                   argMax(digest, created_at) AS digest
+            FROM aliases PREWHERE project_id = {project_id: String}
+            WHERE alias IN {filter_aliases: Array(String)}
+            GROUP BY project_id,
+                     object_id,
+                     alias
+            HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3))))
        AND (deleted_at IS NULL))
     """
     expected_params = {
         "project_id": "test_project",
+        "filter_aliases": ["latest"],
     }
 
     _assert_sql(
@@ -257,7 +270,7 @@ WHERE (((is_latest = 1
     """
     expected_params = {
         "project_id": "test_project",
-        "filter_aliases": ["production"],
+        "filter_aliases": ["latest", "production"],
     }
 
     _assert_sql(
