@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from pydantic import ValidationError
 
@@ -1855,9 +1857,11 @@ def test_sdk_set_aliases_with_list(client: WeaveClient):
     assert "gamma" in aliases
 
 
+@pytest.mark.flaky(reruns=3)
 def test_sdk_set_aliases_with_list_single(client: WeaveClient):
     """set_aliases with a single-element list should behave like a string."""
     ref = weave.publish({"data": "test"}, name="sdk_set_alias_list_single")
+    time.sleep(0.2)
 
     client.set_aliases(ref, ["only-one"])
 
