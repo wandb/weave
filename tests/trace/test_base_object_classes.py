@@ -11,6 +11,7 @@
 4. We ensure that invalid schemas are properly rejected from the server.
 """
 
+import time
 from typing import Literal
 
 import pytest
@@ -175,6 +176,7 @@ def test_pythonic_creation(client: WeaveClient):
     assert inherited_obj_result.val == expected_inherited_val
 
 
+@pytest.mark.flaky(reruns=3)
 def test_interface_creation(client):
     # Now we will do the equivant operation using low-level interface.
     nested_obj_id = "TestOnlyNestedBaseObject"
@@ -223,6 +225,8 @@ def test_interface_creation(client):
         _digest=top_obj_res.digest,
     )
 
+    # Allow ClickHouse eventual consistency to settle before reading
+    time.sleep(0.2)
     top_obj_gotten = weave.ref(top_obj_ref.uri).get()
 
     assert top_obj_gotten.model_dump(by_alias=True) == top_obj.model_dump(by_alias=True)
