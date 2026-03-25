@@ -279,6 +279,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._op_ref_cache_lock = threading.Lock()
         self._database_ensured = False
 
+        if wf_env.wf_clickhouse_disable_lightweight_update():
+            logger.warning(
+                "Lightweight UPDATE/DELETE is disabled via "
+                "WF_CLICKHOUSE_DISABLE_LIGHTWEIGHT_UPDATE. "
+                "Endpoints using lightweight updates will return 501."
+            )
+
     def __del__(self) -> None:
         """Flush batches and the Kafka producer on cleanup."""
         if self._call_batch or self._calls_complete_batch or self._file_batch:
@@ -961,7 +968,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cluster_name=self.clickhouse_cluster_name,
         )
 
-        self._command(query, parameters=pb.get_params())
+        self._command(
+            query,
+            parameters=pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
@@ -1558,7 +1569,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             call_ids_param,
             cluster_name=self.clickhouse_cluster_name,
         )
-        self._command(delete_query, parameters=pb.get_params())
+        self._command(
+            delete_query,
+            parameters=pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
@@ -1610,7 +1625,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             display_name_param,
             cluster_name=self.clickhouse_cluster_name,
         )
-        self._command(update_query, parameters=pb.get_params())
+        self._command(
+            update_query,
+            parameters=pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
@@ -2704,7 +2723,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             scorer_refs=req.scorer_refs,
         )
 
-        self._command(update_query, pb.get_params())
+        self._command(
+            update_query,
+            pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
 
         # Build the response with updated values
         # Use the new values if provided, otherwise keep the old ones
@@ -2762,7 +2785,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cluster_name=self.clickhouse_cluster_name,
         )
 
-        self._command(delete_query, pb.get_params())
+        self._command(
+            delete_query,
+            pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
 
         # Build the response with updated timestamps
         deleted_at = datetime.datetime.now(tz=ZoneInfo("UTC"))
@@ -3110,7 +3137,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 pb=pb,
                 cluster_name=self.clickhouse_cluster_name,
             )
-            self._command(update_query, parameters=pb.get_params())
+            self._command(
+                update_query,
+                parameters=pb.get_params(),
+                settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+            )
         else:
             # Create new record
             progress_id = generate_id()
@@ -6313,12 +6344,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query: str,
         parameters: dict[str, Any],
         column_formats: dict[str, Any] | None = None,
-        settings: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
-        if not settings:
-            settings = {}
-        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+        merged = ch_settings.merge_default_query_settings(settings)
 
         summary = None
         parameters = _process_parameters(parameters)
@@ -6329,7 +6358,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 parameters=parameters,
                 column_formats=column_formats,
                 use_none=True,
-                settings=settings,
+                settings=merged,
             ) as stream:
                 if isinstance(stream.source, QueryResult):
                     summary = stream.source.summary
@@ -6364,12 +6393,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query: str,
         parameters: dict[str, Any],
         column_formats: dict[str, Any] | None = None,
-        settings: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
-        if not settings:
-            settings = {}
-        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+        merged = ch_settings.merge_default_query_settings(settings)
 
         parameters = _process_parameters(parameters)
         start = time.monotonic()
@@ -6379,7 +6406,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 parameters=parameters,
                 column_formats=column_formats,
                 use_none=True,
-                settings=settings,
+                settings=merged,
             )
         except Exception as e:
             duration_ms = round((time.monotonic() - start) * 1000, 1)
@@ -6413,18 +6440,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         command: str,
         parameters: dict[str, Any] | None = None,
-        settings: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
     ) -> None:
         """Execute a mutation command (INSERT, UPDATE, DELETE) that doesn't return results.
 
         Args:
             command: The SQL command to execute.
             parameters: Optional dictionary of query parameters.
-            settings: Optional dictionary of ClickHouse settings.
+            settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
-        if not settings:
-            settings = {}
-        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+        merged = ch_settings.merge_default_query_settings(settings)
 
         processed_params = _process_parameters(parameters) if parameters else None
         start = time.monotonic()
@@ -6432,7 +6457,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self.ch_client.command(
                 command,
                 parameters=processed_params,
-                settings=settings,
+                settings=merged,
             )
         except Exception as e:
             duration_ms = round((time.monotonic() - start) * 1000, 1)
