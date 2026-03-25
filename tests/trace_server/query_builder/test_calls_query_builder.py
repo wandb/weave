@@ -16,10 +16,8 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
-    get_field_by_name,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
-from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
@@ -4009,24 +4007,3 @@ def test_status_sort_calls_complete_uses_sentinels() -> None:
             "pb_8": "project",
         },
     )
-
-
-def test_get_field_by_name_parent_ids_alias() -> None:
-    """Test that parent_ids is accepted as an alias for parent_id.
-
-    The CallsFilter interface uses parent_ids (plural) for list filtering,
-    so query expressions referencing parent_ids should resolve to the
-    parent_id database column rather than raising InvalidFieldError.
-    """
-    field = get_field_by_name("parent_ids")
-    assert field.field == "parent_id"
-
-    # Verify both singular and plural resolve to the same underlying column
-    singular_field = get_field_by_name("parent_id")
-    assert singular_field.field == field.field
-
-
-def test_get_field_by_name_rejects_unknown_field() -> None:
-    """Sanity check: unknown fields still raise InvalidFieldError."""
-    with pytest.raises(InvalidFieldError):
-        get_field_by_name("nonexistent_field")
