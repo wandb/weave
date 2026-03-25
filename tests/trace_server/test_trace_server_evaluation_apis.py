@@ -10,14 +10,18 @@ from tests.trace_server.completions_util import with_simple_mock_litellm_complet
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient, generate_id
 from weave.trace_server.trace_server_interface import (
+    CallReadReq,
     CallsQueryReq,
     EvaluateModelReq,
     EvaluateModelRes,
+    EvaluationRunCreateReq,
     EvaluationStatusComplete,
     EvaluationStatusNotFound,
     EvaluationStatusReq,
     EvaluationStatusRunning,
     ObjCreateReq,
+    PredictionCreateReq,
+    PredictionFinishReq,
     TableCreateReq,
     TraceServerInterface,
     TraceStatus,
@@ -389,3 +393,162 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
             "LLMAsAJudgeScorer": {"score": {"mean": 9.0}},
             "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
         }
+
+
+def test_calls_query_stream_for_eval_subtree_basic(client):
+    project_id = client._project_id()
+
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://basic",
+            model="model://basic",
+        )
+    )
+    pred = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model="model://basic",
+            inputs={"x": "hello"},
+            output="world",
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+        )
+    )
+
+    calls = list(
+        client.server.calls_query_stream_for_eval_subtree(
+            project_id, [run.evaluation_run_id]
+        )
+    )
+
+    call_ids = {c.id for c in calls}
+    assert run.evaluation_run_id not in call_ids, (
+        f"run.evaluation_run_id: {run.evaluation_run_id} in call_ids: {call_ids}"
+    )
+
+    prediction_call = client.server.call_read(
+        CallReadReq(project_id=project_id, id=pred.prediction_id)
+    ).call
+    assert prediction_call is not None
+    pas_id = prediction_call.parent_id
+    assert pas_id in call_ids
+    assert pred.prediction_id in call_ids
+
+
+def test_calls_query_stream_for_eval_subtree_returns_correct_fields(client):
+    project_id = client._project_id()
+
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://fields",
+            model="model://fields",
+        )
+    )
+    pred = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model="model://fields",
+            inputs={"q": "what"},
+            output="answer",
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+        )
+    )
+
+    calls = list(
+        client.server.calls_query_stream_for_eval_subtree(
+            project_id, [run.evaluation_run_id]
+        )
+    )
+
+    assert len(calls) > 0
+    for call in calls:
+        assert call.id is not None
+        assert call.op_name is not None
+        assert call.started_at is not None
+
+
+def test_calls_query_stream_for_eval_subtree_multiple_eval_roots(client):
+    project_id = client._project_id()
+
+    run_a = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://multi-a",
+            model="model://multi-a",
+        )
+    )
+    run_b = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://multi-b",
+            model="model://multi-b",
+        )
+    )
+
+    pred_a = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model="model://multi-a",
+            inputs={"x": "a"},
+            output="out-a",
+            evaluation_run_id=run_a.evaluation_run_id,
+        )
+    )
+    pred_b = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model="model://multi-b",
+            inputs={"x": "b"},
+            output="out-b",
+            evaluation_run_id=run_b.evaluation_run_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(
+            project_id=project_id,
+            prediction_id=pred_a.prediction_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(
+            project_id=project_id,
+            prediction_id=pred_b.prediction_id,
+        )
+    )
+
+    calls = list(
+        client.server.calls_query_stream_for_eval_subtree(
+            project_id, [run_a.evaluation_run_id, run_b.evaluation_run_id]
+        )
+    )
+
+    call_ids = {c.id for c in calls}
+    assert pred_a.prediction_id in call_ids
+    assert pred_b.prediction_id in call_ids
+    assert run_a.evaluation_run_id not in call_ids
+    assert run_b.evaluation_run_id not in call_ids
+
+
+def test_calls_query_stream_for_eval_subtree_empty(client):
+    project_id = client._project_id()
+
+    calls = list(
+        client.server.calls_query_stream_for_eval_subtree(
+            project_id, ["nonexistent-id-0000000000000000"]
+        )
+    )
+
+    assert calls == []
