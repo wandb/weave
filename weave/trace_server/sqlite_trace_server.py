@@ -4437,7 +4437,7 @@ def _build_feedback_subquery(field: str) -> str:
       feedback.[*].payload.output.label  (wildcard - search all feedback types)
       feedback.[wandb.runnable.my_scorer_a].payload.output.label  (specific type)
     """
-    path = field[len("feedback."):]
+    path = field[len("feedback.") :]
     match = re.match(r"^(\[.+?\])\.(.+)$", path)
     if not match:
         raise ValueError(f"Invalid feedback field path: {field}")
@@ -4448,7 +4448,7 @@ def _build_feedback_subquery(field: str) -> str:
     if parts[0] == "payload":
         db_column = "payload_dump"
         extra_parts = parts[1:]
-    elif parts[0] in ("runnable_ref", "trigger_ref"):
+    elif parts[0] in {"runnable_ref", "trigger_ref"}:
         db_column = parts[0]
         extra_parts = []
     else:
