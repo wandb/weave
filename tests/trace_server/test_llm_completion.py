@@ -452,17 +452,16 @@ class TestLLMCompletionStreaming(unittest.TestCase):
                 "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(
-                self.server.table_routing_resolver, "resolve_v2_write_target"
-            ) as mock_resolve,
+                chts.ClickHouseTraceServer, "_insert_call_complete"
+            ) as mock_insert_complete,
             patch.object(
-                chts.ClickHouseTraceServer, "_insert_call"
-            ) as mock_insert_call,
+                chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+            ) as mock_update_end,
         ):
             # Mock the litellm completion stream
             mock_stream = MagicMock()
             mock_stream.__iter__.return_value = mock_chunks
             mock_litellm.return_value = mock_stream
-            mock_resolve.return_value = WriteTarget.CALLS_MERGED
 
             # Create test request
             req = tsi.CompletionsCreateReq(
@@ -487,13 +486,11 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             self.assertEqual(chunks[1]["choices"][0]["delta"]["content"], "Hello")
             self.assertEqual(chunks[2]["choices"][0]["finish_reason"], "stop")
 
-            # Verify call tracking
-            self.assertEqual(mock_insert_call.call_count, 2)  # Start and end calls
-            start_call = mock_insert_call.call_args_list[0][0][0]
-            end_call = mock_insert_call.call_args_list[1][0][0]
+            # Verify call tracking via calls_complete (empty project)
+            mock_insert_complete.assert_called_once()
+            mock_update_end.assert_called_once()
+            start_call = mock_insert_complete.call_args[0][0]
             self.assertEqual(start_call.project_id, "dGVzdF9wcm9qZWN0")
-            self.assertEqual(end_call.project_id, "dGVzdF9wcm9qZWN0")
-            self.assertEqual(end_call.id, start_call.id)
 
     def test_custom_provider_streaming(self):
         """Test streaming completion with a custom provider."""
