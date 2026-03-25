@@ -1283,6 +1283,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         with self.lock:
             if self._obj_exists(cursor, project_id, object_id, digest):
+                # Even on dedup: move "latest" alias to this digest.
+                cursor.execute(
+                    "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
+                    (project_id, object_id, "latest", digest),
+                )
+                conn.commit()
                 return tsi.ObjCreateRes(digest=digest, object_id=object_id)
 
             # Use IMMEDIATE transaction to acquire write lock immediately, preventing
@@ -1332,6 +1338,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     None,
                     wb_user_id,
                 ),
+            )
+            # Set "latest" alias on every new version.
+            cursor.execute(
+                "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
+                (project_id, object_id, "latest", digest),
             )
             conn.commit()
         return tsi.ObjCreateRes(digest=digest, object_id=object_id)
