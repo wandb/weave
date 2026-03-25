@@ -10,18 +10,14 @@ from tests.trace_server.completions_util import with_simple_mock_litellm_complet
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient, generate_id
 from weave.trace_server.trace_server_interface import (
-    CallReadReq,
     CallsQueryReq,
     EvaluateModelReq,
     EvaluateModelRes,
-    EvaluationRunCreateReq,
     EvaluationStatusComplete,
     EvaluationStatusNotFound,
     EvaluationStatusReq,
     EvaluationStatusRunning,
     ObjCreateReq,
-    PredictionCreateReq,
-    PredictionFinishReq,
     TableCreateReq,
     TraceServerInterface,
     TraceStatus,
