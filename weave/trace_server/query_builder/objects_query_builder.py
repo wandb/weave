@@ -323,7 +323,7 @@ class ObjectMetadataQueryBuilder:
             """
 
         query = f"""
-WITH one_row_per_version AS (
+WITH latest_row_per_digest AS (
     -- Multiple rows can exist per (project, object, digest) before
     -- ReplacingMergeTree compacts them.  Pick the latest row for each
     -- version, preferring the deletion event on created_at ties.
@@ -352,7 +352,7 @@ WITH one_row_per_version AS (
     ) AS fc USING (object_id, digest)
     WHERE ov.project_id = {{project_id: String}}{self.object_id_conditions_part}
 ),
-with_version_index AS (
+versioned AS (
     -- Assign sequential version_index (ordered by first publish time),
     -- is_latest (newest non-deleted version), and version_count.
     SELECT
@@ -369,12 +369,12 @@ with_version_index AS (
             ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
-    FROM one_row_per_version
+    FROM latest_row_per_digest
     WHERE rn = 1
 )
 SELECT
     {columns_str}
-FROM with_version_index AS {main_table_alias}
+FROM versioned AS {main_table_alias}
     {join_clause}
 """
         if self.conditions_part:

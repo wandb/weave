@@ -137,7 +137,7 @@ def test_object_query_builder_sort():
 
 
 STATIC_METADATA_QUERY_PART = """
-WITH one_row_per_version AS (
+WITH latest_row_per_digest AS (
     SELECT
         ov.project_id,
         ov.object_id,
@@ -164,7 +164,7 @@ WITH one_row_per_version AS (
 
 
 STATIC_VERSION_INDEX_PART = """),
-with_version_index AS (
+versioned AS (
     SELECT
         *,
         row_number() OVER (
@@ -179,7 +179,7 @@ with_version_index AS (
             ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
-    FROM one_row_per_version
+    FROM latest_row_per_digest
     WHERE rn = 1
 )
 SELECT
@@ -197,7 +197,7 @@ SELECT
     wb_user_id,
     version_count,
     is_op
-FROM with_version_index AS main"""
+FROM versioned AS main"""
 
 
 def assert_sql(exp_query, actual_query):
