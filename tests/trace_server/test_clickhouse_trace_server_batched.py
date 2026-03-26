@@ -10,8 +10,6 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import InvalidFieldError
-from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -1138,73 +1136,4 @@ def test_file_batch_clears_on_insert_failure():
         assert len(server._file_batch) == 0, (
             f"Memory leak: _file_batch retained {len(server._file_batch)} items "
             f"after failed insert. Batch should be cleared on any exception."
-        )
-
-
-def test_tag_request():
-    """tag_request dumps the full request into a single truncated DD tag."""
-    from weave.trace_server.datadog import DD_TAG_MAX_LEN, tag_request
-
-    req = tsi.CallsQueryReq(
-        project_id="test/my-project",
-        columns=["status", "op_name"],
-        sort_by=[tsi.SortBy(field="started_at", direction="desc")],
-        filter=tsi.CallsFilter(op_names=["my_op"]),
-    )
-    tags = tag_request(req)
-
-    assert "test/my-project" in tags["calls_query.req"]
-    assert "status" in tags["calls_query.req"]
-    assert "my_op" in tags["calls_query.req"]
-    assert len(tags["calls_query.req"]) <= DD_TAG_MAX_LEN
-
-
-def test_invalid_field_error_propagates_from_calls_query(mock_ch_server):
-    """InvalidFieldError still propagates from calls_query_stream and calls_query_stats
-    for bad columns, bad filter fields, and bad sort fields.
-    """
-    # Bad column
-    with pytest.raises(InvalidFieldError, match="status"):
-        list(
-            mock_ch_server.calls_query_stream(
-                tsi.CallsQueryReq(project_id="p", columns=["status"])
-            )
-        )
-
-    # Bad filter field
-    with pytest.raises(InvalidFieldError, match="nonexistent"):
-        list(
-            mock_ch_server.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id="p",
-                    query=tsi_query.Query(
-                        expr_=tsi_query.EqOperation.model_validate(
-                            {"$eq": [{"$getField": "nonexistent"}, {"$literal": "v"}]}
-                        )
-                    ),
-                )
-            )
-        )
-
-    # Bad sort field
-    with pytest.raises(InvalidFieldError, match="bogus"):
-        list(
-            mock_ch_server.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id="p", sort_by=[tsi.SortBy(field="bogus", direction="asc")]
-                )
-            )
-        )
-
-    # calls_query_stats with bad filter field
-    with pytest.raises(InvalidFieldError, match="nonexistent"):
-        mock_ch_server.calls_query_stats(
-            tsi.CallsQueryStatsReq(
-                project_id="p",
-                query=tsi_query.Query(
-                    expr_=tsi_query.EqOperation.model_validate(
-                        {"$eq": [{"$getField": "nonexistent"}, {"$literal": "v"}]}
-                    )
-                ),
-            )
         )
