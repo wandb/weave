@@ -139,6 +139,16 @@ class ObjectMetadataQueryBuilder:
         return _make_object_id_conditions_part(self._object_id_conditions)
 
     @property
+    def _prefixed_object_id_conditions_part(self) -> str:
+        """Object ID conditions prefixed with 'ov.' for use in aliased subqueries."""
+        if not self._object_id_conditions:
+            return ""
+        prefixed = [
+            c.replace("object_id", "ov.object_id") for c in self._object_id_conditions
+        ]
+        return _make_object_id_conditions_part(prefixed)
+
+    @property
     def sort_part(self) -> str:
         if not self._sort_by:
             return "ORDER BY created_at ASC"
@@ -341,6 +351,7 @@ FROM (
         project_id,
         object_id,
         created_at,
+        _first_created_at,
         deleted_at,
         kind,
         base_object_class,
@@ -353,38 +364,46 @@ FROM (
             PARTITION BY project_id,
             kind,
             object_id
-            ORDER BY created_at ASC
+            ORDER BY _first_created_at ASC, digest ASC
         ) - 1 AS version_index,
         count(*) OVER (
             PARTITION BY project_id, kind, object_id
         ) as version_count,
         row_number() OVER (
             PARTITION BY project_id, kind, object_id
-            ORDER BY (deleted_at IS NULL) DESC, created_at DESC
+            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
     FROM (
         SELECT
-            project_id,
-            object_id,
-            created_at,
-            deleted_at,
-            kind,
-            base_object_class,
-            leaf_object_class,
-            refs,
-            digest,
-            wb_user_id,
-            if (kind = 'op', 1, 0) AS is_op,
+            ov.project_id,
+            ov.object_id,
+            ov.created_at,
+            COALESCE(fc.first_created_at, ov.created_at) AS _first_created_at,
+            ov.deleted_at,
+            ov.kind,
+            ov.base_object_class,
+            ov.leaf_object_class,
+            ov.refs,
+            ov.digest,
+            ov.wb_user_id,
+            if (ov.kind = 'op', 1, 0) AS is_op,
             row_number() OVER (
-                PARTITION BY project_id,
-                kind,
-                object_id,
-                digest
-                ORDER BY created_at DESC, (deleted_at IS NULL) ASC
+                PARTITION BY ov.project_id,
+                ov.kind,
+                ov.object_id,
+                ov.digest
+                ORDER BY ov.created_at DESC, (ov.deleted_at IS NULL) ASC
             ) AS rn
-        FROM object_versions
-        WHERE project_id = {{project_id: String}}{self.object_id_conditions_part}
+        FROM object_versions AS ov
+        LEFT JOIN (
+            SELECT project_id, object_id, digest, first_created_at
+            FROM object_version_first_seen
+            WHERE project_id = {{project_id: String}}
+        ) AS fc ON ov.project_id = fc.project_id
+            AND ov.object_id = fc.object_id
+            AND ov.digest = fc.digest
+        WHERE ov.project_id = {{project_id: String}}{self._prefixed_object_id_conditions_part}
     )
     WHERE rn = 1
 ) as {main_table_alias}
