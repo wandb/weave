@@ -34,6 +34,7 @@ from typing_extensions import Self
 
 from weave.shared import refs_internal as ri
 from weave.shared.digest import (
+    bytes_digest,
     compute_file_digest,
     compute_object_digest_result,
     compute_row_digest,
@@ -169,12 +170,20 @@ from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
 from weave.trace_server.genai_chat_view import build_trace_chat
+from weave.trace_server.genai_ingest_atif import atif_to_conversation_req
+from weave.trace_server.genai_ingest_openhands import openhands_to_conversation_req
 from weave.trace_server.genai_schema import (
     ALL_GENAI_ATTR_INSERT_COLUMNS,
+    ALL_GENAI_SEARCH_INSERT_COLUMNS,
     ALL_GENAI_SPAN_INSERT_COLUMNS,
     ALL_GENAI_SPAN_SELECT_COLUMNS,
+    GenAIMessageSearchRow,
     GenAISpanAttributeRow,
     GenAISpanCHInsertable,
+)
+from weave.trace_server.genai_structured_ingest import (
+    build_conversation_ingest_response,
+    structured_turns_to_spans,
 )
 
 _GENAI_SPAN_COLS = ", ".join(ALL_GENAI_SPAN_SELECT_COLUMNS)
@@ -346,6 +355,75 @@ def _genai_attr_to_row(attr: GenAISpanAttributeRow) -> list[Any]:
     """Convert a GenAISpanAttributeRow to a row list matching ALL_GENAI_ATTR_INSERT_COLUMNS order."""
     params = attr.model_dump()
     return [params.get(col) for col in ALL_GENAI_ATTR_INSERT_COLUMNS]
+
+
+def _genai_search_row_to_row(row: GenAIMessageSearchRow) -> list[Any]:
+    """Convert a GenAIMessageSearchRow to a row list matching ALL_GENAI_SEARCH_INSERT_COLUMNS order."""
+    params = row.model_dump()
+    return [params.get(col) for col in ALL_GENAI_SEARCH_INSERT_COLUMNS]
+
+
+_SEARCH_CONTENT_PREVIEW_LENGTH = 500
+
+
+def _extract_search_rows(
+    span: GenAISpanCHInsertable,
+) -> list[GenAIMessageSearchRow]:
+    """Extract deduplicated search index rows from a span.
+
+    For each span, indexes:
+    - All output_messages (always new content from this turn)
+    - The last user message from input_messages (the new user query for this turn)
+    - system_instructions (as a single concatenated document)
+
+    Returns one GenAIMessageSearchRow per unique content_digest.
+    """
+    rows: list[GenAIMessageSearchRow] = []
+    seen_digests: set[str] = set()
+
+    def _add_message(role: str, content: str) -> None:
+        if not content or not content.strip():
+            return
+        digest = bytes_digest(content.encode("utf-8"))
+        if digest in seen_digests:
+            return
+        seen_digests.add(digest)
+        rows.append(
+            GenAIMessageSearchRow(
+                project_id=span.project_id,
+                content_digest=digest,
+                conversation_id=span.conversation_id,
+                trace_id=span.trace_id,
+                span_id=span.span_id,
+                role=role,
+                started_at=span.started_at,
+                content=content,
+                agent_name=span.agent_name,
+                conversation_name=span.conversation_name,
+                wb_user_id=span.wb_user_id,
+                provider_name=span.provider_name,
+                request_model=span.request_model,
+                operation_name=span.operation_name,
+            )
+        )
+
+    for msg in span.output_messages:
+        _add_message(msg.role, msg.content)
+
+    # Last user message from input_messages — the new user turn.
+    # Earlier messages are conversation history that was already indexed
+    # when those turns were originally ingested.
+    for msg in reversed(span.input_messages):
+        if msg.role == "user" and msg.content.strip():
+            _add_message(msg.role, msg.content)
+            break
+
+    if span.system_instructions:
+        combined = "\n".join(s for s in span.system_instructions if s.strip())
+        if combined:
+            _add_message("system", combined)
+
+    return rows
 
 
 _ADJECTIVES = [
@@ -824,6 +902,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if attr_rows:
             self._insert_genai_attr_batch(attr_rows)
 
+        search_rows: list[list[Any]] = []
+        for r in results:
+            search_rows.extend(
+                _genai_search_row_to_row(sr) for sr in _extract_search_rows(r.span)
+            )
+        if search_rows:
+            self._insert_genai_search_batch(search_rows)
+
         if results and wf_env.wf_enable_genai_online_eval():
             self._maybe_enqueue_genai_span_ends(results, req.project_id)
 
@@ -899,6 +985,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "genai_span_attributes",
             data=batch,
             column_names=ALL_GENAI_ATTR_INSERT_COLUMNS,
+            settings=settings,
+        )
+
+    def _insert_genai_search_batch(
+        self,
+        batch: list[list[Any]],
+        settings: dict[str, Any] | None = None,
+    ) -> None:
+        """Insert a batch of rows into the genai_message_search table."""
+        if not batch:
+            return
+        self._insert(
+            "genai_message_search",
+            data=batch,
+            column_names=ALL_GENAI_SEARCH_INSERT_COLUMNS,
             settings=settings,
         )
 
@@ -1217,6 +1318,208 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 conv.conversation_name = _auto_conversation_name(conv.conversation_id)
         return tsi.GenAIConversationsQueryRes(
             conversations=conversations, total_count=total_count
+        )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_search")
+    def genai_search(self, req: tsi.GenAISearchReq) -> tsi.GenAISearchRes:
+        """Full-text search across message content in the genai_message_search table."""
+        query_text = req.query.strip()
+        if not query_text:
+            return tsi.GenAISearchRes(results=[], total_conversations=0)
+
+        conditions = ["project_id = {project_id:String}"]
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "search_term": query_text,
+            "limit": min(req.limit, 100),
+            "offset": req.offset,
+        }
+
+        conditions.append(
+            "positionCaseInsensitive(content, {search_term:String}) > 0"
+        )
+
+        if req.roles:
+            conditions.append("role IN {filter_roles:Array(String)}")
+            parameters["filter_roles"] = req.roles
+        if req.conversation_id:
+            conditions.append("conversation_id = {filter_conv:String}")
+            parameters["filter_conv"] = req.conversation_id
+        if req.agent_name:
+            conditions.append("agent_name = {filter_agent:String}")
+            parameters["filter_agent"] = req.agent_name
+        if req.provider_name:
+            conditions.append("provider_name = {filter_provider:String}")
+            parameters["filter_provider"] = req.provider_name
+        if req.request_model:
+            conditions.append("request_model = {filter_model:String}")
+            parameters["filter_model"] = req.request_model
+        if req.started_after is not None:
+            conditions.append("started_at >= {filter_after:DateTime64(6)}")
+            parameters["filter_after"] = req.started_after
+        if req.started_before is not None:
+            conditions.append("started_at < {filter_before:DateTime64(6)}")
+            parameters["filter_before"] = req.started_before
+
+        where_clause = " AND ".join(conditions)
+
+        count_params = {
+            k: v for k, v in parameters.items() if k not in ("limit", "offset")
+        }
+        count_query = f"""
+            SELECT count(DISTINCT conversation_id)
+            FROM genai_message_search
+            WHERE {where_clause}
+              AND conversation_id != ''
+        """
+        count_result = self.ch_client.query(count_query, parameters=count_params)
+        total_conversations = (
+            int(count_result.result_rows[0][0]) if count_result.result_rows else 0
+        )
+
+        # Get conversation_ids ordered by most recent match
+        conv_query = f"""
+            SELECT
+                conversation_id,
+                max(started_at) AS last_match
+            FROM genai_message_search
+            WHERE {where_clause}
+              AND conversation_id != ''
+            GROUP BY conversation_id
+            ORDER BY last_match DESC
+            LIMIT {{limit:UInt64}} OFFSET {{offset:UInt64}}
+        """
+        conv_result = self.ch_client.query(conv_query, parameters=parameters)
+        conv_ids = [str(row[0]) for row in conv_result.result_rows]
+
+        if not conv_ids:
+            return tsi.GenAISearchRes(
+                results=[], total_conversations=total_conversations
+            )
+
+        # Fetch matched messages for these conversations (top 5 per conversation)
+        preview_len = _SEARCH_CONTENT_PREVIEW_LENGTH
+        msgs_query = f"""
+            SELECT
+                conversation_id,
+                span_id,
+                trace_id,
+                role,
+                substring(content, 1, {{preview_len:UInt64}}) AS content_preview,
+                content_digest,
+                started_at,
+                agent_name,
+                conversation_name
+            FROM genai_message_search
+            WHERE project_id = {{project_id:String}}
+              AND conversation_id IN {{conv_ids:Array(String)}}
+              AND positionCaseInsensitive(content, {{search_term:String}}) > 0
+            ORDER BY conversation_id, started_at DESC
+        """
+        msgs_params: dict[str, Any] = {
+            "project_id": req.project_id,
+            "conv_ids": conv_ids,
+            "search_term": query_text,
+            "preview_len": preview_len,
+        }
+        msgs_result = self.ch_client.query(msgs_query, parameters=msgs_params)
+
+        conv_messages: dict[str, list[tsi.GenAISearchMatchedMessage]] = defaultdict(
+            list
+        )
+        conv_meta: dict[str, tuple[str, str]] = {}
+        for row in msgs_result.result_rows:
+            cid = str(row[0])
+            if len(conv_messages[cid]) >= 5:
+                continue
+            conv_messages[cid].append(
+                tsi.GenAISearchMatchedMessage(
+                    span_id=str(row[1]),
+                    trace_id=str(row[2]),
+                    role=str(row[3]),
+                    content_preview=str(row[4]),
+                    content_digest=str(row[5]),
+                    started_at=row[6],
+                )
+            )
+            if cid not in conv_meta:
+                conv_meta[cid] = (str(row[7] or ""), str(row[8] or ""))
+
+        results: list[tsi.GenAISearchConversationResult] = []
+        for cid in conv_ids:
+            msgs = conv_messages.get(cid, [])
+            agent, conv_name = conv_meta.get(cid, ("", ""))
+            last_activity = msgs[0].started_at if msgs else conv_result.result_rows[0][1]
+            results.append(
+                tsi.GenAISearchConversationResult(
+                    conversation_id=cid,
+                    conversation_name=conv_name,
+                    agent_name=agent,
+                    matched_messages=msgs,
+                    total_matches=len(msgs),
+                    last_activity=last_activity,
+                )
+            )
+
+        return tsi.GenAISearchRes(
+            results=results, total_conversations=total_conversations
+        )
+
+    # ------------------------------------------------------------------
+    # GenAI structured conversation ingest
+    # ------------------------------------------------------------------
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_conversation_ingest"
+    )
+    def genai_conversation_ingest(
+        self, req: tsi.GenAIConversationIngestReq
+    ) -> tsi.GenAIConversationIngestRes:
+        """Ingest a structured conversation by converting to genai_spans rows."""
+        conversation_id, trace_ids, spans = structured_turns_to_spans(req)
+
+        rows = [_genai_span_to_row(s) for s in spans]
+        if rows:
+            self._insert_genai_span_batch(rows)
+
+        search_rows: list[list[Any]] = []
+        for s in spans:
+            search_rows.extend(
+                _genai_search_row_to_row(sr) for sr in _extract_search_rows(s)
+            )
+        if search_rows:
+            self._insert_genai_search_batch(search_rows)
+
+        return build_conversation_ingest_response(conversation_id, trace_ids, spans)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_ingest_atif"
+    )
+    def genai_ingest_atif(
+        self, req: tsi.GenAIATIFIngestReq
+    ) -> tsi.GenAIATIFIngestRes:
+        """Ingest an ATIF trajectory by converting to native format then to spans."""
+        native_req = atif_to_conversation_req(req)
+        res = self.genai_conversation_ingest(native_req)
+        return tsi.GenAIATIFIngestRes(
+            conversation_id=res.conversation_id,
+            trace_ids=res.trace_ids,
+            span_count=res.span_count,
+        )
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_ingest_openhands"
+    )
+    def genai_ingest_openhands(
+        self, req: tsi.GenAIOpenHandsIngestReq
+    ) -> tsi.GenAIOpenHandsIngestRes:
+        """Ingest an OpenHands event stream by converting to native format then to spans."""
+        native_req = openhands_to_conversation_req(req)
+        res = self.genai_conversation_ingest(native_req)
+        return tsi.GenAIOpenHandsIngestRes(
+            conversation_id=res.conversation_id,
+            trace_ids=res.trace_ids,
+            span_count=res.span_count,
         )
 
     @ddtrace.tracer.wrap(

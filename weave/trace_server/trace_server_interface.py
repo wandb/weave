@@ -469,6 +469,62 @@ class GenAISpansTraceRes(BaseModel):
     spans: list[GenAISpanSchema]
 
 
+# ---------------------------------------------------------------------------
+# GenAI full-text search
+# ---------------------------------------------------------------------------
+
+
+class GenAISearchReq(BaseModel):
+    """Full-text search across message content and span metadata.
+
+    Searches the genai_message_search index for messages matching the query
+    string, returning results grouped by conversation.
+    """
+
+    project_id: str
+    query: str
+
+    roles: list[str] | None = None
+    conversation_id: str | None = None
+    agent_name: str | None = None
+    provider_name: str | None = None
+    request_model: str | None = None
+    started_after: datetime.datetime | None = None
+    started_before: datetime.datetime | None = None
+
+    limit: int = 20
+    offset: int = 0
+
+
+class GenAISearchMatchedMessage(BaseModel):
+    """A single message that matched the search query."""
+
+    span_id: str
+    trace_id: str
+    role: str
+    content_preview: str
+    content_digest: str
+    started_at: datetime.datetime
+
+
+class GenAISearchConversationResult(BaseModel):
+    """A conversation containing messages that matched the search query."""
+
+    conversation_id: str
+    conversation_name: str
+    agent_name: str
+    matched_messages: list[GenAISearchMatchedMessage]
+    total_matches: int
+    last_activity: datetime.datetime
+
+
+class GenAISearchRes(BaseModel):
+    """Response from a full-text search across GenAI messages."""
+
+    results: list[GenAISearchConversationResult]
+    total_conversations: int
+
+
 class GenAISpanStartReq(BaseModel):
     """Lightweight notification that a span has opened (in-progress)."""
 
@@ -800,6 +856,217 @@ class GenAIAnnotationsQueryRes(BaseModel):
     """Response containing matching annotations."""
 
     annotations: list[GenAIAnnotationRow]
+
+
+# ---------------------------------------------------------------------------
+# GenAI structured conversation ingest
+# ---------------------------------------------------------------------------
+
+
+class GenAIStructuredMessage(BaseModel):
+    """A single message in a structured conversation turn."""
+
+    role: Literal["user", "assistant", "system", "tool"]
+    content: str = ""
+    tool_call_id: str = ""
+    tool_name: str = ""
+
+
+class GenAIStructuredToolCall(BaseModel):
+    """A tool invocation within a conversation turn."""
+
+    tool_name: str
+    arguments: str = ""
+    result: str = ""
+    duration_ms: int = 0
+
+
+class GenAIStructuredTurn(BaseModel):
+    """One user-agent interaction within a conversation.
+
+    Each turn maps to a unique ``trace_id`` in the underlying span storage.
+    """
+
+    messages: list[GenAIStructuredMessage]
+    tool_calls: list[GenAIStructuredToolCall] = Field(default_factory=list)
+    agent_name: str = ""
+    model: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_content: str = ""
+    started_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    system_instructions: list[str] = Field(default_factory=list)
+    trace_id: str = ""
+
+
+class GenAIConversationIngestReq(BaseModel):
+    """Ingest a structured conversation (one or more turns).
+
+    Converts the provided turns into ``genai_spans`` rows so that all
+    existing read APIs (conversation list, chat view, search) work
+    unchanged.
+    """
+
+    project_id: str
+    conversation_id: str = ""
+    conversation_name: str = ""
+    provider_name: str = ""
+    agent_name: str = ""
+    turns: list[GenAIStructuredTurn]
+
+
+class GenAIConversationIngestRes(BaseModel):
+    """Result of a structured conversation ingest."""
+
+    conversation_id: str
+    trace_ids: list[str]
+    span_count: int
+
+
+# ---------------------------------------------------------------------------
+# ATIF (Agent Trace Interchange Format) ingest
+# ---------------------------------------------------------------------------
+
+
+class ATIFMetrics(BaseModel):
+    """Per-step LLM metrics from an ATIF trajectory."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cached_tokens: int = 0
+    cost_usd: float = 0.0
+
+
+class ATIFToolCall(BaseModel):
+    """A tool invocation in an ATIF step."""
+
+    tool_call_id: str = ""
+    function_name: str = ""
+    arguments: str | dict = ""
+
+
+class ATIFObservationResult(BaseModel):
+    """A single tool result in an ATIF observation."""
+
+    source_call_id: str = ""
+    content: str = ""
+
+
+class ATIFObservation(BaseModel):
+    """Environment feedback in an ATIF step."""
+
+    results: list[ATIFObservationResult] = Field(default_factory=list)
+
+
+class ATIFStep(BaseModel):
+    """A single step in an ATIF trajectory."""
+
+    step_id: int = 0
+    timestamp: str = ""
+    source: Literal["user", "agent", "system"] = "agent"
+    message: str = ""
+    reasoning_content: str = ""
+    tool_calls: list[ATIFToolCall] = Field(default_factory=list)
+    observation: ATIFObservation | None = None
+    metrics: ATIFMetrics | None = None
+    extra: dict = Field(default_factory=dict)
+
+
+class ATIFAgent(BaseModel):
+    """Agent metadata from an ATIF trajectory."""
+
+    name: str = ""
+    version: str = ""
+    model_name: str = ""
+    extra: dict = Field(default_factory=dict)
+
+
+class ATIFTrajectory(BaseModel):
+    """An ATIF trajectory document."""
+
+    schema_version: str = ""
+    session_id: str = ""
+    agent: ATIFAgent = Field(default_factory=ATIFAgent)
+    steps: list[ATIFStep] = Field(default_factory=list)
+    extra: dict = Field(default_factory=dict)
+
+
+class GenAIATIFIngestReq(BaseModel):
+    """Ingest an ATIF (Agent Trace Interchange Format) trajectory."""
+
+    project_id: str
+    trajectory: ATIFTrajectory
+    conversation_name: str = ""
+    provider_name: str = ""
+
+
+class GenAIATIFIngestRes(BaseModel):
+    """Result of an ATIF trajectory ingest."""
+
+    conversation_id: str
+    trace_ids: list[str]
+    span_count: int
+
+
+# ---------------------------------------------------------------------------
+# OpenHands event-stream ingest
+# ---------------------------------------------------------------------------
+
+
+class OpenHandsEvent(BaseModel):
+    """A single event from an OpenHands event stream.
+
+    The ``event_type`` discriminates between message, action, observation,
+    and system_prompt events.
+    """
+
+    id: int = 0
+    timestamp: str = ""
+    source: Literal["user", "agent", "environment"] = "agent"
+    event_type: Literal[
+        "message", "action", "observation", "system_prompt", "other"
+    ] = "other"
+
+    # message fields
+    content: str = ""
+
+    # action fields
+    tool_name: str = ""
+    tool_call_id: str = ""
+    thought: str = ""
+    arguments: str | dict = ""
+
+    # observation fields
+    observation_content: str = ""
+    action_id: int = 0
+
+    # system_prompt fields
+    system_prompt: str = ""
+
+    # LLM response grouping
+    llm_response_id: str = ""
+
+    extra: dict = Field(default_factory=dict)
+
+
+class GenAIOpenHandsIngestReq(BaseModel):
+    """Ingest an OpenHands event stream as a conversation."""
+
+    project_id: str
+    session_id: str = ""
+    events: list[OpenHandsEvent]
+    conversation_name: str = ""
+    agent_name: str = ""
+    provider_name: str = ""
+
+
+class GenAIOpenHandsIngestRes(BaseModel):
+    """Result of an OpenHands event stream ingest."""
+
+    conversation_id: str
+    trace_ids: list[str]
+    span_count: int
 
 
 class CallStartReq(BaseModelStrict):
@@ -3279,6 +3546,18 @@ class TraceServerInterface(Protocol):
     def genai_annotations_query(
         self, req: GenAIAnnotationsQueryReq
     ) -> GenAIAnnotationsQueryRes: ...
+    def genai_search(self, req: GenAISearchReq) -> GenAISearchRes: ...
+
+    # GenAI structured ingest API
+    def genai_conversation_ingest(
+        self, req: GenAIConversationIngestReq
+    ) -> GenAIConversationIngestRes: ...
+    def genai_ingest_atif(
+        self, req: GenAIATIFIngestReq
+    ) -> GenAIATIFIngestRes: ...
+    def genai_ingest_openhands(
+        self, req: GenAIOpenHandsIngestReq
+    ) -> GenAIOpenHandsIngestRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

@@ -492,6 +492,34 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             "GenAI conversations query is not yet supported."
         )
 
+    def genai_search(self, req: tsi.GenAISearchReq) -> tsi.GenAISearchRes:
+        """Full-text search across GenAI message content."""
+        raise NotImplementedError("GenAI search is not yet supported.")
+
+    def genai_conversation_ingest(
+        self, req: tsi.GenAIConversationIngestReq
+    ) -> tsi.GenAIConversationIngestRes:
+        """Ingest a structured conversation."""
+        raise NotImplementedError(
+            "GenAI conversation ingest is not yet supported."
+        )
+
+    def genai_ingest_atif(
+        self, req: tsi.GenAIATIFIngestReq
+    ) -> tsi.GenAIATIFIngestRes:
+        """Ingest an ATIF trajectory."""
+        raise NotImplementedError(
+            "GenAI ATIF ingest is not yet supported."
+        )
+
+    def genai_ingest_openhands(
+        self, req: tsi.GenAIOpenHandsIngestReq
+    ) -> tsi.GenAIOpenHandsIngestRes:
+        """Ingest an OpenHands event stream."""
+        raise NotImplementedError(
+            "GenAI OpenHands ingest is not yet supported."
+        )
+
     def genai_conversation_chat(
         self, req: tsi.GenAIConversationChatReq
     ) -> tsi.GenAIConversationChatRes:

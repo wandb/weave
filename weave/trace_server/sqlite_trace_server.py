@@ -2255,6 +2255,36 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             "genai_conversations_query is not implemented for SQLite trace server"
         )
 
+    def genai_search(self, req: tsi.GenAISearchReq) -> tsi.GenAISearchRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_search is not implemented for SQLite trace server"
+        )
+
+    def genai_conversation_ingest(
+        self, req: tsi.GenAIConversationIngestReq
+    ) -> tsi.GenAIConversationIngestRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_conversation_ingest is not implemented for SQLite trace server"
+        )
+
+    def genai_ingest_atif(
+        self, req: tsi.GenAIATIFIngestReq
+    ) -> tsi.GenAIATIFIngestRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_ingest_atif is not implemented for SQLite trace server"
+        )
+
+    def genai_ingest_openhands(
+        self, req: tsi.GenAIOpenHandsIngestReq
+    ) -> tsi.GenAIOpenHandsIngestRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_ingest_openhands is not implemented for SQLite trace server"
+        )
+
     def genai_conversation_chat(
         self, req: tsi.GenAIConversationChatReq
     ) -> tsi.GenAIConversationChatRes:

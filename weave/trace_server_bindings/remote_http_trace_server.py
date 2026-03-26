@@ -650,6 +650,36 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, "/genai/conversations/query")
         return tsi.GenAIConversationsQueryRes.model_validate(r.json())
 
+    def genai_search(self, req: tsi.GenAISearchReq) -> tsi.GenAISearchRes:
+        """Full-text search across GenAI message content."""
+        r = self._post_request_executor("/genai/search", req)
+        handle_response_error(r, "/genai/search")
+        return tsi.GenAISearchRes.model_validate(r.json())
+
+    def genai_conversation_ingest(
+        self, req: tsi.GenAIConversationIngestReq
+    ) -> tsi.GenAIConversationIngestRes:
+        """Ingest a structured conversation."""
+        r = self._post_request_executor("/genai/conversations/ingest", req)
+        handle_response_error(r, "/genai/conversations/ingest")
+        return tsi.GenAIConversationIngestRes.model_validate(r.json())
+
+    def genai_ingest_atif(
+        self, req: tsi.GenAIATIFIngestReq
+    ) -> tsi.GenAIATIFIngestRes:
+        """Ingest an ATIF trajectory."""
+        r = self._post_request_executor("/genai/ingest/atif", req)
+        handle_response_error(r, "/genai/ingest/atif")
+        return tsi.GenAIATIFIngestRes.model_validate(r.json())
+
+    def genai_ingest_openhands(
+        self, req: tsi.GenAIOpenHandsIngestReq
+    ) -> tsi.GenAIOpenHandsIngestRes:
+        """Ingest an OpenHands event stream."""
+        r = self._post_request_executor("/genai/ingest/openhands", req)
+        handle_response_error(r, "/genai/ingest/openhands")
+        return tsi.GenAIOpenHandsIngestRes.model_validate(r.json())
+
     def genai_conversation_chat(
         self, req: tsi.GenAIConversationChatReq
     ) -> tsi.GenAIConversationChatRes:
