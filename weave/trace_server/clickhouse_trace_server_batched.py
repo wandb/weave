@@ -119,6 +119,7 @@ from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
     InsertTooLarge,
+    InvalidFieldError,
     InvalidRequest,
     MissingLLMApiKeyError,
     NotFoundError,
@@ -1004,7 +1005,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id, self.ch_client
         )
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb, read_table)
+        try:
+            query, columns = build_calls_stats_query(req, pb, read_table)
+        except InvalidFieldError:
+            logger.warning(
+                "invalid_field_in_calls_query_stats: %s",
+                str(req),
+                extra={
+                    "project_id": req.project_id,
+                    "req": req.model_dump(mode="json"),
+                },
+            )
+            raise
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -1338,35 +1350,46 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if req.expand_columns is not None:
             cq.set_expand_columns(req.expand_columns)
-        for col in columns:
-            cq.add_field(col)
-        if req.filter is not None:
-            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
-        if req.query is not None:
-            cq.add_condition(req.query.expr_)
+        try:
+            for col in columns:
+                cq.add_field(col)
+            if req.filter is not None:
+                cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+            if req.query is not None:
+                cq.add_condition(req.query.expr_)
 
-        # Sort with empty list results in no sorting
-        if req.sort_by:
-            for sort_by in req.sort_by:
-                cq.add_order(sort_by.field, sort_by.direction)
-            # If user isn't already sorting by id, add id as secondary sort for consistency.
-            if not any(sort_by.field == "id" for sort_by in req.sort_by):
-                last_sort = req.sort_by[-1]
-                # When sorting by started_at, match the id direction to started_at for perf
-                if last_sort.field == "started_at":
-                    cq.add_order("id", last_sort.direction)
-                else:
-                    cq.add_order("id", "desc")
-        else:
-            cq.add_order("started_at", "asc")
-            cq.add_order("id", "asc")
-        if req.limit is not None:
-            cq.set_limit(req.limit)
-        if req.offset is not None:
-            cq.set_offset(req.offset)
+            # Sort with empty list results in no sorting
+            if req.sort_by:
+                for sort_by in req.sort_by:
+                    cq.add_order(sort_by.field, sort_by.direction)
+                # If user isn't already sorting by id, add id as secondary sort for consistency.
+                if not any(sort_by.field == "id" for sort_by in req.sort_by):
+                    last_sort = req.sort_by[-1]
+                    # When sorting by started_at, match the id direction to started_at for perf
+                    if last_sort.field == "started_at":
+                        cq.add_order("id", last_sort.direction)
+                    else:
+                        cq.add_order("id", "desc")
+            else:
+                cq.add_order("started_at", "asc")
+                cq.add_order("id", "asc")
+            if req.limit is not None:
+                cq.set_limit(req.limit)
+            if req.offset is not None:
+                cq.set_offset(req.offset)
 
-        pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
+            pb = ParamBuilder()
+            raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
+        except InvalidFieldError:
+            logger.warning(
+                "invalid_field_in_calls_query: %s",
+                str(req),
+                extra={
+                    "project_id": req.project_id,
+                    "req": req.model_dump(mode="json"),
+                },
+            )
+            raise
 
         if req.include_costs:
             # Cost query SELECT adds ORDER BY fields; result columns must match.
