@@ -146,6 +146,17 @@ def _expected_metadata_query(where_clause: str, outer_clauses: str = "") -> str:
     """
     return f"""
 WITH latest_row_per_digest AS (
+    -- Before ReplacingMergeTree compacts rows, multiple rows can exist
+    -- for the same (project, object, digest) — e.g. the original insert
+    -- and a soft-delete (which inserts a new row with deleted_at set,
+    -- inheriting the original created_at).  Pick the newest row; on
+    -- created_at ties, prefer the soft-delete so deletes are visible
+    -- before RMT merges.
+    --
+    -- _first_created_at comes from the object_version_first_seen MV,
+    -- which tracks the earliest created_at per digest across all inserts.
+    -- This survives RMT merges (which discard old rows) and keeps
+    -- version_index stable when the same digest is re-published.
     SELECT
         ov.project_id,
         ov.object_id,
@@ -172,6 +183,11 @@ WITH latest_row_per_digest AS (
     WHERE {where_clause}
 ),
 object_versions_with_index AS (
+    -- For each object, number its versions 0, 1, 2, ... ordered by when
+    -- each digest was first published (_first_created_at).  Also marks
+    -- is_latest (1 for the most recently published non-deleted version;
+    -- callers always filter with deleted_at IS NULL, so if all versions
+    -- are deleted the query returns no results), and version_count.
     SELECT
         *,
         row_number() OVER (
