@@ -4,6 +4,7 @@ Runs actual SQL against a single-node ClickHouse with embedded Keeper.
 """
 
 import os
+import time
 import uuid
 
 from weave.trace_server.clickhouse_trace_server_migrator import (
@@ -42,6 +43,19 @@ def _get_table_engine_full(ch_client, db_name: str, table_name: str) -> str:
     )
     assert len(result.result_rows) == 1, f"Table {db_name}.{table_name} not found"
     return result.result_rows[0][0]
+
+
+def _sync_mutations(ch_client, db_name: str, table_name: str) -> None:
+    """Wait for all pending mutations to complete on a table."""
+    for _ in range(50):
+        result = ch_client.query(
+            "SELECT count() FROM system.mutations "
+            f"WHERE database = '{db_name}' AND table = '{table_name}' AND is_done = 0"
+        )
+        if result.result_rows[0][0] == 0:
+            return
+        time.sleep(0.1)
+    raise TimeoutError(f"Mutations on {db_name}.{table_name} did not complete")
 
 
 def _table_exists(ch_client, db_name: str, table_name: str) -> bool:
@@ -213,3 +227,62 @@ def test_all_production_migrations_distributed(ch_client):
 
     assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
     assert _get_db_engine(ch_client, target_db) == "Replicated"
+
+
+def test_all_production_down_migrations_replicated(ch_client):
+    """All production down migrations apply cleanly in replicated mode."""
+    mgmt_db = _unique_name("db_mgmt_down_repl")
+    target_db = _unique_name("down_repl")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=True,
+        use_distributed=False,
+        replicated_cluster=_CLUSTER,
+        replicated_path=_REPLICATED_PATH,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+        post_migration_hook=None,
+    )
+
+    # Migrate up to latest
+    migrator.apply_migrations(target_db)
+    assert _get_db_engine(ch_client, target_db) == "Replicated"
+
+    # ALTER TABLE UPDATE mutations are async; wait for them to settle
+    _sync_mutations(ch_client, mgmt_db, "migrations")
+
+    # Migrate all the way back down
+    migrator.apply_migrations(target_db, target_version=0)
+
+
+def test_all_production_down_migrations_distributed(ch_client):
+    """All production down migrations apply cleanly in distributed mode."""
+    mgmt_db = _unique_name("db_mgmt_down_dist")
+    target_db = _unique_name("down_dist")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=True,
+        use_distributed=True,
+        replicated_cluster=_CLUSTER,
+        replicated_path=_REPLICATED_PATH,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+        post_migration_hook=None,
+    )
+
+    # Migrate up to latest
+    migrator.apply_migrations(target_db)
+    assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
+    assert _get_db_engine(ch_client, target_db) == "Replicated"
+
+    # ALTER TABLE UPDATE mutations are async; wait for them to settle
+    _sync_mutations(ch_client, mgmt_db, "migrations")
+
+    # Migrate all the way back down
+    migrator.apply_migrations(target_db, target_version=0)
