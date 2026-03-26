@@ -263,27 +263,15 @@ def _calls_query_req_dd_tags(
     req: tsi.CallsQueryReq | tsi.CallsQueryStatsReq,
     endpoint: str,
 ) -> dict[str, str]:
-    """Extract user-provided query fields as DD span tags for debuggability.
+    """Tag DD span with the user's request for debuggability.
 
-    When InvalidFieldError fires, the DD span already has the request context
+    When InvalidFieldError fires, the span already has the request context
     so operators can see exactly what query triggered the error.
     """
-    tags: dict[str, str] = {
+    return {
         "calls_query.endpoint": endpoint,
-        "calls_query.project_id": req.project_id,
+        "calls_query.req": req.model_dump_json()[:_DD_TAG_MAX_LEN],
     }
-    if req.query is not None:
-        tags["calls_query.query"] = req.query.model_dump_json()[:_DD_TAG_MAX_LEN]
-    if req.filter is not None:
-        tags["calls_query.filter"] = req.filter.model_dump_json()[:_DD_TAG_MAX_LEN]
-    if isinstance(req, tsi.CallsQueryReq):
-        if req.columns is not None:
-            tags["calls_query.columns"] = ",".join(req.columns)[:_DD_TAG_MAX_LEN]
-        if req.sort_by is not None:
-            tags["calls_query.sort_by"] = ",".join(
-                f"{s.field}:{s.direction}" for s in req.sort_by
-            )[:_DD_TAG_MAX_LEN]
-    return tags
 
 
 class ClickHouseTraceServer(tsi.FullTraceServerInterface):

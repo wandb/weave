@@ -1142,33 +1142,20 @@ def test_file_batch_clears_on_insert_failure():
 
 
 def test_calls_query_req_dd_tags():
-    """_calls_query_req_dd_tags extracts user-provided fields for DD span tagging."""
+    """_calls_query_req_dd_tags dumps the full request into a single tag."""
     req = tsi.CallsQueryReq(
         project_id="test/my-project",
         columns=["status", "op_name"],
         sort_by=[tsi.SortBy(field="started_at", direction="desc")],
-        query=tsi_query.Query(
-            expr_=tsi_query.EqOperation.model_validate(
-                {"$eq": [{"$getField": "status"}, {"$literal": "running"}]}
-            )
-        ),
         filter=tsi.CallsFilter(op_names=["my_op"]),
     )
     tags = chts._calls_query_req_dd_tags(req, "calls_query_stream")
 
     assert tags["calls_query.endpoint"] == "calls_query_stream"
-    assert tags["calls_query.project_id"] == "test/my-project"
-    assert tags["calls_query.columns"] == "status,op_name"
-    assert tags["calls_query.sort_by"] == "started_at:desc"
-    assert "status" in tags["calls_query.query"]
-    assert "my_op" in tags["calls_query.filter"]
-
-    # CallsQueryStatsReq has no columns/sort_by — those keys should be absent
-    stats_req = tsi.CallsQueryStatsReq(project_id="test/stats")
-    stats_tags = chts._calls_query_req_dd_tags(stats_req, "calls_query_stats")
-    assert stats_tags["calls_query.endpoint"] == "calls_query_stats"
-    assert "calls_query.columns" not in stats_tags
-    assert "calls_query.sort_by" not in stats_tags
+    assert "test/my-project" in tags["calls_query.req"]
+    assert "status" in tags["calls_query.req"]
+    assert "my_op" in tags["calls_query.req"]
+    assert len(tags["calls_query.req"]) <= 500
 
 
 def test_invalid_field_error_propagates_from_calls_query(mock_ch_server):
