@@ -5097,7 +5097,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             lambda: self.obj_read(req), max_attempts=max_attempts
         )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_content_read_with_retry")
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._file_content_read_with_retry"
+    )
     def _file_content_read_with_retry(
         self, req: tsi.FileContentReadReq, max_attempts: int = 2
     ) -> tsi.FileContentReadRes:
