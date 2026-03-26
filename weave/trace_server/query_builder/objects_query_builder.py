@@ -360,8 +360,9 @@ WITH latest_row_per_digest AS (
     ) AS fc USING (object_id, digest)
     WHERE ov.project_id = {{project_id: String}}{self.object_id_conditions_part}
 ),
-versioned AS (
-    -- Assign version_index (sequential by first publish time),
+object_versions_with_index AS (
+    -- For each object, number its versions 0, 1, 2, ... ordered by when
+    -- each digest was first published (_first_created_at).  Also marks
     -- is_latest (1 for the most recently published non-deleted version;
     -- callers always filter with deleted_at IS NULL, so if all versions
     -- are deleted the query returns no results), and version_count.
@@ -384,7 +385,7 @@ versioned AS (
 )
 SELECT
     {columns_str}
-FROM versioned AS {main_table_alias}
+FROM object_versions_with_index AS {main_table_alias}
     {join_clause}
 """
         if self.conditions_part:

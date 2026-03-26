@@ -171,7 +171,7 @@ WITH latest_row_per_digest AS (
     ) AS fc USING (object_id, digest)
     WHERE {where_clause}
 ),
-versioned AS (
+object_versions_with_index AS (
     SELECT
         *,
         row_number() OVER (
@@ -204,7 +204,7 @@ SELECT
     wb_user_id,
     version_count,
     is_op
-FROM versioned AS main
+FROM object_versions_with_index AS main
 {outer_clauses}"""
 
 
