@@ -203,12 +203,10 @@ FROM (
             ) AS rn
         FROM object_versions AS ov
         LEFT JOIN (
-            SELECT project_id, object_id, digest, first_created_at
+            SELECT object_id, digest, first_created_at
             FROM object_version_first_seen
             WHERE project_id = {project_id: String}
-        ) AS fc ON ov.project_id = fc.project_id
-            AND ov.object_id = fc.object_id
-            AND ov.digest = fc.digest"""
+        ) AS fc USING (object_id, digest)"""
 
 
 def assert_sql(exp_query, actual_query):
