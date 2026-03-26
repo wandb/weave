@@ -176,9 +176,10 @@ WITH latest_row_per_digest AS (
         ) AS rn
     FROM object_versions AS ov
     LEFT JOIN (
-        SELECT object_id, digest, first_created_at
+        SELECT object_id, digest, min(first_created_at) AS first_created_at
         FROM object_version_first_seen
         WHERE project_id = {{project_id: String}}
+        GROUP BY object_id, digest
     ) AS fc USING (object_id, digest)
     WHERE {where_clause}
 ),
