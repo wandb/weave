@@ -5483,22 +5483,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return True
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        # Retry file reads to handle ClickHouse eventual consistency.
+        # ClickHouse eventual consistency: there is a brief window after an
+        # INSERT where a SELECT may not yet see the new rows. Since file uploads
+        # are deferred to a background executor, a read immediately after publish
+        # can race against insert visibility. Same issue as _obj_read_with_retry.
         #
-        # The `files` table uses ReplacingMergeTree. While inserts are synchronous
-        # from the client's perspective (the INSERT returns after data is written),
-        # there is a brief window where a subsequent SELECT may not yet see the
-        # newly inserted rows. This is the same eventual consistency behavior that
-        # motivated `_obj_read_with_retry` for object reads.
-        #
-        # This affects real users, not just tests: `_send_file_create` in the
-        # client defers file uploads to a background executor, and if a user
-        # publishes an object containing a file (Image, Video, Audio, Content)
-        # and immediately reads it back, the query below can race against insert
-        # visibility.
-        #
-        # We use a single retry after 1 second. The data is almost certainly in
-        # ClickHouse — it just may not be visible to queries yet.
+        # Single retry after 1s. Can increase retries at the cost of higher
+        # latency when a file genuinely doesn't exist.
         @retry(
             stop=stop_after_attempt(2),
             wait=wait_fixed(1),
