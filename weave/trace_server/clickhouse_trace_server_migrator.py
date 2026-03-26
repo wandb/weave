@@ -215,12 +215,11 @@ class BaseClickHouseTraceServerMigrator(ABC):
         status = self._get_migration_status(target_db)
         logger.info("""`%s` migration status: %s""", target_db, status)
         if status["partially_applied_version"]:
-            logger.info(
-                "Unable to apply migrations to `%s`. Found partially applied migration version %s. Please fix the database manually and try again.",
-                target_db,
-                status["partially_applied_version"],
+            raise MigrationError(
+                f"Unable to apply migrations to `{target_db}`. Found partially applied "
+                f"migration version {status['partially_applied_version']}. "
+                f"Please fix the database manually and try again."
             )
-            return
         migration_map = self._get_migrations()
         migrations_to_apply = self._determine_migrations_to_apply(
             status["curr_version"], migration_map, target_version
