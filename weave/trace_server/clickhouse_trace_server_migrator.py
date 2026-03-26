@@ -74,7 +74,6 @@
 import logging
 import os
 import re
-import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -83,6 +82,12 @@ from re import Pattern
 
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
@@ -95,9 +100,19 @@ logger = logging.getLogger(__name__)
 # the latest ALTER metadata — common on multi-replica managed ClickHouse clusters
 # when sequential DDL statements run faster than replication can propagate.
 _TRANSIENT_CH_ERROR_CODES = {517}
-_MAX_RETRIES = 5
-_INITIAL_BACKOFF_SECS = 1.0
-_BACKOFF_MULTIPLIER = 2.0
+_MAX_RETRIES = 3
+
+
+def _is_transient_ch_error(exc: BaseException) -> bool:
+    """Check if a ClickHouse error is a known transient replication error."""
+    if not isinstance(exc, DatabaseError):
+        return False
+    # clickhouse_connect.DatabaseError has no structured error code attr; parse from message.
+    match = re.search(r"Code:\s*(\d+)", str(exc))
+    if match is None:
+        return False
+    return int(match.group(1)) in _TRANSIENT_CH_ERROR_CODES
+
 
 # These settings are only used when `replicated` mode is enabled for
 # self managed clickhouse instances.
@@ -432,6 +447,12 @@ class BaseClickHouseTraceServerMigrator(ABC):
         """Check if a string is safe to use as an identifier in SQL."""
         return bool(SQLPatterns.SAFE_IDENTIFIER.match(value))
 
+    @retry(
+        stop=stop_after_attempt(_MAX_RETRIES + 1),
+        wait=wait_exponential(multiplier=1, min=1, max=8),
+        retry=retry_if_exception(_is_transient_ch_error),
+        reraise=True,
+    )
     def _run_ddl_with_retry(self, command: str) -> None:
         """Execute a DDL command with retry for transient replication errors.
 
@@ -439,39 +460,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         causing error 517 (CANNOT_ASSIGN_ALTER). This retries with exponential
         backoff for those known-transient codes.
         """
-        backoff = _INITIAL_BACKOFF_SECS
-        for attempt in range(_MAX_RETRIES + 1):
-            try:
-                self.ch_client.command(command)
-            except DatabaseError as e:
-                error_code = self._extract_ch_error_code(e)
-                if (
-                    error_code not in _TRANSIENT_CH_ERROR_CODES
-                    or attempt == _MAX_RETRIES
-                ):
-                    raise
-                logger.warning(
-                    "Transient ClickHouse error (code %s) on attempt %d/%d, "
-                    "retrying in %.1fs: %s",
-                    error_code,
-                    attempt + 1,
-                    _MAX_RETRIES + 1,
-                    backoff,
-                    e,
-                )
-                time.sleep(backoff)
-                backoff *= _BACKOFF_MULTIPLIER
-            else:
-                return
-
-    @staticmethod
-    def _extract_ch_error_code(exc: DatabaseError) -> int | None:
-        """Extract the numeric error code from a ClickHouse DatabaseError.
-
-        clickhouse_connect.DatabaseError has no structured error code attr; parse from message.
-        """
-        match = re.search(r"Code:\s*(\d+)", str(exc))
-        return int(match.group(1)) if match else None
+        self.ch_client.command(command)
 
 
 class CloudClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator):

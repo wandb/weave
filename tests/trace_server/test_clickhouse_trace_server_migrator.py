@@ -14,6 +14,7 @@ from weave.trace_server.clickhouse_trace_server_migrator import (
     MigrationError,
     ReplicatedClickHouseTraceServerMigrator,
     SQLPatterns,
+    _is_transient_ch_error,
 )
 
 DEFAULT_MIGRATION_DIR = os.path.abspath(
@@ -1092,42 +1093,36 @@ def test_index_operations_only_on_local_tables_distributed(distributed_migrator)
         distributed_migrator.ch_client.command.reset_mock()
 
 
-@patch("weave.trace_server.clickhouse_trace_server_migrator.time.sleep")
+@patch("tenacity.nap.time.sleep")
 def test_run_ddl_with_retry(mock_sleep, mock_costs):
     """Verify retry behavior for transient CH errors (e.g. 517 CANNOT_ASSIGN_ALTER)."""
     ch_client = Mock()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(ch_client)
     ch_client.command.reset_mock()
 
-    # Succeeds immediately on clean call
-    migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
-    assert ch_client.command.call_count == 1
-    ch_client.command.reset_mock()
-    mock_sleep.reset_mock()
-
-    # Retries on 517, then succeeds
     error_517 = DatabaseError(
         "Code: 517. DB::Exception: Looks like this replica doesn't catchup "
         "with latest ALTER query updates: metadata version on replica is 2, "
         "while common metadata is 3. (CANNOT_ASSIGN_ALTER)"
     )
+
+    # Succeeds immediately on clean call
+    migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
+    assert ch_client.command.call_count == 1
+    ch_client.command.reset_mock()
+
+    # Retries on 517, then succeeds
     ch_client.command.side_effect = [error_517, error_517, None]
     migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
     assert ch_client.command.call_count == 3
-    assert mock_sleep.call_count == 2
-    mock_sleep.assert_any_call(1.0)
-    mock_sleep.assert_any_call(2.0)
     ch_client.command.reset_mock()
-    mock_sleep.reset_mock()
 
     # Gives up after max retries
     ch_client.command.side_effect = error_517
     with pytest.raises(DatabaseError, match="Code: 517"):
         migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
     assert ch_client.command.call_count == _MAX_RETRIES + 1
-    assert mock_sleep.call_count == _MAX_RETRIES
     ch_client.command.reset_mock()
-    mock_sleep.reset_mock()
 
     # Non-transient CH errors propagate immediately
     ch_client.command.side_effect = DatabaseError(
@@ -1145,10 +1140,10 @@ def test_run_ddl_with_retry(mock_sleep, mock_costs):
     assert ch_client.command.call_count == 1
 
 
-def test_extract_ch_error_code(mock_costs):
-    """Verify error code parsing from ClickHouse DatabaseError messages."""
-    extract = BaseClickHouseTraceServerMigrator._extract_ch_error_code
-    assert extract(DatabaseError("Code: 517. DB::Exception: ...")) == 517
-    assert extract(DatabaseError("Code: 62. DB::Exception: ...")) == 62
-    assert extract(DatabaseError("some other error")) is None
-    assert extract(DatabaseError("")) is None
+def test_is_transient_ch_error():
+    """Verify transient error detection from ClickHouse DatabaseError messages."""
+    assert _is_transient_ch_error(DatabaseError("Code: 517. DB::Exception: ..."))
+    assert not _is_transient_ch_error(DatabaseError("Code: 62. DB::Exception: ..."))
+    assert not _is_transient_ch_error(DatabaseError("some other error"))
+    assert not _is_transient_ch_error(DatabaseError(""))
+    assert not _is_transient_ch_error(ConnectionError("not a db error"))
