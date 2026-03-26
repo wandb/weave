@@ -137,6 +137,51 @@ def test_object_query_builder_sort():
 
 
 STATIC_METADATA_QUERY_PART = """
+WITH one_row_per_version AS (
+    SELECT
+        ov.project_id,
+        ov.object_id,
+        ov.created_at,
+        COALESCE(fc.first_created_at, ov.created_at) AS _first_created_at,
+        ov.deleted_at,
+        ov.kind,
+        ov.base_object_class,
+        ov.leaf_object_class,
+        ov.refs,
+        ov.digest,
+        ov.wb_user_id,
+        if (ov.kind = 'op', 1, 0) AS is_op,
+        row_number() OVER (
+            PARTITION BY ov.project_id, ov.kind, ov.object_id, ov.digest
+            ORDER BY ov.created_at DESC, (ov.deleted_at IS NULL) ASC
+        ) AS rn
+    FROM object_versions AS ov
+    LEFT JOIN (
+        SELECT object_id, digest, first_created_at
+        FROM object_version_first_seen
+        WHERE project_id = {project_id: String}
+    ) AS fc USING (object_id, digest)"""
+
+
+STATIC_VERSION_INDEX_PART = """),
+with_version_index AS (
+    SELECT
+        *,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY _first_created_at ASC, digest ASC
+        ) - 1 AS version_index,
+        count(*) OVER (
+            PARTITION BY project_id, kind, object_id
+        ) AS version_count,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
+        ) AS row_num,
+        if (row_num = 1, 1, 0) AS is_latest
+    FROM one_row_per_version
+    WHERE rn = 1
+)
 SELECT
     project_id,
     object_id,
@@ -152,61 +197,7 @@ SELECT
     wb_user_id,
     version_count,
     is_op
-FROM (
-    SELECT
-        project_id,
-        object_id,
-        created_at,
-        _first_created_at,
-        deleted_at,
-        kind,
-        base_object_class,
-        leaf_object_class,
-        refs,
-        digest,
-        wb_user_id,
-        is_op,
-        row_number() OVER (
-            PARTITION BY project_id,
-            kind,
-            object_id
-            ORDER BY _first_created_at ASC, digest ASC
-        ) - 1 AS version_index,
-        count(*) OVER (
-            PARTITION BY project_id, kind, object_id
-        ) as version_count,
-        row_number() OVER (
-            PARTITION BY project_id, kind, object_id
-            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
-        ) AS row_num,
-        if (row_num = 1, 1, 0) AS is_latest
-    FROM (
-        SELECT
-            ov.project_id,
-            ov.object_id,
-            ov.created_at,
-            COALESCE(fc.first_created_at, ov.created_at) AS _first_created_at,
-            ov.deleted_at,
-            ov.kind,
-            ov.base_object_class,
-            ov.leaf_object_class,
-            ov.refs,
-            ov.digest,
-            ov.wb_user_id,
-            if (ov.kind = 'op', 1, 0) AS is_op,
-            row_number() OVER (
-                PARTITION BY ov.project_id,
-                ov.kind,
-                ov.object_id,
-                ov.digest
-                ORDER BY ov.created_at DESC, (ov.deleted_at IS NULL) ASC
-            ) AS rn
-        FROM object_versions AS ov
-        LEFT JOIN (
-            SELECT object_id, digest, first_created_at
-            FROM object_version_first_seen
-            WHERE project_id = {project_id: String}
-        ) AS fc USING (object_id, digest)"""
+FROM with_version_index AS main"""
 
 
 def assert_sql(exp_query, actual_query):
@@ -224,10 +215,8 @@ def test_object_query_builder_metadata_query_basic():
     parameters = builder.parameters
 
     expected_query = f"""{STATIC_METADATA_QUERY_PART}
-        WHERE ov.project_id = {{project_id: String}}
-    )
-    WHERE rn = 1
-) as main
+    WHERE ov.project_id = {{project_id: String}}
+{STATIC_VERSION_INDEX_PART}
 WHERE ((is_latest = 1) AND (deleted_at IS NULL))
 ORDER BY created_at ASC"""
 
@@ -252,10 +241,8 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
     parameters = builder.parameters
 
     expected_query = f"""{STATIC_METADATA_QUERY_PART}
-        WHERE ov.project_id = {{project_id: String}} AND object_id = {{object_id: String}}
-    )
-    WHERE rn = 1
-) as main
+    WHERE ov.project_id = {{project_id: String}} AND object_id = {{object_id: String}}
+{STATIC_VERSION_INDEX_PART}
 WHERE ((((digest = {{version_digest_0: String}}) OR (digest = {{version_digest_1: String}}) OR (version_index = {{version_index_2: Int64}}))) AND (base_object_class IN {{base_object_classes: Array(String)}}) AND (deleted_at IS NULL))
 ORDER BY created_at DESC
 LIMIT 10
@@ -282,10 +269,8 @@ def test_objects_query_metadata_op():
     parameters = builder.parameters
 
     expected_query = f"""{STATIC_METADATA_QUERY_PART}
-        WHERE ov.project_id = {{project_id: String}} AND object_id = {{object_id: String}}
-    )
-    WHERE rn = 1
-) as main
+    WHERE ov.project_id = {{project_id: String}} AND object_id = {{object_id: String}}
+{STATIC_VERSION_INDEX_PART}
 WHERE ((is_op = 1) AND (version_index = {{version_index_0: Int64}}) AND (deleted_at IS NULL))
 ORDER BY created_at ASC"""
 
