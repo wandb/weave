@@ -361,8 +361,10 @@ WITH latest_row_per_digest AS (
     WHERE ov.project_id = {{project_id: String}}{self.object_id_conditions_part}
 ),
 versioned AS (
-    -- Assign sequential version_index (ordered by first publish time),
-    -- is_latest (newest non-deleted version), and version_count.
+    -- Assign version_index (sequential by first publish time),
+    -- is_latest (1 for the most recently published non-deleted version;
+    -- callers always filter with deleted_at IS NULL, so if all versions
+    -- are deleted the query returns no results), and version_count.
     SELECT
         *,
         row_number() OVER (
