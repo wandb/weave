@@ -12,7 +12,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
 from re import sub
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -237,6 +237,8 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+T = TypeVar("T")
 
 
 # Create a shared connection pool manager for all ClickHouse connections
@@ -3232,7 +3234,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=object_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
 
         return tsi.OpCreateRes(
             digest=obj_result.digest,
@@ -3245,15 +3247,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         Returns the actual source code of the op.
         """
-        # Query for the ops
-        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_is_op_condition(True)
-        object_query_builder.add_object_ids_condition([req.object_id])
-        object_query_builder.add_digests_conditions(req.digest)
-        object_query_builder.set_include_deleted(include_deleted=True)
-        objs = self._select_objs_query(object_query_builder)
-        if len(objs) == 0:
-            raise NotFoundError(f"Op {req.object_id}:{req.digest} not found")
+
+        def _query_op() -> list[Any]:
+            object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+            object_query_builder.add_is_op_condition(True)
+            object_query_builder.add_object_ids_condition([req.object_id])
+            object_query_builder.add_digests_conditions(req.digest)
+            object_query_builder.set_include_deleted(include_deleted=True)
+            results = self._select_objs_query(object_query_builder)
+            if len(results) == 0:
+                raise NotFoundError(f"Op {req.object_id}:{req.digest} not found")
+            return results
+
+        objs = self._read_with_retry(_query_op)
 
         # There should not be multiple ops returned, but in case there are, just
         # return the first one.
@@ -3285,7 +3291,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # Load the actual source code
             try:
-                file_content_res = self.file_content_read(
+                file_content_res = self._file_content_read_with_retry(
                     tsi.FileContentReadReq(
                         project_id=req.project_id, digest=file_digest
                     )
@@ -3352,7 +3358,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
                         # Load the actual source code
                         try:
-                            file_content_res = self.file_content_read(
+                            file_content_res = self._file_content_read_with_retry(
                                 tsi.FileContentReadReq(
                                     project_id=req.project_id, digest=file_digest
                                 )
@@ -3455,7 +3461,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=dataset_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
 
         return tsi.DatasetCreateRes(
             digest=obj_result.digest,
@@ -3602,7 +3608,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=scorer_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
 
         # Get the ref and return the create result
         scorer_ref = ri.InternalObjectRef(
@@ -3722,7 +3728,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=evaluation_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
 
         # Get the ref and return the create result
         evaluation_ref = ri.InternalObjectRef(
@@ -3868,7 +3874,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=object_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
 
         # Build model reference - external adapter will convert to external format
         model_ref = ri.InternalObjectRef(
@@ -3899,7 +3905,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=req.object_id,
             digest=req.digest,
         )
-        obj_read_res = self.obj_read(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req)
 
         # Extract model properties from the val dict
         val = obj_read_res.obj.val
@@ -3916,7 +3922,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             digest=source_file_digest,
         )
-        file_content_res = self.file_content_read(file_content_req)
+        file_content_res = self._file_content_read_with_retry(file_content_req)
         source_code = file_content_res.content.decode("utf-8")
 
         # Extract additional attributes (exclude system fields)
@@ -3965,7 +3971,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     project_id=req.project_id,
                     digest=source_file_digest,
                 )
-                file_content_res = self.file_content_read(file_content_req)
+                file_content_res = self._file_content_read_with_retry(file_content_req)
                 source_code = file_content_res.content.decode("utf-8")
             else:
                 source_code = ""
@@ -5043,37 +5049,59 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Return grouped prediction/trial/score data for evaluation results."""
         return eval_helpers.eval_results_query(self, req)
 
-    def _obj_read_with_retry(
-        self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
-    ) -> tsi.ObjReadRes:
-        """Read an object with retry logic to handle race conditions.
+    @staticmethod
+    def _read_with_retry(
+        read_fn: Callable[[], T],
+        max_attempts: int = 2,
+        initial_delay: float = 0.05,
+    ) -> T:
+        """Retry a read operation to handle ClickHouse eventual consistency.
 
-        After creating an object, ClickHouse may not immediately make it available
-        for reading due to eventual consistency. This method retries with exponential
-        backoff to handle this race condition.
+        This is a rare case: after a write, ClickHouse may not immediately
+        make the data visible for reads. This helper retries with exponential
+        backoff to handle write-then-immediate-read scenarios.
 
         Args:
-            req: The object read request
-            max_retries: Maximum number of retry attempts (default 10)
-            initial_delay: Initial delay in seconds (default 0.05, i.e., 50ms)
+            read_fn: Callable that performs the read and raises NotFoundError
+                if the data is not yet visible.
+            max_attempts: Total number of attempts (default 2, i.e. 1 retry).
+                Callers should override only when higher consistency latency
+                is expected.
+            initial_delay: Initial delay in seconds (default 0.05, i.e., 50ms).
 
         Returns:
-            ObjReadRes with the object data
+            The result of read_fn.
 
         Raises:
-            NotFoundError: If the object is not found after all retries
+            NotFoundError: If the data is not found after all attempts.
         """
 
         @retry(
-            stop=stop_after_attempt(max_retries),
+            stop=stop_after_attempt(max_attempts),
             wait=wait_exponential(multiplier=1, min=initial_delay, max=1.0),
             retry=retry_if_exception_type(NotFoundError),
             reraise=True,
         )
-        def _read() -> tsi.ObjReadRes:
-            return self.obj_read(req)
+        def _do_read() -> T:
+            return read_fn()
 
-        return _read()
+        return _do_read()
+
+    def _obj_read_with_retry(
+        self, req: tsi.ObjReadReq, max_attempts: int = 2
+    ) -> tsi.ObjReadRes:
+        """Read an object with retry for ClickHouse eventual consistency."""
+        return self._read_with_retry(
+            lambda: self.obj_read(req), max_attempts=max_attempts
+        )
+
+    def _file_content_read_with_retry(
+        self, req: tsi.FileContentReadReq, max_attempts: int = 2
+    ) -> tsi.FileContentReadRes:
+        """Read file content with retry for ClickHouse eventual consistency."""
+        return self._read_with_retry(
+            lambda: self.file_content_read(req), max_attempts=max_attempts
+        )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
     def _parsed_refs_read_batch(
