@@ -1,7 +1,6 @@
 import base64
 import datetime as dt
 import json
-import logging
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
@@ -13,7 +12,6 @@ from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -1143,102 +1141,82 @@ def test_file_batch_clears_on_insert_failure():
         )
 
 
-def _make_ch_server() -> chts.ClickHouseTraceServer:
-    """Create a ClickHouseTraceServer with mocked-out CH client and table resolver."""
-    with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=MagicMock()
-    ):
-        srv = chts.ClickHouseTraceServer(host="test_host")
-        srv._thread_local.ch_client = MagicMock()
-        mock_resolver = MagicMock()
-        mock_resolver.resolve_read_table.return_value = ReadTable.CALLS_MERGED
-        srv._table_routing_resolver = mock_resolver
-        return srv
+def test_calls_query_req_dd_tags():
+    """_calls_query_req_dd_tags extracts user-provided fields for DD span tagging."""
+    req = tsi.CallsQueryReq(
+        project_id="test/my-project",
+        columns=["status", "op_name"],
+        sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+        query=tsi_query.Query(
+            expr_=tsi_query.EqOperation.model_validate(
+                {"$eq": [{"$getField": "status"}, {"$literal": "running"}]}
+            )
+        ),
+        filter=tsi.CallsFilter(op_names=["my_op"]),
+    )
+    tags = chts._calls_query_req_dd_tags(req, "calls_query_stream")
+
+    assert tags["calls_query.endpoint"] == "calls_query_stream"
+    assert tags["calls_query.project_id"] == "test/my-project"
+    assert tags["calls_query.columns"] == "status,op_name"
+    assert tags["calls_query.sort_by"] == "started_at:desc"
+    assert "status" in tags["calls_query.query"]
+    assert "my_op" in tags["calls_query.filter"]
+
+    # CallsQueryStatsReq has no columns/sort_by — those keys should be absent
+    stats_req = tsi.CallsQueryStatsReq(project_id="test/stats")
+    stats_tags = chts._calls_query_req_dd_tags(stats_req, "calls_query_stats")
+    assert stats_tags["calls_query.endpoint"] == "calls_query_stats"
+    assert "calls_query.columns" not in stats_tags
+    assert "calls_query.sort_by" not in stats_tags
 
 
-def test_calls_query_stream_logs_request_on_invalid_field(caplog):
-    """InvalidFieldError in calls_query_stream logs the full request for all error paths:
-    bad column, bad filter field, and bad sort field.
+def test_invalid_field_error_propagates_from_calls_query(mock_ch_server):
+    """InvalidFieldError still propagates from calls_query_stream and calls_query_stats
+    for bad columns, bad filter fields, and bad sort fields.
     """
-    server = _make_ch_server()
-    logger_name = "weave.trace_server.clickhouse_trace_server_batched"
-
     # Bad column
-    with (
-        caplog.at_level(logging.WARNING, logger=logger_name),
-        pytest.raises(InvalidFieldError, match="status"),
-    ):
+    with pytest.raises(InvalidFieldError, match="status"):
         list(
-            server.calls_query_stream(
-                tsi.CallsQueryReq(project_id="test/col", columns=["status"])
+            mock_ch_server.calls_query_stream(
+                tsi.CallsQueryReq(project_id="p", columns=["status"])
             )
         )
 
-    assert len(caplog.records) == 1
-    assert "status" in caplog.records[0].message
-    assert getattr(caplog.records[0], "project_id", None) == "test/col"
-    assert getattr(caplog.records[0], "req", None) is not None
-    caplog.clear()
-
     # Bad filter field
-    bad_filter_req = tsi.CallsQueryReq(
-        project_id="test/filter",
-        query=tsi_query.Query(
-            expr_=tsi_query.EqOperation.model_validate(
-                {"$eq": [{"$getField": "nonexistent"}, {"$literal": "v"}]}
-            )
-        ),
-    )
-    with (
-        caplog.at_level(logging.WARNING, logger=logger_name),
-        pytest.raises(InvalidFieldError),
-    ):
-        list(server.calls_query_stream(bad_filter_req))
-
-    assert len(caplog.records) == 1
-    assert getattr(caplog.records[0], "project_id", None) == "test/filter"
-    assert getattr(caplog.records[0], "req", None) is not None
-    caplog.clear()
-
-    # Bad sort field
-    with (
-        caplog.at_level(logging.WARNING, logger=logger_name),
-        pytest.raises(InvalidFieldError),
-    ):
+    with pytest.raises(InvalidFieldError, match="nonexistent"):
         list(
-            server.calls_query_stream(
+            mock_ch_server.calls_query_stream(
                 tsi.CallsQueryReq(
-                    project_id="test/sort",
-                    sort_by=[tsi.SortBy(field="bogus", direction="asc")],
+                    project_id="p",
+                    query=tsi_query.Query(
+                        expr_=tsi_query.EqOperation.model_validate(
+                            {"$eq": [{"$getField": "nonexistent"}, {"$literal": "v"}]}
+                        )
+                    ),
                 )
             )
         )
 
-    assert len(caplog.records) == 1
-    assert getattr(caplog.records[0], "project_id", None) == "test/sort"
-    assert getattr(caplog.records[0], "req", None) is not None
-
-
-def test_calls_query_stats_logs_request_on_invalid_field(caplog):
-    """InvalidFieldError in calls_query_stats also logs the request."""
-    server = _make_ch_server()
-    req = tsi.CallsQueryStatsReq(
-        project_id="test/stats",
-        query=tsi_query.Query(
-            expr_=tsi_query.EqOperation.model_validate(
-                {"$eq": [{"$getField": "nonexistent"}, {"$literal": "v"}]}
+    # Bad sort field
+    with pytest.raises(InvalidFieldError, match="bogus"):
+        list(
+            mock_ch_server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id="p", sort_by=[tsi.SortBy(field="bogus", direction="asc")]
+                )
             )
-        ),
-    )
+        )
 
-    with (
-        caplog.at_level(
-            logging.WARNING, logger="weave.trace_server.clickhouse_trace_server_batched"
-        ),
-        pytest.raises(InvalidFieldError),
-    ):
-        server.calls_query_stats(req)
-
-    assert len(caplog.records) == 1
-    assert getattr(caplog.records[0], "project_id", None) == "test/stats"
-    assert getattr(caplog.records[0], "req", None) is not None
+    # calls_query_stats with bad filter field
+    with pytest.raises(InvalidFieldError, match="nonexistent"):
+        mock_ch_server.calls_query_stats(
+            tsi.CallsQueryStatsReq(
+                project_id="p",
+                query=tsi_query.Query(
+                    expr_=tsi_query.EqOperation.model_validate(
+                        {"$eq": [{"$getField": "nonexistent"}, {"$literal": "v"}]}
+                    )
+                ),
+            )
+        )

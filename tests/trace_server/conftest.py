@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -18,6 +19,7 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
 )
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server.project_version import project_version
+from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -294,3 +296,19 @@ def trace_server(
         # For now, just return the sqlite trace server so we don't break existing tests.
         # raise ValueError(f"Invalid trace server: {trace_server_flag}")
         return get_sqlite_trace_server()
+
+
+@pytest.fixture
+def mock_ch_server():
+    """ClickHouseTraceServer with mocked CH client and table resolver for unit tests."""
+    with patch.object(
+        clickhouse_trace_server_batched.ClickHouseTraceServer,
+        "_mint_client",
+        return_value=MagicMock(),
+    ):
+        srv = clickhouse_trace_server_batched.ClickHouseTraceServer(host="test_host")
+        srv._thread_local.ch_client = MagicMock()
+        mock_resolver = MagicMock()
+        mock_resolver.resolve_read_table.return_value = ReadTable.CALLS_MERGED
+        srv._table_routing_resolver = mock_resolver
+        return srv

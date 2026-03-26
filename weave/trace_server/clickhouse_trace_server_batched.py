@@ -119,7 +119,6 @@ from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
     InsertTooLarge,
-    InvalidFieldError,
     InvalidRequest,
     MissingLLMApiKeyError,
     NotFoundError,
@@ -255,6 +254,36 @@ _CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
     for idx, col in enumerate(ALL_CALL_COMPLETE_INSERT_COLUMNS)
     if ch_sentinel_values.is_sentinel_field(col)
 ]
+
+
+_DD_TAG_MAX_LEN = 500
+
+
+def _calls_query_req_dd_tags(
+    req: tsi.CallsQueryReq | tsi.CallsQueryStatsReq,
+    endpoint: str,
+) -> dict[str, str]:
+    """Extract user-provided query fields as DD span tags for debuggability.
+
+    When InvalidFieldError fires, the DD span already has the request context
+    so operators can see exactly what query triggered the error.
+    """
+    tags: dict[str, str] = {
+        "calls_query.endpoint": endpoint,
+        "calls_query.project_id": req.project_id,
+    }
+    if req.query is not None:
+        tags["calls_query.query"] = req.query.model_dump_json()[:_DD_TAG_MAX_LEN]
+    if req.filter is not None:
+        tags["calls_query.filter"] = req.filter.model_dump_json()[:_DD_TAG_MAX_LEN]
+    if isinstance(req, tsi.CallsQueryReq):
+        if req.columns is not None:
+            tags["calls_query.columns"] = ",".join(req.columns)[:_DD_TAG_MAX_LEN]
+        if req.sort_by is not None:
+            tags["calls_query.sort_by"] = ",".join(
+                f"{s.field}:{s.direction}" for s in req.sort_by
+            )[:_DD_TAG_MAX_LEN]
+    return tags
 
 
 class ClickHouseTraceServer(tsi.FullTraceServerInterface):
@@ -1001,22 +1030,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
+        set_current_span_dd_tags(_calls_query_req_dd_tags(req, "calls_query_stats"))
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
         pb = ParamBuilder()
-        try:
-            query, columns = build_calls_stats_query(req, pb, read_table)
-        except InvalidFieldError:
-            logger.warning(
-                "invalid_field_in_calls_query_stats: %s",
-                str(req),
-                extra={
-                    "project_id": req.project_id,
-                    "req": req.model_dump(mode="json"),
-                },
-            )
-            raise
+        query, columns = build_calls_stats_query(req, pb, read_table)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -1295,6 +1314,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @generator_trace("clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
+        # Tag DD span with user-provided query fields for debuggability
+        set_current_span_dd_tags(_calls_query_req_dd_tags(req, "calls_query_stream"))
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
@@ -1350,48 +1371,35 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if req.expand_columns is not None:
             cq.set_expand_columns(req.expand_columns)
-        try:
-            for col in columns:
-                cq.add_field(col)
-            if req.filter is not None:
-                cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
-            if req.query is not None:
-                cq.add_condition(req.query.expr_)
+        for col in columns:
+            cq.add_field(col)
+        if req.filter is not None:
+            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+        if req.query is not None:
+            cq.add_condition(req.query.expr_)
 
-            # Sort with empty list results in no sorting
-            if req.sort_by:
-                for sort_by in req.sort_by:
-                    cq.add_order(sort_by.field, sort_by.direction)
-                # If user isn't already sorting by id, add id as secondary sort for consistency.
-                if not any(sort_by.field == "id" for sort_by in req.sort_by):
-                    last_sort = req.sort_by[-1]
-                    # When sorting by started_at, match the id direction to started_at for perf
-                    if last_sort.field == "started_at":
-                        cq.add_order("id", last_sort.direction)
-                    else:
-                        cq.add_order("id", "desc")
-            else:
-                cq.add_order("started_at", "asc")
-                cq.add_order("id", "asc")
-            if req.limit is not None:
-                cq.set_limit(req.limit)
-            if req.offset is not None:
-                cq.set_offset(req.offset)
+        # Sort with empty list results in no sorting
+        if req.sort_by:
+            for sort_by in req.sort_by:
+                cq.add_order(sort_by.field, sort_by.direction)
+            # If user isn't already sorting by id, add id as secondary sort for consistency.
+            if not any(sort_by.field == "id" for sort_by in req.sort_by):
+                last_sort = req.sort_by[-1]
+                # When sorting by started_at, match the id direction to started_at for perf
+                if last_sort.field == "started_at":
+                    cq.add_order("id", last_sort.direction)
+                else:
+                    cq.add_order("id", "desc")
+        else:
+            cq.add_order("started_at", "asc")
+            cq.add_order("id", "asc")
+        if req.limit is not None:
+            cq.set_limit(req.limit)
+        if req.offset is not None:
+            cq.set_offset(req.offset)
 
-            pb = ParamBuilder()
-            query_sql = cq.as_sql(pb)
-        except InvalidFieldError:
-            logger.warning(
-                "invalid_field_in_calls_query: %s",
-                str(req),
-                extra={
-                    "project_id": req.project_id,
-                    "req": req.model_dump(mode="json"),
-                },
-            )
-            raise
-
-        raw_res = self._query_stream(query_sql, pb.get_params(), settings=settings)
+        pb = ParamBuilder()
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
 
         if req.include_costs:
             # Cost query SELECT adds ORDER BY fields; result columns must match.
