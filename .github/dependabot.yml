@@ -27,7 +27,7 @@ updates:
           - "click*"
           - "gql*"
           - "jsonschema*"
-          - "diskcache*"
+          - "diskcache-weave*"
           - "nest-asyncio*"
           # - "weave_server_sdk*"
 

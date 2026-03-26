@@ -164,7 +164,7 @@ def test_construct_eval_with_dataset_get(client):
     )
     ref = dataset.ref
     assert ref is not None
-    dataset2 = weave.ref(ref.uri()).get()
+    dataset2 = weave.ref(ref.uri).get()
     weave.Evaluation(dataset=dataset2)
 
 

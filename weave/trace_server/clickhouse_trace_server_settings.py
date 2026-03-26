@@ -4,8 +4,6 @@ This module contains all configuration constants, type definitions, and column
 specifications used by the ClickHouse trace server implementation.
 """
 
-from typing import Any
-
 from weave.trace_server import environment as wf_env
 
 # File and batch processing settings
@@ -44,7 +42,7 @@ DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
 # https://clickhouse.com/docs/sql-reference/functions/json-functions#json_value
 RETURN_TYPE_ALLOW_COMPLEX = "1"
 
-CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
+CLICKHOUSE_DEFAULT_QUERY_SETTINGS: dict[str, int | str] = {
     "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
     or DEFAULT_MAX_MEMORY_USAGE,
     "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
@@ -52,22 +50,31 @@ CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
     # Valid values here are 'allow' or 'global', with 'global' slightly outperforming in testing
     "distributed_product_mode": "global",
-    "allow_experimental_lightweight_update": 1,
 }
+
+# Settings required for lightweight UPDATE/DELETE queries (ClickHouse 23.12+).
+# Only applied to endpoints that use lightweight updates: calls_complete updates,
+# annotation queue updates/deletes, and annotation queue progress updates.
+# Gated by WF_CLICKHOUSE_DISABLE_LIGHTWEIGHT_UPDATE env var for old CH versions.
+CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS: dict[str, int | str] = (
+    {}
+    if wf_env.wf_clickhouse_disable_lightweight_update()
+    else {"allow_experimental_lightweight_update": 1}
+)
 
 # The new ClickHouse query analyzer (v24+) has a bug serializing SortingStep
 # for non-Full sorting modes on distributed tables, which causes error 48
 # ("Serialization of SortingStep is implemented only for Full sorting").
 # Cost queries create partial-sort pipeline steps that break across shards.
 # Disabling this setting fixes the issue. Fixed in CH version 25.12.x
-CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS: dict[str, Any] = {
+CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS: dict[str, int | str] = {
     "collect_hash_table_stats_during_joins": 0,
 }
 
 # ClickHouse async insert settings
 # These settings are used when async_insert is enabled for high-throughput scenarios
 # Reference: https://clickhouse.com/docs/en/optimize/asynchronous-inserts
-CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, Any] = {
+CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, int | str] = {
     "async_insert": 1,
     # Wait for async insert to complete to ensure errors are caught
     "wait_for_async_insert": 1,
@@ -86,9 +93,18 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, Any] = {
 }
 
 
+def merge_default_query_settings(
+    overrides: dict[str, int | str] | None = None,
+) -> dict[str, int | str]:
+    """Merge caller-provided settings on top of CLICKHOUSE_DEFAULT_QUERY_SETTINGS."""
+    if not overrides:
+        return CLICKHOUSE_DEFAULT_QUERY_SETTINGS
+    return {**CLICKHOUSE_DEFAULT_QUERY_SETTINGS, **overrides}
+
+
 def update_settings_for_async_insert(
-    settings: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    settings: dict[str, int | str] | None = None,
+) -> dict[str, int | str]:
     merged_settings = CLICKHOUSE_ASYNC_INSERT_SETTINGS.copy()
     if settings is not None:
         merged_settings.update(settings)

@@ -1,0 +1,65 @@
+name: /lint
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  lint:
+    name: Auto-fix lint
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.body == '/lint' &&
+      contains(fromJSON('["MEMBER","OWNER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Get PR head ref
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_DATA=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }})
+          echo "ref=$(echo "$PR_DATA" | jq -r .head.ref)" >> "$GITHUB_OUTPUT"
+          echo "repo=$(echo "$PR_DATA" | jq -r .head.repo.full_name)" >> "$GITHUB_OUTPUT"
+
+      - name: Reject fork PRs
+        if: steps.pr.outputs.repo != github.repository
+        run: |
+          echo "::error::Cannot run /lint on fork PRs for security reasons."
+          exit 1
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ steps.pr.outputs.repo }}
+          ref: ${{ steps.pr.outputs.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+
+      - name: Run nox lint
+        run: nox -e lint -- --all-files
+        continue-on-error: true
+
+      - name: Commit and push fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No lint fixes needed."
+          else
+            git commit -m "chore(weave): Auto-fix lint issues"
+            git push
+          fi

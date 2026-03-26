@@ -32,7 +32,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     )
 
     # Construct the URI
-    action_ref_uri = published_ref.uri()
+    action_ref_uri = published_ref.uri
 
     # Part 2: Demonstrate manual feedback (this is not user-facing)
     # This could be it's own test, but it's convenient to have it here.
@@ -46,7 +46,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
         FeedbackCreateReq.model_validate(
             {
                 "project_id": client._project_id(),
-                "weave_ref": call1.ref.uri(),
+                "weave_ref": call1.ref.uri,
                 "feedback_type": "wandb.runnable." + action_name,
                 "runnable_ref": action_ref_uri,
                 "payload": {

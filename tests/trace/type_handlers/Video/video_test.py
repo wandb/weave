@@ -68,7 +68,7 @@ def test_video_with_no_ext_converted(
         ref = weave.publish(clip)
 
         # Check that we can get it back
-        recovered = weave.ref(ref.uri()).get()
+        recovered = weave.ref(ref.uri).get()
         try:
             assert isinstance(recovered, VideoClip)
         finally:
@@ -99,7 +99,7 @@ def test_video_publish(client: WeaveClient, test_video: VideoClip) -> None:
     ref = weave.publish(test_video)
     assert ref is not None
 
-    gotten_video = weave.ref(ref.uri()).get()
+    gotten_video = weave.ref(ref.uri).get()
     assert isinstance(gotten_video, VideoClip)
 
     try:
@@ -133,7 +133,7 @@ def test_video_as_property(client: WeaveClient, test_video: VideoClip) -> None:
     ref = weave.publish(video_wrapper)
     assert ref is not None
 
-    gotten_video_wrapper = weave.ref(ref.uri()).get()
+    gotten_video_wrapper = weave.ref(ref.uri).get()
     assert isinstance(gotten_video_wrapper.video, VideoClip)
 
     try:
@@ -162,7 +162,7 @@ def test_video_as_dataset_cell(client: WeaveClient, test_video: VideoClip) -> No
     ref = weave.publish(dataset)
     assert ref is not None
 
-    gotten_dataset = weave.ref(ref.uri()).get()
+    gotten_dataset = weave.ref(ref.uri).get()
     assert isinstance(gotten_dataset.rows[0]["video"], VideoClip)
 
     try:
@@ -439,9 +439,9 @@ def test_multiple_video_formats(
     webm_ref = weave.publish(webm_clip)
 
     # Retrieve them all
-    mp4_recovered = weave.ref(mp4_ref.uri()).get()
-    gif_recovered = weave.ref(gif_ref.uri()).get()
-    webm_recovered = weave.ref(webm_ref.uri()).get()
+    mp4_recovered = weave.ref(mp4_ref.uri).get()
+    gif_recovered = weave.ref(gif_ref.uri).get()
+    webm_recovered = weave.ref(webm_ref.uri).get()
 
     # Check they're all valid
     assert isinstance(mp4_recovered, VideoClip)

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import openai
 from pydantic import BaseModel
 
 import weave
@@ -270,11 +269,11 @@ def test_to_json_object_excludes_ref(client) -> None:
 
 
 def test_to_json_function_with_memory_address_in_op(client) -> None:
-    openai_client = openai.OpenAI(api_key="fake_key")
+    opaque = object()
 
     @weave.op
     def log_me(x: int) -> int:
-        myclient = openai_client
+        myclient = opaque
         return x
 
     log_me(1)
@@ -284,7 +283,7 @@ def test_to_json_function_with_memory_address_in_op(client) -> None:
 
     @weave.op
     def log_me(x: int) -> int:
-        myclient = openai_client
+        myclient = opaque
         return x
 
     log_me(1)
@@ -292,12 +291,12 @@ def test_to_json_function_with_memory_address_in_op(client) -> None:
     # same op!
     assert len(log_me.calls()) == 3
 
-    # now make a new client
-    openai_client = openai.OpenAI(api_key="fake_key")
+    # now make a new instance
+    opaque = object()
 
     @weave.op
     def log_me(x: int) -> int:
-        myclient = openai_client
+        myclient = opaque
         return x
 
     log_me(1)

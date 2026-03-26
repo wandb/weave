@@ -89,7 +89,8 @@ class DSPyPatcher(MultiPatcher):
 
                 if callback_metadata:
                     logger.debug(
-                        f"Evaluate is called with callback metadata: {callback_metadata}"
+                        "Evaluate is called with callback metadata: %s",
+                        callback_metadata,
                     )
 
                 max_errors = getattr(self, "max_errors", dspy.settings.max_errors)
@@ -200,7 +201,10 @@ class DSPyPatcher(MultiPatcher):
                 ncorrect, ntotal = sum(score for *_, score in results), len(devset)
 
                 logger.info(
-                    f"Average Metric: {ncorrect} / {ntotal} ({round(100 * ncorrect / ntotal, 1)}%)"
+                    "Average Metric: %s / %s (%s%%)",
+                    ncorrect,
+                    ntotal,
+                    round(100 * ncorrect / ntotal, 1),
                 )
 
                 ev.log_summary({"Average Metric": ncorrect / ntotal})
@@ -221,7 +225,7 @@ class DSPyPatcher(MultiPatcher):
 
         except Exception as e:
             # Don't let patching errors break DSPy integration
-            logger.warning(f"Failed to patch DSPy Evaluate: {e}")
+            logger.warning("Failed to patch DSPy Evaluate: %s", e)
 
 
 def get_dspy_patcher(

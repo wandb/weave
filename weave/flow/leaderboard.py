@@ -39,7 +39,7 @@ def get_leaderboard_results(
                     project=project,
                     name="Evaluation.evaluate",
                     _digest="*",
-                ).uri()
+                ).uri
             ],
             input_refs=[c.evaluation_object_ref for c in spec.columns],
         )
@@ -53,12 +53,12 @@ def get_leaderboard_results(
         call_ref = get_ref(call)
         if call_ref is None:
             continue
-        call_ref_uri = call_ref.uri()
+        call_ref_uri = call_ref.uri
 
         model_ref = get_ref(call.inputs["model"])
         if model_ref is None:
             continue
-        model_ref_uri = model_ref.uri()
+        model_ref_uri = model_ref.uri
         if model_ref_uri not in res_map:
             res_map[model_ref_uri] = LeaderboardModelResult(
                 model_ref=model_ref_uri,
@@ -68,7 +68,7 @@ def get_leaderboard_results(
             eval_obj_ref = get_ref(call.inputs["self"])
             if eval_obj_ref is None:
                 continue
-            eval_obj_ref_uri = eval_obj_ref.uri()
+            eval_obj_ref_uri = eval_obj_ref.uri
             if c.evaluation_object_ref != eval_obj_ref_uri:
                 continue
             if call.output is None:

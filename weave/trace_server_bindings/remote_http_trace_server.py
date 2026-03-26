@@ -19,6 +19,7 @@ from weave.trace.settings import (
 from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -35,7 +36,6 @@ from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
     EntityProjectInfo,
-    ServerInfoRes,
     StartBatchItem,
 )
 from weave.utils import http_requests
@@ -238,9 +238,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             return
 
         logger.warning(
-            "Project has been previously written to with `use_calls_complete=True` and requires 'calls_complete' mode. "
-            "Automatically upgrading SDK to use the more performant calls_complete processor. "
-            f"Server message: {error_message}"
+            "Project has been previously written to with `use_calls_complete=True` and requires 'calls_complete' mode. Automatically upgrading SDK to use the more performant calls_complete processor. Server message: %s",
+            error_message,
         )
 
         # Store old processor reference for cleanup
@@ -432,7 +431,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                     response := getattr(e, "response", None)
                 ) and response.status_code == 404:
                     logger.debug(
-                        f"Batching endpoint not available, falling back to individual feedback creation: {e}"
+                        "Batching endpoint not available, falling back to individual feedback creation: %s",
+                        e,
                     )
 
                     # Feedback endpoint doesn't support id, created_at, so we need to strip them
@@ -454,7 +454,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                             )
                         except Exception as individual_error:
                             logger.warning(
-                                f"Failed to create individual feedback: {individual_error}"
+                                "Failed to create individual feedback: %s",
+                                individual_error,
                             )
                 else:
                     # Re-raise server errors (5xx) as they're not client compatibility issues
@@ -849,9 +850,12 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     @with_retry
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        data: dict[str, str] = {"project_id": req.project_id}
+        if req.expected_digest is not None:
+            data["expected_digest"] = req.expected_digest
         r = self.post(
             "/files/create",
-            data={"project_id": req.project_id},
+            data=data,
             files={"file": (req.name, req.content)},
         )
         handle_response_error(r, "/files/create")
@@ -922,6 +926,23 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
         return self._generic_request(
             "/feedback/replace", req, tsi.FeedbackReplaceReq, tsi.FeedbackReplaceRes
+        )
+
+    @validate_call
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        return self._generic_request(
+            "/feedback/stats", req, tsi.FeedbackStatsReq, tsi.FeedbackStatsRes
+        )
+
+    @validate_call
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        return self._generic_request(
+            "/feedback/payload_schema",
+            req,
+            tsi.FeedbackPayloadSchemaReq,
+            tsi.FeedbackPayloadSchemaRes,
         )
 
     @validate_call

@@ -8,14 +8,16 @@ import time
 from collections.abc import Callable
 from contextlib import contextmanager
 
+from tests.trace.server_utils import find_server_layer
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
 def client_is_sqlite(client):
-    return isinstance(
-        client.server._next_trace_server._internal_trace_server,
-        SqliteTraceServer,
-    )
+    try:
+        find_server_layer(client.server, SqliteTraceServer)
+    except TypeError:
+        return False
+    return True
 
 
 class AnyStrMatcher:  # noqa: PLW1641

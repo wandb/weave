@@ -35,6 +35,8 @@ from typing_extensions import Self
 
 from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    split_exact_and_wildcard_values,
+    wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import ch_sentinel_values
 from weave.trace_server import trace_server_interface as tsi
@@ -307,19 +309,15 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         extra_path = split_escaped_field_path(path)
         feedback_type = feedback_type[1:-1]
         if extra_path[0] == "payload":
-            return CallsMergedFeedbackPayloadField(
+            return cls(
                 field="payload_dump",
                 feedback_type=feedback_type,
                 extra_path=extra_path[1:],
             )
         elif extra_path[0] == "runnable_ref":
-            return CallsMergedFeedbackPayloadField(
-                field="runnable_ref", feedback_type=feedback_type, extra_path=[]
-            )
+            return cls(field="runnable_ref", feedback_type=feedback_type, extra_path=[])
         elif extra_path[0] == "trigger_ref":
-            return CallsMergedFeedbackPayloadField(
-                field="trigger_ref", feedback_type=feedback_type, extra_path=[]
-            )
+            return cls(field="trigger_ref", feedback_type=feedback_type, extra_path=[])
         raise InvalidFieldError(f"Invalid feedback path: {path}")
 
     def is_heavy(self) -> bool:
@@ -347,10 +345,15 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         """
         inner = super().as_sql(pb, "feedback")
         if self.feedback_type == "*":
-            # If we are aggregating (calls_merged) use any, non-aggregate uses directly
             res = inner
             if use_agg_fn:
-                res = f"any({inner})"
+                # Concat values from all feedback rows so filters search across every entry
+                if self.extra_path:
+                    extracted = json_dump_field_as_sql(
+                        pb, "feedback", inner, self.extra_path, cast
+                    )
+                    return f"arrayStringConcat(groupArray({extracted}), ', ')"
+                return f"arrayStringConcat(groupArray({inner}), ', ')"
         else:
             param_name = pb.add_param(self.feedback_type)
             if use_agg_fn:
@@ -2382,8 +2385,10 @@ def process_ref_filters_to_sql(
             raise TypeError(f"{field_name} is not an aggregate field")
 
         field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
-        param = param_builder.add_param(refs)
-        ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
+        ref_filter_sql = combine_conditions(
+            _build_clickhouse_ref_match_conditions(refs, field_sql, param_builder),
+            "OR",
+        )
         return f"{ref_filter_sql} OR length({field_sql}) = 0"
 
     ref_filters = []
@@ -2506,14 +2511,26 @@ def process_calls_filter_to_conditions(
     # the output_refs, so lets keep both for clarity
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
+        input_refs_sql = get_field_sql("input_refs")
         conditions.append(
-            f"hasAny({get_field_sql('input_refs')}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+            combine_conditions(
+                _build_clickhouse_ref_match_conditions(
+                    filter.input_refs, input_refs_sql, param_builder
+                ),
+                "OR",
+            )
         )
 
     if filter.output_refs:
         assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
+        output_refs_sql = get_field_sql("output_refs")
         conditions.append(
-            f"hasAny({get_field_sql('output_refs')}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+            combine_conditions(
+                _build_clickhouse_ref_match_conditions(
+                    filter.output_refs, output_refs_sql, param_builder
+                ),
+                "OR",
+            )
         )
 
     if filter.parent_ids:
@@ -2551,6 +2568,23 @@ def process_calls_filter_to_conditions(
         )
 
     return conditions
+
+
+def _build_clickhouse_ref_match_conditions(
+    refs: list[str], field_sql: str, param_builder: ParamBuilder
+) -> list[str]:
+    exact_refs, wildcard_refs = split_exact_and_wildcard_values(refs)
+    or_conditions: list[str] = []
+    if exact_refs:
+        or_conditions.append(
+            f"hasAny({field_sql}, {param_slot(param_builder.add_param(exact_refs), 'Array(String)')})"
+        )
+    for ref in wildcard_refs:
+        ref_prefix = wildcard_version_value_to_ref_prefix(ref)
+        or_conditions.append(
+            f"arrayExists(x -> startsWith(x, {param_slot(param_builder.add_param(ref_prefix), 'String')}), {field_sql})"
+        )
+    return or_conditions
 
 
 ######### STATS QUERY HANDLING ##########

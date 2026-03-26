@@ -22,7 +22,7 @@ class TestWaveRead:
 
         ref = get_ref(audio)
         assert ref is not None
-        gotten_audio = weave.ref(ref.uri()).get()
+        gotten_audio = weave.ref(ref.uri).get()
         assert audio.readframes(10) == gotten_audio.readframes(10)
 
     def test_audio_as_dataset_cell(self, client: WeaveClient) -> None:
@@ -34,7 +34,7 @@ class TestWaveRead:
         ref = get_ref(dataset)
         assert ref is not None
 
-        gotten_dataset = weave.ref(ref.uri()).get()
+        gotten_dataset = weave.ref(ref.uri).get()
         assert audio.readframes(10) == gotten_dataset.rows[0]["audio"].readframes(10)
 
     def test_audio_as_call_io(self, client: WeaveClient) -> None:

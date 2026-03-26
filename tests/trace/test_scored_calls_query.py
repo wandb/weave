@@ -82,13 +82,13 @@ async def perform_scorer_tests(
     _, call_scored_by_s0_v1 = predict.call(4)
     await call_scored_by_s0_v1.apply_scorer(s0_v1)
 
-    s0_v0_uri = s0_v0.ref.uri()
+    s0_v0_uri = s0_v0.ref.uri
     s0_v0_name = s0_v0.ref.name
 
-    s0_v1_uri = s0_v1.ref.uri()
+    s0_v1_uri = s0_v1.ref.uri
     s0_v1_name = s0_v1.ref.name
 
-    s1_v0_uri = s1_v0.ref.uri()
+    s1_v0_uri = s1_v0.ref.uri
     s1_v0_name = s1_v0.ref.name
 
     # This is required for the test to work

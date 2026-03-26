@@ -4,6 +4,10 @@ from weave.trace_server import (
     external_to_internal_trace_server_adapter,
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.service_interface import (
+    ProjectsInfoReq,
+    ProjectsInfoRes,
+)
 
 
 class TwoWayMapping:
@@ -95,6 +99,14 @@ class UserInjectingExternalTraceServer(
         super().__init__(internal_trace_server, id_converter)
         self._user_id = user_id
 
+    def set_user_id(self, user_id: str) -> None:
+        """Set the user identity for subsequent requests.
+
+        This is a test utility — use it instead of reaching through
+        internal layers to mutate _user_id directly.
+        """
+        self._user_id = user_id
+
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.wb_user_id = self._user_id
         return super().call_start(req)
@@ -153,6 +165,15 @@ class UserInjectingExternalTraceServer(
     ) -> tsi.PredictionDeleteRes:
         req.wb_user_id = self._user_id
         return super().prediction_delete(req)
+
+    def projects_info(self, req: ProjectsInfoReq) -> list[ProjectsInfoRes]:
+        return [
+            ProjectsInfoRes(
+                external_project_id=pid,
+                internal_project_id=self._idc.ext_to_int_project_id(pid),
+            )
+            for pid in req.project_ids
+        ]
 
     def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
         req.wb_user_id = self._user_id

@@ -2,7 +2,6 @@ import contextlib
 import json
 import logging
 import os
-import typing
 from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -19,6 +18,7 @@ from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
+from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import http_utils
 from weave.trace_server_bindings.caching_middleware_trace_server import (
@@ -88,6 +88,13 @@ def reset_project_residence_cache():
     _project_residence_cache.clear()
     yield
     _project_residence_cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_digest_settings():
+    """Reset client-side digest settings after each test."""
+    yield
+    parse_and_apply_settings(UserSettings())
 
 
 @pytest.fixture(autouse=True)
@@ -326,7 +333,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 def create_client(
     request,
     trace_server,
-    global_attributes: dict[str, typing.Any] | None = None,
+    global_attributes: dict[str, Any] | None = None,
 ) -> weave_client.WeaveClient:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "prod":
@@ -341,8 +348,14 @@ def create_client(
     # Keeping off for now until it is the default behavior.
     # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
     caching_server = CachingMiddlewareTraceServer.from_env(server)
+    # ensure_project_exists=False because local backends (SQLite) don't
+    # implement ServiceInterface — project creation is a remote-only concern.
+    # In tests we assume the project already exists.
     client = TestOnlyFlushingWeaveClient(
-        TEST_ENTITY, "test-project", make_server_recorder(caching_server)
+        TEST_ENTITY,
+        "test-project",
+        make_server_recorder(caching_server),
+        ensure_project_exists=False,
     )
     weave_client_context.set_weave_client_global(client)
     if global_attributes is not None:
@@ -387,7 +400,7 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
 
     @contextlib.contextmanager
     def client(
-        global_attributes: dict[str, typing.Any] | None = None,
+        global_attributes: dict[str, Any] | None = None,
         settings: weave.trace.settings.UserSettings | None = None,
     ):
         if settings is not None:

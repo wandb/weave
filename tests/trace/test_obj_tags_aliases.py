@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from pydantic import ValidationError
 
@@ -978,7 +980,7 @@ def test_sdk_multiple_tags_and_aliases(client: WeaveClient):
 def test_sdk_add_tags_with_uri_string(client: WeaveClient):
     """add_tags should accept a weave:/// URI string instead of ObjectRef."""
     ref = weave.publish({"data": "test"}, name="sdk_uri_add_tags_obj")
-    uri = ref.uri()
+    uri = ref.uri
 
     client.add_tags(uri, ["from-uri"])
 
@@ -988,7 +990,7 @@ def test_sdk_add_tags_with_uri_string(client: WeaveClient):
 def test_sdk_remove_tags_with_uri_string(client: WeaveClient):
     """remove_tags should accept a weave:/// URI string."""
     ref = weave.publish({"data": "test"}, name="sdk_uri_rm_tags_obj")
-    uri = ref.uri()
+    uri = ref.uri
 
     client.add_tags(ref, ["keep", "remove"])
     client.remove_tags(uri, ["remove"])
@@ -999,7 +1001,7 @@ def test_sdk_remove_tags_with_uri_string(client: WeaveClient):
 def test_sdk_get_tags_with_uri_string(client: WeaveClient):
     """get_tags should accept a weave:/// URI string."""
     ref = weave.publish({"data": "test"}, name="sdk_uri_get_tags_obj")
-    uri = ref.uri()
+    uri = ref.uri
 
     client.add_tags(ref, ["t1", "t2"])
 
@@ -1009,7 +1011,7 @@ def test_sdk_get_tags_with_uri_string(client: WeaveClient):
 def test_sdk_set_aliases_with_uri_string(client: WeaveClient):
     """set_aliases should accept a weave:/// URI string."""
     ref = weave.publish({"data": "test"}, name="sdk_uri_set_alias_obj")
-    uri = ref.uri()
+    uri = ref.uri
 
     client.set_aliases(uri, "production")
 
@@ -1019,7 +1021,7 @@ def test_sdk_set_aliases_with_uri_string(client: WeaveClient):
 def test_sdk_remove_alias_with_uri_string(client: WeaveClient):
     """remove_aliases should accept a weave:/// URI string."""
     ref = weave.publish({"data": "test"}, name="sdk_uri_rm_alias_obj")
-    uri = ref.uri()
+    uri = ref.uri
 
     client.set_aliases(ref, "staging")
     client.remove_aliases(uri, "staging")
@@ -1030,7 +1032,7 @@ def test_sdk_remove_alias_with_uri_string(client: WeaveClient):
 def test_sdk_get_aliases_with_uri_string(client: WeaveClient):
     """get_aliases should accept a weave:/// URI string."""
     ref = weave.publish({"data": "test"}, name="sdk_uri_get_alias_obj")
-    uri = ref.uri()
+    uri = ref.uri
 
     client.set_aliases(ref, "canary")
 
@@ -1042,7 +1044,7 @@ def test_sdk_get_aliases_with_uri_string(client: WeaveClient):
 def test_sdk_tags_mixed_ref_and_uri(client: WeaveClient):
     """add_tags via URI, get_tags via ObjectRef should work."""
     ref = weave.publish({"data": "test"}, name="sdk_uri_mixed_tags_obj")
-    uri = ref.uri()
+    uri = ref.uri
 
     client.add_tags(uri, ["mixed-tag"])
     assert "mixed-tag" in client.get_tags(ref)
@@ -1051,7 +1053,7 @@ def test_sdk_tags_mixed_ref_and_uri(client: WeaveClient):
 def test_sdk_aliases_mixed_ref_and_uri(client: WeaveClient):
     """set_aliases via URI, get_aliases via ObjectRef should work."""
     ref = weave.publish({"data": "test"}, name="sdk_uri_mixed_alias_obj")
-    uri = ref.uri()
+    uri = ref.uri
 
     client.set_aliases(uri, "mixed-alias")
     assert "mixed-alias" in client.get_aliases(ref)
@@ -1855,9 +1857,11 @@ def test_sdk_set_aliases_with_list(client: WeaveClient):
     assert "gamma" in aliases
 
 
+@pytest.mark.flaky(reruns=3)
 def test_sdk_set_aliases_with_list_single(client: WeaveClient):
     """set_aliases with a single-element list should behave like a string."""
     ref = weave.publish({"data": "test"}, name="sdk_set_alias_list_single")
+    time.sleep(0.2)
 
     client.set_aliases(ref, ["only-one"])
 

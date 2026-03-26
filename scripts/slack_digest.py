@@ -210,7 +210,7 @@ class SlackNotifier:
             print(f"Message sent to {channel}:")
             print(message)
         except SlackApiError as e:
-            logger.exception(f"Failed to send message: {e.response['error']}")
+            logger.exception("Failed to send message: %s", e.response["error"])
             raise
         return True
 
@@ -284,7 +284,7 @@ class GitHubDigest:
             sleep_time = reset_timestamp - time.time() + 1  # Add 1 second buffer
             if sleep_time > 0:
                 logger.warning(
-                    f"Rate limit reached. Waiting {sleep_time:.1f} seconds..."
+                    "Rate limit reached. Waiting %.1f seconds...", sleep_time
                 )
                 time.sleep(sleep_time)
                 self._rate_limit_remaining = None  # Force a recheck after waiting
@@ -424,7 +424,7 @@ class GitHubDigest:
         rows = []
         for processed, error in results:
             if error is not None:
-                logger.warning(f"Skipping item due to error: {error}")
+                logger.warning("Skipping item due to error: %s", error)
                 continue
 
             categories = processed["categories"]
@@ -518,7 +518,7 @@ class GitHubDigest:
         draft_rows = []
         for processed, error in results:
             if error is not None:
-                logger.warning(f"Skipping PR due to error: {error}")
+                logger.warning("Skipping PR due to error: %s", error)
                 continue
 
             categories = processed["categories"]
@@ -819,7 +819,9 @@ class SlackOutput:
         # Verify final size is within limits (including code block markers if table)
         if len(content) > self.MAX_CHARS_PER_BLOCK:
             logger.warning(
-                f"Chunk exceeds character limit ({len(content)} > {self.MAX_CHARS_PER_BLOCK})"
+                "Chunk exceeds character limit (%s > %s)",
+                len(content),
+                self.MAX_CHARS_PER_BLOCK,
             )
 
         self.notifier.send_message(self.channel, content)
