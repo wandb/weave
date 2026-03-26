@@ -1379,7 +1379,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 cq.set_offset(req.offset)
 
             pb = ParamBuilder()
-            raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
+            raw_res = self._query_stream(
+                cq.as_sql(pb), pb.get_params(), settings=settings
+            )
         except InvalidFieldError:
             logger.warning(
                 "invalid_field_in_calls_query: %s",

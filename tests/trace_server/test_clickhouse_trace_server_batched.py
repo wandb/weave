@@ -1164,8 +1164,15 @@ def test_calls_query_stream_logs_request_on_invalid_field(caplog):
     logger_name = "weave.trace_server.clickhouse_trace_server_batched"
 
     # Bad column
-    with caplog.at_level(logging.WARNING, logger=logger_name), pytest.raises(InvalidFieldError, match="status"):
-        list(server.calls_query_stream(tsi.CallsQueryReq(project_id="test/col", columns=["status"])))
+    with (
+        caplog.at_level(logging.WARNING, logger=logger_name),
+        pytest.raises(InvalidFieldError, match="status"),
+    ):
+        list(
+            server.calls_query_stream(
+                tsi.CallsQueryReq(project_id="test/col", columns=["status"])
+            )
+        )
 
     assert len(caplog.records) == 1
     assert "status" in caplog.records[0].message
@@ -1182,7 +1189,10 @@ def test_calls_query_stream_logs_request_on_invalid_field(caplog):
             )
         ),
     )
-    with caplog.at_level(logging.WARNING, logger=logger_name), pytest.raises(InvalidFieldError):
+    with (
+        caplog.at_level(logging.WARNING, logger=logger_name),
+        pytest.raises(InvalidFieldError),
+    ):
         list(server.calls_query_stream(bad_filter_req))
 
     assert len(caplog.records) == 1
@@ -1191,10 +1201,18 @@ def test_calls_query_stream_logs_request_on_invalid_field(caplog):
     caplog.clear()
 
     # Bad sort field
-    with caplog.at_level(logging.WARNING, logger=logger_name), pytest.raises(InvalidFieldError):
-        list(server.calls_query_stream(
-            tsi.CallsQueryReq(project_id="test/sort", sort_by=[tsi.SortBy(field="bogus", direction="asc")])
-        ))
+    with (
+        caplog.at_level(logging.WARNING, logger=logger_name),
+        pytest.raises(InvalidFieldError),
+    ):
+        list(
+            server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id="test/sort",
+                    sort_by=[tsi.SortBy(field="bogus", direction="asc")],
+                )
+            )
+        )
 
     assert len(caplog.records) == 1
     assert getattr(caplog.records[0], "project_id", None) == "test/sort"
@@ -1214,7 +1232,9 @@ def test_calls_query_stats_logs_request_on_invalid_field(caplog):
     )
 
     with (
-        caplog.at_level(logging.WARNING, logger="weave.trace_server.clickhouse_trace_server_batched"),
+        caplog.at_level(
+            logging.WARNING, logger="weave.trace_server.clickhouse_trace_server_batched"
+        ),
         pytest.raises(InvalidFieldError),
     ):
         server.calls_query_stats(req)
