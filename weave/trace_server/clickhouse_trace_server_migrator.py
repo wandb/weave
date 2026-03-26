@@ -245,7 +245,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         logger.info("Migrations to apply: %s", migrations_to_apply)
         if status["curr_version"] == 0:
             db_sql = self._create_db_sql(target_db)
-            self._run_command(db_sql)
+            self._run_ddl_with_retry(db_sql)
         applied_target_version = target_version
         for migration_target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, migration_target_version, migration_file)
@@ -271,10 +271,10 @@ class BaseClickHouseTraceServerMigrator(ABC):
     def _initialize_migration_db(self) -> None:
         """Initialize the management database and migrations table."""
         db_sql = self._create_db_sql(self.management_db)
-        self._run_command(db_sql)
+        self._run_ddl_with_retry(db_sql)
 
         create_table_sql = self._create_management_table_sql()
-        self._run_command(create_table_sql)
+        self._run_ddl_with_retry(create_table_sql)
 
     def _get_migration_status(self, db_name: str) -> dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
@@ -422,33 +422,31 @@ class BaseClickHouseTraceServerMigrator(ABC):
         """Update the migration status in management database migrations table."""
         if is_start:
             command = f"ALTER TABLE {self.management_db}.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
-            self._run_command(command)
+            self._run_ddl_with_retry(command)
         else:
             command = f"ALTER TABLE {self.management_db}.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
-            self._run_command(command)
+            self._run_ddl_with_retry(command)
 
     @staticmethod
     def _is_safe_identifier(value: str) -> bool:
         """Check if a string is safe to use as an identifier in SQL."""
         return bool(SQLPatterns.SAFE_IDENTIFIER.match(value))
 
-    def _run_command(self, command: str) -> None:
-        """Execute a ClickHouse command with retry for transient replication errors.
+    def _run_ddl_with_retry(self, command: str) -> None:
+        """Execute a DDL command with retry for transient replication errors.
 
         On multi-replica clusters, sequential DDL can outpace metadata replication
         causing error 517 (CANNOT_ASSIGN_ALTER). This retries with exponential
         backoff for those known-transient codes.
         """
         backoff = _INITIAL_BACKOFF_SECS
-        last_error: DatabaseError | None = None
         for attempt in range(_MAX_RETRIES + 1):
             try:
                 self.ch_client.command(command)
             except DatabaseError as e:
-                error_code = _extract_ch_error_code(e)
+                error_code = self._extract_ch_error_code(e)
                 if error_code not in _TRANSIENT_CH_ERROR_CODES or attempt == _MAX_RETRIES:
                     raise
-                last_error = e
                 logger.warning(
                     "Transient ClickHouse error (code %s) on attempt %d/%d, "
                     "retrying in %.1fs: %s",
@@ -462,16 +460,15 @@ class BaseClickHouseTraceServerMigrator(ABC):
                 backoff *= _BACKOFF_MULTIPLIER
             else:
                 return
-        raise last_error  # type: ignore[misc]
 
+    @staticmethod
+    def _extract_ch_error_code(exc: DatabaseError) -> int | None:
+        """Extract the numeric error code from a ClickHouse DatabaseError.
 
-def _extract_ch_error_code(exc: DatabaseError) -> int | None:
-    """Extract the numeric error code from a ClickHouse DatabaseError.
-
-    clickhouse_connect.DatabaseError has no structured error code attr; parse from message.
-    """
-    match = re.search(r"Code:\s*(\d+)", str(exc))
-    return int(match.group(1)) if match else None
+        clickhouse_connect.DatabaseError has no structured error code attr; parse from message.
+        """
+        match = re.search(r"Code:\s*(\d+)", str(exc))
+        return int(match.group(1)) if match else None
 
 
 class CloudClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator):
@@ -503,7 +500,7 @@ class CloudClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator):
 
         curr_db = self.ch_client.database
         self.ch_client.database = target_db
-        self._run_command(command)
+        self._run_ddl_with_retry(command)
         self.ch_client.database = curr_db
 
 
@@ -616,13 +613,13 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         # When the database uses ENGINE = Replicated, it auto-converts MergeTree
         # to ReplicatedMergeTree and handles DDL replication. Skip explicit conversion.
         if self._uses_replicated_db_engine(target_db):
-            self._run_command(command)
+            self._run_ddl_with_retry(command)
         else:
             formatted_command = self._format_replicated_sql(command)
             formatted_command = self._add_on_cluster_clause(
                 formatted_command, target_db=target_db
             )
-            self._run_command(formatted_command)
+            self._run_ddl_with_retry(formatted_command)
 
         self.ch_client.database = curr_db
 
@@ -851,7 +848,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                 formatted_command = self._add_on_cluster_clause(
                     formatted_command, target_db=target_db
                 )
-            self._run_command(formatted_command)
+            self._run_ddl_with_retry(formatted_command)
             self.ch_client.database = curr_db
             return
 
@@ -933,10 +930,10 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         db = self.ch_client.database
         local_command = self._rename_alter_table_to_local(command)
         local_command = self._add_on_cluster_clause(local_command, target_db=db)
-        self._run_command(local_command)
+        self._run_ddl_with_retry(local_command)
 
         distributed_command = self._add_on_cluster_clause(command, target_db=db)
-        self._run_command(distributed_command)
+        self._run_ddl_with_retry(distributed_command)
 
     def _execute_materialized_view_alter(self, command: str) -> None:
         """Handle ALTER TABLE MODIFY QUERY for materialized views in distributed mode."""
@@ -970,10 +967,10 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         # DROP and CREATE the materialized view
         on_cluster = self._get_on_cluster_clause(self.ch_client.database)
         drop_statement = f"DROP TABLE IF EXISTS {view_name_local}{on_cluster}"
-        self._run_command(drop_statement)
+        self._run_ddl_with_retry(drop_statement)
 
         create_statement = f"CREATE MATERIALIZED VIEW {view_name_local}{on_cluster}\nTO {target_table}\nAS\n{select_query_local}"
-        self._run_command(create_statement)
+        self._run_ddl_with_retry(create_statement)
 
     def _execute_local_table_operation(self, command: str) -> None:
         """Execute operations that only apply to local tables (indexes, mutations)."""
@@ -981,7 +978,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         local_command = self._add_on_cluster_clause(
             local_command, target_db=self.ch_client.database
         )
-        self._run_command(local_command)
+        self._run_ddl_with_retry(local_command)
 
     def _execute_distributed_rename(self, command: str) -> None:
         """Handle RENAME TABLE in distributed mode.
@@ -1004,9 +1001,9 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         new_local = self._add_local_suffix(new_name)
 
         on_cluster = self._get_on_cluster_clause(self.ch_client.database)
-        self._run_command(f"RENAME TABLE {old_local} TO {new_local}{on_cluster}")
-        self._run_command(f"DROP TABLE IF EXISTS {old_name}{on_cluster}")
-        self._run_command(self._create_distributed_table_sql(new_name))
+        self._run_ddl_with_retry(f"RENAME TABLE {old_local} TO {new_local}{on_cluster}")
+        self._run_ddl_with_retry(f"DROP TABLE IF EXISTS {old_name}{on_cluster}")
+        self._run_ddl_with_retry(self._create_distributed_table_sql(new_name))
 
     def _execute_distributed_ddl(self, command: str) -> None:
         """Execute DDL in distributed mode (CREATE TABLE, CREATE/DROP VIEW)."""
@@ -1015,9 +1012,9 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         )
         result = self._format_distributed_sql(formatted_command)
 
-        self._run_command(result.local_command)
+        self._run_ddl_with_retry(result.local_command)
         if result.distributed_command:
-            self._run_command(result.distributed_command)
+            self._run_ddl_with_retry(result.distributed_command)
 
     def _format_distributed_sql(self, sql_query: str) -> DistributedTransformResult:
         """Format SQL for distributed mode (CREATE TABLE, DROP TABLE/VIEW)."""

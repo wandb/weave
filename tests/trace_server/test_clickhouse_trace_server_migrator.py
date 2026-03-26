@@ -3,6 +3,7 @@ import types
 from unittest.mock import Mock, call, patch
 
 import pytest
+from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
 from weave.trace_server.clickhouse_trace_server_migrator import (
@@ -12,6 +13,7 @@ from weave.trace_server.clickhouse_trace_server_migrator import (
     DistributedClickHouseTraceServerMigrator,
     MigrationError,
     ReplicatedClickHouseTraceServerMigrator,
+    SQLPatterns,
 )
 
 DEFAULT_MIGRATION_DIR = os.path.abspath(
@@ -386,8 +388,6 @@ def test_format_replicated_sql_distributed_with_engine_args():
 )
 def test_extract_table_name(sql, expected_table):
     """Test extracting table name from SQL."""
-    from weave.trace_server.clickhouse_trace_server_migrator import SQLPatterns
-
     match = SQLPatterns.CREATE_TABLE.search(sql)
     result = match.group(1) if match else None
     assert result == expected_table
@@ -1093,20 +1093,14 @@ def test_index_operations_only_on_local_tables_distributed(distributed_migrator)
 
 
 @patch("weave.trace_server.clickhouse_trace_server_migrator.time.sleep")
-def test_run_command_retries_transient_errors(mock_sleep, mock_costs):
+def test_run_ddl_with_retry(mock_sleep, mock_costs):
     """Verify retry behavior for transient CH errors (e.g. 517 CANNOT_ASSIGN_ALTER)."""
-    from clickhouse_connect.driver.exceptions import DatabaseError
-
-    from weave.trace_server.clickhouse_trace_server_migrator import (
-        _extract_ch_error_code,
-    )
-
     ch_client = Mock()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(ch_client)
     ch_client.command.reset_mock()
 
     # Succeeds immediately on clean call
-    migrator._run_command("ALTER TABLE foo ADD COLUMN bar String")
+    migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
     assert ch_client.command.call_count == 1
     ch_client.command.reset_mock()
     mock_sleep.reset_mock()
@@ -1118,7 +1112,7 @@ def test_run_command_retries_transient_errors(mock_sleep, mock_costs):
         "while common metadata is 3. (CANNOT_ASSIGN_ALTER)"
     )
     ch_client.command.side_effect = [error_517, error_517, None]
-    migrator._run_command("ALTER TABLE foo ADD COLUMN bar String")
+    migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
     assert ch_client.command.call_count == 3
     assert mock_sleep.call_count == 2
     mock_sleep.assert_any_call(1.0)
@@ -1129,7 +1123,7 @@ def test_run_command_retries_transient_errors(mock_sleep, mock_costs):
     # Gives up after max retries
     ch_client.command.side_effect = error_517
     with pytest.raises(DatabaseError, match="Code: 517"):
-        migrator._run_command("ALTER TABLE foo ADD COLUMN bar String")
+        migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
     assert ch_client.command.call_count == _MAX_RETRIES + 1
     assert mock_sleep.call_count == _MAX_RETRIES
     ch_client.command.reset_mock()
@@ -1138,18 +1132,21 @@ def test_run_command_retries_transient_errors(mock_sleep, mock_costs):
     # Non-transient CH errors propagate immediately
     ch_client.command.side_effect = DatabaseError("Code: 62. DB::Exception: Syntax error")
     with pytest.raises(DatabaseError, match="Code: 62"):
-        migrator._run_command("INVALID SQL")
+        migrator._run_ddl_with_retry("INVALID SQL")
     assert ch_client.command.call_count == 1
     ch_client.command.reset_mock()
 
     # Non-DatabaseError exceptions propagate immediately
     ch_client.command.side_effect = ConnectionError("connection refused")
     with pytest.raises(ConnectionError):
-        migrator._run_command("ALTER TABLE foo ADD COLUMN bar String")
+        migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
     assert ch_client.command.call_count == 1
 
-    # _extract_ch_error_code parses correctly
-    assert _extract_ch_error_code(DatabaseError("Code: 517. DB::Exception: ...")) == 517
-    assert _extract_ch_error_code(DatabaseError("Code: 62. DB::Exception: ...")) == 62
-    assert _extract_ch_error_code(DatabaseError("some other error")) is None
-    assert _extract_ch_error_code(DatabaseError("")) is None
+
+def test_extract_ch_error_code(mock_costs):
+    """Verify error code parsing from ClickHouse DatabaseError messages."""
+    extract = BaseClickHouseTraceServerMigrator._extract_ch_error_code
+    assert extract(DatabaseError("Code: 517. DB::Exception: ...")) == 517
+    assert extract(DatabaseError("Code: 62. DB::Exception: ...")) == 62
+    assert extract(DatabaseError("some other error")) is None
+    assert extract(DatabaseError("")) is None
