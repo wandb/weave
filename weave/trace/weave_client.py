@@ -90,7 +90,7 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
-from weave.trace.urls import redirect_call
+from weave.trace.urls import compare_evaluations_url, redirect_call
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.wandb_run_context import (
@@ -190,6 +190,11 @@ class CrossProjectRefError(Exception):
 
 
 # TODO: should be Call, not WeaveObject
+
+
+def _is_eval_op_name(op_name: str) -> bool:
+    """Check if an op name corresponds to an evaluation call."""
+    return "Evaluation.evaluate" in op_name
 
 
 def print_call_link(call: Call) -> None:
@@ -415,7 +420,13 @@ class WeaveClient:
             self._wal_pending_call_ids.discard(call_id)
             project_id = start.get("project_id", "")
             entity, project = from_project_id(project_id)
-            url = redirect_call(entity, project, call_id)
+            attributes = start.get("attributes", {})
+            if attributes.get("_weave_eval_meta") or _is_eval_op_name(
+                start.get("op_name", "")
+            ):
+                url = compare_evaluations_url(entity, project, call_id)
+            else:
+                url = redirect_call(entity, project, call_id)
             logger.info("%s %s", TRACE_CALL_EMOJI, url)
         except Exception:
             pass

@@ -1,3 +1,4 @@
+import json
 from urllib.parse import quote
 
 from weave.compat import wandb
@@ -33,3 +34,10 @@ def leaderboard_path(entity_name: str, project_name: str, object_name: str) -> s
 
 def redirect_call(entity_name: str, project_name: str, call_id: str) -> str:
     return f"{remote_project_root_url(entity_name, project_name)}/r/call/{call_id}"
+
+
+def compare_evaluations_url(
+    entity_name: str, project_name: str, eval_call_id: str
+) -> str:
+    call_ids_json = json.dumps([eval_call_id])
+    return f"{project_weave_root_url(entity_name, project_name)}/compare-evaluations?evaluationCallIds={quote(call_ids_json)}"

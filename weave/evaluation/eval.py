@@ -27,7 +27,9 @@ from weave.flow.scorer import (
 )
 from weave.flow.util import make_memorable_name, transpose
 from weave.object.obj import Object
+from weave.trace import urls
 from weave.trace.call import Call, CallsIter
+from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
@@ -46,6 +48,17 @@ INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
     + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
 )
+
+
+def _set_eval_ui_url(call: Call) -> None:
+    """Override the call's UI URL to point to the evaluation comparison page."""
+    try:
+        entity, project = from_project_id(call.project_id)
+        call._ui_url_override = urls.compare_evaluations_url(
+            entity, project, call.id
+        )
+    except Exception:
+        pass  # Fall back to default call URL
 
 
 def default_evaluation_display_name(call: Call) -> str:
@@ -294,6 +307,10 @@ class Evaluation(Object):
 
     @op(call_display_name=default_evaluation_display_name, eager_call_start=True)
     async def evaluate(self, model: Op | Model) -> dict:
+        current_call = call_context.get_current_call()
+        if current_call:
+            _set_eval_ui_url(current_call)
+
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 

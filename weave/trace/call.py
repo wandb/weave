@@ -80,6 +80,7 @@ class Call:
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
+    _ui_url_override: str | None = None
 
     # Size of metadata storage for this call
     storage_size_bytes: int | None = None
@@ -137,6 +138,9 @@ class Call:
 
     @property
     def ui_url(self) -> str:
+        if self._ui_url_override:
+            return self._ui_url_override
+
         if not self.id:
             raise ValueError(
                 "Can't get URL for call without ID, was `weave.init` called?"

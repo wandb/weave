@@ -16,7 +16,11 @@ from types import MethodType
 from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 
 from weave.dataset.dataset import Dataset
-from weave.evaluation.eval import Evaluation, default_evaluation_display_name
+from weave.evaluation.eval import (
+    Evaluation,
+    _set_eval_ui_url,
+    default_evaluation_display_name,
+)
 from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
@@ -751,6 +755,7 @@ class EvaluationLogger:
             attributes=self.attributes,
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
+        _set_eval_ui_url(self._evaluate_call)
 
     @property
     def ui_url(self) -> str | None:
