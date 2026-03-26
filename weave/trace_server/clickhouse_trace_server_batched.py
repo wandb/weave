@@ -5052,8 +5052,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @staticmethod
     def _read_with_retry(
         read_fn: Callable[[], T],
+        *,
         max_attempts: int = 2,
-        initial_delay: float = 0.05,
+        initial_delay_seconds: float = 0.05,
     ) -> T:
         """Retry a read operation to handle ClickHouse eventual consistency.
 
@@ -5067,7 +5068,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             max_attempts: Total number of attempts (default 2, i.e. 1 retry).
                 Callers should override only when higher consistency latency
                 is expected.
-            initial_delay: Initial delay in seconds (default 0.05, i.e., 50ms).
+            initial_delay_seconds: Initial delay in seconds (default 0.05, i.e., 50ms).
 
         Returns:
             The result of read_fn.
@@ -5078,7 +5079,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         @retry(
             stop=stop_after_attempt(max_attempts),
-            wait=wait_exponential(multiplier=1, min=initial_delay, max=1.0),
+            wait=wait_exponential(multiplier=1, min=initial_delay_seconds, max=1.0),
             retry=retry_if_exception_type(NotFoundError),
             reraise=True,
         )
