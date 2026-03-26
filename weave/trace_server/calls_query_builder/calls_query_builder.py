@@ -2270,9 +2270,20 @@ def process_children_of_eval_ids_to_sql(
     )
     eval_root_children_subquery = eval_root_children_cq.as_sql(param_builder)
 
+    # for the calls-merged table, eaceh call is stored as split start/end rows.
+    # end-rows have parent_id as NULL, so we need to do this.
+    parent_id_conditions = (
+        f"{parent_id_field_sql} IN {eval_root_ids_param}"
+        f" OR {parent_id_field_sql} IN ({eval_root_children_subquery})"
+    )
+    if read_table == ReadTable.CALLS_MERGED:
+        parent_null = parent_id_field.null_check_sql(
+            param_builder, table_alias, read_table, use_agg_fn=False
+        )
+        parent_id_conditions += f" OR {parent_null}"
+
     return (
-        f" AND ({parent_id_field_sql} IN {eval_root_ids_param}"
-        f" OR {parent_id_field_sql} IN ({eval_root_children_subquery}))"
+        f" AND ({parent_id_conditions})"
         f" AND {table_alias}.id NOT IN {eval_root_ids_param}"
     )
 
