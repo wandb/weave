@@ -1758,6 +1758,13 @@ ALLOWED_CALL_FIELDS = {
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
+# Short-name aliases that clients may pass instead of the full field path
+FIELD_ALIASES = {
+    "status": "summary.weave.status",
+    "latency_ms": "summary.weave.latency_ms",
+    "trace_name": "summary.weave.trace_name",
+}
+
 # Fields that are stored as DateTime64 columns in ClickHouse. When comparing
 # these fields with numeric unix timestamps, the value must be converted to a
 # datetime string so ClickHouse can properly use primary key / ORDER BY indexes.
@@ -1765,6 +1772,7 @@ DATETIME_COLUMN_FIELDS = {"started_at", "ended_at", "deleted_at"}
 
 
 def get_field_by_name(name: str) -> CallsMergedField:
+    name = FIELD_ALIASES.get(name, name)
     if name not in ALLOWED_CALL_FIELDS:
         if name.startswith("feedback."):
             return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])

@@ -16,8 +16,10 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
+    get_field_by_name,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
@@ -4099,3 +4101,33 @@ def test_status_sort_calls_complete_uses_sentinels() -> None:
             "pb_8": "project",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Tests for FIELD_ALIASES in get_field_by_name
+# ---------------------------------------------------------------------------
+
+
+def test_get_field_by_name_status_alias():
+    """Short alias 'status' must resolve to the same field as the full path."""
+    assert get_field_by_name("status") == get_field_by_name("summary.weave.status")
+
+
+def test_get_field_by_name_latency_ms_alias():
+    """Short alias 'latency_ms' must resolve to the same field as the full path."""
+    assert get_field_by_name("latency_ms") == get_field_by_name(
+        "summary.weave.latency_ms"
+    )
+
+
+def test_get_field_by_name_trace_name_alias():
+    """Short alias 'trace_name' must resolve to the same field as the full path."""
+    assert get_field_by_name("trace_name") == get_field_by_name(
+        "summary.weave.trace_name"
+    )
+
+
+def test_get_field_by_name_invalid_field_raises():
+    """A truly invalid field name must still raise InvalidFieldError."""
+    with pytest.raises(InvalidFieldError):
+        get_field_by_name("this_field_does_not_exist")
