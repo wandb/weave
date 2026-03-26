@@ -6,6 +6,9 @@ from functools import wraps
 from typing import Any
 
 import ddtrace
+from pydantic import BaseModel
+
+DD_TAG_MAX_LEN = 500
 
 logger = logging.getLogger(__name__)
 
@@ -78,3 +81,13 @@ def set_current_span_dd_tags(tags: dict[str, str | float | int]) -> None:
     current_span = ddtrace.tracer.current_span()
     if current_span is not None:
         current_span.set_tags(tags)
+
+
+def tag_request(
+    req: BaseModel,
+    tag_prefix: str = "calls_query",
+) -> dict[str, str | float | int]:
+    """Serialize a pydantic request model as a DD span tag for debuggability."""
+    return {
+        f"{tag_prefix}.req": req.model_dump_json()[:DD_TAG_MAX_LEN],
+    }

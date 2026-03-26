@@ -1141,21 +1141,22 @@ def test_file_batch_clears_on_insert_failure():
         )
 
 
-def test_calls_query_req_dd_tags():
-    """_calls_query_req_dd_tags dumps the full request into a single tag."""
+def test_tag_request():
+    """tag_request dumps the full request into a single truncated DD tag."""
+    from weave.trace_server.datadog import DD_TAG_MAX_LEN, tag_request
+
     req = tsi.CallsQueryReq(
         project_id="test/my-project",
         columns=["status", "op_name"],
         sort_by=[tsi.SortBy(field="started_at", direction="desc")],
         filter=tsi.CallsFilter(op_names=["my_op"]),
     )
-    tags = chts._calls_query_req_dd_tags(req, "calls_query_stream")
+    tags = tag_request(req)
 
-    assert tags["calls_query.endpoint"] == "calls_query_stream"
     assert "test/my-project" in tags["calls_query.req"]
     assert "status" in tags["calls_query.req"]
     assert "my_op" in tags["calls_query.req"]
-    assert len(tags["calls_query.req"]) <= 500
+    assert len(tags["calls_query.req"]) <= DD_TAG_MAX_LEN
 
 
 def test_invalid_field_error_propagates_from_calls_query(mock_ch_server):

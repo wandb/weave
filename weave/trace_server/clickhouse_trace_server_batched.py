@@ -114,6 +114,7 @@ from weave.trace_server.datadog import (
     generator_trace,
     set_current_span_dd_tags,
     set_root_span_dd_tags,
+    tag_request,
 )
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
@@ -254,24 +255,6 @@ _CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
     for idx, col in enumerate(ALL_CALL_COMPLETE_INSERT_COLUMNS)
     if ch_sentinel_values.is_sentinel_field(col)
 ]
-
-
-_DD_TAG_MAX_LEN = 500
-
-
-def _calls_query_req_dd_tags(
-    req: tsi.CallsQueryReq | tsi.CallsQueryStatsReq,
-    endpoint: str,
-) -> dict[str, str | float | int]:
-    """Tag DD span with the user's request for debuggability.
-
-    When InvalidFieldError fires, the span already has the request context
-    so operators can see exactly what query triggered the error.
-    """
-    return {
-        "calls_query.endpoint": endpoint,
-        "calls_query.req": req.model_dump_json()[:_DD_TAG_MAX_LEN],
-    }
 
 
 class ClickHouseTraceServer(tsi.FullTraceServerInterface):
@@ -1018,7 +1001,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        set_current_span_dd_tags(_calls_query_req_dd_tags(req, "calls_query_stats"))
+        set_current_span_dd_tags(tag_request(req))
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
@@ -1303,7 +1286,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         # Tag DD span with user-provided query fields for debuggability
-        set_current_span_dd_tags(_calls_query_req_dd_tags(req, "calls_query_stream"))
+        set_current_span_dd_tags(tag_request(req))
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
