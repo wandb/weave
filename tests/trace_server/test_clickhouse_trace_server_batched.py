@@ -1235,13 +1235,17 @@ def test_obj_digest_exists_non_deleted(ch_server):
     project_id = _make_project_id("exists")
     obj_id = "exists_obj"
     r = _obj_create(ch_server, project_id, obj_id, {"x": 1})
-    assert ch_server._obj_digest_exists_non_deleted(project_id, obj_id, r.digest) is True
+    assert (
+        ch_server._obj_digest_exists_non_deleted(project_id, obj_id, r.digest) is True
+    )
 
     # After delete
     ch_server.obj_delete(
         tsi.ObjDeleteReq(project_id=project_id, object_id=obj_id, digests=[r.digest])
     )
-    assert ch_server._obj_digest_exists_non_deleted(project_id, obj_id, r.digest) is False
+    assert (
+        ch_server._obj_digest_exists_non_deleted(project_id, obj_id, r.digest) is False
+    )
 
 
 # ── version_index ordering with _first_created_at ────────────────────
