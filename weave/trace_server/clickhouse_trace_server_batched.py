@@ -1704,24 +1704,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=digest,
         )
 
-        # No dedup query — duplicate digests are handled by:
-        #   1. Query-time dedup (rn = 1 window function)
-        #   2. ReplacingMergeTree background merge
-        # The object_version_first_seen MV tracks min(created_at) per digest
-        # independently, surviving RMT merges for stable version_index ordering.
         self._insert(
             "object_versions",
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
-        )
-
-        # Set "latest" alias on every publish (including re-publish).
-        self._insert_aliases(
-            req.obj.project_id,
-            req.obj.object_id,
-            ["latest"],
-            digest,
-            wb_user_id=req.obj.wb_user_id or "",
         )
 
         return tsi.ObjCreateRes(
