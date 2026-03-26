@@ -334,8 +334,9 @@ def drain(
     skipped with a warning.
 
     Poison pill protection: if a handler raises, the failed record is appended
-    to the consumer's dead-letter sidecar file and processing continues.  The
-    batch is always acknowledged, so a single bad record never blocks the WAL.
+    to the consumer's dead-letter sidecar file and processing continues.  If
+    the dead-letter write itself also fails, draining halts immediately so
+    the checkpoint is not advanced past an unrecoverable record.
 
     Args:
         consumer: A consumer bound to a specific WAL file.
@@ -360,9 +361,11 @@ def drain(
                 _write_dead_letter(consumer.dead_letter_path, entry.record)
             except Exception:
                 logger.exception(
-                    "Failed to write dead-letter record at offset %d",
+                    "Failed to write dead-letter record at offset %d; "
+                    "halting drain to avoid data loss",
                     entry.end_offset,
                 )
+                break
             last_offset = entry.end_offset
             continue
         handler = handlers.get(record_type)
@@ -386,9 +389,11 @@ def drain(
                     _write_dead_letter(consumer.dead_letter_path, entry.record)
                 except Exception:
                     logger.exception(
-                        "Failed to write dead-letter record at offset %d",
+                        "Failed to write dead-letter record at offset %d; "
+                        "halting drain to avoid data loss",
                         entry.end_offset,
                     )
+                    break
         else:
             logger.warning(
                 "No handler registered for record type %r at offset %d; "
@@ -400,9 +405,11 @@ def drain(
                 _write_dead_letter(consumer.dead_letter_path, entry.record)
             except Exception:
                 logger.exception(
-                    "Failed to write dead-letter record at offset %d",
+                    "Failed to write dead-letter record at offset %d; "
+                    "halting drain to avoid data loss",
                     entry.end_offset,
                 )
+                break
         last_offset = entry.end_offset
         if max_records and processed >= max_records:
             break

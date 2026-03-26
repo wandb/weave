@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from unittest import mock
 
 import pytest
 
@@ -242,6 +243,45 @@ class TestDrain:
         assert [r["seq"] for r in received] == [0, 2]
         # All three records (including the untyped one) are acknowledged.
         assert list(consumer.read_pending()) == []
+
+
+    @pytest.mark.disable_logging_error_check
+    def test_dead_letter_write_failure_halts_drain(self, tmp_path: str) -> None:
+        """If the dead-letter write itself fails, drain halts so the record is retryable.
+
+        Without this protection, a record that fails both handler dispatch AND
+        dead-letter persistence is silently lost: the checkpoint advances past
+        it, so it is never retried.
+        """
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with mgr.create_file() as writer:
+            writer.write({"type": "obj_create", "seq": 0})
+            writer.write({"type": "obj_create", "seq": 1})
+            writer.write({"type": "obj_create", "seq": 2})
+
+        def failing_handler(record: WALRecord) -> None:
+            if record["seq"] == 1:
+                raise RuntimeError("handler fails on seq=1")
+
+        path = mgr.list_files()[0]
+        consumer = JSONLWALConsumer(path)
+
+        # Make the dead-letter write also fail, simulating e.g. disk full.
+        with mock.patch(
+            "weave.durability.wal._write_dead_letter",
+            side_effect=OSError("disk full"),
+        ):
+            count = drain(consumer, {"obj_create": failing_handler})
+
+        # Only record 0 was successfully processed.
+        assert count == 1
+
+        # The critical invariant: record 1 (and 2) must still be pending
+        # because the checkpoint must NOT have advanced past the lost record.
+        remaining = list(consumer.read_pending())
+        assert len(remaining) >= 2
+        assert remaining[0].record["seq"] == 1
+        assert remaining[1].record["seq"] == 2
 
 
 class TestDrainAll:
