@@ -1041,15 +1041,14 @@ def test_trace_call_query_timings(client):
         else:  # call 99 gets 'even_later'
             return even_later
 
-    # Create a datetime subclass that overrides now() but preserves the real
-    # class for isinstance() checks — replacing datetime.datetime with a
-    # MagicMock breaks isinstance() in any code sharing the datetime module.
-    class _MockDatetime(datetime.datetime):
-        @classmethod
-        def now(cls, *args, **kwargs):
-            return mock_now()
+    with mock.patch(
+        "weave.trace.weave_client.datetime.datetime"
+    ) as mock_datetime_class:
+        # Mock only the .now() method, keep everything else as-is
+        mock_datetime_class.now = mock.Mock(side_effect=mock_now)
+        # Preserve other datetime functionality
+        mock_datetime_class.side_effect = datetime.datetime
 
-    with mock.patch("weave.trace.weave_client.datetime.datetime", _MockDatetime):
         for i in range(num_calls):
             call_index = i
             client.create_call("y", {"a": i})

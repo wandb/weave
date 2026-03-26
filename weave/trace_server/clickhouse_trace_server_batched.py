@@ -193,6 +193,7 @@ from weave.trace_server.query_builder.obj_tags_query_builder import (
     make_get_tags_query,
     make_list_aliases_query,
     make_list_tags_query,
+    make_obj_digest_exists_non_deleted_query,
     make_obj_version_exists_query,
     make_resolve_alias_query,
 )
@@ -1635,27 +1636,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         inserts mean a small race window, but the read-path dedup and
         ReplacingMergeTree handle duplicates correctly.
         """
-        query = """
-            SELECT count() > 0
-            FROM (
-                SELECT
-                    argMax(deleted_at, created_at) AS latest_deleted_at
-                FROM object_versions
-                WHERE project_id = {project_id: String}
-                    AND object_id = {object_id: String}
-                    AND digest = {digest: String}
-                GROUP BY project_id, object_id, digest
-            )
-            WHERE latest_deleted_at IS NULL
-                OR latest_deleted_at = toDateTime64(0, 3)
-        """
+        query, parameters = make_obj_digest_exists_non_deleted_query(
+            project_id, object_id, digest
+        )
         result = self._query(
             query,
-            parameters={
-                "project_id": project_id,
-                "object_id": object_id,
-                "digest": digest,
-            },
+            parameters=parameters,
         )
         if result.result_rows and result.result_rows[0]:
             return bool(result.result_rows[0][0])

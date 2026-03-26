@@ -41,6 +41,41 @@ def make_obj_version_exists_query(
     return query, parameters
 
 
+def make_obj_digest_exists_non_deleted_query(
+    project_id: str,
+    object_id: str,
+    digest: str,
+) -> tuple[str, dict[str, Any]]:
+    """Build a query to check if a non-deleted row with the given digest exists.
+
+    Uses argMax(deleted_at, created_at) to handle pre-merge state where
+    multiple rows may exist for the same digest.
+
+    Returns:
+        A tuple of (sql_query, parameters).
+    """
+    query = """
+        SELECT count() > 0
+        FROM (
+            SELECT
+                argMax(deleted_at, created_at) AS latest_deleted_at
+            FROM object_versions
+            WHERE project_id = {project_id: String}
+                AND object_id = {object_id: String}
+                AND digest = {digest: String}
+            GROUP BY project_id, object_id, digest
+        )
+        WHERE latest_deleted_at IS NULL
+            OR latest_deleted_at = toDateTime64(0, 3)
+    """
+    parameters = {
+        "project_id": project_id,
+        "object_id": object_id,
+        "digest": digest,
+    }
+    return query, parameters
+
+
 def make_get_tags_query(
     project_id: str,
     object_ids: list[str],
