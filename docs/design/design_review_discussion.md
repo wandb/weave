@@ -26,7 +26,7 @@ Weave traces LLM calls well. But as agent frameworks have matured (OpenAI Agents
 - **Multi-turn conversations.** Each trace is independent. Weave has threads for grouping, but the underlying data doesn't natively understand sessions.
 - **Standalone runtimes.** Cursor, Claude Code, and similar IDE agents run in separate processes with no Python runtime to import into.
 
-Beyond agents, there's a more general scaling concern with the current data model. In Weave today, if you want to filter calls by a parameter like `temperature` across millions of rows, ClickHouse has to scan the full `inputs` JSON column — which also contains all the messages — to extract that one value. At scale this leads to queries that freeze ClickHouse and page the on-call, for what should be a fast indexed lookup on a `Float64` column. The GenAI schema avoids this entirely: `request_temperature` is a dedicated column with its own index.
+Beyond agents, there's a more general scaling concern with the current data model. In Weave today, if you want to filter calls by a parameter like `temperature` across millions of rows, ClickHouse has to scan the full `inputs` JSON column — which also contains all the messages — to extract that one value using `JSONExtract*` functions, which incur full parsing costs on every query without columnar storage benefits (ClickHouse's own best practices [recommend structured Tuple columns over String+JSONExtract](https://clickhouse.com/docs/best-practices/use-json-where-appropriate) for known schemas, noting that Tuple fields get their own sub-columns on disk with individual compression). At scale this leads to queries that freeze ClickHouse and page the on-call, for what should be a fast indexed lookup on a `Float64` column. The GenAI schema avoids this entirely: `request_temperature` is a dedicated column with its own index.
 
 I started looking at how the agent ecosystem was solving the data model problem and found that most major frameworks were converging on OpenTelemetry — either shipping native OTel instrumentations or being instrumented by the community. The OTel GenAI semantic conventions turned out to be a good fit for both the agent patterns above and the broader structured-data need.
 
@@ -291,38 +291,63 @@ The system is called **Sink** in the UI (sidebar, routes, page headers). Backend
 
 ---
 
-## Open questions
+## Two products, by design
 
-### How does this relate to Weave's existing call model?
+The pitch is not "we're splitting Weave in two." It's that Weave and Sink serve different jobs, and keeping them separate is what makes each one good at its job. Blending them into one system means compromising both — Weave's simplicity and Sink's scalability.
 
-The call model and the GenAI schema serve different needs. The call model with `@weave.op()` is oriented around capturing Python function execution — automatic code versioning, object serialization, evaluation pipelines. The GenAI schema is oriented around structured, queryable data for GenAI workloads at scale — typed columns, normalized messages, agent primitives, conversation linking.
+### Weave: decorator-based program tracing
 
-The GenAI schema brings things like backend queryability, schema stability across provider changes, semantic operation names, and first-class agent concepts. The call model brings things the GenAI schema doesn't attempt — particularly code versioning and evaluation/dataset integration.
+Weave is a **developer tracing tool** for Python and TypeScript AI workflows. You add `@weave.op()` to your functions, and Weave captures inputs, outputs, code versions, and execution trees. It's designed for the inner development loop — building, debugging, and evaluating your own code.
 
-**Decision:** All new GenAI and agent investment goes into the GenAI schema (Sink). The call model continues to serve `@weave.op()` users and the evaluation pipeline. When to use which:
+**What stays in Weave:**
 
-| If you're doing...                                            | Use...                   |
-| ------------------------------------------------------------- | ------------------------ |
-| Monitoring a deployed agent or completions endpoint at scale  | OTel GenAI → genai_spans |
-| Tracing an IDE agent (Cursor, Claude Code)                    | Daemon → genai_spans     |
-| Using an agent framework with OTel instrumentation            | OTel GenAI → genai_spans |
-| Developing/evaluating custom pipeline code with `@weave.op()` | Calls (existing)         |
+- **Op Traces** — The trace tree built from `@weave.op()` decorated functions. Each trace is a tree of function calls with serialized inputs/outputs. This is Weave's core — lightweight instrumentation that captures everything about your code's execution.
+- **Evaluations** — Run a scorer over a dataset, see results in a comparison table. Evals are deeply integrated with the call model — they're function calls that produce function calls.
+- **Objects** — Datasets, models, prompts, scorers stored as versioned objects. The object system builds on Weave's Python serialization.
+- **Playground** — Interactive prompt testing against stored prompts and models.
+- **Op Conversations** — The existing threads feature, grouping op traces into multi-turn sessions.
 
-### Should we dual-write from the existing OTel endpoint?
+Weave's strength is that it's easy. `import weave; weave.init(); @weave.op()` — three lines and your code is traced. The data model is your code's data model — function signatures become columns, return values become outputs. It's a natural fit for development-time iteration on AI pipelines.
 
-Today Weave's patched integrations send to `/otel/v1/traces` → calls pipeline. The new endpoint is `/otel/v1/genai/traces` → genai_spans.
+Weave's limitation is that the data is unstructured by design. Inputs and outputs are JSON dumps of arbitrary function signatures. This makes Weave flexible (any function, any arguments) but makes analytics hard — you can't efficiently filter by `temperature` across millions of rows when it's buried in a JSON blob alongside the entire message array. And it can't model things that aren't function calls — agent frameworks you don't own, tool executions in external processes, IDE agents running in separate runtimes.
 
-**Decision:** No dual-write. Redirect at the integration layer for new work. Historical data stays in calls. This is implemented — new GenAI/agent workloads use the Sink endpoint directly.
+### Sink: universal GenAI observability
 
-### How do evaluations connect?
+Sink is a **GenAI monitoring and analytics platform**. It ingests OTel spans that follow GenAI semantic conventions, normalizes them into typed columns, and provides purpose-built UI for agents, conversations, and LLM analytics at scale. It's designed for production monitoring — understanding what your GenAI systems are doing across millions of interactions.
 
-The `genai_spans` table has `content_refs`, `artifact_refs`, and `object_refs` columns that can hold references to datasets and artifacts, providing a bridge. The initial answer is taking shape: the **Signals** system (see Phase 2 below) runs LLM-as-judge scorers over spans and conversations and writes results to `entity_annotations`. This is the foundation — evals on GenAI data are "run a scorer over these entities and store results as annotations," which complements the existing call-based evaluation model.
+**What Sink provides:**
 
-**Status:** Signals infrastructure is implemented. Full eval pipeline (batch scoring over historical data, dataset integration) is next.
+- **Structured ingest** — A dedicated OTel endpoint (`/otel/v1/genai/traces`) that accepts spans from any framework shipping OTel instrumentation. The server normalizes vendor-specific attribute names (OpenAI, Google ADK, Traceloop, Arize Phoenix, etc.) into a stable column schema at write time.
+- **Typed table** — `genai_spans` stores every field that matters — model, tokens, temperature, agent name, messages, conversation ID, operation type — as a dedicated typed column with appropriate indexes. No JSON crawling. "Tokens by model this week" is a fast indexed scan, not a full-table JSON parse.
+- **Agent and conversation dashboards** — `genai_agents` and `genai_conversations` materialized views maintain pre-aggregated statistics on insert. Agent list pages and conversation list pages are O(1) regardless of data volume.
+- **Chat trajectory views** — Read-time projection from span trees into chat-style narratives. Works for single traces and multi-turn conversations. Improving the algorithm fixes all historical data.
+- **Signals** — LLM-as-judge scoring over spans and conversations, with typed inputs (the scorer gets `messages`, `model`, `agent_name` as structured fields, not JSON dumps to parse). Preset classifier groups for conversation quality, safety, response quality, and tool use. Results stored in `entity_annotations` with typed key-value metadata — not JSON dumps.
+- **Universal integration** — Any framework that emits OTel GenAI spans works out of the box. We ship first-party instrumentations for core frameworks (OpenAI Agents SDK, Google ADK) and the normalization layer handles community instrumentations (OpenLLMetry, OpenInference) that use different attribute names for the same concepts.
+- **Out-of-process agents** — The daemon pattern lets Cursor, Claude Code, and similar IDE agents produce the same structured data as in-process SDK instrumentation. No Python runtime required.
 
-### What's the confusion surface?
+### Why they must stay separate
 
-Two systems: Calls (Traces tab) and Sink. The UI presents them as separate sections in the sidebar — Sink at the top for GenAI/agent workloads, Traces below for `@weave.op()`. Each has its own data shape, its own UI, and its own feature set (Sink has Signals; Calls has evals and op versioning). The decision tree above keeps it simple. Over time, as more GenAI workloads move to Sink, the split becomes less relevant.
+The temptation is to merge Sink into Weave — one product, one sidebar, one mental model. The Frankentable experiment (see Appendix) tested this directly and showed why it doesn't work:
+
+**The table structure is the product advantage.** Sink's value proposition is that every field is a typed, indexed column — fast analytics, efficient filtering, structured scoring inputs. The moment you put this on a shared table with JSON dump columns, you inherit the performance characteristics of the shared table (scans past non-GenAI rows, skip indexes that don't help because GenAI rows are scattered sparsely across granules), and the engine constraints — `AggregatingMergeTree` on `calls_merged` requires columns to be typed as `SimpleAggregateFunction` or `AggregateFunction`, and adding materialized views for GenAI aggregation means filtering for "GenAI-relevant" rows inside a table that's mostly non-GenAI. A separate table is what makes "tokens by model" fast and "agent list page" O(1). Compromising the table structure compromises the analytics story.
+
+**Branching logic in a shared system slows everything down.** If GenAI data lives in calls, every query, filter, API handler, and UI component needs to handle two data shapes. Adding a new GenAI field means touching the migration, the extraction, the query builder, the API schema, the sentinel suppression, and the frontend — across code designed for the other shape. In the Frankentable experiment, every layer had branching logic for "is this a GenAI row?" This isn't implementation sloppiness — it's structural. Two data shapes in one system means two code paths in every component. Keeping them separate means each path is coherent end-to-end.
+
+**Sink needs to move fast independently.** The GenAI observability space is evolving rapidly — new frameworks, new agent patterns, new scoring approaches. Sink needs to ship features (new columns, new materialized views, new signal types, new visualizations) without worrying about backward compatibility with the calls schema, the calls API, the calls UI, or the calls saved views. A shared system couples their release cycles. A separate system lets Sink iterate at the pace the GenAI market demands.
+
+**The integration model is fundamentally different.** Weave integrations wrap Python/TypeScript function calls — you own the code, you add decorators. Sink integrations accept OTel spans from external frameworks — you configure an exporter, the framework does the rest. These are different developer experiences targeting different personas. A Weave user is building and debugging their own AI pipeline. A Sink user is monitoring deployed agents and LLM endpoints at scale, potentially across frameworks they don't own. Trying to serve both in one UI means compromising the experience for each.
+
+### How users choose
+
+| You're... | Use | Why |
+| --- | --- | --- |
+| Building/debugging a custom AI pipeline with `@weave.op()` | Weave | Your code _is_ the schema. Weave captures function signatures, versions code, and integrates with evals/datasets. |
+| Monitoring a deployed agent framework (OpenAI Agents, ADK, etc.) | Sink | The framework emits OTel spans. Sink ingests them with typed columns, agent dashboards, conversation tracking. |
+| Tracing an IDE agent (Cursor, Claude Code) | Sink | Out-of-process daemon produces OTel spans. No Python runtime needed. |
+| Running completions at scale and need token/model analytics | Sink | Typed columns with indexes. "Cost by model per day" is a fast query, not a JSON scan. |
+| Evaluating prompt quality with datasets and scorers | Weave (evals) + Sink (signals) | Weave evals for batch scoring over datasets. Sink signals for online scoring of production traffic. |
+
+Over time, the boundary clarifies naturally. As more GenAI workloads adopt OTel instrumentation, Sink handles the growing production monitoring surface. Weave narrows to its core strength: developer-time tracing, evaluation, and the object/prompt/dataset system. They share a project, they share a sidebar, but they don't share a table or a UI — and that's what makes each one work.
 
 ---
 
@@ -332,7 +357,7 @@ After the design review, the most common question was: _why can't we add these s
 
 **The Parallel approach:** Ship `genai_spans` and `calls` as separate tables with separate endpoints. Each optimized for its domain. Build integration points between them over time.
 
-**The Frankentable approach:** Add GenAI columns to the calls table (likely `calls_complete`, since `calls_merged`'s `AggregatingMergeTree` engine makes column additions painful). Write both Weave calls and OTel spans to this unified table. Populate the GenAI columns when available, leave them empty when not.
+**The Frankentable approach:** Add GenAI columns to the calls table (likely `calls_complete`, since `calls_merged`'s `AggregatingMergeTree` engine requires columns to be typed as `AggregateFunction` or `SimpleAggregateFunction`, constraining what can be added). Write both Weave calls and OTel spans to this unified table. Populate the GenAI columns when available, leave them empty when not.
 
 ### The extraction problem (applies to both approaches)
 
@@ -364,7 +389,7 @@ The calls UI and the GenAI UI are separate because the data shapes are fundament
 | **OTel ecosystem compat** | Clean — external OTel sources write to a dedicated endpoint that speaks their language.                                                                    | Awkward — external OTel spans must be transformed into calls-shaped rows. They don't have `op_name`, `inputs_dump`, or weave refs.                                                                                                                                                   |
 | **Frontend**              | Each UI is purpose-built for its data shape. GenAI gets flat typed columns + chat views. Calls get the inputs/outputs inspector. No conditional rendering. | One table, but still two UIs — the calls table/filter/saved-view system can't render GenAI data without major rework, and GenAI views don't need inputs/outputs columns. You get the maintenance cost of two UIs anyway, plus the complexity of routing within a single data source. |
 | **Feature integration**   | Evals, datasets, op versioning live in calls-world. Bridging to genai_spans requires explicit work.                                                        | Everything in one table so existing features _could_ apply. But op versioning doesn't make sense for external OTel spans, and the eval model would need to understand both column shapes.                                                                                            |
-| **Migration risk**        | Zero — `genai_spans` is additive.                                                                                                                          | Schema migration on a table with billions of rows. If something goes wrong, it affects all tracing.                                                                                                                                                                                  |
+| **Migration risk**        | Zero — `genai_spans` is additive.                                                                                                                          | `ALTER TABLE ADD COLUMN` is metadata-only and fast, but the blast radius is all of tracing — any bug in the new write path or query logic affects the production calls table.                                                                                                         |
 | **Long-term trajectory**  | Two tables converge naturally as integrations migrate to GenAI mode. Calls narrows to `@weave.op()` + evals.                                               | Permanent mixed table. GenAI columns and call columns coexist forever. No convergence point.                                                                                                                                                                                         |
 
 ### The honest case for Frankentable
@@ -438,15 +463,96 @@ The existing integrations already have all the information — the OpenAI patche
 
 The question is whether this is worth the SDK complexity. If new users default to GenAI mode and existing users are fine with calls, maintaining two emission modes in every integration might be cost without clear payoff. It could make sense as a migration path if we eventually want all LLM data in `genai_spans`, but it's not obvious we need to force that. Worth revisiting once we see how adoption of the GenAI schema plays out.
 
-### Separate UIs, not unified
-
-The two tables have separate UIs, and that's the right call — they present fundamentally different data shapes. Calls show function-call detail with nested input/output JSON columns. The Sink shows flat, typed columns (model, tokens, messages, agent name) with chat trajectory views, agent dashboards, conversation pages, and a Signals tab for configuring LLM-powered analysis. Trying to unify these into one view would mean compromising both.
-
 ### Summary
 
 | Phase                            | What                                                                                         | Status                                |
 | -------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------- |
-| **1. Ship parallel**             | `genai_spans` for OTel/agent workloads, calls for `@weave.op()`                              | Implemented (on branch)               |
+| **1. Ship Sink**                 | `genai_spans` for OTel/agent workloads, Weave calls unchanged for `@weave.op()`              | Implemented (on branch)               |
 | **2. Signals + scoring**         | Sink scoring worker, Signals tab, preset classifiers, score display across Sink tabs          | Implemented (on branch)               |
 | **3. Evals on GenAI data**       | Eval pipelines reading GenAI spans, scoring, writing annotations                             | Next — builds on signals worker       |
-| **4. Maybe: OTel emitting mode** | Weave integrations emit structured GenAI spans instead of JSON blobs                         | Revisit based on adoption             |
+| **4. Stats + alerting APIs**     | Deterministic analytics endpoints on typed columns (tokens/cost/latency aggregations, anomaly detection, alerting rules) | Next — typed columns make this tractable |
+| **5. Maybe: OTel emitting mode** | Weave integrations emit structured GenAI spans instead of JSON blobs                         | Revisit based on adoption             |
+
+---
+
+## Appendix: The Frankentable experiment
+
+After the design review, we built a working Frankentable implementation on `ben/frankentable` to stress-test the approach. The experiment added 20+ GenAI columns to `calls_complete`, built dual extraction paths (OTel attributes and SDK JSON dumps), wired the columns through the frontend type/filter/query stack, and added Agents and Conversations tabs to the calls UI. This section documents what we had to build, where it broke down, and what's lost by choosing the parallel path instead.
+
+### What was built
+
+**Backend (weave-public, ~600 lines of new Python + 109-line migration):**
+
+- `026_genai_columns.up.sql` — ALTER TABLE on `calls_complete` adding 16 scalar columns (`operation_name`, `provider_name`, `request_model`, `response_model`, `response_id`, `input_tokens`, `output_tokens`, `total_tokens`, `reasoning_tokens`, `request_temperature`, `request_max_tokens`, `request_top_p`, `conversation_id`, `agent_name`, `tool_name`, `tool_call_arguments`), 2 structured array columns (`input_messages`, `output_messages` as `Array(Tuple(role, content, tool_call_id, tool_name))`), 2 metadata arrays (`finish_reasons`, `system_instructions`), and 6 skip indexes.
+- `genai_call_extraction.py` (255 lines) — Backend extraction from SDK JSON dumps (`inputs_dump`, `output_dump`, `summary_dump`) for known integration op names. Pattern-matches on op name prefixes to identify provider, then navigates the serialized function arguments to find model, tokens, and messages.
+- `genai_fields.py` (356 lines) — OTel attribute extraction with vendor fallback chains. Defines `GenAIFields` dataclass and pure extraction functions that resolve standard GenAI semconv, OpenAI Agents SDK, Traceloop, Arize Phoenix, and GCP Vertex attribute names into the same column values.
+- Changes to `clickhouse_schema.py`, `clickhouse_trace_server_batched.py`, `calls_query_builder.py`, `trace_server_interface.py`, `python_spans.py` — Schema mixin, dual write paths, query registration, API exposure.
+
+**Frontend (core, ~1,500 lines of new TypeScript):**
+
+- `AgentsTab.tsx` — Fetches calls with `operation_name='invoke_agent'`, aggregates client-side into agent stat cards (call count, error rate, token usage, models).
+- `ConversationsTab.tsx` — Fetches calls with non-empty `conversation_id`, groups client-side by conversation, renders expandable rows.
+- GenAI columns in `callsTableColumns.tsx` — `genai.request_model`, `genai.provider_name`, `genai.operation_name`, `genai.input_tokens`, `genai.output_tokens` added to the calls table.
+- Filter/type infrastructure — `requestModels`, `operationNames`, `providerNames`, `conversationIds`, `agentNames` threaded through Zod schemas, `TraceCallsFilter`, `CallFilter`, `WFHighLevelCallFilter`, saved views, and bidirectional filter conversion.
+- `AgentsPage.tsx` — Standalone page with routing at `/agents`.
+
+### What we learned
+
+The specific bugs in the implementation (fixable individually) point to deeper structural problems that would persist in any Frankentable implementation.
+
+**Every layer needs branching logic for two data shapes.**
+
+The calls table now has two kinds of rows: function calls (with `op_name`, `inputs_dump`, `output_dump`) and GenAI spans (with `operation_name`, `request_model`, `input_messages`). Some rows have both. This isn't a schema problem — it's a control flow problem. Every component that touches the data has to ask "is this a GenAI row or a call row?" and behave differently:
+
+- The **query builder** needs to know which columns to select and aggregate. GenAI columns use `SimpleAggregateFunction(any, ...)` in `calls_merged`, but calls columns use different aggregation strategies. Query construction branches on column family.
+- The **filter system** was designed around function-call hierarchies where root spans are the interesting entry points (`traceRootsOnly: true` by default). GenAI filtering needs to reach into child spans — the `chat` operation is rarely the root. Every filter predicate needs to consider whether it should override the root-only default.
+- The **API layer** needs to suppress empty GenAI fields on non-GenAI rows (converting `0` / `""` defaults to `null`) while preserving them on GenAI rows where `0` might be a real value (e.g. `temperature=0.0` means deterministic sampling). This three-state ambiguity — "not a GenAI row," "GenAI row where the field wasn't populated," "GenAI row where the value is actually zero" — exists for every numeric GenAI column, and each consumer needs its own logic to distinguish them.
+- The **frontend** renders two different UIs from one data source — the inputs/outputs inspector for calls, flat typed columns + chat views for GenAI. Saved views, column visibility, and sort persistence all need to handle both layouts. We ended up building `AgentsTab`, `ConversationsTab`, and GenAI columns as a separate UI bolted onto the calls page, which is the same work as a dedicated page but with more coupling.
+
+This branching multiplies with every feature. Adding a new GenAI field means touching the migration, the extraction, the query builder registration, the API schema, the sentinel suppression logic, and the frontend column definition — across two column families in files designed for the other one. In the parallel design, each path is coherent end-to-end: GenAI fields go through GenAI-specific code, call fields go through call-specific code, and neither needs to account for the other.
+
+**Query performance degrades for GenAI analytics on a mixed table.**
+
+`calls_complete` contains all tracing data — `@weave.op()` function calls, eval runs, integration LLM calls, and now GenAI spans. A query like "total tokens by model this week" scans the full table, including all non-GenAI rows where the GenAI columns are empty. Skip indexes help (`SET` indexes on `operation_name`, `request_model`, etc.) but they're a mitigation, not a solution — ClickHouse's own best practices note that skip indexes ["only provide benefit when they eliminate a meaningful number of data blocks, and can actually introduce overhead if the query or data structure doesn't align"](https://clickhouse.com/docs/best-practices/use-data-skipping-indices-where-appropriate) and that ["effective skip index usage often depends on a strong correlation between the indexed column and the table's primary key"](https://clickhouse.com/docs/best-practices/use-data-skipping-indices-where-appropriate). GenAI rows in the calls table have no such correlation — they're scattered sparsely across granules sorted by the calls table's primary key, so the skip indexes can't exclude meaningful blocks.
+
+The parallel table only contains GenAI rows, so every query scans only relevant data. The sort key is chosen for GenAI access patterns (`project_id, started_at, span_id`) rather than inheriting the calls table's sort key which was designed for function-call lookup.
+
+More importantly, the parallel design supports **materialized views** that maintain pre-aggregated agent and conversation statistics on insert. In the Frankentable, the `AggregatingMergeTree` engine on `calls_merged` makes adding new materialized views painful — new columns must be typed as `SimpleAggregateFunction` or `AggregateFunction`, and the views would need to filter for "GenAI-relevant" rows (non-empty `operation_name`?), adding yet another branching condition. Each materialized view also [adds at least one write per INSERT block and executes sequentially](https://bigdataboutique.com/blog/clickhouse-materialized-views-guide) when multiple MVs target the same source table, directly increasing insert latency — a real concern on a high-throughput production table. Without materialized views, the agents and conversations UIs had to aggregate data client-side with hard limits (10K calls for agents, 1K for conversations), silently truncating results.
+
+**The extraction problem creates permanent asymmetry.**
+
+Populating GenAI columns from SDK calls requires parsing `inputs_dump` / `output_dump` / `summary_dump` — JSON strings whose shape is the arbitrary function signature of whatever method was wrapped. The extraction module (`genai_call_extraction.py`) matched op names against a hardcoded prefix list of ~12 integration patterns and navigated JSON with heuristics (e.g. "iterate the usage dict and return the first key that isn't `'usage'`" to guess the model name).
+
+This could populate ~15 of the 20+ columns. Fields like `agent_name`, `conversation_id`, `system_instructions`, and `reasoning_tokens` were unreachable because the SDK JSON dumps don't carry that information. Output message extraction only handled OpenAI's `ChatCompletion` shape — Anthropic, Google, and the Responses API all produced empty `output_messages`. Every new provider format means a new parser function.
+
+The OTel path reads named attributes (`gen_ai.request.model`, `gen_ai.usage.input_tokens`) with vendor fallback chains — dramatically simpler, and every field is populated. This asymmetry between the two extraction paths is structural, not a matter of implementation completeness. Closing it would require client-side changes to the SDK integrations, at which point you might as well emit OTel attributes directly.
+
+### What's lost by going parallel
+
+Being honest about what Frankentable gives up:
+
+1. **Lightweight enrichment of existing SDK traces.** Users running `@weave.op()` with OpenAI patching today would get `request_model`, `input_tokens`, `output_tokens` as queryable columns on their existing calls, without changing any code. In the parallel approach, those calls stay in the calls table with JSON dumps. Users who want typed GenAI columns need to switch to the OTel SDK path.
+
+2. **One table for all trace data.** "Everything is in calls" is simpler to explain than "function traces are here, GenAI traces are there." The parallel approach requires users to understand which system their data lands in.
+
+3. **Existing eval/dataset integration.** Evals and datasets operate on calls today. GenAI data in a separate table needs new eval infrastructure (the Signals system addresses this, but it's additional work).
+
+4. **Continuity for users already filtering by model/tokens on calls.** If we ever shipped the Frankentable columns, users who built saved views or dashboards around them would need to migrate.
+
+The first point — lightweight enrichment — is the most real loss. It could be partially recovered by adding a small subset of GenAI columns to calls (just `request_model`, `provider_name`, `input_tokens`, `output_tokens`, `total_tokens`) as a future quality-of-life improvement, without the full 20-column schema or the agents/conversations UI. This is a bounded, low-risk addition that doesn't require solving the extraction problem comprehensively — the existing summary/usage fields are reliable enough for token counts, and `request_model` can be extracted from the subset of integrations where the JSON shape is stable.
+
+### Reusable pieces
+
+The following code from the Frankentable branch transfers directly to the parallel approach:
+
+- **`genai_fields.py`** — The `GenAIFields` dataclass, vendor fallback chains, and `_normalize_messages()` are the same extraction logic needed for the `genai_spans` ingest path. Already used on both branches.
+- **Column set** — The 20+ columns validated in the migration are the same fields stored in `genai_spans`. The Frankentable experiment confirmed the right column set.
+- **Frontend type infrastructure** — The TypeScript types (`TraceCallSchema` GenAI fields), Zod schemas, and filter field definitions are adaptable to the parallel API surface.
+- **`opentelemetry.ts` chat format** — The OTel-to-chat-message normalization in the frontend transfers to the parallel chat view.
+
+The following code is Frankentable-specific and doesn't transfer:
+
+- **`genai_call_extraction.py`** — The SDK JSON dump parsing. Not needed when data arrives as typed OTel attributes.
+- **Client-side aggregation in `AgentsTab` / `ConversationsTab`** — Replaced by server-side materialized views in the parallel design.
+- **Calls query builder changes** — The `CallsMergedAggField` registrations for GenAI columns. The parallel table has its own query layer.
+- **`clickhouse_schema.py` mixin** — The `GenAIColumnsCHMixin` on `CallCompleteCHInsertable`. The parallel table has a dedicated schema.
