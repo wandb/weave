@@ -324,9 +324,17 @@ class ObjectMetadataQueryBuilder:
 
         query = f"""
 WITH latest_row_per_digest AS (
-    -- Multiple rows can exist per (project, object, digest) before
-    -- ReplacingMergeTree compacts them.  Pick the latest row for each
-    -- version, preferring the deletion event on created_at ties.
+    -- Before ReplacingMergeTree compacts rows, multiple rows can exist
+    -- for the same (project, object, digest) — e.g. the original insert
+    -- and a soft-delete (which inserts a new row with deleted_at set,
+    -- inheriting the original created_at).  Pick the newest row; on
+    -- created_at ties, prefer the soft-delete so deletes are visible
+    -- before RMT merges.
+    --
+    -- _first_created_at comes from the object_version_first_seen MV,
+    -- which tracks the earliest created_at per digest across all inserts.
+    -- This survives RMT merges (which discard old rows) and keeps
+    -- version_index stable when the same digest is re-published.
     SELECT
         ov.project_id,
         ov.object_id,
