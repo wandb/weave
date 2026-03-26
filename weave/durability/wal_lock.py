@@ -105,6 +105,17 @@ def release_lock(lock_path: str) -> None:
             "external tampering or a logic error.",
             lock_path,
         )
+    except PermissionError:
+        # On Windows, the sender thread may have the lock file open for
+        # reading (in _read_lock_pid / is_writer_alive) at the moment we
+        # try to unlink.  Windows forbids deleting files with open handles.
+        # The sender's next drain cycle will see the stale PID and treat
+        # the file as safe to clean up, so this is not a data-loss risk.
+        logger.debug(
+            "Cannot remove lock file %s (still open by another thread/process), "
+            "will be cleaned up by the sender.",
+            lock_path,
+        )
 
 
 def is_writer_alive(wal_path: str, lock_ext: str = LOCK_EXT) -> bool:
