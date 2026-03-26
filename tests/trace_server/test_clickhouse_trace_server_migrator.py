@@ -1130,7 +1130,9 @@ def test_run_ddl_with_retry(mock_sleep, mock_costs):
     mock_sleep.reset_mock()
 
     # Non-transient CH errors propagate immediately
-    ch_client.command.side_effect = DatabaseError("Code: 62. DB::Exception: Syntax error")
+    ch_client.command.side_effect = DatabaseError(
+        "Code: 62. DB::Exception: Syntax error"
+    )
     with pytest.raises(DatabaseError, match="Code: 62"):
         migrator._run_ddl_with_retry("INVALID SQL")
     assert ch_client.command.call_count == 1

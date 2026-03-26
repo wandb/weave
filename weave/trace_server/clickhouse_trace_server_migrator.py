@@ -445,7 +445,10 @@ class BaseClickHouseTraceServerMigrator(ABC):
                 self.ch_client.command(command)
             except DatabaseError as e:
                 error_code = self._extract_ch_error_code(e)
-                if error_code not in _TRANSIENT_CH_ERROR_CODES or attempt == _MAX_RETRIES:
+                if (
+                    error_code not in _TRANSIENT_CH_ERROR_CODES
+                    or attempt == _MAX_RETRIES
+                ):
                     raise
                 logger.warning(
                     "Transient ClickHouse error (code %s) on attempt %d/%d, "
