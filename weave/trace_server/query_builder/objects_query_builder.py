@@ -139,16 +139,6 @@ class ObjectMetadataQueryBuilder:
         return _make_object_id_conditions_part(self._object_id_conditions)
 
     @property
-    def _prefixed_object_id_conditions_part(self) -> str:
-        """Object ID conditions prefixed with 'ov.' for use in aliased subqueries."""
-        if not self._object_id_conditions:
-            return ""
-        prefixed = [
-            c.replace("object_id", "ov.object_id") for c in self._object_id_conditions
-        ]
-        return _make_object_id_conditions_part(prefixed)
-
-    @property
     def sort_part(self) -> str:
         if not self._sort_by:
             return "ORDER BY created_at ASC"
@@ -401,7 +391,7 @@ FROM (
             FROM object_version_first_seen
             WHERE project_id = {{project_id: String}}
         ) AS fc USING (object_id, digest)
-        WHERE ov.project_id = {{project_id: String}}{self._prefixed_object_id_conditions_part}
+        WHERE ov.project_id = {{project_id: String}}{self.object_id_conditions_part}
     )
     WHERE rn = 1
 ) as {main_table_alias}

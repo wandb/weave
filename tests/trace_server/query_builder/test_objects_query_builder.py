@@ -252,7 +252,7 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
     parameters = builder.parameters
 
     expected_query = f"""{STATIC_METADATA_QUERY_PART}
-        WHERE ov.project_id = {{project_id: String}} AND ov.object_id = {{object_id: String}}
+        WHERE ov.project_id = {{project_id: String}} AND object_id = {{object_id: String}}
     )
     WHERE rn = 1
 ) as main
@@ -282,7 +282,7 @@ def test_objects_query_metadata_op():
     parameters = builder.parameters
 
     expected_query = f"""{STATIC_METADATA_QUERY_PART}
-        WHERE ov.project_id = {{project_id: String}} AND ov.object_id = {{object_id: String}}
+        WHERE ov.project_id = {{project_id: String}} AND object_id = {{object_id: String}}
     )
     WHERE rn = 1
 ) as main
