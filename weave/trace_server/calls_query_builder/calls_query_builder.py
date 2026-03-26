@@ -2263,6 +2263,9 @@ def process_children_of_eval_ids_to_sql(
         param_builder.add_param(eval_root_ids), "Array(String)"
     )
 
+    # we generate a nested CallsQuery to find all instances of the PredictandScore calls
+    # that are children of the eval root IDs. this is then used as a WHERE clause
+    # in the outer query to return both the PredictandScore calls and their children (scorers/predict calls).
     eval_root_children_cq = CallsQuery(project_id=project_id, read_table=read_table)
     eval_root_children_cq.add_field("id")
     eval_root_children_cq.set_hardcoded_filter(
@@ -2270,7 +2273,7 @@ def process_children_of_eval_ids_to_sql(
     )
     eval_root_children_subquery = eval_root_children_cq.as_sql(param_builder)
 
-    # for the calls-merged table, eaceh call is stored as split start/end rows.
+    # for the calls-merged table, each call is stored as split start/end rows.
     # end-rows have parent_id as NULL, so we need to do this.
     parent_id_conditions = (
         f"{parent_id_field_sql} IN {eval_root_ids_param}"

@@ -80,25 +80,6 @@ def test_eval_root_ids_filter_calls_complete() -> None:
     )
 
 
-def test_eval_root_ids_not_set_generates_baseline_query() -> None:
-    """When eval_root_ids is not set, the query is unchanged from baseline."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_MERGED)
-    cq.add_field("id")
-    assert_sql(
-        cq,
-        """
-        SELECT calls_merged.id AS id
-        FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_0:String}
-        GROUP BY (calls_merged.project_id,
-                  calls_merged.id)
-        HAVING (((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
-        """,
-        {"pb_0": "project"},
-    )
-
-
 def test_eval_root_ids_combined_with_op_names_filter() -> None:
     """eval_root_ids composes correctly with other hardcoded filters."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_MERGED)

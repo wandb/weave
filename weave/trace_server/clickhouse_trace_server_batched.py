@@ -1414,20 +1414,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id, self.ch_client
         )
         columns = sorted(
-            set(
-                REQUIRED_CALL_COLUMNS
-                + [
-                    "id",
-                    "parent_id",
-                    "op_name",
-                    "attributes",
-                    "inputs",
-                    "output",
-                    "summary",
-                    "started_at",
-                    "ended_at",
-                ]
-            )
+            [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
         )
         cq = CallsQuery(project_id=project_id, read_table=read_table)
         for col in columns:
@@ -1442,7 +1429,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for row in raw_res:
                 yield tsi.CallSchema.model_validate(
                     _ch_call_dict_to_call_schema_dict(
-                        dict(zip(select_columns, row, strict=False))
+                        dict(zip(select_columns, row, strict=True))
                     )
                 )
         finally:
