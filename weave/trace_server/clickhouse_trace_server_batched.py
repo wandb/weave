@@ -1379,9 +1379,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 cq.set_offset(req.offset)
 
             pb = ParamBuilder()
-            raw_res = self._query_stream(
-                cq.as_sql(pb), pb.get_params(), settings=settings
-            )
+            query_sql = cq.as_sql(pb)
         except InvalidFieldError:
             logger.warning(
                 "invalid_field_in_calls_query: %s",
@@ -1392,6 +1390,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 },
             )
             raise
+
+        raw_res = self._query_stream(query_sql, pb.get_params(), settings=settings)
 
         if req.include_costs:
             # Cost query SELECT adds ORDER BY fields; result columns must match.
