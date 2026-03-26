@@ -19,6 +19,8 @@ import logging
 import os
 import sys
 
+from weave.telemetry.trace_sentry import log_warning
+
 logger = logging.getLogger(__name__)
 
 LOCK_EXT = ".lock"
@@ -68,6 +70,7 @@ def acquire_lock(wal_path: str, lock_ext: str = LOCK_EXT) -> str:
             path,
             existing_pid,
         )
+        log_warning(f"WAL stale lock detected (PID {existing_pid}); overwriting")
         with open(path, "w", encoding="utf-8") as f:
             f.write(str(os.getpid()))
     return path

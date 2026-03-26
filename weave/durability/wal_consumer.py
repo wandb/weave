@@ -7,6 +7,7 @@ import tempfile
 from collections.abc import Iterator
 
 from weave.durability.wal import WALEntry
+from weave.telemetry.trace_sentry import log_warning
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,7 @@ class JSONLWALConsumer:
                             self._path,
                             preview,
                         )
+                        log_warning("WAL corrupt record skipped")
                         continue
                     yield WALEntry(record=record, end_offset=offset)
         except FileNotFoundError:
