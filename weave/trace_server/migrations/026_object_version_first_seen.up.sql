@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS object_version_first_seen (
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, object_id, digest);
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS object_version_first_seen_mv
+CREATE MATERIALIZED VIEW IF NOT EXISTS object_version_first_seen_view
 TO object_version_first_seen AS
 SELECT
     project_id,
