@@ -262,7 +262,7 @@ _DD_TAG_MAX_LEN = 500
 def _calls_query_req_dd_tags(
     req: tsi.CallsQueryReq | tsi.CallsQueryStatsReq,
     endpoint: str,
-) -> dict[str, str]:
+) -> dict[str, str | float | int]:
     """Tag DD span with the user's request for debuggability.
 
     When InvalidFieldError fires, the span already has the request context
