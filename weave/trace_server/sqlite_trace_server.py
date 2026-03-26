@@ -4160,7 +4160,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             return tsi.EvalResultsQueryRes(
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
-        all_calls = list(self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids))
+        all_calls = list(
+            self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
+        )
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
