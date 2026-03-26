@@ -147,10 +147,12 @@ def test_apply_migrations_raises_on_partially_applied():
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client, post_migration_hook=None
     )
-    migrator._get_migration_status = Mock(return_value={
-        "curr_version": 1,
-        "partially_applied_version": 2,
-    })
+    migrator._get_migration_status = Mock(
+        return_value={
+            "curr_version": 1,
+            "partially_applied_version": 2,
+        }
+    )
 
     with pytest.raises(MigrationError, match="partially applied migration version 2"):
         migrator.apply_migrations("test_db")
