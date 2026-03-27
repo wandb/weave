@@ -29,3 +29,13 @@ _wandb_api_context: ContextVar[WandbApiContext | None] = ContextVar("wandb_api_c
 
 def get_wandb_api_context() -> WandbApiContext | None:
     return _wandb_api_context.get(None)
+
+
+def init() -> None:
+    """Read auth from environment and set the context (if not already set)."""
+    if get_wandb_api_context() is not None:
+        return
+    from weave.trace import env
+
+    if api_key := env.weave_wandb_api_key():
+        _wandb_api_context.set(WandbApiContext(api_key=api_key))
