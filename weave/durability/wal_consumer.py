@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 import tempfile
 from collections.abc import Iterator
 
 from weave.durability.wal import WALEntry
 from weave.telemetry.trace_sentry import log_warning
-
-logger = logging.getLogger(__name__)
-
 
 _active_consumers: set[str] = set()
 
@@ -77,13 +73,10 @@ class JSONLWALConsumer:
                         # won't end with \n so readline() returns it as the
                         # last line and we skip it here.
                         preview = line[:100].decode("utf-8", errors="replace").rstrip()
-                        logger.warning(
-                            "Skipping corrupt WAL line at offset %d in %s: %s",
-                            offset,
-                            self._path,
-                            preview,
+                        log_warning(
+                            f"WAL corrupt record skipped at offset {offset} "
+                            f"in {self._path}: {preview}"
                         )
-                        log_warning("WAL corrupt record skipped")
                         continue
                     yield WALEntry(record=record, end_offset=offset)
         except FileNotFoundError:

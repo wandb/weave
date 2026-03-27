@@ -78,7 +78,6 @@ class WALManager:
             )
             logger.debug("WAL write: %s -> %s", record_type, self.wal_dir)
         except Exception:
-            logger.warning("Failed to write %s to WAL", record_type, exc_info=True)
             log_warning(f"WAL write failed for {record_type}")
 
     def flush(self) -> None:

@@ -187,8 +187,7 @@ class BackgroundWALSender:
             try:
                 consumer.close()
             except Exception:
-                logger.exception("Failed to close consumer for %s", path)
-                log_warning("WAL failed to close consumer on stop")
+                log_warning(f"WAL failed to close consumer on stop for {path}")
         self._consumers.clear()
 
     def notify(self) -> None:
@@ -227,18 +226,16 @@ class BackgroundWALSender:
                     try:
                         self._consumers.pop(path).close()
                     except Exception:
-                        logger.exception(
-                            "Failed to close evicted consumer for %s", path
+                        log_warning(
+                            f"WAL failed to close evicted consumer for {path}"
                         )
-                        log_warning("WAL failed to close evicted consumer")
 
             for path in current_paths:
                 if path not in self._consumers:
                     try:
                         self._consumers[path] = self._consumer_factory(path)
                     except Exception:
-                        logger.exception("Failed to create consumer for %s", path)
-                        log_error("WAL sender failed to create consumer")
+                        log_error(f"WAL sender failed to create consumer for {path}")
                         continue
                 consumer = self._consumers[path]
                 try:
@@ -250,8 +247,7 @@ class BackgroundWALSender:
                         self._mgr.remove(path)
                         logger.debug("WAL removed fully-consumed file: %s", path)
                 except Exception:
-                    logger.exception("Error draining or cleaning up WAL file %s", path)
-                    log_error("WAL sender drain/cleanup error")
+                    log_error(f"WAL sender drain/cleanup error for {path}")
 
             return total
 
@@ -283,7 +279,6 @@ class BackgroundWALSender:
             try:
                 self.drain_once()
             except Exception:
-                logger.exception("Error in WAL sender drain cycle")
                 log_error("WAL sender drain cycle error")
             self._drain_event.wait(self._poll_interval)
             self._drain_event.clear()
@@ -293,7 +288,6 @@ class BackgroundWALSender:
         try:
             self.drain_once()
         except Exception:
-            logger.exception("Error in WAL sender final drain")
             log_error("WAL sender final drain error")
 
 
