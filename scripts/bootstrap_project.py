@@ -2,26 +2,19 @@
 
 Generates (each step can be run individually):
   - datasets:        Publish sample datasets
-  - calls:           Traced op calls (nested, streaming, async, errors, display names, views)
-  - evaluations:     Evaluations with function and class-based scorers
-  - imperative-eval: Imperative evaluation logging via EvaluationLogger
-  - objects:         Custom objects, prompt templates, tags, and aliases
+  - calls:           Traced ops: nested, streaming, async, threaded, errors,
+                     log_call, postprocess, sample_rate, views, Markdown/Content
+  - evaluations:     Function + class scorers, custom summarize, preprocess
+  - imperative-eval: EvaluationLogger with log_prediction/log_score
+  - objects:         Objects, prompts (String/Messages/Easy), tags, aliases,
+                     ref/get, Dataset.from_pandas
 
 No LLM API keys are required — all models are simulated locally.
 
 Usage:
-    # Run all steps (default):
     python scripts/bootstrap_project.py my-team/demo-project
-
-    # Run only specific steps:
     python scripts/bootstrap_project.py my-team/demo --steps calls datasets
-    python scripts/bootstrap_project.py my-team/demo --steps evaluations
-
-    # Point at a local trace server:
     python scripts/bootstrap_project.py my-team/demo --base-url http://localhost:9994
-
-Requires:
-    pip install weave  (or run from the repo with `uv run`)
 """
 
 from __future__ import annotations
@@ -37,13 +30,13 @@ from typing import Any
 from pydantic import Field
 
 import weave
+from weave import ThreadPoolExecutor
+
+# ==========================================================================
+# Constants
+# ==========================================================================
 
 ALL_STEPS = ["datasets", "calls", "evaluations", "imperative-eval", "objects"]
-
-
-# ---------------------------------------------------------------------------
-# Sample data
-# ---------------------------------------------------------------------------
 
 QA_EXAMPLES = [
     {
@@ -81,11 +74,7 @@ QA_EXAMPLES = [
         "expected": "Leonardo da Vinci",
         "category": "art",
     },
-    {
-        "question": "What is 7 × 8?",
-        "expected": "56",
-        "category": "math",
-    },
+    {"question": "What is 7 × 8?", "expected": "56", "category": "math"},
     {
         "question": "What is the largest ocean on Earth?",
         "expected": "Pacific Ocean",
@@ -152,10 +141,105 @@ SUMMARIZATION_EXAMPLES = [
     },
 ]
 
+QA_KNOWLEDGE = {
+    "capital": "Paris",
+    "france": "Paris",
+    "1984": "George Orwell",
+    "wrote": "George Orwell",
+    "square root": "12",
+    "144": "12",
+    "closest": "Mercury",
+    "sun": "Mercury",
+    "world war": "1945",
+    "chemical symbol": "Au",
+    "gold": "Au",
+    "mona lisa": "Leonardo da Vinci",
+    "painted": "Leonardo da Vinci",
+    "7 × 8": "56",
+    "7 * 8": "56",
+    "largest ocean": "Pacific Ocean",
+    "relativity": "Albert Einstein",
+    "developed": "Albert Einstein",
+}
 
-# ---------------------------------------------------------------------------
-# Simulated models (no API keys required)
-# ---------------------------------------------------------------------------
+POSITIVE_WORDS = {
+    "love",
+    "fantastic",
+    "great",
+    "excellent",
+    "amazing",
+    "delightful",
+    "recommended",
+    "perfect",
+    "exceeded",
+    "best",
+}
+
+NEGATIVE_WORDS = {
+    "terrible",
+    "worst",
+    "broke",
+    "hate",
+    "awful",
+    "horrible",
+    "bad",
+    "never",
+    "disappointed",
+    "useless",
+}
+
+ERROR_INPUTS = ["", "{bad json", "   "]
+
+
+# ==========================================================================
+# Simulation helpers
+# ==========================================================================
+
+
+def simulate_qa_answer(question: str, temperature: float) -> str:
+    q_lower = question.lower()
+    for key, answer in QA_KNOWLEDGE.items():
+        if key in q_lower:
+            if random.random() < (1.0 - temperature * 0.3):
+                return answer
+            return answer + " (approximately)"
+    return "I'm not sure about that."
+
+
+def simulate_sentiment(text: str) -> tuple[str, float]:
+    words = set(text.lower().split())
+    pos_count = len(words & POSITIVE_WORDS)
+    neg_count = len(words & NEGATIVE_WORDS)
+
+    if pos_count > neg_count:
+        label = "positive"
+        score = min(0.95, 0.6 + pos_count * 0.1 + random.uniform(0, 0.15))
+    elif neg_count > pos_count:
+        label = "negative"
+        score = min(0.95, 0.6 + neg_count * 0.1 + random.uniform(0, 0.15))
+    else:
+        label = "neutral"
+        score = 0.4 + random.uniform(0, 0.2)
+    return label, round(score, 3)
+
+
+def simulate_summarization(document: str, max_length: int) -> str:
+    sentences = document.replace(". ", ".\n").split("\n")
+    sentences = [s.strip() for s in sentences if s.strip()]
+    if len(sentences) <= 1:
+        return document[:max_length]
+    picked = [sentences[0]]
+    if len(sentences) > 2:
+        picked.append(random.choice(sentences[1:]))
+    summary = " ".join(picked)
+    if len(summary) > max_length:
+        summary = summary[:max_length].rsplit(" ", 1)[0] + "..."
+    return summary
+
+
+# ==========================================================================
+# Models
+# ==========================================================================
 
 
 class QAModel(weave.Model):
@@ -166,7 +250,7 @@ class QAModel(weave.Model):
 
     @weave.op
     def predict(self, question: str) -> dict:
-        answer = _simulate_qa_answer(question, self.temperature)
+        answer = simulate_qa_answer(question, self.temperature)
         return {"answer": answer, "confidence": random.uniform(0.5, 1.0)}
 
 
@@ -177,7 +261,7 @@ class SentimentModel(weave.Model):
 
     @weave.op
     def predict(self, text: str) -> dict:
-        label, score = _simulate_sentiment(text)
+        label, score = simulate_sentiment(text)
         return {"label": label, "score": score}
 
 
@@ -188,13 +272,13 @@ class SummarizationModel(weave.Model):
 
     @weave.op
     def predict(self, document: str) -> dict:
-        summary = _simulate_summarization(document, self.max_length)
+        summary = simulate_summarization(document, self.max_length)
         return {"summary": summary}
 
 
-# ---------------------------------------------------------------------------
+# ==========================================================================
 # Custom objects
-# ---------------------------------------------------------------------------
+# ==========================================================================
 
 
 class PipelineConfig(weave.Object):
@@ -215,89 +299,9 @@ class ExperimentMetadata(weave.Object):
     notes: str = ""
 
 
-# ---------------------------------------------------------------------------
-# Ops (traced functions)
-# ---------------------------------------------------------------------------
-
-
-@weave.op
-def retrieve_context(question: str, top_k: int = 3) -> list[str]:
-    """Simulate a RAG retrieval step."""
-    time.sleep(random.uniform(0.01, 0.05))
-    snippets = [
-        f"Relevant passage {i + 1} for: {question[:40]}..."
-        for i in range(top_k)
-    ]
-    return snippets
-
-
-@weave.op
-def format_prompt(question: str, context: list[str]) -> str:
-    """Format a prompt with retrieved context."""
-    context_block = "\n".join(f"- {c}" for c in context)
-    return f"Context:\n{context_block}\n\nQuestion: {question}\nAnswer:"
-
-
-@weave.op
-def generate_answer(prompt: str, temperature: float = 0.7) -> str:
-    """Simulate LLM generation."""
-    time.sleep(random.uniform(0.02, 0.08))
-    # Extract the question from the prompt
-    if "Question:" in prompt:
-        question = prompt.rsplit("Question:", maxsplit=1)[-1].split("\n", maxsplit=1)[0].strip()
-        return _simulate_qa_answer(question, temperature)
-    return "I don't have enough information to answer that."
-
-
-@weave.op
-def rag_pipeline(question: str) -> dict:
-    """A full RAG pipeline: retrieve -> format -> generate."""
-    context = retrieve_context(question)
-    prompt = format_prompt(question, context)
-    answer = generate_answer(prompt)
-    return {
-        "answer": answer,
-        "context": context,
-        "prompt_length": len(prompt),
-    }
-
-
-@weave.op
-def classify_text(text: str) -> dict:
-    """Classify text sentiment."""
-    label, score = _simulate_sentiment(text)
-    return {"label": label, "score": score}
-
-
-@weave.op
-def extract_entities(text: str) -> list[dict]:
-    """Simulate named entity extraction."""
-    time.sleep(random.uniform(0.01, 0.03))
-    words = text.split()
-    entities = []
-    for word in words:
-        cleaned = word.strip(".,!?")
-        if cleaned and cleaned[0].isupper() and len(cleaned) > 1:
-            entity_type = random.choice(["PERSON", "ORG", "LOC", "MISC"])
-            entities.append({"text": cleaned, "type": entity_type})
-    return entities
-
-
-@weave.op
-def process_document(document: str) -> dict:
-    """Process a document: classify sentiment and extract entities."""
-    sentiment = classify_text(document)
-    entities = extract_entities(document)
-    return {
-        "sentiment": sentiment,
-        "entities": entities,
-        "word_count": len(document.split()),
-    }
-
-
-# ---------------------------------------------------------------------------
+# ==========================================================================
 # Scorers
-# ---------------------------------------------------------------------------
+# ==========================================================================
 
 
 @weave.op
@@ -346,21 +350,130 @@ class AnswerRelevanceScorer(weave.Scorer):
     @weave.op
     def score(self, *, output: Any, question: str, **kwargs: Any) -> dict:
         answer = output.get("answer", "")
-        q_words = set(question.lower().split()) - {"what", "is", "the", "of", "a", "who", "in"}
+        q_words = set(question.lower().split()) - {
+            "what",
+            "is",
+            "the",
+            "of",
+            "a",
+            "who",
+            "in",
+        }
         a_words = set(answer.lower().split())
         overlap = len(q_words & a_words) / max(len(q_words), 1)
         return {"relevant": overlap >= self.min_overlap, "overlap": round(overlap, 3)}
 
 
-# ---------------------------------------------------------------------------
-# Streaming, async, error, and display-name ops
-# ---------------------------------------------------------------------------
+class FailureReportScorer(weave.Scorer):
+    """Scorer with a custom summarize() that reports failure details."""
+
+    @weave.op
+    def score(self, *, output: Any, expected: str, **kwargs: Any) -> dict:
+        answer = output.get("answer", "")
+        match = answer.strip().lower() == expected.strip().lower()
+        return {"match": match, "answer": answer, "expected": expected}
+
+    @weave.op
+    def summarize(self, score_rows: list) -> dict:
+        total = len(score_rows)
+        failures = [r for r in score_rows if not r.get("match", True)]
+        return {
+            "total": total,
+            "pass_rate": (total - len(failures)) / max(total, 1),
+            "failure_count": len(failures),
+            "failure_examples": [
+                f"got '{f['answer']}' expected '{f['expected']}'" for f in failures[:3]
+            ],
+        }
+
+
+# ==========================================================================
+# Ops — nested pipeline
+# ==========================================================================
+
+
+@weave.op
+def retrieve_context(question: str, top_k: int = 3) -> list[str]:
+    """Simulate a RAG retrieval step."""
+    time.sleep(random.uniform(0.01, 0.05))
+    return [f"Relevant passage {i + 1} for: {question[:40]}..." for i in range(top_k)]
+
+
+@weave.op
+def format_prompt(question: str, context: list[str]) -> str:
+    """Format a prompt with retrieved context."""
+    context_block = "\n".join(f"- {c}" for c in context)
+    return f"Context:\n{context_block}\n\nQuestion: {question}\nAnswer:"
+
+
+@weave.op
+def generate_answer(prompt: str, temperature: float = 0.7) -> str:
+    """Simulate LLM generation."""
+    time.sleep(random.uniform(0.02, 0.08))
+    if "Question:" in prompt:
+        question = (
+            prompt.rsplit("Question:", maxsplit=1)[-1]
+            .split("\n", maxsplit=1)[0]
+            .strip()
+        )
+        return simulate_qa_answer(question, temperature)
+    return "I don't have enough information to answer that."
+
+
+@weave.op
+def rag_pipeline(question: str) -> dict:
+    """A full RAG pipeline: retrieve -> format -> generate."""
+    context = retrieve_context(question)
+    prompt = format_prompt(question, context)
+    answer = generate_answer(prompt)
+    return {"answer": answer, "context": context, "prompt_length": len(prompt)}
+
+
+@weave.op
+def classify_text(text: str) -> dict:
+    """Classify text sentiment."""
+    label, score = simulate_sentiment(text)
+    return {"label": label, "score": score}
+
+
+@weave.op
+def extract_entities(text: str) -> list[dict]:
+    """Simulate named entity extraction."""
+    time.sleep(random.uniform(0.01, 0.03))
+    entities = []
+    for word in text.split():
+        cleaned = word.strip(".,!?")
+        if cleaned and cleaned[0].isupper() and len(cleaned) > 1:
+            entities.append(
+                {
+                    "text": cleaned,
+                    "type": random.choice(["PERSON", "ORG", "LOC", "MISC"]),
+                }
+            )
+    return entities
+
+
+@weave.op
+def process_document(document: str) -> dict:
+    """Process a document: classify sentiment and extract entities."""
+    sentiment = classify_text(document)
+    entities = extract_entities(document)
+    return {
+        "sentiment": sentiment,
+        "entities": entities,
+        "word_count": len(document.split()),
+    }
+
+
+# ==========================================================================
+# Ops — streaming, async, errors, display names, views, threading
+# ==========================================================================
 
 
 @weave.op(call_display_name=lambda call: f"stream [{call.inputs['prompt'][:30]}...]")
 def stream_tokens(prompt: str) -> Iterator[str]:
     """Simulate token-by-token LLM generation (streaming op)."""
-    answer = _simulate_qa_answer(prompt, temperature=0.5)
+    answer = simulate_qa_answer(prompt, temperature=0.5)
     for token in answer.split():
         time.sleep(random.uniform(0.01, 0.03))
         yield token + " "
@@ -370,11 +483,7 @@ def stream_tokens(prompt: str) -> Iterator[str]:
 async def async_fetch_data(url: str) -> dict:
     """Simulate an async data fetch."""
     await asyncio.sleep(random.uniform(0.02, 0.08))
-    return {
-        "url": url,
-        "status": 200,
-        "tokens": random.randint(50, 500),
-    }
+    return {"url": url, "status": 200, "tokens": random.randint(50, 500)}
 
 
 @weave.op
@@ -390,8 +499,9 @@ def failing_parse(raw_input: str) -> dict:
     if not raw_input or not raw_input.strip():
         raise ValueError("Input must not be empty")
     if raw_input.startswith("{"):
-        # Simulate a JSON parse that fails on malformed input
-        raise ValueError(f"Malformed JSON payload: unexpected token at position 0 in: {raw_input[:50]}")
+        raise ValueError(
+            f"Malformed JSON payload: unexpected token at position 0 in: {raw_input[:50]}"
+        )
     return {"parsed": raw_input.strip(), "length": len(raw_input)}
 
 
@@ -403,7 +513,6 @@ def analyze_with_view(text: str) -> dict:
     char_count = len(text)
     unique_words = len({w.lower().strip(".,!?") for w in words})
 
-    # Attach a rich markdown report as a view on this call
     report = (
         f"# Text Analysis Report\n\n"
         f"| Metric | Value |\n"
@@ -414,7 +523,6 @@ def analyze_with_view(text: str) -> dict:
         f"| Avg word length | {char_count / max(word_count, 1):.1f} |\n"
     )
     weave.set_view("analysis-report", report, extension="md")
-
     return {
         "word_count": word_count,
         "char_count": char_count,
@@ -422,87 +530,73 @@ def analyze_with_view(text: str) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Simulation helpers
-# ---------------------------------------------------------------------------
-
-_QA_KNOWLEDGE = {
-    "capital": "Paris",
-    "france": "Paris",
-    "1984": "George Orwell",
-    "wrote": "George Orwell",
-    "square root": "12",
-    "144": "12",
-    "closest": "Mercury",
-    "sun": "Mercury",
-    "world war": "1945",
-    "chemical symbol": "Au",
-    "gold": "Au",
-    "mona lisa": "Leonardo da Vinci",
-    "painted": "Leonardo da Vinci",
-    "7 × 8": "56",
-    "7 * 8": "56",
-    "largest ocean": "Pacific Ocean",
-    "relativity": "Albert Einstein",
-    "developed": "Albert Einstein",
-}
-
-_POSITIVE_WORDS = {
-    "love", "fantastic", "great", "excellent", "amazing",
-    "delightful", "recommended", "perfect", "exceeded", "best",
-}
-_NEGATIVE_WORDS = {
-    "terrible", "worst", "broke", "hate", "awful",
-    "horrible", "bad", "never", "disappointed", "useless",
-}
+@weave.op
+def chat_turn(user_message: str) -> str:
+    """A single chat turn — used inside weave.thread() to group a conversation."""
+    answer = simulate_qa_answer(user_message, temperature=0.5)
+    call = weave.get_current_call()
+    if call:
+        call.summary["message_length"] = len(answer)
+    return answer
 
 
-def _simulate_qa_answer(question: str, temperature: float) -> str:
-    q_lower = question.lower()
-    for key, answer in _QA_KNOWLEDGE.items():
-        if key in q_lower:
-            # Simulate temperature-based noise
-            if random.random() < (1.0 - temperature * 0.3):
-                return answer
-            return answer + " (approximately)"
-    return "I'm not sure about that."
+def _redact_keys(inputs: dict) -> dict:
+    """Strip keys named 'api_key' — used as postprocess_inputs demo."""
+    return {k: ("***" if "key" in k.lower() else v) for k, v in inputs.items()}
 
 
-def _simulate_sentiment(text: str) -> tuple[str, float]:
-    words = set(text.lower().split())
-    pos_count = len(words & _POSITIVE_WORDS)
-    neg_count = len(words & _NEGATIVE_WORDS)
-
-    if pos_count > neg_count:
-        label = "positive"
-        score = min(0.95, 0.6 + pos_count * 0.1 + random.uniform(0, 0.15))
-    elif neg_count > pos_count:
-        label = "negative"
-        score = min(0.95, 0.6 + neg_count * 0.1 + random.uniform(0, 0.15))
-    else:
-        label = "neutral"
-        score = 0.4 + random.uniform(0, 0.2)
-    return label, round(score, 3)
+@weave.op(
+    name="secure_lookup",
+    postprocess_inputs=_redact_keys,
+    postprocess_output=lambda out: {**out, "_postprocessed": True},
+)
+def lookup_with_key(query: str, api_key: str = "sk-demo-key-12345") -> dict:
+    """Op with postprocess_inputs (redacts api_key) and postprocess_output."""
+    return {"result": f"Result for: {query}", "source": "demo-api"}
 
 
-def _simulate_summarization(document: str, max_length: int) -> str:
-    sentences = document.replace(". ", ".\n").split("\n")
-    sentences = [s.strip() for s in sentences if s.strip()]
-    if len(sentences) <= 1:
-        return document[:max_length]
-    # Pick first and a random other sentence
-    picked = [sentences[0]]
-    if len(sentences) > 2:
-        picked.append(random.choice(sentences[1:]))
-    summary = " ".join(picked)
-    if len(summary) > max_length:
-        summary = summary[:max_length].rsplit(" ", 1)[0] + "..."
-    return summary
+@weave.op(tracing_sample_rate=0.5)
+def high_volume_op(item_id: int) -> dict:
+    """Op with tracing_sample_rate=0.5 — only ~half the calls are traced."""
+    return {"item_id": item_id, "processed": True}
 
 
-# ---------------------------------------------------------------------------
-# Bootstrap steps
-# ---------------------------------------------------------------------------
+@weave.op
+def generate_markdown_report(data: list[dict]) -> weave.Markdown:
+    """Op that returns a weave.Markdown object for rich rendering in the UI."""
+    lines = ["# Bootstrap Data Summary\n"]
+    lines.append(f"Total records: **{len(data)}**\n")
+    lines.append("| # | Question | Expected |")
+    lines.append("|---|----------|----------|")
+    for i, row in enumerate(data[:5]):
+        lines.append(
+            f"| {i + 1} | {row.get('question', 'N/A')} | {row.get('expected', 'N/A')} |"
+        )
+    if len(data) > 5:
+        lines.append(f"\n*...and {len(data) - 5} more rows*")
+    return weave.Markdown("\n".join(lines))
+
+
+@weave.op
+def generate_content_artifact(text: str) -> weave.Content:
+    """Op that returns a weave.Content object (e.g. a CSV snippet)."""
+    csv_body = "question,expected,category\n"
+    for row in QA_EXAMPLES[:5]:
+        csv_body += f"{row['question']},{row['expected']},{row['category']}\n"
+    return weave.Content.from_text(csv_body, extension="csv", mimetype="text/csv")
+
+
+@weave.op
+def threaded_worker(task_id: int, text: str) -> dict:
+    """A worker op invoked via ThreadPoolExecutor — context propagates correctly."""
+    time.sleep(random.uniform(0.01, 0.03))
+    label, score = simulate_sentiment(text)
+    return {"task_id": task_id, "label": label, "score": score}
+
+
+# ==========================================================================
+# Steps
+# ==========================================================================
 
 
 def step_datasets() -> dict[str, weave.Dataset]:
@@ -513,7 +607,9 @@ def step_datasets() -> dict[str, weave.Dataset]:
     weave.publish(qa_dataset)
     print(f"    ✓ qa-examples ({len(QA_EXAMPLES)} rows)")
 
-    sentiment_dataset = weave.Dataset(name="sentiment-examples", rows=SENTIMENT_EXAMPLES)
+    sentiment_dataset = weave.Dataset(
+        name="sentiment-examples", rows=SENTIMENT_EXAMPLES
+    )
     weave.publish(sentiment_dataset)
     print(f"    ✓ sentiment-examples ({len(SENTIMENT_EXAMPLES)} rows)")
 
@@ -536,15 +632,21 @@ def step_calls() -> None:
 
     # RAG pipeline calls with attributes (nested: retrieve -> format -> generate)
     for i, example in enumerate(QA_EXAMPLES):
-        with weave.attributes({"category": example["category"], "batch": "rag", "index": i}):
+        with weave.attributes(
+            {"category": example["category"], "batch": "rag", "index": i}
+        ):
             rag_pipeline(example["question"])
     print(f"    ✓ {len(QA_EXAMPLES)} RAG pipeline calls (with nested ops + attributes)")
 
     # Sentiment classification calls
     for i, example in enumerate(SENTIMENT_EXAMPLES):
-        with weave.attributes({"expected_label": example["label"], "batch": "sentiment", "index": i}):
+        with weave.attributes(
+            {"expected_label": example["label"], "batch": "sentiment", "index": i}
+        ):
             classify_text(example["text"])
-    print(f"    ✓ {len(SENTIMENT_EXAMPLES)} sentiment classification calls (with attributes)")
+    print(
+        f"    ✓ {len(SENTIMENT_EXAMPLES)} sentiment classification calls (with attributes)"
+    )
 
     # Document processing calls (nested: classify + extract_entities)
     docs = [ex["document"] for ex in SUMMARIZATION_EXAMPLES]
@@ -555,7 +657,7 @@ def step_calls() -> None:
 
     # Streaming ops (custom call_display_name + yield)
     for example in QA_EXAMPLES[:3]:
-        tokens = list(stream_tokens(example["question"]))
+        list(stream_tokens(example["question"]))
     print("    ✓ 3 streaming op calls (with custom display names)")
 
     # Async ops (concurrent fetch)
@@ -569,26 +671,86 @@ def step_calls() -> None:
     print(f"    ✓ {len(SUMMARIZATION_EXAMPLES)} calls with set_view (markdown report)")
 
     # Error state calls
-    error_inputs = ["", "{bad json", "   "]
-    for raw in error_inputs:
+    for raw in ERROR_INPUTS:
         try:
             failing_parse(raw)
         except ValueError:
-            pass  # Expected — the error is recorded in the call
-    # Also one successful call for contrast
+            pass
     failing_parse("valid input text")
-    print(f"    ✓ {len(error_inputs)} errored calls + 1 success (error states in UI)")
+    print(f"    ✓ {len(ERROR_INPUTS)} errored calls + 1 success (error states in UI)")
+
+    # Threaded conversation (weave.thread groups calls by thread_id)
+    with weave.thread() as t:
+        chat_turn("Hello, what is the capital of France?")
+        chat_turn("And what about Germany?")
+        chat_turn("Thanks! What is 7 × 8?")
+    print(f"    ✓ 1 threaded conversation (3 turns, thread_id={t.thread_id[:12]}...)")
+
+    # log_call: manual call logging for undecorated functions
+    weave.log_call(
+        op="legacy_data_transform",
+        inputs={"raw_records": 150, "filter": "active"},
+        output={"transformed": 142, "dropped": 8},
+    )
+    weave.log_call(
+        op="legacy_data_transform",
+        inputs={"raw_records": 0, "filter": "active"},
+        output=None,
+        exception=ValueError("No records to transform"),
+    )
+    print("    ✓ 2 manually logged calls via weave.log_call (1 success, 1 error)")
+
+    # postprocess_inputs (redacts api_key) and postprocess_output
+    lookup_with_key("weather forecast", api_key="sk-secret-key-abc123")
+    lookup_with_key("stock prices")
+    print("    ✓ 2 calls with postprocess_inputs/output (api_key redacted)")
+
+    # tracing_sample_rate — only ~half will be traced
+    for i in range(20):
+        high_volume_op(i)
+    print("    ✓ 20 high-volume calls with tracing_sample_rate=0.5 (~10 traced)")
+
+    # Markdown output
+    generate_markdown_report(QA_EXAMPLES)
+    print("    ✓ 1 call returning weave.Markdown (rich rendering)")
+
+    # Content output
+    generate_content_artifact("qa data")
+    print("    ✓ 1 call returning weave.Content (CSV artifact)")
+
+    # ThreadPoolExecutor with context propagation
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = [
+            pool.submit(threaded_worker, i, ex["text"])
+            for i, ex in enumerate(SENTIMENT_EXAMPLES[:6])
+        ]
+        [f.result() for f in futures]
+    print("    ✓ 6 calls via ThreadPoolExecutor (context-aware threading)")
+
+
+def _format_results(results: dict) -> str:
+    """Format evaluation results for display."""
+    parts = []
+    for key, value in results.items():
+        if isinstance(value, dict):
+            for metric, metric_val in value.items():
+                if isinstance(metric_val, dict) and "true_fraction" in metric_val:
+                    parts.append(f"{key}.{metric}={metric_val['true_fraction']:.0%}")
+                elif isinstance(metric_val, dict) and "mean" in metric_val:
+                    parts.append(f"{key}.{metric}={metric_val['mean']:.2f}")
+    return ", ".join(parts) if parts else str(results)
 
 
 async def step_evaluations(datasets: dict[str, weave.Dataset] | None = None) -> None:
     """Run evaluations with different models and scorers."""
     print("  [evaluations] Running evaluations...")
 
-    # If datasets weren't published in an earlier step, create them inline
     if datasets is None:
         datasets = {
             "qa": weave.Dataset(name="qa-examples", rows=QA_EXAMPLES),
-            "sentiment": weave.Dataset(name="sentiment-examples", rows=SENTIMENT_EXAMPLES),
+            "sentiment": weave.Dataset(
+                name="sentiment-examples", rows=SENTIMENT_EXAMPLES
+            ),
             "summarization": weave.Dataset(
                 name="summarization-examples", rows=SUMMARIZATION_EXAMPLES
             ),
@@ -600,7 +762,12 @@ async def step_evaluations(datasets: dict[str, weave.Dataset] | None = None) -> 
     qa_eval = weave.Evaluation(
         name="qa-evaluation",
         dataset=datasets["qa"],
-        scorers=[exact_match, contains_expected, confidence_above_threshold, relevance_scorer],
+        scorers=[
+            exact_match,
+            contains_expected,
+            confidence_above_threshold,
+            relevance_scorer,
+        ],
     )
     qa_results = await qa_eval.evaluate(qa_model)
     print(f"    ✓ QA evaluation: {_format_results(qa_results)}")
@@ -630,15 +797,34 @@ async def step_evaluations(datasets: dict[str, weave.Dataset] | None = None) -> 
     summarization_results = await summarization_eval.evaluate(summarization_model)
     print(f"    ✓ Summarization evaluation: {_format_results(summarization_results)}")
 
+    # Evaluation with custom Scorer.summarize and preprocess_model_input
+    failure_scorer = FailureReportScorer()
+
+    @weave.op
+    def strip_category(example: dict) -> dict:
+        """preprocess_model_input: remove 'category' before passing to model."""
+        return {k: v for k, v in example.items() if k != "category"}
+
+    qa_eval_v3 = weave.Evaluation(
+        name="qa-with-failure-report",
+        dataset=datasets["qa"],
+        scorers=[failure_scorer],
+        preprocess_model_input=strip_category,
+    )
+    qa_results_v3 = await qa_eval_v3.evaluate(qa_model)
+    print(
+        f"    ✓ QA eval (custom summarize + preprocess): {_format_results(qa_results_v3)}"
+    )
+
 
 def step_imperative_eval() -> None:
-    """Demonstrate imperative evaluation logging via EvaluationLogger."""
+    """Log an evaluation imperatively with log_prediction / log_score / log_summary."""
     print("  [imperative-eval] Running imperative evaluation...")
 
     ev = weave.EvaluationLogger(name="manual-review-eval")
 
     for example in QA_EXAMPLES[:5]:
-        answer = _simulate_qa_answer(example["question"], temperature=0.5)
+        answer = simulate_qa_answer(example["question"], temperature=0.5)
         confidence = random.uniform(0.5, 1.0)
 
         pred = ev.log_prediction(
@@ -663,7 +849,6 @@ def step_objects() -> None:
     """Publish custom objects and prompt templates."""
     print("  [objects] Publishing custom objects and prompts...")
 
-    # Publish a pipeline config object
     config = PipelineConfig(
         name="default-rag-config",
         retriever_top_k=3,
@@ -674,7 +859,6 @@ def step_objects() -> None:
     weave.publish(config)
     print("    ✓ PipelineConfig: default-rag-config")
 
-    # Publish a second config variant for comparison
     config_v2 = PipelineConfig(
         name="creative-rag-config",
         retriever_top_k=5,
@@ -685,7 +869,6 @@ def step_objects() -> None:
     weave.publish(config_v2)
     print("    ✓ PipelineConfig: creative-rag-config")
 
-    # Publish experiment metadata
     experiment = ExperimentMetadata(
         name="baseline-qa-experiment",
         hypothesis="Lowering temperature improves exact-match accuracy on factual QA",
@@ -696,7 +879,6 @@ def step_objects() -> None:
     weave.publish(experiment)
     print("    ✓ ExperimentMetadata: baseline-qa-experiment")
 
-    # Publish prompt templates
     qa_prompt = weave.StringPrompt(
         "You are a helpful assistant. Answer the following question concisely "
         "and accurately. If you are unsure, say so."
@@ -705,51 +887,73 @@ def step_objects() -> None:
     weave.publish(qa_prompt)
     print("    ✓ StringPrompt: qa-system-prompt")
 
-    chat_prompt = weave.MessagesPrompt([
-        {
-            "role": "system",
-            "content": (
-                "You are a retrieval-augmented assistant. Use the provided "
-                "context to answer questions. Cite your sources."
-            ),
-        },
-        {"role": "user", "content": "Context: {context}\n\nQuestion: {question}"},
-    ])
+    chat_prompt = weave.MessagesPrompt(
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You are a retrieval-augmented assistant. Use the provided "
+                    "context to answer questions. Cite your sources."
+                ),
+            },
+            {"role": "user", "content": "Context: {context}\n\nQuestion: {question}"},
+        ]
+    )
     chat_prompt.name = "rag-chat-prompt"
     weave.publish(chat_prompt)
     print("    ✓ MessagesPrompt: rag-chat-prompt")
 
-    # --- Tags and aliases on published objects ---
-    config_ref = weave.publish(PipelineConfig(
-        name="tagged-config",
-        retriever_top_k=3,
-        model_temperature=0.5,
-        max_tokens=256,
-        system_prompt="You are a precise assistant.",
-    ))
+    easy = weave.EasyPrompt("You are a multilingual assistant.", role="system")
+    easy.append({"role": "user", "content": "Translate '{text}' to {language}."})
+    easy.name = "translation-prompt"
+    weave.publish(easy)
+    print("    ✓ EasyPrompt: translation-prompt")
+
+    # Tags and aliases
+    config_ref = weave.publish(
+        PipelineConfig(
+            name="tagged-config",
+            retriever_top_k=3,
+            model_temperature=0.5,
+            max_tokens=256,
+            system_prompt="You are a precise assistant.",
+        )
+    )
+    from weave.trace.context.weave_client_context import require_weave_client
+
+    require_weave_client().flush()
     weave.add_tags(config_ref, ["stable", "reviewed", "v1"])
     print("    ✓ Tagged object: tagged-config (stable, reviewed, v1)")
 
     weave.set_aliases(config_ref, ["production", "latest-stable"])
     print("    ✓ Aliased object: tagged-config -> production, latest-stable")
 
+    retrieved = weave.ref("tagged-config").get()
+    print(
+        f"    ✓ weave.ref('tagged-config').get() -> top_k={retrieved.retriever_top_k}"
+    )
 
-def _format_results(results: dict) -> str:
-    """Format evaluation results for display."""
-    parts = []
-    for key, value in results.items():
-        if isinstance(value, dict):
-            for metric, metric_val in value.items():
-                if isinstance(metric_val, dict) and "true_fraction" in metric_val:
-                    parts.append(f"{key}.{metric}={metric_val['true_fraction']:.0%}")
-                elif isinstance(metric_val, dict) and "mean" in metric_val:
-                    parts.append(f"{key}.{metric}={metric_val['mean']:.2f}")
-    return ", ".join(parts) if parts else str(results)
+    try:
+        import pandas as pd
+
+        df = pd.DataFrame(
+            {
+                "input": ["2+2", "capital of Italy", "who wrote Hamlet"],
+                "expected": ["4", "Rome", "Shakespeare"],
+                "difficulty": ["easy", "medium", "medium"],
+            }
+        )
+        pandas_ds = weave.Dataset.from_pandas(df)
+        pandas_ds.name = "pandas-dataset"
+        weave.publish(pandas_ds)
+        print(f"    ✓ Dataset.from_pandas: pandas-dataset ({len(df)} rows)")
+    except ImportError:
+        print("    - Skipped Dataset.from_pandas (pandas not installed)")
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+# ==========================================================================
+# CLI
+# ==========================================================================
 
 
 def main() -> None:
@@ -758,11 +962,15 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "available steps:\n"
-            "  datasets         Publish sample datasets (QA, sentiment, summarization)\n"
-            "  calls            Traced ops: nested, streaming, async, errors, views\n"
-            "  evaluations      Evaluations with function + class-based scorers\n"
-            "  imperative-eval  Log an evaluation imperatively via EvaluationLogger\n"
-            "  objects          Objects, prompts, tags, and aliases\n"
+            "  datasets         Publish sample datasets\n"
+            "  calls            All op variants: nested, streaming, async, threaded,\n"
+            "                   errors, log_call, postprocess, sample_rate, views,\n"
+            "                   Markdown/Content output, ThreadPoolExecutor\n"
+            "  evaluations      Function + class scorers, custom summarize,\n"
+            "                   preprocess_model_input\n"
+            "  imperative-eval  EvaluationLogger with log_prediction/log_score\n"
+            "  objects          Objects, prompts (String/Messages/Easy), tags,\n"
+            "                   aliases, ref/get, Dataset.from_pandas\n"
             "\n"
             "examples:\n"
             "  %(prog)s my-team/demo\n"
@@ -798,7 +1006,6 @@ def main() -> None:
     args = parser.parse_args()
 
     steps = set(args.steps) if args.steps else set(ALL_STEPS)
-
     random.seed(args.seed)
 
     print(f"\n{'=' * 60}")
@@ -811,44 +1018,40 @@ def main() -> None:
 
     weave.init(project_name=args.project)
 
-    # Track what was created for the summary
     summary_lines: list[str] = []
 
-    # --- datasets ---
     datasets: dict[str, weave.Dataset] | None = None
     if "datasets" in steps:
         datasets = step_datasets()
-        summary_lines.append(
-            f"3 published datasets ({len(QA_EXAMPLES) + len(SENTIMENT_EXAMPLES) + len(SUMMARIZATION_EXAMPLES)} total rows)"
-        )
+        total = len(QA_EXAMPLES) + len(SENTIMENT_EXAMPLES) + len(SUMMARIZATION_EXAMPLES)
+        summary_lines.append(f"3 published datasets ({total} total rows)")
         print()
 
-    # --- calls ---
     if "calls" in steps:
         step_calls()
         summary_lines.append(
-            "Traced op calls: nested pipelines, streaming, async, errors, "
-            "custom display names, and set_view"
+            "Traced op calls: nested, streaming, async, threaded, errors, "
+            "log_call, postprocess, sample_rate, views, Markdown/Content"
         )
         print()
 
-    # --- evaluations ---
     if "evaluations" in steps:
         asyncio.run(step_evaluations(datasets))
-        summary_lines.append("4 evaluations with function + class-based scorers")
+        summary_lines.append(
+            "5 evaluations: function + class scorers, custom summarize, preprocess"
+        )
         print()
 
-    # --- imperative-eval ---
     if "imperative-eval" in steps:
         step_imperative_eval()
         summary_lines.append("1 imperative evaluation via EvaluationLogger")
         print()
 
-    # --- objects ---
     if "objects" in steps:
         step_objects()
         summary_lines.append(
-            "Published objects with tags and aliases (configs, prompts, experiment)"
+            "Objects: configs, prompts (String/Messages/Easy), tags, aliases, "
+            "ref/get, Dataset.from_pandas"
         )
         print()
 
