@@ -60,15 +60,15 @@ async function createAndFinishCall(
   // so a narrower callable type like Op<(x: Scorer) => void> can't be assigned to
   // Op<(...args: unknown[]) => unknown>. We only use this for ref tracking, not calling.
   opRef: OpRef | Op<any>,
-  params: unknown[],
+  params: any[],
   parameterNames: ParameterNamesOption,
-  thisArg: unknown,
+  thisArg: any,
   currentEntry: CallStackEntry,
   parentEntry: CallStackEntry | undefined,
   startTime: Date,
-  output: unknown,
+  output: any,
   displayName?: string,
-  attributes?: Record<string, unknown>
+  attributes?: Record<string, any>
 ): Promise<CallStackEntry> {
   const startPromise = client.createCall(
     internalCall,
@@ -110,11 +110,11 @@ async function createAndFinishCall(
 interface EvaluationParameters extends WeaveObjectParameters {
   dataset?: Dataset<DatasetRow> | string;
   scorers?: string[];
-  [key: string]: unknown; // Allow arbitrary attributes (trial_id, run_id, etc.)
+  [key: string]: any; // Allow arbitrary attributes (trial_id, run_id, etc.)
 }
 
 class Evaluation extends WeaveObject {
-  [key: string]: unknown;
+  [key: string]: any;
   dataset?: Dataset<DatasetRow> | string;
   scorers: string[];
 
@@ -143,11 +143,11 @@ class Evaluation extends WeaveObject {
  */
 interface ModelParameters extends WeaveObjectParameters {
   modelName?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 class Model extends WeaveObject {
-  [key: string]: unknown;
+  [key: string]: any;
   modelName?: string;
 
   constructor(parameters: ModelParameters) {
@@ -172,11 +172,11 @@ class Model extends WeaveObject {
  */
 interface ScorerParameters extends WeaveObjectParameters {
   scorerName?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 class Scorer extends WeaveObject {
-  [key: string]: unknown;
+  [key: string]: any;
   scorerName?: string;
 
   constructor(parameters: ScorerParameters) {
@@ -210,7 +210,7 @@ const evaluationEvaluate = op(
   async function evaluate(
     evaluation: Evaluation,
     model: Model | WeaveObject
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Record<string, any>> {
     // internal function — never executed; provides structure for Weave UI
     return {};
   },
@@ -221,8 +221,8 @@ const evaluationPredictAndScore = op(
   async function predict_and_score(
     evaluation: Evaluation,
     model: Model | WeaveObject,
-    example: Record<string, unknown>
-  ): Promise<Record<string, unknown>> {
+    example: Record<string, any>
+  ): Promise<Record<string, any>> {
     // internal function — never executed; provides structure for Weave UI
     return {};
   },
@@ -232,7 +232,7 @@ const evaluationPredictAndScore = op(
 const evaluationSummarize = op(
   async function summarize(
     evaluation: Evaluation
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Record<string, any>> {
     // internal function — never executed; provides structure for Weave UI
     return {};
   },
@@ -242,7 +242,7 @@ const evaluationSummarize = op(
 const modelPredict = op(
   async function predict(
     model: Model | WeaveObject,
-    inputs: Record<string, unknown>
+    inputs: Record<string, any>
   ): Promise<void> {
     // internal function — never executed; provides structure for Weave UI
   },
@@ -253,8 +253,8 @@ const scorerScoreFactory = (scorerName: string) =>
   op(
     async function score(
       scorer: Scorer,
-      output: unknown,
-      target?: unknown
+      output: any,
+      target?: any
     ): Promise<void> {
       // internal function — never executed; provides structure for Weave UI
     },
@@ -276,7 +276,7 @@ interface PredictAndScoreCallMetadataOptions {
   evaluateEntry: CallStackEntry;
   predictAndScoreStartPromise: Promise<void>;
   predictCallId: string;
-  output: unknown;
+  output: any;
 }
 
 class PredictAndScoreCallMetadata {
@@ -285,8 +285,8 @@ class PredictAndScoreCallMetadata {
   evaluateEntry: CallStackEntry;
   predictAndScoreStartPromise: Promise<void>;
   predictCallId: string; // ID of the finished predict call (for attaching feedback)
-  scores: Record<string, unknown> = {};
-  output: unknown;
+  scores: Record<string, any> = {};
+  output: any;
 
   constructor(options: PredictAndScoreCallMetadataOptions) {
     this.predictAndScoreCall = options.predictAndScoreCall;
@@ -373,7 +373,7 @@ export class ScoreLogger {
    * @param scorerName - Name of the scorer (e.g., "accuracy", "f1_score")
    * @param score - The score value
    */
-  logScore(scorerName: string, score: unknown): Promise<void> {
+  logScore(scorerName: string, score: any): Promise<void> {
     // Add operation to the chain
     const operation = this.operationChain
       .then(async () => {
@@ -523,8 +523,8 @@ export interface EvaluationLoggerOptions {
   dataset?: Dataset<DatasetRow> | string;
   scorers?: string[];
   model?: WeaveObject | {name?: string};
-  attributes?: Record<string, unknown>; // Custom attributes to attach to evaluate call
-  [key: string]: unknown; // Allow arbitrary attributes
+  attributes?: Record<string, any>; // Custom attributes to attach to evaluate call
+  [key: string]: any; // Allow arbitrary attributes
 }
 
 /**
@@ -552,7 +552,7 @@ export class EvaluationLogger {
   private evaluation: Evaluation;
   private initPromise: Promise<void>;
   private model: Model | WeaveObject;
-  private evalAttributes: Record<string, unknown>;
+  private evalAttributes: Record<string, any>;
 
   // Evaluate call tracking
   private evaluateCall?: InternalCall;
@@ -654,7 +654,7 @@ export class EvaluationLogger {
    * scoreLogger.finish();
    * await evalLogger.logSummary(); // Waits for everything
    */
-  logPrediction(inputs: Record<string, unknown>, output: unknown): ScoreLogger {
+  logPrediction(inputs: Record<string, any>, output: any): ScoreLogger {
     // Create ScoreLogger immediately (synchronously)
     const scoreLogger = new ScoreLogger(this);
     this.scoreLoggers.add(scoreLogger);
@@ -680,8 +680,8 @@ export class EvaluationLogger {
    * await scoreLogger.finish();
    */
   async logPredictionAsync(
-    inputs: Record<string, unknown>,
-    output: unknown
+    inputs: Record<string, any>,
+    output: any
   ): Promise<ScoreLogger> {
     // Create ScoreLogger immediately (synchronously)
     const scoreLogger = new ScoreLogger(this);
@@ -699,8 +699,8 @@ export class EvaluationLogger {
    * Performs async initialization and sets up the prediction call tree.
    */
   private async logPredictionImpl(
-    inputs: Record<string, unknown>,
-    output: unknown,
+    inputs: Record<string, any>,
+    output: any,
     scoreLogger: ScoreLogger
   ): Promise<void> {
     await this.initPromise;
@@ -780,7 +780,7 @@ export class EvaluationLogger {
    * This method can be called without await (fire-and-forget), but internally
    * it will wait for all pending operations to complete.
    */
-  async logSummary(summary?: Record<string, unknown>): Promise<void> {
+  async logSummary(summary?: Record<string, any>): Promise<void> {
     await this.initPromise;
     const client = requireGlobalClient();
     if (!client || !this.evaluateEntry) {
@@ -858,7 +858,7 @@ export class EvaluationLogger {
    * Called by ScoreLogger.finish() to maintain O(1) memory usage.
    * @internal
    */
-  updateScoreAggregates(scores: Record<string, unknown>): void {
+  updateScoreAggregates(scores: Record<string, any>): void {
     for (const [scoreName, score] of Object.entries(scores)) {
       if (score == null) continue;
 
@@ -896,8 +896,8 @@ export class EvaluationLogger {
    * Calculates mean for numeric scores, true_fraction for boolean scores.
    * Runs in O(K) time where K = number of unique scorers.
    */
-  private generateAutoSummary(): Record<string, unknown> {
-    const summary: Record<string, unknown> = {};
+  private generateAutoSummary(): Record<string, any> {
+    const summary: Record<string, any> = {};
 
     for (const [scoreName, agg] of this.scoreAggregates) {
       if (agg.count === 0) continue;
