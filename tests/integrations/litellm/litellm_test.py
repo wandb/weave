@@ -24,7 +24,7 @@ class Nearly:  # noqa: PLW1641
     def __init__(self, v: float) -> None:
         self.v = v
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return abs(self.v - other) < 2
 
 

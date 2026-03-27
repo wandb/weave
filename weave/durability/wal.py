@@ -44,6 +44,8 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Literal, Protocol, runtime_checkable
 
+from weave.telemetry.trace_sentry import log_error, log_warning
+
 logger = logging.getLogger(__name__)
 
 # Opaque dict — the WAL layer is format-agnostic.  Schema defined by callers.
@@ -351,18 +353,14 @@ def drain(
     for entry in consumer.read_pending():
         record_type = entry.record.get("type")
         if record_type is None:
-            logger.warning(
-                "WAL record without 'type' key at offset %d; "
-                "writing to dead-letter file",
-                entry.end_offset,
+            log_warning(
+                f"WAL record without 'type' key at offset {entry.end_offset}; "
+                "moved to dead-letter"
             )
             try:
                 _write_dead_letter(consumer.dead_letter_path, entry.record)
             except Exception:
-                logger.exception(
-                    "Failed to write dead-letter record at offset %d",
-                    entry.end_offset,
-                )
+                log_error(f"WAL dead-letter write failed at offset {entry.end_offset}")
             last_offset = entry.end_offset
             continue
         handler = handlers.get(record_type)
@@ -376,33 +374,25 @@ def drain(
                     entry.end_offset,
                 )
             except Exception:
-                logger.exception(
-                    "Handler failed for record type %r at offset %d; "
-                    "writing to dead-letter file",
-                    record_type,
-                    entry.end_offset,
+                log_error(
+                    f"WAL handler failed for record type {record_type!r} "
+                    f"at offset {entry.end_offset}; moved to dead-letter"
                 )
                 try:
                     _write_dead_letter(consumer.dead_letter_path, entry.record)
                 except Exception:
-                    logger.exception(
-                        "Failed to write dead-letter record at offset %d",
-                        entry.end_offset,
+                    log_error(
+                        f"WAL dead-letter write failed at offset {entry.end_offset}"
                     )
         else:
-            logger.warning(
-                "No handler registered for record type %r at offset %d; "
-                "writing to dead-letter file",
-                record_type,
-                entry.end_offset,
+            log_warning(
+                f"WAL no handler for record type {record_type!r} "
+                f"at offset {entry.end_offset}; moved to dead-letter"
             )
             try:
                 _write_dead_letter(consumer.dead_letter_path, entry.record)
             except Exception:
-                logger.exception(
-                    "Failed to write dead-letter record at offset %d",
-                    entry.end_offset,
-                )
+                log_error(f"WAL dead-letter write failed at offset {entry.end_offset}")
         last_offset = entry.end_offset
         if max_records and processed >= max_records:
             break
@@ -453,7 +443,7 @@ def drain_all(
         try:
             consumer = consumer_factory(path)
         except Exception:
-            logger.exception("Failed to create consumer for %s", path)
+            log_error(f"WAL failed to create consumer for {path}")
             continue
         try:
             total += drain(consumer, handlers)
@@ -462,7 +452,7 @@ def drain_all(
             if next(consumer.read_pending(), None) is None:
                 directory_manager.remove(path)
         except Exception:
-            logger.exception("Error draining WAL file %s", path)
+            log_error(f"WAL drain error for {path}")
         finally:
             consumer.close()
     return total

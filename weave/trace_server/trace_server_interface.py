@@ -14,9 +14,6 @@ else:
     except ImportError:
         ResourceSpans = Any
 
-DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
-MAX_FEEDBACK_SAMPLE_LIMIT = 5000
-
 from weave.trace_server import http_service_interface as his
 from weave.trace_server.common_interface import (
     WB_USER_ID_DESCRIPTION,
@@ -33,6 +30,9 @@ from weave.trace_server.service_interface import (  # noqa: F401
     ProjectsInfoReq,
     ProjectsInfoRes,
 )
+
+DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
+MAX_FEEDBACK_SAMPLE_LIMIT = 5000
 
 
 class ExtraKeysTypedDict(TypedDict):
@@ -317,7 +317,7 @@ class ObjSchemaForInsert(BaseModel):
 
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
         if self.set_base_object_class is not None and self.builtin_object_class is None:
             self.builtin_object_class = self.set_base_object_class
@@ -2779,9 +2779,9 @@ class EvalResultsScorerStats(BaseModel):
             "token_distance.passed. None for root-level scalar scorers."
         ),
     )
-    value_type: Literal["binary", "continuous"] | None = Field(
+    value_type: Literal["binary", "continuous", "text"] | None = Field(
         default=None,
-        description="Type of the leaf value: binary (bool) or continuous (number).",
+        description="Type of the leaf value: binary (bool), continuous (number), or text (string).",
     )
     trial_count: int = 0
     numeric_count: int = 0

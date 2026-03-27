@@ -7,6 +7,8 @@ from typing import Any, Optional
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 
+from weave.trace_server.validation_util import CHValidationError
+
 # =============================================================================
 # Error Codes - Machine-readable codes for client-side error detection
 # =============================================================================
@@ -304,6 +306,9 @@ class ErrorRegistry:
 
         # 504
         self.register(QueryTimeoutExceededError, 504)
+
+        # Validation errors
+        self.register(CHValidationError, 400)
 
         # Standard library exceptions
         self.register(ValueError, 400)

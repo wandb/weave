@@ -7,14 +7,13 @@ display method (rich, print, logger, etc.).
 
 from __future__ import annotations
 
+import types
 from collections.abc import Callable
 from typing import Any
 
 from typing_extensions import Self
 
 from weave.trace import settings
-
-DEFAULT_PROGRESS_REFRESH_PER_SECOND = 10
 from weave.trace.display.protocols import (
     CaptureContextProtocol,
     ProgressProtocol,
@@ -24,6 +23,8 @@ from weave.trace.display.protocols import (
     ViewerProtocol,
 )
 from weave.trace.display.types import Style
+
+DEFAULT_PROGRESS_REFRESH_PER_SECOND = 10
 
 # Since ViewerProtocol is a Protocol, we can't use Type[ViewerProtocol]
 # Instead, we use a callable that returns a ViewerProtocol
@@ -226,7 +227,12 @@ class Progress:
         self._progress.__enter__()
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Context manager exit."""
         return self._progress.__exit__(exc_type, exc_val, exc_tb)
 

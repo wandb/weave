@@ -117,13 +117,13 @@ def test_object_query_builder_limit_offset():
     assert builder.offset_part == "OFFSET 5"
 
     # Test invalid values
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Limit must be a positive integer"):
         builder.set_limit(-1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Offset must be a positive integer"):
         builder.set_offset(-1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Limit can only be set once"):
         builder.set_limit(5)  # Limit already set
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Offset can only be set once"):
         builder.set_offset(10)  # Offset already set
 
 
@@ -132,7 +132,7 @@ def test_object_query_builder_sort():
     builder.add_order("created_at", "DESC")
     assert builder.sort_part == "ORDER BY created_at DESC"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Direction .* is not allowed"):
         builder.add_order("created_at", "INVALID")
 
 

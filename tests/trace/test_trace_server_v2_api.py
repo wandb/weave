@@ -2535,3 +2535,220 @@ class TestEvalResultsReadAPI:
         ]
         assert combined_query.summary is not None
         assert combined_query.summary.model_dump() == separate_summary.model_dump()
+
+    def test_eval_results_summary_text_dimension_scalar(self, client):
+        """A scorer that returns a plain string produces a 'text' scorer_stats entry."""
+        project_id = client._project_id()
+        entity, project = from_project_id(project_id)
+
+        scorer_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="reasoning_scorer",
+                op_source_code="def score(output):\n    return 'good'",
+            )
+        )
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        run = client.server.evaluation_run_create(
+            tsi.EvaluationRunCreateReq(
+                project_id=project_id,
+                evaluation="eval://text-scalar",
+                model="model://text-scalar",
+            )
+        )
+        prediction = client.server.prediction_create(
+            tsi.PredictionCreateReq(
+                project_id=project_id,
+                model="model://text-scalar",
+                inputs={"x": "data"},
+                output="some output",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        prediction_call = client.server.call_read(
+            tsi.CallReadReq(project_id=project_id, id=prediction.prediction_id)
+        ).call
+        assert prediction_call is not None
+        assert prediction_call.parent_id is not None
+        predict_and_score_id = prediction_call.parent_id
+
+        score_call_id = generate_id()
+        client.server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=predict_and_score_id,
+                    op_name="ReasoningScorer.score",
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    attributes={
+                        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                            constants.SCORE_ATTR_KEY: "true",
+                            constants.SCORE_SCORER_ATTR_KEY: scorer_ref,
+                        }
+                    },
+                    inputs={"self": scorer_ref},
+                    wb_user_id="test-user",
+                )
+            )
+        )
+        client.server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    output="excellent reasoning here",
+                    summary={},
+                )
+            )
+        )
+        client.server.prediction_finish(
+            tsi.PredictionFinishReq(
+                project_id=project_id, prediction_id=prediction.prediction_id
+            )
+        )
+
+        summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+            )
+        ).summary
+
+        eval_summary = next(
+            e
+            for e in summary.evaluations
+            if e.evaluation_call_id == run.evaluation_run_id
+        )
+        assert len(eval_summary.scorer_stats) == 1
+
+        stats = next(
+            s
+            for s in eval_summary.scorer_stats
+            if s.scorer_key == "reasoning_scorer" and s.path is None
+        )
+        assert stats.value_type == "text"
+        assert stats.trial_count == 1
+        assert stats.numeric_count == 0
+        assert stats.numeric_mean is None
+        assert stats.pass_known_count == 0
+        assert stats.pass_rate is None
+
+    def test_eval_results_summary_text_dimension_mixed_dict(self, client):
+        """A scorer returning a dict with string and bool produces one 'text' and one 'binary' entry."""
+        project_id = client._project_id()
+        entity, project = from_project_id(project_id)
+
+        scorer_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="llm_judge",
+                op_source_code="def score(output):\n    return {'reasoning': 'x', 'passed': True}",
+            )
+        )
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        run = client.server.evaluation_run_create(
+            tsi.EvaluationRunCreateReq(
+                project_id=project_id,
+                evaluation="eval://text-mixed",
+                model="model://text-mixed",
+            )
+        )
+        prediction = client.server.prediction_create(
+            tsi.PredictionCreateReq(
+                project_id=project_id,
+                model="model://text-mixed",
+                inputs={"x": "data"},
+                output="some output",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        prediction_call = client.server.call_read(
+            tsi.CallReadReq(project_id=project_id, id=prediction.prediction_id)
+        ).call
+        assert prediction_call is not None
+        assert prediction_call.parent_id is not None
+        predict_and_score_id = prediction_call.parent_id
+
+        score_call_id = generate_id()
+        client.server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=predict_and_score_id,
+                    op_name="LLMJudge.score",
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    attributes={
+                        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                            constants.SCORE_ATTR_KEY: "true",
+                            constants.SCORE_SCORER_ATTR_KEY: scorer_ref,
+                        }
+                    },
+                    inputs={"self": scorer_ref},
+                    wb_user_id="test-user",
+                )
+            )
+        )
+        client.server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    output={
+                        "reasoning": "the model answered correctly",
+                        "passed": True,
+                    },
+                    summary={},
+                )
+            )
+        )
+        client.server.prediction_finish(
+            tsi.PredictionFinishReq(
+                project_id=project_id, prediction_id=prediction.prediction_id
+            )
+        )
+
+        summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+            )
+        ).summary
+
+        eval_summary = next(
+            e
+            for e in summary.evaluations
+            if e.evaluation_call_id == run.evaluation_run_id
+        )
+        assert len(eval_summary.scorer_stats) == 2
+
+        stats_by_path = {s.path: s for s in eval_summary.scorer_stats}
+
+        reasoning_stats = stats_by_path["reasoning"]
+        assert reasoning_stats.scorer_key == "llm_judge"
+        assert reasoning_stats.value_type == "text"
+        assert reasoning_stats.trial_count == 1
+        assert reasoning_stats.numeric_count == 0
+        assert reasoning_stats.numeric_mean is None
+        assert reasoning_stats.pass_known_count == 0
+        assert reasoning_stats.pass_rate is None
+
+        passed_stats = stats_by_path["passed"]
+        assert passed_stats.scorer_key == "llm_judge"
+        assert passed_stats.value_type == "binary"
+        assert passed_stats.trial_count == 1
+        assert passed_stats.pass_true_count == 1
+        assert passed_stats.pass_rate == 1.0

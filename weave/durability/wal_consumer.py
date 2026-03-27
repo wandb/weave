@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 import tempfile
 from collections.abc import Iterator
 
 from weave.durability.wal import WALEntry
-
-logger = logging.getLogger(__name__)
+from weave.telemetry.trace_sentry import log_warning
 
 # Max bytes to preview when logging corrupt WAL lines
 CORRUPT_LINE_PREVIEW_LENGTH = 100
-
 
 _active_consumers: set[str] = set()
 
@@ -83,11 +80,9 @@ class JSONLWALConsumer:
                             .decode("utf-8", errors="replace")
                             .rstrip()
                         )
-                        logger.warning(
-                            "Skipping corrupt WAL line at offset %d in %s: %s",
-                            offset,
-                            self._path,
-                            preview,
+                        log_warning(
+                            f"WAL corrupt record skipped at offset {offset} "
+                            f"in {self._path}: {preview}"
                         )
                         continue
                     yield WALEntry(record=record, end_offset=offset)

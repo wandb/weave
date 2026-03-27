@@ -177,9 +177,9 @@ class WeaveTrustScorerV1(weave.Scorer):
         )
     )
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         """Initialize scorers after model validation."""
-        super().model_post_init(__context)
+        super().model_post_init(context)
         self._load_scorers()
 
     def _load_scorers(self) -> None:

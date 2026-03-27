@@ -403,7 +403,7 @@ def test_schema_validation(client):
         )
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="object_class must match"):
         # Mismatching base object class, should raise
         client.server.obj_create(
             tsi.ObjCreateReq.model_validate(
@@ -423,7 +423,7 @@ def test_schema_validation(client):
         )
 
     # Test hierarchy object with wrong builtin_object_class - should fail
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="object_class must match"):
         client.server.obj_create(
             tsi.ObjCreateReq.model_validate(
                 {

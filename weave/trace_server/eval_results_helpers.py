@@ -533,6 +533,17 @@ def _process_scorer_output(
         current_total = (stats.numeric_mean or 0.0) * stats.numeric_count
         stats.numeric_count += 1
         stats.numeric_mean = (current_total + numeric_val) / stats.numeric_count
+    elif isinstance(scorer_val, str):
+        path_str = ".".join(path_parts) if path_parts else None
+        dim_key = (scorer_key, path_str)
+        if dim_key not in scorer_stats_map[eval_call_id]:
+            scorer_stats_map[eval_call_id][dim_key] = tsi.EvalResultsScorerStats(
+                scorer_key=scorer_key,
+                path=path_str,
+                value_type="text",
+            )
+        stats = scorer_stats_map[eval_call_id][dim_key]
+        stats.trial_count += 1
     elif (
         scorer_val is not None
         and isinstance(scorer_val, dict)

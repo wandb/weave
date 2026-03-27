@@ -8,6 +8,7 @@ import json
 import keyword
 import logging
 import re
+import types
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -15,11 +16,11 @@ from threading import Lock
 from types import MethodType
 from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 
+from typing_extensions import Self
+
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import MissingInferenceMethodError, Model
-
-DEFAULT_SCORER_CACHE_SIZE = 1000
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
@@ -37,6 +38,8 @@ from weave.utils.sentinel import NOT_SET, _NotSetType
 
 if TYPE_CHECKING:
     from weave.trace.call import Call
+
+DEFAULT_SCORER_CACHE_SIZE = 1000
 
 T = TypeVar("T")
 ID = str
@@ -264,7 +267,7 @@ class _LogScoreContext:
         """Set the score value that will be logged on exit."""
         self._score_value = val
 
-    def __enter__(self) -> _LogScoreContext:
+    def __enter__(self) -> Self:
         """Enter context and set call stack to include the score call."""
         # Set call stack to include the score call so operations become children
         self._call_stack_context = call_context.set_call_stack(
@@ -277,7 +280,12 @@ class _LogScoreContext:
         self._call_stack_context.__enter__()
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Exit context, restore call stack, and finish the score call."""
         try:
             # scorer is guaranteed to be a Scorer instance here because it was prepared in _create_score_call
@@ -587,13 +595,18 @@ class ScoreLogger:
         """Set the output value that will be used when finishing."""
         self._predict_output = value
 
-    def __enter__(self) -> ScoreLogger:
+    def __enter__(self) -> Self:
         """Enter context manager and set call stack to predict_call."""
         self._call_stack_context = call_context.set_call_stack([self.predict_call])
         self._call_stack_context.__enter__()
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Exit context manager, restore call stack, and automatically finish."""
         try:
             if not self._has_finished:

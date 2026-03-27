@@ -48,11 +48,11 @@ class TestObjectPathParseStr:
         assert ObjectPath.parse_str("a,b!").elements == ["a,b!"]
 
     def test_handles_key_access_errors(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid object access"):
             ObjectPath.parse_str(".")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid object access"):
             ObjectPath.parse_str("a[0].")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid object access"):
             ObjectPath.parse_str("a..b")
 
     def test_handles_array_index_cases(self) -> None:
@@ -60,13 +60,13 @@ class TestObjectPathParseStr:
         assert ObjectPath.parse_str("foo[2][3]").elements == ["foo", 2, 3]
 
     def test_handles_array_index_errors(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid array index"):
             ObjectPath.parse_str("foo[")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid array index"):
             ObjectPath.parse_str("foo[]")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid array index"):
             ObjectPath.parse_str("foo[1e3]")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid object access"):
             ObjectPath.parse_str("foo.[1]")
 
     def test_handles_escaped_chars(self) -> None:
@@ -74,7 +74,7 @@ class TestObjectPathParseStr:
         assert ObjectPath.parse_str("foo\\[").elements == ["foo["]
 
     def test_handles_escaping_errors(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid escape sequence"):
             ObjectPath.parse_str("foo\\")
 
     def test_handles_complex_cases(self) -> None:

@@ -13,12 +13,11 @@ If True, all weave ops will behave like regular functions and no network request
 import os
 from contextvars import ContextVar
 from pathlib import Path
-
-DEFAULT_RETRY_MAX_INTERVAL_SECONDS = 60 * 5  # 5 minutes
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
+DEFAULT_RETRY_MAX_INTERVAL_SECONDS = 60 * 5  # 5 minutes
 SETTINGS_PREFIX = "WEAVE_"
 
 # Attention Devs:

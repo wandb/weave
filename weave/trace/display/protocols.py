@@ -5,7 +5,10 @@ must follow. Using protocols provides better type checking and documentation
 of the expected interface.
 """
 
-from typing import Any, Optional, Protocol, runtime_checkable
+from __future__ import annotations
+
+import types
+from typing import Any, Protocol, runtime_checkable
 
 from typing_extensions import Self
 
@@ -16,11 +19,16 @@ from weave.trace.display.types import Style
 class CaptureContextProtocol(Protocol):
     """Protocol for capture context objects."""
 
-    def __enter__(self) -> "CaptureContextProtocol":
+    def __enter__(self) -> Self:
         """Enter the context."""
         ...
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Exit the context."""
         ...
 
@@ -42,7 +50,7 @@ class TextProtocol(Protocol):
 class SyntaxProtocol(Protocol):
     """Protocol for syntax highlighting objects."""
 
-    def to_string(self, console: Optional["ConsoleProtocol"] = None) -> str:
+    def to_string(self, console: ConsoleProtocol | None = None) -> str:
         """Convert to string representation."""
         ...
 
@@ -65,7 +73,7 @@ class TableProtocol(Protocol):
         """Add a row to the table."""
         ...
 
-    def to_string(self, console: Optional["ConsoleProtocol"] = None) -> str:
+    def to_string(self, console: ConsoleProtocol | None = None) -> str:
         """Convert the table to a string."""
         ...
 
@@ -103,7 +111,12 @@ class ProgressProtocol(Protocol):
         """Context manager entry."""
         ...
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Context manager exit."""
         ...
 
@@ -146,7 +159,7 @@ class ViewerProtocol(Protocol):
         ...
 
     def create_progress(
-        self, console: Optional["ConsoleProtocol"] = None, **kwargs: Any
+        self, console: ConsoleProtocol | None = None, **kwargs: Any
     ) -> ProgressProtocol:
         """Create a progress bar object."""
         ...

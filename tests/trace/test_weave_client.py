@@ -592,13 +592,13 @@ def test_get_calls_len(client):
     calls = client.get_calls(offset=10, limit=10)
     assert len(calls) == 0
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="limit must be greater than 0"):
         client.get_calls(limit=-1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="limit must be greater than 0"):
         client.get_calls(limit=0)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="offset must be greater than or equal to 0"):
         client.get_calls(offset=-1)
 
 
@@ -776,7 +776,7 @@ def test_delete_calls(client):
     assert len(calls) == 1
     assert calls[0].id == call_2_id
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="validation error"):
         client.delete_calls([1111111111111111])
 
     client.delete_calls([call_2_id])
@@ -2745,25 +2745,41 @@ def test_calls_query_sort_by_latency(client):
     """Test that sort_by summary.weave.latency_ms works with get_calls."""
     # Use a unique test ID to identify these calls
     test_id = str(uuid.uuid4())
+    base_time = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
 
-    # Create calls with different latencies
-    # Fast call - minimal latency
-    fast_call = client.create_call("x", {"a": 1, "b": 1, "test_id": test_id})
-    client.finish_call(fast_call, "fast result")
-    client.flush()
+    # Set timestamps explicitly so latency ordering is deterministic without sleeps.
+    fast_call = client.create_call(
+        "x",
+        {"a": 1, "b": 1, "test_id": test_id},
+        started_at=base_time,
+    )
+    client.finish_call(
+        fast_call,
+        "fast result",
+        ended_at=base_time + datetime.timedelta(milliseconds=10),
+    )
 
-    # Medium latency
-    medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
-    # Sleep to ensure different latency
-    time.sleep(0.05)
-    client.finish_call(medium_call, "medium result")
-    client.flush()
+    medium_call = client.create_call(
+        "x",
+        {"a": 2, "b": 2, "test_id": test_id},
+        started_at=base_time,
+    )
+    client.finish_call(
+        medium_call,
+        "medium result",
+        ended_at=base_time + datetime.timedelta(milliseconds=20),
+    )
 
-    # Slow call - higher latency
-    slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
-    # Sleep to ensure different latency
-    time.sleep(0.1)
-    client.finish_call(slow_call, "slow result")
+    slow_call = client.create_call(
+        "x",
+        {"a": 3, "b": 3, "test_id": test_id},
+        started_at=base_time,
+    )
+    client.finish_call(
+        slow_call,
+        "slow result",
+        ended_at=base_time + datetime.timedelta(milliseconds=30),
+    )
     client.flush()
 
     # Create a query to find just our test calls
