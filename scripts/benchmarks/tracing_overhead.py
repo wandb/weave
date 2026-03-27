@@ -267,9 +267,9 @@ def _overhead_pct(base: float, measured: float) -> float:
 
 def build_results_table(all_stats: dict[str, dict[str, dict[str, float]]]) -> Table:
     """Build a single Rich table summarising all benchmarks."""
-    headers = ["Benchmark", "Variant", "Mean", "Median", "Std Dev", "Min", "Max", "Overhead"]
-    styles = ["cyan", "magenta", "green", "green", "yellow", "white", "white", "red"]
-    justifications = ["left", "left", "right", "right", "right", "right", "right", "right"]
+    headers = ["Benchmark", "Variant", "Iterations", "Mean", "Median", "Std Dev", "Min", "Max", "Overhead"]
+    styles = ["cyan", "magenta", "dim", "green", "green", "yellow", "white", "white", "red"]
+    justifications = ["left", "left", "right", "right", "right", "right", "right", "right", "right"]
     rows: list[list[str]] = []
 
     for bench_name, variants in all_stats.items():
@@ -278,9 +278,12 @@ def build_results_table(all_stats: dict[str, dict[str, dict[str, float]]]) -> Ta
         for vname, stats in variants.items():
             overhead = _overhead_pct(base_stats["mean"], stats["mean"]) if vname != variant_names[0] else 0.0
             overhead_str = utils.format_percentage(overhead) if vname != variant_names[0] else "—"
+            iters = int(stats.get("iterations", 0))
+            iters_str = str(iters) if iters > 0 else "—"
             rows.append([
                 bench_name,
                 vname,
+                iters_str,
                 utils.format_seconds(stats["mean"], 6),
                 utils.format_seconds(stats["median"], 6),
                 utils.format_seconds(stats["std_dev"], 6),
@@ -302,7 +305,7 @@ def write_results_to_csv(
     all_stats: dict[str, dict[str, dict[str, float]]], filename: str
 ) -> None:
     """Write all benchmark results to a CSV file."""
-    headers = ["Benchmark", "Variant", "Mean", "Median", "Std_Dev", "Min", "Max", "Overhead_Percent"]
+    headers = ["Benchmark", "Variant", "Iterations", "Mean", "Median", "Std_Dev", "Min", "Max", "Overhead_Percent"]
     rows: list[list[str]] = []
 
     for bench_name, variants in all_stats.items():
@@ -313,6 +316,7 @@ def write_results_to_csv(
             rows.append([
                 bench_name,
                 vname,
+                str(int(stats.get("iterations", 0))),
                 f"{stats['mean']:.6f}",
                 f"{stats['median']:.6f}",
                 f"{stats['std_dev']:.6f}",
@@ -329,38 +333,47 @@ def display_summary(all_stats: dict[str, dict[str, dict[str, float]]]) -> None:
     lines: list[str] = []
 
     if "weave.init()" in all_stats:
-        init_mean = all_stats["weave.init()"]["init"]["mean"]
-        lines.append(f"weave.init()        : [yellow]{utils.format_seconds(init_mean)}[/yellow]")
+        s = all_stats["weave.init()"]["init"]
+        n = int(s.get("iterations", 0))
+        lines.append(f"weave.init()        : [yellow]{utils.format_seconds(s['mean'])}[/yellow]  [dim](n={n})[/dim]")
 
     if "@weave.op decorate" in all_stats:
-        dec_mean = all_stats["@weave.op decorate"]["decorate"]["mean"]
-        lines.append(f"@weave.op decorate  : [yellow]{utils.format_seconds(dec_mean, 6)}[/yellow]")
+        s = all_stats["@weave.op decorate"]["decorate"]
+        n = int(s.get("iterations", 0))
+        lines.append(f"@weave.op decorate  : [yellow]{utils.format_seconds(s['mean'], 6)}[/yellow]  [dim](n={n})[/dim]")
 
     if "traced call" in all_stats:
-        plain = all_stats["traced call"]["plain"]["mean"]
-        traced = all_stats["traced call"]["traced"]["mean"]
-        overhead = _overhead_pct(plain, traced)
+        plain_s = all_stats["traced call"]["plain"]
+        traced_s = all_stats["traced call"]["traced"]
+        n = int(traced_s.get("iterations", 0))
+        overhead = _overhead_pct(plain_s["mean"], traced_s["mean"])
         lines.append(
             f"traced call overhead : [yellow]{utils.format_percentage(overhead)}[/yellow]"
-            f"  (plain {utils.format_seconds(plain, 6)} → traced {utils.format_seconds(traced, 6)})"
+            f"  (plain {utils.format_seconds(plain_s['mean'], 6)} → traced {utils.format_seconds(traced_s['mean'], 6)})"
+            f"  [dim](n={n})[/dim]"
         )
 
     if "nested calls" in all_stats:
-        flat = all_stats["nested calls"]["flat (1 level)"]["mean"]
-        nested = all_stats["nested calls"]["nested (3 levels)"]["mean"]
-        overhead = _overhead_pct(flat, nested)
+        flat_s = all_stats["nested calls"]["flat (1 level)"]
+        nested_s = all_stats["nested calls"]["nested (3 levels)"]
+        n = int(nested_s.get("iterations", 0))
+        overhead = _overhead_pct(flat_s["mean"], nested_s["mean"])
         lines.append(
             f"nested 3-level cost : [yellow]{utils.format_percentage(overhead)}[/yellow] vs flat"
-            f"  ({utils.format_seconds(flat, 6)} → {utils.format_seconds(nested, 6)})"
+            f"  ({utils.format_seconds(flat_s['mean'], 6)} → {utils.format_seconds(nested_s['mean'], 6)})"
+            f"  [dim](n={n})[/dim]"
         )
 
     if "throughput" in all_stats:
-        plain = all_stats["throughput"]["plain/call"]["mean"]
-        traced = all_stats["throughput"]["traced/call"]["mean"]
-        overhead = _overhead_pct(plain, traced)
+        plain_s = all_stats["throughput"]["plain/call"]
+        traced_s = all_stats["throughput"]["traced/call"]
+        n = int(traced_s.get("iterations", 0))
+        batch = int(plain_s.get("iterations", 0))
+        overhead = _overhead_pct(plain_s["mean"], traced_s["mean"])
         lines.append(
             f"throughput per-call  : [yellow]{utils.format_percentage(overhead)}[/yellow] overhead"
-            f"  (plain {utils.format_seconds(plain, 6)} → traced {utils.format_seconds(traced, 6)})"
+            f"  (plain {utils.format_seconds(plain_s['mean'], 6)} → traced {utils.format_seconds(traced_s['mean'], 6)})"
+            f"  [dim](n={n}, batch={batch})[/dim]"
         )
 
     console.print(Panel("\n".join(lines), title="Summary", border_style="bold"))
@@ -380,6 +393,7 @@ def get_stats_from_csv(csv_data: list[dict[str, str]]) -> dict[str, dict[str, di
         if bench not in all_stats:
             all_stats[bench] = {}
         all_stats[bench][variant] = {
+            "iterations": float(row.get("Iterations", 0)),
             "mean": float(row["Mean"]),
             "median": float(row["Median"]),
             "std_dev": float(row["Std_Dev"]),
@@ -459,23 +473,31 @@ def main() -> None:
         step += 1
         console.print(f"[bold cyan]{step}/{total}[/bold cyan] weave.init()")
         init_times = bench_init(args.init_iterations)
-        all_stats["weave.init()"] = {"init": utils.calculate_stats(init_times)}
+        init_stats = utils.calculate_stats(init_times)
+        init_stats["iterations"] = args.init_iterations
+        all_stats["weave.init()"] = {"init": init_stats}
 
     # 2. @weave.op decoration
     if "decoration" in selected:
         step += 1
         console.print(f"[bold cyan]{step}/{total}[/bold cyan] @weave.op decoration")
         dec_times = bench_decoration(args.iterations)
-        all_stats["@weave.op decorate"] = {"decorate": utils.calculate_stats(dec_times)}
+        dec_stats = utils.calculate_stats(dec_times)
+        dec_stats["iterations"] = args.iterations
+        all_stats["@weave.op decorate"] = {"decorate": dec_stats}
 
     # 3. Traced vs untraced call
     if "call" in selected:
         step += 1
         console.print(f"[bold cyan]{step}/{total}[/bold cyan] Traced vs untraced call")
         plain_times, traced_times = bench_traced_call(args.iterations, args.warmup)
+        plain_stats = utils.calculate_stats(plain_times)
+        plain_stats["iterations"] = args.iterations
+        traced_stats = utils.calculate_stats(traced_times)
+        traced_stats["iterations"] = args.iterations
         all_stats["traced call"] = {
-            "plain": utils.calculate_stats(plain_times),
-            "traced": utils.calculate_stats(traced_times),
+            "plain": plain_stats,
+            "traced": traced_stats,
         }
 
     # 4. Nested calls
@@ -483,9 +505,13 @@ def main() -> None:
         step += 1
         console.print(f"[bold cyan]{step}/{total}[/bold cyan] Nested op calls")
         flat_times, nested_times = bench_nested_calls(args.iterations, args.warmup)
+        flat_stats = utils.calculate_stats(flat_times)
+        flat_stats["iterations"] = args.iterations
+        nested_stats = utils.calculate_stats(nested_times)
+        nested_stats["iterations"] = args.iterations
         all_stats["nested calls"] = {
-            "flat (1 level)": utils.calculate_stats(flat_times),
-            "nested (3 levels)": utils.calculate_stats(nested_times),
+            "flat (1 level)": flat_stats,
+            "nested (3 levels)": nested_stats,
         }
 
     # 5. Throughput
@@ -493,9 +519,13 @@ def main() -> None:
         step += 1
         console.print(f"[bold cyan]{step}/{total}[/bold cyan] Throughput")
         plain_per, traced_per = bench_throughput(args.batch_size, args.iterations, args.warmup)
+        plain_tp_stats = utils.calculate_stats(plain_per)
+        plain_tp_stats["iterations"] = args.batch_size
+        traced_tp_stats = utils.calculate_stats(traced_per)
+        traced_tp_stats["iterations"] = args.iterations
         all_stats["throughput"] = {
-            "plain/call": utils.calculate_stats(plain_per),
-            "traced/call": utils.calculate_stats(traced_per),
+            "plain/call": plain_tp_stats,
+            "traced/call": traced_tp_stats,
         }
 
     # Output
