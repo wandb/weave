@@ -168,6 +168,11 @@ def get_ch_trace_server(
                 )
             )
 
+            # Disable async inserts at the user level so every connection
+            # (including thread-local ones) gets synchronous, immediately-
+            # visible writes — regardless of ClickHouse server defaults.
+            ch_server.ch_client.command("ALTER USER default SETTINGS async_insert = 0")
+
             # Clean up any existing worker-specific databases
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
