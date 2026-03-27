@@ -17,7 +17,12 @@ from weave.shared.digest import str_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.errors import InvalidRequest, ObjectDeletedError
+from weave.trace_server.errors import (
+    InvalidRequest,
+    ObjectDeletedError,
+    handle_server_exception,
+)
+from weave.trace_server.validation_util import CHValidationError
 
 
 def make_base_64_content(content: str) -> str:
@@ -461,11 +466,12 @@ def test_table_create_different_key_order_same_digest(trace_server):
     assert res.row_digests[0] == res.row_digests[1]
 
 
-def test_call_start_batch_skips_invalid_trace_id():
-    """A single call with an invalid trace_id must not abort the entire batch.
+def test_call_start_batch_invalid_trace_id_returns_400():
+    """An invalid trace_id in a batch should fail the whole batch with a 400, not a 500.
 
     Regression test for: POST /call/upsert_batch drops entire batch for
-    non-UUID trace_id (e.g. 'session:main:agent:main:main').
+    non-UUID trace_id (e.g. 'session:main:agent:main:main') with a 500
+    instead of returning a useful validation error.
     """
     mock_ch_client = MagicMock()
     mock_ch_client.command.return_value = None
@@ -484,20 +490,6 @@ def test_call_start_batch_skips_invalid_trace_id():
 
         batch_req = tsi.CallCreateBatchReq(
             batch=[
-                # Valid call — should be inserted
-                tsi.CallBatchStartMode(
-                    mode="start",
-                    req=tsi.CallStartReq(
-                        start=tsi.StartedCallSchemaForInsert(
-                            project_id=project_id,
-                            op_name="valid_op",
-                            started_at=datetime.datetime.now(datetime.timezone.utc),
-                            attributes={},
-                            inputs={},
-                        )
-                    ),
-                ),
-                # Invalid call: session-style trace_id that fails both OTel and UUID validation
                 tsi.CallBatchStartMode(
                     mode="start",
                     req=tsi.CallStartReq(
@@ -514,25 +506,17 @@ def test_call_start_batch_skips_invalid_trace_id():
             ]
         )
 
-        # Must not raise — the invalid item should be skipped, not crash the batch
-        result = trace_server.call_start_batch(batch_req)
+        # The batch should raise CHValidationError, not an opaque internal error
+        with pytest.raises(CHValidationError, match="Invalid UUID"):
+            trace_server.call_start_batch(batch_req)
 
-        # The valid call was processed; result should contain exactly one entry
-        assert len(result.res) == 1
-
-        # The invalid item must be reported in errors so the client knows what was dropped
-        assert len(result.errors) == 1
-        err = result.errors[0]
-        assert err["batch_index"] == 1
-        assert "trace_id" in err
-        assert err["trace_id"] == "session:main:agent:main:main"
-
-        # The valid call must have been flushed to ClickHouse
-        insert_tables = [
-            call.args[0] if call.args else call.kwargs.get("table")
-            for call in mock_ch_client.insert.call_args_list
-        ]
-        assert "call_parts" in insert_tables
+        # The error registry should map CHValidationError to 400 (not 500)
+        try:
+            trace_server.call_start_batch(batch_req)
+        except CHValidationError as e:
+            error_with_status = handle_server_exception(e)
+            assert error_with_status.status_code == 400
+            assert "Invalid UUID" in error_with_status.message["reason"]
 
 
 def test_obj_batch_mixed_projects_errors(trace_server, client):

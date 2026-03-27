@@ -305,6 +305,11 @@ class ErrorRegistry:
         # 504
         self.register(QueryTimeoutExceededError, 504)
 
+        # Validation errors
+        from weave.trace_server.validation_util import CHValidationError
+
+        self.register(CHValidationError, 400)
+
         # Standard library exceptions
         self.register(ValueError, 400)
         self.register(KeyError, 500, lambda exc: {"reason": "Internal backend error"})
