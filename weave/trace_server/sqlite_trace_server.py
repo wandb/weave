@@ -10,6 +10,7 @@ from collections.abc import Iterator
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, cast
 
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
@@ -186,7 +187,9 @@ def close_conn_cursor(db_path: str | None = None) -> None:
 logger = logging.getLogger(__name__)
 
 
-_DEFAULT_COSTS_FILE = __file__.rsplit("/", 1)[0] + "/migrations/006_seed_costs.up.sql"
+_DEFAULT_COSTS_FILE = str(
+    Path(__file__).parent / "migrations" / "006_seed_costs.up.sql"
+)
 
 
 def _normalize_datetime_for_costs(
