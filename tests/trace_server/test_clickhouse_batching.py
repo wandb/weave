@@ -461,6 +461,80 @@ def test_table_create_different_key_order_same_digest(trace_server):
     assert res.row_digests[0] == res.row_digests[1]
 
 
+def test_call_start_batch_skips_invalid_trace_id():
+    """A single call with an invalid trace_id must not abort the entire batch.
+
+    Regression test for: POST /call/upsert_batch drops entire batch for
+    non-UUID trace_id (e.g. 'session:main:agent:main:main').
+    """
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+
+    project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
+
+    mock_query_result = MagicMock()
+    mock_query_result.result_rows = [[0, 1]]  # has_complete=0, has_merged=1
+
+    with patch.object(
+        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        trace_server = ClickHouseTraceServer(host="test_host")
+        mock_ch_client.query.return_value = mock_query_result
+
+        batch_req = tsi.CallCreateBatchReq(
+            batch=[
+                # Valid call — should be inserted
+                tsi.CallBatchStartMode(
+                    mode="start",
+                    req=tsi.CallStartReq(
+                        start=tsi.StartedCallSchemaForInsert(
+                            project_id=project_id,
+                            op_name="valid_op",
+                            started_at=datetime.datetime.now(datetime.timezone.utc),
+                            attributes={},
+                            inputs={},
+                        )
+                    ),
+                ),
+                # Invalid call: session-style trace_id that fails both OTel and UUID validation
+                tsi.CallBatchStartMode(
+                    mode="start",
+                    req=tsi.CallStartReq(
+                        start=tsi.StartedCallSchemaForInsert(
+                            project_id=project_id,
+                            op_name="invalid_op",
+                            trace_id="session:main:agent:main:main",
+                            started_at=datetime.datetime.now(datetime.timezone.utc),
+                            attributes={},
+                            inputs={},
+                        )
+                    ),
+                ),
+            ]
+        )
+
+        # Must not raise — the invalid item should be skipped, not crash the batch
+        result = trace_server.call_start_batch(batch_req)
+
+        # The valid call was processed; result should contain exactly one entry
+        assert len(result.res) == 1
+
+        # The invalid item must be reported in errors so the client knows what was dropped
+        assert len(result.errors) == 1
+        err = result.errors[0]
+        assert err["batch_index"] == 1
+        assert "trace_id" in err
+        assert err["trace_id"] == "session:main:agent:main:main"
+
+        # The valid call must have been flushed to ClickHouse
+        insert_tables = [
+            call.args[0] if call.args else call.kwargs.get("table")
+            for call in mock_ch_client.insert.call_args_list
+        ]
+        assert "call_parts" in insert_tables
+
+
 def test_obj_batch_mixed_projects_errors(trace_server, client):
     """Uploading objects to different projects in one batch should error."""
     if client_is_sqlite(client):

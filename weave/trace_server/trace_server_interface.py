@@ -390,6 +390,9 @@ class CallCreateBatchReq(BaseModelStrict):
 
 class CallCreateBatchRes(BaseModel):
     res: list[CallStartRes | CallEndRes]
+    # Per-index validation errors for items that were skipped. Empty means all succeeded.
+    # Each entry contains: {"batch_index": int, "error": str} plus any available identifiers.
+    errors: list[dict[str, Any]] = []
 
 
 class CallsUpsertCompleteReq(BaseModel):

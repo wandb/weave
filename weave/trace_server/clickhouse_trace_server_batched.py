@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
+import pydantic
 from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
@@ -230,6 +231,7 @@ from weave.trace_server.trace_server_common import (
     make_feedback_query_req,
     set_nested_key,
 )
+from weave.trace_server.validation_util import CHValidationError
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
     EvaluateModelDispatcher,
@@ -718,14 +720,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         with self.call_batch():
             res = []
-            for item in req.batch:
-                if item.mode == "start":
-                    res.append(self.call_start(item.req))
-                elif item.mode == "end":
-                    res.append(self.call_end(item.req))
-                else:
-                    raise ValueError("Invalid mode")
-        return tsi.CallCreateBatchRes(res=res)
+            errors = []
+            for batch_index, item in enumerate(req.batch):
+                try:
+                    if item.mode == "start":
+                        res.append(self.call_start(item.req))
+                    elif item.mode == "end":
+                        res.append(self.call_end(item.req))
+                    else:
+                        raise ValueError("Invalid mode")
+                except (pydantic.ValidationError, CHValidationError) as e:
+                    error_info: dict = {"batch_index": batch_index, "error": str(e)}
+                    if item.mode == "start":
+                        start = item.req.start
+                        if start.id is not None:
+                            error_info["call_id"] = start.id
+                        if start.trace_id is not None:
+                            error_info["trace_id"] = start.trace_id
+                    elif item.mode == "end":
+                        error_info["call_id"] = item.req.end.id
+                    logger.warning(
+                        "Skipping invalid call in batch (validation error)",
+                        extra=error_info,
+                    )
+                    errors.append(error_info)
+        return tsi.CallCreateBatchRes(res=res, errors=errors)
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         """Creates a new call."""

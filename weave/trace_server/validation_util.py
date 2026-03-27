@@ -4,7 +4,7 @@ import uuid
 from weave.shared import refs_internal
 
 
-class CHValidationError(Exception):
+class CHValidationError(ValueError):
     pass
 
 
