@@ -2,10 +2,10 @@
 
 Generates (each step can be run individually):
   - datasets:        Publish sample datasets
-  - calls:           Traced op calls (including nested call trees)
-  - evaluations:     Evaluations with multiple models and scorers
+  - calls:           Traced op calls (nested, streaming, async, errors, display names, views)
+  - evaluations:     Evaluations with function and class-based scorers
   - imperative-eval: Imperative evaluation logging via EvaluationLogger
-  - objects:         Custom objects and prompt templates
+  - objects:         Custom objects, prompt templates, tags, and aliases
 
 No LLM API keys are required — all models are simulated locally.
 
@@ -31,6 +31,8 @@ import asyncio
 import os
 import random
 import time
+from collections.abc import Iterator
+from typing import Any
 
 from pydantic import Field
 
@@ -336,6 +338,90 @@ def summary_length_ok(output: dict) -> dict:
     return {"length_ok": is_ok, "length": len(summary)}
 
 
+class AnswerRelevanceScorer(weave.Scorer):
+    """A class-based scorer that checks answer relevance via keyword overlap."""
+
+    min_overlap: float = 0.3
+
+    @weave.op
+    def score(self, *, output: Any, question: str, **kwargs: Any) -> dict:
+        answer = output.get("answer", "")
+        q_words = set(question.lower().split()) - {"what", "is", "the", "of", "a", "who", "in"}
+        a_words = set(answer.lower().split())
+        overlap = len(q_words & a_words) / max(len(q_words), 1)
+        return {"relevant": overlap >= self.min_overlap, "overlap": round(overlap, 3)}
+
+
+# ---------------------------------------------------------------------------
+# Streaming, async, error, and display-name ops
+# ---------------------------------------------------------------------------
+
+
+@weave.op(call_display_name=lambda call: f"stream [{call.inputs['prompt'][:30]}...]")
+def stream_tokens(prompt: str) -> Iterator[str]:
+    """Simulate token-by-token LLM generation (streaming op)."""
+    answer = _simulate_qa_answer(prompt, temperature=0.5)
+    for token in answer.split():
+        time.sleep(random.uniform(0.01, 0.03))
+        yield token + " "
+
+
+@weave.op(call_display_name=lambda call: f"async-fetch [{call.inputs['url'][:25]}]")
+async def async_fetch_data(url: str) -> dict:
+    """Simulate an async data fetch."""
+    await asyncio.sleep(random.uniform(0.02, 0.08))
+    return {
+        "url": url,
+        "status": 200,
+        "tokens": random.randint(50, 500),
+    }
+
+
+@weave.op
+async def async_parallel_pipeline(questions: list[str]) -> list[dict]:
+    """Fetch data for multiple questions concurrently (async op)."""
+    tasks = [async_fetch_data(f"https://api.example.com/q/{q[:20]}") for q in questions]
+    return await asyncio.gather(*tasks)
+
+
+@weave.op
+def failing_parse(raw_input: str) -> dict:
+    """An op that sometimes fails — demonstrates error states in the UI."""
+    if not raw_input or not raw_input.strip():
+        raise ValueError("Input must not be empty")
+    if raw_input.startswith("{"):
+        # Simulate a JSON parse that fails on malformed input
+        raise ValueError(f"Malformed JSON payload: unexpected token at position 0 in: {raw_input[:50]}")
+    return {"parsed": raw_input.strip(), "length": len(raw_input)}
+
+
+@weave.op
+def analyze_with_view(text: str) -> dict:
+    """An op that attaches a markdown view to its call via set_view."""
+    words = text.split()
+    word_count = len(words)
+    char_count = len(text)
+    unique_words = len({w.lower().strip(".,!?") for w in words})
+
+    # Attach a rich markdown report as a view on this call
+    report = (
+        f"# Text Analysis Report\n\n"
+        f"| Metric | Value |\n"
+        f"|--------|-------|\n"
+        f"| Words | {word_count} |\n"
+        f"| Characters | {char_count} |\n"
+        f"| Unique words | {unique_words} |\n"
+        f"| Avg word length | {char_count / max(word_count, 1):.1f} |\n"
+    )
+    weave.set_view("analysis-report", report, extension="md")
+
+    return {
+        "word_count": word_count,
+        "char_count": char_count,
+        "unique_words": unique_words,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Simulation helpers
 # ---------------------------------------------------------------------------
@@ -467,6 +553,32 @@ def step_calls() -> None:
             process_document(doc)
     print(f"    ✓ {len(docs)} document processing calls (with nested ops)")
 
+    # Streaming ops (custom call_display_name + yield)
+    for example in QA_EXAMPLES[:3]:
+        tokens = list(stream_tokens(example["question"]))
+    print("    ✓ 3 streaming op calls (with custom display names)")
+
+    # Async ops (concurrent fetch)
+    questions = [ex["question"] for ex in QA_EXAMPLES[:4]]
+    asyncio.run(async_parallel_pipeline(questions))
+    print("    ✓ 1 async parallel pipeline call (4 concurrent fetches)")
+
+    # Calls with set_view (rich markdown view attached)
+    for example in SUMMARIZATION_EXAMPLES:
+        analyze_with_view(example["document"])
+    print(f"    ✓ {len(SUMMARIZATION_EXAMPLES)} calls with set_view (markdown report)")
+
+    # Error state calls
+    error_inputs = ["", "{bad json", "   "]
+    for raw in error_inputs:
+        try:
+            failing_parse(raw)
+        except ValueError:
+            pass  # Expected — the error is recorded in the call
+    # Also one successful call for contrast
+    failing_parse("valid input text")
+    print(f"    ✓ {len(error_inputs)} errored calls + 1 success (error states in UI)")
+
 
 async def step_evaluations(datasets: dict[str, weave.Dataset] | None = None) -> None:
     """Run evaluations with different models and scorers."""
@@ -482,12 +594,13 @@ async def step_evaluations(datasets: dict[str, weave.Dataset] | None = None) -> 
             ),
         }
 
-    # QA evaluation
+    # QA evaluation (mix of function scorers + class-based scorer)
+    relevance_scorer = AnswerRelevanceScorer(min_overlap=0.2)
     qa_model = QAModel(temperature=0.3, system_prompt="Answer concisely.")
     qa_eval = weave.Evaluation(
         name="qa-evaluation",
         dataset=datasets["qa"],
-        scorers=[exact_match, contains_expected, confidence_above_threshold],
+        scorers=[exact_match, contains_expected, confidence_above_threshold, relevance_scorer],
     )
     qa_results = await qa_eval.evaluate(qa_model)
     print(f"    ✓ QA evaluation: {_format_results(qa_results)}")
@@ -606,6 +719,20 @@ def step_objects() -> None:
     weave.publish(chat_prompt)
     print("    ✓ MessagesPrompt: rag-chat-prompt")
 
+    # --- Tags and aliases on published objects ---
+    config_ref = weave.publish(PipelineConfig(
+        name="tagged-config",
+        retriever_top_k=3,
+        model_temperature=0.5,
+        max_tokens=256,
+        system_prompt="You are a precise assistant.",
+    ))
+    weave.add_tags(config_ref, ["stable", "reviewed", "v1"])
+    print("    ✓ Tagged object: tagged-config (stable, reviewed, v1)")
+
+    weave.set_aliases(config_ref, ["production", "latest-stable"])
+    print("    ✓ Aliased object: tagged-config -> production, latest-stable")
+
 
 def _format_results(results: dict) -> str:
     """Format evaluation results for display."""
@@ -632,10 +759,10 @@ def main() -> None:
         epilog=(
             "available steps:\n"
             "  datasets         Publish sample datasets (QA, sentiment, summarization)\n"
-            "  calls            Generate traced op calls with nested call trees\n"
-            "  evaluations      Run Evaluation objects with models and scorers\n"
+            "  calls            Traced ops: nested, streaming, async, errors, views\n"
+            "  evaluations      Evaluations with function + class-based scorers\n"
             "  imperative-eval  Log an evaluation imperatively via EvaluationLogger\n"
-            "  objects          Publish custom objects and prompt templates\n"
+            "  objects          Objects, prompts, tags, and aliases\n"
             "\n"
             "examples:\n"
             "  %(prog)s my-team/demo\n"
@@ -699,14 +826,16 @@ def main() -> None:
     # --- calls ---
     if "calls" in steps:
         step_calls()
-        n_calls = len(QA_EXAMPLES) + len(SENTIMENT_EXAMPLES) + len(SUMMARIZATION_EXAMPLES)
-        summary_lines.append(f"{n_calls} traced op calls with nested call trees and attributes")
+        summary_lines.append(
+            "Traced op calls: nested pipelines, streaming, async, errors, "
+            "custom display names, and set_view"
+        )
         print()
 
     # --- evaluations ---
     if "evaluations" in steps:
         asyncio.run(step_evaluations(datasets))
-        summary_lines.append("4 evaluations (QA x2, sentiment, summarization)")
+        summary_lines.append("4 evaluations with function + class-based scorers")
         print()
 
     # --- imperative-eval ---
@@ -718,7 +847,9 @@ def main() -> None:
     # --- objects ---
     if "objects" in steps:
         step_objects()
-        summary_lines.append("5 published objects (2 configs, 1 experiment, 2 prompts)")
+        summary_lines.append(
+            "Published objects with tags and aliases (configs, prompts, experiment)"
+        )
         print()
 
     weave.finish()
