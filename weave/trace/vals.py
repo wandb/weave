@@ -422,6 +422,10 @@ class WeaveTable(Traceable):  # noqa: PLW1641
 
         In this case, we don't need to make any calls and can just return the rows
         """
+        # NOTE: wc may be None when the user calls ref.get() without weave.init().
+        # ObjectRef.get() auto-creates a temporary client to fetch the object, then
+        # destroys it — but self.server remains valid. When wc is None we just pass
+        # the row digest as a plain string instead of a Future.
         wc = get_weave_client()
         if (
             self.ref is None
@@ -465,9 +469,11 @@ class WeaveTable(Traceable):  # noqa: PLW1641
                 return get_row_digest
 
             if wc is not None:
+                # Use future_executor for parallel digest computation
                 next_id_future = wc.future_executor.defer(make_get_row_digest(i))
                 new_ref = self.ref.with_item(next_id_future)
             else:
+                # No client — pass digest directly instead of as a Future
                 new_ref = self.ref.with_item(cached_table_ref.row_digests[i])
             val = self._prefetched_rows[i]
             res = from_json(val, self.table_ref.project_id, self.server)
@@ -478,6 +484,8 @@ class WeaveTable(Traceable):  # noqa: PLW1641
         if self.table_ref is None:
             return
 
+        # NOTE: wc may be None (see comment in _local_iter_with_remote_fallback).
+        # When None, we yield rows directly instead of batching via future_executor.
         wc = get_weave_client()
 
         page_index = 0
