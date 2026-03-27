@@ -7,6 +7,10 @@ import pytest
 from PIL import Image
 
 import weave
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    set_weave_client_global,
+)
 from weave.trace.weave_client import WeaveClient, get_ref
 
 """When testing types, it is important to test:
@@ -256,11 +260,6 @@ def test_images_in_dataset_without_client(client):
     """Regression test for WB-21596: datasets with images should be iterable
     without an active global client (e.g. after ref.get() auto-init cleanup).
     """
-    from weave.trace.context.weave_client_context import (
-        get_weave_client,
-        set_weave_client_global,
-    )
-
     n_rows = 3
     rows = [{"img": make_random_image()} for _ in range(n_rows)]
     dataset = weave.Dataset(rows=rows)
