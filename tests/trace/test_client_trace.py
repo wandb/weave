@@ -6,13 +6,13 @@ import random
 import sys
 import time
 import uuid
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, NamedTuple
 from unittest import mock
 
 import pytest
@@ -1893,12 +1893,16 @@ def test_tuple_support(client):
     assert res.calls[0].output == [[1, 2], 3]
 
 
+class Point(NamedTuple):
+    x: Any
+    y: Any
+
+
 def test_namedtuple_support(client):
     @weave.op
     def tuple_maker(a, b):
         return (a, b)
 
-    Point = namedtuple("Point", ["x", "y"])
     act = tuple_maker(Point(1, 2), 3)
     exp = (Point(1, 2), 3)
     assert act == exp
@@ -2669,10 +2673,6 @@ def test_call_query_stream_columns(client):
 
 
 def test_call_query_stream_columns_with_costs(client):
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
-
     @weave.op
     def calculate(a: int, b: int) -> dict[str, Any]:
         return {
@@ -2766,9 +2766,6 @@ def test_call_query_stream_columns_with_costs(client):
 
 
 def test_call_query_stream_trace_name_column_with_costs(client):
-    if client_is_sqlite(client):
-        return
-
     @weave.op
     def my_traced_op(x: int) -> dict[str, Any]:
         return {
@@ -2905,10 +2902,6 @@ def test_call_read_with_unkown_llm(client):
     """Tests that if an op reports usage for an LLM ID that has no cost entry
     in the database, the cost calculation handles it gracefully (by not adding cost info).
     """
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
-
     # Generate a unique LLM ID unlikely to exist
     llm_id_no_cost = f"non_existent_llm_{generate_id()}"
 
@@ -4082,13 +4075,13 @@ async def test_op_sampling_inheritance_async_generator(client):
 
 
 def test_op_sampling_invalid_rates(client):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="tracing_sample_rate must be between 0 and 1"):
 
         @weave.op(tracing_sample_rate=-0.5)
         def negative_rate():
             pass
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="tracing_sample_rate must be between 0 and 1"):
 
         @weave.op(tracing_sample_rate=1.5)
         def too_high_rate():
@@ -4602,10 +4595,6 @@ def test_obj_query_with_storage_size_clickhouse(client):
 
 
 def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client):
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
-
     @weave.op
     def child_op(a: int, b: int) -> dict[str, Any]:
         return {
@@ -4625,12 +4614,13 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged FINAL",
-    )
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    if not client_is_sqlite(client):
+        clickhouse_client.command(
+            "OPTIMIZE TABLE calls_merged FINAL",
+        )
+        clickhouse_client.command(
+            "OPTIMIZE TABLE calls_merged_stats FINAL",
+        )
 
     # Test that "include_costs" and "include_total_storage_size" can be used together
     calls = list(
@@ -4834,7 +4824,7 @@ def test_calls_query_stats_with_limit(client):
     # test filter, should not use special optimization
     assert calls_stats(filter={"trace_ids": [trace_id]}).count == 2
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Limit must be"):
         calls_stats(limit=-1)
 
     # Test that the query works with include_total_storage_size
@@ -5033,7 +5023,7 @@ def test_project_stats_clickhouse(client, clickhouse_client):
     assert res.files_storage_size_bytes == file_size
 
     # test that requesting with none of the include_* params returns an error
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="At least one of"):
         client.server.project_stats(
             tsi.ProjectStatsReq(
                 project_id=project_id,
@@ -6367,9 +6357,6 @@ def test_calls_query_sort_by_nested_attributes_field_with_costs(client):
 @pytest.mark.asyncio
 async def test_calls_query_sort_by_feedback_field_with_costs(client):
     """Test sorting by feedback field with cost query and minimal columns."""
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        pytest.skip("Sorting by feedback fields not implemented in SQLite")
 
     @weave.op
     def my_scorer(x: int, output: int) -> dict:

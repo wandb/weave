@@ -37,7 +37,7 @@ class BedrockGuardrailScorer(weave.Scorer):
     # Private attributes
     _bedrock_runtime: Any = PrivateAttr(default=None)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         """Initialize the Bedrock runtime client."""
         try:
             import boto3

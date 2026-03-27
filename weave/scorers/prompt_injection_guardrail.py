@@ -49,7 +49,7 @@ class PromptInjectionLLMGuardrail(LLMScorer):
         description="Maximum number of tokens allowed in the LLM's response",
     )
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         if self.model_id not in SUPPORTED_MODELS:
             warnings.warn(
                 f"The prompting strategy used in this guardrail has been tested with the following models: {', '.join(SUPPORTED_MODELS)}."

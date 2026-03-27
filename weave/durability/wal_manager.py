@@ -11,6 +11,7 @@ from weave.durability.wal import WALRecord, WALRecordType, WALWriter
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_sender import BackgroundWALSender, create_sender
 from weave.durability.wal_writer import JSONLWALWriter
+from weave.telemetry.trace_sentry import log_warning
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ class WALManager:
             )
             logger.debug("WAL write: %s -> %s", record_type, self.wal_dir)
         except Exception:
-            logger.warning("Failed to write %s to WAL", record_type, exc_info=True)
+            log_warning(f"WAL write failed for {record_type}")
 
     def flush(self) -> None:
         """Flush the WAL to disk."""

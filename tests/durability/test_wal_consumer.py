@@ -132,7 +132,7 @@ class TestJSONLWALConsumer:
         assert len(entries) == good_before + good_after
         for i, entry in enumerate(entries):
             assert entry.record == {"seq": i}
-        assert "Skipping corrupt WAL line" in caplog.text  # type: ignore[union-attr]
+        assert "WAL corrupt record skipped" in caplog.text  # type: ignore[union-attr]
 
     def test_end_offsets_are_correct(self, tmp_path: str) -> None:
         """end_offset equals the byte position immediately after each record's newline."""

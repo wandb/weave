@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import types
 from collections.abc import Callable
 from functools import wraps
 from typing import Any
@@ -45,7 +46,12 @@ class _WeaveConnectWrapper:
             self._original_connection = await self._original_result
         return connection.WeaveAsyncWebsocketConnection(self._original_connection)
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> bool:
         if hasattr(self._original_result, "__aexit__"):
             return await self._original_result.__aexit__(exc_type, exc_val, exc_tb)  # type: ignore[return-value]
         if self._original_connection is not None:

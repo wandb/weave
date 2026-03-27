@@ -77,7 +77,7 @@ def test_custom_feedback(client) -> None:
     assert f.feedback_type == "hallucination"
     assert f.payload["value"] == 0.5
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="reserved for annotation feedback"):
         trace_object.feedback.add("wandb.trying_to_use_reserved_prefix", value=1)
 
 

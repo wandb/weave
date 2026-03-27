@@ -17,11 +17,12 @@
  */
 
 import {WeaveObject, WeaveObjectParameters} from './weaveObject';
-import {Dataset} from './dataset';
+import {Dataset, DatasetRow} from './dataset';
 import {op} from './op';
 import {requireGlobalClient} from './clientApi';
 import {InternalCall} from './call';
-import {CallStackEntry} from './weaveClient';
+import {CallStackEntry, WeaveClient} from './weaveClient';
+import {Op, OpRef, ParameterNamesOption} from './opType';
 import {uuidv7} from 'uuidv7';
 
 // ============================================================================
@@ -53,11 +54,14 @@ const IMPERATIVE_SCORE_MARKER = {
  * @returns The finished call entry for reference
  */
 async function createAndFinishCall(
-  client: any,
+  client: WeaveClient,
   internalCall: InternalCall,
-  opRef: any,
+  // Op<any> is intentional: Op<T> is invariant in T due to function contravariance,
+  // so a narrower callable type like Op<(x: Scorer) => void> can't be assigned to
+  // Op<(...args: unknown[]) => unknown>. We only use this for ref tracking, not calling.
+  opRef: OpRef | Op<any>,
   params: any[],
-  parameterNames: any,
+  parameterNames: ParameterNamesOption,
   thisArg: any,
   currentEntry: CallStackEntry,
   parentEntry: CallStackEntry | undefined,
@@ -104,13 +108,14 @@ async function createAndFinishCall(
  * Named "Evaluation" so that constructor.name serializes to 'Evaluation'.
  */
 interface EvaluationParameters extends WeaveObjectParameters {
-  dataset?: Dataset<any> | string;
+  dataset?: Dataset<DatasetRow> | string;
   scorers?: string[];
   [key: string]: any; // Allow arbitrary attributes (trial_id, run_id, etc.)
 }
 
 class Evaluation extends WeaveObject {
-  dataset?: Dataset<any> | string;
+  [key: string]: any;
+  dataset?: Dataset<DatasetRow> | string;
   scorers: string[];
 
   constructor(parameters: EvaluationParameters) {
@@ -123,11 +128,10 @@ class Evaluation extends WeaveObject {
     // the WeaveObject and visible in the Weave UI.
     // Exclude properties already explicitly assigned to avoid duplication.
     const excludedKeys = ['dataset', 'scorers', 'name', 'description'];
-    for (const [key, value] of Object.entries(parameters)) {
-      if (!excludedKeys.includes(key)) {
-        (this as any)[key] = value;
-      }
-    }
+    const extras = Object.fromEntries(
+      Object.entries(parameters).filter(([key]) => !excludedKeys.includes(key))
+    );
+    Object.assign(this, extras);
   }
 }
 
@@ -143,6 +147,7 @@ interface ModelParameters extends WeaveObjectParameters {
 }
 
 class Model extends WeaveObject {
+  [key: string]: any;
   modelName?: string;
 
   constructor(parameters: ModelParameters) {
@@ -154,11 +159,10 @@ class Model extends WeaveObject {
     // the WeaveObject and visible in the Weave UI.
     // Exclude properties already explicitly assigned to avoid duplication.
     const excludedKeys = ['modelName', 'name', 'description'];
-    for (const [key, value] of Object.entries(parameters)) {
-      if (!excludedKeys.includes(key)) {
-        (this as any)[key] = value;
-      }
-    }
+    const extras = Object.fromEntries(
+      Object.entries(parameters).filter(([key]) => !excludedKeys.includes(key))
+    );
+    Object.assign(this, extras);
   }
 }
 
@@ -172,6 +176,7 @@ interface ScorerParameters extends WeaveObjectParameters {
 }
 
 class Scorer extends WeaveObject {
+  [key: string]: any;
   scorerName?: string;
 
   constructor(parameters: ScorerParameters) {
@@ -183,11 +188,10 @@ class Scorer extends WeaveObject {
     // the WeaveObject and visible in the Weave UI.
     // Exclude properties already explicitly assigned to avoid duplication.
     const excludedKeys = ['scorerName', 'name', 'description'];
-    for (const [key, value] of Object.entries(parameters)) {
-      if (!excludedKeys.includes(key)) {
-        (this as any)[key] = value;
-      }
-    }
+    const extras = Object.fromEntries(
+      Object.entries(parameters).filter(([key]) => !excludedKeys.includes(key))
+    );
+    Object.assign(this, extras);
   }
 }
 
@@ -203,44 +207,56 @@ class Scorer extends WeaveObject {
  */
 
 const evaluationEvaluate = op(
-  async function evaluate(evaluation: any, model: any): Promise<any> {
-    // internal function
+  async function evaluate(
+    evaluation: Evaluation,
+    model: Model | WeaveObject
+  ): Promise<Record<string, any>> {
+    // internal function — never executed; provides structure for Weave UI
+    return {};
   },
   {name: 'Evaluation.evaluate'}
 );
 
 const evaluationPredictAndScore = op(
   async function predict_and_score(
-    evaluation: any,
-    model: any,
+    evaluation: Evaluation,
+    model: Model | WeaveObject,
     example: Record<string, any>
-  ): Promise<any> {
-    // internal function
+  ): Promise<Record<string, any>> {
+    // internal function — never executed; provides structure for Weave UI
+    return {};
   },
   {name: 'Evaluation.predict_and_score'}
 );
 
 const evaluationSummarize = op(
-  async function summarize(evaluation: any): Promise<any> {
-    // internal function
+  async function summarize(
+    evaluation: Evaluation
+  ): Promise<Record<string, any>> {
+    // internal function — never executed; provides structure for Weave UI
+    return {};
   },
   {name: 'Evaluation.summarize'}
 );
 
 const modelPredict = op(
   async function predict(
-    model: any,
+    model: Model | WeaveObject,
     inputs: Record<string, any>
-  ): Promise<any> {
-    // internal function
+  ): Promise<void> {
+    // internal function — never executed; provides structure for Weave UI
   },
   {name: 'Model.predict'}
 );
 
 const scorerScoreFactory = (scorerName: string) =>
   op(
-    async function score(scorer: any, output: any, target?: any): Promise<any> {
-      // internal function
+    async function score(
+      scorer: Scorer,
+      output: any,
+      target?: any
+    ): Promise<void> {
+      // internal function — never executed; provides structure for Weave UI
     },
     {name: `${scorerName}.score`}
   );
@@ -258,7 +274,7 @@ interface PredictAndScoreCallMetadataOptions {
   predictAndScoreCall: InternalCall;
   predictAndScoreEntry: CallStackEntry;
   evaluateEntry: CallStackEntry;
-  predictAndScoreStartPromise: Promise<any>;
+  predictAndScoreStartPromise: Promise<void>;
   predictCallId: string;
   output: any;
 }
@@ -267,7 +283,7 @@ class PredictAndScoreCallMetadata {
   predictAndScoreCall: InternalCall;
   predictAndScoreEntry: CallStackEntry;
   evaluateEntry: CallStackEntry;
-  predictAndScoreStartPromise: Promise<any>;
+  predictAndScoreStartPromise: Promise<void>;
   predictCallId: string; // ID of the finished predict call (for attaching feedback)
   scores: Record<string, any> = {};
   output: any;
@@ -504,7 +520,7 @@ export class ScoreLogger {
 export interface EvaluationLoggerOptions {
   name: string;
   description?: string;
-  dataset?: Dataset<any> | string;
+  dataset?: Dataset<DatasetRow> | string;
   scorers?: string[];
   model?: WeaveObject | {name?: string};
   attributes?: Record<string, any>; // Custom attributes to attach to evaluate call
@@ -541,7 +557,7 @@ export class EvaluationLogger {
   // Evaluate call tracking
   private evaluateCall?: InternalCall;
   private evaluateEntry?: CallStackEntry;
-  private evaluateStartPromise?: Promise<any>;
+  private evaluateStartPromise?: Promise<void>;
 
   // Incremental summary aggregates (O(K) memory where K = # scorers)
   private scoreAggregates: Map<string, ScoreAggregate> = new Map();
