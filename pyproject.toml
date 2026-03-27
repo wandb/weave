@@ -349,14 +349,12 @@ reportPossiblyUnboundVariable = false
 reportOptionalMemberAccess = false
 reportArgumentType = false
 reportCallIssue = false
-reportIncompatibleVariableOverride = false
 
 [tool.mypy]
 warn_unused_configs = true
 # Note: You have to update .pre-commit-config.yaml too!
 exclude = [".*pyi$", "tests", "examples"]
 ignore_missing_imports = true
-disable_error_code = ["import-untyped"]
 
 [[tool.mypy.overrides]]
 module = "weave.*"
