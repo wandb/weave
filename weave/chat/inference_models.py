@@ -52,9 +52,9 @@ class InferenceModels:
 
         try:
             validated = ModelsResponseSuccess.model_validate(d)
-        except ValidationError as e:
+        except ValidationError:
             print(d)
-            raise e
+            raise
 
         # Our API returns models in a non-deterministic order.
         # The order returned by OpenAI's API is unclear, but appears to be

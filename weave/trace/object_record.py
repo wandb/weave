@@ -139,7 +139,7 @@ def getmembers(
             if on_error:
                 on_error(e)
             else:
-                raise e
+                raise
         # This is where the modified code ends
 
         if not predicate or predicate(value):

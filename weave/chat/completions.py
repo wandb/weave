@@ -281,6 +281,6 @@ class Completions:
             d = d["response"]
         try:
             return ChatCompletion.model_validate(d)
-        except ValidationError as e:
+        except ValidationError:
             print(d)
-            raise e
+            raise

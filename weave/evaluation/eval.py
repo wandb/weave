@@ -248,8 +248,8 @@ class Evaluation(Object):
         async def eval_example(example: dict) -> dict:
             try:
                 eval_row = await self.predict_and_score(model, example)
-            except OpCallError as e:
-                raise e
+            except OpCallError:
+                raise
             except Exception:
                 logger.info("Predict and score failed")
                 traceback.print_exc()
