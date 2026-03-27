@@ -23,7 +23,7 @@ class ObjectRecord:  # noqa: PLW1641
     def __repr__(self) -> str:
         return f"ObjectRecord({self.__dict__})"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, ObjectRecord):
             if self._class_name != other._class_name:
                 return False

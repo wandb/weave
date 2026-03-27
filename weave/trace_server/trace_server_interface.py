@@ -314,7 +314,7 @@ class ObjSchemaForInsert(BaseModel):
 
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
         if self.set_base_object_class is not None and self.builtin_object_class is None:
             self.builtin_object_class = self.set_base_object_class

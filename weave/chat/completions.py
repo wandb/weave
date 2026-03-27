@@ -55,7 +55,7 @@ class Completions:
         max_tokens: int | None | NotGiven = NOT_GIVEN,
         n: int | None | NotGiven = NOT_GIVEN,
         presence_penalty: float | None | NotGiven = NOT_GIVEN,
-        stream: Literal[False] | Literal[True] | None | NotGiven = NOT_GIVEN,
+        stream: Literal[False, True] | None | NotGiven = NOT_GIVEN,
         stream_options: ChatCompletionStreamOptionsParam | None | NotGiven = NOT_GIVEN,
         temperature: float | None | NotGiven = NOT_GIVEN,
         top_p: float | None | NotGiven = NOT_GIVEN,

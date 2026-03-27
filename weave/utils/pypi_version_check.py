@@ -74,7 +74,7 @@ def _parse_version(version: str) -> packaging.version.Version:
     return parse_version(version)
 
 
-def _sync_get_with_timeout(url: str, timeout: int | float) -> httpx.Response | None:
+def _sync_get_with_timeout(url: str, timeout: float) -> httpx.Response | None:
     """Make a synchronous GET request with a timeout."""
     try:
         with httpx.Client() as client:

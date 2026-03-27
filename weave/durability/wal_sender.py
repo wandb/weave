@@ -43,6 +43,7 @@ from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel
+from typing_extensions import Self
 
 from weave.durability.wal import (
     WALConsumer,
@@ -252,7 +253,7 @@ class BackgroundWALSender:
 
     # -- Context manager ---------------------------------------------------
 
-    def __enter__(self) -> BackgroundWALSender:
+    def __enter__(self) -> Self:
         self.start()
         return self
 
