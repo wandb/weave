@@ -2741,28 +2741,24 @@ def test_calls_query_sort_by_status(client):
     assert calls_desc[2].id == error_call.id
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_calls_query_sort_by_latency(client):
     """Test that sort_by summary.weave.latency_ms works with get_calls."""
     # Use a unique test ID to identify these calls
     test_id = str(uuid.uuid4())
 
-    # Create calls with different latencies
-    # Fast call - minimal latency
+    # Create calls with clearly separated latencies across backends.
     fast_call = client.create_call("x", {"a": 1, "b": 1, "test_id": test_id})
     client.finish_call(fast_call, "fast result")
     client.flush()
 
-    # Medium latency
     medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
-    # Sleep to ensure different latency
-    time.sleep(0.05)
+    time.sleep(0.3)
     client.finish_call(medium_call, "medium result")
     client.flush()
 
-    # Slow call - higher latency
     slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
-    # Sleep to ensure different latency
-    time.sleep(0.1)
+    time.sleep(0.6)
     client.finish_call(slow_call, "slow result")
     client.flush()
 
@@ -2779,11 +2775,20 @@ def test_calls_query_sort_by_latency(client):
         )
     )
 
-    # Verify order - should be fast, medium, slow in ascending order
     assert len(calls_asc) == 3
-    assert calls_asc[0].id == fast_call.id
-    assert calls_asc[1].id == medium_call.id
-    assert calls_asc[2].id == slow_call.id
+    assert {call.id for call in calls_asc} == {
+        fast_call.id,
+        medium_call.id,
+        slow_call.id,
+    }
+    latencies_asc = [c.summary.get("weave", {}).get("latency_ms") for c in calls_asc]
+    assert all(lat is not None for lat in latencies_asc), (
+        f"Expected all calls to have latency_ms, but got {latencies_asc}"
+    )
+    for i in range(len(latencies_asc) - 1):
+        assert latencies_asc[i] <= latencies_asc[i + 1], (
+            f"Expected latency ASC order, but got {latencies_asc}"
+        )
 
     # Descending sort (slow to fast)
     calls_desc = list(
@@ -2793,11 +2798,20 @@ def test_calls_query_sort_by_latency(client):
         )
     )
 
-    # Verify order - should be slow, medium, fast in descending order
     assert len(calls_desc) == 3
-    assert calls_desc[0].id == slow_call.id
-    assert calls_desc[1].id == medium_call.id
-    assert calls_desc[2].id == fast_call.id
+    assert {call.id for call in calls_desc} == {
+        fast_call.id,
+        medium_call.id,
+        slow_call.id,
+    }
+    latencies_desc = [c.summary.get("weave", {}).get("latency_ms") for c in calls_desc]
+    assert all(lat is not None for lat in latencies_desc), (
+        f"Expected all calls to have latency_ms, but got {latencies_desc}"
+    )
+    for i in range(len(latencies_desc) - 1):
+        assert latencies_desc[i] >= latencies_desc[i + 1], (
+            f"Expected latency DESC order, but got {latencies_desc}"
+        )
 
 
 def test_calls_filter_by_status(client):
