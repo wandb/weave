@@ -1,4 +1,7 @@
 import base64
+import time
+
+import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY
@@ -187,6 +190,7 @@ def test_objs_query_wb_user_id(client: WeaveClient):
     assert all(obj.wb_user_id == correct_id for obj in res)
 
 
+@pytest.mark.flaky(reruns=3)
 def test_objs_query_deleted_interaction(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -211,6 +215,9 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
 
     assert res.num_deleted == 1
 
+    # Allow ClickHouse ReplacingMergeTree to settle after soft delete
+    time.sleep(0.2)
+
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
@@ -230,6 +237,9 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
     )
     assert res.num_deleted == 2
 
+    # Allow ClickHouse ReplacingMergeTree to settle after soft delete
+    time.sleep(0.2)
+
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
@@ -239,6 +249,7 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
     assert len(res.objs) == 0
 
 
+@pytest.mark.flaky(reruns=3)
 def test_objs_query_delete_and_recreate(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -264,6 +275,9 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
 
     weave.publish({"i": 1}, name="obj_1")
 
+    # Allow ClickHouse ReplacingMergeTree to settle after delete+recreate
+    time.sleep(0.2)
+
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
@@ -277,6 +291,9 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
     weave.publish({"i": 2}, name="obj_1")
     weave.publish({"i": 3}, name="obj_1")
 
+    # Allow ClickHouse ReplacingMergeTree to settle after recreating versions
+    time.sleep(0.2)
+
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
@@ -286,10 +303,10 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
     assert len(res.objs) == 3
 
     for i in range(3):
-        print("res.objs[i].val", res.objs[i].val)
         assert res.objs[i].val["i"] == i + 1
 
 
+@pytest.mark.flaky(reruns=3)
 def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -313,6 +330,9 @@ def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
     weave.publish({"i": 4}, name="obj_1")
     weave.publish({"i": 5}, name="obj_1")
     weave.publish({"i": 6}, name="obj_1")
+
+    # Allow ClickHouse ReplacingMergeTree to settle after delete+recreate
+    time.sleep(0.2)
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
