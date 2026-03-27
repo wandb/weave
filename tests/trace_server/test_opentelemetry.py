@@ -1211,10 +1211,6 @@ class TestSemanticConventionParsing:
 
     def test_opentelemetry_cost_calculation(self, client: weave_client.WeaveClient):
         """Test that costs are properly calculated for OTEL spans with usage at query time."""
-        if client_is_sqlite(client):
-            # SQLite does not support costs
-            return
-
         project_id = client._project_id()
 
         # Create span with gpt-4 model and usage

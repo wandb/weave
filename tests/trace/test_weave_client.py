@@ -1601,10 +1601,6 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
 
 
 def test_summary_tokens_cost(client):
-    if client_is_sqlite(client):
-        # SQLite does not support costs
-        return
-
     @weave.op
     def gpt4(text):
         result = "a: " + text
@@ -1733,38 +1729,6 @@ def test_summary_tokens_cost(client):
         "trace_name": "models",
         "latency_ms": AnyIntMatcher(),
     }
-
-
-@pytest.mark.skip_clickhouse_client
-def test_summary_tokens_cost_sqlite(client):
-    if not client_is_sqlite(client):
-        # only run this test for sqlite
-        return
-
-    # ensure that include_costs is a no-op for sqlite
-    call0 = client.create_call("x", {"a": 5, "b": 10})
-    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
-    _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
-    call1 = client.create_call("y", {"a": 6, "b": 11})
-
-    calls_with_cost = list(client.get_calls(include_costs=True))
-    calls_no_cost = list(client.get_calls(include_costs=False))
-
-    assert len(calls_with_cost) == len(calls_no_cost)
-    assert len(calls_with_cost) == 4
-
-    no_cost_call_summary = calls_no_cost[0].summary
-    with_cost_call_summary = calls_with_cost[0].summary
-
-    weave_summary = {
-        "weave": {
-            "status": "running",
-            "trace_name": "x",
-        }
-    }
-
-    assert no_cost_call_summary == weave_summary
-    assert with_cost_call_summary == weave_summary
 
 
 def _setup_calls_for_storage_size_test(client):

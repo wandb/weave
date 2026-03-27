@@ -3,17 +3,12 @@ import uuid
 
 import pytest
 
-from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 
 
 def test_cost_apis(client):
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
-
     project_id = client._project_id()
 
     costs = {
@@ -143,10 +138,6 @@ def test_cost_apis(client):
 
 
 def test_purge_only_ids(client):
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
-
     project_id = client._project_id()
     costs = {
         "my_model_to_delete": {
@@ -205,9 +196,6 @@ def test_costs_streamed_with_all_fields(client):
     (provider_id, effective_date, pricing_level, etc.) and must not fail
     Pydantic validation even when some of those fields are absent.
     """
-    if client_is_sqlite(client):
-        return
-
     project_id = client._project_id()
 
     # 1. Create cost entry with optional metadata fields populated
