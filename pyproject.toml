@@ -419,6 +419,9 @@ dev = [
   # linting
   "pre-commit",
   "jupyter",
+  "ruff>=0.12.3",
+  "mypy>=1.17.0",
+  "pyright>=1.1.387",
   "ty>=0.0.2",
 ]
 trace_server = [

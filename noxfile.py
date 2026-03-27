@@ -24,7 +24,7 @@ NUM_TRACE_SERVER_SHARDS = 4
 
 @nox.session(venv_backend="none")
 def lint(session: nox.Session):
-    """Run linters directly — no pre-commit, no stashing, no venv setup.
+    """Run linters directly — no pre-commit, no stashing.
 
     Usage:
         nox -e lint                     # all checks (safe auto-fix by default)
@@ -48,10 +48,12 @@ def lint(session: nox.Session):
     if not checks:
         checks = list(all_checks)
 
+    run = ["uv", "run", "--group", "dev"]
+
     failed = []
     for check in checks:
         if check == "ruff":
-            ruff_check = ["uvx", "ruff", "check", "--config=pyproject.toml"]
+            ruff_check = [*run, "ruff", "check", "--config=pyproject.toml"]
             if not no_fix:
                 ruff_check.append("--fix")
             ruff_check.append(".")
@@ -59,7 +61,7 @@ def lint(session: nox.Session):
                 session.run(*ruff_check, external=True)
             except nox.command.CommandFailed:
                 failed.append("ruff check")
-            ruff_fmt = ["uvx", "ruff", "format", "--config=pyproject.toml"]
+            ruff_fmt = [*run, "ruff", "format", "--config=pyproject.toml"]
             if no_fix:
                 ruff_fmt.append("--check")
             ruff_fmt.append(".")
@@ -70,23 +72,18 @@ def lint(session: nox.Session):
         elif check == "mypy":
             try:
                 session.run(
-                    "uv",
-                    "run",
-                    "mypy",
-                    "--config-file=pyproject.toml",
-                    ".",
-                    external=True,
+                    *run, "mypy", "--config-file=pyproject.toml", ".", external=True
                 )
             except nox.command.CommandFailed:
                 failed.append("mypy")
         elif check == "ty":
             try:
-                session.run("uv", "run", "ty", "check", external=True)
+                session.run(*run, "ty", "check", external=True)
             except nox.command.CommandFailed:
                 failed.append("ty")
         elif check == "pyright":
             try:
-                session.run("uv", "run", "pyright", external=True)
+                session.run(*run, "pyright", external=True)
             except nox.command.CommandFailed:
                 failed.append("pyright")
 
