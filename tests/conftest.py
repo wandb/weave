@@ -13,7 +13,9 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import *
+
+pytest_plugins = ["tests.trace_server.conftest"]
+
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context

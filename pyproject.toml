@@ -230,17 +230,11 @@ select = [
   "B", # https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
   "D", # https://docs.astral.sh/ruff/rules/#pydoclint-doc
   #
+  "F",       # https://docs.astral.sh/ruff/rules/#pyflakes-f
   "FIX001",  # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",  # https://docs.astral.sh/ruff/rules/line-contains-xxx/
-  "F541",    # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
   "I",       # https://docs.astral.sh/ruff/rules/#isort-i
   "W",       # https://docs.astral.sh/ruff/rules/#warning-w
-  "F401",    # https://docs.astral.sh/ruff/rules/unused-import/
-  "F402",    # https://docs.astral.sh/ruff/rules/import-shadowed-by-loop-var/
-  "F6",      # https://docs.astral.sh/ruff/rules/multi-value-repeated-key-literal/
-  "F811",    # https://docs.astral.sh/ruff/rules/redefined-while-unused/
-  "F821",    # https://docs.astral.sh/ruff/rules/undefined-name/
-  "F822",    # https://docs.astral.sh/ruff/rules/undefined-export/
   "TID252",  # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
   "UP",      # https://docs.astral.sh/ruff/rules/#pyupgrade-up
   "TRY002",  # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
@@ -299,6 +293,9 @@ ignore = [
   "PLC2701", # https://docs.astral.sh/ruff/rules/import-private-name/
   # Keep explicit empty-string checks for readability in tests and parsing paths.
   "PLC1901", # https://docs.astral.sh/ruff/rules/compare-to-empty-string/
+  # Too many existing unused-variable assignments to fix in one pass; defer for
+  # a dedicated cleanup.
+  "F841",    # https://docs.astral.sh/ruff/rules/unused-variable/
   # Initial PLR rollout: defer broad structural and magic-number checks for a
   # dedicated cleanup pass to keep lint actionable.
   "PLR0904", # https://docs.astral.sh/ruff/rules/too-many-public-methods/
