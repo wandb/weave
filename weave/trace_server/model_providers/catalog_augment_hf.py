@@ -13,14 +13,14 @@ from __future__ import annotations
 
 import json
 import re
-
-HF_API_TIMEOUT_SECONDS = 30.0
-NEW_MODEL_THRESHOLD_DAYS = 30
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import httpx
+
+HF_API_TIMEOUT_SECONDS = 30.0
+NEW_MODEL_THRESHOLD_DAYS = 30
 
 dir_this = Path(__file__).parent
 file_in = dir_this / "modelsBegin.json"

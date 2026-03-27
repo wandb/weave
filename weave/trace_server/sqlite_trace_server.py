@@ -28,9 +28,6 @@ from weave.shared.trace_server_interface_util import (
     wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import constants, object_creation_utils, usage_utils
-
-MAX_REFS_BATCH_SIZE = 1000
-MAX_OTEL_ERROR_MESSAGES = 20
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
@@ -81,6 +78,9 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelArgs,
     EvaluateModelDispatcher,
 )
+
+MAX_REFS_BATCH_SIZE = 1000
+MAX_OTEL_ERROR_MESSAGES = 20
 
 
 def _apply_aggregations(

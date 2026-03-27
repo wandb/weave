@@ -6,12 +6,12 @@ from collections.abc import Callable
 from queue import Empty, Queue
 from threading import Lock
 
+from weave.integrations.openai_realtime.state_exporter import StateExporter
+
 logger = logging.getLogger(__name__)
 
 WORKER_JOIN_TIMEOUT_SECONDS = 1.0
 QUEUE_POLL_INTERVAL_SECONDS = 0.1
-
-from weave.integrations.openai_realtime.state_exporter import StateExporter
 
 Handler = Callable[[dict], None]
 
