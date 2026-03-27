@@ -11,11 +11,16 @@ if sys.version_info < (3, 10):  # noqa: UP036
 
 from weave import version
 from weave.trace.api import (
+    ObjectRef,
+    Table,
+    ThreadContext,
     add_tags,
+    as_op,
     attributes,
     finish,
     get,
     get_aliases,
+    get_client,
     get_current_call,
     get_tags,
     get_tags_and_aliases,
@@ -31,6 +36,7 @@ from weave.trace.api import (
     set_aliases,
     set_view,
     thread,
+    weave_client_context,
 )
 
 __version__ = version.VERSION
@@ -78,15 +84,20 @@ __all__ = [
     "Model",
     "Monitor",
     "Object",
+    "ObjectRef",
     "Prompt",
     "SavedView",
     "Scorer",
     "StringPrompt",
+    "Table",
+    "ThreadContext",
     "add_tags",
+    "as_op",
     "attributes",
     "finish",
     "get",
     "get_aliases",
+    "get_client",
     "get_current_call",
     "get_tags",
     "get_tags_and_aliases",
@@ -103,4 +114,5 @@ __all__ = [
     "set_aliases",
     "set_view",
     "thread",
+    "weave_client_context",
 ]
