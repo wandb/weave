@@ -1,4 +1,5 @@
 import datetime
+import json
 from unittest.mock import Mock, patch
 
 from weave.trace_server import sqlite_trace_server as slts
@@ -135,8 +136,6 @@ def test_sqlite_storage_size_bytes_populated_on_call_end():
         assert call.storage_size_bytes > 0
 
         # Verify the value matches the expected sum of JSON-serialized field lengths
-        import json
-
         expected = (
             len(json.dumps({"key": "value"}))
             + len(json.dumps({"prompt": "hello world"}))
@@ -186,8 +185,6 @@ def test_sqlite_storage_size_bytes_populated_via_calls_complete():
             )
         )
         assert len(result.calls) == 1
-
-        import json
 
         expected = (
             len(json.dumps(attrs))
