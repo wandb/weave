@@ -3,14 +3,18 @@ import types
 from unittest.mock import Mock, call, patch
 
 import pytest
+from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
 from weave.trace_server.clickhouse_trace_server_migrator import (
+    _MAX_RETRIES,
     BaseClickHouseTraceServerMigrator,
     CloudClickHouseTraceServerMigrator,
     DistributedClickHouseTraceServerMigrator,
     MigrationError,
     ReplicatedClickHouseTraceServerMigrator,
+    SQLPatterns,
+    _is_transient_ch_error,
 )
 
 DEFAULT_MIGRATION_DIR = os.path.abspath(
@@ -140,6 +144,22 @@ def test_migration_dir_must_be_absolute():
         trace_server_migrator.get_clickhouse_trace_server_migrator(
             ch_client, migration_dir="relative/path"
         )
+
+
+def test_apply_migrations_raises_on_partially_applied():
+    ch_client = Mock()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+    migrator._get_migration_status = Mock(
+        return_value={
+            "curr_version": 1,
+            "partially_applied_version": 2,
+        }
+    )
+
+    with pytest.raises(MigrationError, match="partially applied migration version 2"):
+        migrator.apply_migrations("test_db")
 
 
 def test_apply_migrations_costs_disabled_does_not_call_costs():
@@ -385,8 +405,6 @@ def test_format_replicated_sql_distributed_with_engine_args():
 )
 def test_extract_table_name(sql, expected_table):
     """Test extracting table name from SQL."""
-    from weave.trace_server.clickhouse_trace_server_migrator import SQLPatterns
-
     match = SQLPatterns.CREATE_TABLE.search(sql)
     result = match.group(1) if match else None
     assert result == expected_table
@@ -1026,9 +1044,11 @@ def test_replicated_db_engine_skips_on_cluster(replicated_migrator):
     )
 
     call_sql = replicated_migrator.ch_client.command.call_args_list[0][0][0]
-    # Should have ReplicatedMergeTree but NO ON CLUSTER
-    assert "ReplicatedMergeTree" in call_sql
+    # When the DB uses ENGINE = Replicated, the SQL should be passed through as-is:
+    # no ReplicatedMergeTree conversion (DB handles it) and no ON CLUSTER (auto-replicated).
+    assert "ReplicatedMergeTree" not in call_sql
     assert "ON CLUSTER" not in call_sql
+    assert "MergeTree" in call_sql
 
 
 def test_replicated_db_engine_skips_on_cluster_distributed(distributed_migrator):
@@ -1087,3 +1107,59 @@ def test_index_operations_only_on_local_tables_distributed(distributed_migrator)
 
         # Reset for next test case
         distributed_migrator.ch_client.command.reset_mock()
+
+
+@patch("tenacity.nap.time.sleep")
+def test_run_ddl_with_retry(mock_sleep, mock_costs):
+    """Verify retry behavior for transient CH errors (e.g. 517 CANNOT_ASSIGN_ALTER)."""
+    ch_client = Mock()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(ch_client)
+    ch_client.command.reset_mock()
+
+    error_517 = DatabaseError(
+        "Code: 517. DB::Exception: Looks like this replica doesn't catchup "
+        "with latest ALTER query updates: metadata version on replica is 2, "
+        "while common metadata is 3. (CANNOT_ASSIGN_ALTER)"
+    )
+
+    # Succeeds immediately on clean call
+    migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
+    assert ch_client.command.call_count == 1
+    ch_client.command.reset_mock()
+
+    # Retries on 517, then succeeds
+    ch_client.command.side_effect = [error_517, error_517, None]
+    migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
+    assert ch_client.command.call_count == 3
+    ch_client.command.reset_mock()
+
+    # Gives up after max retries
+    ch_client.command.side_effect = error_517
+    with pytest.raises(DatabaseError, match="Code: 517"):
+        migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
+    assert ch_client.command.call_count == _MAX_RETRIES + 1
+    ch_client.command.reset_mock()
+
+    # Non-transient CH errors propagate immediately
+    ch_client.command.side_effect = DatabaseError(
+        "Code: 62. DB::Exception: Syntax error"
+    )
+    with pytest.raises(DatabaseError, match="Code: 62"):
+        migrator._run_ddl_with_retry("INVALID SQL")
+    assert ch_client.command.call_count == 1
+    ch_client.command.reset_mock()
+
+    # Non-DatabaseError exceptions propagate immediately
+    ch_client.command.side_effect = ConnectionError("connection refused")
+    with pytest.raises(ConnectionError):
+        migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
+    assert ch_client.command.call_count == 1
+
+
+def test_is_transient_ch_error():
+    """Verify transient error detection from ClickHouse DatabaseError messages."""
+    assert _is_transient_ch_error(DatabaseError("Code: 517. DB::Exception: ..."))
+    assert not _is_transient_ch_error(DatabaseError("Code: 62. DB::Exception: ..."))
+    assert not _is_transient_ch_error(DatabaseError("some other error"))
+    assert not _is_transient_ch_error(DatabaseError(""))
+    assert not _is_transient_ch_error(ConnectionError("not a db error"))

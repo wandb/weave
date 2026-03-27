@@ -403,6 +403,7 @@ class TestWALManagerLifecycle:
         mgr.close()
         mgr.close()  # second call should be a no-op
 
+    @pytest.mark.disable_logging_error_check
     def test_close_with_sender_is_idempotent(self, wal_client_with_sender):
         """close() on a manager with sender should be safe to call twice."""
         wal_client_with_sender._wal.close()

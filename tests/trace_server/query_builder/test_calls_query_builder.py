@@ -547,6 +547,98 @@ def test_query_with_simple_feedback_filter() -> None:
     )
 
 
+def test_query_with_wildcard_feedback_filter() -> None:
+    """Test that wildcard feedback filter uses groupArray instead of any()."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "feedback.[*].payload.output.label"},
+                    {"$literal": "scorer_b"},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_2:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_2:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {pb_2:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((arrayStringConcat(groupArray(coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_0:String}), 'null'), '')), ', ') = {pb_1:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": '$."output"."label"',
+            "pb_1": "scorer_b",
+            "pb_2": "project",
+        },
+    )
+
+
+def test_query_with_wildcard_feedback_filter_no_extra_path() -> None:
+    """Test wildcard feedback filter without extra path uses groupArray directly."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "feedback.[*].runnable_ref"},
+                    {"$literal": "some_value"},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_1:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_1:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {pb_1:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((arrayStringConcat(groupArray(feedback.runnable_ref), ', ') = {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "some_value",
+            "pb_1": "project",
+        },
+    )
+
+
 def test_query_with_simple_feedback_sort_and_filter() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")

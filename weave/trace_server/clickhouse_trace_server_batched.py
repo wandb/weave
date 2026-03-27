@@ -12,7 +12,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from functools import partial
 from re import sub
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -238,6 +238,8 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+T = TypeVar("T")
+
 
 # Create a shared connection pool manager for all ClickHouse connections
 # maxsize: Maximum connections per pool (set higher than thread count to avoid blocking)
@@ -289,6 +291,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._op_ref_cache_lock = threading.Lock()
         self._placeholder_file_projects: set[str] = set()
         self._database_ensured = False
+
+        if wf_env.wf_clickhouse_disable_lightweight_update():
+            logger.warning(
+                "Lightweight UPDATE/DELETE is disabled via "
+                "WF_CLICKHOUSE_DISABLE_LIGHTWEIGHT_UPDATE. "
+                "Endpoints using lightweight updates will return 501."
+            )
 
     def __del__(self) -> None:
         """Flush batches and the Kafka producer on cleanup."""
@@ -957,7 +966,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cluster_name=self.clickhouse_cluster_name,
         )
 
-        self._command(query, parameters=pb.get_params())
+        self._command(
+            query,
+            parameters=pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
@@ -1406,6 +1419,36 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if hasattr(raw_res, "close"):
                 raw_res.close()
 
+    def _calls_query_stream_for_eval_subtree(
+        self, project_id: str, eval_root_ids: list[str]
+    ) -> Iterator[tsi.CallSchema]:
+        """Fetch direct children of eval root IDs and their children in one query."""
+        read_table = self.table_routing_resolver.resolve_read_table(
+            project_id, self.ch_client
+        )
+        columns = sorted(
+            [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
+        )
+        cq = CallsQuery(project_id=project_id, read_table=read_table)
+        for col in columns:
+            cq.add_field(col)
+        cq.eval_root_ids = eval_root_ids
+        cq.add_order("started_at", "asc")
+        cq.add_order("id", "asc")
+        pb = ParamBuilder()
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
+        select_columns = [c.field for c in cq.select_fields]
+        try:
+            for row in raw_res:
+                yield tsi.CallSchema.model_validate(
+                    _ch_call_dict_to_call_schema_dict(
+                        dict(zip(select_columns, row, strict=True))
+                    )
+                )
+        finally:
+            if hasattr(raw_res, "close"):
+                raw_res.close()
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
         self, project_id: str, calls: list[dict[str, Any]]
@@ -1572,7 +1615,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             call_ids_param,
             cluster_name=self.clickhouse_cluster_name,
         )
-        self._command(delete_query, parameters=pb.get_params())
+        self._command(
+            delete_query,
+            parameters=pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
@@ -1624,7 +1671,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             display_name_param,
             cluster_name=self.clickhouse_cluster_name,
         )
-        self._command(update_query, parameters=pb.get_params())
+        self._command(
+            update_query,
+            parameters=pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
@@ -2732,7 +2783,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             scorer_refs=req.scorer_refs,
         )
 
-        self._command(update_query, pb.get_params())
+        self._command(
+            update_query,
+            pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
 
         # Build the response with updated values
         # Use the new values if provided, otherwise keep the old ones
@@ -2790,7 +2845,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cluster_name=self.clickhouse_cluster_name,
         )
 
-        self._command(delete_query, pb.get_params())
+        self._command(
+            delete_query,
+            pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
 
         # Build the response with updated timestamps
         deleted_at = datetime.datetime.now(tz=ZoneInfo("UTC"))
@@ -3138,7 +3197,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 pb=pb,
                 cluster_name=self.clickhouse_cluster_name,
             )
-            self._command(update_query, parameters=pb.get_params())
+            self._command(
+                update_query,
+                parameters=pb.get_params(),
+                settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+            )
         else:
             # Create new record
             progress_id = generate_id()
@@ -3201,7 +3264,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=object_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
 
         return tsi.OpCreateRes(
             digest=obj_result.digest,
@@ -3214,15 +3277,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         Returns the actual source code of the op.
         """
-        # Query for the ops
-        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_is_op_condition(True)
-        object_query_builder.add_object_ids_condition([req.object_id])
-        object_query_builder.add_digests_conditions(req.digest)
-        object_query_builder.set_include_deleted(include_deleted=True)
-        objs = self._select_objs_query(object_query_builder)
-        if len(objs) == 0:
-            raise NotFoundError(f"Op {req.object_id}:{req.digest} not found")
+
+        def _query_op() -> list[Any]:
+            object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+            object_query_builder.add_is_op_condition(True)
+            object_query_builder.add_object_ids_condition([req.object_id])
+            object_query_builder.add_digests_conditions(req.digest)
+            object_query_builder.set_include_deleted(include_deleted=True)
+            results = self._select_objs_query(object_query_builder)
+            if len(results) == 0:
+                raise NotFoundError(f"Op {req.object_id}:{req.digest} not found")
+            return results
+
+        objs = self._read_with_retry(_query_op)
 
         # There should not be multiple ops returned, but in case there are, just
         # return the first one.
@@ -3254,7 +3321,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # Load the actual source code
             try:
-                file_content_res = self.file_content_read(
+                file_content_res = self._file_content_read_with_retry(
                     tsi.FileContentReadReq(
                         project_id=req.project_id, digest=file_digest
                     )
@@ -3321,7 +3388,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
                         # Load the actual source code
                         try:
-                            file_content_res = self.file_content_read(
+                            file_content_res = self._file_content_read_with_retry(
                                 tsi.FileContentReadReq(
                                     project_id=req.project_id, digest=file_digest
                                 )
@@ -3424,7 +3491,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=dataset_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
 
         return tsi.DatasetCreateRes(
             digest=obj_result.digest,
@@ -3571,7 +3638,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=scorer_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
 
         # Get the ref and return the create result
         scorer_ref = ri.InternalObjectRef(
@@ -3691,7 +3758,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=evaluation_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
 
         # Get the ref and return the create result
         evaluation_ref = ri.InternalObjectRef(
@@ -3837,7 +3904,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=object_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
 
         # Build model reference - external adapter will convert to external format
         model_ref = ri.InternalObjectRef(
@@ -3868,7 +3935,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=req.object_id,
             digest=req.digest,
         )
-        obj_read_res = self.obj_read(obj_read_req)
+        obj_read_res = self._obj_read_with_retry(obj_read_req)
 
         # Extract model properties from the val dict
         val = obj_read_res.obj.val
@@ -3885,7 +3952,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             digest=source_file_digest,
         )
-        file_content_res = self.file_content_read(file_content_req)
+        file_content_res = self._file_content_read_with_retry(file_content_req)
         source_code = file_content_res.content.decode("utf-8")
 
         # Extract additional attributes (exclude system fields)
@@ -3934,7 +4001,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     project_id=req.project_id,
                     digest=source_file_digest,
                 )
-                file_content_res = self.file_content_read(file_content_req)
+                file_content_res = self._file_content_read_with_retry(file_content_req)
                 source_code = file_content_res.content.decode("utf-8")
             else:
                 source_code = ""
@@ -5010,39 +5077,75 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         """Return grouped prediction/trial/score data for evaluation results."""
-        return eval_helpers.eval_results_query(self, req)
+        eval_root_ids = eval_helpers.resolve_eval_root_ids(req)
+        if not eval_root_ids:
+            empty_summary = tsi.EvalResultsSummaryRes() if req.include_summary else None
+            return tsi.EvalResultsQueryRes(
+                rows=[], total_rows=0, summary=empty_summary, warnings=[]
+            )
+        all_calls = list(
+            self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
+        )
+        return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
 
-    def _obj_read_with_retry(
-        self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
-    ) -> tsi.ObjReadRes:
-        """Read an object with retry logic to handle race conditions.
+    @staticmethod
+    def _read_with_retry(
+        read_fn: Callable[[], T],
+        *,
+        max_attempts: int = 2,
+        initial_delay_seconds: float = 0.05,
+    ) -> T:
+        """Retry a read operation to handle ClickHouse eventual consistency.
 
-        After creating an object, ClickHouse may not immediately make it available
-        for reading due to eventual consistency. This method retries with exponential
-        backoff to handle this race condition.
+        This is a rare case: after a write, ClickHouse may not immediately
+        make the data visible for reads. This helper retries with exponential
+        backoff to handle write-then-immediate-read scenarios.
 
         Args:
-            req: The object read request
-            max_retries: Maximum number of retry attempts (default 10)
-            initial_delay: Initial delay in seconds (default 0.05, i.e., 50ms)
+            read_fn: Callable that performs the read and raises NotFoundError
+                if the data is not yet visible.
+            max_attempts: Total number of attempts (default 2, i.e. 1 retry).
+                Callers should override only when higher consistency latency
+                is expected.
+            initial_delay_seconds: Initial delay in seconds (default 0.05, i.e., 50ms).
 
         Returns:
-            ObjReadRes with the object data
+            The result of read_fn.
 
         Raises:
-            NotFoundError: If the object is not found after all retries
+            NotFoundError: If the data is not found after all attempts.
         """
 
         @retry(
-            stop=stop_after_attempt(max_retries),
-            wait=wait_exponential(multiplier=1, min=initial_delay, max=1.0),
+            stop=stop_after_attempt(max_attempts),
+            wait=wait_exponential(multiplier=1, min=initial_delay_seconds, max=1.0),
             retry=retry_if_exception_type(NotFoundError),
             reraise=True,
         )
-        def _read() -> tsi.ObjReadRes:
-            return self.obj_read(req)
+        def _do_read() -> T:
+            return read_fn()
 
-        return _read()
+        return _do_read()
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._obj_read_with_retry")
+    def _obj_read_with_retry(
+        self, req: tsi.ObjReadReq, max_attempts: int = 2
+    ) -> tsi.ObjReadRes:
+        """Read an object with retry for ClickHouse eventual consistency."""
+        return self._read_with_retry(
+            lambda: self.obj_read(req), max_attempts=max_attempts
+        )
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._file_content_read_with_retry"
+    )
+    def _file_content_read_with_retry(
+        self, req: tsi.FileContentReadReq, max_attempts: int = 2
+    ) -> tsi.FileContentReadRes:
+        """Read file content with retry for ClickHouse eventual consistency."""
+        return self._read_with_retry(
+            lambda: self.file_content_read(req), max_attempts=max_attempts
+        )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
     def _parsed_refs_read_batch(
@@ -5976,16 +6079,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 req.project_id,
                 self.ch_client,
             )
-            if write_target == WriteTarget.CALLS_COMPLETE:
-                # TODO: Once the SDK ships calls_complete support for streaming
-                # completions, route start/end via calls_complete.
-                # Example future path (sketch):
-                # ch_complete_start = _start_call_insertable_to_complete_start(start_call)
-                # self._insert_call_complete(ch_complete_start)
-                # insert_call = self._update_call_end_in_calls_complete
-                # REMOVE ME: (for now always default to CALLS_MERGED)
-                write_target = WriteTarget.CALLS_MERGED
-
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
             tracked_inputs = req.inputs.model_dump(
@@ -6010,7 +6103,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
             # Insert immediately so that callers can see the call in progress
-            if write_target == WriteTarget.CALLS_MERGED:
+            if write_target == WriteTarget.CALLS_COMPLETE:
+                ch_complete_start = _start_call_insertable_to_complete_start(start_call)
+                self._insert_call_complete(ch_complete_start)
+            else:
                 self._insert_call(start_call)
 
         # Set the combined messages (with template vars replaced) for LiteLLM
@@ -6039,12 +6135,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return chunk_iter
 
         # Otherwise, wrap the iterator with tracking
+        end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            end_call_handler = lambda end: self._update_call_end_in_calls_complete(
+                tsi.EndedCallSchemaForInsertWithStartedAt(
+                    **end.model_dump(),
+                    started_at=start_call.started_at,
+                )
+            )
         return _create_tracked_stream_wrapper(
             self._insert_call,
             chunk_iter,
             start_call,
             model_name,
             req.project_id,
+            end_call_handler=end_call_handler,
         )
 
     def image_create(
@@ -6346,12 +6451,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query: str,
         parameters: dict[str, Any],
         column_formats: dict[str, Any] | None = None,
-        settings: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
-        if not settings:
-            settings = {}
-        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+        merged = ch_settings.merge_default_query_settings(settings)
 
         summary = None
         parameters = _process_parameters(parameters)
@@ -6362,7 +6465,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 parameters=parameters,
                 column_formats=column_formats,
                 use_none=True,
-                settings=settings,
+                settings=merged,
             ) as stream:
                 if isinstance(stream.source, QueryResult):
                     summary = stream.source.summary
@@ -6397,12 +6500,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query: str,
         parameters: dict[str, Any],
         column_formats: dict[str, Any] | None = None,
-        settings: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
-        if not settings:
-            settings = {}
-        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+        merged = ch_settings.merge_default_query_settings(settings)
 
         parameters = _process_parameters(parameters)
         start = time.monotonic()
@@ -6412,7 +6513,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 parameters=parameters,
                 column_formats=column_formats,
                 use_none=True,
-                settings=settings,
+                settings=merged,
             )
         except Exception as e:
             duration_ms = round((time.monotonic() - start) * 1000, 1)
@@ -6446,18 +6547,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         command: str,
         parameters: dict[str, Any] | None = None,
-        settings: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
     ) -> None:
         """Execute a mutation command (INSERT, UPDATE, DELETE) that doesn't return results.
 
         Args:
             command: The SQL command to execute.
             parameters: Optional dictionary of query parameters.
-            settings: Optional dictionary of ClickHouse settings.
+            settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
-        if not settings:
-            settings = {}
-        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+        merged = ch_settings.merge_default_query_settings(settings)
 
         processed_params = _process_parameters(parameters) if parameters else None
         start = time.monotonic()
@@ -6465,7 +6564,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self.ch_client.command(
                 command,
                 parameters=processed_params,
-                settings=settings,
+                settings=merged,
             )
         except Exception as e:
             duration_ms = round((time.monotonic() - start) * 1000, 1)
@@ -7341,6 +7440,7 @@ def _create_tracked_stream_wrapper(
     start_call: CallStartCHInsertable,
     model_name: str,
     project_id: str,
+    end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Create a wrapper that tracks streaming completion and emits call records."""
 
@@ -7441,8 +7541,11 @@ def _create_tracked_stream_wrapper(
                 output=aggregated_output,
                 summary=summary,
             )
-            end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
-            insert_call(end_call)
+            if end_call_handler is not None:
+                end_call_handler(end)
+            else:
+                end_call_ch = _end_call_for_insert_to_ch_insertable_end_call(end)
+                insert_call(end_call_ch)
 
     return _stream_wrapper()
 
