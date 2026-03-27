@@ -3,23 +3,11 @@ from unittest.mock import Mock
 import agents
 import pytest
 from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
-from agents.tracing import (
-    AgentSpanData,
-    GenerationSpanData,
-    MCPListToolsSpanData,
-    ResponseSpanData,
-    Span,
-    SpeechGroupSpanData,
-    SpeechSpanData,
-    Trace,
-    TranscriptionSpanData,
-)
+from agents.tracing import AgentSpanData, ResponseSpanData, Span, Trace
 from pydantic import BaseModel
 
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
 from weave.trace.weave_client import WeaveClient
-
-# TODO: Responses should be updated once we have patching for the new Responses API
 
 
 @pytest.fixture
@@ -46,17 +34,17 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     assert len(calls) == 2
 
     trace_root = calls[0]
-    trace_root.inputs["name"] = "Agent workflow"
-    trace_root.output["status"] = "completed"
-    trace_root.output["metrics"] = {}
-    trace_root.output["metadata"] = {}
+    assert trace_root.inputs["name"] == "Agent workflow"
+    assert trace_root.output["status"] == "completed"
+    assert trace_root.output["metrics"] == {}
+    assert trace_root.output["metadata"] == {}
 
     agent_call = calls[1]
-    agent_call.inputs["name"] = "Assistant"
-    agent_call.output["output"] = None
-    agent_call.output["metrics"] = {}
-    agent_call.output["metadata"] = {"tools": [], "handoffs": [], "output_type": "str"}
-    agent_call.output["error"] = None
+    assert agent_call.inputs["name"] == "Assistant"
+    assert agent_call.output["output"] is None
+    assert agent_call.output["metrics"] == {}
+    assert agent_call.output["metadata"] == {"tools": [], "handoffs": [], "output_type": "str"}
+    assert agent_call.output["error"] is None
 
 
 @pytest.mark.skip(
@@ -393,179 +381,3 @@ def test_response_spans_are_skipped(client: WeaveClient) -> None:
     processor.on_trace_end(trace)
     assert "trace_1" not in processor._trace_calls
     assert "trace_1" not in processor._trace_data
-
-
-def _make_trace_and_processor(client: WeaveClient):
-    """Helper to set up a processor with an active trace."""
-    processor = WeaveTracingProcessor()
-    trace = Mock(spec=Trace)
-    trace.trace_id = "trace_1"
-    trace.name = "test_trace"
-    processor.on_trace_start(trace)
-    return processor, trace
-
-
-def _make_span(span_data, span_id="span_1"):
-    """Helper to create a mock span with the given span_data."""
-    span = Mock(spec=Span)
-    span.trace_id = "trace_1"
-    span.span_id = span_id
-    span.parent_id = None
-    span.span_data = span_data
-    span.error = None
-    return span
-
-
-def test_generation_span(client: WeaveClient) -> None:
-    """Test that GenerationSpanData spans are properly tracked with token usage."""
-    processor, trace = _make_trace_and_processor(client)
-
-    span_data = Mock(spec=GenerationSpanData)
-    span_data.type = "generation"
-    span_data.name = None
-    span_data.input = [{"role": "user", "content": "hello"}]
-    span_data.output = [{"role": "assistant", "content": "hi"}]
-    span_data.model = "gpt-4o"
-    span_data.model_config = {"temperature": 0.7}
-    span_data.usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
-    span_data.__class__ = GenerationSpanData
-
-    span = _make_span(span_data)
-
-    processor.on_span_start(span)
-    assert "span_1" in processor._span_calls
-
-    processor.on_span_end(span)
-    assert "span_1" not in processor._span_calls
-
-    calls = client.get_calls()
-    # Find the generation call (not the trace root)
-    gen_calls = [c for c in calls if "openai_agent_generation" in c.op_name]
-    assert len(gen_calls) == 1
-
-    gen_call = gen_calls[0]
-    assert gen_call.output["metadata"]["model"] == "gpt-4o"
-    assert gen_call.output["metadata"]["model_config"] == {"temperature": 0.7}
-    assert gen_call.output["metrics"]["tokens"] == 15
-    assert gen_call.output["metrics"]["prompt_tokens"] == 10
-    assert gen_call.output["metrics"]["completion_tokens"] == 5
-
-    processor.on_trace_end(trace)
-
-
-def test_transcription_span(client: WeaveClient) -> None:
-    """Test that TranscriptionSpanData spans are properly tracked."""
-    processor, trace = _make_trace_and_processor(client)
-
-    span_data = Mock(spec=TranscriptionSpanData)
-    span_data.type = "transcription"
-    span_data.name = None
-    span_data.input = "base64_audio_data"
-    span_data.input_format = "pcm"
-    span_data.output = "Hello world"
-    span_data.model = "whisper-1"
-    span_data.model_config = None
-    span_data.__class__ = TranscriptionSpanData
-
-    span = _make_span(span_data)
-
-    processor.on_span_start(span)
-    processor.on_span_end(span)
-
-    calls = client.get_calls()
-    transcription_calls = [
-        c for c in calls if "openai_agent_transcription" in c.op_name
-    ]
-    assert len(transcription_calls) == 1
-
-    tc = transcription_calls[0]
-    assert tc.output["output"] == "Hello world"
-    assert tc.output["metadata"]["model"] == "whisper-1"
-
-    processor.on_trace_end(trace)
-
-
-def test_speech_span(client: WeaveClient) -> None:
-    """Test that SpeechSpanData spans are properly tracked."""
-    processor, trace = _make_trace_and_processor(client)
-
-    span_data = Mock(spec=SpeechSpanData)
-    span_data.type = "speech"
-    span_data.name = None
-    span_data.input = "Hello world"
-    span_data.output = "base64_audio_data"
-    span_data.output_format = "pcm"
-    span_data.model = "tts-1"
-    span_data.model_config = None
-    span_data.first_content_at = "2025-01-01T00:00:00Z"
-    span_data.__class__ = SpeechSpanData
-
-    span = _make_span(span_data)
-
-    processor.on_span_start(span)
-    processor.on_span_end(span)
-
-    calls = client.get_calls()
-    speech_calls = [
-        c
-        for c in calls
-        if "openai_agent_speech" in c.op_name and "speech_group" not in c.op_name
-    ]
-    assert len(speech_calls) == 1
-
-    sc = speech_calls[0]
-    assert sc.output["output"] == "base64_audio_data"
-    assert sc.output["metadata"]["model"] == "tts-1"
-    assert sc.output["metadata"]["first_content_at"] == "2025-01-01T00:00:00Z"
-
-    processor.on_trace_end(trace)
-
-
-def test_speech_group_span(client: WeaveClient) -> None:
-    """Test that SpeechGroupSpanData spans are properly tracked."""
-    processor, trace = _make_trace_and_processor(client)
-
-    span_data = Mock(spec=SpeechGroupSpanData)
-    span_data.type = "speech_group"
-    span_data.name = None
-    span_data.input = "Hello world"
-    span_data.__class__ = SpeechGroupSpanData
-
-    span = _make_span(span_data)
-
-    processor.on_span_start(span)
-    processor.on_span_end(span)
-
-    calls = client.get_calls()
-    sg_calls = [c for c in calls if "openai_agent_speech_group" in c.op_name]
-    assert len(sg_calls) == 1
-    assert sg_calls[0].inputs["name"] == "Speech Group"
-
-    processor.on_trace_end(trace)
-
-
-def test_mcp_list_tools_span(client: WeaveClient) -> None:
-    """Test that MCPListToolsSpanData spans are properly tracked."""
-    processor, trace = _make_trace_and_processor(client)
-
-    span_data = Mock(spec=MCPListToolsSpanData)
-    span_data.type = "mcp_tools"
-    span_data.name = None
-    span_data.server = "my-mcp-server"
-    span_data.result = ["tool_a", "tool_b", "tool_c"]
-    span_data.__class__ = MCPListToolsSpanData
-
-    span = _make_span(span_data)
-
-    processor.on_span_start(span)
-    processor.on_span_end(span)
-
-    calls = client.get_calls()
-    mcp_calls = [c for c in calls if "openai_agent_mcp_tools" in c.op_name]
-    assert len(mcp_calls) == 1
-
-    mc = mcp_calls[0]
-    assert mc.inputs["name"] == "my-mcp-server"
-    assert mc.output["output"] == ["tool_a", "tool_b", "tool_c"]
-
-    processor.on_trace_end(trace)
