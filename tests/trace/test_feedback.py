@@ -507,6 +507,40 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
             f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
         )
 
+    # Also test $contains on feedback fields (substring matching).
+    # model_output values are: "a", "x", "c", "y" for ids[0..3].
+    # expected values are: "a", "b", "c", "d" for ids[0..3].
+    model_output_field = (
+        "feedback.[wandb.runnable.my_scorer].payload.output.model_output"
+    )
+    model_ref = get_ref(my_model).uri
+    for substr, expected_ids in [
+        # "a" appears as model_output for ids[0] only
+        ("a", [ids[0]]),
+        # "x" appears as model_output for ids[1] only
+        ("x", [ids[1]]),
+    ]:
+        calls = client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_names=[model_ref]),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": model_output_field},
+                            "substr": {"$literal": substr},
+                        }
+                    }
+                },
+            )
+        )
+
+        found_ids = [c.id for c in calls]
+        assert found_ids == expected_ids, (
+            f"Filtering by {model_output_field} $contains '{substr}' failed, "
+            f"expected {expected_ids}, got {found_ids}"
+        )
+
 
 class MatchAnyDatetime:  # noqa: PLW1641
     def __eq__(self, other):
