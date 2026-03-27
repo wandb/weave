@@ -54,7 +54,7 @@ from weave.durability.wal import (
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_lock import is_writer_alive
-from weave.telemetry.trace_sentry import log_error, log_warning
+from weave.telemetry.trace_sentry import log_error
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import (
@@ -187,7 +187,7 @@ class BackgroundWALSender:
             try:
                 consumer.close()
             except Exception:
-                log_warning(f"WAL failed to close consumer on stop for {path}")
+                log_error(f"WAL failed to close consumer on stop for {path}")
         self._consumers.clear()
 
     def notify(self) -> None:
@@ -226,7 +226,7 @@ class BackgroundWALSender:
                     try:
                         self._consumers.pop(path).close()
                     except Exception:
-                        log_warning(
+                        log_error(
                             f"WAL failed to close evicted consumer for {path}"
                         )
 
