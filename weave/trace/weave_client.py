@@ -2398,7 +2398,7 @@ class WeaveClient:
     def _ref_is_own(self, ref: Ref) -> bool:
         return isinstance(ref, Ref)
 
-    @cached_property
+    @property
     def project_id(self) -> str:
         return f"{self.entity}/{self.project}"
 
