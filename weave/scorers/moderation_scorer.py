@@ -12,6 +12,8 @@ from weave.scorers.scorer_types import (
 )
 from weave.scorers.utils import MODEL_PATHS, load_local_model_weights
 
+MODERATION_MAX_TOKENS = 512
+
 if TYPE_CHECKING:
     from torch import Tensor
 
@@ -107,7 +109,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         description="The threshold for individual category scores to flag the input.",
         default=TOXICITY_CATEGORY_THRESHOLD,
     )
-    max_tokens: int = 512
+    max_tokens: int = MODERATION_MAX_TOKENS
     overlap: int = DEFAULT_ROLLING_WINDOW_OVERLAP
     _categories: list[str] = PrivateAttr(
         default_factory=lambda: [

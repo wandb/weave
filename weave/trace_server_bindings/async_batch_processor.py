@@ -49,7 +49,11 @@ logger = logging.getLogger(__name__)
 
 HEALTH_CHECK_INTERVAL = 5.0  # seconds
 MAX_LOGFILES = 3
-MAX_LOG_FILE_SIZE_BYTES = 1024 * 1024 * 512  # 512MB
+MAX_LOG_FILE_SIZE_BYTES = 512 * 1024 * 1024  # 512 MB
+
+DEFAULT_MAX_BATCH_SIZE = 100
+DEFAULT_MIN_BATCH_INTERVAL = 1.0  # seconds
+DEFAULT_MAX_QUEUE_SIZE = 10_000
 
 
 class AsyncBatchProcessor(Generic[T]):
@@ -58,9 +62,9 @@ class AsyncBatchProcessor(Generic[T]):
     def __init__(
         self,
         processor_fn: Callable[[list[T]], None],
-        max_batch_size: int = 100,
-        min_batch_interval: float = 1.0,
-        max_queue_size: int = 10_000,
+        max_batch_size: int = DEFAULT_MAX_BATCH_SIZE,
+        min_batch_interval: float = DEFAULT_MIN_BATCH_INTERVAL,
+        max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
         enable_disk_fallback: bool = False,
         disk_fallback_path: str = ".weave_client_dropped_items_log.jsonl",
     ) -> None:

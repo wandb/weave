@@ -13,6 +13,8 @@ from typing import Any
 from typing_extensions import Self
 
 from weave.trace import settings
+
+DEFAULT_PROGRESS_REFRESH_PER_SECOND = 10
 from weave.trace.display.protocols import (
     CaptureContextProtocol,
     ProgressProtocol,
@@ -183,7 +185,7 @@ class Progress:
         self,
         *columns: Any,
         console: Console | None = None,
-        refresh_per_second: float = 10,
+        refresh_per_second: float = DEFAULT_PROGRESS_REFRESH_PER_SECOND,
         **kwargs: Any,
     ):
         """Initialize the progress bar."""
