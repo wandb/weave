@@ -244,7 +244,6 @@ class TestDrain:
         # All three records (including the untyped one) are acknowledged.
         assert list(consumer.read_pending()) == []
 
-
     @pytest.mark.disable_logging_error_check
     def test_dead_letter_write_failure_halts_drain(self, tmp_path: str) -> None:
         """If the dead-letter write itself fails, drain halts so the record is retryable.
