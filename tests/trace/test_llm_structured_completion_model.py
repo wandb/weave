@@ -31,7 +31,7 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "llm_model_minimal",
                     "val": model_minimal.model_dump(by_alias=True),
                     "builtin_object_class": "LLMStructuredCompletionModel",
@@ -43,7 +43,7 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
     # Read back and verify class assignment
     read_minimal_res = client.server.obj_read(
         tsi.ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id="llm_model_minimal",
             digest=minimal_res.digest,
         )
@@ -73,7 +73,7 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "llm_model_full",
                     "val": model_full.model_dump(by_alias=True),
                     "builtin_object_class": "LLMStructuredCompletionModel",
@@ -85,7 +85,7 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
     # Read back and verify
     read_full_res = client.server.obj_read(
         tsi.ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id="llm_model_full",
             digest=full_res.digest,
         )
@@ -123,7 +123,7 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "model_1",
                     "val": model1.model_dump(by_alias=True),
                     "builtin_object_class": "LLMStructuredCompletionModel",
@@ -136,7 +136,7 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "model_2",
                     "val": model2.model_dump(by_alias=True),
                     "builtin_object_class": "LLMStructuredCompletionModel",
@@ -149,7 +149,7 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
     leaf_filter_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"leaf_object_classes": ["LLMStructuredCompletionModel"]},
             }
         )
@@ -166,7 +166,7 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
     base_filter_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"base_object_classes": ["Model"]},
             }
         )
@@ -179,7 +179,7 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
     combined_filter_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {
                     "base_object_classes": ["Model"],
                     "leaf_object_classes": ["LLMStructuredCompletionModel"],
@@ -757,7 +757,7 @@ def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
             tsi.ObjCreateReq.model_validate(
                 {
                     "obj": {
-                        "project_id": client._project_id(),
+                        "project_id": client.project_id,
                         "object_id": "invalid_model",
                         "val": {
                             # Missing required llm_model_id
@@ -774,7 +774,7 @@ def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "valid_minimal_model",
                     "val": {
                         "llm_model_id": "gpt-4",

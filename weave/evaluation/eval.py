@@ -331,7 +331,7 @@ class Evaluation(Object):
             raise ValueError("Evaluation has no ref, please run the evaluation first!")
 
         evaluate_op_name = "Evaluation.evaluate"
-        eval_op_ref = f"weave:///{client._project_id()}/op/{evaluate_op_name}:*"
+        eval_op_ref = f"weave:///{client.project_id}/op/{evaluate_op_name}:*"
         return client.get_calls(
             filter=CallsFilter(
                 input_refs=[self.ref.uri],

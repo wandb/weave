@@ -91,7 +91,7 @@ def get_client_trace_server(
 
 
 def get_client_project_id(client: weave_client.WeaveClient) -> str:
-    return client._project_id()
+    return client.project_id
 
 
 ## End hacky interface compatibility helpers
@@ -161,7 +161,7 @@ def test_trace_server_call_start_and_end(client):
     trace_id = generate_id()
     parent_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         id=call_id,
         op_name="test_name",
         trace_id=trace_id,
@@ -175,7 +175,7 @@ def test_trace_server_call_start_and_end(client):
 
     res = client.server.call_read(
         tsi.CallReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             id=call_id,
         )
     )
@@ -185,7 +185,7 @@ def test_trace_server_call_start_and_end(client):
     )
 
     assert res.call.model_dump() == {
-        "project_id": client._project_id(),
+        "project_id": client.project_id,
         "id": call_id,
         "op_name": "test_name",
         "trace_id": trace_id,
@@ -215,7 +215,7 @@ def test_trace_server_call_start_and_end(client):
     }
 
     end = tsi.EndedCallSchemaForInsert(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         id=call_id,
         ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
         summary={"c": 5},
@@ -225,7 +225,7 @@ def test_trace_server_call_start_and_end(client):
 
     res = client.server.call_read(
         tsi.CallReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             id=call_id,
         )
     )
@@ -235,7 +235,7 @@ def test_trace_server_call_start_and_end(client):
     )
 
     assert res.call.model_dump() == {
-        "project_id": client._project_id(),
+        "project_id": client.project_id,
         "id": call_id,
         "op_name": "test_name",
         "trace_id": trace_id,
@@ -271,7 +271,7 @@ def test_call_read_not_found(client):
     call_id = generate_id()
     res = client.server.call_read(
         tsi.CallReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             id=call_id,
         )
     )
@@ -1593,7 +1593,7 @@ def test_ops_with_default_params(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -1635,7 +1635,7 @@ def test_root_type(client):
 
     inner_res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -1643,7 +1643,7 @@ def test_root_type(client):
 
     inner_res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(
                 base_object_classes=["BaseTypeA"],
             ),
@@ -1983,7 +1983,7 @@ def test_unknown_input_and_output_types(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2082,7 +2082,7 @@ def test_single_primitive_output(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2205,7 +2205,7 @@ def test_mapped_execution(client, mapper):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2309,7 +2309,7 @@ def test_call_stack_order_implicit_depth_first(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2355,7 +2355,7 @@ def test_call_stack_order_explicit_depth_first(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2404,7 +2404,7 @@ def test_call_stack_order_langchain_batch(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2457,7 +2457,7 @@ def test_call_stack_order_out_of_order_pop(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2524,7 +2524,7 @@ def test_call_stack_order_height_ordering(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2567,7 +2567,7 @@ def test_call_stack_order_mixed(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2590,13 +2590,13 @@ def test_call_query_stream_equality(client):
 
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     calls_stream = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2618,7 +2618,7 @@ def test_call_query_stream_columns(client):
 
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "inputs"],
         )
     )
@@ -2635,7 +2635,7 @@ def test_call_query_stream_columns(client):
     # now explicitly get output
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "inputs", "output.result"],
         )
     )
@@ -2648,7 +2648,7 @@ def test_call_query_stream_columns(client):
     # now get summary
     calls2 = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary"],
         )
     )
@@ -2688,7 +2688,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are returned if we include the summary field
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary"],
             include_costs=True,
         )
@@ -2708,7 +2708,7 @@ def test_call_query_stream_columns_with_costs(client):
 
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary"],
             include_costs=True,
         )
@@ -2727,7 +2727,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are returned if we include the summary_dump field
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary_dump"],
             include_costs=True,
         )
@@ -2740,7 +2740,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are returned if we don't include the summary field
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id"],
             include_costs=True,
         )
@@ -2754,7 +2754,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are not returned if we include the summary field, but don't include costs
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary"],
         )
     )
@@ -2789,7 +2789,7 @@ def test_call_query_stream_trace_name_column_with_costs(client):
     calls = list(
         client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 columns=["id", "summary.weave.trace_name"],
                 include_costs=True,
             )
@@ -2808,7 +2808,7 @@ def test_call_query_stream_trace_name_column_with_costs(client):
     calls = list(
         client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 columns=["id"],
                 include_costs=True,
                 sort_by=[
@@ -2827,7 +2827,7 @@ def test_read_call_start_with_cost(client):
         # dont run this test for sqlite
         return
 
-    project_id = client._project_id()
+    project_id = client.project_id
     call_id = generate_id()
     trace_id = generate_id()
     llm_id = "test-model-v1"  # Price needed for potential joins, even if no usage
@@ -2932,7 +2932,7 @@ def test_call_read_with_unkown_llm(client):
 
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary", "output_dump"],
             include_costs=True,
         )
@@ -3298,7 +3298,7 @@ def test_calls_stream_column_expansion(client):
     # output is a ref
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -3308,7 +3308,7 @@ def test_calls_stream_column_expansion(client):
     # output is dereffed
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output"],
             expand_columns=["output"],
         )
@@ -3320,7 +3320,7 @@ def test_calls_stream_column_expansion(client):
     # expand 2 refs, should be {"b": {"a": ref}}
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output.b"],
             expand_columns=["output", "output.b"],
         )
@@ -3331,7 +3331,7 @@ def test_calls_stream_column_expansion(client):
     # expand 3 refs, should be {"b": {"a": {"id": 123}}}
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output.b.a"],
             expand_columns=["output", "output.b", "output.b.a"],
         )
@@ -3342,7 +3342,7 @@ def test_calls_stream_column_expansion(client):
     # incomplete expansion columns, output should be un expanded
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output"],
             expand_columns=["output.b"],
         )
@@ -3353,7 +3353,7 @@ def test_calls_stream_column_expansion(client):
     # non-existent column, should be un expanded
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output.b.a"],
             expand_columns=["output.b", "output.zzzz"],
         )
@@ -3387,7 +3387,7 @@ def test_calls_stream_column_expansion_dynamic_batch_size(
 
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output"],
             expand_columns=["output"],
         )
@@ -3414,7 +3414,7 @@ def test_object_with_disallowed_keys(client):
     create_req = tsi.ObjCreateReq.model_validate(
         {
             "obj": {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "object_id": name,
                 "val": {"1": 1},
             }
@@ -3439,7 +3439,7 @@ def test_object_with_char_limit(client):
     create_req = tsi.ObjCreateReq.model_validate(
         {
             "obj": {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "object_id": name,
                 "val": {"1": 1},
             }
@@ -3460,7 +3460,7 @@ def test_object_with_char_over_limit(client):
     create_req = tsi.ObjCreateReq.model_validate(
         {
             "obj": {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "object_id": name,
                 "val": {"1": 1},
             }
@@ -3484,7 +3484,7 @@ def test_objects_and_keys_with_special_characters(client):
     weave.publish(obj)
     assert obj.ref is not None
 
-    entity, project = from_project_id(client._project_id())
+    entity, project = from_project_id(client.project_id)
     project_id = to_project_id(entity, project)
     ref_base = f"weave:///{project_id}"
     exp_name = sanitize_object_name(name_with_special_characters)
@@ -3549,7 +3549,7 @@ def test_calls_stream_feedback(client):
     # now get calls from the server, with the feedback expanded
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             include_feedback=True,
         )
     )
@@ -4209,7 +4209,7 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
     trace_id = generate_id()
     parent_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         id=call_id,
         op_name="test_name",
         trace_id=trace_id,
@@ -4227,7 +4227,7 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
     assert not res[0].output
 
     end = tsi.EndedCallSchemaForInsert(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         id=call_id,
         ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
         summary={"c": 5},
@@ -4578,7 +4578,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
     table_ref = TableRef.parse_uri(queried_obj.val["rows"])
     res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digests=[table_ref.digest],
             include_storage_size=True,
         )
@@ -4749,7 +4749,7 @@ def test_dedupe_ref_in_calls_stream(client):
         return list(
             client.server.calls_query_stream(
                 tsi.CallsQueryReq(
-                    project_id=client._project_id(),
+                    project_id=client.project_id,
                     columns=columns,
                     expand_columns=expand_columns,
                 )

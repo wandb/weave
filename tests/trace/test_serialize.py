@@ -264,7 +264,7 @@ def test_to_json_object_excludes_ref(client) -> None:
 
     obj = MyObj()
     obj_rec = pydantic_object_record(obj)
-    serialized = to_json(obj_rec, client._project_id(), client)
+    serialized = to_json(obj_rec, client.project_id, client)
     assert "ref" not in serialized
 
 

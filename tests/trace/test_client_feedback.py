@@ -6,7 +6,7 @@ from weave.trace_server.interface.query import Query
 
 
 def test_feedback_apis(client):
-    project_id = client._project_id()
+    project_id = client.project_id
 
     # Emoji from Jamie
     req = tsi.FeedbackCreateReq(
@@ -200,7 +200,7 @@ def test_feedback_apis(client):
 
 
 def test_feedback_payload(client):
-    project_id = client._project_id()
+    project_id = client.project_id
 
     # Emoji from Jamie
     req = tsi.FeedbackCreateReq(
@@ -226,7 +226,7 @@ def test_feedback_payload(client):
 
 
 def test_feedback_create_too_large(client):
-    project_id = client._project_id()
+    project_id = client.project_id
 
     value = "a" * (1 << 21)  # > 1 MiB, past the limit
     req = tsi.FeedbackCreateReq(

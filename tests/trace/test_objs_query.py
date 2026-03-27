@@ -18,7 +18,7 @@ def test_objs_query_all(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
     assert len(res.objs) == 100
@@ -29,7 +29,7 @@ def test_objs_query_filter_object_ids(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(object_ids=["obj_0", "obj_1"]),
         )
     )
@@ -42,13 +42,13 @@ def test_objs_query_filter_is_op(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(), filter=tsi.ObjectVersionFilter(is_op=True)
+            project_id=client.project_id, filter=tsi.ObjectVersionFilter(is_op=True)
         )
     )
     assert len(res.objs) == 0
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(), filter=tsi.ObjectVersionFilter(is_op=False)
+            project_id=client.project_id, filter=tsi.ObjectVersionFilter(is_op=False)
         )
     )
     assert len(res.objs) == 100
@@ -59,7 +59,7 @@ def test_objs_query_filter_latest_only(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=True),
         )
     )
@@ -73,7 +73,7 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
@@ -91,7 +91,7 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
@@ -113,7 +113,7 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
@@ -131,7 +131,7 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
@@ -153,7 +153,7 @@ def test_objs_query_filter_metadata_only(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=True),
             metadata_only=True,
         )
@@ -165,7 +165,7 @@ def test_objs_query_filter_metadata_only(client: WeaveClient):
     # sanity check that we get the full object when we don't ask for metadata only
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=True),
             metadata_only=False,
         )
@@ -194,7 +194,7 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=False),
         )
     )
@@ -203,7 +203,7 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
 
     res = client.server.obj_delete(
         tsi.ObjDeleteReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id="obj_1",
             digests=[res.objs[0].digest],
         )
@@ -213,7 +213,7 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=False),
         )
     )
@@ -223,7 +223,7 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
     # Delete the remaining objects
     res = client.server.obj_delete(
         tsi.ObjDeleteReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id="obj_1",
             digests=[res.objs[0].digest, res.objs[1].digest],
         )
@@ -232,7 +232,7 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=False),
         )
     )
@@ -246,7 +246,7 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=False),
         )
     )
@@ -256,7 +256,7 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
 
     res = client.server.obj_delete(
         tsi.ObjDeleteReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id="obj_1",
         )
     )
@@ -266,7 +266,7 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=False),
         )
     )
@@ -279,7 +279,7 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=False),
         )
     )
@@ -297,7 +297,7 @@ def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=False),
         )
     )
@@ -305,7 +305,7 @@ def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
 
     res = client.server.obj_delete(
         tsi.ObjDeleteReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id="obj_1",
         )
     )
@@ -316,7 +316,7 @@ def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(latest_only=False),
         )
     )
@@ -335,7 +335,7 @@ def test_publish_model_query_no_ref(client: WeaveClient):
     res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"object_ids": [ref.name]},
             }
         )

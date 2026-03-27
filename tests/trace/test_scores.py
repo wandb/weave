@@ -30,7 +30,7 @@ def test_send_score_call(client):
 
     query_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             include_feedback=True,
         )
     )

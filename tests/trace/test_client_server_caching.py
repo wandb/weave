@@ -565,7 +565,7 @@ def test_cache_invalidation_on_add_tags(client):
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -578,7 +578,7 @@ def test_cache_invalidation_on_add_tags(client):
     caching_server.reset_cache_recorder()
     client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -593,7 +593,7 @@ def test_cache_invalidation_on_add_tags(client):
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -613,7 +613,7 @@ def test_cache_invalidation_on_remove_tags(client):
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -629,7 +629,7 @@ def test_cache_invalidation_on_remove_tags(client):
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -648,7 +648,7 @@ def test_cache_invalidation_on_set_alias(client):
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -664,7 +664,7 @@ def test_cache_invalidation_on_set_alias(client):
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -684,7 +684,7 @@ def test_cache_invalidation_on_remove_aliases(client):
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -700,7 +700,7 @@ def test_cache_invalidation_on_remove_aliases(client):
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,

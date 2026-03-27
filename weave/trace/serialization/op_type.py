@@ -451,7 +451,7 @@ def _get_code_deps(
                     if should_redact(var_name):
                         json_val = REDACTED_VALUE
                     else:
-                        json_val = to_json(var_value, client._project_id(), client)
+                        json_val = to_json(var_value, client.project_id, client)
                         if _has_memory_address(json_val):
                             json_val = _replace_memory_address(json_val)
                 except Exception as e:

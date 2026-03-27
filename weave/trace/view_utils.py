@@ -132,5 +132,5 @@ def set_call_view(
     if isinstance(legacy_views, dict):
         views.update(legacy_views)
 
-    project_id = client._project_id()
+    project_id = client.project_id
     views[name] = to_json(content_obj, project_id, client, use_dictify=False)
