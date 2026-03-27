@@ -97,7 +97,7 @@ print(elapsed)
     for i in range(iterations):
         t = _run_subprocess_timing(script, f"init_{i}")
         times.append(t)
-        console.print(f"    [{i+1}/{iterations}] {t:.4f}s")
+        console.print(f"    [{i + 1}/{iterations}] {t:.4f}s")
     return times
 
 
@@ -121,7 +121,9 @@ def bench_decoration(iterations: int) -> list[float]:
         weave.op(_fn)
         elapsed = time.perf_counter() - start
         times.append(elapsed)
-    console.print(f"    done — median {utils.format_seconds(sorted(times)[len(times)//2], 6)}")
+    console.print(
+        f"    done — median {utils.format_seconds(sorted(times)[len(times) // 2], 6)}"
+    )
     return times
 
 
@@ -134,7 +136,9 @@ def bench_traced_call(iterations: int, warmup: int) -> tuple[list[float], list[f
     """Compare calling a plain function vs a @weave.op-wrapped function."""
     import weave
 
-    weave.init(f"bench_call_{uuid.uuid4().hex[:8]}", settings={"print_call_link": False})
+    weave.init(
+        f"bench_call_{uuid.uuid4().hex[:8]}", settings={"print_call_link": False}
+    )
 
     def plain_fn(x: int) -> int:
         return x * 2 + 1
@@ -164,8 +168,8 @@ def bench_traced_call(iterations: int, warmup: int) -> tuple[list[float], list[f
         traced_times.append(time.perf_counter() - start)
 
     console.print(
-        f"    plain median {utils.format_seconds(sorted(plain_times)[len(plain_times)//2], 6)}"
-        f"  |  traced median {utils.format_seconds(sorted(traced_times)[len(traced_times)//2], 6)}"
+        f"    plain median {utils.format_seconds(sorted(plain_times)[len(plain_times) // 2], 6)}"
+        f"  |  traced median {utils.format_seconds(sorted(traced_times)[len(traced_times) // 2], 6)}"
     )
     return plain_times, traced_times
 
@@ -179,7 +183,9 @@ def bench_nested_calls(iterations: int, warmup: int) -> tuple[list[float], list[
     """Compare flat traced call vs 3-level nested traced calls."""
     import weave
 
-    weave.init(f"bench_nest_{uuid.uuid4().hex[:8]}", settings={"print_call_link": False})
+    weave.init(
+        f"bench_nest_{uuid.uuid4().hex[:8]}", settings={"print_call_link": False}
+    )
 
     @weave.op
     def flat_fn(x: int) -> int:
@@ -197,7 +203,9 @@ def bench_nested_calls(iterations: int, warmup: int) -> tuple[list[float], list[
     def outer(x: int) -> int:
         return middle(x)
 
-    console.print(f"  nested calls (3 levels) — {iterations} iterations ({warmup} warmup)")
+    console.print(
+        f"  nested calls (3 levels) — {iterations} iterations ({warmup} warmup)"
+    )
 
     for j in range(warmup):
         flat_fn(j)
@@ -215,8 +223,8 @@ def bench_nested_calls(iterations: int, warmup: int) -> tuple[list[float], list[
         nested_times.append(time.perf_counter() - start)
 
     console.print(
-        f"    flat median {utils.format_seconds(sorted(flat_times)[len(flat_times)//2], 6)}"
-        f"  |  nested median {utils.format_seconds(sorted(nested_times)[len(nested_times)//2], 6)}"
+        f"    flat median {utils.format_seconds(sorted(flat_times)[len(flat_times) // 2], 6)}"
+        f"  |  nested median {utils.format_seconds(sorted(nested_times)[len(nested_times) // 2], 6)}"
     )
     return flat_times, nested_times
 
@@ -226,7 +234,9 @@ def bench_nested_calls(iterations: int, warmup: int) -> tuple[list[float], list[
 # ---------------------------------------------------------------------------
 
 
-def bench_throughput(batch_size: int, iterations: int, warmup: int) -> tuple[list[float], list[float]]:
+def bench_throughput(
+    batch_size: int, iterations: int, warmup: int
+) -> tuple[list[float], list[float]]:
     """Time a batch of N calls and report per-call cost."""
     import weave
 
@@ -266,8 +276,8 @@ def bench_throughput(batch_size: int, iterations: int, warmup: int) -> tuple[lis
     traced_per_call = [t / batch_size for t in traced_batch_times]
 
     console.print(
-        f"    per-call plain {utils.format_seconds(sorted(plain_per_call)[len(plain_per_call)//2], 6)}"
-        f"  |  traced {utils.format_seconds(sorted(traced_per_call)[len(traced_per_call)//2], 6)}"
+        f"    per-call plain {utils.format_seconds(sorted(plain_per_call)[len(plain_per_call) // 2], 6)}"
+        f"  |  traced {utils.format_seconds(sorted(traced_per_call)[len(traced_per_call) // 2], 6)}"
     )
     return plain_per_call, traced_per_call
 
@@ -283,30 +293,68 @@ def _overhead_pct(base: float, measured: float) -> float:
 
 def build_results_table(all_stats: dict[str, dict[str, dict[str, float]]]) -> Table:
     """Build a single Rich table summarising all benchmarks."""
-    headers = ["Benchmark", "Variant", "Iterations", "Mean", "Median", "Std Dev", "Min", "Max", "Overhead"]
-    styles = ["cyan", "magenta", "dim", "green", "green", "yellow", "white", "white", "red"]
-    justifications = ["left", "left", "right", "right", "right", "right", "right", "right", "right"]
+    headers = [
+        "Benchmark",
+        "Variant",
+        "Iterations",
+        "Mean",
+        "Median",
+        "Std Dev",
+        "Min",
+        "Max",
+        "Overhead",
+    ]
+    styles = [
+        "cyan",
+        "magenta",
+        "dim",
+        "green",
+        "green",
+        "yellow",
+        "white",
+        "white",
+        "red",
+    ]
+    justifications = [
+        "left",
+        "left",
+        "right",
+        "right",
+        "right",
+        "right",
+        "right",
+        "right",
+        "right",
+    ]
     rows: list[list[str]] = []
 
     for bench_name, variants in all_stats.items():
         variant_names = list(variants.keys())
         base_stats = variants[variant_names[0]]  # first variant is the baseline
         for vname, stats in variants.items():
-            overhead = _overhead_pct(base_stats["mean"], stats["mean"]) if vname != variant_names[0] else 0.0
-            overhead_str = utils.format_percentage(overhead) if vname != variant_names[0] else "—"
+            overhead = (
+                _overhead_pct(base_stats["mean"], stats["mean"])
+                if vname != variant_names[0]
+                else 0.0
+            )
+            overhead_str = (
+                utils.format_percentage(overhead) if vname != variant_names[0] else "—"
+            )
             iters = int(stats.get("iterations", 0))
             iters_str = str(iters) if iters > 0 else "—"
-            rows.append([
-                bench_name,
-                vname,
-                iters_str,
-                utils.format_seconds(stats["mean"], 6),
-                utils.format_seconds(stats["median"], 6),
-                utils.format_seconds(stats["std_dev"], 6),
-                utils.format_seconds(stats["min"], 6),
-                utils.format_seconds(stats["max"], 6),
-                overhead_str,
-            ])
+            rows.append(
+                [
+                    bench_name,
+                    vname,
+                    iters_str,
+                    utils.format_seconds(stats["mean"], 6),
+                    utils.format_seconds(stats["median"], 6),
+                    utils.format_seconds(stats["std_dev"], 6),
+                    utils.format_seconds(stats["min"], 6),
+                    utils.format_seconds(stats["max"], 6),
+                    overhead_str,
+                ]
+            )
 
     return utils.create_basic_table(
         "Weave Tracing Overhead — Granular Results",
@@ -321,25 +369,41 @@ def write_results_to_csv(
     all_stats: dict[str, dict[str, dict[str, float]]], filename: str
 ) -> None:
     """Write all benchmark results to a CSV file."""
-    headers = ["Benchmark", "Variant", "Iterations", "Mean", "Median", "Std_Dev", "Min", "Max", "Overhead_Percent"]
+    headers = [
+        "Benchmark",
+        "Variant",
+        "Iterations",
+        "Mean",
+        "Median",
+        "Std_Dev",
+        "Min",
+        "Max",
+        "Overhead_Percent",
+    ]
     rows: list[list[str]] = []
 
     for bench_name, variants in all_stats.items():
         variant_names = list(variants.keys())
         base_stats = variants[variant_names[0]]
         for vname, stats in variants.items():
-            overhead = _overhead_pct(base_stats["mean"], stats["mean"]) if vname != variant_names[0] else 0.0
-            rows.append([
-                bench_name,
-                vname,
-                str(int(stats.get("iterations", 0))),
-                f"{stats['mean']:.6f}",
-                f"{stats['median']:.6f}",
-                f"{stats['std_dev']:.6f}",
-                f"{stats['min']:.6f}",
-                f"{stats['max']:.6f}",
-                f"{overhead:.2f}",
-            ])
+            overhead = (
+                _overhead_pct(base_stats["mean"], stats["mean"])
+                if vname != variant_names[0]
+                else 0.0
+            )
+            rows.append(
+                [
+                    bench_name,
+                    vname,
+                    str(int(stats.get("iterations", 0))),
+                    f"{stats['mean']:.6f}",
+                    f"{stats['median']:.6f}",
+                    f"{stats['std_dev']:.6f}",
+                    f"{stats['min']:.6f}",
+                    f"{stats['max']:.6f}",
+                    f"{overhead:.2f}",
+                ]
+            )
 
     utils.write_csv_with_headers(filename, headers, rows)
 
@@ -351,12 +415,16 @@ def display_summary(all_stats: dict[str, dict[str, dict[str, float]]]) -> None:
     if "weave.init()" in all_stats:
         s = all_stats["weave.init()"]["init"]
         n = int(s.get("iterations", 0))
-        lines.append(f"weave.init()        : [yellow]{utils.format_seconds(s['mean'])}[/yellow]  [dim](n={n})[/dim]")
+        lines.append(
+            f"weave.init()        : [yellow]{utils.format_seconds(s['mean'])}[/yellow]  [dim](n={n})[/dim]"
+        )
 
     if "@weave.op decorate" in all_stats:
         s = all_stats["@weave.op decorate"]["decorate"]
         n = int(s.get("iterations", 0))
-        lines.append(f"@weave.op decorate  : [yellow]{utils.format_seconds(s['mean'], 6)}[/yellow]  [dim](n={n})[/dim]")
+        lines.append(
+            f"@weave.op decorate  : [yellow]{utils.format_seconds(s['mean'], 6)}[/yellow]  [dim](n={n})[/dim]"
+        )
 
     if "traced call" in all_stats:
         plain_s = all_stats["traced call"]["plain"]
@@ -400,7 +468,9 @@ def display_summary(all_stats: dict[str, dict[str, dict[str, float]]]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def get_stats_from_csv(csv_data: list[dict[str, str]]) -> dict[str, dict[str, dict[str, float]]]:
+def get_stats_from_csv(
+    csv_data: list[dict[str, str]],
+) -> dict[str, dict[str, dict[str, float]]]:
     """Reconstruct the all_stats structure from CSV rows."""
     all_stats: dict[str, dict[str, dict[str, float]]] = {}
     for row in csv_data:
@@ -436,13 +506,38 @@ def main() -> None:
         default=None,
         help=f"Comma-separated list of benchmarks to run (default: all). Choices: {bench_list}",
     )
-    parser.add_argument("--list", action="store_true", help="List available benchmarks and exit")
-    parser.add_argument("--iterations", type=int, default=20, help="Iterations per benchmark (default: 20)")
-    parser.add_argument("--warmup", type=int, default=5, help="Warm-up calls (default: 5)")
-    parser.add_argument("--batch-size", type=int, default=100, help="Calls per batch in throughput test (default: 100)")
-    parser.add_argument("--init-iterations", type=int, default=5, help="Iterations for init benchmark — slower due to subprocess (default: 5)")
-    parser.add_argument("--out_filetype", choices=["csv"], help="Output file type for results")
-    parser.add_argument("--from_file", type=str, help="Read results from existing file instead of running")
+    parser.add_argument(
+        "--list", action="store_true", help="List available benchmarks and exit"
+    )
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=20,
+        help="Iterations per benchmark (default: 20)",
+    )
+    parser.add_argument(
+        "--warmup", type=int, default=5, help="Warm-up calls (default: 5)"
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=100,
+        help="Calls per batch in throughput test (default: 100)",
+    )
+    parser.add_argument(
+        "--init-iterations",
+        type=int,
+        default=5,
+        help="Iterations for init benchmark — slower due to subprocess (default: 5)",
+    )
+    parser.add_argument(
+        "--out_filetype", choices=["csv"], help="Output file type for results"
+    )
+    parser.add_argument(
+        "--from_file",
+        type=str,
+        help="Read results from existing file instead of running",
+    )
 
     args = parser.parse_args()
 
@@ -451,7 +546,9 @@ def main() -> None:
         console.print("[bold]Available benchmarks:[/bold]\n")
         for name, desc in BENCHMARKS.items():
             console.print(f"  [cyan]{name:<14}[/cyan] {desc}")
-        console.print(f"\nRun all:  [dim]--benchmarks {','.join(ALL_BENCHMARK_NAMES)}[/dim]")
+        console.print(
+            f"\nRun all:  [dim]--benchmarks {','.join(ALL_BENCHMARK_NAMES)}[/dim]"
+        )
         return
 
     if args.from_file:
@@ -460,10 +557,10 @@ def main() -> None:
             console.print(f"[red]Error: File {args.from_file} does not exist[/red]")
             return
         csv_data = utils.read_results_from_csv(args.from_file)
-        all_stats = get_stats_from_csv(csv_data)
+        loaded_stats = get_stats_from_csv(csv_data)
         console.print()
-        console.print(build_results_table(all_stats))
-        display_summary(all_stats)
+        console.print(build_results_table(loaded_stats))
+        display_summary(loaded_stats)
         return
 
     # Parse --benchmarks flag
@@ -534,7 +631,9 @@ def main() -> None:
     if "throughput" in selected:
         step += 1
         console.print(f"[bold cyan]{step}/{total}[/bold cyan] Throughput")
-        plain_per, traced_per = bench_throughput(args.batch_size, args.iterations, args.warmup)
+        plain_per, traced_per = bench_throughput(
+            args.batch_size, args.iterations, args.warmup
+        )
         plain_tp_stats = utils.calculate_stats(plain_per)
         plain_tp_stats["iterations"] = args.batch_size
         traced_tp_stats = utils.calculate_stats(traced_per)
