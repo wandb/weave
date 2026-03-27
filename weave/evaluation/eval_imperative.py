@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import MissingInferenceMethodError, Model
+
+DEFAULT_SCORER_CACHE_SIZE = 1000
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
@@ -210,7 +212,7 @@ class ScorerCache:
     _cached_scorers_lock: Any
     _max_size: int
 
-    def __init__(self, max_size: int = 1000) -> None:
+    def __init__(self, max_size: int = DEFAULT_SCORER_CACHE_SIZE) -> None:
         self._cached_scorers = {}
         self._cached_scorers_lock = Lock()
         self._max_size = max_size

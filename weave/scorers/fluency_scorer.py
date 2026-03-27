@@ -9,6 +9,7 @@ from weave.scorers.scorer_types import HuggingFacePipelineScorer
 from weave.scorers.utils import load_local_model_weights
 
 FLUENCY_SCORER_THRESHOLD = 0.5
+FLUENCY_TOP_K = 2
 
 
 class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
@@ -51,7 +52,7 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
             self.task,
             model=self._local_model_path,
             device=self.device,
-            top_k=2,
+            top_k=FLUENCY_TOP_K,
         )
 
     @validate_call

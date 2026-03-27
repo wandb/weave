@@ -5,7 +5,11 @@ from pydantic import Field, PrivateAttr, validate_call
 import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
-from weave.scorers.scorer_types import LLMScorer, RollingWindowScorer
+from weave.scorers.scorer_types import (
+    DEFAULT_ROLLING_WINDOW_OVERLAP,
+    LLMScorer,
+    RollingWindowScorer,
+)
 from weave.scorers.utils import MODEL_PATHS, load_local_model_weights
 
 if TYPE_CHECKING:
@@ -104,7 +108,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         default=TOXICITY_CATEGORY_THRESHOLD,
     )
     max_tokens: int = 512
-    overlap: int = 50
+    overlap: int = DEFAULT_ROLLING_WINDOW_OVERLAP
     _categories: list[str] = PrivateAttr(
         default_factory=lambda: [
             "Race/Origin",

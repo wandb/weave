@@ -16,6 +16,8 @@ from weave.telemetry.trace_sentry import (
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 
+DROPPED_ITEM_LOG_FREQUENCY = 1000
+
 
 class SkipIndividualProcessingError(Exception):
     """Signals the batch processor to skip individual-item fallback processing.
@@ -120,7 +122,7 @@ class AsyncBatchProcessor(Generic[T]):
                     error_message = f"Queue is full. Dropping item. Item ID: {item_id}. Max queue size: {self.queue.maxsize}"
 
                     # Only log the first dropped item and every 1000th thereafter
-                    if self._dropped_item_count % 1000 == 1:
+                    if self._dropped_item_count % DROPPED_ITEM_LOG_FREQUENCY == 1:
                         log_warning(
                             f"{error_message}. Total dropped items: {self._dropped_item_count}"
                         )

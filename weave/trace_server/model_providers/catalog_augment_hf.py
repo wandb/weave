@@ -13,6 +13,9 @@ from __future__ import annotations
 
 import json
 import re
+
+HF_API_TIMEOUT_SECONDS = 30.0
+NEW_MODEL_THRESHOLD_DAYS = 30
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -83,7 +86,7 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
     """
     url = f"https://huggingface.co/api/models/{model_name}"
     try:
-        with httpx.Client(timeout=30.0) as client:
+        with httpx.Client(timeout=HF_API_TIMEOUT_SECONDS) as client:
             response = client.get(url)
             response.raise_for_status()
             d = response.json()
@@ -144,7 +147,7 @@ def main() -> None:
                     launch_date.replace("Z", "+00:00")
                 )
                 # Calculate if more than one month old
-                if (current_date - launch_datetime).days <= 30:
+                if (current_date - launch_datetime).days <= NEW_MODEL_THRESHOLD_DAYS:
                     model["isNew"] = True
             except (ValueError, TypeError):
                 # Skip models with invalid launch dates

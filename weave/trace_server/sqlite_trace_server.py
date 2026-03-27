@@ -28,6 +28,9 @@ from weave.shared.trace_server_interface_util import (
     wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import constants, object_creation_utils, usage_utils
+
+MAX_REFS_BATCH_SIZE = 1000
+MAX_OTEL_ERROR_MESSAGES = 20
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
@@ -1948,7 +1951,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         # where it can. Like it should group by object that we need to read.
         # And it should also batch into table refs (like when we are reading a bunch
         # of rows from a single Dataset)
-        if len(req.refs) > 1000:
+        if len(req.refs) > MAX_REFS_BATCH_SIZE:
             raise ValueError("Too many refs")
 
         parsed_refs = [ri.parse_internal_uri(r) for r in req.refs]
@@ -2242,8 +2245,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 partial_success=tsi.ExportTracePartialSuccess(
                     rejected_spans=rejected_spans,
                     error_message=(
-                        "; ".join(error_messages[:20])
-                        + ("; ..." if len(error_messages) > 20 else "")
+                        "; ".join(error_messages[:MAX_OTEL_ERROR_MESSAGES])
+                        + ("; ..." if len(error_messages) > MAX_OTEL_ERROR_MESSAGES else "")
                     ),
                 )
             )
