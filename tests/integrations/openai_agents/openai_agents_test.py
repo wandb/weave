@@ -43,7 +43,11 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     assert agent_call.inputs["name"] == "Assistant"
     assert agent_call.output["output"] is None
     assert agent_call.output["metrics"] == {}
-    assert agent_call.output["metadata"] == {"tools": [], "handoffs": [], "output_type": "str"}
+    assert agent_call.output["metadata"] == {
+        "tools": [],
+        "handoffs": [],
+        "output_type": "str",
+    }
     assert agent_call.output["error"] is None
 
 
