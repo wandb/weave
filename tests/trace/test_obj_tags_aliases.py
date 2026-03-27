@@ -1306,9 +1306,7 @@ def test_tags_list_excludes_removed(client: WeaveClient):
 
 def test_aliases_list_empty_project(client: WeaveClient):
     """Empty project returns empty list."""
-    res = client.server.aliases_list(
-        tsi.AliasesListReq(project_id=client.project_id)
-    )
+    res = client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id))
     assert res.aliases == []
 
 
@@ -1334,9 +1332,7 @@ def test_aliases_list_returns_distinct(client: WeaveClient):
         )
     )
 
-    res = client.server.aliases_list(
-        tsi.AliasesListReq(project_id=client.project_id)
-    )
+    res = client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id))
     assert res.aliases == ["canary", "production"]
 
 
@@ -1368,9 +1364,7 @@ def test_aliases_list_excludes_removed(client: WeaveClient):
         )
     )
 
-    res = client.server.aliases_list(
-        tsi.AliasesListReq(project_id=client.project_id)
-    )
+    res = client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id))
     assert res.aliases == ["keep-alias"]
 
 
