@@ -26,11 +26,9 @@ class InferenceModels:
         self._client = client
 
     def list(self) -> ModelsResponse:
-        cur_ctx = get_wandb_api_context()
-        if not cur_ctx:
-            # I don't think this should happen.
-            raise ValueError("No context found")
-        api_key = cur_ctx.api_key
+        api_key = get_wandb_api_context()
+        if not api_key:
+            raise ValueError("No API key found")
         headers = {
             "Authorization": f"Bearer {api_key}",
             "OpenAI-Project": f"{self._client.entity}/{self._client.project}",

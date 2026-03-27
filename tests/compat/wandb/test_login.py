@@ -402,7 +402,6 @@ def test_full_login_flow_without_netrc(
         )
 
 
-
 def test_project_create_if_not_exists(mock_wandb_api):
     mock_wandb_api.project.return_value = None
     mock_wandb_api.upsert_project.return_value = {
