@@ -137,14 +137,19 @@ Or run on all files (slower but more thorough):
 pre-commit run --hook-stage=pre-push --all-files
 ```
 
-You can also use the `lint` nox target to run linting:
+You can also use nox to run linting:
 
 ```sh
-# Run on staged files only (default, faster)
+# Fast: run ruff, mypy, ty, pyright directly (no pre-commit stashing)
 nox -e lint
 
-# Run on all files
-nox -e lint -- --all-files
+# Run a subset of checks
+nox -e lint -- ruff
+nox -e lint -- ruff mypy
+
+# Full pre-commit suite (stashes unstaged changes, used by CI)
+nox -e lint_full
+nox -e lint_full -- --all-files
 ```
 
 ### Building the `weave` package

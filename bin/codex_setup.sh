@@ -93,7 +93,7 @@ install_test_environments() {
 
 install_lint_environment() {
     echo "Installing lint environment..."
-    nox -e lint -- dry-run
+    nox -e lint_full -- dry-run
     echo "✓ Lint environment installed"
 }
 

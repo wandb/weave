@@ -98,7 +98,7 @@ Focus on these primary test shards:
 
 1. Run all tests in a specific shard: `nox --no-install -e "tests-3.12(shard='trace')"`
 2. Run a specific test by appending `-- [test]` like so: `nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op`
-3. Run linting: `nox --no-install -e lint` (Note: This will modify files)
+3. Run linting: `nox -e lint` (fast, no pre-commit) or `nox --no-install -e lint_full` (full pre-commit suite, may modify files)
 
 _Important:_ Since you don't have internet access, you must run `nox` with `--no-install`. We have pre-installed the requirements on the above shards.
 
@@ -161,7 +161,7 @@ unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" --
 ```
 
 **Pre-commit stashing behavior:**
-`nox --no-install -e lint` runs `pre-commit`, and pre-commit stashes unstaged changes before running hooks. If you need to validate a fix to one file (for example with `--mypy-only`), stage that file first or run the checker directly, otherwise hooks may run against older content.
+`nox --no-install -e lint_full` runs `pre-commit`, and pre-commit stashes unstaged changes before running hooks. If you need to validate a fix to one file, use `nox -e lint` instead — it runs checkers directly without stashing.
 
 **Markdown serialization and MTSAAS env:**
 `weave/type_handlers/Markdown/markdown.py` only stores large markdown payloads in `markup.md` when `is_mtsaas()` is true. If local `WANDB_BASE_URL`/`WF_TRACE_SERVER_URL` differs from CI defaults, `test_serialization_correctness[markdown]` may fail locally with inline markup differences. For CI-like behavior, set:

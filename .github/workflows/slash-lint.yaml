@@ -49,7 +49,7 @@ jobs:
           pip install nox uv
 
       - name: Run nox lint
-        run: nox -e lint -- --all-files
+        run: nox -e lint_full -- --all-files
         continue-on-error: true
 
       - name: Commit and push fixes

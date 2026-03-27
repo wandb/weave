@@ -22,8 +22,85 @@ INCOMPATIBLE_SHARDS = {
 NUM_TRACE_SERVER_SHARDS = 4
 
 
-@nox.session
+@nox.session(venv_backend="none")
 def lint(session: nox.Session):
+    """Run linters directly — no pre-commit, no stashing, no venv setup.
+
+    Usage:
+        nox -e lint                     # all checks
+        nox -e lint -- ruff             # just ruff
+        nox -e lint -- ruff mypy        # pick any combo
+        nox -e lint -- --fix            # let ruff auto-fix
+    """
+    all_checks = ("ruff", "mypy", "ty", "pyright")
+    checks = []
+    fix = False
+    for arg in session.posargs:
+        if arg == "--fix":
+            fix = True
+        elif arg in all_checks:
+            checks.append(arg)
+        else:
+            session.error(
+                f"Unknown arg: {arg!r}. Valid: {', '.join(all_checks)}, --fix"
+            )
+
+    if not checks:
+        checks = list(all_checks)
+
+    failed = []
+    for check in checks:
+        if check == "ruff":
+            ruff_check = ["uvx", "ruff", "check", "--config=pyproject.toml"]
+            if fix:
+                ruff_check.append("--fix")
+            ruff_check.append(".")
+            try:
+                session.run(*ruff_check, external=True)
+            except nox.command.CommandFailed:
+                failed.append("ruff check")
+            try:
+                session.run(
+                    "uvx",
+                    "ruff",
+                    "format",
+                    "--check",
+                    "--config=pyproject.toml",
+                    ".",
+                    external=True,
+                )
+            except nox.command.CommandFailed:
+                failed.append("ruff format")
+        elif check == "mypy":
+            try:
+                session.run(
+                    "uv",
+                    "run",
+                    "mypy",
+                    "--config-file=pyproject.toml",
+                    ".",
+                    external=True,
+                )
+            except nox.command.CommandFailed:
+                failed.append("mypy")
+        elif check == "ty":
+            try:
+                session.run("uv", "run", "ty", "check", external=True)
+            except nox.command.CommandFailed:
+                failed.append("ty")
+        elif check == "pyright":
+            try:
+                session.run("uv", "run", "pyright", external=True)
+            except nox.command.CommandFailed:
+                failed.append("pyright")
+
+    if failed:
+        session.error(f"Failed: {', '.join(failed)}")
+
+
+@nox.session
+def lint_full(session: nox.Session):
+    """Run all pre-commit hooks (stashes unstaged changes). Used by CI."""
     session.run("uv", "sync", "--active", "--group", "dev", "--frozen")
 
     dry_run = session.posargs and "dry-run" in session.posargs

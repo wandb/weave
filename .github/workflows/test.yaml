@@ -60,7 +60,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install nox uv
       - name: Run nox
-        run: nox -e lint
+        run: nox -e lint_full
 
   trace_no_server:
     name: Trace non-trace server tests

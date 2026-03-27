@@ -11,4 +11,4 @@ To run a benchmark, invoke `uv run benchmark.py`. This will bring up a CLI for s
 
 ## 2. Stripping EXIF data from images
 
-To run the pre-commit hook, invoke `nox -e lint`.
+To run the pre-commit hook, invoke `nox -e lint_full`.
