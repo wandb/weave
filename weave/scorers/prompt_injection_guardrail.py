@@ -57,7 +57,7 @@ class PromptInjectionLLMGuardrail(LLMScorer):
                 stacklevel=2,
             )
 
-    @weave.op
+    @weave.op(kind="guardrail")
     async def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
         user_prompt = PROMPT_INJECTION_GUARDRAIL_USER_PROMPT.format(
             research_paper_summary=PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,

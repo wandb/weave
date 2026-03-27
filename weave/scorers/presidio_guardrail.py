@@ -135,7 +135,7 @@ class PresidioScorer(weave.Scorer):
             anonymized_text = anonymized_result.text
         return anonymized_text
 
-    @weave.op
+    @weave.op(kind="guardrail")
     def score(
         self, *, output: str, entities: list[str] | None = None, **kwargs: Any
     ) -> WeaveScorerResult:
