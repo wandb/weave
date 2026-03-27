@@ -60,7 +60,7 @@ class BedrockGuardrailScorer(weave.Scorer):
         """Format the content for the guardrail API."""
         return {"source": self.source, "content": [{"text": {"text": output}}]}
 
-    @weave.op
+    @weave.op(kind="guardrail")
     def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
         if self._bedrock_runtime is None:
             raise ValueError("Bedrock runtime client is not initialized")
