@@ -510,7 +510,7 @@ class ThreadContext:
 
 
 @contextlib.contextmanager
-def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadContext]:
+def thread(thread_id: str | object | None = _AUTO_GENERATE) -> Iterator[ThreadContext]:
     """Context manager for setting thread_id on calls within the context.
 
     Examples:
