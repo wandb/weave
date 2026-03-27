@@ -160,7 +160,7 @@ class Evaluation(Object):
 
         return cls(**field_values)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         # Determine output key based on scorer types
         scorers = self.scorers or []
         if _has_oldstyle_scorers(scorers):

@@ -6,13 +6,13 @@ import random
 import sys
 import time
 import uuid
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, NamedTuple
 from unittest import mock
 
 import pytest
@@ -1893,12 +1893,16 @@ def test_tuple_support(client):
     assert res.calls[0].output == [[1, 2], 3]
 
 
+class Point(NamedTuple):
+    x: Any
+    y: Any
+
+
 def test_namedtuple_support(client):
     @weave.op
     def tuple_maker(a, b):
         return (a, b)
 
-    Point = namedtuple("Point", ["x", "y"])
     act = tuple_maker(Point(1, 2), 3)
     exp = (Point(1, 2), 3)
     assert act == exp

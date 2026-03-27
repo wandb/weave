@@ -8,6 +8,7 @@ import logging
 import random
 import sys
 import traceback
+import types
 import weakref
 from collections import defaultdict
 from collections.abc import (
@@ -32,7 +33,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec, TypeIs, Unpack
+from typing_extensions import ParamSpec, Self, TypeIs, Unpack
 
 from weave.trace import box, settings
 from weave.trace.context import call_context, weave_client_context
@@ -427,10 +428,10 @@ def is_placeholder_call(call: Call) -> TypeIs[NoOpCall]:
 
 
 def _set_python_function_type_on_weave_dict(
-    __weave: WeaveKwargs, type_str: str
+    weave: WeaveKwargs, /, type_str: str
 ) -> None:
     weave_dict = (
-        __weave.setdefault("attributes", {})
+        weave.setdefault("attributes", {})
         .setdefault("weave", {})
         .setdefault("python", {})
     )
@@ -1601,7 +1602,7 @@ class _IteratorWrapper(Generic[V]):
             return object.__getattribute__(self, name)
         return getattr(self._iterator_or_ctx_manager, name)
 
-    def __enter__(self) -> _IteratorWrapper:
+    def __enter__(self) -> Self:
         if hasattr(self._iterator_or_ctx_manager, "__enter__"):
             # let's enter the context manager to get the stream iterator
             self._iterator_or_ctx_manager = self._iterator_or_ctx_manager.__enter__()
@@ -1609,9 +1610,9 @@ class _IteratorWrapper(Generic[V]):
 
     def __exit__(
         self,
-        exc_type: Exception | None,
+        exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: Any,
+        traceback: types.TracebackType | None,
     ) -> None:
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
@@ -1621,7 +1622,7 @@ class _IteratorWrapper(Generic[V]):
             self._iterator_or_ctx_manager.__exit__(exc_type, exc_value, traceback)
         self._call_on_close_once()
 
-    async def __aenter__(self) -> _IteratorWrapper:
+    async def __aenter__(self) -> Self:
         if hasattr(
             self._iterator_or_ctx_manager, "__aenter__"
         ):  # let's enter the context manager
@@ -1632,9 +1633,9 @@ class _IteratorWrapper(Generic[V]):
 
     async def __aexit__(
         self,
-        exc_type: Exception | None,
+        exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: Any,
+        traceback: types.TracebackType | None,
     ) -> None:
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)

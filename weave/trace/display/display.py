@@ -7,6 +7,7 @@ display method (rich, print, logger, etc.).
 
 from __future__ import annotations
 
+import types
 from collections.abc import Callable
 from typing import Any
 
@@ -224,7 +225,12 @@ class Progress:
         self._progress.__enter__()
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Context manager exit."""
         return self._progress.__exit__(exc_type, exc_val, exc_tb)
 

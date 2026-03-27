@@ -73,7 +73,7 @@ class MutationAppend:
 
 
 Mutation = MutationSetattr | MutationSetitem | MutationAppend
-MutationOperation = Literal["setitem"] | Literal["setattr"] | Literal["append"]
+MutationOperation = Literal["setitem", "setattr", "append"]
 
 
 def make_mutation(
@@ -245,25 +245,25 @@ class WeaveObject(Traceable):  # noqa: PLW1641
         memo[id(self)] = res
         return res
 
-    def __getattribute__(self, __name: str) -> Any:
+    def __getattribute__(self, name: str, /) -> Any:
         try:
-            return object.__getattribute__(self, __name)
+            return object.__getattribute__(self, name)
         except AttributeError:
             pass
-        val_attr_val = object.__getattribute__(self._val, __name)
-        result = attribute_access_result(self, val_attr_val, __name, server=self.server)
+        val_attr_val = object.__getattribute__(self._val, name)
+        result = attribute_access_result(self, val_attr_val, name, server=self.server)
 
         # Store the result on _val so we don't deref next time.
         try:
-            object.__setattr__(self._val, __name, result)
+            object.__setattr__(self._val, name, result)
         except AttributeError:
             # Happens if self._val.<name> is a property. Return the raw value instead
             # of a Traceable value.
             return val_attr_val
         return result
 
-    def __setattr__(self, __name: str, __value: Any) -> None:
-        if __name in {
+    def __setattr__(self, name: str, value: Any, /) -> None:
+        if name in {
             "_val",
             "ref",
             "server",
@@ -272,13 +272,13 @@ class WeaveObject(Traceable):  # noqa: PLW1641
             "_is_dirty",
             "parent",
         }:
-            return object.__setattr__(self, __name, __value)
+            return object.__setattr__(self, name, value)
         else:
             self._mark_dirty()
-            if isinstance(__value, Traceable):
-                __value.parent = self
+            if isinstance(value, Traceable):
+                value.parent = self
 
-            return setattr(self._val, __name, __value)
+            return setattr(self._val, name, value)
 
     def __dir__(self) -> list[str]:
         return dir(self._val)
@@ -286,7 +286,7 @@ class WeaveObject(Traceable):  # noqa: PLW1641
     def __repr__(self) -> str:
         return f"WeaveObject({self._val})"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return self._val == other
 
     def unwrap(self) -> Any:
@@ -408,7 +408,7 @@ class WeaveTable(Traceable):  # noqa: PLW1641
         )
         return response.count
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         rows = self._inefficiently_materialize_rows_as_list()
         return rows == other
 
@@ -660,7 +660,7 @@ class WeaveList(Traceable, list):  # noqa: PLW1641
     def __repr__(self) -> str:
         return f"WeaveList({super().__repr__()})"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, list):
             return False
         if len(self) != len(other):
@@ -743,7 +743,7 @@ class WeaveDict(Traceable, dict):  # noqa: PLW1641
     def __repr__(self) -> str:
         return f"WeaveDict({super().__repr__()})"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, dict):
             return False
         if len(self) != len(other):

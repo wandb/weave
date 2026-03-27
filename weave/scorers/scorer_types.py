@@ -37,7 +37,7 @@ class LLMScorer(weave.Scorer):
     _aembedding: "aembedding" = PrivateAttr()
     _amoderation: "amoderation" = PrivateAttr()
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         try:
             from litellm import acompletion, aembedding, amoderation
         except ImportError:
@@ -101,7 +101,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
 
     _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         ensure_hf_imports()
         check_cuda(self.device)
         if self._pipeline is None:
@@ -129,7 +129,7 @@ class HuggingFaceScorer(weave.Scorer):
     _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
     _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
 
-    def model_post_init(self, __context: Any = None) -> None:
+    def model_post_init(self, context: Any = None, /) -> None:
         """Template method for post-initialization."""
         check_cuda(self.device)
         ensure_hf_imports()
