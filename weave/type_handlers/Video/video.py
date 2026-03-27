@@ -56,6 +56,7 @@ class VideoFormat(str, Enum):
 
 
 DEFAULT_VIDEO_FORMAT = VideoFormat.MP4
+DEFAULT_VIDEO_FPS = 24
 
 
 def get_format_from_filename(filename: str) -> VideoFormat:
@@ -83,9 +84,9 @@ def write_video(fp: str, clip: VideoClip) -> None:
     errors if the file does not end in a supported video extension.
     """
     try:
-        fps = clip.fps or 24
+        fps = clip.fps or DEFAULT_VIDEO_FPS
     except Exception as _:
-        fps = 24
+        fps = DEFAULT_VIDEO_FPS
 
     audio = clip.audio
     fmt_str = get_format_from_filename(fp)
