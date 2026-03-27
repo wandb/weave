@@ -98,7 +98,7 @@ Focus on these primary test shards:
 
 1. Run all tests in a specific shard: `nox --no-install -e "tests-3.12(shard='trace')"`
 2. Run a specific test by appending `-- [test]` like so: `nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op`
-3. Run linting: `nox -e lint` (fast, no pre-commit) or `nox --no-install -e lint_full` (full pre-commit suite, may modify files)
+3. Run linting: `nox -e lint` (fast, safe auto-fix, no stashing) or `nox --no-install -e lint_full` (full pre-commit suite, stashes unstaged changes)
 
 _Important:_ Since you don't have internet access, you must run `nox` with `--no-install`. We have pre-installed the requirements on the above shards.
 

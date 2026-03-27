@@ -27,22 +27,22 @@ def lint(session: nox.Session):
     """Run linters directly — no pre-commit, no stashing, no venv setup.
 
     Usage:
-        nox -e lint                     # all checks
+        nox -e lint                     # all checks (safe auto-fix by default)
         nox -e lint -- ruff             # just ruff
         nox -e lint -- ruff mypy        # pick any combo
-        nox -e lint -- --fix            # let ruff auto-fix
+        nox -e lint -- --no-fix         # check-only, no auto-fix
     """
     all_checks = ("ruff", "mypy", "ty", "pyright")
     checks = []
-    fix = False
+    no_fix = False
     for arg in session.posargs:
-        if arg == "--fix":
-            fix = True
+        if arg == "--no-fix":
+            no_fix = True
         elif arg in all_checks:
             checks.append(arg)
         else:
             session.error(
-                f"Unknown arg: {arg!r}. Valid: {', '.join(all_checks)}, --fix"
+                f"Unknown arg: {arg!r}. Valid: {', '.join(all_checks)}, --no-fix"
             )
 
     if not checks:
@@ -52,23 +52,19 @@ def lint(session: nox.Session):
     for check in checks:
         if check == "ruff":
             ruff_check = ["uvx", "ruff", "check", "--config=pyproject.toml"]
-            if fix:
+            if not no_fix:
                 ruff_check.append("--fix")
             ruff_check.append(".")
             try:
                 session.run(*ruff_check, external=True)
             except nox.command.CommandFailed:
                 failed.append("ruff check")
+            ruff_fmt = ["uvx", "ruff", "format", "--config=pyproject.toml"]
+            if no_fix:
+                ruff_fmt.append("--check")
+            ruff_fmt.append(".")
             try:
-                session.run(
-                    "uvx",
-                    "ruff",
-                    "format",
-                    "--check",
-                    "--config=pyproject.toml",
-                    ".",
-                    external=True,
-                )
+                session.run(*ruff_fmt, external=True)
             except nox.command.CommandFailed:
                 failed.append("ruff format")
         elif check == "mypy":
