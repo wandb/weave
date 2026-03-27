@@ -36,6 +36,11 @@ class Scorer(Object):
     def model_post_init(self, __context: Any) -> None:
         super().model_post_init(__context)
         _validate_scorer_signature(self)
+        # Auto-set kind="scorer" on score method if it's an op without an explicit kind.
+        # This allows subclasses (e.g. guardrails) to override with their own kind.
+        score_fn = getattr(self.score, "__func__", self.score)
+        if is_op(score_fn) and score_fn.kind is None:
+            score_fn.kind = "scorer"
 
     @property
     def display_name(self) -> str:
