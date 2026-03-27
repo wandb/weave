@@ -91,7 +91,9 @@ def _find_available(
     pypi_url = f"https://pypi.org/pypi/{module_name}/json"
     yanked_dict = {}
     try:
-        response = _sync_get_with_timeout(pypi_url, timeout=PYPI_REQUEST_TIMEOUT_SECONDS)
+        response = _sync_get_with_timeout(
+            pypi_url, timeout=PYPI_REQUEST_TIMEOUT_SECONDS
+        )
         if not response:
             return None
         data = response.json()

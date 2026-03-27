@@ -34,7 +34,8 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
 
     task: str = "sentiment-analysis"
     model_max_length: int = Field(
-        default=DEFAULT_COHERENCE_MODEL_MAX_LENGTH, description="The maximum length of the model output."
+        default=DEFAULT_COHERENCE_MODEL_MAX_LENGTH,
+        description="The maximum length of the model output.",
     )
 
     def load_pipeline(self) -> None:

@@ -2246,7 +2246,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     rejected_spans=rejected_spans,
                     error_message=(
                         "; ".join(error_messages[:MAX_OTEL_ERROR_MESSAGES])
-                        + ("; ..." if len(error_messages) > MAX_OTEL_ERROR_MESSAGES else "")
+                        + (
+                            "; ..."
+                            if len(error_messages) > MAX_OTEL_ERROR_MESSAGES
+                            else ""
+                        )
                     ),
                 )
             )

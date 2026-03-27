@@ -265,7 +265,9 @@ CALLS_STREAM_GROWTH_FACTOR = 10
 OBJ_READ_RETRY_ATTEMPTS = 3
 
 # Create a shared connection pool manager for all ClickHouse connections
-_CH_POOL_MANAGER = get_pool_manager(maxsize=CH_POOL_MAX_CONNECTIONS, num_pools=CH_POOL_COUNT)
+_CH_POOL_MANAGER = get_pool_manager(
+    maxsize=CH_POOL_MAX_CONNECTIONS, num_pools=CH_POOL_COUNT
+)
 
 
 # Precomputed list of (column_index, field_name) for every sentinel field that appears
@@ -3285,7 +3287,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=object_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS)
+        obj_read_res = self._obj_read_with_retry(
+            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         return tsi.OpCreateRes(
             digest=obj_result.digest,
@@ -3512,7 +3516,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=dataset_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS)
+        obj_read_res = self._obj_read_with_retry(
+            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         return tsi.DatasetCreateRes(
             digest=obj_result.digest,
@@ -3659,7 +3665,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=scorer_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS)
+        obj_read_res = self._obj_read_with_retry(
+            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         # Get the ref and return the create result
         scorer_ref = ri.InternalObjectRef(
@@ -3779,7 +3787,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=evaluation_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS)
+        obj_read_res = self._obj_read_with_retry(
+            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         # Get the ref and return the create result
         evaluation_ref = ri.InternalObjectRef(
@@ -3925,7 +3935,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=object_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS)
+        obj_read_res = self._obj_read_with_retry(
+            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         # Build model reference - external adapter will convert to external format
         model_ref = ri.InternalObjectRef(

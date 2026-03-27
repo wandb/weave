@@ -78,7 +78,11 @@ class JSONLWALConsumer:
                         # For trailing truncation (crash mid-write), the line
                         # won't end with \n so readline() returns it as the
                         # last line and we skip it here.
-                        preview = line[:CORRUPT_LINE_PREVIEW_LENGTH].decode("utf-8", errors="replace").rstrip()
+                        preview = (
+                            line[:CORRUPT_LINE_PREVIEW_LENGTH]
+                            .decode("utf-8", errors="replace")
+                            .rstrip()
+                        )
                         logger.warning(
                             "Skipping corrupt WAL line at offset %d in %s: %s",
                             offset,

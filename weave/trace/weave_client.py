@@ -2750,7 +2750,9 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
 
     # if total_parallelism is None, calculate it
     if total_parallelism is None:
-        total_parallelism = min(MAX_AUTO_PARALLELISM, (os.cpu_count() or 1) + PARALLELISM_CPU_PADDING)
+        total_parallelism = min(
+            MAX_AUTO_PARALLELISM, (os.cpu_count() or 1) + PARALLELISM_CPU_PADDING
+        )
 
     # use 50/50 split between main and fastlane
     parallelism_main = int(total_parallelism * (1 - BACKGROUND_PARALLELISM_MIX))

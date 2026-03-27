@@ -26,7 +26,10 @@ class EmbeddingSimilarityScorer(LLMScorer):
     """
 
     model_id: str = OPENAI_DEFAULT_EMBEDDING_MODEL
-    threshold: float = Field(DEFAULT_SIMILARITY_THRESHOLD, description="The threshold for the similarity score")
+    threshold: float = Field(
+        DEFAULT_SIMILARITY_THRESHOLD,
+        description="The threshold for the similarity score",
+    )
 
     @weave.op
     async def score(self, *, output: str, target: str, **kwargs: Any) -> Any:

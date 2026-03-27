@@ -83,7 +83,9 @@ def response_display_name(model: str | None) -> str:
     return "Response"
 
 
-def turn_display_name(prompt: str | None, max_words: int = MAX_ABBREVIATION_WORDS) -> str:
+def turn_display_name(
+    prompt: str | None, max_words: int = MAX_ABBREVIATION_WORDS
+) -> str:
     """Generate display name for a turn call from the first few words of the prompt."""
     if not prompt:
         return "Turn"
@@ -97,6 +99,8 @@ def turn_display_name(prompt: str | None, max_words: int = MAX_ABBREVIATION_WORD
 def session_display_name(prompt: str | None) -> str:
     """Generate display name for the root session call."""
     if prompt:
-        truncated = prompt[:SESSION_NAME_MAX_LENGTH] + ("..." if len(prompt) > SESSION_NAME_MAX_LENGTH else "")
+        truncated = prompt[:SESSION_NAME_MAX_LENGTH] + (
+            "..." if len(prompt) > SESSION_NAME_MAX_LENGTH else ""
+        )
         return f"Session: {truncated}"
     return "Session"

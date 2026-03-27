@@ -71,12 +71,20 @@ def wf_enable_online_eval() -> bool:
 
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", str(DEFAULT_SCORING_WORKER_BATCH_SIZE)))
+    return int(
+        os.environ.get(
+            "WF_SCORING_WORKER_BATCH_SIZE", str(DEFAULT_SCORING_WORKER_BATCH_SIZE)
+        )
+    )
 
 
 def wf_scoring_worker_batch_timeout() -> int:
     """The timeout for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", str(DEFAULT_SCORING_WORKER_BATCH_TIMEOUT)))
+    return int(
+        os.environ.get(
+            "WF_SCORING_WORKER_BATCH_TIMEOUT", str(DEFAULT_SCORING_WORKER_BATCH_TIMEOUT)
+        )
+    )
 
 
 def wf_scoring_worker_check_cancellation() -> bool:

@@ -263,13 +263,17 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
             )
             # If the output is less than 1000 tokens, curtail the input query and context only
             if len_outs < self._model_max_length - OUTPUT_TOKEN_CURTAILMENT_THRESHOLD:
-                inp_remaining = self._model_max_length - (len_outs + INPUT_TOKEN_ALLOCATION_RESERVE)
+                inp_remaining = self._model_max_length - (
+                    len_outs + INPUT_TOKEN_ALLOCATION_RESERVE
+                )
                 inps_input_ids = inps_toks.input_ids[:inp_remaining]
                 out_input_ids = outs_toks.input_ids
             else:
                 # If the output exceeds threshold, curtail all 3: query, context and output
                 inps_input_ids = inps_toks.input_ids[:INPUT_TOKEN_ALLOCATION_RESERVE]
-                out_input_ids = outs_toks.input_ids[: self._model_max_length - OUTPUT_TOKEN_RESERVATION_BUFFER]
+                out_input_ids = outs_toks.input_ids[
+                    : self._model_max_length - OUTPUT_TOKEN_RESERVATION_BUFFER
+                ]
 
             inps = tokenizer.decode(inps_input_ids)
             outs = tokenizer.decode(out_input_ids)
