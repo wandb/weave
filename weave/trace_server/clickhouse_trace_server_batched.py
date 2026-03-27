@@ -510,13 +510,67 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
+
+        calls, rejected_spans, error_messages = self._otel_parse_and_convert_spans(req)
+
+        set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
+
+        self._otel_resolve_ops(req, calls)
+
+        write_target = self.table_routing_resolver.resolve_v2_write_target(
+            req.project_id,
+            self.ch_client,
+        )
+
+        # Build event callbacks (same for both write targets)
+        event_callbacks = [
+            partial(
+                _maybe_enqueue_minimal_call_end,
+                self.kafka_producer,
+                end_call.project_id,
+                end_call.id,
+                end_call.ended_at,
+                False,
+            )
+            for _, end_call in calls
+        ]
+
+        self._otel_convert_and_insert_rows(calls, write_target)
+
+        # Run callbacks and flush
+        for cb in event_callbacks:
+            cb()
+        self._flush_kafka_producer()
+
+        if rejected_spans > 0:
+            # Join the first 20 errors and return them delimited by ';'
+            joined_errors = "; ".join(error_messages[:20]) + (
+                "; ..." if len(error_messages) > 20 else ""
+            )
+            return tsi.OTelExportRes(
+                partial_success=tsi.ExportTracePartialSuccess(
+                    rejected_spans=rejected_spans,
+                    error_message=joined_errors,
+                )
+            )
+        return tsi.OTelExportRes()
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.otel_parse_and_convert_spans"
+    )
+    def _otel_parse_and_convert_spans(
+        self, req: tsi.OTelExportReq
+    ) -> tuple[
+        list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]],
+        int,
+        list[str],
+    ]:
         calls: list[
             tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
         ] = []
         rejected_spans = 0
         error_messages: list[str] = []
         for processed_span in req.processed_spans:
-            # Extract wb_run_id from the processed span
             wb_run_id = processed_span.run_id
 
             if not isinstance(processed_span.resource_spans, ResourceSpans):
@@ -531,9 +585,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     try:
                         span = Span.from_proto(proto_span, resource)
                     except AttributePathConflictError as e:
-                        # Record and skip malformed spans so we can partially accept the batch
                         rejected_spans += 1
-                        # Use data available on the proto span for context
                         try:
                             trace_id = proto_span.trace_id.hex()
                             span_id = proto_span.span_id.hex()
@@ -545,7 +597,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         span_ident = (
                             f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
                         )
-                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        error_messages.append(
+                            f"Rejected span ({span_ident}): {e!s}"
+                        )
                         continue
 
                     calls.append(
@@ -555,9 +609,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             wb_run_id=wb_run_id,
                         )
                     )
+        return calls, rejected_spans, error_messages
 
-        set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
-
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_resolve_ops")
+    def _otel_resolve_ops(
+        self,
+        req: tsi.OTelExportReq,
+        calls: list[
+            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+        ],
+    ) -> None:
         obj_id_idx_map = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
             op_name = object_creation_utils.make_safe_name(start_call.op_name)
@@ -570,10 +631,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         for op_name, op_ref_uri in existing_ops.items():
-            # Modify each of the matched start calls in place
             for idx in obj_id_idx_map[op_name]:
                 calls[idx][0].op_name = op_ref_uri
-            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
             obj_id_idx_map.pop(op_name)
 
         if obj_id_idx_map:
@@ -604,25 +663,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 for op_name, op_ref_uri in cached_op_refs.items():
                     self._op_ref_cache[req.project_id, op_name] = op_ref_uri
 
-        write_target = self.table_routing_resolver.resolve_v2_write_target(
-            req.project_id,
-            self.ch_client,
-        )
-
-        # Build event callbacks (same for both write targets)
-        event_callbacks = [
-            partial(
-                _maybe_enqueue_minimal_call_end,
-                self.kafka_producer,
-                end_call.project_id,
-                end_call.id,
-                end_call.ended_at,
-                False,
-            )
-            for _, end_call in calls
-        ]
-
-        # Convert and insert based on write target
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.otel_convert_and_insert_rows"
+    )
+    def _otel_convert_and_insert_rows(
+        self,
+        calls: list[
+            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+        ],
+        write_target: WriteTarget,
+    ) -> None:
         if write_target == WriteTarget.CALLS_COMPLETE:
             rows = [
                 _ch_complete_call_to_row(
@@ -640,27 +690,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     )
                 )
                 rows.append(
-                    _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
+                    _ch_call_to_row(
+                        _end_call_for_insert_to_ch_insertable_end_call(end)
+                    )
                 )
             self._insert_call_batch(rows)
-
-        # Run callbacks and flush
-        for cb in event_callbacks:
-            cb()
-        self._flush_kafka_producer()
-
-        if rejected_spans > 0:
-            # Join the first 20 errors and return them delimited by ';'
-            joined_errors = "; ".join(error_messages[:20]) + (
-                "; ..." if len(error_messages) > 20 else ""
-            )
-            return tsi.OTelExportRes(
-                partial_success=tsi.ExportTracePartialSuccess(
-                    rejected_spans=rejected_spans,
-                    error_message=joined_errors,
-                )
-            )
-        return tsi.OTelExportRes()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
