@@ -2795,6 +2795,7 @@ def test_calls_query_sort_by_latency(client):
         )
     )
 
+    # Verify order - should be fast, medium, slow in ascending order
     assert len(calls_asc) == 3
     assert calls_asc[0].id == fast_call.id
     assert calls_asc[1].id == medium_call.id
@@ -2808,6 +2809,7 @@ def test_calls_query_sort_by_latency(client):
         )
     )
 
+    # Verify order - should be slow, medium, fast in descending order
     assert len(calls_desc) == 3
     assert calls_desc[0].id == slow_call.id
     assert calls_desc[1].id == medium_call.id
