@@ -244,7 +244,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 wb_run_step_end INTEGER,
                 deleted_at TEXT,
                 display_name TEXT,
-                otel_dump TEXT
+                otel_dump TEXT,
+                storage_size_bytes INTEGER
             )
         """
         )
@@ -347,14 +348,25 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 if call.otel_dump is not None:
                     otel_dump_str = json.dumps(call.otel_dump)
 
+                attributes_json = json.dumps(call.attributes)
+                inputs_json = json.dumps(call.inputs)
+                output_json = json.dumps(call.output)
+                summary_json = json.dumps(call.summary)
+                storage_size = (
+                    len(attributes_json)
+                    + len(inputs_json)
+                    + len(output_json)
+                    + len(summary_json)
+                )
+
                 cursor.execute(
                     """INSERT INTO calls (
                         project_id, id, trace_id, parent_id, thread_id, turn_id,
                         op_name, display_name, started_at, ended_at, exception,
                         attributes, inputs, input_refs, output, output_refs,
                         summary, wb_user_id, wb_run_id, wb_run_step, wb_run_step_end,
-                        otel_dump
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        otel_dump, storage_size_bytes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         call.project_id,
                         call.id,
@@ -367,21 +379,22 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         call.started_at.isoformat(),
                         call.ended_at.isoformat(),
                         call.exception,
-                        json.dumps(call.attributes),
-                        json.dumps(call.inputs),
+                        attributes_json,
+                        inputs_json,
                         json.dumps(
                             extract_refs_from_values(list(call.inputs.values()))
                         ),
-                        json.dumps(call.output),
+                        output_json,
                         json.dumps(
                             extract_refs_from_values(list(parsable_output.values()))
                         ),
-                        json.dumps(call.summary),
+                        summary_json,
                         call.wb_user_id,
                         call.wb_run_id,
                         call.wb_run_step,
                         call.wb_run_step_end,
                         otel_dump_str,
+                        storage_size,
                     ),
                 )
             conn.commit()
@@ -476,6 +489,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if not isinstance(parsable_output, dict):
             parsable_output = {"output": parsable_output}
         parsable_output = cast(dict, parsable_output)
+        output_json = json.dumps(req.end.output)
+        summary_json = json.dumps(req.end.summary)
         with self.lock:
             cursor.execute(
                 """UPDATE calls SET
@@ -484,17 +499,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     output = ?,
                     output_refs = ?,
                     summary = ?,
-                    wb_run_step_end = ?
+                    wb_run_step_end = ?,
+                    storage_size_bytes = COALESCE(length(attributes), 0) + COALESCE(length(inputs), 0) + ? + ?
                 WHERE id = ?""",
                 (
                     req.end.ended_at.isoformat(),
                     req.end.exception,
-                    json.dumps(req.end.output),
+                    output_json,
                     json.dumps(
                         extract_refs_from_values(list(parsable_output.values()))
                     ),
-                    json.dumps(req.end.summary),
+                    summary_json,
                     req.end.wb_run_step_end,
+                    len(output_json),
+                    len(summary_json),
                     req.end.id,
                 ),
             )
@@ -726,7 +744,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         if req.include_storage_size:
             select_columns.append(
-                "(COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0))"
+                "COALESCE(storage_size_bytes, COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0))"
             )
             select_columns_names.append("storage_size_bytes")
 
