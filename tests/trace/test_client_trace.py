@@ -1902,6 +1902,7 @@ def test_namedtuple_support(client):
     @weave.op
     def tuple_maker(a, b):
         return (a, b)
+
     act = tuple_maker(Point(1, 2), 3)
     exp = (Point(1, 2), 3)
     assert act == exp

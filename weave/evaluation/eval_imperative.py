@@ -278,7 +278,12 @@ class _LogScoreContext:
         self._call_stack_context.__enter__()
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Exit context, restore call stack, and finish the score call."""
         try:
             # scorer is guaranteed to be a Scorer instance here because it was prepared in _create_score_call
@@ -594,7 +599,12 @@ class ScoreLogger:
         self._call_stack_context.__enter__()
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Exit context manager, restore call stack, and automatically finish."""
         try:
             if not self._has_finished:
