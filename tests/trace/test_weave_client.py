@@ -2741,25 +2741,45 @@ def test_calls_query_sort_by_status(client):
     assert calls_desc[2].id == error_call.id
 
 
-@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_calls_query_sort_by_latency(client):
     """Test that sort_by summary.weave.latency_ms works with get_calls."""
     # Use a unique test ID to identify these calls
     test_id = str(uuid.uuid4())
+    base_time = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
 
-    # Create calls with clearly separated latencies across backends.
-    fast_call = client.create_call("x", {"a": 1, "b": 1, "test_id": test_id})
-    client.finish_call(fast_call, "fast result")
-    client.flush()
+    # Set timestamps explicitly so latency ordering is deterministic without sleeps.
+    fast_call = client.create_call(
+        "x",
+        {"a": 1, "b": 1, "test_id": test_id},
+        started_at=base_time,
+    )
+    client.finish_call(
+        fast_call,
+        "fast result",
+        ended_at=base_time + datetime.timedelta(milliseconds=10),
+    )
 
-    medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
-    time.sleep(0.3)
-    client.finish_call(medium_call, "medium result")
-    client.flush()
+    medium_call = client.create_call(
+        "x",
+        {"a": 2, "b": 2, "test_id": test_id},
+        started_at=base_time,
+    )
+    client.finish_call(
+        medium_call,
+        "medium result",
+        ended_at=base_time + datetime.timedelta(milliseconds=20),
+    )
 
-    slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
-    time.sleep(0.6)
-    client.finish_call(slow_call, "slow result")
+    slow_call = client.create_call(
+        "x",
+        {"a": 3, "b": 3, "test_id": test_id},
+        started_at=base_time,
+    )
+    client.finish_call(
+        slow_call,
+        "slow result",
+        ended_at=base_time + datetime.timedelta(milliseconds=30),
+    )
     client.flush()
 
     # Create a query to find just our test calls
