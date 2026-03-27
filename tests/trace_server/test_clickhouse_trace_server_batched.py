@@ -10,10 +10,6 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_schema import (
-    CallEndCHInsertable,
-    CallStartCHInsertable,
-)
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -387,7 +383,12 @@ def test_completions_create_stream_custom_provider_with_tracking():
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+        ) as mock_update_end,
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
@@ -468,13 +469,12 @@ def test_completions_create_stream_custom_provider_with_tracking():
         assert chunks[2]["choices"][0]["finish_reason"] == "stop"
         assert "usage" in chunks[2]
 
-        # Verify call tracking
-        assert mock_insert_call.call_count == 2  # Start and end calls
-        start_call = mock_insert_call.call_args_list[0][0][0]
-        end_call = mock_insert_call.call_args_list[1][0][0]
+        # Verify call tracking via calls_complete (empty project → CALLS_COMPLETE)
+        mock_insert_complete.assert_called_once()
+        mock_update_end.assert_called_once()
+        start_call = mock_insert_complete.call_args[0][0]
         assert start_call.project_id == "dGVzdF9wcm9qZWN0"
-        assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-        assert end_call.id == start_call.id
+        assert start_call.ended_at is None
 
         # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()
@@ -560,7 +560,12 @@ def test_completions_create_stream_multiple_choices():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+        ) as mock_update_end,
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
@@ -599,36 +604,24 @@ def test_completions_create_stream_multiple_choices():
         assert chunks[3]["choices"][0]["finish_reason"] == "stop"
         assert chunks[3]["choices"][1]["finish_reason"] == "stop"
 
-        # Verify call tracking - should have 1 start call + 1 end call = 2 total
-        assert mock_insert_call.call_count == 2
-
-        # Get all the calls
-        call_args = [call[0][0] for call in mock_insert_call.call_args_list]
-        start_calls = [
-            call for call in call_args if isinstance(call, CallStartCHInsertable)
-        ]
-        end_calls = [
-            call for call in call_args if isinstance(call, CallEndCHInsertable)
-        ]
-
-        # Should have 1 start call and 1 end call
-        assert len(start_calls) == 1
-        assert len(end_calls) == 1
+        # Verify call tracking via calls_complete (empty project → CALLS_COMPLETE)
+        mock_insert_complete.assert_called_once()
+        mock_update_end.assert_called_once()
 
         # Verify start call
-        start_call = start_calls[0]
+        start_call = mock_insert_complete.call_args[0][0]
         assert start_call.project_id == "dGVzdF9wcm9qZWN0"
         start_call_inputs = json.loads(start_call.inputs_dump)
         assert start_call_inputs["model"] == "gpt-3.5-turbo"
         assert start_call_inputs["n"] == 2
-        assert "choice_index" not in start_call_inputs  # Should not have choice_index
+        assert "choice_index" not in start_call_inputs
 
         # Verify end call has correct output with BOTH choices
-        end_call = end_calls[0]
+        end_call = mock_update_end.call_args[0][0]
         assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-        end_call_output = json.loads(end_call.output_dump)
+        end_call_output = end_call.output
         assert "choices" in end_call_output
-        assert len(end_call_output["choices"]) == 2  # Should have both choices
+        assert len(end_call_output["choices"]) == 2
 
         # Verify both choices are accumulated correctly
         choices = end_call_output["choices"]
@@ -642,9 +635,6 @@ def test_completions_create_stream_multiple_choices():
         choice_1 = next(c for c in choices if c["index"] == 1)
         assert choice_1["message"]["content"] == "Hi friend!"
         assert choice_1["finish_reason"] == "stop"
-
-        # Verify call IDs match between start and end calls
-        assert start_call.id == end_call.id
 
         # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()
@@ -699,7 +689,12 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+        ) as mock_update_end,
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
@@ -727,49 +722,34 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         # Verify streaming functionality - should maintain legacy format
         assert len(chunks) == 3  # Meta chunk + 2 content chunks
         assert "_meta" in chunks[0]
-        assert "weave_call_id" in chunks[0]["_meta"]  # Legacy format for n=1
-        assert "weave_call_ids" not in chunks[0]["_meta"]  # Should not have new format
+        assert "weave_call_id" in chunks[0]["_meta"]
+        assert "weave_call_ids" not in chunks[0]["_meta"]
 
         # Verify content
         assert chunks[1]["choices"][0]["delta"]["content"] == "Hello world!"
         assert chunks[2]["choices"][0]["finish_reason"] == "stop"
 
-        # Verify call tracking - should have 1 start call + 1 end call = 2 total
-        assert mock_insert_call.call_count == 2
-
-        # Get all the calls
-        call_args = [call[0][0] for call in mock_insert_call.call_args_list]
-        start_calls = [
-            call for call in call_args if isinstance(call, CallStartCHInsertable)
-        ]
-        end_calls = [
-            call for call in call_args if isinstance(call, CallEndCHInsertable)
-        ]
-
-        # Should have 1 start call and 1 end call
-        assert len(start_calls) == 1
-        assert len(end_calls) == 1
+        # Verify call tracking via calls_complete (empty project → CALLS_COMPLETE)
+        mock_insert_complete.assert_called_once()
+        mock_update_end.assert_called_once()
 
         # Verify start call
-        start_call = start_calls[0]
+        start_call = mock_insert_complete.call_args[0][0]
         assert start_call.project_id == "dGVzdF9wcm9qZWN0"
         start_call_inputs = json.loads(start_call.inputs_dump)
         assert start_call_inputs["model"] == "gpt-3.5-turbo"
         assert start_call_inputs["n"] == 1
-        assert "choice_index" not in start_call_inputs  # Should not have choice_index
+        assert "choice_index" not in start_call_inputs
 
         # Verify end call has correct output
-        end_call = end_calls[0]
+        end_call = mock_update_end.call_args[0][0]
         assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-        end_call_output = json.loads(end_call.output_dump)
+        end_call_output = end_call.output
         assert "choices" in end_call_output
         assert len(end_call_output["choices"]) == 1
         choice = end_call_output["choices"][0]
         assert choice["index"] == 0
         assert choice["message"]["content"] == "Hello world!"
-
-        # Verify call IDs match between start and end calls
-        assert start_call.id == end_call.id
 
         # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()

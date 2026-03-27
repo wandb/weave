@@ -7,6 +7,8 @@ from weave.trace_server.environment import (
     kafka_producer_max_buffer_size,
     wf_clickhouse_calls_shard_key,
     wf_scoring_worker_check_cancellation,
+    wf_scoring_worker_debounced_scoring_max_call_history,
+    wf_scoring_worker_debounced_scoring_max_sampling_rate,
     wf_scoring_worker_kafka_consumer_group_id_override,
 )
 
@@ -41,6 +43,58 @@ def test_wf_scoring_worker_check_cancellation():
     os.environ["SCORING_WORKER_CHECK_CANCELLATION"] = "invalid"
     assert wf_scoring_worker_check_cancellation() is False
     del os.environ["SCORING_WORKER_CHECK_CANCELLATION"]
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_debounced_scoring_max_sampling_rate(monkeypatch):
+    """Max sampling rate defaults to 0.0, parses floats, clamps to [0, 1], invalid -> 0.0."""
+    key = "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_SAMPLING_RATE"
+    monkeypatch.delenv(key, raising=False)
+
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
+
+    monkeypatch.setenv(key, "0")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
+    monkeypatch.setenv(key, "0.5")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.5
+    monkeypatch.setenv(key, "1")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 1.0
+    monkeypatch.setenv(key, "1.0")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 1.0
+
+    monkeypatch.setenv(key, "-0.1")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
+    monkeypatch.setenv(key, "1.5")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 1.0
+
+    monkeypatch.setenv(key, "invalid")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
+    monkeypatch.setenv(key, "")
+    assert wf_scoring_worker_debounced_scoring_max_sampling_rate() == 0.0
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_debounced_scoring_max_call_history(monkeypatch):
+    """Max call history defaults to 0, parses ints, clamps to >= 0, invalid -> 0."""
+    key = "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_CALL_HISTORY"
+    monkeypatch.delenv(key, raising=False)
+
+    assert wf_scoring_worker_debounced_scoring_max_call_history() == 0
+
+    monkeypatch.setenv(key, "0")
+    assert wf_scoring_worker_debounced_scoring_max_call_history() == 0
+    monkeypatch.setenv(key, "500")
+    assert wf_scoring_worker_debounced_scoring_max_call_history() == 500
+    monkeypatch.setenv(key, "1000")
+    assert wf_scoring_worker_debounced_scoring_max_call_history() == 1000
+
+    monkeypatch.setenv(key, "-1")
+    assert wf_scoring_worker_debounced_scoring_max_call_history() == 0
+
+    monkeypatch.setenv(key, "invalid")
+    assert wf_scoring_worker_debounced_scoring_max_call_history() == 0
+    monkeypatch.setenv(key, "")
+    assert wf_scoring_worker_debounced_scoring_max_call_history() == 0
 
 
 @pytest.mark.disable_logging_error_check

@@ -34,7 +34,7 @@ def kafka_producer_max_buffer_size() -> int | None:
     try:
         return int(size)
     except ValueError:
-        logger.exception(f"KAFKA_PRODUCER_MAX_BUFFER_SIZE value '{size}' is not valid")
+        logger.exception("KAFKA_PRODUCER_MAX_BUFFER_SIZE value '%s' is not valid", size)
         return None
 
 
@@ -86,6 +86,32 @@ def wf_scoring_worker_kafka_consumer_group_id_override() -> str | None:
     Useful for tests to set a unique value per test run to avoid offset issues.
     """
     return os.environ.get("SCORING_WORKER_KAFKA_CONSUMER_GROUP_ID")
+
+
+def wf_scoring_worker_debounced_scoring_max_sampling_rate() -> float:
+    """Max sampling rate cap for debounced scoring (delay > 0). 0.0 = disable, 1.0 = no cap beyond monitor rate."""
+    default = 0.0
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_SAMPLING_RATE", str(default)
+    )
+    try:
+        rate = float(raw)
+    except ValueError:
+        return default
+    return max(0.0, min(1.0, rate))
+
+
+def wf_scoring_worker_debounced_scoring_max_call_history() -> int:
+    """Max number of prior calls to fetch per task when aggregation_method is 'all_messages'. 0 = disabled."""
+    default = 0
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_CALL_HISTORY", str(default)
+    )
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(0, value)
 
 
 # Clickhouse Settings
@@ -167,7 +193,7 @@ def wf_clickhouse_max_memory_usage() -> int | None:
     try:
         return int(mem)
     except ValueError:
-        logger.exception(f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not valid")
+        logger.exception("WF_CLICKHOUSE_MAX_MEMORY_USAGE value '%s' is not valid", mem)
         return None
 
 
@@ -180,7 +206,7 @@ def wf_clickhouse_max_execution_time() -> int | None:
         return int(time)
     except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not valid"
+            "WF_CLICKHOUSE_MAX_EXECUTION_TIME value '%s' is not valid", time
         )
         return None
 
@@ -200,9 +226,23 @@ def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
         return int(val)
     except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '{val}' is not valid"
+            "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '%s' is not valid",
+            val,
         )
         return 100
+
+
+def wf_clickhouse_disable_lightweight_update() -> bool:
+    """Disable ClickHouse lightweight UPDATE/DELETE support.
+
+    Set to 'true' for old ClickHouse versions that do not support the
+    allow_experimental_lightweight_update setting. When disabled, endpoints
+    that rely on lightweight updates will return a 502 error.
+    """
+    return (
+        os.environ.get("WF_CLICKHOUSE_DISABLE_LIGHTWEIGHT_UPDATE", "false").lower()
+        == "true"
+    )
 
 
 def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
@@ -221,7 +261,8 @@ def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
         return int(val)
     except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '{val}' is not valid"
+            "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '%s' is not valid",
+            val,
         )
         return 1000
 
@@ -340,3 +381,11 @@ def inference_service_base_url() -> str:
     return os.environ.get(
         "INFERENCE_SERVICE_BASE_URL", "https://api.inference.wandb.ai/v1"
     )
+
+
+# Redis Settings
+
+
+def redis_url() -> str | None:
+    """Redis connection URL (e.g., redis://127.0.0.1:6379)."""
+    return os.environ.get("WEAVE_REDIS_URL")

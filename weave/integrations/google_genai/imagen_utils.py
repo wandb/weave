@@ -27,7 +27,7 @@ def google_genai_gemini_postprocess_outputs(
             try:
                 pil_image = Image.open(BytesIO(image_data.image.image_bytes))
             except Exception as e:
-                logger.info(f"Error converting image to `PIL.Image.Image`: {e}")
+                logger.info("Error converting image to `PIL.Image.Image`: %s", e)
 
             modified_outputs.append(
                 {

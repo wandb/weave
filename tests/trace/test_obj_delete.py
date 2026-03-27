@@ -197,7 +197,7 @@ def test_read_deleted_object(client: WeaveClient):
 
     ref_res = client.server.refs_read_batch(
         tsi.RefsReadBatchReq(
-            refs=[obj1_v2.uri()],
+            refs=[obj1_v2.uri],
         )
     )
     assert len(ref_res.vals) == 1
@@ -254,7 +254,7 @@ def test_read_deleted_op(client: WeaveClient):
 
     ref_res = client.server.refs_read_batch(
         tsi.RefsReadBatchReq(
-            refs=[op_ref.uri()],
+            refs=[op_ref.uri],
         )
     )
     assert len(ref_res.vals) == 1

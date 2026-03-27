@@ -10,7 +10,7 @@ class DummyWeaveClient:
         self.finished: list[str] = []
         self.thread_ids: list[str | None] = []
 
-    def create_call(self, op, inputs=None, parent=None):
+    def create_call(self, op, inputs=None, parent=None, **kwargs):
         from weave.trace.call import Call
         from weave.trace.context.call_context import get_thread_id
 
@@ -24,7 +24,7 @@ class DummyWeaveClient:
             inputs=inputs or {},
         )
 
-    def finish_call(self, call, output=None):
+    def finish_call(self, call, output=None, **kwargs):
         # Track by response ID from output dict for meaningful assertions
         rid = output.get("id") if isinstance(output, dict) else None
         self.finished.append(rid or call._op_name)

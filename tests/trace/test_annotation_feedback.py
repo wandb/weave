@@ -69,7 +69,7 @@ def test_human_feedback_basic(client):
                 "project_id": client._project_id(),
                 "weave_ref": "weave:///entity/project/call/name:digest",
                 "feedback_type": "wandb.annotation." + ref1.name,
-                "annotation_ref": ref1.uri(),
+                "annotation_ref": ref1.uri,
                 "payload": {"value": 0},
             }
         )
@@ -82,7 +82,7 @@ def test_human_feedback_basic(client):
                     "project_id": client._project_id(),
                     "weave_ref": "weave:///entity/project/call/name:digest",
                     "feedback_type": "wandb.annotation." + ref1.name,
-                    "annotation_ref": ref1.uri(),
+                    "annotation_ref": ref1.uri,
                     "payload": {"value": 42},
                 }
             )
@@ -149,7 +149,7 @@ def test_field_schema_with_pydantic_model(client):
                 "project_id": client._project_id(),
                 "weave_ref": "weave:///entity/project/call/name:digest",
                 "feedback_type": "wandb.annotation." + ref.name,
-                "annotation_ref": ref.uri(),
+                "annotation_ref": ref.uri,
                 "payload": {
                     "value": {
                         "rating": 1,
@@ -168,7 +168,7 @@ def test_field_schema_with_pydantic_model(client):
                     "project_id": client._project_id(),
                     "weave_ref": "weave:///entity/project/call/name:digest",
                     "feedback_type": "wandb.annotation." + ref.name,
-                    "annotation_ref": ref.uri(),
+                    "annotation_ref": ref.uri,
                     "payload": {
                         "value": {
                             "rating": "not a number",
@@ -484,14 +484,14 @@ def test_annotation_feedback_sdk(client):
     calls[0].feedback.add(
         "wandb.annotation.number-spec",
         {"value": 3},
-        annotation_ref=ref.uri(),
+        annotation_ref=ref.uri,
     )
 
     # Query the feedback
     feedback = calls[0].feedback.refresh()
     assert len(feedback) == 1
     assert feedback[0].payload["value"] == 3
-    assert feedback[0].annotation_ref == ref.uri()
+    assert feedback[0].annotation_ref == ref.uri
 
     # no annotation_ref
     with pytest.raises(ValueError):
@@ -512,4 +512,4 @@ def test_annotation_feedback_sdk(client):
         ValueError,
         match="To add annotation feedback, feedback_type must conform to the format: 'wandb.annotation.<name>'.",
     ):
-        calls[0].feedback.add("number_rating", {"value": 3}, annotation_ref=ref.uri())
+        calls[0].feedback.add("number_rating", {"value": 3}, annotation_ref=ref.uri)

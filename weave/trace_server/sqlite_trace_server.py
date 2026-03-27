@@ -3,6 +3,7 @@
 import datetime
 import json
 import logging
+import re
 import sqlite3
 import threading
 from collections.abc import Iterator
@@ -23,11 +24,15 @@ from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
     extract_refs_from_values,
+    split_exact_and_wildcard_values,
+    wildcard_version_value_to_ref_prefix,
 )
-from weave.trace_server import constants, object_creation_utils
+from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.call_stats_helpers import validate_call_stats_range
 from weave.trace_server.common_interface import SortBy
+from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
@@ -45,9 +50,13 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.methods.evaluation_status import evaluation_status
+from weave.trace_server.methods.sqlite_feedback_stats import (
+    sqlite_feedback_payload_schema,
+    sqlite_feedback_stats,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import quote_json_path
+from weave.trace_server.orm import quote_json_path, quote_json_path_parts
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
@@ -69,6 +78,34 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelArgs,
     EvaluateModelDispatcher,
 )
+
+
+def _apply_aggregations(
+    bucket: dict[str, Any],
+    metric: str,
+    values: list[float] | list[int],
+    aggregations: list[tsi.AggregationType],
+    percentiles: list[float] | None = None,
+) -> None:
+    """Apply aggregation functions and percentiles to a list of values, writing results into bucket."""
+    for agg in aggregations:
+        if agg == tsi.AggregationType.SUM:
+            bucket[f"sum_{metric}"] = sum(values)
+        elif agg == tsi.AggregationType.AVG:
+            bucket[f"avg_{metric}"] = sum(values) / len(values) if values else 0
+        elif agg == tsi.AggregationType.MIN:
+            bucket[f"min_{metric}"] = min(values) if values else 0
+        elif agg == tsi.AggregationType.MAX:
+            bucket[f"max_{metric}"] = max(values) if values else 0
+        elif agg == tsi.AggregationType.COUNT:
+            bucket[f"count_{metric}"] = len(values)
+    if percentiles:
+        sorted_vals = sorted(values)
+        n = len(sorted_vals)
+        for p in percentiles:
+            idx = int(p / 100 * (n - 1))
+            idx = max(0, min(idx, n - 1))
+            bucket[f"p{int(p)}_{metric}"] = sorted_vals[idx]
 
 
 @dataclass(frozen=True)
@@ -142,6 +179,21 @@ def close_conn_cursor(db_path: str | None = None) -> None:
 logger = logging.getLogger(__name__)
 
 
+def _build_sqlite_ref_filter_condition(column_name: str, refs: list[str]) -> str:
+    exact_refs, wildcard_refs = split_exact_and_wildcard_values(refs)
+    or_conditions = [
+        f"EXISTS (SELECT 1 FROM json_each({column_name}) WHERE json_each.value = '{ref}')"
+        for ref in exact_refs
+    ]
+    or_conditions += [
+        "EXISTS (SELECT 1 FROM json_each("
+        f"{column_name}"
+        f") WHERE instr(json_each.value, '{wildcard_version_value_to_ref_prefix(ref)}') = 1)"
+        for ref in wildcard_refs
+    ]
+    return "(" + " OR ".join(or_conditions) + ")"
+
+
 class SqliteTraceServer(tsi.FullTraceServerInterface):
     def __init__(
         self,
@@ -192,7 +244,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 wb_run_step_end INTEGER,
                 deleted_at TEXT,
                 display_name TEXT,
-                otel_dump TEXT
+                otel_dump TEXT,
+                storage_size_bytes INTEGER
             )
         """
         )
@@ -281,6 +334,92 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
 
+    def calls_complete(
+        self, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            for call in req.batch:
+                parsable_output = call.output
+                if not isinstance(parsable_output, dict):
+                    parsable_output = {"output": parsable_output}
+                parsable_output = cast(dict, parsable_output)
+                otel_dump_str = None
+                if call.otel_dump is not None:
+                    otel_dump_str = json.dumps(call.otel_dump)
+
+                attributes_json = json.dumps(call.attributes)
+                inputs_json = json.dumps(call.inputs)
+                output_json = json.dumps(call.output)
+                summary_json = json.dumps(call.summary)
+                storage_size = (
+                    len(attributes_json)
+                    + len(inputs_json)
+                    + len(output_json)
+                    + len(summary_json)
+                )
+
+                cursor.execute(
+                    """INSERT INTO calls (
+                        project_id, id, trace_id, parent_id, thread_id, turn_id,
+                        op_name, display_name, started_at, ended_at, exception,
+                        attributes, inputs, input_refs, output, output_refs,
+                        summary, wb_user_id, wb_run_id, wb_run_step, wb_run_step_end,
+                        otel_dump, storage_size_bytes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        call.project_id,
+                        call.id,
+                        call.trace_id,
+                        call.parent_id,
+                        call.thread_id,
+                        call.turn_id,
+                        call.op_name,
+                        call.display_name,
+                        call.started_at.isoformat(),
+                        call.ended_at.isoformat(),
+                        call.exception,
+                        attributes_json,
+                        inputs_json,
+                        json.dumps(
+                            extract_refs_from_values(list(call.inputs.values()))
+                        ),
+                        output_json,
+                        json.dumps(
+                            extract_refs_from_values(list(parsable_output.values()))
+                        ),
+                        summary_json,
+                        call.wb_user_id,
+                        call.wb_run_id,
+                        call.wb_run_step,
+                        call.wb_run_step_end,
+                        otel_dump_str,
+                        storage_size,
+                    ),
+                )
+            conn.commit()
+        return tsi.CallsUpsertCompleteRes()
+
+    def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
+        res = self.call_start(tsi.CallStartReq(start=req.start))
+        return tsi.CallStartV2Res(id=res.id, trace_id=res.trace_id)
+
+    def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
+        self.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=req.end.project_id,
+                    id=req.end.id,
+                    ended_at=req.end.ended_at,
+                    exception=req.end.exception,
+                    output=req.end.output,
+                    summary=req.end.summary,
+                    wb_run_step_end=req.end.wb_run_step_end,
+                )
+            )
+        )
+        return tsi.CallEndV2Res()
+
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -350,6 +489,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if not isinstance(parsable_output, dict):
             parsable_output = {"output": parsable_output}
         parsable_output = cast(dict, parsable_output)
+        output_json = json.dumps(req.end.output)
+        summary_json = json.dumps(req.end.summary)
         with self.lock:
             cursor.execute(
                 """UPDATE calls SET
@@ -358,17 +499,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     output = ?,
                     output_refs = ?,
                     summary = ?,
-                    wb_run_step_end = ?
+                    wb_run_step_end = ?,
+                    storage_size_bytes = COALESCE(length(attributes), 0) + COALESCE(length(inputs), 0) + ? + ?
                 WHERE id = ?""",
                 (
                     req.end.ended_at.isoformat(),
                     req.end.exception,
-                    json.dumps(req.end.output),
+                    output_json,
                     json.dumps(
                         extract_refs_from_values(list(parsable_output.values()))
                     ),
-                    json.dumps(req.end.summary),
+                    summary_json,
                     req.end.wb_run_step_end,
+                    len(output_json),
+                    len(summary_json),
                     req.end.id,
                 ),
             )
@@ -417,18 +561,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 assert_parameter_length_less_than_max(
                     "input_refs", len(filter.input_refs)
                 )
-                or_conditions = []
-                for ref in filter.input_refs:
-                    or_conditions.append(f"input_refs LIKE '%{ref}%'")
-                conds.append("(" + " OR ".join(or_conditions) + ")")
+                conds.append(
+                    _build_sqlite_ref_filter_condition("input_refs", filter.input_refs)
+                )
             if filter.output_refs:
                 assert_parameter_length_less_than_max(
                     "output_refs", len(filter.output_refs)
                 )
-                or_conditions = []
-                for ref in filter.output_refs:
-                    or_conditions.append(f"output_refs LIKE '%{ref}%'")
-                conds.append("(" + " OR ".join(or_conditions) + ")")
+                conds.append(
+                    _build_sqlite_ref_filter_condition(
+                        "output_refs", filter.output_refs
+                    )
+                )
             if filter.parent_ids:
                 assert_parameter_length_less_than_max(
                     "parent_ids", len(filter.parent_ids)
@@ -528,6 +672,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 if isinstance(operand, tsi_query.LiteralOperation):
                     return json.dumps(operand.literal_)
                 elif isinstance(operand, tsi_query.GetFieldOperator):
+                    if operand.get_field_.startswith("feedback."):
+                        return _build_feedback_subquery(operand.get_field_)
                     field = _transform_external_calls_field_to_internal_calls_field(
                         operand.get_field_, None
                     )
@@ -573,11 +719,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         select_columns = [
             key
             for key in tsi.CallSchema.model_fields.keys()
-            if key not in {"storage_size_bytes", "total_storage_size_bytes"}
+            if key
+            not in {"storage_size_bytes", "total_storage_size_bytes", "wb_username"}
         ]
         if req.columns:
             # TODO(gst): allow json fields to be selected
             simple_columns = list({x.split(".")[0] for x in req.columns})
+            if req.include_usernames and "wb_user_id" not in simple_columns:
+                simple_columns.append("wb_user_id")
             if "summary" in simple_columns or req.include_costs:
                 simple_columns += ["ended_at", "exception", "display_name"]
 
@@ -595,7 +744,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         if req.include_storage_size:
             select_columns.append(
-                "(COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0))"
+                "COALESCE(storage_size_bytes, COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0))"
             )
             select_columns_names.append("storage_size_bytes")
 
@@ -717,6 +866,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         if sort_field.startswith("summary."):
                             json_path = sort_field[len("summary.") :]
                             sort_field = "summary"
+                elif sort_field.startswith("feedback."):
+                    sort_field = _build_feedback_subquery(sort_field)
+                    json_path = None
 
                 assert direction in {
                     "ASC",
@@ -836,6 +988,42 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
 
+    def _calls_query_stream_for_eval_subtree(
+        self, project_id: str, eval_root_ids: list[str]
+    ) -> Iterator[tsi.CallSchema]:
+        columns = [
+            "id",
+            "parent_id",
+            "op_name",
+            "attributes",
+            "inputs",
+            "output",
+            "summary",
+            "started_at",
+            "ended_at",
+        ]
+        eval_root_children = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    filter=tsi.CallsFilter(parent_ids=eval_root_ids),
+                    columns=columns,
+                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                )
+            )
+        )
+        yield from eval_root_children
+        eval_root_children_ids = [c.id for c in eval_root_children]
+        if eval_root_children_ids:
+            yield from self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
+                    columns=columns,
+                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                )
+            )
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         if req.limit is not None and req.limit < 1:
             raise ValueError("Limit must be a positive integer")
@@ -855,6 +1043,224 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 for call in calls
                 if call.total_storage_size_bytes is not None
             ),
+        )
+
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        validate_call_stats_range(req.start, end)
+
+        granularity = req.granularity or int((end - req.start).total_seconds())
+        if granularity <= 0:
+            granularity = 1
+
+        # Fetch matching calls
+        calls = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=req.filter,
+                )
+            )
+        )
+
+        # Filter to time range
+        calls = [
+            c
+            for c in calls
+            if c.started_at is not None
+            and c.started_at >= req.start
+            and c.started_at < end
+        ]
+
+        # Token field mapping: metric name -> summary.usage[model] keys to sum
+        token_keys_map: dict[str, list[str]] = {
+            "input_tokens": ["prompt_tokens", "input_tokens"],
+            "output_tokens": ["completion_tokens", "output_tokens"],
+            "total_tokens": ["total_tokens"],
+        }
+
+        def _bucket_ts(started_at: datetime.datetime) -> str:
+            offset = int((started_at - req.start).total_seconds())
+            bucket_idx = offset // granularity
+            return (
+                req.start + datetime.timedelta(seconds=bucket_idx * granularity)
+            ).isoformat()
+
+        # Build usage buckets (grouped by timestamp + model)
+        usage_buckets: list[dict[str, Any]] = []
+        if req.usage_metrics:
+            # Collect per-(bucket, model) raw values for each metric
+            raw: dict[
+                tuple[str, str], dict[str, list[int]]
+            ] = {}  # (ts, model) -> metric -> values
+
+            for call in calls:
+                if not call.summary or not isinstance(call.summary, dict):
+                    continue
+                usage = call.summary.get("usage")
+                if not isinstance(usage, dict):
+                    continue
+                ts = _bucket_ts(call.started_at)
+                for model, model_usage in usage.items():
+                    if not isinstance(model_usage, dict):
+                        continue
+                    key = (ts, model)
+                    if key not in raw:
+                        raw[key] = {}
+                    for spec in req.usage_metrics:
+                        token_keys = token_keys_map.get(spec.metric, [])
+                        val = 0
+                        for k in token_keys:
+                            raw_val = model_usage.get(k)
+                            if isinstance(raw_val, (int, float, str)):
+                                val += int(raw_val)
+                        raw[key].setdefault(spec.metric, []).append(val)
+
+            for (ts, model), metrics in sorted(raw.items()):
+                bucket: dict[str, Any] = {"timestamp": ts, "model": model}
+                for spec in req.usage_metrics:
+                    values = metrics.get(spec.metric, [])
+                    if not values:
+                        continue
+                    _apply_aggregations(
+                        bucket, spec.metric, values, spec.aggregations, spec.percentiles
+                    )
+                usage_buckets.append(bucket)
+
+        # Build call buckets (grouped by timestamp only)
+        call_buckets: list[dict[str, Any]] = []
+        if req.call_metrics:
+            bucket_data: dict[str, dict[str, list[Any]]] = {}  # ts -> metric -> values
+
+            for call in calls:
+                ts = _bucket_ts(call.started_at)
+                if ts not in bucket_data:
+                    bucket_data[ts] = {}
+                for cm_spec in req.call_metrics:
+                    if cm_spec.metric == "latency_ms":
+                        if call.ended_at and call.started_at:
+                            ms = (
+                                call.ended_at - call.started_at
+                            ).total_seconds() * 1000
+                            bucket_data[ts].setdefault("latency_ms", []).append(ms)
+                    elif cm_spec.metric == "call_count":
+                        bucket_data[ts].setdefault("call_count", []).append(1)
+                    elif cm_spec.metric == "error_count":
+                        bucket_data[ts].setdefault("error_count", []).append(
+                            1 if call.exception else 0
+                        )
+
+            for ts, metrics in sorted(bucket_data.items()):
+                bucket = {"timestamp": ts}
+                for cm_spec in req.call_metrics:
+                    values = metrics.get(cm_spec.metric, [])
+                    if not values:
+                        continue
+                    _apply_aggregations(
+                        bucket,
+                        cm_spec.metric,
+                        values,
+                        cm_spec.aggregations,
+                        cm_spec.percentiles,
+                    )
+                call_buckets.append(bucket)
+
+        return tsi.CallStatsRes(
+            start=req.start,
+            end=end,
+            granularity=granularity,
+            timezone=req.timezone or "UTC",
+            usage_buckets=usage_buckets,
+            call_buckets=call_buckets,
+        )
+
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        usage_calls: list[usage_utils.UsageCall] = []
+        unfinished_call_ids: set[str] = set()
+        for call in calls:
+            usage_calls.append(
+                usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=dict(call.summary) if call.summary else None,
+                )
+            )
+            if call.ended_at is None:
+                unfinished_call_ids.add(call.id)
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            usage_calls, req.include_costs
+        )
+
+        return tsi.TraceUsageRes(
+            call_usage=aggregated_usage,
+            unfinished_call_ids=sorted(unfinished_call_ids),
+        )
+
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        if not req.call_ids:
+            return tsi.CallsUsageRes(call_usage={}, unfinished_call_ids=[])
+
+        root_calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(call_ids=req.call_ids),
+                columns=["trace_id"],
+                limit=len(req.call_ids),
+            )
+        )
+        trace_ids = {call.trace_id for call in root_calls}
+        if not trace_ids:
+            root_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {
+                call_id: {} for call_id in req.call_ids
+            }
+            return tsi.CallsUsageRes(call_usage=root_usage, unfinished_call_ids=[])
+
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        usage_calls: list[usage_utils.UsageCall] = []
+        unfinished_call_ids: set[str] = set()
+        for call in calls:
+            usage_calls.append(
+                usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=dict(call.summary) if call.summary else None,
+                )
+            )
+            if call.ended_at is None:
+                unfinished_call_ids.add(call.id)
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            usage_calls, req.include_costs
+        )
+
+        root_usage = {
+            call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
+        }
+
+        return tsi.CallsUsageRes(
+            call_usage=root_usage,
+            unfinished_call_ids=sorted(unfinished_call_ids),
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -921,6 +1327,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         processed_val = digest_result.processed_val
         json_val = digest_result.json_val
         digest = digest_result.digest
+        validate_expected_digest(
+            expected=req.obj.expected_digest,
+            actual=digest,
+            label=f"obj {req.obj.object_id!r}",
+        )
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
             req.obj.object_id,
@@ -1183,6 +1594,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
             cursor.execute(delete_query, delete_parameters)
+            # Cascade: clean up tags and aliases for deleted digests
+            digest_placeholders = ",".join("?" * len(found_digests))
+            cursor.execute(
+                f"DELETE FROM tags WHERE project_id = ? AND object_id = ? AND digest IN ({digest_placeholders})",
+                [req.project_id, req.object_id] + list(found_digests),
+            )
+            cursor.execute(
+                f"DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND digest IN ({digest_placeholders})",
+                [req.project_id, req.object_id] + list(found_digests),
+            )
             conn.commit()
 
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
@@ -1227,29 +1648,33 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conn.commit()
         return tsi.ObjRemoveTagsRes()
 
-    def obj_set_alias(self, req: tsi.ObjSetAliasReq) -> tsi.ObjSetAliasRes:
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
             self._ensure_obj_version_exists(
                 cursor, req.project_id, req.object_id, req.digest
             )
-            cursor.execute(
-                "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
-                (req.project_id, req.object_id, req.alias, req.digest),
-            )
+            for alias in req.aliases:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO aliases (project_id, object_id, alias, digest) VALUES (?, ?, ?, ?)",
+                    (req.project_id, req.object_id, alias, req.digest),
+                )
             conn.commit()
-        return tsi.ObjSetAliasRes()
+        return tsi.ObjSetAliasesRes()
 
-    def obj_remove_alias(self, req: tsi.ObjRemoveAliasReq) -> tsi.ObjRemoveAliasRes:
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
+            placeholders = ",".join("?" for _ in req.aliases)
             cursor.execute(
-                "DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias = ?",
-                (req.project_id, req.object_id, req.alias),
+                f"DELETE FROM aliases WHERE project_id = ? AND object_id = ? AND alias IN ({placeholders})",
+                (req.project_id, req.object_id, *req.aliases),
             )
             conn.commit()
-        return tsi.ObjRemoveAliasRes()
+        return tsi.ObjRemoveAliasesRes()
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1278,15 +1703,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             row_json = json.dumps(r)
             row_digest = compute_row_digest(r)
             insert_rows.append((req.table.project_id, row_digest, row_json))
+
+        row_digests = [r[1] for r in insert_rows]
+        digest = compute_table_digest(row_digests)
+        validate_expected_digest(
+            expected=req.table.expected_digest,
+            actual=digest,
+            label=f"table ({len(row_digests)} rows)",
+        )
+
         with self.lock:
             cursor.executemany(
                 "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
                 insert_rows,
             )
-
-            row_digests = [r[1] for r in insert_rows]
-
-            digest = compute_table_digest(row_digests)
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
@@ -1304,6 +1734,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         # Calculate table digest from row digests
         digest = compute_table_digest(req.row_digests)
+        validate_expected_digest(
+            expected=req.expected_digest,
+            actual=digest,
+            label=f"table ({len(req.row_digests)} rows)",
+        )
 
         with self.lock:
             cursor.execute(
@@ -1685,6 +2120,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             payload=create_result.payload,
         )
 
+    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+        """Compute feedback stats using SQLite + Python aggregation."""
+        return sqlite_feedback_stats(self, req)
+
+    def feedback_payload_schema(
+        self, req: tsi.FeedbackPayloadSchemaReq
+    ) -> tsi.FeedbackPayloadSchemaRes:
+        """Discover feedback payload schema from SQLite samples."""
+        return sqlite_feedback_payload_schema(self, req)
+
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
@@ -1695,6 +2140,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         digest = compute_file_digest(req.content)
+        validate_expected_digest(
+            expected=req.expected_digest, actual=digest, label="file"
+        )
         with self.lock:
             cursor.execute(
                 "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)",
@@ -2141,7 +2589,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         table_ref = ri.InternalTableRef(
             project_id=req.project_id,
             digest=table_res.digest,
-        ).uri()
+        ).uri
 
         # Create the dataset object
         dataset_val = object_creation_utils.build_dataset_val(
@@ -2309,7 +2757,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=scorer_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.ScorerCreateRes(
             digest=obj_result.digest,
@@ -2427,7 +2875,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=evaluation_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.EvaluationCreateRes(
             digest=obj_result.digest,
@@ -2577,7 +3025,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=object_id,
             version=obj_result.digest,
-        ).uri()
+        ).uri
 
         return tsi.ModelCreateRes(
             digest=obj_result.digest,
@@ -3056,7 +3504,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     id=predict_and_score_id,
                     trace_id=trace_id,
                     parent_id=req.evaluation_run_id,
-                    op_name=predict_and_score_op_ref.uri(),
+                    op_name=predict_and_score_op_ref.uri,
                     started_at=datetime.datetime.now(datetime.timezone.utc),
                     attributes={
                         constants.WEAVE_ATTRIBUTES_NAMESPACE: {
@@ -3127,7 +3575,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 id=prediction_id,
                 trace_id=trace_id,
                 parent_id=parent_id,
-                op_name=predict_op_ref.uri(),
+                op_name=predict_op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes=prediction_attributes,
                 inputs={
@@ -3523,7 +3971,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 id=score_id,
                 trace_id=trace_id,
                 parent_id=parent_id,
-                op_name=score_op_ref.uri(),
+                op_name=score_op_ref.uri,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes=score_attributes,
                 inputs={
@@ -3564,7 +4012,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         feedback_req = tsi.FeedbackCreateReq(
             project_id=req.project_id,
-            weave_ref=prediction_call_ref.uri(),
+            weave_ref=prediction_call_ref.uri,
             feedback_type=f"{RUNNABLE_FEEDBACK_TYPE_PREFIX}.{scorer_name}",
             payload={"output": req.value},
             runnable_ref=req.scorer,
@@ -3730,7 +4178,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         """Return grouped prediction/trial/score data for evaluation results."""
-        return eval_helpers.eval_results_query(self, req)
+        eval_root_ids = eval_helpers.resolve_eval_root_ids(req)
+        if not eval_root_ids:
+            empty_summary = tsi.EvalResultsSummaryRes() if req.include_summary else None
+            return tsi.EvalResultsQueryRes(
+                rows=[], total_rows=0, summary=empty_summary, warnings=[]
+            )
+        all_calls = list(
+            self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
+        )
+        return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -4034,3 +4491,63 @@ def _transform_external_calls_field_to_internal_calls_field(
         )
 
     return field
+
+
+def _build_feedback_subquery(field: str) -> str:
+    """Build a SQLite subquery for a feedback field reference.
+
+    Handles fields like:
+      feedback.[*].payload.output.label  (wildcard - search all feedback types)
+      feedback.[wandb.runnable.my_scorer_a].payload.output.label  (specific type)
+    """
+    path = field[len("feedback.") :]
+    match = re.match(r"^(\[.+?\])\.(.+)$", path)
+    if not match:
+        raise ValueError(f"Invalid feedback field path: {field}")
+    feedback_type_bracket, rest = match.groups()
+    feedback_type = feedback_type_bracket[1:-1]
+
+    parts = rest.split(".")
+    if parts[0] == "payload":
+        db_column = "payload_dump"
+        extra_parts = parts[1:]
+    elif parts[0] in {"runnable_ref", "trigger_ref"}:
+        db_column = parts[0]
+        extra_parts = []
+    else:
+        raise ValueError(f"Invalid feedback field path: {field}")
+
+    if extra_parts:
+        json_path = quote_json_path_parts(extra_parts)
+        # Use a CASE expression to convert SQLite's json_extract results to
+        # string representations matching ClickHouse's JSON_VALUE behavior,
+        # where booleans are returned as "true"/"false" strings.
+        raw = f"json_extract({db_column}, '{json_path}')"
+        value_expr = (
+            f"CASE json_type({db_column}, '{json_path}')"
+            f" WHEN 'true' THEN 'true'"
+            f" WHEN 'false' THEN 'false'"
+            f" ELSE {raw} END"
+        )
+    else:
+        value_expr = db_column
+
+    type_filter = ""
+    if feedback_type != "*":
+        escaped = feedback_type.replace("'", "''")
+        type_filter = f" AND feedback_type = '{escaped}'"
+
+    if feedback_type == "*":
+        # For wildcard, concatenate values from all feedback rows so filters
+        # can search across every entry.
+        return (
+            f"(SELECT GROUP_CONCAT({value_expr}, ',') FROM feedback"
+            f" WHERE feedback.weave_ref = 'weave-trace-internal:///' || calls.project_id || '/call/' || calls.id"
+            f"{type_filter})"
+        )
+    else:
+        return (
+            f"(SELECT {value_expr} FROM feedback"
+            f" WHERE feedback.weave_ref = 'weave-trace-internal:///' || calls.project_id || '/call/' || calls.id"
+            f"{type_filter} LIMIT 1)"
+        )

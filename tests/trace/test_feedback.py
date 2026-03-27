@@ -90,7 +90,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
     payload = {"value": 1}
 
     ref = weave.publish(AnnotationSpec(name=column_name, field_schema=int))
-    annotation_ref = ref.uri()
+    annotation_ref = ref.uri
 
     # Case 1: Errors with no name in type (dangle or char len 0)
     with pytest.raises(InvalidRequest):
@@ -384,10 +384,6 @@ async def populate_feedback(client: WeaveClient) -> None:
 
 @pytest.mark.asyncio
 async def test_sort_by_feedback(client: WeaveClient) -> None:
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        return pytest.skip()
-
     """Test sorting by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
 
@@ -411,7 +407,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 sort_by=[
                     SortBy(
                         field=field,
@@ -430,7 +426,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 sort_by=[
                     SortBy(
                         field=field,
@@ -449,10 +445,6 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
 
 @pytest.mark.asyncio
 async def test_filter_by_feedback(client: WeaveClient) -> None:
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        return pytest.skip()
-
     """Test filtering by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
     for field, value, eq_ids, gt_ids in [
@@ -478,7 +470,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 query={
                     "$expr": {
                         "$eq": [
@@ -498,7 +490,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 query={
                     "$expr": {
                         "$gt": [
@@ -523,16 +515,12 @@ class MatchAnyDatetime:  # noqa: PLW1641
 
 @pytest.mark.asyncio
 async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        return pytest.skip()
-
-    """Test filtering by feedback."""
+    """Test filtering and sorting by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
             project_id=client._project_id(),
-            filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
+            filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
             # Filter down to just correct matches
             query={
                 "$expr": {
@@ -556,6 +544,112 @@ async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
     calls = list(calls)
     assert len(calls) == 2
     assert [c.id for c in calls] == [ids[2], ids[0]]
+
+
+@pytest.mark.asyncio
+async def test_filter_by_wildcard_feedback_with_multiple_items(
+    client: WeaveClient,
+) -> None:
+    """Test that wildcard feedback filtering searches across ALL feedback entries.
+
+    Regression test for a bug where filtering with feedback.[*].payload.X used
+    any() which only checked one arbitrary feedback row, missing matches in other
+    feedback entries on the same call.
+    """
+
+    @weave.op
+    def my_scorer_a(x: int, output: str) -> dict:
+        return {"label": "scorer_a", "score": x * 10}
+
+    @weave.op
+    def my_scorer_b(x: int, output: str) -> dict:
+        return {"label": "scorer_b", "score": x * 100}
+
+    @weave.op
+    def my_model(x: int) -> str:
+        return f"result_{x}"
+
+    # Create 3 calls, each scored by both scorers
+    ids = []
+    for x in range(3):
+        _, c = my_model.call(x)
+        ids.append(c.id)
+        await c.apply_scorer(my_scorer_a)
+        await c.apply_scorer(my_scorer_b)
+
+    model_ref = get_ref(my_model).uri
+
+    # Each call now has 2 feedback items (one per scorer).
+    # Wildcard filter should search across BOTH feedback entries.
+
+    # Filter for scorer_b's label — should match all 3 calls.
+    # With the old any() approach, this could miss scorer_b if any() picked
+    # scorer_a's feedback row arbitrarily.
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_names=[model_ref]),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "feedback.[*].payload.output.label"},
+                            "substr": {"$literal": "scorer_b"},
+                            "case_insensitive": False,
+                        }
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 3, (
+        f"Expected all 3 calls to match wildcard filter for scorer_b label, got {len(calls)}"
+    )
+
+    # Also verify scorer_a is findable via the same wildcard path
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_names=[model_ref]),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "feedback.[*].payload.output.label"},
+                            "substr": {"$literal": "scorer_a"},
+                            "case_insensitive": False,
+                        }
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 3, (
+        f"Expected all 3 calls to match wildcard filter for scorer_a label, got {len(calls)}"
+    )
+
+    # Filter using a specific scorer type (non-wildcard) still works
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_names=[model_ref]),
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {
+                                "$getField": "feedback.[wandb.runnable.my_scorer_a].payload.output.label"
+                            },
+                            {"$literal": "scorer_a"},
+                        ]
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 3, (
+        f"Expected all 3 calls to match specific feedback type filter, got {len(calls)}"
+    )
 
 
 def test_feedback_replace(client) -> None:
@@ -752,11 +846,11 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     """Test that $contains works with numeric literals on JSON fields.
 
     This test reproduces the ClickHouse error:
-    Illegal type UInt64 of argument of function position
+    Illegal type Int64 of argument of function position
 
     The issue occurs when using $contains with a numeric literal on a JSON field.
     The query builder should convert the numeric literal to a string for the
-    position function, not cast it to UInt64.
+    position function, not cast it to an integer type.
     """
     project_id = client._project_id()
     call_ref_uri = f"weave:///{project_id}/call/call_id_456"
@@ -772,11 +866,11 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
 
     # Query for feedback where dataset_id contains the numeric literal 94
     # This should work but currently fails with:
-    # "Illegal type UInt64 of argument of function position"
+    # "Illegal type Int64 of argument of function position"
     if not client_is_sqlite(client):
         with pytest.raises(
             DatabaseError,
-            match="Illegal type UInt64 of argument of function position",
+            match="Illegal type Int64 of argument of function position",
         ):
             client.server.feedback_query(
                 FeedbackQueryReq(
@@ -1033,3 +1127,152 @@ def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
     # Query all feedback
     all_feedback = client.server.feedback_query(FeedbackQueryReq(project_id=project_id))
     assert len(all_feedback.result) == 3
+
+
+# ---------------------------------------------------------------------------
+# feedback_stats / feedback_payload_schema integration tests
+# ---------------------------------------------------------------------------
+
+
+def _seed_numeric_feedback(
+    client: WeaveClient,
+    scores: list[float],
+    feedback_type: str = "wandb.runnable.test-scorer",
+    trigger_ref: str | None = None,
+) -> None:
+    """Create feedback rows with numeric payload for stats testing."""
+    project_id = client._project_id()
+    call = client.create_call("x", {"a": 1})
+    client.finish_call(call, "done")
+    weave_ref = get_ref(client.get_call(call.id)).uri()
+    call_ref = f"weave:///{project_id}/call/{call.id}"
+    runnable_name = feedback_type.rsplit(".", 1)[-1]
+    runnable_ref = f"weave:///{project_id}/op/{runnable_name}:op_digest_1"
+
+    for score in scores:
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type=feedback_type,
+                payload={"output": {"score": score}},
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+                trigger_ref=trigger_ref,
+            )
+        )
+
+
+def test_feedback_stats(client: WeaveClient) -> None:
+    """End-to-end: seed feedback, query aggregated stats, verify buckets and window_stats.
+
+    Runs with both SQLite and ClickHouse backends (controlled by --trace-server).
+    """
+    project_id = client._project_id()
+    trigger = f"weave:///{project_id}/object/test-scorer:trig_1"
+    scores = [0.5, 0.8, 1.0]
+    _seed_numeric_feedback(
+        client,
+        scores,
+        feedback_type="wandb.runnable.test-scorer",
+        trigger_ref=trigger,
+    )
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    res = client.server.feedback_stats(
+        tsi.FeedbackStatsReq(
+            project_id=project_id,
+            start=now - datetime.timedelta(hours=1),
+            end=now + datetime.timedelta(minutes=5),
+            feedback_type="wandb.runnable.test-scorer",
+            trigger_ref=trigger,
+            metrics=[
+                tsi.FeedbackMetricSpec(
+                    json_path="output.score",
+                    value_type="numeric",
+                    aggregations=[
+                        tsi.AggregationType.AVG,
+                        tsi.AggregationType.MIN,
+                        tsi.AggregationType.MAX,
+                    ],
+                )
+            ],
+        )
+    )
+
+    assert isinstance(res.buckets, list)
+    assert len(res.buckets) >= 1
+    total_count = sum(b.get("count", 0) for b in res.buckets)
+    assert total_count == len(scores)
+    assert res.granularity > 0
+
+    assert res.window_stats is not None
+    assert "output_score" in res.window_stats
+    ws = res.window_stats["output_score"]
+    assert ws["min"] == pytest.approx(0.5)
+    assert ws["max"] == pytest.approx(1.0)
+    assert ws["avg"] == pytest.approx(sum(scores) / len(scores), abs=1e-6)
+
+
+def test_feedback_payload_schema(client: WeaveClient) -> None:
+    """End-to-end: seed varied feedback, discover payload schema paths."""
+    project_id = client._project_id()
+    call = client.create_call("x", {"a": 1})
+    client.finish_call(call, "done")
+    weave_ref = get_ref(client.get_call(call.id)).uri()
+    call_ref = f"weave:///{project_id}/call/{call.id}"
+    runnable_ref = f"weave:///{project_id}/op/schema-scorer:op_digest_1"
+    trigger = f"weave:///{project_id}/object/schema-scorer:trig_schema"
+
+    for payload in [
+        {"output": {"score": 0.9}},
+        {"output": {"score": 0.5}, "label": "good"},
+    ]:
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type="wandb.runnable.schema-scorer",
+                payload=payload,
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+                trigger_ref=trigger,
+            )
+        )
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    res = client.server.feedback_payload_schema(
+        tsi.FeedbackPayloadSchemaReq(
+            project_id=project_id,
+            start=now - datetime.timedelta(hours=1),
+            end=now + datetime.timedelta(minutes=5),
+            feedback_type="wandb.runnable.schema-scorer",
+            trigger_ref=trigger,
+        )
+    )
+
+    path_map = {p.json_path: p.value_type for p in res.paths}
+    assert "output.score" in path_map
+    assert path_map["output.score"] == "numeric"
+    assert "label" in path_map
+    assert path_map["label"] == "categorical"
+
+
+def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
+    """Empty metrics list returns empty buckets without error.
+
+    Runs with both SQLite and ClickHouse backends (controlled by --trace-server).
+    """
+    project_id = client._project_id()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    res = client.server.feedback_stats(
+        tsi.FeedbackStatsReq(
+            project_id=project_id,
+            start=now - datetime.timedelta(hours=1),
+            end=now + datetime.timedelta(minutes=5),
+            metrics=[],
+        )
+    )
+
+    assert res.buckets == []
+    assert res.granularity == 3600

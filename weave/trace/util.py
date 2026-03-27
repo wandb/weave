@@ -74,7 +74,7 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
         wrapped_fn = partial(self._run_with_context, fn)
         return super().submit(wrapped_fn, copy_context(), *args, **kwargs)
 
-    def map(
+    def map(  # type: ignore[override]
         self,
         fn: Callable,
         *iterables: Iterable[Any],

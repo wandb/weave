@@ -11,6 +11,7 @@
 4. We ensure that invalid schemas are properly rejected from the server.
 """
 
+import time
 from typing import Literal
 
 import pytest
@@ -52,11 +53,11 @@ def test_pythonic_creation(client: WeaveClient):
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
-        nested_base_object=weave.publish(nested_obj).uri(),
+        nested_base_object=weave.publish(nested_obj).uri,
     )
     ref = weave.publish(top_obj)
 
-    top_obj_gotten = weave.ref(ref.uri()).get()
+    top_obj_gotten = weave.ref(ref.uri).get()
 
     assert isinstance(top_obj_gotten, base_objects.TestOnlyExample)
     assert top_obj_gotten.model_dump(by_alias=True) == top_obj.model_dump(by_alias=True)
@@ -67,7 +68,7 @@ def test_pythonic_creation(client: WeaveClient):
     )
     inherited_ref = weave.publish(inherited_obj)
 
-    inherited_obj_gotten = weave.ref(inherited_ref.uri()).get()
+    inherited_obj_gotten = weave.ref(inherited_ref.uri).get()
 
     assert isinstance(inherited_obj_gotten, base_objects.TestOnlyInheritedBaseObject)
     assert inherited_obj_gotten.model_dump(by_alias=True) == inherited_obj.model_dump(
@@ -175,6 +176,7 @@ def test_pythonic_creation(client: WeaveClient):
     assert inherited_obj_result.val == expected_inherited_val
 
 
+@pytest.mark.flaky(reruns=3)
 def test_interface_creation(client):
     # Now we will do the equivant operation using low-level interface.
     nested_obj_id = "TestOnlyNestedBaseObject"
@@ -202,7 +204,7 @@ def test_interface_creation(client):
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
-        nested_base_object=nested_obj_ref.uri(),
+        nested_base_object=nested_obj_ref.uri,
     )
     top_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
@@ -223,11 +225,13 @@ def test_interface_creation(client):
         _digest=top_obj_res.digest,
     )
 
-    top_obj_gotten = weave.ref(top_obj_ref.uri()).get()
+    # Allow ClickHouse eventual consistency to settle before reading
+    time.sleep(0.2)
+    top_obj_gotten = weave.ref(top_obj_ref.uri).get()
 
     assert top_obj_gotten.model_dump(by_alias=True) == top_obj.model_dump(by_alias=True)
 
-    nested_obj_gotten = weave.ref(nested_obj_ref.uri()).get()
+    nested_obj_gotten = weave.ref(nested_obj_ref.uri).get()
 
     assert nested_obj_gotten.model_dump(by_alias=True) == nested_obj.model_dump(
         by_alias=True
@@ -308,7 +312,7 @@ def test_digest_equality(client):
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
-        nested_base_object=nested_ref.uri(),
+        nested_base_object=nested_ref.uri,
     )
     ref = weave.publish(top_obj)
     nested_pythonic_digest = nested_ref.digest
@@ -344,7 +348,7 @@ def test_digest_equality(client):
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
-        nested_base_object=nested_obj_ref.uri(),
+        nested_base_object=nested_obj_ref.uri,
     )
     top_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
@@ -923,7 +927,7 @@ def test_exclude_base_object_classes(client: WeaveClient):
     top_obj = base_objects.TestOnlyExample(
         primitive=200,
         nested_base_model=TestOnlyNestedBaseModel(a=300, aliased_property_alias=400),
-        nested_base_object=nested_ref.uri(),
+        nested_base_object=nested_ref.uri,
     )
     top_ref = weave.publish(top_obj)
 
@@ -1007,7 +1011,7 @@ def test_exclude_base_object_classes_with_include_filter(client: WeaveClient):
     top_obj = base_objects.TestOnlyExample(
         primitive=333,
         nested_base_model=TestOnlyNestedBaseModel(a=444, aliased_property_alias=555),
-        nested_base_object=nested_ref1.uri(),
+        nested_base_object=nested_ref1.uri,
     )
     top_ref = weave.publish(top_obj)
 

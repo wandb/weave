@@ -122,7 +122,7 @@ def publish_results_as_feedback(
 ) -> FeedbackCreateRes:
     project_id = target_call.project_id
     call_id = target_call.id
-    weave_ref = InternalCallRef(project_id, call_id).uri()
+    weave_ref = InternalCallRef(project_id, call_id).uri
     parsed_action_ref = parse_internal_uri(action_ref)
     if not isinstance(parsed_action_ref, (InternalObjectRef, InternalOpRef)):
         raise TypeError(f"Invalid action ref: {action_ref}")

@@ -1,7 +1,7 @@
 from tests.trace.data_serialization.spec import SerializationTestCase
 from weave import AnnotationSpec
 from weave.flow import leaderboard
-from weave.flow.monitor import Monitor
+from weave.flow.monitor import ClassifierMonitor, Monitor
 
 config_cases = [
     SerializationTestCase(
@@ -138,6 +138,7 @@ config_cases = [
                 "_class_name": "Query",
                 "_bases": ["BaseModel"],
             },
+            "is_traced": True,
             "active": False,
             "scorer_debounce_config": {
                 "aggregation_field": "trace_id",
@@ -272,6 +273,41 @@ config_cases = [
             "active": False,
             "_class_name": "Monitor",
             "_bases": ["Object", "BaseModel"],
+        },
+        exp_objects=[],
+        exp_files=[],
+        # Sad ... equality is really a pain to assert here (and is broken)
+        # TODO: Write a good equality check and make it work
+        equality_check=lambda a, b: True,
+    ),
+    SerializationTestCase(
+        id="ClassifierMonitor",
+        runtime_object_factory=lambda: ClassifierMonitor(
+            name="test_classifier_monitor",
+            sampling_rate=0.75,
+            scorers=[],
+            op_names=["classify_op"],
+            prompt_header="Analyze the following categories:",
+            prompt_footer="Return a JSON object with your classification.",
+            is_traced=False,
+        ),
+        inline_call_param=False,
+        is_legacy=False,
+        exp_json={
+            "_type": "ClassifierMonitor",
+            "name": "test_classifier_monitor",
+            "description": None,
+            "sampling_rate": 0.75,
+            "scorers": [],
+            "op_names": ["classify_op"],
+            "query": None,
+            "is_traced": False,
+            "active": False,
+            "scorer_debounce_config": None,
+            "prompt_header": "Analyze the following categories:",
+            "prompt_footer": "Return a JSON object with your classification.",
+            "_class_name": "ClassifierMonitor",
+            "_bases": ["Monitor", "Object", "BaseModel"],
         },
         exp_objects=[],
         exp_files=[],

@@ -363,6 +363,95 @@ async def test_async_anthropic_messages_stream_ctx_manager(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
+def test_anthropic_messages_stream_get_final_message(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
+
+    with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        message = stream.get_final_message()
+
+    exp = "Hello there!"
+    assert message.content[0].text.strip() == exp
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+
+    assert call.exception is None
+    assert call.ended_at is not None
+    output = call.output
+    assert output.model == model
+    assert output.stop_reason == "end_turn"
+    assert output.content[0].text.strip() == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+@pytest.mark.asyncio
+async def test_async_anthropic_messages_stream_get_final_message(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    anthropic_client = AsyncAnthropic(
+        api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+    )
+
+    async with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        message = await stream.get_final_message()
+
+    exp = "Hello there!"
+    assert message.content[0].text.strip() == exp
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+
+    assert call.exception is None
+    assert call.ended_at is not None
+    output = call.output
+    assert output.model == model
+    assert output.stop_reason == "end_turn"
+    assert output.content[0].text.strip() == exp
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
 def test_anthropic_messages_stream_ctx_manager_text(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:

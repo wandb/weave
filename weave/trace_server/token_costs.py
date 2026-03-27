@@ -621,6 +621,7 @@ def get_cost_final_select(
     if order_fields:
         # Circular import avoidance: calls_query_builder imports from token_costs
         from weave.trace_server.calls_query_builder.calls_query_builder import (
+            CallsMergedDynamicField,
             CallsMergedSummaryField,
         )
 
@@ -635,14 +636,21 @@ def get_cost_final_select(
                 order_parts.append(f"{safe_alias(of.field.field)} {of.direction}")
             else:
                 # Feedback fields need use_agg_fn=True because they come from a
-                # JOIN and aren't in the GROUP BY.  All other fields (e.g.
-                # CallsMergedAggField with argMaxMerge) have already been
-                # materialized to plain columns by the CTEs, so use_agg_fn=False.
+                # JOIN and aren't in the GROUP BY.  Dynamic summary fields (e.g.
+                # summary.acuracia) also need use_agg_fn=True because
+                # summary_dump is not in the GROUP BY (it's rebuilt with cost
+                # data).  All other fields (e.g. CallsMergedAggField with
+                # argMaxMerge) have already been materialized to plain columns
+                # by the CTEs, so use_agg_fn=False.
+                needs_agg = of.field.is_feedback_field() or (
+                    isinstance(of.field, CallsMergedDynamicField)
+                    and of.field.field == "summary_dump"
+                )
                 order_parts.append(
                     of.as_sql(
                         pb,
                         "ranked_prices",
-                        use_agg_fn=of.field.is_feedback_field(),
+                        use_agg_fn=needs_agg,
                     )
                 )
         order_by = f"ORDER BY {', '.join(order_parts)}"

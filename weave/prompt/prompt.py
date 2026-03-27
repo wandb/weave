@@ -414,10 +414,15 @@ class EasyPrompt(UserList, Prompt):
         self.config.update(kwargs)
         return self
 
-    def publish(self, name: str | None = None) -> ObjectRef:
+    def publish(
+        self,
+        name: str | None = None,
+        tags: list[str] | None = None,
+        aliases: list[str] | None = None,
+    ) -> ObjectRef:
         # TODO: This only works if we've called weave.init, but it seems like
         #       that shouldn't be necessary if we have loaded this from a ref.
-        return weave_publish(self, name=name)
+        return weave_publish(self, name=name, tags=tags, aliases=aliases)
 
     def messages_table(self, title: str | None = None) -> display.Table:
         table = display.Table(title=title, title_justify="left", show_header=False)
@@ -510,14 +515,14 @@ class EasyPrompt(UserList, Prompt):
                 "Prompt.load() takes a file-like object, not a string. Did you mean Prompt.e()?"
             )
         data = json.load(fp)
-        prompt = EasyPrompt(**data)
+        prompt = cls(**data)
         return prompt
 
     @classmethod
     def load_file(cls, filepath: str | Path) -> Self:
         expanded_path = os.path.expanduser(str(filepath))
         with open(expanded_path, encoding="utf-8") as f:
-            return EasyPrompt.load(f)
+            return cls.load(f)
 
     def dump(self, fp: IO) -> None:
         json.dump(self.as_pydantic_dict(), fp, indent=2)

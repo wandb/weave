@@ -53,11 +53,17 @@ def maybe_unwrap_api_response(value: Any) -> Any:
     """
     maybe_value: Any = None
 
-    if isinstance(value, LegacyAPIResponse):
-        maybe_value = value.parse()
+    try:
+        if isinstance(value, LegacyAPIResponse):
+            maybe_value = value.parse()
 
-    if isinstance(value, APIResponse):
-        maybe_value = value.parse()
+        if isinstance(value, APIResponse):
+            maybe_value = value.parse()
+    except Exception:
+        # LegacyAPIResponse.parse() can fail in streaming contexts due to
+        # async race conditions (e.g. httpx.ResponseNotRead on Windows CI).
+        # Since this is best-effort unwrapping, fall back to the original response.
+        return value
 
     if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
         return maybe_value

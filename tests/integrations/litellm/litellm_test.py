@@ -265,7 +265,7 @@ def test_model_predict(
 
     # Create instances with different models
     claude_translator = TranslatorModel(
-        model="claude-3-5-sonnet-20240620", temperature=0.1
+        model="anthropic/claude-3-5-sonnet-20240620", temperature=0.1
     )
 
     res = claude_translator.predict("There is a bug in my code!", "Spanish")
