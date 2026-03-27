@@ -374,7 +374,7 @@ class FailureReportScorer(weave.Scorer):
         return {"match": match, "answer": answer, "expected": expected}
 
     @weave.op
-    def summarize(self, score_rows: list) -> dict:
+    def summarize(self, score_rows: list) -> dict | None:
         total = len(score_rows)
         failures = [r for r in score_rows if not r.get("match", True)]
         return {
@@ -535,7 +535,7 @@ def chat_turn(user_message: str) -> str:
     """A single chat turn — used inside weave.thread() to group a conversation."""
     answer = simulate_qa_answer(user_message, temperature=0.5)
     call = weave.get_current_call()
-    if call:
+    if call and call.summary is not None:
         call.summary["message_length"] = len(answer)
     return answer
 
@@ -684,7 +684,8 @@ def step_calls() -> None:
         chat_turn("Hello, what is the capital of France?")
         chat_turn("And what about Germany?")
         chat_turn("Thanks! What is 7 × 8?")
-    print(f"    ✓ 1 threaded conversation (3 turns, thread_id={t.thread_id[:12]}...)")
+    tid = t.thread_id or "unknown"
+    print(f"    ✓ 1 threaded conversation (3 turns, thread_id={tid[:12]}...)")
 
     # log_call: manual call logging for undecorated functions
     weave.log_call(
