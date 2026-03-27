@@ -9,6 +9,8 @@ if sys.version_info < (3, 10):  # noqa: UP036
         stacklevel=2,
     )
 
+# Side-effect import: applies thread-safety patches to PIL and MoviePy.
+import weave.initialization  # noqa: F401
 from weave import version
 from weave.trace.api import (
     ObjectRef,
