@@ -1212,6 +1212,40 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
+    def move_calls(
+        self,
+        call_ids: list[str],
+        to_project: str,
+    ) -> int:
+        """Move calls from this project to another project.
+
+        The calls are moved server-side: their ``project_id`` is updated to
+        ``to_project`` and they are removed from the current project.
+
+        Args:
+            call_ids: List of call IDs to move.
+            to_project: Destination project in ``"entity/project"`` format.
+
+        Returns:
+            The number of calls moved.
+        """
+        from weave.trace_server.trace_server_interface import (
+            CallsMoveReq,
+        )
+
+        if not call_ids:
+            return 0
+
+        res = self.server.calls_move(
+            CallsMoveReq(
+                project_id=self._project_id(),
+                call_ids=call_ids,
+                target_project_id=to_project,
+            )
+        )
+        return res.num_moved
+
+    @trace_sentry.global_trace_sentry.watch()
     def delete_object_version(self, object: ObjectRef) -> None:
         self.server.obj_delete(
             ObjDeleteReq(

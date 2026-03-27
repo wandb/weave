@@ -274,6 +274,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.calls_delete, req, req.project_id
         )
 
+    def calls_move(self, req: tsi.CallsMoveReq) -> tsi.CallsMoveRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        req.target_project_id = self._idc.ext_to_int_project_id(
+            req.target_project_id
+        )
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._internal_trace_server.calls_move(req)
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.filter is not None:

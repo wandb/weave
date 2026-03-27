@@ -2927,6 +2927,31 @@ def build_calls_complete_delete_query(
     return safely_format_sql(raw_sql, logger)
 
 
+def build_calls_complete_move_query(
+    table_name: str,
+    columns: list[str],
+    source_project_id_param: str,
+    target_project_id_param: str,
+    call_ids_param: str,
+    cluster_name: str | None = None,
+) -> str:
+    """Build an INSERT…SELECT that copies rows with a new project_id."""
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+    # Replace project_id in the SELECT list with the target value.
+    select_cols = ", ".join(
+        f"{{{target_project_id_param}:String}}" if c == "project_id" else c
+        for c in columns
+    )
+    raw_sql = f"""
+        INSERT INTO {table_name} ({', '.join(columns)})
+        SELECT {select_cols}
+        FROM {table_name}
+        WHERE project_id = {{{source_project_id_param}:String}}
+          AND id IN {{{call_ids_param}:Array(String)}}
+        """
+    return safely_format_sql(raw_sql, logger)
+
+
 def build_calls_complete_update_query(
     table_name: str,
     project_id_param: str,

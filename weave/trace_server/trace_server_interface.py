@@ -453,6 +453,19 @@ class CallsDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="The number of calls deleted")
 
 
+class CallsMoveReq(BaseModelStrict):
+    project_id: str
+    call_ids: list[str]
+    target_project_id: str
+
+    # wb_user_id is automatically populated by the server
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class CallsMoveRes(BaseModel):
+    num_moved: int = Field(..., description="The number of calls moved")
+
+
 class CompletionsCreateRequestInputs(BaseModel):
     model: str
     messages: list = []
@@ -2816,6 +2829,7 @@ class TraceServerInterface(Protocol):
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
+    def calls_move(self, req: CallsMoveReq) -> CallsMoveRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_stats(self, req: "CallStatsReq") -> "CallStatsRes": ...
     def trace_usage(self, req: "TraceUsageReq") -> "TraceUsageRes": ...

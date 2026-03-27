@@ -571,6 +571,26 @@ def finish() -> None:
         wc.finish()
 
 
+def move_calls(
+    call_ids: list[str],
+    to_project: str,
+) -> int:
+    """Move calls from the current project to another project.
+
+    The calls are moved server-side: their ``project_id`` is updated to
+    ``to_project`` and they are removed from the current project.
+
+    Args:
+        call_ids: List of call IDs to move.
+        to_project: Destination project in ``"entity/project"`` format.
+
+    Returns:
+        The number of calls moved.
+    """
+    client = weave_client_context.require_weave_client()
+    return client.move_calls(call_ids, to_project)
+
+
 __all__ = [
     "ObjectRef",
     "Table",
@@ -588,6 +608,7 @@ __all__ = [
     "init",
     "list_aliases",
     "list_tags",
+    "move_calls",
     "op",
     "publish",
     "ref",

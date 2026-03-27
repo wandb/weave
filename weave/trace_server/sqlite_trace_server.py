@@ -1243,6 +1243,19 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsDeleteRes(num_deleted=len(all_ids))
 
+    def calls_move(self, req: tsi.CallsMoveReq) -> tsi.CallsMoveRes:
+        conn, cursor = get_conn_cursor(self.db_path)
+        with self.lock:
+            placeholders = ", ".join("?" * len(req.call_ids))
+            cursor.execute(
+                f"""UPDATE calls
+                SET project_id = ?
+                WHERE project_id = ? AND deleted_at IS NULL AND id IN ({placeholders})""",
+                [req.target_project_id, req.project_id] + req.call_ids,
+            )
+            conn.commit()
+        return tsi.CallsMoveRes(num_moved=cursor.rowcount)
+
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         if req.display_name is None:

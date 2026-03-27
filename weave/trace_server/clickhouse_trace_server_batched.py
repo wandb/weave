@@ -75,6 +75,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     QueryBuilderDynamicField,
     QueryBuilderField,
     build_calls_complete_delete_query,
+    build_calls_complete_move_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
     build_calls_stats_query,
@@ -1573,6 +1574,73 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cluster_name=self.clickhouse_cluster_name,
         )
         self._command(delete_query, parameters=pb.get_params())
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_move")
+    def calls_move(self, req: tsi.CallsMoveReq) -> tsi.CallsMoveRes:
+        """Move calls from one project to another.
+
+        Since project_id is part of the ClickHouse ORDER BY key it cannot be
+        UPDATEd in place.  Instead we INSERT … SELECT the rows with the new
+        project_id, then DELETE the originals.
+        """
+        if not req.call_ids:
+            return tsi.CallsMoveRes(num_moved=0)
+
+        # --- v2 calls_complete table ---
+        write_target = self.table_routing_resolver.resolve_v1_write_target(
+            req.project_id,
+            self.ch_client,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            pb = ParamBuilder()
+            src_param = pb.add_param(req.project_id)
+            tgt_param = pb.add_param(req.target_project_id)
+            ids_param = pb.add_param(req.call_ids)
+
+            move_query = build_calls_complete_move_query(
+                "calls_complete",
+                ALL_CALL_COMPLETE_INSERT_COLUMNS,
+                src_param,
+                tgt_param,
+                ids_param,
+                cluster_name=self.clickhouse_cluster_name,
+            )
+            self._command(move_query, parameters=pb.get_params())
+            self._delete_calls_complete(req.project_id, req.call_ids)
+            return tsi.CallsMoveRes(num_moved=len(req.call_ids))
+
+        # --- v1 call_parts table (legacy) ---
+        pb = ParamBuilder()
+        src_param = pb.add_param(req.project_id)
+        tgt_param = pb.add_param(req.target_project_id)
+        ids_param = pb.add_param(req.call_ids)
+
+        move_query = build_calls_complete_move_query(
+            "call_parts",
+            ALL_CALL_INSERT_COLUMNS,
+            src_param,
+            tgt_param,
+            ids_param,
+            cluster_name=self.clickhouse_cluster_name,
+        )
+        self._command(move_query, parameters=pb.get_params())
+
+        # Soft-delete the originals in v1 via a delete-part insert.
+        deleted_at = datetime.datetime.now()
+        insertables = [
+            CallDeleteCHInsertable(
+                project_id=req.project_id,
+                id=call_id,
+                wb_user_id=req.wb_user_id or "",
+                deleted_at=deleted_at,
+            )
+            for call_id in req.call_ids
+        ]
+        with self.call_batch():
+            for insertable in insertables:
+                self._insert_call(insertable)
+
+        return tsi.CallsMoveRes(num_moved=len(req.call_ids))
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
