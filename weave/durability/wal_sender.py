@@ -226,9 +226,7 @@ class BackgroundWALSender:
                     try:
                         self._consumers.pop(path).close()
                     except Exception:
-                        log_error(
-                            f"WAL failed to close evicted consumer for {path}"
-                        )
+                        log_error(f"WAL failed to close evicted consumer for {path}")
 
             for path in current_paths:
                 if path not in self._consumers:

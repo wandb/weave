@@ -360,9 +360,7 @@ def drain(
             try:
                 _write_dead_letter(consumer.dead_letter_path, entry.record)
             except Exception:
-                log_error(
-                    f"WAL dead-letter write failed at offset {entry.end_offset}"
-                )
+                log_error(f"WAL dead-letter write failed at offset {entry.end_offset}")
             last_offset = entry.end_offset
             continue
         handler = handlers.get(record_type)
@@ -394,9 +392,7 @@ def drain(
             try:
                 _write_dead_letter(consumer.dead_letter_path, entry.record)
             except Exception:
-                log_error(
-                    f"WAL dead-letter write failed at offset {entry.end_offset}"
-                )
+                log_error(f"WAL dead-letter write failed at offset {entry.end_offset}")
         last_offset = entry.end_offset
         if max_records and processed >= max_records:
             break
