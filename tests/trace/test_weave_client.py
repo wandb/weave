@@ -828,12 +828,9 @@ def test_call_display_name(client):
 
 
 def test_dataset_calls(client):
-    ref = client.save(
-        weave.Dataset(rows=[{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
-        "my-dataset",
-    )
+    rows = [{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]
     op_name = ""
-    for row in ref.rows:
+    for row in rows:
         call = client.create_call("x", {"a": row["doc"]})
         op_name = call.op_name
         client.finish_call(call, None)
