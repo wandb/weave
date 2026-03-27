@@ -399,11 +399,11 @@ def maybe_get_storage_client_from_env() -> FileStorageClient | None:
     try:
         parsed_uri = FileStorageURI.parse_uri_str(file_storage_uri)
     except Exception as e:
-        logger.warning(f"Error parsing file storage URI: {e}")
+        logger.warning("Error parsing file storage URI: %s", e)
         return None
     if parsed_uri.has_path():
         logger.error(
-            f"Supplied file storage uri contains path components: {file_storage_uri}"
+            "Supplied file storage uri contains path components: %s", file_storage_uri
         )
         return None
 

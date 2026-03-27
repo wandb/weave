@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 from typing_extensions import Self
 
 from weave.shared import refs_internal
+from weave.shared.refs_internal import CallableProperty
 
 if TYPE_CHECKING:
     from weave.trace_server.errors import ObjectDeletedError
@@ -25,6 +26,7 @@ class WeaveDigestError(ValueError):
 
 @dataclass(frozen=True)
 class Ref:
+    @CallableProperty
     def uri(self) -> str:
         raise NotImplementedError
 
@@ -126,6 +128,7 @@ class TableRef(Ref):
             refs_internal.validate_no_slashes(self._digest, "digest")
             refs_internal.validate_no_colons(self._digest, "digest")
 
+    @CallableProperty
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
 
@@ -205,6 +208,7 @@ class ObjectRef(RefWithExtra):
         refs_internal.validate_no_slashes(self.name, "name")
         refs_internal.validate_no_colons(self.name, "name")
 
+    @CallableProperty
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/object/{self.name}:{self.digest}"
         if self.extra:
@@ -271,6 +275,7 @@ class ObjectRef(RefWithExtra):
 
 @dataclass(frozen=True)
 class OpRef(ObjectRef):
+    @CallableProperty
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/op/{self.name}:{self.digest}"
         if self.extra:
@@ -310,6 +315,7 @@ class CallRef(RefWithExtra):
     def extra(self) -> tuple[str, ...]:
         return tuple(e if isinstance(e, str) else e.result() for e in self._extra)
 
+    @CallableProperty
     def uri(self) -> str:
         u = f"weave:///{self.entity}/{self.project}/call/{self.id}"
         if self._extra:
@@ -330,10 +336,11 @@ class DeletedRef(Ref):
     error: ObjectDeletedError
 
     def __repr__(self) -> str:
-        return f"<DeletedRef {self.uri()}>"
+        return f"<DeletedRef {self.uri}>"
 
+    @CallableProperty
     def uri(self) -> str:
-        return self.ref.uri()
+        return self.ref.uri
 
 
 AnyRef = ObjectRef | TableRef | CallRef | OpRef

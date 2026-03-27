@@ -17,6 +17,11 @@ from weave.trace.ref_util import get_ref
 from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 
+# Metadata keys added by weave serialization that are not real model fields.
+# These must be stripped before Pydantic validation since Object uses extra="forbid".
+# Pydantic forbids underscore-prefixed fields by default, so there's no risk of collision.
+_WEAVE_SERIALIZATION_METADATA_KEYS = {"_type", "_class_name", "_bases"}
+
 
 class Object(BaseModel):
     """Base class for Weave objects that can be tracked and versioned.
@@ -82,6 +87,23 @@ class Object(BaseModel):
                 f"`{cls.__name__}` must implement `from_obj` to support deserialization from a URI."
             )
         return api.ref(uri).get(objectify=objectify)
+
+    @model_validator(mode="before")
+    @classmethod
+    def strip_weave_serialization_metadata(cls, data: Any) -> Any:
+        """Strip weave serialization metadata from dict inputs.
+
+        Weave's serialization adds _type, _class_name, and _bases to dicts
+        for type reconstruction.  These are not real model fields and must be
+        removed before Pydantic validation, which uses extra="forbid".
+        """
+        if isinstance(data, dict):
+            return {
+                k: v
+                for k, v in data.items()
+                if k not in _WEAVE_SERIALIZATION_METADATA_KEYS
+            }
+        return data
 
     @model_validator(mode="wrap")
     @classmethod

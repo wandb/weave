@@ -85,7 +85,7 @@ def test_row_ref_inside_dict(client):
     assert isinstance(second_row.ref, ObjectRef)
 
     # Create a dict pointing to the second row
-    inputs = {"example": second_row.ref.uri()}
+    inputs = {"example": second_row.ref.uri}
     saved_dict = client.save(inputs, "my-dict")
 
     # We want to spy on the table_query method to ensure it is only returning

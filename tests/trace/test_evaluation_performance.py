@@ -112,7 +112,6 @@ async def test_evaluation_performance(client: WeaveClient):
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
     gold_log = [
-        "ensure_project_exists",
         "get_call_processor",
         "get_call_processor",
         "get_feedback_processor",
@@ -139,7 +138,6 @@ async def test_evaluation_performance(client: WeaveClient):
     assert (
         counts
         == {
-            "ensure_project_exists": 1,
             "get_call_processor": 2,
             "get_feedback_processor": 2,
             "table_create": 2,  # dataset and score results
@@ -175,7 +173,7 @@ async def test_evaluation_resilience(
     client_with_throwing_server.finish()
 
     logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
+    ag_res = Counter([k.split(", req:")[0] for k in {l.getMessage() for l in logs}])
     assert len(ag_res) == 2
     assert ag_res["Task failed: DummyTestException: ('FAILURE - obj_create"] <= 2
     assert ag_res["Task failed: DummyTestException: ('FAILURE - file_create"] <= 2
@@ -188,7 +186,7 @@ async def test_evaluation_resilience(
     client_with_throwing_server.finish()
 
     logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
+    ag_res = Counter([k.split(", req:")[0] for k in {l.getMessage() for l in logs}])
     # Tim: This is very specific and intentiaion, please don't change
     # this unless you are sure that is the expected behavior.
     # For some reason with high parallelism, some logs are not captured,

@@ -79,39 +79,6 @@ def extract_eval_root_metadata_from_calls(
     return metadata
 
 
-def build_pas_calls_query_req(
-    project_id: str, eval_root_ids: list[str]
-) -> tsi.CallsQueryReq:
-    """Build CallsQueryReq for predict-and-score child calls of eval roots."""
-    return tsi.CallsQueryReq(
-        project_id=project_id,
-        filter=tsi.CallsFilter(parent_ids=eval_root_ids),
-        columns=["id", "parent_id", "op_name", "inputs", "output"],
-        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
-    )
-
-
-def build_child_calls_query_req(
-    project_id: str, pas_ids: list[str]
-) -> tsi.CallsQueryReq:
-    """Build CallsQueryReq for child calls of predict-and-score calls."""
-    return tsi.CallsQueryReq(
-        project_id=project_id,
-        filter=tsi.CallsFilter(parent_ids=pas_ids),
-        columns=[
-            "id",
-            "parent_id",
-            "op_name",
-            "attributes",
-            "inputs",
-            "output",
-            "summary",
-            "started_at",
-            "ended_at",
-        ],
-    )
-
-
 def filter_predict_and_score_calls(
     calls: Iterable[tsi.CallSchema],
     eval_root_ids: list[str],
@@ -414,23 +381,18 @@ def resolve_eval_row_refs(
 
 @_trace_wrap("eval_results_helpers.eval_results_grouped_rows")
 def eval_results_grouped_rows(
-    server: tsi.TraceServerInterface, req: tsi.EvalResultsQueryReq
+    server: tsi.TraceServerInterface,
+    req: tsi.EvalResultsQueryReq,
+    eval_root_ids: list[str],
+    all_calls: list[tsi.CallSchema],
 ) -> tuple[list[tsi.EvalResultsRow], int, list[str]]:
     """Build grouped eval rows before pagination. Performs DB access via server."""
-    eval_root_ids = resolve_eval_root_ids(req)
-    if not eval_root_ids:
-        return [], 0, []
-
-    pas_req = build_pas_calls_query_req(req.project_id, eval_root_ids)
-    predict_and_score_calls = filter_predict_and_score_calls(
-        server.calls_query_stream(pas_req), eval_root_ids
-    )
+    predict_and_score_calls = filter_predict_and_score_calls(all_calls, eval_root_ids)
     if not predict_and_score_calls:
         return [], 0, []
 
-    pas_ids = [call.id for call in predict_and_score_calls]
-    child_req = build_child_calls_query_req(req.project_id, pas_ids)
-    child_calls = list(server.calls_query_stream(child_req))
+    predict_and_score_calls_set = {call.id for call in predict_and_score_calls}
+    child_calls = [c for c in all_calls if c.parent_id in predict_and_score_calls_set]
     child_by_parent = build_child_by_parent(child_calls)
 
     row_map, row_eval_map = build_eval_rows_from_calls(
@@ -471,16 +433,12 @@ def fetch_eval_root_metadata(
 
 @_trace_wrap("eval_results_helpers.eval_results_query")
 def eval_results_query(
-    server: tsi.TraceServerInterface, req: tsi.EvalResultsQueryReq
+    server: tsi.TraceServerInterface,
+    req: tsi.EvalResultsQueryReq,
+    eval_root_ids: list[str],
+    all_calls: list[tsi.CallSchema],
 ) -> tsi.EvalResultsQueryRes:
     """Return grouped prediction/trial/score data for evaluation results."""
-    eval_root_ids = resolve_eval_root_ids(req)
-    if not eval_root_ids:
-        empty_summary = tsi.EvalResultsSummaryRes() if req.include_summary else None
-        return tsi.EvalResultsQueryRes(
-            rows=[], total_rows=0, summary=empty_summary, warnings=[]
-        )
-
     all_rows_req = tsi.EvalResultsQueryReq(
         project_id=req.project_id,
         evaluation_call_ids=req.evaluation_call_ids,
@@ -494,7 +452,9 @@ def eval_results_query(
         limit=None,
         offset=0,
     )
-    all_rows, _, warnings = eval_results_grouped_rows(server, all_rows_req)
+    all_rows, _, warnings = eval_results_grouped_rows(
+        server, all_rows_req, eval_root_ids, all_calls
+    )
 
     rows: list[tsi.EvalResultsRow] = []
     total_rows = 0

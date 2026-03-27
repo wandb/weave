@@ -27,14 +27,14 @@ def do_assertions_for_scorer_op(
         score_fn.name if isinstance(score_fn, Op) else score_fn.__class__.__name__
     )
     assert target_feedback.feedback_type == "wandb.runnable." + scorer_name
-    assert target_feedback.runnable_ref == score_fn.ref.uri()
+    assert target_feedback.runnable_ref == score_fn.ref.uri
     assert (
         target_feedback.call_ref
         == CallRef(
             entity=client.entity,
             project=client.project,
             id=apply_score_res.score_call.id,
-        ).uri()
+        ).uri
     )
     assert target_feedback.payload == {"output": apply_score_res.result}
 

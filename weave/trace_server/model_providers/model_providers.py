@@ -30,6 +30,7 @@ PROVIDER_TO_API_KEY_NAME_MAP = {
     "vertex_ai": "VERTEXAI_JSON_CREDENTIALS",
     "vertex_ai-language-models": "VERTEXAI_JSON_CREDENTIALS",
     "fireworks_ai": "FIREWORKS_API_KEY",
+    "moonshot": "MOONSHOT_API_KEY",
 }
 
 # Provider names that use Vertex credentials (same as keys in PROVIDER_TO_API_KEY_NAME_MAP).
@@ -58,7 +59,7 @@ def read_model_to_provider_info_map(
             return json.load(f)
     except Exception as e:
         logger.exception(
-            f"Failed to read model to provider info file at: {full_path}", exc_info=e
+            "Failed to read model to provider info file at: %s", full_path, exc_info=e
         )
         return {}
 
@@ -116,7 +117,7 @@ def read_model_id_to_details_map(
             loaded = json.load(f)
             return {model["id"]: model for model in loaded["models"]}
     except Exception as e:
-        logger.exception(f"Failed to read model info file at: {full_path}", exc_info=e)
+        logger.exception("Failed to read model info file at: %s", full_path, exc_info=e)
         return {}
 
 

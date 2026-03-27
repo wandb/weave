@@ -5,6 +5,7 @@ from pydantic import BaseModel, BeforeValidator, Field
 
 from weave import Model, op
 from weave.prompt.prompt import format_message_with_template_vars
+from weave.trace import vals
 from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 from weave.trace_server.trace_server_interface import (
@@ -103,6 +104,11 @@ def cast_to_llm_structured_model_params(
         return obj
     elif isinstance(obj, dict):
         return LLMStructuredCompletionModelDefaultParams.model_validate(obj)
+    elif isinstance(obj, vals.Traceable):
+        return LLMStructuredCompletionModelDefaultParams.model_validate(
+            vals.unwrap(obj)  # Recursively "unwrap" to a dict with plain python types
+        )
+
     raise TypeError("Unable to cast to LLMStructuredCompletionModelDefaultParams")
 
 
@@ -118,7 +124,7 @@ class LLMStructuredCompletionModel(Model):
     # <provider>/<model> or ref to a provider model
     llm_model_id: str | base_object_def.RefStr
 
-    default_params: LLMStructuredCompletionModelDefaultParams = Field(
+    default_params: LLMStructuredModelParamsLike = Field(
         default_factory=LLMStructuredCompletionModelDefaultParams
     )
 
