@@ -67,6 +67,22 @@ def _run_subprocess_timing(script_content: str, label: str) -> float:
             os.remove(temp_file)
 
 
+def time_weave_import() -> float:
+    """Time the import of weave module in a fresh process.
+
+    Returns:
+        float: Time taken to import weave in seconds.
+    """
+    script = """
+import time
+start_time = time.perf_counter()
+import weave
+end_time = time.perf_counter()
+print(end_time - start_time)
+"""
+    return _run_subprocess_timing(script, "import")
+
+
 def bench_init(iterations: int) -> list[float]:
     """Measure weave.init() time in fresh processes (excludes import)."""
     console.print(f"  weave.init() — {iterations} iterations (subprocess each)")
