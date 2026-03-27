@@ -1001,7 +1001,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        set_current_span_dd_tags(tag_request(req))
+        set_current_span_dd_tags(tag_request(req, "calls_query"))
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
@@ -1286,7 +1286,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         # Tag DD span with user-provided query fields for debuggability
-        set_current_span_dd_tags(tag_request(req))
+        set_current_span_dd_tags(tag_request(req, "calls_query"))
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )

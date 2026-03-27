@@ -1,5 +1,6 @@
 """Datadog integration utilities for trace server."""
 
+import json
 import logging
 from collections.abc import Callable, Generator, Iterator
 from functools import wraps
@@ -85,9 +86,21 @@ def set_current_span_dd_tags(tags: dict[str, str | float | int]) -> None:
 
 def tag_request(
     req: BaseModel,
-    tag_prefix: str = "calls_query",
+    tag_prefix: str,
 ) -> dict[str, str | float | int]:
-    """Serialize a pydantic request model as a DD span tag for debuggability."""
-    return {
-        f"{tag_prefix}.req": req.model_dump_json()[:DD_TAG_MAX_LEN],
-    }
+    """Serialize a pydantic request model as DD span tags for debuggability.
+
+    Builds tags one field at a time, dropping fields that would exceed the
+    per-tag size limit so every emitted value is valid JSON.
+    """
+    tags: dict[str, str | float | int] = {}
+    remaining = DD_TAG_MAX_LEN
+    for key, value in req.model_dump().items():
+        if isinstance(value, BaseModel):
+            serialized = value.model_dump_json()
+        else:
+            serialized = json.dumps(value)
+        if len(serialized) <= remaining:
+            tags[f"{tag_prefix}.{key}"] = serialized
+            remaining -= len(serialized)
+    return tags
