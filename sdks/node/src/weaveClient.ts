@@ -37,6 +37,24 @@ import {CallRef} from './refs';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 
+/**
+ * Serialized representation of a file blob stored in the Weave content store.
+ * Returned by serializedFileBlob/serializedImage/serializedAudio.
+ */
+interface SerializedFileBlob {
+  _type: 'CustomWeaveType';
+  weave_type: {type: string};
+  files: Record<string, string>;
+  load_op: string;
+}
+
+/**
+ * Shape of a single item in the call batch queue.
+ */
+type BatchItem =
+  | {mode: 'start'; data: {start: CallStartParams}}
+  | {mode: 'end'; data: {end: CallEndParams}};
+
 export type CallStackEntry = {
   callId: string;
   traceId: string;
@@ -89,7 +107,7 @@ const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private attributesContext = new AsyncLocalStorage<Record<string, any>>();
-  private callQueue: Array<{mode: 'start' | 'end'; data: any}> = [];
+  private callQueue: BatchItem[] = [];
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
   private batchProcessingPromises: Set<Promise<void>> = new Set();
@@ -170,10 +188,12 @@ export class WeaveClient {
     this.isBatchProcessing = true;
 
     const batchReq = {
-      batch: batchToProcess.map(item => ({
-        mode: item.mode,
-        req: item.data,
-      })),
+      batch: batchToProcess.map(item => {
+        if (item.mode === 'start') {
+          return {mode: 'start' as const, req: item.data};
+        }
+        return {mode: 'end' as const, req: item.data};
+      }),
     };
 
     try {
@@ -561,11 +581,11 @@ export class WeaveClient {
     typeName: string,
     fileName: string,
     fileContent: Blob
-  ): Promise<any> {
+  ): Promise<SerializedFileBlob> {
     const buffer = await fileContent.arrayBuffer().then(Buffer.from);
     const digest = computeDigest(buffer);
 
-    const placeholder = {
+    const placeholder: SerializedFileBlob = {
       _type: 'CustomWeaveType',
       weave_type: {type: typeName},
       files: {
@@ -590,7 +610,7 @@ export class WeaveClient {
   private async serializedImage(
     imageData: Buffer,
     imageType: ImageType = DEFAULT_IMAGE_TYPE
-  ): Promise<any> {
+  ): Promise<SerializedFileBlob> {
     const blob = new Blob([imageData], {type: `image/${imageType}`});
     return this.serializedFileBlob('PIL.Image.Image', 'image.png', blob);
   }
@@ -598,7 +618,7 @@ export class WeaveClient {
   private async serializedAudio(
     audioData: Buffer,
     audioType: AudioType = DEFAULT_AUDIO_TYPE
-  ): Promise<any> {
+  ): Promise<SerializedFileBlob> {
     const blob = new Blob([audioData], {type: `audio/${audioType}`});
     return this.serializedFileBlob('wave.Wave_read', 'audio.wav', blob);
   }
@@ -616,7 +636,7 @@ export class WeaveClient {
   public async serializeAudio(
     data: Buffer,
     audioType: AudioType = DEFAULT_AUDIO_TYPE
-  ): Promise<any> {
+  ): Promise<SerializedFileBlob> {
     return this.serializedAudio(data, audioType);
   }
 
@@ -729,7 +749,7 @@ export class WeaveClient {
   public async saveOp(
     op: Op<(...args: any[]) => any>,
     objId?: string
-  ): Promise<any> {
+  ): Promise<OpRef> {
     if (op.__savedRef) {
       return op.__savedRef;
     }
