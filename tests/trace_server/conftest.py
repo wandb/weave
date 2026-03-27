@@ -7,8 +7,6 @@ from dataclasses import dataclass
 import pytest
 
 from tests.trace.server_utils import TEST_ENTITY
-
-pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
     UserInjectingExternalTraceServer,
@@ -21,6 +19,8 @@ from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+
+pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
 
 
 @dataclass(frozen=True)
