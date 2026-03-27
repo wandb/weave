@@ -406,8 +406,7 @@ def drain(
                 entry.end_offset,
             )
             log_warning(
-                f"WAL no handler for record type {record_type!r}; "
-                "moved to dead-letter"
+                f"WAL no handler for record type {record_type!r}; moved to dead-letter"
             )
             try:
                 _write_dead_letter(consumer.dead_letter_path, entry.record)
