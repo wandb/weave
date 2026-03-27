@@ -243,11 +243,7 @@ select = [
   "F822",    # https://docs.astral.sh/ruff/rules/undefined-export/
   "TID252",  # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
   "UP",      # https://docs.astral.sh/ruff/rules/#pyupgrade-up
-  "TRY002",  # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
-  "TRY004",  # https://docs.astral.sh/ruff/rules/type-check-without-type-error/
-  "TRY300",  # https://docs.astral.sh/ruff/rules/try-consider-else/
-  "TRY400",  # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
-  "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
+  "TRY",     # https://docs.astral.sh/ruff/rules/#tryceratops-try
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
   "SIM101",  # https://docs.astral.sh/ruff/rules/duplicate-isinstance-call/
@@ -292,7 +288,10 @@ ignore = [
   "D415",
   "D417",
   # This is a more involved change, so disabling for now.
-  "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
+  "C901",   # https://docs.astral.sh/ruff/rules/complex-structure/
+  # Initial TRY rollout: defer high-volume rules for a dedicated cleanup pass.
+  "TRY003", # https://docs.astral.sh/ruff/rules/raise-vanilla-args/
+  "TRY301", # https://docs.astral.sh/ruff/rules/raise-within-try/
   # Existing code intentionally uses many lazy imports and private symbols;
   # keep these disabled until we do a dedicated cleanup.
   "PLC0415", # https://docs.astral.sh/ruff/rules/import-outside-top-level/
