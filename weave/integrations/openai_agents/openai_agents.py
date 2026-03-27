@@ -243,8 +243,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             metrics = {
                 "tokens": usage.get("total_tokens")
                 or (
-                    (usage.get("input_tokens") or 0)
-                    + (usage.get("output_tokens") or 0)
+                    (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
                 ),
                 "prompt_tokens": usage.get("input_tokens"),
                 "completion_tokens": usage.get("output_tokens"),
@@ -312,9 +311,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             error=None,
         )
 
-    def _speech_group_log_data(
-        self, span: Span[SpeechGroupSpanData]
-    ) -> WeaveDataDict:
+    def _speech_group_log_data(self, span: Span[SpeechGroupSpanData]) -> WeaveDataDict:
         """Extract log data from a speech group span."""
         inputs: dict[str, Any] = {}
         if span.span_data.input is not None:

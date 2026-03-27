@@ -506,7 +506,11 @@ def test_speech_span(client: WeaveClient) -> None:
     processor.on_span_end(span)
 
     calls = client.get_calls()
-    speech_calls = [c for c in calls if "openai_agent_speech" in c.op_name and "speech_group" not in c.op_name]
+    speech_calls = [
+        c
+        for c in calls
+        if "openai_agent_speech" in c.op_name and "speech_group" not in c.op_name
+    ]
     assert len(speech_calls) == 1
 
     sc = speech_calls[0]
