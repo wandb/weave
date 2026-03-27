@@ -1,0 +1,47 @@
+<clickhouse>
+    <!-- Embedded Keeper (replaces external ZooKeeper) -->
+    <keeper_server>
+        <tcp_port>9181</tcp_port>
+        <server_id>1</server_id>
+        <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
+        <coordination_settings>
+            <operation_timeout_ms>10000</operation_timeout_ms>
+            <session_timeout_ms>30000</session_timeout_ms>
+            <raft_logs_level>warning</raft_logs_level>
+        </coordination_settings>
+        <raft_configuration>
+            <server>
+                <id>1</id>
+                <hostname>localhost</hostname>
+                <port>9234</port>
+            </server>
+        </raft_configuration>
+    </keeper_server>
+
+    <!-- Tell ClickHouse to use its own embedded Keeper -->
+    <zookeeper>
+        <node>
+            <host>localhost</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+
+    <!-- Single-node cluster definition -->
+    <remote_servers>
+        <weave_cluster>
+            <shard>
+                <replica>
+                    <host>localhost</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </weave_cluster>
+    </remote_servers>
+
+    <!-- Macros for ReplicatedMergeTree path templates -->
+    <macros>
+        <shard>shard1</shard>
+        <replica>replica1</replica>
+    </macros>
+</clickhouse>

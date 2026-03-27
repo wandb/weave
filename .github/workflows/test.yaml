@@ -239,12 +239,65 @@ jobs:
           name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+  trace-server-migrator-tests:
+    name: Trace server migrator tests
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: ["12"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Start ClickHouse with embedded Keeper
+        run: |
+          docker run -d --rm \
+            -e CLICKHOUSE_DB=default \
+            -e CLICKHOUSE_USER=default \
+            -e "CLICKHOUSE_PASSWORD=" \
+            -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
+            -p 8130:8123 \
+            -v ${{ github.workspace }}/tests/trace_server/conftest_lib/clickhouse_keeper_config.xml:/etc/clickhouse-server/config.d/keeper.xml \
+            --name weave-test-keeper \
+            --ulimit nofile=262144:262144 \
+            clickhouse/clickhouse-server:25.11.2.24
+          # Wait for server to be healthy
+          for i in $(seq 1 30); do
+            wget -q -O- 'http://localhost:8130/ping' && break || sleep 1
+          done
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run migrator functional tests
+        env:
+          CI: 1
+          WF_CLICKHOUSE_KEEPER_PORT: 8130
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server_migrator')"
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          flags: trace-server-migrator
+          name: trace-server-migrator-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 
     needs:
       - trace-tests
       - trace_no_server
+      - trace-server-migrator-tests
 
     runs-on: ubuntu-latest
 

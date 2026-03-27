@@ -65,13 +65,16 @@ class TestUpdateCosts(unittest.TestCase):
             }
         }
         mock_get.return_value = mock_response
-        costs = fetch_new_costs()
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        frozen_time = datetime(2025, 1, 1, 12, 0, 0)
+        with patch("weave.trace_server.costs.update_costs.datetime") as mock_datetime:
+            mock_datetime.now.return_value = frozen_time
+            mock_datetime.side_effect = datetime
+            costs = fetch_new_costs()
         self.assertIn("model1", costs)
         self.assertEqual(costs["model1"]["input"], 0.01)
         self.assertEqual(costs["model1"]["output"], 0.02)
         self.assertEqual(costs["model1"]["provider"], "test_provider")
-        self.assertEqual(costs["model1"]["created_at"], current_time)
+        self.assertEqual(costs["model1"]["created_at"], "2025-01-01 12:00:00")
 
     @patch("httpx.Client.get")
     def test_fetch_new_costs_request_exception(self, mock_get):
