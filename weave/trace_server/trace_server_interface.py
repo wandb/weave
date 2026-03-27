@@ -905,10 +905,11 @@ class GenAIConversationIngestReq(BaseModel):
 
     Converts the provided turns into ``genai_spans`` rows so that all
     existing read APIs (conversation list, chat view, search) work
-    unchanged.
+    unchanged.  ``project_id`` is optional — when empty the HTTP handler
+    infers it from auth context.
     """
 
-    project_id: str
+    project_id: str = ""
     conversation_id: str = ""
     conversation_name: str = ""
     provider_name: str = ""
@@ -993,12 +994,34 @@ class ATIFTrajectory(BaseModel):
 
 
 class GenAIATIFIngestReq(BaseModel):
-    """Ingest an ATIF (Agent Trace Interchange Format) trajectory."""
+    """Ingest an ATIF (Agent Trace Interchange Format) trajectory.
 
-    project_id: str
-    trajectory: ATIFTrajectory
+    Accepts either the wrapped format (``project_id`` + ``trajectory``) or a
+    raw ATIF trajectory posted directly (detected by the presence of
+    ``schema_version`` at the top level).  ``project_id`` is optional — when
+    empty the HTTP handler infers it from auth context.
+    """
+
+    project_id: str = ""
+    trajectory: ATIFTrajectory = Field(default_factory=ATIFTrajectory)
     conversation_name: str = ""
     provider_name: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _auto_wrap_raw_trajectory(cls, data: Any) -> Any:
+        """Allow posting a raw ATIF document without the wrapper."""
+        if isinstance(data, dict) and "schema_version" in data and "trajectory" not in data:
+            pid = data.pop("project_id", "")
+            cname = data.pop("conversation_name", "")
+            pname = data.pop("provider_name", "")
+            return {
+                "project_id": pid,
+                "conversation_name": cname,
+                "provider_name": pname,
+                "trajectory": data,
+            }
+        return data
 
 
 class GenAIATIFIngestRes(BaseModel):
@@ -1051,9 +1074,13 @@ class OpenHandsEvent(BaseModel):
 
 
 class GenAIOpenHandsIngestReq(BaseModel):
-    """Ingest an OpenHands event stream as a conversation."""
+    """Ingest an OpenHands event stream as a conversation.
 
-    project_id: str
+    ``project_id`` is optional — when empty the HTTP handler infers it from
+    auth context.
+    """
+
+    project_id: str = ""
     session_id: str = ""
     events: list[OpenHandsEvent]
     conversation_name: str = ""
