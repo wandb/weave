@@ -597,9 +597,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         span_ident = (
                             f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
                         )
-                        error_messages.append(
-                            f"Rejected span ({span_ident}): {e!s}"
-                        )
+                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
                     calls.append(
@@ -690,9 +688,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     )
                 )
                 rows.append(
-                    _ch_call_to_row(
-                        _end_call_for_insert_to_ch_insertable_end_call(end)
-                    )
+                    _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
                 )
             self._insert_call_batch(rows)
 
