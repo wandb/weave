@@ -57,7 +57,7 @@ from weave.trace_server.methods.sqlite_feedback_stats import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import quote_json_path, quote_json_path_parts
+from weave.trace_server.orm import Row, quote_json_path, quote_json_path_parts
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
@@ -2520,7 +2520,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         with self.lock:
             for llm_id, cost in req.costs.items():
                 cost_id = generate_id()
-                row = {
+                row: Row = {
                     "id": cost_id,
                     "pricing_level": PRICING_LEVELS["PROJECT"],
                     "pricing_level_id": req.project_id,
