@@ -251,6 +251,15 @@ class WeaveObject(Traceable):  # noqa: PLW1641
         except AttributeError:
             pass
         val_attr_val = object.__getattribute__(self._val, __name)
+
+        # Check for lazy-loading sentinel (heavy fields not yet fetched).
+        # Uses duck-typing to avoid circular imports from weave.trace.call.
+        if getattr(val_attr_val, "__weave_not_loaded__", False):
+            inner = object.__getattribute__(self, "_val")
+            if hasattr(inner, "_load_heavy_fields"):
+                inner._load_heavy_fields()
+                val_attr_val = object.__getattribute__(self._val, __name)
+
         result = attribute_access_result(self, val_attr_val, __name, server=self.server)
 
         # Store the result on _val so we don't deref next time.

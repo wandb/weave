@@ -614,7 +614,9 @@ class WeaveClient:
         It supports pagination, filtering, sorting, field projection, and scoring metadata,
         and can be used to power custom trace UIs or analysis tools.
 
-        Performance Tip: Specify `columns` and use `filter` or `query` to reduce result size.
+        By default, heavy payload fields (inputs, output, attributes) are NOT fetched
+        in the initial query for performance. They are lazy-loaded on first access.
+        To eagerly fetch them, pass ``columns=["inputs", "output", "attributes", ...]``.
 
         Args:
             `filter`: High-level filter for narrowing results by fields like `op_name`, `parent_ids`, etc.
@@ -627,7 +629,9 @@ class WeaveClient:
             `include_storage_size`: If True, includes the storage size for a call.
             `include_total_storage_size`: If True, includes the total storage size for a trace.
             `include_usernames`: If True, attempts to resolve each call's `wb_user_id` to a `wb_username`.
-            `columns`: List of fields to return per call. Reducing this can significantly improve performance.
+            `columns`: List of fields to return per call. When None (default), only lightweight
+                    metadata columns are fetched; heavy fields (inputs, output, attributes) are
+                    lazy-loaded on access. Pass specific column names to eagerly include them.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.

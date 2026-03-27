@@ -39,11 +39,62 @@ logger = logging.getLogger(__name__)
 DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
+class _NotLoaded:
+    """Sentinel indicating a heavy field was not loaded in the initial query.
+
+    When get_calls() is used without specifying columns, heavy fields
+    (inputs, output, attributes) are excluded from the query for performance.
+    Accessing these fields triggers a lazy fetch of the full call data.
+    """
+
+    _instance: _NotLoaded | None = None
+    __weave_not_loaded__ = True
+
+    def __new__(cls) -> _NotLoaded:
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self) -> str:
+        return "<NotLoaded>"
+
+    def __bool__(self) -> bool:
+        return False
+
+
+_NOT_LOADED = _NotLoaded()
+
+# Heavy columns excluded from the default get_calls() query for performance.
+# These contain potentially large JSON payloads (inputs, outputs, attributes).
+HEAVY_CALL_COLUMNS = frozenset({"inputs", "output", "attributes"})
+
+# Light columns: metadata fields returned by default in get_calls().
+# Sufficient for listing, browsing, and most filtering use cases.
+LIGHT_CALL_COLUMNS = [
+    "id",
+    "project_id",
+    "trace_id",
+    "op_name",
+    "started_at",
+    "ended_at",
+    "display_name",
+    "parent_id",
+    "thread_id",
+    "turn_id",
+    "exception",
+    "summary",
+    "wb_user_id",
+    "wb_run_id",
+    "wb_run_step",
+    "wb_run_step_end",
+]
+
+
 class OpNameError(ValueError):
     """Raised when an op name is invalid."""
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False)
 class Call:
     """A Call represents a single operation executed as part of a trace.
 
@@ -81,11 +132,31 @@ class Call:
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
 
+    # Server reference for lazy-loading heavy fields
+    _server: TraceServerInterface | None = dataclasses.field(
+        default=None, repr=False, compare=False
+    )
+
     # Size of metadata storage for this call
     storage_size_bytes: int | None = None
 
     # Total size of metadata storage for the entire trace
     total_storage_size_bytes: int | None = None
+
+    # Keep Call unhashable (same as default dataclass with eq=True)
+    __hash__ = None  # type: ignore[assignment]
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Call):
+            return NotImplemented
+        self._ensure_heavy_fields_loaded()
+        other._ensure_heavy_fields_loaded()
+        for f in dataclasses.fields(self):
+            if not f.compare:
+                continue
+            if getattr(self, f.name) != getattr(other, f.name):
+                return False
+        return True
 
     @property
     def display_name(self) -> str | Callable[[Call], str] | None:
@@ -147,6 +218,59 @@ class Call:
         except ValueError:
             raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
+
+    def _ensure_heavy_fields_loaded(self) -> None:
+        """Ensure heavy fields (inputs, output, attributes) are loaded.
+
+        If any heavy field holds the _NOT_LOADED sentinel, fetches the full
+        call data from the server in a single request.
+        """
+        if (
+            isinstance(self.inputs, _NotLoaded)
+            or isinstance(self.output, _NotLoaded)
+            or isinstance(self.attributes, _NotLoaded)
+        ):
+            self._load_heavy_fields()
+
+    def _load_heavy_fields(self) -> None:
+        """Fetch heavy fields from the server and populate them."""
+        if self._server is None or self.id is None:
+            if isinstance(self.inputs, _NotLoaded):
+                self.inputs = {}
+            if isinstance(self.output, _NotLoaded):
+                self.output = None
+            if isinstance(self.attributes, _NotLoaded):
+                self.attributes = {}
+            return
+
+        calls = list(
+            self._server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=self.project_id,
+                    filter=CallsFilter(call_ids=[self.id]),
+                )
+            )
+        )
+        if not calls:
+            if isinstance(self.inputs, _NotLoaded):
+                self.inputs = {}
+            if isinstance(self.output, _NotLoaded):
+                self.output = None
+            if isinstance(self.attributes, _NotLoaded):
+                self.attributes = {}
+            return
+
+        server_call = calls[0]
+        if isinstance(self.inputs, _NotLoaded):
+            self.inputs = from_json(
+                server_call.inputs, self.project_id, self._server
+            )
+        if isinstance(self.output, _NotLoaded):
+            self.output = from_json(
+                server_call.output, self.project_id, self._server
+            )
+        if isinstance(self.attributes, _NotLoaded):
+            self.attributes = server_call.attributes
 
     @property
     def ref(self) -> CallRef:
@@ -248,6 +372,7 @@ class Call:
         """
         from weave.flow.scorer import Scorer, apply_scorer_async
 
+        self._ensure_heavy_fields_loaded()
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}
         output = self.output
@@ -268,6 +393,7 @@ class Call:
         return apply_scorer_result
 
     def to_dict(self) -> CallDict:
+        self._ensure_heavy_fields_loaded()
         if callable(display_name := self.display_name):
             display_name = "Callable Display Name (not called yet)"
 
@@ -362,6 +488,18 @@ def _make_calls_iterator(
     return_expanded_column_values: bool = True,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
+    # When no columns are specified, default to light columns for performance.
+    # Heavy fields (inputs, output, attributes) are lazy-loaded on access.
+    if columns is None:
+        effective_columns: list[str] | None = LIGHT_CALL_COLUMNS
+        heavy_fields_loaded: frozenset[str] | None = frozenset()
+    else:
+        effective_columns = columns
+        loaded = {
+            col.split(".")[0] for col in columns
+        } & HEAVY_CALL_COLUMNS
+        heavy_fields_loaded = None if loaded >= HEAVY_CALL_COLUMNS else frozenset(loaded)
+
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
         # Add the global offset to the page offset
         # This ensures the offset is applied only once
@@ -383,7 +521,7 @@ def _make_calls_iterator(
                     include_usernames=include_usernames,
                     query=query,
                     sort_by=sort_by,
-                    columns=columns,
+                    columns=effective_columns,
                     expand_columns=expand_columns,
                     return_expanded_column_values=return_expanded_column_values,
                 )
@@ -393,7 +531,10 @@ def _make_calls_iterator(
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
         entity, project = from_project_id(project_id)
-        return make_client_call(entity, project, call, server)
+        return make_client_call(
+            entity, project, call, server,
+            heavy_fields_loaded=heavy_fields_loaded,
+        )
 
     def size_func() -> int:
         response = server.calls_query_stats(
@@ -425,10 +566,24 @@ def _make_calls_iterator(
 
 
 def make_client_call(
-    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
+    entity: str,
+    project: str,
+    server_call: CallSchema,
+    server: TraceServerInterface,
+    heavy_fields_loaded: frozenset[str] | None = None,
 ) -> WeaveObject:
+    """Create a client-side Call wrapped in a WeaveObject.
+
+    Args:
+        heavy_fields_loaded: Which heavy fields were fetched from the server.
+            None means all fields were loaded (e.g. from get_call()).
+            An empty frozenset means no heavy fields were loaded.
+            A non-empty frozenset lists the specific heavy fields that were loaded.
+    """
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
+
+    all_loaded = heavy_fields_loaded is None
 
     call = Call(
         _op_name=server_call.op_name,
@@ -436,12 +591,24 @@ def make_client_call(
         trace_id=server_call.trace_id,
         parent_id=server_call.parent_id,
         id=call_id,
-        inputs=from_json(server_call.inputs, server_call.project_id, server),
-        output=from_json(server_call.output, server_call.project_id, server),
+        inputs=(
+            from_json(server_call.inputs, server_call.project_id, server)
+            if all_loaded or "inputs" in heavy_fields_loaded
+            else _NOT_LOADED
+        ),
+        output=(
+            from_json(server_call.output, server_call.project_id, server)
+            if all_loaded or "output" in heavy_fields_loaded
+            else _NOT_LOADED
+        ),
         exception=server_call.exception,
         summary=dict(server_call.summary) if server_call.summary is not None else {},
         _display_name=server_call.display_name,
-        attributes=server_call.attributes,
+        attributes=(
+            server_call.attributes
+            if all_loaded or "attributes" in heavy_fields_loaded
+            else _NOT_LOADED
+        ),
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
@@ -452,6 +619,7 @@ def make_client_call(
         wb_run_id=server_call.wb_run_id,
         wb_run_step=server_call.wb_run_step,
         wb_run_step_end=server_call.wb_run_step_end,
+        _server=server,
         storage_size_bytes=server_call.storage_size_bytes,
         total_storage_size_bytes=server_call.total_storage_size_bytes,
     )
