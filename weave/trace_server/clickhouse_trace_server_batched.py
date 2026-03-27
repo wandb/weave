@@ -1001,7 +1001,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        set_current_span_dd_tags(tag_request(req, "calls_query"))
+        set_current_span_dd_tags(tag_request(req, "calls_query_stats"))
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
