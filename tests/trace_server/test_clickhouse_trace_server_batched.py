@@ -71,7 +71,7 @@ def test_clickhouse_storage_size_query_generation():
 
 
 def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
-    trace_server,
+    ch_server,
 ):
     """Filter with thread_ids=[] against real ClickHouse: query runs and returns 0 rows.
 
@@ -79,16 +79,12 @@ def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
     server. The query builder emits thread_id IN ([]) which ClickHouse accepts and
     returns no rows. Skips when trace_server is SQLite.
     """
-    server = trace_server._internal_trace_server
-    if not isinstance(server, chts.ClickHouseTraceServer):
-        pytest.skip("ClickHouse-only test: run with --trace-server=clickhouse")
-
     req = tsi.CallsQueryReq(
         project_id="test_project",
         filter=tsi.CallsFilter(thread_ids=[]),
         limit=100,
     )
-    result = list(server.calls_query_stream(req))
+    result = list(ch_server.calls_query_stream(req))
 
     # Empty thread_ids -> IN [] -> no rows from ClickHouse
     assert result == []
@@ -1140,15 +1136,6 @@ def test_file_batch_clears_on_insert_failure():
 
 
 # ── version_index ordering with MV-backed _first_created_at ─────────
-
-
-@pytest.fixture
-def ch_server(trace_server):
-    """Extract ClickHouseTraceServer from the test fixture, or skip."""
-    server = trace_server._internal_trace_server
-    if not isinstance(server, chts.ClickHouseTraceServer):
-        pytest.skip("ClickHouse-only test")
-    return server
 
 
 def _make_project_id(prefix: str) -> str:
