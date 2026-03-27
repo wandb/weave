@@ -315,6 +315,10 @@ RESERVED_SUMMARY_USAGE_KEY = "usage"
 RESERVED_SUMMARY_STATUS_COUNTS_KEY = "status_counts"
 
 BACKGROUND_PARALLELISM_MIX = 0.5
+# Upper bound on thread pool size when auto-calculating parallelism
+MAX_AUTO_PARALLELISM = 32
+# Extra threads beyond CPU count for I/O-bound work
+PARALLELISM_CPU_PADDING = 4
 # This size is correlated with the maximum single row insert size
 # in clickhouse, which is currently unavoidable.
 MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
@@ -2746,7 +2750,7 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
 
     # if total_parallelism is None, calculate it
     if total_parallelism is None:
-        total_parallelism = min(32, (os.cpu_count() or 1) + 4)
+        total_parallelism = min(MAX_AUTO_PARALLELISM, (os.cpu_count() or 1) + PARALLELISM_CPU_PADDING)
 
     # use 50/50 split between main and fastlane
     parallelism_main = int(total_parallelism * (1 - BACKGROUND_PARALLELISM_MIX))

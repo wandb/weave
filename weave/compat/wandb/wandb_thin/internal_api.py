@@ -16,6 +16,8 @@ from weave.wandb_interface.context import get_wandb_api_context
 
 logger = logging.getLogger(__name__)
 
+TCP_CONNECTION_POOL_LIMIT = 50
+
 
 class Api:
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
@@ -223,7 +225,7 @@ class ApiAsync:
     def __init__(self) -> None:
         import aiohttp
 
-        self.connector = aiohttp.TCPConnector(limit=50)
+        self.connector = aiohttp.TCPConnector(limit=TCP_CONNECTION_POOL_LIMIT)
 
     async def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
         import aiohttp
