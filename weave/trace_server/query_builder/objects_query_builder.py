@@ -322,72 +322,73 @@ class ObjectMetadataQueryBuilder:
             ) as object_versions_stats ON object_versions_stats.digest = {main_table_alias}.digest
             """
 
-        # Object versions are uniquely identified by (kind, project_id, object_id, digest).
-        # The first subquery selects a row to represent each object version. There are multiple rows
-        # for each object version if it has been deleted or recreated prior to a table merge.
-
-        # In the most nested order by (defining row_number), we follow this crucial logic:
-        # Prefer the most recent row. If there is a tie, prefer the row
-        # with non-null deleted_at, which represents the deletion event.
+        # latest_row_per_digest: Before ReplacingMergeTree compacts rows,
+        # multiple rows can exist for the same (project, object, digest) —
+        # e.g. the original insert and a soft-delete (which inserts a new row
+        # with deleted_at set, inheriting the original created_at).  Pick the
+        # newest row; on created_at ties, prefer the soft-delete so deletes
+        # are visible before RMT merges.
         #
-        # Rows for the same object version may have the same created_at
-        # because deletion events inherit the created_at of the last
-        # non-deleted row for the object version.
+        # _first_created_at comes from the object_version_first_seen MV,
+        # which tracks the earliest created_at per digest across all inserts.
+        # This survives RMT merges (which discard old rows) and keeps
+        # version_index stable when the same digest is re-published.
+        #
+        # object_versions_with_index: For each object, number its versions
+        # 0, 1, 2, ... ordered by when each digest was first published
+        # (_first_created_at).  Also marks is_latest (1 for the most recently
+        # published non-deleted version; callers always filter with
+        # deleted_at IS NULL, so if all versions are deleted the query returns
+        # no results), and version_count.
         query = f"""
-SELECT
-    {columns_str}
-FROM (
+WITH latest_row_per_digest AS (
     SELECT
-        project_id,
-        object_id,
-        created_at,
-        deleted_at,
-        kind,
-        base_object_class,
-        leaf_object_class,
-        refs,
-        digest,
-        wb_user_id,
-        is_op,
+        ov.project_id,
+        ov.object_id,
+        ov.created_at,
+        COALESCE(fc.first_created_at, ov.created_at) AS _first_created_at,
+        ov.deleted_at,
+        ov.kind,
+        ov.base_object_class,
+        ov.leaf_object_class,
+        ov.refs,
+        ov.digest,
+        ov.wb_user_id,
+        if (ov.kind = 'op', 1, 0) AS is_op,
         row_number() OVER (
-            PARTITION BY project_id,
-            kind,
-            object_id
-            ORDER BY created_at ASC
+            PARTITION BY ov.project_id, ov.kind, ov.object_id, ov.digest
+            ORDER BY ov.created_at DESC, (ov.deleted_at IS NULL) ASC
+        ) AS rn
+    FROM object_versions AS ov
+    LEFT JOIN (
+        SELECT object_id, digest, min(first_created_at) AS first_created_at
+        FROM object_version_first_seen
+        WHERE project_id = {{project_id: String}}
+        GROUP BY object_id, digest
+    ) AS fc USING (object_id, digest)
+    WHERE ov.project_id = {{project_id: String}}{self.object_id_conditions_part}
+),
+object_versions_with_index AS (
+    SELECT
+        *,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY _first_created_at ASC, digest ASC
         ) - 1 AS version_index,
         count(*) OVER (
             PARTITION BY project_id, kind, object_id
-        ) as version_count,
+        ) AS version_count,
         row_number() OVER (
             PARTITION BY project_id, kind, object_id
-            ORDER BY (deleted_at IS NULL) DESC, created_at DESC
+            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
-    FROM (
-        SELECT
-            project_id,
-            object_id,
-            created_at,
-            deleted_at,
-            kind,
-            base_object_class,
-            leaf_object_class,
-            refs,
-            digest,
-            wb_user_id,
-            if (kind = 'op', 1, 0) AS is_op,
-            row_number() OVER (
-                PARTITION BY project_id,
-                kind,
-                object_id,
-                digest
-                ORDER BY created_at DESC, (deleted_at IS NULL) ASC
-            ) AS rn
-        FROM object_versions
-        WHERE project_id = {{project_id: String}}{self.object_id_conditions_part}
-    )
+    FROM latest_row_per_digest
     WHERE rn = 1
-) as {main_table_alias}
+)
+SELECT
+    {columns_str}
+FROM object_versions_with_index AS {main_table_alias}
     {join_clause}
 """
         if self.conditions_part:

@@ -16,6 +16,7 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
 from weave.trace_server import clickhouse_trace_server_batched
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -295,3 +296,12 @@ def trace_server(
         # For now, just return the sqlite trace server so we don't break existing tests.
         # raise ValueError(f"Invalid trace server: {trace_server_flag}")
         return get_sqlite_trace_server()
+
+
+@pytest.fixture
+def ch_server(trace_server):
+    """Extract ClickHouseTraceServer from the test fixture, or skip."""
+    server = trace_server._internal_trace_server
+    if not isinstance(server, ClickHouseTraceServer):
+        pytest.skip("ClickHouse-only test")
+    return server
