@@ -1048,7 +1048,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> dict[str, dict[str, float]]:
         """Query llm_token_prices for the given models and return best prices.
 
-        Returns a dict mapping model -> {prompt_token_cost, completion_token_cost}.
+        Returns a dict mapping model -> {prompt_token_cost, completion_token_cost,
+        cache_read_input_token_cost, cache_write_input_token_cost}.
         Uses pricing level priority: project > default, newest effective_date.
         """
         if not models:
@@ -1067,11 +1068,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         prices: dict[str, dict[str, float]] = {}
         for row in result.result_rows:
-            llm_id, prompt_cost, completion_cost = row
+            llm_id, prompt_cost, completion_cost, cache_read_cost, cache_write_cost = (
+                row
+            )
             prices[llm_id] = {
                 "prompt_token_cost": float(prompt_cost) if prompt_cost else 0.0,
                 "completion_token_cost": float(completion_cost)
                 if completion_cost
+                else 0.0,
+                "cache_read_input_token_cost": float(cache_read_cost)
+                if cache_read_cost
+                else 0.0,
+                "cache_write_input_token_cost": float(cache_write_cost)
+                if cache_write_cost
                 else 0.0,
             }
         return prices
@@ -1104,9 +1113,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             model_prices = prices.get(model, {})
             prompt_cost = model_prices.get("prompt_token_cost", 0.0)
             completion_cost = model_prices.get("completion_token_cost", 0.0)
+            cache_read_price = model_prices.get("cache_read_input_token_cost", 0.0)
+            cache_write_price = model_prices.get("cache_write_input_token_cost", 0.0)
 
             input_tokens = bucket.get("sum_input_tokens", 0) or 0
             output_tokens = bucket.get("sum_output_tokens", 0) or 0
+            cache_read_tokens = bucket.get("sum_cache_read_input_tokens", 0) or 0
+            cache_write_tokens = bucket.get("sum_cache_write_input_tokens", 0) or 0
 
             if "input_cost" in requested_cost_metrics:
                 bucket["sum_input_cost"] = input_tokens * prompt_cost
@@ -1114,12 +1127,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if "output_cost" in requested_cost_metrics:
                 bucket["sum_output_cost"] = output_tokens * completion_cost
 
+            if "cache_read_cost" in requested_cost_metrics:
+                bucket["sum_cache_read_cost"] = cache_read_tokens * cache_read_price
+
+            if "cache_write_cost" in requested_cost_metrics:
+                bucket["sum_cache_write_cost"] = cache_write_tokens * cache_write_price
+
             if "total_cost" in requested_cost_metrics:
                 input_cost = bucket.get("sum_input_cost", input_tokens * prompt_cost)
                 output_cost = bucket.get(
                     "sum_output_cost", output_tokens * completion_cost
                 )
-                bucket["sum_total_cost"] = input_cost + output_cost
+                cr_cost = bucket.get(
+                    "sum_cache_read_cost", cache_read_tokens * cache_read_price
+                )
+                cw_cost = bucket.get(
+                    "sum_cache_write_cost", cache_write_tokens * cache_write_price
+                )
+                bucket["sum_total_cost"] = input_cost + output_cost + cr_cost + cw_cost
 
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
         """Return call statistics grouped by bucket with requested aggregations.

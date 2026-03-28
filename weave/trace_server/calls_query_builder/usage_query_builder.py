@@ -71,7 +71,14 @@ def _get_usage_metric_extraction_sql(metric: str, json_col: str) -> str:
             ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, 'completion_tokens')), 0) +
             ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, 'output_tokens')), 0)
         )"""
+    elif metric == "cache_write_input_tokens":
+        # Anthropic uses cache_creation_input_tokens, normalize both
+        return f"""(
+            ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, 'cache_write_input_tokens')), 0) +
+            ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, 'cache_creation_input_tokens')), 0)
+        )"""
     else:
+        # Handles: total_tokens, cache_read_input_tokens, and any future metrics
         return f"toFloat64OrNull(JSONExtractRaw({json_col}, '{metric}'))"
 
 

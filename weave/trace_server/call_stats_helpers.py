@@ -50,7 +50,13 @@ def split_usage_metrics(
         >>> "input_cost" in cost_metrics
         True
     """
-    cost_metrics = {"input_cost", "output_cost", "total_cost"}
+    cost_metrics = {
+        "input_cost",
+        "output_cost",
+        "total_cost",
+        "cache_read_cost",
+        "cache_write_cost",
+    }
     requested_cost_metrics: set[str] = set()
     token_metrics: list[tsi.UsageMetricSpec] = []
 
@@ -84,6 +90,26 @@ def split_usage_metrics(
             token_metrics.append(
                 tsi.UsageMetricSpec(
                     metric="output_tokens",
+                    aggregations=[tsi.AggregationType.SUM],
+                )
+            )
+        if (
+            "cache_read_cost" in requested_cost_metrics
+            or "total_cost" in requested_cost_metrics
+        ) and "cache_read_input_tokens" not in existing_token_metrics:
+            token_metrics.append(
+                tsi.UsageMetricSpec(
+                    metric="cache_read_input_tokens",
+                    aggregations=[tsi.AggregationType.SUM],
+                )
+            )
+        if (
+            "cache_write_cost" in requested_cost_metrics
+            or "total_cost" in requested_cost_metrics
+        ) and "cache_write_input_tokens" not in existing_token_metrics:
+            token_metrics.append(
+                tsi.UsageMetricSpec(
+                    metric="cache_write_input_tokens",
                     aggregations=[tsi.AggregationType.SUM],
                 )
             )
