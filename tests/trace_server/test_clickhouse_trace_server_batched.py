@@ -1484,3 +1484,17 @@ def test_concurrent_queries_on_one_client_vs_session_autogeneration(
             assert "concurrent queries within the same session" in str(e), e
     else:
         assert not errors, errors
+
+
+# ── Explicit "latest" alias on obj_create ────────────────────────────
+
+
+def test_obj_create_writes_latest_alias(ch_server):
+    """obj_create should write a 'latest' alias pointing to the new digest."""
+    project_id = _make_project_id("alias")
+    obj_id = "alias_obj"
+
+    r = _obj_create(ch_server, project_id, obj_id, {"v": 1})
+
+    resolved = ch_server._maybe_resolve_alias(project_id, obj_id, "latest")
+    assert resolved == r.digest

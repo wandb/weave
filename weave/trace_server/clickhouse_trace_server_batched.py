@@ -1819,6 +1819,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             column_names=list(ch_obj.model_fields.keys()),
         )
 
+        # Set "latest" alias on every new version.
+        self._insert_aliases(
+            req.obj.project_id,
+            req.obj.object_id,
+            ["latest"],
+            digest,
+            wb_user_id=req.obj.wb_user_id or "",
+        )
+
         return tsi.ObjCreateRes(
             digest=digest,
             object_id=req.obj.object_id,
@@ -2237,24 +2246,42 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         object_id: str,
         digest: str,
     ) -> str | None:
-        """If digest looks like an alias name (not a hash, not version-like, not 'latest'),
+        """If digest looks like an alias name (not a hash, not version-like),
         resolve it to the actual digest via the aliases table. Returns None if not an alias.
         """
-        # Return None for digests that are not alias names, so the caller
-        # falls through to normal digest-based lookup.  "latest" and version
-        # patterns (v0, v1, …) are handled by the existing obj_read logic;
-        # content hashes are real digests that don't need resolution.
-        if digest == "latest":
-            return None
+        # Version patterns (v0, v1, …) are handled by the existing obj_read
+        # logic; content hashes are real digests that don't need resolution.
         (is_version, _) = tsc.digest_is_version_like(digest)
         if is_version:
             return None
         if tsc.digest_is_content_hash(digest):
             return None
+        # "latest" is now an explicit alias written on every obj_create.
+        # Resolve it from the aliases table like any other alias.
         query, parameters = make_resolve_alias_query(project_id, object_id, digest)
         result = self._query(query, parameters)
         if result.result_rows:
             return result.result_rows[0][0]
+        # Fallback for "latest": if no explicit alias row exists (legacy
+        # objects created before the alias write, or alias INSERT failed),
+        # resolve via the computed is_latest window function so that
+        # obj_read("latest") stays consistent with objs_query(latest_only).
+        if digest == "latest":
+            return self._resolve_computed_latest(project_id, object_id)
+        return None
+
+    def _resolve_computed_latest(
+        self,
+        project_id: str,
+        object_id: str,
+    ) -> str | None:
+        """Fallback: resolve "latest" via the computed is_latest property."""
+        object_query_builder = ObjectMetadataQueryBuilder(project_id)
+        object_query_builder.add_object_ids_condition([object_id])
+        object_query_builder.add_is_latest_condition()
+        objs = self._select_objs_query(object_query_builder, metadata_only=True)
+        if objs:
+            return objs[0].digest
         return None
 
     def _enrich_objs_with_tags_and_aliases(
