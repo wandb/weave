@@ -18,6 +18,8 @@ from weave.trace.display.protocols import (
 )
 from weave.trace.display.types import Style
 
+DEFAULT_TERMINAL_WIDTH = 80
+
 
 class CaptureContext:
     """Context manager for capturing output."""
@@ -70,7 +72,7 @@ class PrintViewer:
         print(output, end=end, file=self._file)
 
     def rule(self, title: str = "", style: str | Style | None = None) -> None:
-        width = 80  # Default width
+        width = DEFAULT_TERMINAL_WIDTH
         if title:
             padding = (width - len(title) - 2) // 2
             rule = "─" * padding + f" {title} " + "─" * padding

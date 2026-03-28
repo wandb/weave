@@ -26,7 +26,7 @@ def test_save_object(client):
 
 
 def test_robust_to_url_sensitive_chars(client):
-    project_id = client._project_id()
+    project_id = client.project_id
     object_id = "mali_cious-obj.ect"
     bad_key = "mali:cious/ke%y"
     bad_val = {bad_key: "hello world"}

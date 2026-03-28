@@ -154,14 +154,11 @@ def lite_llm_image_generation(
         else:
             image_params["size"] = "1024x1024"
 
-        try:
-            # gpt-image-1 doesn't support response_format parameter
-            if model_name in {"gpt-image-1", "gpt-image-1.5"}:
-                res = image_generation(**image_params)
-            else:
-                res = image_generation(response_format="url", **image_params)
-        except Exception as e:
-            raise
+        # gpt-image-1 doesn't support response_format parameter
+        if model_name in {"gpt-image-1", "gpt-image-1.5"}:
+            res = image_generation(**image_params)
+        else:
+            res = image_generation(response_format="url", **image_params)
 
         response_data = res.model_dump()
 

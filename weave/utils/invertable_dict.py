@@ -14,7 +14,7 @@ class InvertableDict(MutableMapping[KT, VT]):
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self._forward = dict(*args, **kwargs)
+        self._forward: dict[KT, VT] = dict(*args, **kwargs)
         self._backward: dict[VT, KT] = {}
         for key, value in self._forward.items():
             if value in self._backward:

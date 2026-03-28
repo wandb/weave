@@ -289,14 +289,14 @@ def test_custom_provider_completions_create(client):
 
     # Create a Provider object with test configuration
     provider_obj = create_provider_obj(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         provider_id=provider_id,
         extra_headers={"X-Custom-Header": "value"},
     )
 
     # Create a ProviderModel object with test configuration
     provider_model_obj = create_provider_model_obj(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         provider_id=provider_id,
         model_id=model_id,
         model_name=model_id,  # Use the actual model name part only
@@ -331,7 +331,7 @@ def test_custom_provider_completions_create(client):
                     res = client.server.completions_create(
                         tsi.CompletionsCreateReq.model_validate(
                             {
-                                "project_id": client._project_id(),
+                                "project_id": client.project_id,
                                 "inputs": inputs,
                             }
                         )
@@ -411,7 +411,7 @@ def test_custom_provider_ollama_model(client):
 
     # Create a Provider object with Ollama-specific configuration
     provider_obj = create_provider_obj(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         provider_id=provider_id,
         base_url="http://localhost:11434",
         api_key_name="OLLAMA_API_KEY",
@@ -420,7 +420,7 @@ def test_custom_provider_ollama_model(client):
 
     # Create a ProviderModel object with Ollama-specific configuration
     provider_model_obj = create_provider_model_obj(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         provider_id=provider_id,
         model_id=model_id,
         model_name="llama2",  # Note: this will be prefixed with ollama/
@@ -458,7 +458,7 @@ def test_custom_provider_ollama_model(client):
                     res = client.server.completions_create(
                         tsi.CompletionsCreateReq.model_validate(
                             {
-                                "project_id": client._project_id(),
+                                "project_id": client.project_id,
                                 "inputs": inputs,
                             }
                         )
@@ -498,7 +498,7 @@ def test_custom_provider_trailing_slash_normalization(client):
 
     # Create a Provider object with a trailing slash in base_url
     provider_obj = create_provider_obj(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         provider_id=provider_id,
         base_url="http://localhost:11434/",  # Note the trailing slash
         api_key_name="TEST_API_KEY",
@@ -507,7 +507,7 @@ def test_custom_provider_trailing_slash_normalization(client):
 
     # Create a ProviderModel object
     provider_model_obj = create_provider_model_obj(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         provider_id=provider_id,
         model_id=model_id,
         model_name=model_id,
@@ -542,7 +542,7 @@ def test_custom_provider_trailing_slash_normalization(client):
                     client.server.completions_create(
                         tsi.CompletionsCreateReq.model_validate(
                             {
-                                "project_id": client._project_id(),
+                                "project_id": client.project_id,
                                 "inputs": inputs,
                             }
                         )
@@ -633,7 +633,7 @@ def test_error_handling_custom_provider(client):
                 res = client.server.completions_create(
                     tsi.CompletionsCreateReq.model_validate(
                         {
-                            "project_id": client._project_id(),
+                            "project_id": client.project_id,
                             "inputs": inputs,
                         }
                     )
@@ -672,7 +672,7 @@ def test_custom_provider_invalid_model_format(client):
             res = client.server.completions_create(
                 tsi.CompletionsCreateReq.model_validate(
                     {
-                        "project_id": client._project_id(),
+                        "project_id": client.project_id,
                         "inputs": inputs,
                     }
                 )

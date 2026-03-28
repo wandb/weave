@@ -144,7 +144,7 @@ def create_test_export_request(project_id="test_project") -> tsi.OTelExportReq:
 def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     """Test the otel_export method."""
     export_req = create_test_export_request()
-    project_id = client._project_id()
+    project_id = client.project_id
     export_req.project_id = project_id
     export_req.wb_user_id = "abcd123"
 
@@ -210,7 +210,7 @@ def test_otel_export_multiple_processed_spans(client: weave_client.WeaveClient):
     per-processed-span loop, causing it to re-process already-resolved calls on
     the 2nd+ iteration and corrupt their op_name with a mangled ref URI.
     """
-    project_id = client._project_id()
+    project_id = client.project_id
 
     # Build two separate ProcessedResourceSpans, each with one span
     processed_spans = []
@@ -279,7 +279,7 @@ def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
     """Test the otel_export method with turn and thread attributes."""
     # Create a test export request
     export_req = create_test_export_request()
-    project_id = client._project_id()
+    project_id = client.project_id
     export_req.project_id = project_id
     export_req.wb_user_id = "abcd123"
 
@@ -333,7 +333,7 @@ def test_otel_export_with_turn_no_thread(client: weave_client.WeaveClient):
     """Test the otel_export method with is_turn=True but no thread_id."""
     # Create a test export request
     export_req = create_test_export_request()
-    project_id = client._project_id()
+    project_id = client.project_id
     export_req.project_id = project_id
     export_req.wb_user_id = "abcd123"
 
@@ -1211,7 +1211,11 @@ class TestSemanticConventionParsing:
 
     def test_opentelemetry_cost_calculation(self, client: weave_client.WeaveClient):
         """Test that costs are properly calculated for OTEL spans with usage at query time."""
-        project_id = client._project_id()
+        if client_is_sqlite(client):
+            # SQLite does not support costs
+            return
+
+        project_id = client.project_id
 
         # Create span with gpt-4 model and usage
         span_gpt4 = create_test_span()
@@ -1520,7 +1524,7 @@ def test_otel_export_partial_success_on_attribute_conflict(
     The good span is ingested; the conflicting span is rejected with a helpful message.
     """
     export_req = create_test_export_request()
-    project_id = client._project_id()
+    project_id = client.project_id
     export_req.project_id = project_id
     export_req.wb_user_id = "abcd123"
 
@@ -1603,7 +1607,7 @@ def test_otel_span_wandb_attributes_and_data_routing(
     """
     # Create a test export request
     export_req = create_test_export_request()
-    project_id = client._project_id()
+    project_id = client.project_id
     export_req.project_id = project_id
     export_req.wb_user_id = "abcd123"
 

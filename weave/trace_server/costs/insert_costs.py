@@ -13,6 +13,7 @@ from typing import TypedDict
 from clickhouse_connect.driver.client import Client
 
 COST_FILE = "cost_checkpoint.json"
+MAX_DEFAULT_COST_ROWS = 10_000
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -22,7 +23,7 @@ def get_current_costs(
     client: Client,
 ) -> list[tuple[str, float, float, datetime]]:
     current_costs = client.query(
-        """
+        f"""
         SELECT
             llm_id,
             prompt_token_cost,
@@ -31,8 +32,8 @@ def get_current_costs(
         FROM llm_token_prices
         WHERE
         created_by = 'system'
-        -- There should not ever be more than 10000 default rows in the table, but just in case we limit
-        LIMIT 10000
+        -- There should not ever be more than {MAX_DEFAULT_COST_ROWS} default rows in the table, but just in case we limit
+        LIMIT {MAX_DEFAULT_COST_ROWS}
         """
     )
     return current_costs.result_rows

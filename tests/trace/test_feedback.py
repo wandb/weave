@@ -82,7 +82,7 @@ def test_custom_feedback(client) -> None:
 
 
 def test_annotation_feedback(client: WeaveClient) -> None:
-    project_id = client._project_id()
+    project_id = client.project_id
     column_name = "column_name"
     feedback_type = f"wandb.annotation.{column_name}"
     weave_ref = f"weave:///{project_id}/call/cal_id_123"
@@ -202,7 +202,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
 
 def test_runnable_feedback(client: WeaveClient) -> None:
     """Test feedback creation with runnable references."""
-    project_id = client._project_id()
+    project_id = client.project_id
     runnable_name = "runnable_name"
     feedback_type = f"wandb.runnable.{runnable_name}"
     weave_ref = f"weave:///{project_id}/call/cal_id_123"
@@ -406,7 +406,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
     ]:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 sort_by=[
                     SortBy(
@@ -425,7 +425,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 sort_by=[
                     SortBy(
@@ -469,7 +469,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
     ]:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 query={
                     "$expr": {
@@ -489,7 +489,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
                 query={
                     "$expr": {
@@ -519,7 +519,7 @@ async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
     ids, my_scorer, my_model = await populate_feedback(client)
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
             # Filter down to just correct matches
             query={
@@ -588,7 +588,7 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     calls = list(
         client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 filter=tsi.CallsFilter(op_names=[model_ref]),
                 query={
                     "$expr": {
@@ -610,7 +610,7 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     calls = list(
         client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 filter=tsi.CallsFilter(op_names=[model_ref]),
                 query={
                     "$expr": {
@@ -632,7 +632,7 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     calls = list(
         client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 filter=tsi.CallsFilter(op_names=[model_ref]),
                 query={
                     "$expr": {
@@ -732,7 +732,7 @@ def test_feedback_replace(client) -> None:
 def test_get_feedback_with_dict_query(client) -> None:
     """Test that get_feedback works with dict queries as shown in the docstring example."""
     # Create some test feedback using the server API
-    project_id = client._project_id()
+    project_id = client.project_id
 
     # Create a call to attach feedback to
     call_ref_uri = f"weave:///{project_id}/call/call_id_123"
@@ -812,7 +812,7 @@ def test_get_feedback_with_dict_query(client) -> None:
 def test_feedback_query_bad_json_path(client) -> None:
     """Test that querying for nonexistent JSON paths raises appropriate error."""
     # Create some test feedback
-    project_id = client._project_id()
+    project_id = client.project_id
 
     # Create a call to attach feedback to
     call = client.create_call("test_op", {"input": "test"})
@@ -852,7 +852,7 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     The query builder should convert the numeric literal to a string for the
     position function, not cast it to an integer type.
     """
-    project_id = client._project_id()
+    project_id = client.project_id
     call_ref_uri = f"weave:///{project_id}/call/call_id_456"
 
     # Create feedback with a payload containing a dataset_id
@@ -915,7 +915,7 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
         # Skip for SQLite - annotation queues not implemented
         return pytest.skip()
 
-    project_id = client._project_id()
+    project_id = client.project_id
     weave_ref = f"weave:///{project_id}/call/call_id_789"
 
     # Create an annotation queue first
@@ -970,7 +970,7 @@ def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
         # Skip for SQLite - annotation queues not implemented
         return pytest.skip()
 
-    project_id = client._project_id()
+    project_id = client.project_id
     weave_ref = f"weave:///{project_id}/call/call_id_invalid"
     invalid_queue_id = "00000000-0000-0000-0000-000000000000"
 
@@ -993,7 +993,7 @@ def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> N
         # Skip for SQLite - annotation queues not implemented
         return pytest.skip()
 
-    project_id = client._project_id()
+    project_id = client.project_id
     other_project_id = f"{project_id}_other"
 
     # Create a queue in the original project
@@ -1027,7 +1027,7 @@ def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
         # Skip for SQLite - annotation queues not implemented
         return pytest.skip()
 
-    project_id = client._project_id()
+    project_id = client.project_id
 
     # Create two queues
     queue1_res = client.server.annotation_queue_create(
@@ -1141,7 +1141,7 @@ def _seed_numeric_feedback(
     trigger_ref: str | None = None,
 ) -> None:
     """Create feedback rows with numeric payload for stats testing."""
-    project_id = client._project_id()
+    project_id = client.project_id
     call = client.create_call("x", {"a": 1})
     client.finish_call(call, "done")
     weave_ref = get_ref(client.get_call(call.id)).uri()
@@ -1168,7 +1168,7 @@ def test_feedback_stats(client: WeaveClient) -> None:
 
     Runs with both SQLite and ClickHouse backends (controlled by --trace-server).
     """
-    project_id = client._project_id()
+    project_id = client.project_id
     trigger = f"weave:///{project_id}/object/test-scorer:trig_1"
     scores = [0.5, 0.8, 1.0]
     _seed_numeric_feedback(
@@ -1216,7 +1216,7 @@ def test_feedback_stats(client: WeaveClient) -> None:
 
 def test_feedback_payload_schema(client: WeaveClient) -> None:
     """End-to-end: seed varied feedback, discover payload schema paths."""
-    project_id = client._project_id()
+    project_id = client.project_id
     call = client.create_call("x", {"a": 1})
     client.finish_call(call, "done")
     weave_ref = get_ref(client.get_call(call.id)).uri()
@@ -1263,7 +1263,7 @@ def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
 
     Runs with both SQLite and ClickHouse backends (controlled by --trace-server).
     """
-    project_id = client._project_id()
+    project_id = client.project_id
     now = datetime.datetime.now(datetime.timezone.utc)
     res = client.server.feedback_stats(
         tsi.FeedbackStatsReq(

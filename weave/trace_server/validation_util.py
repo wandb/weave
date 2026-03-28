@@ -3,6 +3,11 @@ import uuid
 
 from weave.shared import refs_internal
 
+# OTel trace ID: 16 bytes encoded as 32 hex characters
+OTEL_TRACE_ID_HEX_LENGTH = 32
+# OTel span ID: 8 bytes encoded as 16 hex characters
+OTEL_SPAN_ID_HEX_LENGTH = 16
+
 
 class CHValidationError(Exception):
     pass
@@ -14,7 +19,7 @@ def require_otel_trace_id(s: str) -> str:
         raise CHValidationError(f"Invalid Trace ID: {s}. Trace ID must be lowercase")
 
     # 16 Bytes is a hex string of len 32
-    if len(s) != 32:
+    if len(s) != OTEL_TRACE_ID_HEX_LENGTH:
         raise CHValidationError(f"Invalid Trace ID: {s}. Trace ID must be 16 bytes")
     return s
 
@@ -25,7 +30,7 @@ def require_otel_span_id(s: str) -> str:
         raise CHValidationError(f"Invalid Span ID: {s}. Span ID must be lowercase")
 
     # 8 Bytes is a hex string of len 16
-    if len(s) != 16:
+    if len(s) != OTEL_SPAN_ID_HEX_LENGTH:
         raise CHValidationError(f"Invalid Span ID: {s}. Span ID must be 8 bytes")
     return s
 
