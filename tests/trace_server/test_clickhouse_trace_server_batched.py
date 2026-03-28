@@ -1527,3 +1527,43 @@ def test_obj_create_moves_latest_alias_on_dedup(ch_server):
     # Re-publish A (dedup hit) — latest should move to A
     _obj_create(ch_server, project_id, obj_id, {"v": "A"})
     assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r1.digest
+
+
+def test_resolve_latest_falls_back_to_computed(ch_server):
+    """If no explicit 'latest' alias exists, fall back to computed is_latest."""
+    project_id = _make_project_id("alias")
+    obj_id = "alias_fallback"
+
+    # Insert directly bypassing obj_create to avoid writing the alias
+    from weave.shared.digest import compute_object_digest_result
+    from weave.trace_server.clickhouse_schema import ObjCHInsertable
+
+    val = {"v": "no_alias"}
+    digest_result = compute_object_digest_result(val, None)
+    ch_obj = ObjCHInsertable(
+        project_id=project_id,
+        object_id=obj_id,
+        wb_user_id="",
+        kind="object",
+        base_object_class=digest_result.base_object_class,
+        leaf_object_class=digest_result.leaf_object_class,
+        refs=[],
+        val_dump=digest_result.json_val,
+        digest=digest_result.digest,
+    )
+    ch_server._insert(
+        "object_versions",
+        data=[list(ch_obj.model_dump().values())],
+        column_names=list(ch_obj.model_fields.keys()),
+    )
+
+    # No alias written — _maybe_resolve_alias should fall back to computed latest
+    resolved = ch_server._maybe_resolve_alias(project_id, obj_id, "latest")
+    assert resolved == digest_result.digest
+
+
+def test_resolve_computed_latest_returns_none_for_missing(ch_server):
+    """_resolve_computed_latest should return None for nonexistent object."""
+    project_id = _make_project_id("alias")
+    result = ch_server._resolve_computed_latest(project_id, "nonexistent_obj")
+    assert result is None
