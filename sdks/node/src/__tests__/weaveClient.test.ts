@@ -76,6 +76,45 @@ describe('WeaveClient', () => {
       });
     });
 
+    it('should support the options form with query parameters', async () => {
+      const mockCalls = [{id: '1', name: 'call1'}];
+      const query = {
+        $expr: {
+          $eq: [{$getField: 'display_name'}, {$literal: 'target-call'}],
+        },
+      };
+      const sortBy = [{field: 'started_at', direction: 'desc' as const}];
+      mockStreamResponse(mockTraceServerApi, mockCalls);
+
+      const result = await client.getCalls({
+        filter: {op_names: ['demo-op']},
+        query,
+        includeCosts: true,
+        includeFeedback: true,
+        limit: 25,
+        offset: 10,
+        sortBy,
+        columns: ['id', 'display_name'],
+        expandColumns: ['inputs.prompt'],
+      });
+
+      expect(result).toEqual(mockCalls);
+      expect(
+        mockTraceServerApi.calls.callsQueryStreamCallsStreamQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        filter: {op_names: ['demo-op']},
+        query,
+        include_costs: true,
+        include_feedback: true,
+        limit: 25,
+        offset: 10,
+        sort_by: sortBy,
+        columns: ['id', 'display_name'],
+        expand_columns: ['inputs.prompt'],
+      });
+    });
+
     it('should handle remaining buffer data after stream ends', async () => {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({

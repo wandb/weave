@@ -6,8 +6,11 @@ import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {computeDigest} from './digest';
 import {
   CallSchema,
+  CallsQueryReq,
   CallsFilter,
   EndedCallSchemaForInsert,
+  Query,
+  SortBy,
   StartedCallSchemaForInsert,
   Api as TraceServerApi,
 } from './generated/traceServerApi';
@@ -60,6 +63,65 @@ export type CallStackEntry = {
   traceId: string;
   childSummary: Record<string, any>;
 };
+
+export interface GetCallsOptions {
+  filter?: CallsFilter;
+  query?: Query;
+  includeCosts?: boolean;
+  includeFeedback?: boolean;
+  limit?: number;
+  offset?: number;
+  sortBy?: SortBy[];
+  columns?: string[];
+  expandColumns?: string[];
+}
+
+function isGetCallsOptions(
+  value: CallsFilter | GetCallsOptions | undefined
+): value is GetCallsOptions {
+  if (value == null) {
+    return false;
+  }
+  return (
+    'filter' in value ||
+    'query' in value ||
+    'includeCosts' in value ||
+    'includeFeedback' in value ||
+    'limit' in value ||
+    'offset' in value ||
+    'sortBy' in value ||
+    'columns' in value ||
+    'expandColumns' in value
+  );
+}
+
+function normalizeGetCallsRequest(
+  filterOrOptions: CallsFilter | GetCallsOptions = {},
+  includeCosts: boolean = false,
+  limit: number = 1000
+): CallsQueryReq {
+  if (isGetCallsOptions(filterOrOptions)) {
+    return {
+      filter: filterOrOptions.filter,
+      query: filterOrOptions.query,
+      include_costs: filterOrOptions.includeCosts,
+      include_feedback: filterOrOptions.includeFeedback,
+      limit: filterOrOptions.limit ?? 1000,
+      offset: filterOrOptions.offset,
+      sort_by: filterOrOptions.sortBy,
+      columns: filterOrOptions.columns,
+      expand_columns: filterOrOptions.expandColumns,
+      project_id: '',
+    };
+  }
+
+  return {
+    filter: filterOrOptions,
+    include_costs: includeCosts,
+    limit,
+    project_id: '',
+  };
+}
 
 function generateTraceId(): string {
   return uuidv7();
@@ -248,12 +310,22 @@ export class WeaveClient {
     return calls[0];
   }
   public async getCalls(
-    filter: CallsFilter = {},
+    filter?: CallsFilter,
+    includeCosts?: boolean,
+    limit?: number
+  ): Promise<Call[]>;
+  public async getCalls(options: GetCallsOptions): Promise<Call[]>;
+  public async getCalls(
+    filterOrOptions: CallsFilter | GetCallsOptions = {},
     includeCosts: boolean = false,
     limit: number = 1000
-  ) {
+  ): Promise<Call[]> {
     const calls: Call[] = [];
-    const iterator = this.getCallsIterator(filter, includeCosts, limit);
+    const iterator = this.getCallsIteratorInternal(
+      filterOrOptions,
+      includeCosts,
+      limit
+    );
     for await (const call of iterator) {
       const internalCall = new InternalCall();
       internalCall.updateWithCallSchemaData(call);
@@ -261,18 +333,32 @@ export class WeaveClient {
     }
     return calls;
   }
-  public async *getCallsIterator(
-    filter: CallsFilter = {},
+  public getCallsIterator(
+    filter?: CallsFilter,
+    includeCosts?: boolean,
+    limit?: number
+  ): AsyncIterableIterator<CallSchema>;
+  public getCallsIterator(
+    options: GetCallsOptions
+  ): AsyncIterableIterator<CallSchema>;
+  public getCallsIterator(
+    filterOrOptions: CallsFilter | GetCallsOptions = {},
     includeCosts: boolean = false,
     limit: number = 1000
   ): AsyncIterableIterator<CallSchema> {
+    return this.getCallsIteratorInternal(filterOrOptions, includeCosts, limit);
+  }
+
+  private async *getCallsIteratorInternal(
+    filterOrOptions: CallsFilter | GetCallsOptions = {},
+    includeCosts: boolean = false,
+    limit: number = 1000
+  ): AsyncIterableIterator<CallSchema> {
+    const req = normalizeGetCallsRequest(filterOrOptions, includeCosts, limit);
+    req.project_id = this.projectId;
+
     const resp =
-      await this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost({
-        project_id: this.projectId,
-        filter,
-        include_costs: includeCosts,
-        limit,
-      });
+      await this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost(req);
 
     const reader = resp.body!.getReader();
     const decoder = new TextDecoder();
