@@ -1144,7 +1144,8 @@ def test_server_list_endpoints(client: WeaveClient):
         )
     )
     res = client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id))
-    assert res.aliases == ["canary", "production"]
+    # "latest" appears because obj_create now writes an explicit "latest" alias.
+    assert res.aliases == ["canary", "latest", "production"]
 
     # Removed tags/aliases don't appear
     client.server.obj_remove_tags(
