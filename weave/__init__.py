@@ -53,6 +53,7 @@ from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.flow.annotation_spec import AnnotationSpec
+from weave.flow.code_scorer import CodeScorer
 from weave.flow.model import Model
 from weave.flow.monitor import Monitor
 from weave.flow.saved_view import SavedView
@@ -75,6 +76,7 @@ __all__ = [
     "AgentState",
     "AnnotationSpec",
     "Audio",
+    "CodeScorer",
     "Content",
     "Dataset",
     "EasyPrompt",
