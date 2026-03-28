@@ -2297,12 +2297,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
 
+        # Build a set of object_ids that have an explicit "latest" alias
+        # so we only fall back to computed is_latest for legacy objects.
+        objects_with_explicit_latest: set[str] = set()
+        for (object_id, _digest), aliases in aliases_map.items():
+            if "latest" in aliases:
+                objects_with_explicit_latest.add(object_id)
+
         for obj in objs:
             key = (obj.object_id, obj.digest)
             obj.tags = sorted(tags_map.get(key, []))
             aliases = aliases_map.get(key, [])
-            # "latest" is virtual — synthesized from the is_latest window function
-            if obj.is_latest == 1 and "latest" not in aliases:
+            # Fallback: synthesize "latest" from is_latest for objects
+            # that don't have an explicit "latest" alias (legacy objects
+            # created before the explicit alias write was added).
+            if (
+                obj.is_latest == 1
+                and "latest" not in aliases
+                and obj.object_id not in objects_with_explicit_latest
+            ):
                 aliases = ["latest"] + aliases
             obj.aliases = aliases
 
