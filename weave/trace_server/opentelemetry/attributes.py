@@ -1,3 +1,4 @@
+from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
@@ -24,12 +25,11 @@ class SpanEvent(dict):
     dropped_attributes_count: int
 
 
+T_KeyMapping = list[str] | dict[str, list[str]] | list[tuple[str, Callable[..., Any]]] | dict[str, list[tuple[str, Callable[..., Any]]]]
+
 def parse_weave_values(
     attributes: dict[str, Any],
-    key_mapping: list[str]
-    | dict[str, list[str]]
-    | list[tuple[str, Callable[..., Any]]]
-    | dict[str, list[tuple[str, Callable[..., Any]]]],
+    key_mapping: T_KeyMapping
 ) -> dict[str, Any]:
     result = {}
     # If list use the attribute as the key - Prevents synthetic attributes under input and output
@@ -101,9 +101,40 @@ def get_weave_usage(attributes: dict[str, Any]) -> dict[str, Any]:
     return usage
 
 
+def parse_events(events: list[SpanEvent]) -> dict[str, Any]:
+    def find_output() -> tuple[int, str | dict[str, Any]] | None:
+        for i, event in enumerate(reversed(events)):
+            if output := parse_weave_values(event.attributes, OUTPUT_KEYS):
+                return i, output
+        return None
+
+    output = find_output()
+    inputs = []
+    if output is not None:
+        out_idx, output = output
+    else:
+        out_idx = -1 # never
+
+    for i in range(len(events)):
+        res = parse_weave_values(events[i].attributes, INPUT_KEYS)
+
+        if out_idx != -1 and i != out_idx: # Can skip if no output ever
+            res.update(parse_weave_values(events[i].attributes, OUTPUT_KEYS))
+
+        if len(res.items()) > 0:
+            inputs.append(res)
+
+    if output is not None:
+        return {
+            "inputs": inputs,
+            "output": output
+        }
+    return {}
+
+
 # Pass events here even though they are unused because some libraries put input in event attributes
 def get_weave_inputs(_: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
-    return parse_weave_values(attributes, INPUT_KEYS)
+    return parse_weave_values(attributes, ATTRIBUTE_KEYS)
 
 
 # Pass events here even though they are unused because some libraries put output in event attributes
