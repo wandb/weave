@@ -54,6 +54,19 @@ def anthropic_accumulator(
     # Merge in the usage info if available
     if hasattr(value, "message") and value.message.usage is not None:
         acc.usage.input_tokens += value.message.usage.input_tokens
+        # Track cache tokens if present
+        cache_creation = getattr(
+            value.message.usage, "cache_creation_input_tokens", None
+        )
+        if cache_creation is not None:
+            existing = getattr(acc.usage, "cache_creation_input_tokens", None) or 0
+            acc.usage.cache_creation_input_tokens = existing + cache_creation
+        cache_read = getattr(
+            value.message.usage, "cache_read_input_tokens", None
+        )
+        if cache_read is not None:
+            existing = getattr(acc.usage, "cache_read_input_tokens", None) or 0
+            acc.usage.cache_read_input_tokens = existing + cache_read
 
     # Accumulate the content if it's a ContentBlockDeltaEvent
     if isinstance(
