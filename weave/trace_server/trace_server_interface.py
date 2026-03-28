@@ -47,13 +47,19 @@ class LLMUsageSchema(TypedDict, total=False):
     output_tokens: int | None
     requests: int | None
     total_tokens: int | None
+    cache_read_input_tokens: int | None
+    cache_write_input_tokens: int | None
 
 
 class LLMCostSchema(LLMUsageSchema, total=False):
     prompt_tokens_total_cost: float | None
     completion_tokens_total_cost: float | None
+    cache_read_input_tokens_total_cost: float | None
+    cache_write_input_tokens_total_cost: float | None
     prompt_token_cost: float | None
     completion_token_cost: float | None
+    cache_read_input_token_cost: float | None
+    cache_write_input_token_cost: float | None
     prompt_token_cost_unit: str | None
     completion_token_cost_unit: str | None
     effective_date: str | None
@@ -3176,9 +3182,13 @@ class LLMAggregatedUsage(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    cache_read_input_tokens: int = 0
+    cache_write_input_tokens: int = 0
     # Cost fields - only populated when include_costs=True
     prompt_tokens_total_cost: float | None = None
     completion_tokens_total_cost: float | None = None
+    cache_read_input_tokens_total_cost: float | None = None
+    cache_write_input_tokens_total_cost: float | None = None
 
 
 # --- /trace/usage endpoint (per-call usage with descendant rollup) ---
