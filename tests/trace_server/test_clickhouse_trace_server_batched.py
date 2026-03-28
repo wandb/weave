@@ -1498,3 +1498,32 @@ def test_obj_create_writes_latest_alias(ch_server):
 
     resolved = ch_server._maybe_resolve_alias(project_id, obj_id, "latest")
     assert resolved == r.digest
+
+
+def test_obj_create_moves_latest_alias_on_new_version(ch_server):
+    """Each new version should move the 'latest' alias."""
+    project_id = _make_project_id("alias")
+    obj_id = "alias_move"
+
+    r1 = _obj_create(ch_server, project_id, obj_id, {"v": 1})
+    r2 = _obj_create(ch_server, project_id, obj_id, {"v": 2})
+
+    resolved = ch_server._maybe_resolve_alias(project_id, obj_id, "latest")
+    assert resolved == r2.digest
+    assert resolved != r1.digest
+
+
+def test_obj_create_moves_latest_alias_on_dedup(ch_server):
+    """Re-publishing old content should move 'latest' to the re-published digest."""
+    project_id = _make_project_id("alias")
+    obj_id = "alias_dedup"
+
+    r1 = _obj_create(ch_server, project_id, obj_id, {"v": "A"})
+    r2 = _obj_create(ch_server, project_id, obj_id, {"v": "B"})
+
+    # latest should point to B
+    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r2.digest
+
+    # Re-publish A (dedup hit) — latest should move to A
+    _obj_create(ch_server, project_id, obj_id, {"v": "A"})
+    assert ch_server._maybe_resolve_alias(project_id, obj_id, "latest") == r1.digest
