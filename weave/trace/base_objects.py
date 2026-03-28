@@ -1,1 +1,37 @@
-from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import *
+from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+    BUILTIN_OBJECT_REGISTRY,
+    ActionSpec,
+    AlertSpec,
+    AnnotationSpec,
+    BaseObject,
+    ChartConfig,
+    ComparisonView,
+    Leaderboard,
+    LLMStructuredCompletionModel,
+    Provider,
+    ProviderModel,
+    SavedView,
+    TestOnlyExample,
+    TestOnlyInheritedBaseObject,
+    TestOnlyNestedBaseObject,
+    register_base_object,
+)
+
+__all__ = [
+    "BUILTIN_OBJECT_REGISTRY",
+    "ActionSpec",
+    "AlertSpec",
+    "AnnotationSpec",
+    "BaseObject",
+    "ChartConfig",
+    "ComparisonView",
+    "LLMStructuredCompletionModel",
+    "Leaderboard",
+    "Provider",
+    "ProviderModel",
+    "SavedView",
+    "TestOnlyExample",
+    "TestOnlyInheritedBaseObject",
+    "TestOnlyNestedBaseObject",
+    "register_base_object",
+]

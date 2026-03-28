@@ -39,6 +39,8 @@ from weave.utils.sentinel import NOT_SET, _NotSetType
 if TYPE_CHECKING:
     from weave.trace.call import Call
 
+DEFAULT_SCORER_CACHE_SIZE = 1000
+
 T = TypeVar("T")
 ID = str
 ScoreType = float | bool | dict
@@ -213,7 +215,7 @@ class ScorerCache:
     _cached_scorers_lock: Any
     _max_size: int
 
-    def __init__(self, max_size: int = 1000) -> None:
+    def __init__(self, max_size: int = DEFAULT_SCORER_CACHE_SIZE) -> None:
         self._cached_scorers = {}
         self._cached_scorers_lock = Lock()
         self._max_size = max_size

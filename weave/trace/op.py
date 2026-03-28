@@ -474,7 +474,7 @@ def _call_sync_func(
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
-        raise e
+        raise
     except Exception as e:
         _restore_call_stack(call_stack_snapshot)
         if get_raise_on_captured_errors():
@@ -603,7 +603,7 @@ async def _call_async_func(
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
-        raise e
+        raise
     except Exception as e:
         _restore_call_stack(call_stack_snapshot)
         if get_raise_on_captured_errors():
@@ -913,7 +913,7 @@ def _call_sync_gen(
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
                 nonlocal e
-                raise e
+                raise e  # noqa: TRY201 - bare raise invalid outside exception handler
             # This will never actually yield anything but is needed for typing
             yield from []
 
@@ -1140,7 +1140,7 @@ async def _call_async_gen(
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
                 nonlocal e
-                raise e
+                raise e  # noqa: TRY201 - bare raise invalid outside exception handler
             # This will never actually yield anything but is needed for typing
             for _ in []:
                 yield _

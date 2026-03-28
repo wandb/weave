@@ -68,7 +68,7 @@ def test_serialization_correctness(
             or sys.version_info.minor != case.python_version_code_capture[1]
         )
 
-    project_id = client._project_id()
+    project_id = client.project_id
 
     def verify_test_case():
         # Verify that all refs in json and objects are in objects.

@@ -14,7 +14,7 @@ def test_op_return_sync_empty(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -35,7 +35,7 @@ async def test_op_return_async_empty(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -55,7 +55,7 @@ def test_op_return_sync_obj(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -76,7 +76,7 @@ async def test_op_return_async_obj(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -114,7 +114,7 @@ def test_op_return_sync_generator(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -139,7 +139,7 @@ async def test_op_return_async_generator(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -172,7 +172,7 @@ def test_op_return_sync_iterator(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -206,7 +206,7 @@ async def test_op_return_async_iterator(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -229,7 +229,7 @@ def test_op_return_sync_generator_never_iter(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -254,7 +254,7 @@ async def test_op_return_async_generator_never_iter(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -286,7 +286,7 @@ def test_op_return_sync_iterator_never_iter(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -319,7 +319,7 @@ async def test_op_return_async_iterator_never_iter(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -344,7 +344,7 @@ def test_op_return_sync_generator_partial(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -371,7 +371,7 @@ async def test_op_return_async_generator_partial(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -405,7 +405,7 @@ def test_op_return_sync_iterator_partial(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -440,7 +440,7 @@ async def test_op_return_async_iterator_partial(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -469,7 +469,7 @@ def test_op_return_sync_generator_exception(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -500,7 +500,7 @@ async def test_op_return_async_generator_exception(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -539,7 +539,7 @@ def test_op_return_sync_iterator_exception(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -579,7 +579,7 @@ async def test_op_return_async_iterator_exception(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 

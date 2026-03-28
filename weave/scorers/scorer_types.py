@@ -9,6 +9,10 @@ from weave.scorers.utils import ensure_hf_imports
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_ROLLING_WINDOW_MAX_TOKENS = 512
+DEFAULT_ROLLING_WINDOW_OVERLAP = 50
+DEFAULT_LLM_MAX_TOKENS = 4096
+
 if TYPE_CHECKING:
     import torch
     from litellm import acompletion, aembedding, amoderation
@@ -171,9 +175,9 @@ class RollingWindowScorer(HuggingFaceScorer):
         aggregation_method: The method to aggregate predictions ("max" or "mean").
     """
 
-    max_tokens: int = 512  # Default maximum tokens per window
+    max_tokens: int = DEFAULT_ROLLING_WINDOW_MAX_TOKENS
     overlap: int = Field(
-        default=50,
+        default=DEFAULT_ROLLING_WINDOW_OVERLAP,
         description="The number of overlapping tokens between consecutive windows",
     )
     aggregation_method: Literal["max", "mean"] = Field(

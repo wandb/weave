@@ -1,4 +1,30 @@
-from weave.integrations.patch import *
+from weave.integrations.patch import (
+    patch_anthropic,
+    patch_autogen,
+    patch_cerebras,
+    patch_claude_agent_sdk,
+    patch_cohere,
+    patch_crewai,
+    patch_dspy,
+    patch_google_genai,
+    patch_groq,
+    patch_huggingface,
+    patch_instructor,
+    patch_langchain,
+    patch_litellm,
+    patch_llamaindex,
+    patch_mcp,
+    patch_mistral,
+    patch_notdiamond,
+    patch_nvidia,
+    patch_openai,
+    patch_openai_agents,
+    patch_openai_realtime,
+    patch_smolagents,
+    patch_verdict,
+    patch_verifiers,
+    patch_vertexai,
+)
 
 __all__ = [
     "patch_anthropic",

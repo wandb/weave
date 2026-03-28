@@ -240,11 +240,34 @@ logger.setLevel(logging.INFO)
 
 T = TypeVar("T")
 
+# ClickHouse connection pool settings
+CH_POOL_MAX_CONNECTIONS = 50
+CH_POOL_COUNT = 2
+
+# ClickHouse port defaults
+CLICKHOUSE_DEFAULT_PORT = 8123
+CLICKHOUSE_SECURE_PORT = 8443
+
+# Op ref cache: in-memory TTL cache for resolved op refs
+OP_REF_CACHE_MAX_SIZE = 50_000
+OP_REF_CACHE_TTL_SECONDS = 300
+
+# Max error messages to include in OTel export partial success responses
+MAX_OTEL_ERROR_MESSAGES = 20
+
+# Cache size for ref expansion during call streaming
+REF_EXPANSION_CACHE_SIZE = 1000
+
+# Growth factor for dynamic batch sizing during call streaming
+CALLS_STREAM_GROWTH_FACTOR = 10
+
+# Retry attempts when reading back a newly-created object (eventual consistency)
+OBJ_READ_RETRY_ATTEMPTS = 3
 
 # Create a shared connection pool manager for all ClickHouse connections
-# maxsize: Maximum connections per pool (set higher than thread count to avoid blocking)
-# num_pools: Number of distinct connection pools (for different hosts/configs)
-_CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
+_CH_POOL_MANAGER = get_pool_manager(
+    maxsize=CH_POOL_MAX_CONNECTIONS, num_pools=CH_POOL_COUNT
+)
 
 
 # Precomputed list of (column_index, field_name) for every sentinel field that appears
@@ -263,7 +286,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         *,
         host: str,
-        port: int = 8123,
+        port: int = CLICKHOUSE_DEFAULT_PORT,
         user: str = "default",
         password: str = "",
         database: str = "default",
@@ -286,7 +309,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
         self._op_ref_cache: TTLCache[tuple[str, str], str] = TTLCache(
-            maxsize=50_000, ttl=300
+            maxsize=OP_REF_CACHE_MAX_SIZE, ttl=OP_REF_CACHE_TTL_SECONDS
         )
         self._op_ref_cache_lock = threading.Lock()
         self._placeholder_file_projects: set[str] = set()
@@ -651,8 +674,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
-            joined_errors = "; ".join(error_messages[:20]) + (
-                "; ..." if len(error_messages) > 20 else ""
+            joined_errors = "; ".join(error_messages[:MAX_OTEL_ERROR_MESSAGES]) + (
+                "; ..." if len(error_messages) > MAX_OTEL_ERROR_MESSAGES else ""
             )
             return tsi.OTelExportRes(
                 partial_success=tsi.ExportTracePartialSuccess(
@@ -1396,11 +1419,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
                 return
 
-            ref_cache = LRUCache(max_size=1000)
+            ref_cache = LRUCache(max_size=REF_EXPANSION_CACHE_SIZE)
             batch_processor = DynamicBatchProcessor(
                 initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
                 max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
-                growth_factor=10,
+                growth_factor=CALLS_STREAM_GROWTH_FACTOR,
             )
 
             for batch in batch_processor.make_batches(raw_res):
@@ -3264,7 +3287,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=object_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
+        obj_read_res = self._obj_read_with_retry(
+            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         return tsi.OpCreateRes(
             digest=obj_result.digest,
@@ -3491,7 +3516,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=dataset_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
+        obj_read_res = self._obj_read_with_retry(
+            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         return tsi.DatasetCreateRes(
             digest=obj_result.digest,
@@ -3638,7 +3665,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=scorer_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
+        obj_read_res = self._obj_read_with_retry(
+            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         # Get the ref and return the create result
         scorer_ref = ri.InternalObjectRef(
@@ -3758,7 +3787,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=evaluation_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
+        obj_read_res = self._obj_read_with_retry(
+            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         # Get the ref and return the create result
         evaluation_ref = ri.InternalObjectRef(
@@ -3904,7 +3935,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=object_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req, max_attempts=3)
+        obj_read_res = self._obj_read_with_retry(
+            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         # Build model reference - external adapter will convert to external format
         model_ref = ri.InternalObjectRef(
@@ -6334,7 +6367,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             port=self._port,
             user=self._user,
             password=self._password,
-            secure=self._port == 8443,
+            secure=self._port == CLICKHOUSE_SECURE_PORT,
             pool_mgr=_CH_POOL_MANAGER,
         )
         self._ensure_database(client)

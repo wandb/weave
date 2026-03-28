@@ -31,6 +31,9 @@ from weave.trace_server.service_interface import (  # noqa: F401
     ProjectsInfoRes,
 )
 
+DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
+MAX_FEEDBACK_SAMPLE_LIMIT = 5000
+
 
 class ExtraKeysTypedDict(TypedDict):
     pass
@@ -1387,9 +1390,9 @@ class FeedbackPayloadSchemaReq(_FeedbackFilterBase):
     """Request for feedback payload schema discovery."""
 
     sample_limit: int = Field(
-        default=2000,
+        default=DEFAULT_FEEDBACK_SAMPLE_LIMIT,
         ge=1,
-        le=5000,
+        le=MAX_FEEDBACK_SAMPLE_LIMIT,
         description=(
             "Max distinct trigger_refs to sample when discovering the payload schema. "
             "Each distinct trigger_ref (monitor/source) typically has a fixed payload "

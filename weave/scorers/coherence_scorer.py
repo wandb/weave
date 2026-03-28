@@ -8,6 +8,8 @@ from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.scorer_types import HuggingFacePipelineScorer
 from weave.scorers.utils import load_local_model_weights
 
+DEFAULT_COHERENCE_MODEL_MAX_LENGTH = 1024
+
 
 class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
     """The scorer that assesses if the model output is coherent using a fine-tuned
@@ -32,7 +34,8 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
 
     task: str = "sentiment-analysis"
     model_max_length: int = Field(
-        default=1024, description="The maximum length of the model output."
+        default=DEFAULT_COHERENCE_MODEL_MAX_LENGTH,
+        description="The maximum length of the model output.",
     )
 
     def load_pipeline(self) -> None:
