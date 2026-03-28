@@ -48,13 +48,14 @@ def lint(session: nox.Session):
     if not checks:
         checks = list(all_checks)
 
-    # Sync once up front so each tool invocation doesn't re-check the env.
+    # Sync once up front, then run tools from .venv/bin directly.
     session.run("uv", "sync", "--group", "dev", "--frozen", external=True)
+    venv_bin = ".venv/bin/"
 
     failed = []
     for check in checks:
         if check == "ruff":
-            ruff_check = ["ruff", "check", "--config=pyproject.toml"]
+            ruff_check = [f"{venv_bin}ruff", "check", "--config=pyproject.toml"]
             if not no_fix:
                 ruff_check.append("--fix")
             ruff_check.append(".")
@@ -62,7 +63,7 @@ def lint(session: nox.Session):
                 session.run(*ruff_check, external=True)
             except nox.command.CommandFailed:
                 failed.append("ruff check")
-            ruff_fmt = ["ruff", "format", "--config=pyproject.toml"]
+            ruff_fmt = [f"{venv_bin}ruff", "format", "--config=pyproject.toml"]
             if no_fix:
                 ruff_fmt.append("--check")
             ruff_fmt.append(".")
@@ -72,17 +73,22 @@ def lint(session: nox.Session):
                 failed.append("ruff format")
         elif check == "mypy":
             try:
-                session.run("mypy", "--config-file=pyproject.toml", ".", external=True)
+                session.run(
+                    f"{venv_bin}mypy",
+                    "--config-file=pyproject.toml",
+                    ".",
+                    external=True,
+                )
             except nox.command.CommandFailed:
                 failed.append("mypy")
         elif check == "ty":
             try:
-                session.run("ty", "check", external=True)
+                session.run(f"{venv_bin}ty", "check", external=True)
             except nox.command.CommandFailed:
                 failed.append("ty")
         elif check == "pyright":
             try:
-                session.run("pyright", external=True)
+                session.run(f"{venv_bin}pyright", external=True)
             except nox.command.CommandFailed:
                 failed.append("pyright")
 
