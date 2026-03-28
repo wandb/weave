@@ -24,6 +24,8 @@ HTTP_TIMEOUT = 30.0
 class CostDetails(TypedDict):
     input: float
     output: float
+    cache_read_input: float
+    cache_write_input: float
     provider: str
     created_at: str
 
@@ -77,6 +79,14 @@ def fetch_new_costs() -> dict[str, CostDetails]:
             provider=raw_costs[k].get("litellm_provider", "default"),
             input=float(Decimal(raw_costs[k].get("input_cost_per_token", 0))),
             output=float(Decimal(raw_costs[k].get("output_cost_per_token", 0))),
+            cache_read_input=float(
+                Decimal(raw_costs[k].get("cache_read_input_token_cost", 0))
+            ),
+            cache_write_input=float(
+                Decimal(
+                    raw_costs[k].get("cache_creation_input_token_cost", 0)
+                )
+            ),
             created_at=current_time,
         )
 
@@ -157,6 +167,8 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
             provider=provider,
             input=input_cost_per_token,
             output=output_cost_per_token,
+            cache_read_input=0.0,
+            cache_write_input=0.0,
             created_at=current_time,
         )
 
@@ -209,7 +221,10 @@ def main(file_name: str = COST_FILE) -> None:
             costs[k] = [v]
         elif costs[k] and (
             # If the new cost is different from the last cost, we store it
-            costs[k][-1]["input"] != v["input"] or costs[k][-1]["output"] != v["output"]
+            costs[k][-1]["input"] != v["input"]
+            or costs[k][-1]["output"] != v["output"]
+            or costs[k][-1].get("cache_read_input", 0) != v["cache_read_input"]
+            or costs[k][-1].get("cache_write_input", 0) != v["cache_write_input"]
         ):
             new_costs_count += 1
             # We store up to 3 historical costs for each model
