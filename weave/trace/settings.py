@@ -17,6 +17,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
+DEFAULT_RETRY_MAX_INTERVAL_SECONDS = 60 * 5  # 5 minutes
 SETTINGS_PREFIX = "WEAVE_"
 
 # Attention Devs:
@@ -162,7 +163,7 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_MAX_CALLS_QUEUE_SIZE`
     """
 
-    retry_max_interval: float = 60 * 5  # 5 min
+    retry_max_interval: float = DEFAULT_RETRY_MAX_INTERVAL_SECONDS
     """
     Sets the maximum interval between retries.  Defaults to 5 minutes.
 
@@ -368,7 +369,7 @@ def retry_max_interval() -> float:
     """Returns the maximum interval between retries in seconds."""
     max_interval = _optional_float("retry_max_interval")
     if max_interval is None:
-        return 60 * 5  # 5 minutes
+        return DEFAULT_RETRY_MAX_INTERVAL_SECONDS
     return max_interval
 
 

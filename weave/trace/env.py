@@ -7,6 +7,7 @@ import os
 from urllib.parse import urlparse
 
 WEAVE_PARALLELISM = "WEAVE_PARALLELISM"
+DEFAULT_WEAVE_PARALLELISM = 20
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ class Settings:
 
 
 def get_weave_parallelism() -> int:
-    return int(os.getenv(WEAVE_PARALLELISM, "20"))
+    return int(os.getenv(WEAVE_PARALLELISM, str(DEFAULT_WEAVE_PARALLELISM)))
 
 
 def wandb_base_url() -> str:

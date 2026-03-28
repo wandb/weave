@@ -7,6 +7,8 @@ import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
 from weave.scorers.scorer_types import LLMScorer
 
+DEFAULT_ENTITY_DENSITY_THRESHOLD = 0.08
+
 DEFAULT_EXTRACTION_SYSTEM_PROMPT = """
 Given a <text>, extract all the unique entities from the text without repetition.
 """
@@ -107,7 +109,7 @@ class SummarizationScorer(LLMScorer):
         DEFAULT_SUMMARIZATION_EVALUATION_SYSTEM_PROMPT
     )
     summarization_evaluation_prompt: str = DEFAULT_SUMMARIZATION_EVALUATION_USER_PROMPT
-    entity_density_threshold: float = 0.08
+    entity_density_threshold: float = DEFAULT_ENTITY_DENSITY_THRESHOLD
     model_id: str = OPENAI_DEFAULT_MODEL
     temperature: float = Field(
         default=0.7,

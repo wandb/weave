@@ -101,6 +101,8 @@ logger = logging.getLogger(__name__)
 # when sequential DDL statements run faster than replication can propagate.
 _TRANSIENT_CH_ERROR_CODES = {517}
 _MAX_RETRIES = 3
+_RETRY_MAX_WAIT_SECONDS = 8
+_COMMAND_PREVIEW_LENGTH = 100
 
 
 def _is_transient_ch_error(exc: BaseException) -> bool:
@@ -448,7 +450,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
 
     @retry(
         stop=stop_after_attempt(_MAX_RETRIES + 1),
-        wait=wait_exponential(multiplier=1, min=1, max=8),
+        wait=wait_exponential(multiplier=1, min=1, max=_RETRY_MAX_WAIT_SECONDS),
         retry=retry_if_exception(_is_transient_ch_error),
         reraise=True,
     )
@@ -815,7 +817,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         if SQLPatterns.INSERT_STMT.search(command_for_match):
             logger.warning(
                 "Skipping INSERT command (not supported in distributed mode): %s...",
-                command[:100],
+                command[:_COMMAND_PREVIEW_LENGTH],
             )
             self.ch_client.database = curr_db
             return

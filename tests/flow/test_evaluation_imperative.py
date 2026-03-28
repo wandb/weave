@@ -718,8 +718,8 @@ def test_evaluation_logger_set_view(client):
     assert "views" in evaluate_call.summary["weave"]
     views = evaluate_call.summary["weave"]["views"]
     assert len(views) == 2
-    assert views["report"] == to_json(content, client._project_id(), client)
-    assert views["report2"] == to_json(content2, client._project_id(), client)
+    assert views["report"] == to_json(content, client.project_id, client)
+    assert views["report2"] == to_json(content2, client.project_id, client)
 
 
 def test_evaluation_logger_set_view_string(client):

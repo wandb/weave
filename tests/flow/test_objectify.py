@@ -96,7 +96,7 @@ async def test_gotten_methods(client):
     # TODO: Replace with client version of this query when available
     res = client.server.objs_query(
         ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=ObjectVersionFilter(object_ids=relevant_object_ids),
         )
     )

@@ -5,6 +5,11 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+# OpenAI Realtime API default audio format: 16-bit PCM, mono, 24kHz
+DEFAULT_SAMPLE_RATE_HZ = 24000
+DEFAULT_BITS_PER_SAMPLE = 16
+DEFAULT_AUDIO_CHANNELS = 1
+
 
 @dataclass
 class AudioBufferManager:
@@ -14,9 +19,9 @@ class AudioBufferManager:
     Default format: 16-bit PCM, mono, 24kHz (extensible).
     """
 
-    sample_rate_hz: int = 24000
-    bits_per_sample: int = 16
-    channels: int = 1
+    sample_rate_hz: int = DEFAULT_SAMPLE_RATE_HZ
+    bits_per_sample: int = DEFAULT_BITS_PER_SAMPLE
+    channels: int = DEFAULT_AUDIO_CHANNELS
     buffer: bytearray = field(default_factory=bytearray)
 
     def bytes_per_sample(self) -> int:

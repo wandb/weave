@@ -24,6 +24,8 @@ from weave.trace.display.protocols import (
 )
 from weave.trace.display.types import Style
 
+DEFAULT_PROGRESS_REFRESH_PER_SECOND = 10
+
 # Since ViewerProtocol is a Protocol, we can't use Type[ViewerProtocol]
 # Instead, we use a callable that returns a ViewerProtocol
 ViewerFactory = Callable[..., ViewerProtocol]
@@ -184,7 +186,7 @@ class Progress:
         self,
         *columns: Any,
         console: Console | None = None,
-        refresh_per_second: float = 10,
+        refresh_per_second: float = DEFAULT_PROGRESS_REFRESH_PER_SECOND,
         **kwargs: Any,
     ):
         """Initialize the progress bar."""
