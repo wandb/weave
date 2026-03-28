@@ -1443,6 +1443,12 @@ class FilesStatsRes(BaseModel):
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
+    cache_read_input_token_cost: float = Field(
+        0.0, description="The cost per cached read input token"
+    )
+    cache_write_input_token_cost: float = Field(
+        0.0, description="The cost per cache write (creation) input token"
+    )
     prompt_token_cost_unit: str | None = Field(
         "USD", description="The unit of the cost for the prompt tokens"
     )
@@ -1501,6 +1507,8 @@ class CostQueryOutput(BaseModel):
     llm_id: str | None = Field(default=None, examples=["gpt4"])
     prompt_token_cost: float | None = Field(default=None, examples=[1.0])
     completion_token_cost: float | None = Field(default=None, examples=[1.0])
+    cache_read_input_token_cost: float | None = Field(default=None, examples=[0.5])
+    cache_write_input_token_cost: float | None = Field(default=None, examples=[1.5])
     prompt_token_cost_unit: str | None = Field(default=None, examples=["USD"])
     completion_token_cost_unit: str | None = Field(default=None, examples=["USD"])
     effective_date: datetime.datetime | None = Field(

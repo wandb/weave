@@ -54,6 +54,8 @@ LLM_TOKEN_PRICES_COLUMNS = [
     Column(name="effective_date", type="datetime"),
     Column(name="prompt_token_cost", type="float"),
     Column(name="completion_token_cost", type="float"),
+    Column(name="cache_read_input_token_cost", type="float"),
+    Column(name="cache_write_input_token_cost", type="float"),
     Column(name="prompt_token_cost_unit", type="string"),
     Column(name="completion_token_cost_unit", type="string"),
     Column(name="created_by", type="string"),
@@ -81,12 +83,14 @@ def build_model_prices_query(
         SQL string and parameters dict.
     """
     sql = f"""
-    SELECT llm_id, prompt_token_cost, completion_token_cost
+    SELECT llm_id, prompt_token_cost, completion_token_cost, cache_read_input_token_cost, cache_write_input_token_cost
     FROM (
         SELECT
             llm_id,
             prompt_token_cost,
             completion_token_cost,
+            cache_read_input_token_cost,
+            cache_write_input_token_cost,
             ROW_NUMBER() OVER (
                 PARTITION BY llm_id
                 ORDER BY
