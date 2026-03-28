@@ -259,7 +259,11 @@ class ObjectMetadataQueryBuilder:
 
     def add_aliases_condition(self, aliases: list[str]) -> None:
         t = self._main_table_alias
-        non_latest = [a for a in aliases if a != "latest"]
+        # "latest" is now an explicit alias written on obj_create.
+        # Include it in the aliases table lookup alongside other aliases,
+        # with is_latest=1 as a fallback for legacy objects that don't
+        # have an explicit "latest" alias row.
+        all_aliases = aliases
         has_latest = "latest" in aliases
         alias_subquery = f"""({t}.project_id, {t}.object_id, {t}.digest) IN (
                     SELECT project_id, object_id, argMax(digest, created_at) AS digest
@@ -269,18 +273,18 @@ class ObjectMetadataQueryBuilder:
                     GROUP BY project_id, object_id, alias
                     HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
                 )"""
-        if non_latest and has_latest:
+        if has_latest:
+            # Check both: explicit "latest" alias in DB, OR computed
+            # is_latest for legacy objects without an alias row.
             self._conditions.append(f"""
                 (is_latest = 1 OR {alias_subquery})
             """)
-            self.parameters["filter_aliases"] = non_latest
-        elif has_latest:
-            self._conditions.append("is_latest = 1")
+            self.parameters["filter_aliases"] = all_aliases
         else:
             self._conditions.append(f"""
                 {alias_subquery}
             """)
-            self.parameters["filter_aliases"] = non_latest
+            self.parameters["filter_aliases"] = all_aliases
 
     def add_order(self, field: str, direction: str) -> None:
         direction = direction.lower()
