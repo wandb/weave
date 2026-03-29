@@ -2013,23 +2013,24 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 )
                 parameters["filter_tags"] = [req.project_id] + list(req.filter.tags)
             if req.filter.aliases:
-                non_latest = [a for a in req.filter.aliases if a != "latest"]
+                # "latest" is now an explicit alias written on obj_create.
+                # Include it in the alias subquery alongside other aliases,
+                # with is_latest=1 as a fallback for legacy objects.
+                all_aliases = req.filter.aliases
                 has_latest = "latest" in req.filter.aliases
                 alias_subquery = (
                     "(project_id, object_id, digest) IN "
                     "(SELECT project_id, object_id, digest FROM aliases "
                     "WHERE project_id = ? AND alias IN ("
-                    + ",".join(["?" for _ in non_latest])
+                    + ",".join(["?" for _ in all_aliases])
                     + "))"
                 )
-                if non_latest and has_latest:
+                if has_latest:
                     conds.append(f"(is_latest = 1 OR {alias_subquery})")
-                    parameters["filter_aliases"] = [req.project_id] + non_latest
-                elif has_latest:
-                    conds.append("is_latest = 1")
+                    parameters["filter_aliases"] = [req.project_id] + list(all_aliases)
                 else:
                     conds.append(alias_subquery)
-                    parameters["filter_aliases"] = [req.project_id] + non_latest
+                    parameters["filter_aliases"] = [req.project_id] + list(all_aliases)
 
         objs = self._select_objs_query(
             req.project_id,
@@ -4916,11 +4917,27 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         tags_map = self._get_tags_for_objects(project_id, object_ids)
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
 
+        # Build a set of object_ids that have an explicit "latest" alias
+        # so we only fall back to computed is_latest for legacy objects
+        # and obj_create_batch objects (which skip alias writes).
+        objects_with_explicit_latest: set[str] = set()
+        for (object_id, _digest), aliases in aliases_map.items():
+            if "latest" in aliases:
+                objects_with_explicit_latest.add(object_id)
+
         for obj in objs:
             key = (obj.object_id, obj.digest)
             obj.tags = sorted(tags_map.get(key, []))
             aliases = aliases_map.get(key, [])
-            if obj.is_latest == 1 and "latest" not in aliases:
+            # Fallback: synthesize "latest" from is_latest for objects
+            # that don't have an explicit "latest" alias (legacy objects
+            # created before the explicit alias write, or obj_create_batch
+            # objects which skip alias writes).
+            if (
+                obj.is_latest == 1
+                and "latest" not in aliases
+                and obj.object_id not in objects_with_explicit_latest
+            ):
                 aliases = ["latest"] + aliases
             obj.aliases = aliases
 

@@ -2263,13 +2263,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if result.result_rows:
             return result.result_rows[0][0]
         # Fallback for "latest": if no explicit alias row exists (legacy
-        # objects created before the alias write, or alias INSERT failed),
-        # resolve via the computed is_latest window function so that
-        # obj_read("latest") stays consistent with objs_query(latest_only).
+        # objects created before the alias write, obj_create_batch objects
+        # which skip alias writes, or alias INSERT failed), resolve via
+        # the computed is_latest window function so that obj_read("latest")
+        # stays consistent with objs_query(latest_only).
         if digest == "latest":
             return self._resolve_computed_latest(project_id, object_id)
         return None
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._resolve_computed_latest"
+    )
     def _resolve_computed_latest(
         self,
         project_id: str,
@@ -2298,7 +2302,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         aliases_map = self._get_aliases_for_objects(project_id, object_ids)
 
         # Build a set of object_ids that have an explicit "latest" alias
-        # so we only fall back to computed is_latest for legacy objects.
+        # so we only fall back to computed is_latest for legacy objects
+        # and obj_create_batch objects (which skip alias writes).
         objects_with_explicit_latest: set[str] = set()
         for (object_id, _digest), aliases in aliases_map.items():
             if "latest" in aliases:
@@ -2310,7 +2315,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             aliases = aliases_map.get(key, [])
             # Fallback: synthesize "latest" from is_latest for objects
             # that don't have an explicit "latest" alias (legacy objects
-            # created before the explicit alias write was added).
+            # created before the explicit alias write, or obj_create_batch
+            # objects which skip alias writes).
             if (
                 obj.is_latest == 1
                 and "latest" not in aliases
