@@ -28,7 +28,7 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
-from weave.trace_server.workers.evaluate_model_worker import evaluate_model_worker
+from weave_server.workers.evaluate_model_worker import evaluate_model_worker
 from weave.utils.project_id import from_project_id, to_project_id
 
 _LATENCY_TOL = 10 if sys.platform == "win32" else 1

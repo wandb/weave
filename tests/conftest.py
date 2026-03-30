@@ -2,7 +2,10 @@ import contextlib
 import json
 import logging
 import os
+import sys
+from collections.abc import Callable
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -11,10 +14,17 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
+# ---------------------------------------------------------------------------
+# Make the weave-trace sibling importable so tests can use weave_server
+# (SqliteTraceServer, ExternalTraceServer, etc.) as a test-only dependency.
+# ---------------------------------------------------------------------------
+_WEAVE_TRACE_DIR = Path(__file__).resolve().parents[1] / ".." / ".." / "weave-trace"
+if _WEAVE_TRACE_DIR.is_dir() and str(_WEAVE_TRACE_DIR) not in sys.path:
+    sys.path.insert(0, str(_WEAVE_TRACE_DIR))
+
 import weave
+from tests.trace.server_utils import TEST_ENTITY
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import *
-from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
@@ -24,9 +34,269 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave_server.external_to_internal_trace_server_adapter import IdConverter
+from weave_server.sqlite_trace_server import SqliteTraceServer
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
+
+
+# ---------------------------------------------------------------------------
+# pytest options and fixtures migrated from tests/trace_server/conftest.py
+# ---------------------------------------------------------------------------
+
+
+def pytest_addoption(parser):
+    try:
+        parser.addoption(
+            "--trace-server",
+            action="store",
+            default="sqlite",
+            help="Specify the backend to use: sqlite or clickhouse",
+        )
+        parser.addoption(
+            "--ch",
+            "--clickhouse",
+            action="store_true",
+            help="Use clickhouse server (shorthand for --trace-server=clickhouse)",
+        )
+        parser.addoption(
+            "--sq",
+            "--sqlite",
+            action="store_true",
+            help="Use sqlite server (shorthand for --trace-server=sqlite)",
+        )
+        parser.addoption(
+            "--clickhouse-process",
+            action="store",
+            default="false",
+            help="Use a clickhouse process instead of a container",
+        )
+        parser.addoption(
+            "--remote-http-trace-server",
+            action="store",
+            default="remote",
+            help="Specify the remote HTTP trace server implementation: remote or stainless",
+        )
+    except ValueError:
+        pass
+
+
+def get_trace_server_flag(request):
+    if request.config.getoption("--clickhouse"):
+        return "clickhouse"
+    if request.config.getoption("--sqlite"):
+        return "sqlite"
+    return request.config.getoption("--trace-server")
+
+
+class _DummyIdConverter(IdConverter):
+    """Minimal IdConverter for test use — maps ids via base64 encoding."""
+
+    import base64 as _b64
+
+    def __init__(self):
+        self._project_map: dict[str, str] = {}
+        self._run_map: dict[str, str] = {}
+        self._user_map: dict[str, str] = {}
+
+    @staticmethod
+    def _b64e(s: str) -> str:
+        import base64
+
+        return base64.b64encode(s.encode("ascii")).decode("ascii")
+
+    def ext_to_int_project_id(self, project_id: str) -> str:
+        return self._project_map.setdefault(project_id, self._b64e(project_id))
+
+    def int_to_ext_project_id(self, project_id: str) -> str | None:
+        for k, v in self._project_map.items():
+            if v == project_id:
+                return k
+        val = self._b64e(project_id)
+        self._project_map[val] = project_id
+        return val
+
+    def ext_to_int_run_id(self, run_id: str) -> str:
+        return self._run_map.setdefault(run_id, self._b64e(run_id) + ":" + run_id)
+
+    def int_to_ext_run_id(self, run_id: str) -> str:
+        for k, v in self._run_map.items():
+            if v == run_id:
+                return k
+        parts = run_id.split(":")
+        return parts[1] if len(parts) > 1 else run_id
+
+    def ext_to_int_user_id(self, user_id: str) -> str:
+        return self._user_map.setdefault(user_id, self._b64e(user_id))
+
+    def int_to_ext_user_id(self, user_id: str) -> str:
+        for k, v in self._user_map.items():
+            if v == user_id:
+                return k
+        return self._b64e(user_id)
+
+
+from weave_server.external_to_internal_trace_server_adapter import ExternalTraceServer
+
+
+class UserInjectingExternalTraceServer(ExternalTraceServer):
+    """Test wrapper: injects a user id into external-facing requests."""
+
+    def __init__(
+        self,
+        internal_trace_server: tsi.TraceServerInterface,
+        id_converter: IdConverter,
+        user_id: str,
+    ):
+        super().__init__(internal_trace_server, id_converter)
+        self._user_id = user_id
+
+    def set_user_id(self, user_id: str) -> None:
+        self._user_id = user_id
+
+    def call_start(self, req):
+        req.start.wb_user_id = self._user_id
+        return super().call_start(req)
+
+    def calls_delete(self, req):
+        req.wb_user_id = self._user_id
+        return super().calls_delete(req)
+
+    def call_update(self, req):
+        req.wb_user_id = self._user_id
+        return super().call_update(req)
+
+    def feedback_create(self, req):
+        req.wb_user_id = self._user_id
+        return super().feedback_create(req)
+
+    def feedback_create_batch(self, req):
+        for feedback_req in req.batch:
+            feedback_req.wb_user_id = self._user_id
+        return super().feedback_create_batch(req)
+
+    def cost_create(self, req):
+        req.wb_user_id = self._user_id
+        return super().cost_create(req)
+
+    def actions_execute_batch(self, req):
+        req.wb_user_id = self._user_id
+        return super().actions_execute_batch(req)
+
+    def obj_create(self, req):
+        req.obj.wb_user_id = self._user_id
+        return super().obj_create(req)
+
+    def evaluate_model(self, req):
+        req.wb_user_id = self._user_id
+        return super().evaluate_model(req)
+
+    def evaluation_run_delete(self, req):
+        req.wb_user_id = self._user_id
+        return super().evaluation_run_delete(req)
+
+    def evaluation_run_finish(self, req):
+        req.wb_user_id = self._user_id
+        return super().evaluation_run_finish(req)
+
+    def prediction_delete(self, req):
+        req.wb_user_id = self._user_id
+        return super().prediction_delete(req)
+
+    def score_delete(self, req):
+        req.wb_user_id = self._user_id
+        return super().score_delete(req)
+
+    def obj_add_tags(self, req):
+        req.wb_user_id = self._user_id
+        return super().obj_add_tags(req)
+
+    def obj_remove_tags(self, req):
+        req.wb_user_id = self._user_id
+        return super().obj_remove_tags(req)
+
+    def obj_set_aliases(self, req):
+        req.wb_user_id = self._user_id
+        return super().obj_set_aliases(req)
+
+    def obj_remove_aliases(self, req):
+        req.wb_user_id = self._user_id
+        return super().obj_remove_aliases(req)
+
+    def projects_info(self, req):
+        from weave.trace_server.service_interface import ProjectsInfoRes
+
+        return [
+            ProjectsInfoRes(
+                external_project_id=pid,
+                internal_project_id=self._idc.ext_to_int_project_id(pid),
+            )
+            for pid in req.project_ids
+        ]
+
+
+def _externalize_trace_server(
+    trace_server: tsi.TraceServerInterface,
+    user_id: str = "test_user",
+    id_converter: IdConverter | None = None,
+) -> UserInjectingExternalTraceServer:
+    converter = id_converter or _DummyIdConverter()
+    return UserInjectingExternalTraceServer(trace_server, converter, user_id)
+
+
+class _EvaluateModelTestDispatcher:
+    """Dispatcher that runs evaluate_model synchronously for testing."""
+
+    def __init__(self, id_converter: IdConverter):
+        self.id_converter = id_converter
+
+    def dispatch(self, args) -> None:
+        from weave_server.external_to_internal_trace_server_adapter import (
+            universal_int_to_ext_ref_converter,
+        )
+        from weave_server.workers.evaluate_model_worker.evaluate_model_worker import (
+            evaluate_model,
+        )
+
+        externalized_args = universal_int_to_ext_ref_converter(
+            args, self.id_converter.int_to_ext_project_id
+        )
+        evaluate_model(externalized_args)
+
+
+@pytest.fixture
+def trace_server(request) -> tsi.TraceServerInterface:
+    """Create a SQLite-backed trace server for testing."""
+    from weave_server.secret_fetcher_context import secret_fetcher_context
+
+    class _LocalSecretFetcher:
+        def fetch(self, secret_name: str) -> dict:
+            return {"secrets": {secret_name: os.getenv(secret_name)}}
+
+    id_converter = _DummyIdConverter()
+    db_path = "file::memory:?cache=shared"
+    sqlite_server = SqliteTraceServer(
+        db_path,
+        evaluate_model_dispatcher=_EvaluateModelTestDispatcher(id_converter),
+    )
+    sqlite_server.setup_tables()
+
+    server = _externalize_trace_server(
+        sqlite_server, TEST_ENTITY, id_converter=id_converter
+    )
+
+    with secret_fetcher_context(_LocalSecretFetcher()):
+        yield server
+
+    try:
+        sqlite_server.drop_tables()
+    except Exception:
+        pass
+    try:
+        sqlite_server.close()
+    except Exception:
+        pass
 
 
 @pytest.fixture(autouse=True)
@@ -34,10 +304,10 @@ def patch_kafka_producer():
     """Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
     This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
 
-    If a test needs to test the Kafka producer, they should orride this patch explicitly.
+    If a test needs to test the Kafka producer, they should override this patch explicitly.
     """
     with patch(
-        "weave.trace_server.kafka.KafkaProducer.from_env",
+        "weave_server.kafka.KafkaProducer.from_env",
         return_value=MagicMock(),
     ):
         yield
@@ -80,7 +350,7 @@ def reset_project_residence_cache():
     This needs to be cleared between tests to prevent state leakage, especially when tests
     create projects with the same name but different data characteristics.
     """
-    from weave.trace_server.project_version.project_version import (
+    from weave_server.project_version.project_version import (
         _project_residence_cache,
     )
 

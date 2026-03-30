@@ -29,7 +29,7 @@ from weave.trace.weave_client import (
 )
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import DigestMismatchError
-from weave.trace_server.external_to_internal_trace_server_adapter import (
+from weave_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
 )
 

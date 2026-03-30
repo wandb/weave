@@ -5,7 +5,7 @@ Tests verify that the Scorer V2 API correctly creates, reads, lists, and deletes
 
 import pytest
 
-from tests.trace_server.conftest import TEST_ENTITY
+from tests.trace.server_utils import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 

@@ -24,9 +24,7 @@ from tests.trace.util import (
     RegexStringMatcher,
     client_is_sqlite,
 )
-from tests.trace_server.conftest_lib.trace_server_external_adapter import (
-    UserInjectingExternalTraceServer,
-)
+from tests.conftest import UserInjectingExternalTraceServer
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
@@ -51,19 +49,13 @@ from weave.trace.serialization.serializer import (
     register_serializer,
 )
 from weave.trace.wandb_run_context import WandbRunContext
-from weave.trace_server.clickhouse_trace_server_batched import (
-    ClickHouseTraceServer,
-    NotFoundError,
-)
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
     LLMStructuredCompletionModelDefaultParams,
-)
-from weave.trace_server.sqlite_trace_server import (
-    NotFoundError as sqliteNotFoundError,
 )
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
@@ -1816,8 +1808,12 @@ def test_get_calls_storage_size_with_limit(client):
 @pytest.fixture
 def clickhouse_client(client):
     try:
+        from weave_server.clickhouse_trace_server_batched import (
+            ClickHouseTraceServer,
+        )
+
         ch_server = find_server_layer(client.server, ClickHouseTraceServer)
-    except TypeError:
+    except (TypeError, ImportError):
         return None
     return ch_server.ch_client
 
@@ -2020,7 +2016,7 @@ def test_object_version_read(client):
     # check badly formatted digests
     digests = ["v1111", "1", ""]
     for digest in digests:
-        with pytest.raises((NotFoundError, sqliteNotFoundError)):
+        with pytest.raises(NotFoundError):
             # grab non-existant version
             obj_res = client.server.obj_read(
                 tsi.ObjReadReq(
@@ -2031,7 +2027,7 @@ def test_object_version_read(client):
             )
 
     # check non-existant object_id
-    with pytest.raises((NotFoundError, sqliteNotFoundError)):
+    with pytest.raises(NotFoundError):
         obj_res = client.server.obj_read(
             tsi.ObjReadReq(
                 project_id=client._project_id(),

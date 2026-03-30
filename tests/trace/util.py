@@ -9,7 +9,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 
 from tests.trace.server_utils import find_server_layer
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+from weave_server.sqlite_trace_server import SqliteTraceServer
 
 
 def client_is_sqlite(client):

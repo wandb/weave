@@ -15,7 +15,7 @@ from tests.trace.server_utils import TEST_ENTITY, find_server_layer
 from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+from weave_server.sqlite_trace_server import SqliteTraceServer
 
 
 def test_filter_calls_by_queue_inner_join_behavior(client):

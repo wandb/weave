@@ -15,11 +15,10 @@ import weave
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
 from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+from weave_server.sqlite_trace_server import SqliteTraceServer
 
 
 class CallsFixture(NamedTuple):
@@ -725,8 +724,12 @@ def test_annotation_queues_stats(client):
 
     # We need to insert into the annotator_queue_items_progress table
     try:
+        from weave_server.clickhouse_trace_server_batched import (
+            ClickHouseTraceServer,
+        )
+
         ch_server = find_server_layer(client.server, ClickHouseTraceServer)
-    except TypeError:
+    except (TypeError, ImportError):
         pytest.skip("Direct DB manipulation only works with ClickHouse server")
     ch_client = ch_server.ch_client
 
