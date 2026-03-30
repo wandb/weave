@@ -74,9 +74,65 @@ HF_KEYS_TO_KEEP = {
 }
 
 
-# TODO: Add in any other fields we want
+def _hf_defaults_on_fetch_failure() -> dict[str, Any]:
+    """Default HuggingFace-derived fields when the API request fails."""
+    return {
+        "likesHuggingFace": 0,
+        "downloadsHuggingFace": 0,
+        "license": "unknown",
+    }
+
+
+def _fetch_hf_model_json(model_name: str) -> dict[str, Any] | None:
+    """GET a single model from the Hugging Face Hub API.
+
+    Args:
+        model_name: Hugging Face model id (e.g. ``org/name``).
+
+    Returns:
+        Parsed JSON object, or ``None`` if the request failed.
+    """
+    url = f"https://huggingface.co/api/models/{model_name}"
+    try:
+        with httpx.Client(timeout=HF_API_TIMEOUT_SECONDS) as client:
+            response = client.get(url)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPError as e:
+        print(f"\nFailed to get HuggingFace info for {model_name}: {e}")
+        print("This may be expected for a prerelease model\n")
+        return None
+
+
+def _hf_likes_downloads_from_response(d: dict[str, Any]) -> dict[str, Any]:
+    """Extract likes and downloads from a Hub API model payload."""
+    return pick_keys(d, HF_KEYS_TO_KEEP)
+
+
+def _hf_license_from_response(d: dict[str, Any]) -> dict[str, Any]:
+    """Extract license from cardData if present."""
+    license_val = d.get("cardData", {}).get("license")
+    if license_val:
+        return {"license": license_val}
+    return {}
+
+
+def _hf_fields_from_response(d: dict[str, Any]) -> dict[str, Any]:
+    """Map a successful Hub API model JSON object to our stored fields.
+
+    Args:
+        d: Raw JSON object from ``/api/models/{model}``.
+
+    Returns:
+        Dict with ``likesHuggingFace``, ``downloadsHuggingFace``, and optionally ``license``.
+    """
+    out = _hf_likes_downloads_from_response(d)
+    out.update(_hf_license_from_response(d))
+    return out
+
+
 def get_hf_info(model_name: str) -> dict[str, Any]:
-    """Get HuggingFace information for a given model name.
+    """Get HuggingFace information for a given model name (one API call).
 
     Args:
         model_name (str): The HuggingFace model name/ID.
@@ -84,25 +140,47 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
     Returns:
         Dict[str, Any]: Dictionary containing filtered HuggingFace model information.
     """
-    url = f"https://huggingface.co/api/models/{model_name}"
-    try:
-        with httpx.Client(timeout=HF_API_TIMEOUT_SECONDS) as client:
-            response = client.get(url)
-            response.raise_for_status()
-            d = response.json()
-    except httpx.HTTPError as e:
-        print(f"\nFailed to get HuggingFace info for {model_name}: {e}")
-        print("This may be expected for a prerelease model\n")
-        return {
-            "likesHuggingFace": 0,
-            "downloadsHuggingFace": 0,
-            "license": "unknown",
-        }
-    filtered = pick_keys(d, HF_KEYS_TO_KEEP)
-    license = d.get("cardData", {}).get("license")
-    if license:
-        filtered["license"] = license
-    return filtered
+    d = _fetch_hf_model_json(model_name)
+    if d is None:
+        return _hf_defaults_on_fetch_failure()
+    return _hf_fields_from_response(d)
+
+
+def get_hf_info_from_lineage(lineage: list[str]) -> dict[str, Any]:
+    """Get HuggingFace fields using ``idLineage``: likes/downloads from the earliest id, license from the latest.
+
+    Index ``0`` is the earliest model; the last index is the latest. If earliest and latest are the same
+    (including a one-element lineage), only one API request is made.
+
+    Args:
+        lineage: Non-empty list of Hugging Face model ids, oldest first.
+
+    Returns:
+        Dict with likes/downloads from the first entry and license from the last (when available).
+    """
+    earliest = lineage[0]
+    latest = lineage[-1]
+    if earliest == latest:
+        d = _fetch_hf_model_json(earliest)
+        if d is None:
+            return _hf_defaults_on_fetch_failure()
+        return _hf_fields_from_response(d)
+
+    d_earliest = _fetch_hf_model_json(earliest)
+    d_latest = _fetch_hf_model_json(latest)
+
+    merged: dict[str, Any] = {}
+    if d_earliest is None:
+        merged.update({"likesHuggingFace": 0, "downloadsHuggingFace": 0})
+    else:
+        merged.update(_hf_likes_downloads_from_response(d_earliest))
+
+    if d_latest is None:
+        merged["license"] = "unknown"
+    else:
+        merged.update(_hf_license_from_response(d_latest))
+
+    return merged
 
 
 def write_models(file_out: Path, models: dict[str, Any] | list[dict[str, Any]]) -> None:
@@ -130,11 +208,17 @@ def main() -> None:
 
     # Augment models with HuggingFace info
     for model in models:
-        model_id = model["idHuggingFace"]
-        print(f"Augmenting {model_id}")
-        # This order puts our fields first, keeps id overriding
         our_id = model["id"]
-        info = {**model, **get_hf_info(model_id), "id": our_id}
+        lineage = model.get("idLineage")
+        if isinstance(lineage, list) and len(lineage) > 0:
+            print(f"Augmenting {our_id} (lineage {lineage[0]} ... {lineage[-1]})")
+            hf_info = get_hf_info_from_lineage(lineage)
+        else:
+            model_id = model["idHuggingFace"]
+            print(f"Augmenting {model_id}")
+            hf_info = get_hf_info(model_id)
+        # This order puts our fields first, keeps id overriding
+        info = {**model, **hf_info, "id": our_id}
         models_data.append(info)
 
     # Set isNew flag for models that are less than one month old

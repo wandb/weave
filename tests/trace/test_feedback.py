@@ -522,7 +522,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
     ]:
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 filter=tsi.CallsFilter(op_names=[model_ref]),
                 query={
                     "$expr": {
