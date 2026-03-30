@@ -4950,17 +4950,15 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """If digest looks like an alias name, resolve it to the actual digest.
         Returns None if not an alias.
         """
-        # Return None for digests that are not alias names, so the caller
-        # falls through to normal digest-based lookup.  "latest" and version
-        # patterns (v0, v1, …) are handled by the existing obj_read logic;
-        # content hashes are real digests that don't need resolution.
-        if digest == "latest":
-            return None
+        # Version patterns (v0, v1, …) are handled by the existing obj_read
+        # logic; content hashes are real digests that don't need resolution.
         (is_version, _) = digest_is_version_like(digest)
         if is_version:
             return None
         if digest_is_content_hash(digest):
             return None
+        # "latest" is now an explicit alias written on every obj_create.
+        # Resolve it from the aliases table like any other alias.
         conn, cursor = get_conn_cursor(self.db_path)
         cursor.execute(
             "SELECT digest FROM aliases WHERE project_id = ? AND object_id = ? AND alias = ? LIMIT 1",
@@ -4969,6 +4967,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         row = cursor.fetchone()
         if row:
             return row[0]
+        # Fallback for "latest": if no explicit alias row exists (legacy
+        # objects created before the alias write, obj_create_batch objects
+        # which skip alias writes, or alias INSERT failed), return None
+        # so obj_read falls through to _make_digest_condition("latest")
+        # which uses is_latest = 1.
         return None
 
     def _select_objs_query(
