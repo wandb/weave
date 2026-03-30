@@ -14,7 +14,7 @@ def test_cost_apis(client):
         # dont run this test for sqlite
         return
 
-    project_id = client._project_id()
+    project_id = client.project_id
 
     costs = {
         "my_model_to_delete": {
@@ -147,7 +147,7 @@ def test_purge_only_ids(client):
         # dont run this test for sqlite
         return
 
-    project_id = client._project_id()
+    project_id = client.project_id
     costs = {
         "my_model_to_delete": {
             "prompt_token_cost": 5,
@@ -208,7 +208,7 @@ def test_costs_streamed_with_all_fields(client):
     if client_is_sqlite(client):
         return
 
-    project_id = client._project_id()
+    project_id = client.project_id
 
     # 1. Create cost entry with optional metadata fields populated
     client.server.cost_create(

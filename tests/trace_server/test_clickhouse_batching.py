@@ -17,7 +17,12 @@ from weave.shared.digest import str_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.errors import InvalidRequest, ObjectDeletedError
+from weave.trace_server.errors import (
+    InvalidRequest,
+    ObjectDeletedError,
+    handle_server_exception,
+)
+from weave.trace_server.validation_util import CHValidationError
 
 
 def make_base_64_content(content: str) -> str:
@@ -459,6 +464,59 @@ def test_table_create_different_key_order_same_digest(trace_server):
     # Both rows are logically identical so their digests must match
     assert len(res.row_digests) == 2
     assert res.row_digests[0] == res.row_digests[1]
+
+
+def test_call_start_batch_invalid_trace_id_returns_400():
+    """An invalid trace_id in a batch should fail the whole batch with a 400, not a 500.
+
+    Regression test for: POST /call/upsert_batch drops entire batch for
+    non-UUID trace_id (e.g. 'session:main:agent:main:main') with a 500
+    instead of returning a useful validation error.
+    """
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.return_value = MagicMock()
+
+    project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
+
+    mock_query_result = MagicMock()
+    mock_query_result.result_rows = [[0, 1]]  # has_complete=0, has_merged=1
+
+    with patch.object(
+        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        trace_server = ClickHouseTraceServer(host="test_host")
+        mock_ch_client.query.return_value = mock_query_result
+
+        batch_req = tsi.CallCreateBatchReq(
+            batch=[
+                tsi.CallBatchStartMode(
+                    mode="start",
+                    req=tsi.CallStartReq(
+                        start=tsi.StartedCallSchemaForInsert(
+                            project_id=project_id,
+                            op_name="invalid_op",
+                            trace_id="session:main:agent:main:main",
+                            started_at=datetime.datetime.now(datetime.timezone.utc),
+                            attributes={},
+                            inputs={},
+                        )
+                    ),
+                ),
+            ]
+        )
+
+        # The batch should raise CHValidationError, not an opaque internal error
+        with pytest.raises(CHValidationError, match="Invalid UUID"):
+            trace_server.call_start_batch(batch_req)
+
+        # The error registry should map CHValidationError to 400 (not 500)
+        try:
+            trace_server.call_start_batch(batch_req)
+        except CHValidationError as e:
+            error_with_status = handle_server_exception(e)
+            assert error_with_status.status_code == 400
+            assert "Invalid UUID" in error_with_status.message["reason"]
 
 
 def test_obj_batch_mixed_projects_errors(trace_server, client):

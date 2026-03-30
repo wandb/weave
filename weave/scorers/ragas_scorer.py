@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
-from weave.scorers.scorer_types import LLMScorer
+from weave.scorers.scorer_types import DEFAULT_LLM_MAX_TOKENS, LLMScorer
 
 
 class EntityExtractionResponse(BaseModel):
@@ -52,7 +52,7 @@ class ContextEntityRecallScorer(LLMScorer):
         description="Controls randomness in the LLM's responses (0.0 to 1.0)",
     )
     max_tokens: int = Field(
-        default=4096,
+        default=DEFAULT_LLM_MAX_TOKENS,
         description="Maximum number of tokens allowed in the LLM's response",
     )
 
@@ -128,7 +128,7 @@ class ContextRelevancyScorer(LLMScorer):
         description="Controls randomness in the LLM's responses (0.0 to 1.0)",
     )
     max_tokens: int = Field(
-        default=4096,
+        default=DEFAULT_LLM_MAX_TOKENS,
         description="Maximum number of tokens allowed in the LLM's response",
     )
 

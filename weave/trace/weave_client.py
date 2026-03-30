@@ -315,6 +315,10 @@ RESERVED_SUMMARY_USAGE_KEY = "usage"
 RESERVED_SUMMARY_STATUS_COUNTS_KEY = "status_counts"
 
 BACKGROUND_PARALLELISM_MIX = 0.5
+# Upper bound on thread pool size when auto-calculating parallelism
+MAX_AUTO_PARALLELISM = 32
+# Extra threads beyond CPU count for I/O-bound work
+PARALLELISM_CPU_PADDING = 4
 # This size is correlated with the maximum single row insert size
 # in clickhouse, which is currently unavoidable.
 MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
@@ -653,7 +657,7 @@ class WeaveClient:
 
         return _make_calls_iterator(
             self.server,
-            self._project_id(),
+            self.project_id,
             filter=filter,
             limit_override=limit,
             offset_override=offset,
@@ -694,7 +698,7 @@ class WeaveClient:
         calls = list(
             self.server.calls_query_stream(
                 CallsQueryReq(
-                    project_id=self._project_id(),
+                    project_id=self.project_id,
                     filter=CallsFilter(call_ids=[call_id]),
                     include_costs=include_costs,
                     include_feedback=include_feedback,
@@ -810,7 +814,7 @@ class WeaveClient:
 
         call = Call(
             _op_name=op_name_future,
-            project_id=self._project_id(),
+            project_id=self.project_id,
             trace_id=trace_id,
             parent_id=parent_id,
             id=call_id,
@@ -843,7 +847,7 @@ class WeaveClient:
         if started_at is None:
             started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.started_at = started_at
-        project_id = self._project_id()
+        project_id = self.project_id
 
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
@@ -1038,7 +1042,7 @@ class WeaveClient:
             exception_str = exception_to_json_str(exception)
             call.exception = exception_str
 
-        project_id = self._project_id()
+        project_id = self.project_id
 
         # The finish handler serves as a last chance for integrations
         # to customize what gets logged for a call.
@@ -1190,7 +1194,7 @@ class WeaveClient:
     def delete_call(self, call: Call) -> None:
         self.server.calls_delete(
             CallsDeleteReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 call_ids=[call.id],
             )
         )
@@ -1206,7 +1210,7 @@ class WeaveClient:
         """
         self.server.calls_delete(
             CallsDeleteReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 call_ids=call_ids,
             )
         )
@@ -1215,7 +1219,7 @@ class WeaveClient:
     def delete_object_version(self, object: ObjectRef) -> None:
         self.server.obj_delete(
             ObjDeleteReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=object.name,
                 digests=[object.digest],
             )
@@ -1233,7 +1237,7 @@ class WeaveClient:
         """
         result = self.server.obj_delete(
             ObjDeleteReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=object_name,
                 digests=None,
             )
@@ -1253,7 +1257,7 @@ class WeaveClient:
         """
         result = self.server.obj_delete(
             ObjDeleteReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=object_name,
                 digests=digests,
             )
@@ -1279,7 +1283,7 @@ class WeaveClient:
         obj_ref = self._resolve_obj_ref(obj_ref)
         self.server.obj_add_tags(
             ObjAddTagsReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=obj_ref.name,
                 digest=obj_ref.digest,
                 tags=tags,
@@ -1298,7 +1302,7 @@ class WeaveClient:
         obj_ref = self._resolve_obj_ref(obj_ref)
         self.server.obj_remove_tags(
             ObjRemoveTagsReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=obj_ref.name,
                 digest=obj_ref.digest,
                 tags=tags,
@@ -1320,7 +1324,7 @@ class WeaveClient:
         obj_ref = self._resolve_obj_ref(obj_ref)
         res = self.server.obj_read(
             ObjReadReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=obj_ref.name,
                 digest=obj_ref.digest,
                 include_tags_and_aliases=True,
@@ -1345,7 +1349,7 @@ class WeaveClient:
         obj_ref = self._resolve_obj_ref(obj_ref)
         res = self.server.obj_read(
             ObjReadReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=obj_ref.name,
                 digest=obj_ref.digest,
                 include_tags_and_aliases=True,
@@ -1368,7 +1372,7 @@ class WeaveClient:
             return
         self.server.obj_set_aliases(
             ObjSetAliasesReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=obj_ref.name,
                 digest=obj_ref.digest,
                 aliases=aliases,
@@ -1390,7 +1394,7 @@ class WeaveClient:
             return
         self.server.obj_remove_aliases(
             ObjRemoveAliasesReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=obj_ref.name,
                 aliases=aliases,
             )
@@ -1411,7 +1415,7 @@ class WeaveClient:
         obj_ref = self._resolve_obj_ref(obj_ref)
         res = self.server.obj_read(
             ObjReadReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=obj_ref.name,
                 digest=obj_ref.digest,
                 include_tags_and_aliases=True,
@@ -1426,7 +1430,7 @@ class WeaveClient:
         Returns:
             List of all tag strings in the project.
         """
-        res = self.server.tags_list(TagsListReq(project_id=self._project_id()))
+        res = self.server.tags_list(TagsListReq(project_id=self.project_id))
         return res.tags
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1436,14 +1440,14 @@ class WeaveClient:
         Returns:
             List of all alias strings in the project.
         """
-        res = self.server.aliases_list(AliasesListReq(project_id=self._project_id()))
+        res = self.server.aliases_list(AliasesListReq(project_id=self.project_id))
         return res.aliases
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
         self.server.obj_delete(
             ObjDeleteReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=op.name,
                 digests=[op.digest],
             )
@@ -1461,7 +1465,7 @@ class WeaveClient:
         """
         result = self.server.obj_delete(
             ObjDeleteReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 object_id=op_name,
                 digests=None,
             )
@@ -1602,7 +1606,7 @@ class WeaveClient:
             provider_id=provider_id,
         )
         return self.server.cost_create(
-            CostCreateReq(project_id=self._project_id(), costs={llm_id: cost})
+            CostCreateReq(project_id=self.project_id, costs={llm_id: cost})
         )
 
     def purge_costs(self, ids: list[str] | str) -> None:
@@ -1626,7 +1630,7 @@ class WeaveClient:
             ]
         }
         self.server.cost_purge(
-            CostPurgeReq(project_id=self._project_id(), query=Query(**{"$expr": expr}))
+            CostPurgeReq(project_id=self.project_id, query=Query(**{"$expr": expr}))
         )
 
     def query_costs(
@@ -1690,7 +1694,7 @@ class WeaveClient:
 
         res = self.server.cost_query(
             CostQueryReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 query=rewritten_query,
                 offset=offset,
                 limit=limit,
@@ -1759,7 +1763,7 @@ class WeaveClient:
 
         # Prepare the result payload - we purposely do not map to refs here
         # because we prefer to have the raw data.
-        results_json = to_json(output, self._project_id(), self)
+        results_json = to_json(output, self.project_id, self)
 
         # # Prepare the supervision payload
 
@@ -1768,7 +1772,7 @@ class WeaveClient:
         }
 
         freq = FeedbackCreateReq(
-            project_id=self._project_id(),
+            project_id=self.project_id,
             weave_ref=weave_ref_uri,
             feedback_type=RUNNABLE_FEEDBACK_TYPE_PREFIX + "." + runnable_ref.name,
             payload=payload,
@@ -1930,7 +1934,7 @@ class WeaveClient:
         returns False and the client silently falls back to server-computed
         digests.
         """
-        self.project_id_resolver.get_internal_project_id(self._project_id())
+        self.project_id_resolver.get_internal_project_id(self.project_id)
 
     def _handle_digest_mismatch(
         self, e: DigestMismatchError | HTTPError, label: str
@@ -1982,7 +1986,7 @@ class WeaveClient:
             CrossProjectRefError: The value contains cross-project refs that
                 cannot be resolved without a server round-trip.
         """
-        project_id = self._project_id()
+        project_id = self.project_id
         internal_project_id = self.project_id_resolver.get_internal_project_id(
             project_id
         )
@@ -2040,7 +2044,7 @@ class WeaveClient:
         def send_obj_create() -> ObjCreateRes:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
-            json_val = to_json(val, self._project_id(), self)
+            json_val = to_json(val, self.project_id, self)
 
             # Fast path: compute the digest client-side so the server can
             # validate it via expected_digest instead of the client waiting
@@ -2137,7 +2141,7 @@ class WeaveClient:
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
         compute_digests = self._should_compute_client_digests()
-        json_rows = to_json(rows, self._project_id(), self)
+        json_rows = to_json(rows, self.project_id, self)
 
         expected_digest = None
         if compute_digests:
@@ -2158,7 +2162,7 @@ class WeaveClient:
             local_digest = expected_digest or compute_table_digest(row_digests)
             req = TableCreateReq(
                 table=TableSchemaForInsert(
-                    project_id=self._project_id(),
+                    project_id=self.project_id,
                     rows=json_rows,
                 )
             )
@@ -2168,7 +2172,7 @@ class WeaveClient:
         # Standard path: send directly to the trace server.
         req = TableCreateReq(
             table=TableSchemaForInsert(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 rows=json_rows,
                 expected_digest=expected_digest,
             )
@@ -2178,7 +2182,7 @@ class WeaveClient:
         except (DigestMismatchError, HTTPError) as e:
             if expected_digest is None:
                 raise
-            self._handle_digest_mismatch(e, f"table in {self._project_id()}")
+            self._handle_digest_mismatch(e, f"table in {self.project_id}")
             req.table.expected_digest = None
             return self.server.table_create(req)
 
@@ -2250,7 +2254,7 @@ class WeaveClient:
         use_parallel_chunks = False
         if use_chunking and should_use_parallel_table_upload():
             test_req = TableCreateFromDigestsReq(
-                project_id=self._project_id(), row_digests=[]
+                project_id=self.project_id, row_digests=[]
             )
 
             def test_func(req: TableCreateFromDigestsReq) -> Any:
@@ -2306,7 +2310,7 @@ class WeaveClient:
             if self._should_compute_client_digests():
                 expected_digest = compute_table_digest(all_row_digests)
             create_req = TableCreateFromDigestsReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 row_digests=all_row_digests,
                 expected_digest=expected_digest,
             )
@@ -2341,7 +2345,7 @@ class WeaveClient:
         first_raw_chunk = raw_chunks[0]
 
         def create_first_chunk() -> TableCreateRes:
-            serialized_rows = to_json(first_raw_chunk, self._project_id(), self)
+            serialized_rows = to_json(first_raw_chunk, self.project_id, self)
             return self._send_table_create(serialized_rows)
 
         base_future = self.future_executor.defer(create_first_chunk)
@@ -2357,10 +2361,10 @@ class WeaveClient:
             # Process remaining chunks sequentially (each depends on previous)
             for raw_chunk in raw_chunks[1:]:
                 # Serialize each chunk separately to avoid recursion
-                serialized_chunk = to_json(raw_chunk, self._project_id(), self)
+                serialized_chunk = to_json(raw_chunk, self.project_id, self)
                 payloads = [TableAppendSpecPayload(row=row) for row in serialized_chunk]
                 update_req = TableUpdateReq(
-                    project_id=self._project_id(),
+                    project_id=self.project_id,
                     base_digest=current_digest,
                     updates=[TableAppendSpec(append=payload) for payload in payloads],
                 )
@@ -2379,7 +2383,7 @@ class WeaveClient:
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
         payloads = [TableAppendSpecPayload(row=row) for row in rows]
         table_update_req = TableUpdateReq(
-            project_id=self._project_id(),
+            project_id=self.project_id,
             base_digest=table_digest,
             updates=[TableAppendSpec(append=payload) for payload in payloads],
         )
@@ -2398,7 +2402,8 @@ class WeaveClient:
     def _ref_is_own(self, ref: Ref) -> bool:
         return isinstance(ref, Ref)
 
-    def _project_id(self) -> str:
+    @property
+    def project_id(self) -> str:
         return f"{self.entity}/{self.project}"
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2419,7 +2424,7 @@ class WeaveClient:
 
         response = self.server.objs_query(
             ObjQueryReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 filter=filter,
             )
         )
@@ -2434,7 +2439,7 @@ class WeaveClient:
             display_name = ""
         self.server.call_update(
             CallUpdateReq(
-                project_id=self._project_id(),
+                project_id=self.project_id,
                 call_id=call.id,
                 display_name=elide_display_name(display_name),
             )
@@ -2746,7 +2751,9 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
 
     # if total_parallelism is None, calculate it
     if total_parallelism is None:
-        total_parallelism = min(32, (os.cpu_count() or 1) + 4)
+        total_parallelism = min(
+            MAX_AUTO_PARALLELISM, (os.cpu_count() or 1) + PARALLELISM_CPU_PADDING
+        )
 
     # use 50/50 split between main and fastlane
     parallelism_main = int(total_parallelism * (1 - BACKGROUND_PARALLELISM_MIX))

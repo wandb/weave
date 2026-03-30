@@ -89,7 +89,7 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, int | str] = {
     # Controlled via WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS env var.
     "async_insert_busy_timeout_max_ms": wf_env.wf_clickhouse_async_insert_busy_timeout_max_ms(),
     # Max data size before flushing (10 MB), this is the default
-    "async_insert_max_data_size": 10_485_760,
+    "async_insert_max_data_size": 10 * 1024 * 1024,
 }
 
 

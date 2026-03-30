@@ -6,7 +6,7 @@
 # the trace interface should only ever operate on internal refs.
 from __future__ import annotations
 
-import urllib
+import urllib.parse
 from dataclasses import dataclass, field
 from typing import Any
 

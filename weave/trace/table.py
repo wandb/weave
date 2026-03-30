@@ -44,7 +44,7 @@ class Table:  # noqa: PLW1641
     def __iter__(self) -> Iterator:
         return iter(self.rows)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return self.rows == other
 
     def append(self, row: dict) -> None:

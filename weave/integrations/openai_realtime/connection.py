@@ -11,6 +11,8 @@ from weave.integrations.openai_realtime.conversation_manager import Conversation
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_FINISH_TIMEOUT_SECONDS = 3.0
+
 try:
     from aiohttp import WSMsgType
 except ImportError:
@@ -40,7 +42,7 @@ def _try_json_load(data: Any) -> Any:
 class WeaveMediaConnection:
     _weave_initialized = True
     # Global config set by patcher
-    _finish_timeout_seconds: float | None = 3.0
+    _finish_timeout_seconds: float | None = DEFAULT_FINISH_TIMEOUT_SECONDS
     _skip_on_exit: bool = False
 
     @classmethod
@@ -55,7 +57,7 @@ class WeaveMediaConnection:
             cls._skip_on_exit = False
         except Exception:
             # Fall back to default
-            cls._finish_timeout_seconds = 3.0
+            cls._finish_timeout_seconds = DEFAULT_FINISH_TIMEOUT_SECONDS
             cls._skip_on_exit = False
 
     def __init__(

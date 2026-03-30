@@ -37,7 +37,7 @@ class BedrockGuardrailScorer(weave.Scorer):
     # Private attributes
     _bedrock_runtime: Any = PrivateAttr(default=None)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         """Initialize the Bedrock runtime client."""
         try:
             import boto3
@@ -60,7 +60,7 @@ class BedrockGuardrailScorer(weave.Scorer):
         """Format the content for the guardrail API."""
         return {"source": self.source, "content": [{"text": {"text": output}}]}
 
-    @weave.op
+    @weave.op(kind="guardrail")
     def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
         if self._bedrock_runtime is None:
             raise ValueError("Bedrock runtime client is not initialized")

@@ -6,7 +6,7 @@ from weave.trace_server.interface.query import Query
 
 
 def test_feedback_apis(client):
-    project_id = client._project_id()
+    project_id = client.project_id
 
     # Emoji from Jamie
     req = tsi.FeedbackCreateReq(
@@ -182,25 +182,25 @@ def test_feedback_apis(client):
     assert res.result[0]["count(*)"] == 3
 
     # Purging with a different shaped query raises
-    with pytest.raises(InvalidRequest):
-        req = tsi.FeedbackPurgeReq(
-            project_id=project_id,
-            query=Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "feedback_type"},
-                            {"$literal": "wandb.reaction.1"},
-                        ],
-                    }
+    req = tsi.FeedbackPurgeReq(
+        project_id=project_id,
+        query=Query(
+            **{
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "feedback_type"},
+                        {"$literal": "wandb.reaction.1"},
+                    ],
                 }
-            ),
-        )
+            }
+        ),
+    )
+    with pytest.raises(InvalidRequest):
         client.server.feedback_purge(req)
 
 
 def test_feedback_payload(client):
-    project_id = client._project_id()
+    project_id = client.project_id
 
     # Emoji from Jamie
     req = tsi.FeedbackCreateReq(
@@ -226,7 +226,7 @@ def test_feedback_payload(client):
 
 
 def test_feedback_create_too_large(client):
-    project_id = client._project_id()
+    project_id = client.project_id
 
     value = "a" * (1 << 21)  # > 1 MiB, past the limit
     req = tsi.FeedbackCreateReq(

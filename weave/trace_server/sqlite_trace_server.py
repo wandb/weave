@@ -9,6 +9,8 @@ import threading
 from collections.abc import Iterator
 from contextvars import ContextVar
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, cast
 
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
@@ -56,8 +58,14 @@ from weave.trace_server.methods.sqlite_feedback_stats import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import quote_json_path, quote_json_path_parts
+from weave.trace_server.orm import Row, quote_json_path, quote_json_path_parts
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
+from weave.trace_server.token_costs import (
+    DEFAULT_PRICING_LEVEL_ID,
+    LLM_TOKEN_PRICES_TABLE,
+    PRICING_LEVELS,
+    validate_cost_purge_req,
+)
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
     determine_call_status,
@@ -78,6 +86,9 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelArgs,
     EvaluateModelDispatcher,
 )
+
+MAX_REFS_BATCH_SIZE = 1000
+MAX_OTEL_ERROR_MESSAGES = 20
 
 
 def _apply_aggregations(
@@ -179,6 +190,99 @@ def close_conn_cursor(db_path: str | None = None) -> None:
 logger = logging.getLogger(__name__)
 
 
+_DEFAULT_COSTS_FILE = str(
+    Path(__file__).parent / "migrations" / "006_seed_costs.up.sql"
+)
+
+
+def _normalize_datetime_for_costs(
+    value: datetime.datetime | str | None,
+) -> datetime.datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = datetime.datetime.fromisoformat(value)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=datetime.timezone.utc)
+    return value.astimezone(datetime.timezone.utc)
+
+
+def _serialize_cost_datetime(value: datetime.datetime) -> str:
+    normalized = _normalize_datetime_for_costs(value)
+    assert normalized is not None
+    return normalized.isoformat()
+
+
+def _safe_int_for_costs(value: Any) -> int:
+    try:
+        return int(value) if value is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def _cost_usage_from_summary(
+    summary: dict[str, Any] | None,
+) -> dict[str, dict[str, int]]:
+    usage_map = (summary or {}).get("usage")
+    if not isinstance(usage_map, dict):
+        return {}
+
+    normalized_usage: dict[str, dict[str, int]] = {}
+    for llm_id, usage in usage_map.items():
+        if not isinstance(usage, dict):
+            continue
+        normalized_usage[str(llm_id)] = {
+            "prompt_tokens": _safe_int_for_costs(usage.get("prompt_tokens"))
+            + _safe_int_for_costs(usage.get("input_tokens")),
+            "completion_tokens": _safe_int_for_costs(usage.get("completion_tokens"))
+            + _safe_int_for_costs(usage.get("output_tokens")),
+            "requests": _safe_int_for_costs(usage.get("requests")),
+            # Match ClickHouse: keep total_tokens as-reported rather than deriving it.
+            "total_tokens": _safe_int_for_costs(usage.get("total_tokens")),
+        }
+    return normalized_usage
+
+
+@lru_cache(maxsize=1)
+def _load_default_cost_definitions() -> tuple[dict[str, Any], ...]:
+    with open(_DEFAULT_COSTS_FILE, encoding="utf-8") as f:
+        seed_sql = f.read()
+
+    now = _serialize_cost_datetime(datetime.datetime.now(datetime.timezone.utc))
+    default_rows: list[dict[str, Any]] = []
+    row_pattern = re.compile(
+        r"\(generateUUIDv4\(\), '([^']+)', '([^']+)', '([^']+)', '([^']+)', now\(\), ([^,]+), '([^']+)', ([^,]+), '([^']+)', '([^']+)', now\(\)\)"
+    )
+    for match in row_pattern.finditer(seed_sql):
+        (
+            pricing_level,
+            pricing_level_id,
+            provider_id,
+            llm_id,
+            prompt_token_cost,
+            prompt_token_cost_unit,
+            completion_token_cost,
+            completion_token_cost_unit,
+            created_by,
+        ) = match.groups()
+        default_rows.append(
+            {
+                "pricing_level": pricing_level,
+                "pricing_level_id": pricing_level_id,
+                "provider_id": provider_id,
+                "llm_id": llm_id,
+                "effective_date": now,
+                "prompt_token_cost": float(prompt_token_cost),
+                "completion_token_cost": float(completion_token_cost),
+                "prompt_token_cost_unit": prompt_token_cost_unit,
+                "completion_token_cost_unit": completion_token_cost_unit,
+                "created_by": created_by,
+                "created_at": now,
+            }
+        )
+    return tuple(default_rows)
+
+
 def _build_sqlite_ref_filter_condition(column_name: str, refs: list[str]) -> str:
     exact_refs, wildcard_refs = split_exact_and_wildcard_values(refs)
     or_conditions = [
@@ -216,6 +320,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         cursor.execute("DROP TABLE IF EXISTS table_rows")
         cursor.execute("DROP TABLE IF EXISTS tags")
         cursor.execute("DROP TABLE IF EXISTS aliases")
+        cursor.execute("DROP TABLE IF EXISTS llm_token_prices")
 
     def setup_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -244,7 +349,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 wb_run_step_end INTEGER,
                 deleted_at TEXT,
                 display_name TEXT,
-                otel_dump TEXT
+                otel_dump TEXT,
+                storage_size_bytes INTEGER
             )
         """
         )
@@ -320,6 +426,30 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS llm_token_prices (
+                id TEXT PRIMARY KEY,
+                pricing_level TEXT NOT NULL,
+                pricing_level_id TEXT NOT NULL,
+                provider_id TEXT NOT NULL,
+                llm_id TEXT NOT NULL,
+                effective_date TEXT NOT NULL,
+                prompt_token_cost REAL NOT NULL,
+                completion_token_cost REAL NOT NULL,
+                prompt_token_cost_unit TEXT NOT NULL,
+                completion_token_cost_unit TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_llm_token_prices_lookup
+            ON llm_token_prices (llm_id, pricing_level, pricing_level_id, effective_date)
+            """
+        )
         cursor.execute(TABLE_FEEDBACK.create_sql())
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
@@ -347,14 +477,25 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 if call.otel_dump is not None:
                     otel_dump_str = json.dumps(call.otel_dump)
 
+                attributes_json = json.dumps(call.attributes)
+                inputs_json = json.dumps(call.inputs)
+                output_json = json.dumps(call.output)
+                summary_json = json.dumps(call.summary)
+                storage_size = (
+                    len(attributes_json)
+                    + len(inputs_json)
+                    + len(output_json)
+                    + len(summary_json)
+                )
+
                 cursor.execute(
                     """INSERT INTO calls (
                         project_id, id, trace_id, parent_id, thread_id, turn_id,
                         op_name, display_name, started_at, ended_at, exception,
                         attributes, inputs, input_refs, output, output_refs,
                         summary, wb_user_id, wb_run_id, wb_run_step, wb_run_step_end,
-                        otel_dump
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        otel_dump, storage_size_bytes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         call.project_id,
                         call.id,
@@ -367,21 +508,22 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         call.started_at.isoformat(),
                         call.ended_at.isoformat(),
                         call.exception,
-                        json.dumps(call.attributes),
-                        json.dumps(call.inputs),
+                        attributes_json,
+                        inputs_json,
                         json.dumps(
                             extract_refs_from_values(list(call.inputs.values()))
                         ),
-                        json.dumps(call.output),
+                        output_json,
                         json.dumps(
                             extract_refs_from_values(list(parsable_output.values()))
                         ),
-                        json.dumps(call.summary),
+                        summary_json,
                         call.wb_user_id,
                         call.wb_run_id,
                         call.wb_run_step,
                         call.wb_run_step_end,
                         otel_dump_str,
+                        storage_size,
                     ),
                 )
             conn.commit()
@@ -476,6 +618,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if not isinstance(parsable_output, dict):
             parsable_output = {"output": parsable_output}
         parsable_output = cast(dict, parsable_output)
+        output_json = json.dumps(req.end.output)
+        summary_json = json.dumps(req.end.summary)
         with self.lock:
             cursor.execute(
                 """UPDATE calls SET
@@ -484,22 +628,240 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     output = ?,
                     output_refs = ?,
                     summary = ?,
-                    wb_run_step_end = ?
+                    wb_run_step_end = ?,
+                    storage_size_bytes = COALESCE(length(attributes), 0) + COALESCE(length(inputs), 0) + ? + ?
                 WHERE id = ?""",
                 (
                     req.end.ended_at.isoformat(),
                     req.end.exception,
-                    json.dumps(req.end.output),
+                    output_json,
                     json.dumps(
                         extract_refs_from_values(list(parsable_output.values()))
                     ),
-                    json.dumps(req.end.summary),
+                    summary_json,
                     req.end.wb_run_step_end,
+                    len(output_json),
+                    len(summary_json),
                     req.end.id,
                 ),
             )
             conn.commit()
         return tsi.CallEndRes()
+
+    def _ensure_default_costs(self, cursor: sqlite3.Cursor) -> bool:
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM llm_token_prices
+            WHERE pricing_level = ? AND pricing_level_id = ?
+            """,
+            (PRICING_LEVELS["DEFAULT"], DEFAULT_PRICING_LEVEL_ID),
+        )
+        result = cursor.fetchone()
+        if result is not None and result[0] > 0:
+            return False
+
+        default_rows = [
+            (
+                generate_id(),
+                row["pricing_level"],
+                row["pricing_level_id"],
+                row["provider_id"],
+                row["llm_id"],
+                row["effective_date"],
+                row["prompt_token_cost"],
+                row["completion_token_cost"],
+                row["prompt_token_cost_unit"],
+                row["completion_token_cost_unit"],
+                row["created_by"],
+                row["created_at"],
+            )
+            for row in _load_default_cost_definitions()
+        ]
+        cursor.executemany(
+            """
+            INSERT INTO llm_token_prices (
+                id,
+                pricing_level,
+                pricing_level_id,
+                provider_id,
+                llm_id,
+                effective_date,
+                prompt_token_cost,
+                completion_token_cost,
+                prompt_token_cost_unit,
+                completion_token_cost_unit,
+                created_by,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            default_rows,
+        )
+        return True
+
+    def _pick_best_cost_row(
+        self,
+        rows: list[dict[str, Any]],
+        started_at: datetime.datetime,
+        project_id: str,
+    ) -> dict[str, Any] | None:
+        if not rows:
+            return None
+
+        def rank_key(row: dict[str, Any]) -> tuple[int, int, float]:
+            effective_date = _normalize_datetime_for_costs(row["effective_date"])
+            assert effective_date is not None
+            is_future = 1 if effective_date > started_at else 0
+            if (
+                row["pricing_level"] == PRICING_LEVELS["PROJECT"]
+                and row["pricing_level_id"] == project_id
+            ):
+                pricing_rank = 0
+            elif (
+                row["pricing_level"] == PRICING_LEVELS["DEFAULT"]
+                and row["pricing_level_id"] == DEFAULT_PRICING_LEVEL_ID
+            ):
+                pricing_rank = 1
+            else:
+                pricing_rank = 2
+            return (is_future, pricing_rank, -effective_date.timestamp())
+
+        return min(rows, key=rank_key)
+
+    def _apply_costs_to_calls(
+        self,
+        cursor: sqlite3.Cursor,
+        calls: list[dict[str, Any]],
+        project_id: str,
+    ) -> None:
+        usage_by_call_id: dict[str, dict[str, dict[str, int]]] = {}
+        llm_ids: set[str] = set()
+
+        for call in calls:
+            summary = call.get("summary")
+            if not isinstance(summary, dict):
+                continue
+            usage_by_model = _cost_usage_from_summary(summary)
+            if not usage_by_model:
+                continue
+            usage_by_call_id[call["id"]] = usage_by_model
+            llm_ids.update(usage_by_model.keys())
+
+        if not llm_ids:
+            return
+
+        with self.lock:
+            inserted_default_costs = self._ensure_default_costs(cursor)
+            if inserted_default_costs:
+                cursor.connection.commit()
+
+        placeholders = ", ".join("?" for _ in llm_ids)
+        cursor.execute(
+            f"""
+            SELECT
+                id,
+                pricing_level,
+                pricing_level_id,
+                provider_id,
+                llm_id,
+                effective_date,
+                prompt_token_cost,
+                completion_token_cost,
+                prompt_token_cost_unit,
+                completion_token_cost_unit,
+                created_by,
+                created_at
+            FROM llm_token_prices
+            WHERE llm_id IN ({placeholders})
+              AND (
+                (pricing_level = ? AND pricing_level_id = ?)
+                OR (pricing_level = ? AND pricing_level_id = ?)
+              )
+            """,
+            [
+                *llm_ids,
+                PRICING_LEVELS["PROJECT"],
+                project_id,
+                PRICING_LEVELS["DEFAULT"],
+                DEFAULT_PRICING_LEVEL_ID,
+            ],
+        )
+
+        price_rows_by_llm: dict[str, list[dict[str, Any]]] = {}
+        for row in cursor.fetchall():
+            row_dict = dict(
+                zip(
+                    [
+                        "id",
+                        "pricing_level",
+                        "pricing_level_id",
+                        "provider_id",
+                        "llm_id",
+                        "effective_date",
+                        "prompt_token_cost",
+                        "completion_token_cost",
+                        "prompt_token_cost_unit",
+                        "completion_token_cost_unit",
+                        "created_by",
+                        "created_at",
+                    ],
+                    row,
+                    strict=False,
+                )
+            )
+            price_rows_by_llm.setdefault(str(row_dict["llm_id"]), []).append(row_dict)
+
+        for call in calls:
+            summary = call.get("summary")
+            if not isinstance(summary, dict):
+                continue
+
+            weave_summary = summary.get("weave")
+            if not isinstance(weave_summary, dict):
+                weave_summary = {}
+                summary["weave"] = weave_summary
+            else:
+                weave_summary.pop("costs", None)
+
+            started_at = _normalize_datetime_for_costs(call.get("started_at"))
+            assert started_at is not None
+
+            call_costs: dict[str, dict[str, Any]] = {}
+            for llm_id, usage in usage_by_call_id.get(call["id"], {}).items():
+                best_row = self._pick_best_cost_row(
+                    price_rows_by_llm.get(llm_id, []), started_at, project_id
+                )
+                if best_row is None:
+                    continue
+
+                prompt_cost = float(best_row["prompt_token_cost"] or 0.0)
+                completion_cost = float(best_row["completion_token_cost"] or 0.0)
+                prompt_tokens = usage["prompt_tokens"]
+                completion_tokens = usage["completion_tokens"]
+
+                call_costs[llm_id] = {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "requests": usage["requests"],
+                    "total_tokens": usage["total_tokens"],
+                    "prompt_tokens_total_cost": prompt_tokens * prompt_cost,
+                    "completion_tokens_total_cost": completion_tokens * completion_cost,
+                    "prompt_token_cost": prompt_cost,
+                    "completion_token_cost": completion_cost,
+                    "prompt_token_cost_unit": best_row["prompt_token_cost_unit"],
+                    "completion_token_cost_unit": best_row[
+                        "completion_token_cost_unit"
+                    ],
+                    "effective_date": best_row["effective_date"],
+                    "provider_id": best_row["provider_id"],
+                    "pricing_level": best_row["pricing_level"],
+                    "pricing_level_id": best_row["pricing_level_id"],
+                    "created_at": best_row["created_at"],
+                    "created_by": best_row["created_by"],
+                }
+
+            if call_costs:
+                weave_summary["costs"] = call_costs
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         calls = self.calls_query(
@@ -507,6 +869,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 limit=1,
                 filter=tsi.CallsFilter(call_ids=[req.id]),
+                include_costs=req.include_costs,
+                include_storage_size=req.include_storage_size,
+                include_total_storage_size=req.include_total_storage_size,
             )
         ).calls
         return tsi.CallReadRes(call=calls[0] if calls else None)
@@ -706,11 +1071,24 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         ]
         if req.columns:
             # TODO(gst): allow json fields to be selected
-            simple_columns = list({x.split(".")[0] for x in req.columns})
+            simple_columns = []
+            for column in req.columns:
+                top_level_column = column.split(".")[0]
+                if (
+                    top_level_column.endswith("_dump")
+                    and top_level_column[:-5] in select_columns
+                ):
+                    top_level_column = top_level_column[:-5]
+                if top_level_column not in simple_columns:
+                    simple_columns.append(top_level_column)
             if req.include_usernames and "wb_user_id" not in simple_columns:
                 simple_columns.append("wb_user_id")
+            if req.include_costs and "summary" not in simple_columns:
+                simple_columns.append("summary")
             if "summary" in simple_columns or req.include_costs:
-                simple_columns += ["ended_at", "exception", "display_name"]
+                for column in ["ended_at", "exception", "display_name"]:
+                    if column not in simple_columns:
+                        simple_columns.append(column)
 
             select_columns = [x for x in simple_columns if x in select_columns]
             # add required columns, preserving requested column order
@@ -726,7 +1104,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         if req.include_storage_size:
             select_columns.append(
-                "(COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0))"
+                "COALESCE(storage_size_bytes, COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0))"
             )
             select_columns_names.append("storage_size_bytes")
 
@@ -932,6 +1310,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     else:
                         call_dict[col] = {}
             calls.append(call_dict)
+
+        if req.include_costs and calls:
+            self._apply_costs_to_calls(cursor, calls, req.project_id)
 
         if req.include_feedback:
             feedback_query_req = make_feedback_query_req(req.project_id, calls)
@@ -1948,7 +2329,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         # where it can. Like it should group by object that we need to read.
         # And it should also batch into table refs (like when we are reading a bunch
         # of rows from a single Dataset)
-        if len(req.refs) > 1000:
+        if len(req.refs) > MAX_REFS_BATCH_SIZE:
             raise ValueError("Too many refs")
 
         parsed_refs = [ri.parse_internal_uri(r) for r in req.refs]
@@ -2153,15 +2534,102 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.FilesStatsRes(total_size_bytes=-1)
 
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        print("COST CREATE is not implemented for local sqlite", req)
-        return tsi.CostCreateRes()
+        assert_non_null_wb_user_id(req)
+        conn, cursor = get_conn_cursor(self.db_path)
+        created_at = _serialize_cost_datetime(
+            datetime.datetime.now(datetime.timezone.utc)
+        )
+
+        created_costs: list[tuple[str, str]] = []
+        with self.lock:
+            for llm_id, cost in req.costs.items():
+                cost_id = generate_id()
+                row: Row = {
+                    "id": cost_id,
+                    "pricing_level": PRICING_LEVELS["PROJECT"],
+                    "pricing_level_id": req.project_id,
+                    "provider_id": cost.provider_id or "default",
+                    "llm_id": llm_id,
+                    "effective_date": _serialize_cost_datetime(
+                        cost.effective_date
+                        or datetime.datetime.now(datetime.timezone.utc)
+                    ),
+                    "prompt_token_cost": cost.prompt_token_cost,
+                    "completion_token_cost": cost.completion_token_cost,
+                    "prompt_token_cost_unit": cost.prompt_token_cost_unit or "USD",
+                    "completion_token_cost_unit": cost.completion_token_cost_unit
+                    or "USD",
+                    "created_by": req.wb_user_id,
+                    "created_at": created_at,
+                }
+                prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare(
+                    database_type="sqlite"
+                )
+                cursor.executemany(prepared.sql, prepared.data)
+                created_costs.append((cost_id, llm_id))
+            conn.commit()
+        return tsi.CostCreateRes(ids=created_costs)
 
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        print("COST QUERY is not implemented for local sqlite", req)
-        return tsi.CostQueryRes()
+        _, cursor = get_conn_cursor(self.db_path)
+        expr = {
+            "$and": [
+                (
+                    req.query.expr_
+                    if req.query
+                    else {
+                        "$eq": [
+                            {"$getField": "pricing_level_id"},
+                            {"$literal": req.project_id},
+                        ],
+                    }
+                ),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": PRICING_LEVELS["PROJECT"]},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+        query = LLM_TOKEN_PRICES_TABLE.select()
+        query = query.fields(req.fields)
+        query = query.where(query_with_pricing_level)
+        query = query.order_by(req.sort_by)
+        query = query.limit(req.limit).offset(req.offset)
+        prepared = query.prepare(database_type="sqlite")
+        result = cursor.execute(prepared.sql, prepared.parameters)
+        rows = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(result.fetchall(), prepared.fields)
+        return tsi.CostQueryRes(results=rows)
 
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        print("COST PURGE is not implemented for local sqlite", req)
+        validate_cost_purge_req(req)
+        conn, cursor = get_conn_cursor(self.db_path)
+        expr = {
+            "$and": [
+                req.query.expr_,
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level"},
+                        {"$literal": PRICING_LEVELS["PROJECT"]},
+                    ],
+                },
+            ]
+        }
+        query_with_pricing_level = tsi.Query(**{"$expr": expr})
+        query = LLM_TOKEN_PRICES_TABLE.purge()
+        query = query.where(query_with_pricing_level)
+        prepared = query.prepare(database_type="sqlite")
+        with self.lock:
+            cursor.execute(prepared.sql, prepared.parameters)
+            conn.commit()
         return tsi.CostPurgeRes()
 
     def completions_create(
@@ -2242,8 +2710,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 partial_success=tsi.ExportTracePartialSuccess(
                     rejected_spans=rejected_spans,
                     error_message=(
-                        "; ".join(error_messages[:20])
-                        + ("; ..." if len(error_messages) > 20 else "")
+                        "; ".join(error_messages[:MAX_OTEL_ERROR_MESSAGES])
+                        + (
+                            "; ..."
+                            if len(error_messages) > MAX_OTEL_ERROR_MESSAGES
+                            else ""
+                        )
                     ),
                 )
             )

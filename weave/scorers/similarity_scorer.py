@@ -8,6 +8,8 @@ import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_EMBEDDING_MODEL
 from weave.scorers.scorer_types import LLMScorer
 
+DEFAULT_SIMILARITY_THRESHOLD = 0.5
+
 
 class EmbeddingSimilarityScorer(LLMScorer):
     """Computes the cosine similarity between the embeddings of a model output and a target text.
@@ -24,7 +26,10 @@ class EmbeddingSimilarityScorer(LLMScorer):
     """
 
     model_id: str = OPENAI_DEFAULT_EMBEDDING_MODEL
-    threshold: float = Field(0.5, description="The threshold for the similarity score")
+    threshold: float = Field(
+        DEFAULT_SIMILARITY_THRESHOLD,
+        description="The threshold for the similarity score",
+    )
 
     @weave.op
     async def score(self, *, output: str, target: str, **kwargs: Any) -> Any:

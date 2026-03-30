@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+MAX_ABBREVIATION_WORDS = 8
+SESSION_NAME_MAX_LENGTH = 80
+
 
 def format_model_name(model_id: str) -> str:
     """Format a model ID into a nice display name.
@@ -54,7 +57,7 @@ def tool_use_display_name(tool_name: str, tool_input: dict[str, Any]) -> str:
     return f"{tool_name}({params})"
 
 
-def _abbreviate(text: str, max_words: int = 8) -> str:
+def _abbreviate(text: str, max_words: int = MAX_ABBREVIATION_WORDS) -> str:
     """Abbreviate text to the first few words."""
     words = text.split()[:max_words]
     name = " ".join(words)
@@ -80,7 +83,9 @@ def response_display_name(model: str | None) -> str:
     return "Response"
 
 
-def turn_display_name(prompt: str | None, max_words: int = 8) -> str:
+def turn_display_name(
+    prompt: str | None, max_words: int = MAX_ABBREVIATION_WORDS
+) -> str:
     """Generate display name for a turn call from the first few words of the prompt."""
     if not prompt:
         return "Turn"
@@ -94,6 +99,8 @@ def turn_display_name(prompt: str | None, max_words: int = 8) -> str:
 def session_display_name(prompt: str | None) -> str:
     """Generate display name for the root session call."""
     if prompt:
-        truncated = prompt[:80] + ("..." if len(prompt) > 80 else "")
+        truncated = prompt[:SESSION_NAME_MAX_LENGTH] + (
+            "..." if len(prompt) > SESSION_NAME_MAX_LENGTH else ""
+        )
         return f"Session: {truncated}"
     return "Session"

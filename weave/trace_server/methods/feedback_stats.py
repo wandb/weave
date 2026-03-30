@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.call_stats_helpers import rows_to_bucket_dicts
+from weave.trace_server.calls_query_builder.stats_query_base import GRANULARITY_1H
 from weave.trace_server.feedback_payload_schema import (
     build_feedback_payload_sample_query,
     discover_payload_schema,
@@ -114,7 +115,7 @@ def feedback_stats(
         return tsi.FeedbackStatsRes(
             start=req.start,
             end=end,
-            granularity=3600,
+            granularity=GRANULARITY_1H,
             timezone=req.timezone or "UTC",
             buckets=[],
         )
