@@ -91,6 +91,11 @@ from tenacity import (
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
+from weave.trace_server.database_engine import (
+    ENGINE_DISCOVERY_MAX_WAIT_SECONDS,
+    EngineDiscoveryError,
+    wait_for_database_engine,
+)
 from weave.trace_server.environment import wf_clickhouse_calls_shard_key
 
 logger = logging.getLogger(__name__)
@@ -182,7 +187,6 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self.management_db = management_db
         self.migration_dir = self._resolve_migration_dir(migration_dir)
         self.post_migration_hook = post_migration_hook
-        self._replicated_db_engine_cache: dict[str, bool] = {}
         self._initialize_migration_db()
 
     def _uses_replicated_db_engine(self, db_name: str) -> bool:
@@ -192,19 +196,20 @@ class BaseClickHouseTraceServerMigrator(ABC):
         replicated via ZooKeeper. Including ON CLUSTER in DDL statements inside
         such a database causes ClickHouse error 80 (INCORRECT_QUERY):
         "ON CLUSTER is not allowed for Replicated database."
+
+        The base class always returns False. The replicated subclass overrides
+        this to read from ``_replicated_db_engine_cache``.
         """
-        if db_name not in self._replicated_db_engine_cache:
-            try:
-                result = self.ch_client.query(
-                    f"SELECT engine FROM system.databases WHERE name = '{db_name}'"
-                )
-                self._replicated_db_engine_cache[db_name] = (
-                    bool(result.result_rows)
-                    and result.result_rows[0][0] == "Replicated"
-                )
-            except Exception:
-                self._replicated_db_engine_cache[db_name] = False
-        return self._replicated_db_engine_cache[db_name]
+        return False
+
+    def _ensure_database(self, db_name: str) -> None:
+        """Create a database if it does not exist.
+
+        Subclasses that need engine introspection override this to also
+        populate ``_replicated_db_engine_cache``.
+        """
+        db_sql = self._create_db_sql(db_name)
+        self._run_ddl_with_retry(db_sql)
 
     @staticmethod
     def _resolve_migration_dir(migration_dir: str) -> str:
@@ -260,8 +265,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
             return
         logger.info("Migrations to apply: %s", migrations_to_apply)
         if status["curr_version"] == 0:
-            db_sql = self._create_db_sql(target_db)
-            self._run_ddl_with_retry(db_sql)
+            self._ensure_database(target_db)
         applied_target_version = target_version
         for migration_target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, migration_target_version, migration_file)
@@ -286,9 +290,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
 
     def _initialize_migration_db(self) -> None:
         """Initialize the management database and migrations table."""
-        db_sql = self._create_db_sql(self.management_db)
-        self._run_ddl_with_retry(db_sql)
-
+        self._ensure_database(self.management_db)
         create_table_sql = self._create_management_table_sql()
         self._run_ddl_with_retry(create_table_sql)
 
@@ -514,6 +516,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
+        database_engine_discovery_max_wait_seconds: float | None = None,
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
@@ -526,28 +529,64 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             if replicated_cluster is None
             else replicated_cluster
         )
+        self.database_engine_discovery_max_wait_seconds = (
+            ENGINE_DISCOVERY_MAX_WAIT_SECONDS
+            if database_engine_discovery_max_wait_seconds is None
+            else database_engine_discovery_max_wait_seconds
+        )
 
         # Validate configuration
         if not self._is_safe_identifier(self.replicated_cluster):
             raise MigrationError(f"Invalid cluster name: {self.replicated_cluster}")
+        if self.database_engine_discovery_max_wait_seconds <= 0:
+            raise MigrationError(
+                "database_engine_discovery_max_wait_seconds must be positive"
+            )
 
         logger.info(
             "%s ReplicatedClickHouseTraceServerMigrator initialized with: "
             "replicated_cluster=%s, "
             "replicated_path=%s, "
-            "management_db=%s",
+            "management_db=%s, "
+            "database_engine_discovery_max_wait_seconds=%s",
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             self.replicated_cluster,
             self.replicated_path,
             management_db,
+            self.database_engine_discovery_max_wait_seconds,
         )
 
+        self._replicated_db_engine_cache: dict[str, bool] = {}
         super().__init__(
             ch_client,
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
         )
+
+    def _uses_replicated_db_engine(self, db_name: str) -> bool:
+        return self._replicated_db_engine_cache.get(db_name, False)
+
+    def _ensure_database(self, db_name: str) -> None:
+        """Create the database and discover its engine for the DDL cache.
+
+        After ``CREATE DATABASE IF NOT EXISTS``, the engine may not be
+        immediately visible in ``system.databases`` (metadata propagation lag
+        on replicated clusters).  We poll with back-off so that all later DDL
+        knows whether to emit ``ON CLUSTER`` / ``ReplicatedMergeTree``.
+        """
+        db_sql = self._create_db_sql(db_name)
+        self._run_ddl_with_retry(db_sql)
+        try:
+            engine = wait_for_database_engine(
+                self.ch_client,
+                db_name,
+                max_wait_seconds=self.database_engine_discovery_max_wait_seconds,
+                context=db_sql,
+            )
+        except EngineDiscoveryError as exc:
+            raise MigrationError(str(exc)) from exc
+        self._replicated_db_engine_cache[db_name] = engine == "Replicated"
 
     def _create_db_sql(self, db_name: str) -> str:
         """Generate SQL to create a database in replicated mode.
@@ -580,6 +619,23 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             f" ENGINE = Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
         )
 
+    def _prepare_ddl_for_database(self, sql_query: str, target_db: str) -> str:
+        """Adapt DDL for the target database's engine type.
+
+        * **Replicated engine** — the database auto-converts ``MergeTree`` to
+          ``ReplicatedMergeTree`` and auto-replicates DDL, so we pass the SQL
+          through unchanged.  Emitting ``ON CLUSTER`` would cause ClickHouse
+          error 80 (INCORRECT_QUERY).
+        * **Atomic engine** — the database does not auto-replicate, so we must
+          explicitly rewrite ``MergeTree`` → ``ReplicatedMergeTree`` and add
+          ``ON CLUSTER`` to every DDL statement.
+        """
+        if self._uses_replicated_db_engine(target_db):
+            return sql_query
+
+        sql_query = self._format_replicated_sql(sql_query)
+        return self._add_on_cluster_clause(sql_query, target_db=target_db)
+
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in replicated mode."""
         create_table_sql = f"""
@@ -588,11 +644,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             ENGINE = MergeTree()
             ORDER BY (db_name)
         """
-        create_table_sql = self._format_replicated_sql(create_table_sql)
-        create_table_sql = self._add_on_cluster_clause(
-            create_table_sql, target_db=self.management_db
-        )
-        return create_table_sql
+        return self._prepare_ddl_for_database(create_table_sql, self.management_db)
 
     def _execute_migration_command(self, target_db: str, command: str) -> None:
         """Execute command in replicated mode."""
@@ -603,16 +655,8 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         curr_db = self.ch_client.database
         self.ch_client.database = target_db
 
-        # When the database uses ENGINE = Replicated, it auto-converts MergeTree
-        # to ReplicatedMergeTree and handles DDL replication. Skip explicit conversion.
-        if self._uses_replicated_db_engine(target_db):
-            self._run_ddl_with_retry(command)
-        else:
-            formatted_command = self._format_replicated_sql(command)
-            formatted_command = self._add_on_cluster_clause(
-                formatted_command, target_db=target_db
-            )
-            self._run_ddl_with_retry(formatted_command)
+        formatted_command = self._prepare_ddl_for_database(command, target_db)
+        self._run_ddl_with_retry(formatted_command)
 
         self.ch_client.database = curr_db
 
@@ -734,6 +778,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
+        database_engine_discovery_max_wait_seconds: float | None = None,
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
@@ -747,6 +792,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             replicated_path,
             replicated_cluster,
             management_db,
+            database_engine_discovery_max_wait_seconds,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
         )
@@ -1177,6 +1223,7 @@ def get_clickhouse_trace_server_migrator(
     replicated_cluster: str | None = None,
     use_distributed: bool | None = None,
     management_db: str = "db_management",
+    database_engine_discovery_max_wait_seconds: float | None = None,
     migration_dir: str | None = None,
     post_migration_hook: PostMigrationHook
     | None = _default_trace_server_costs_post_migration_hook,
@@ -1190,6 +1237,9 @@ def get_clickhouse_trace_server_migrator(
         replicated_cluster: Cluster name for replication
         use_distributed: Whether to use distributed tables (requires replicated=True)
         management_db: Database name for migration management
+        database_engine_discovery_max_wait_seconds: Maximum time to wait for
+            system.databases to report the created DB engine in replicated /
+            distributed mode
         migration_dir: Absolute path to a directory containing `*.up.sql` / `*.down.sql`
         post_migration_hook: Optional callable run after migrations; defaults to the Weave costs backfill hook (pass None to disable)
 
@@ -1209,6 +1259,7 @@ def get_clickhouse_trace_server_migrator(
         "replicated_cluster=%s, "
         "replicated_path=%s, "
         "management_db=%s, "
+        "database_engine_discovery_max_wait_seconds=%s, "
         "migration_dir=%s, "
         "post_migration_hook=%s",
         replicated,
@@ -1216,6 +1267,7 @@ def get_clickhouse_trace_server_migrator(
         replicated_cluster,
         replicated_path,
         management_db,
+        database_engine_discovery_max_wait_seconds,
         migration_dir,
         "none" if post_migration_hook is None else "callable",
     )
@@ -1238,6 +1290,7 @@ def get_clickhouse_trace_server_migrator(
             replicated_path,
             replicated_cluster,
             management_db,
+            database_engine_discovery_max_wait_seconds,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
         )
@@ -1247,6 +1300,7 @@ def get_clickhouse_trace_server_migrator(
             replicated_path,
             replicated_cluster,
             management_db,
+            database_engine_discovery_max_wait_seconds,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
         )
