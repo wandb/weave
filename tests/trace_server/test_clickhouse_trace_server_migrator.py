@@ -45,6 +45,21 @@ def _make_ch_client(database_engine: str = "Atomic") -> Mock:
 
 
 @pytest.fixture
+def mock_migration_lock():
+    """Bypass the distributed migration lock for tests that call apply_migrations."""
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_migrator.acquire_with_retry",
+            return_value="aabbccdd0011",
+        ),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_migrator.release",
+        ),
+    ):
+        yield
+
+
+@pytest.fixture
 def mock_costs():
     with (
         patch(
@@ -107,7 +122,9 @@ def distributed_migrator():
     return migrator
 
 
-def test_apply_migrations_with_target_version(mock_costs, tmp_path):
+def test_apply_migrations_with_target_version(
+    mock_migration_lock, mock_costs, tmp_path
+):
     # Create a temporary migration file
     migration_dir = tmp_path / "migrations"
     migration_dir.mkdir()
@@ -168,7 +185,7 @@ def test_migration_dir_must_be_absolute():
         )
 
 
-def test_apply_migrations_raises_on_partially_applied():
+def test_apply_migrations_raises_on_partially_applied(mock_migration_lock):
     ch_client = _make_ch_client()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client, post_migration_hook=None
@@ -184,7 +201,7 @@ def test_apply_migrations_raises_on_partially_applied():
         migrator.apply_migrations("test_db")
 
 
-def test_apply_migrations_costs_disabled_does_not_call_costs():
+def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock):
     ch_client = _make_ch_client()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client, post_migration_hook=None
