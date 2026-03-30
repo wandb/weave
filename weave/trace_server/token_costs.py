@@ -42,6 +42,8 @@ LLM_USAGE_COLUMNS = [
     Column(name="prompt_tokens", type="float"),
     Column(name="completion_tokens", type="float"),
     Column(name="total_tokens", type="float"),
+    Column(name="cache_read_input_tokens", type="float"),
+    Column(name="cache_creation_input_tokens", type="float"),
 ]
 
 
@@ -54,6 +56,8 @@ LLM_TOKEN_PRICES_COLUMNS = [
     Column(name="effective_date", type="datetime"),
     Column(name="prompt_token_cost", type="float"),
     Column(name="completion_token_cost", type="float"),
+    Column(name="cache_read_input_token_cost", type="float"),
+    Column(name="cache_creation_input_token_cost", type="float"),
     Column(name="prompt_token_cost_unit", type="string"),
     Column(name="completion_token_cost_unit", type="string"),
     Column(name="created_by", type="string"),

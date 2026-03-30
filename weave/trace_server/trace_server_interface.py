@@ -3047,6 +3047,8 @@ UsageMetric = Literal[
     "input_tokens",
     "output_tokens",
     "total_tokens",
+    "cache_read_input_tokens",
+    "cache_creation_input_tokens",
     "input_cost",
     "output_cost",
     "total_cost",
@@ -3057,6 +3059,8 @@ Token metrics are extracted from summary.usage[model]:
 - input_tokens: Sum of prompt_tokens (OpenAI) and input_tokens (Anthropic/others)
 - output_tokens: Sum of completion_tokens (OpenAI) and output_tokens (Anthropic/others)
 - total_tokens: Total tokens (input + output)
+- cache_read_input_tokens: Tokens read from prompt cache (all providers)
+- cache_creation_input_tokens: Tokens used to create prompt cache (Anthropic)
 
 Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices:
 - input_cost: input_tokens * prompt_token_cost
@@ -3179,9 +3183,13 @@ class LLMAggregatedUsage(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    cache_read_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
     # Cost fields - only populated when include_costs=True
     prompt_tokens_total_cost: float | None = None
     completion_tokens_total_cost: float | None = None
+    cache_read_input_tokens_total_cost: float | None = None
+    cache_creation_input_tokens_total_cost: float | None = None
 
 
 # --- /trace/usage endpoint (per-call usage with descendant rollup) ---
