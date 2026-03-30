@@ -534,11 +534,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
 
-        calls, rejected_spans, error_messages = self._otel_parse_and_convert_spans(req)
+        parse_result = self._otel_parse_and_convert_spans(req)
 
-        set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
+        set_current_span_dd_tags(
+            {"weave_trace_server.insert_call_count": len(parse_result.calls)}
+        )
 
-        self._otel_resolve_ops(req, calls)
+        self._otel_resolve_ops(req, parse_result.calls)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
@@ -550,29 +552,32 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             partial(
                 _maybe_enqueue_minimal_call_end,
                 self.kafka_producer,
-                end_call.project_id,
-                end_call.id,
-                end_call.ended_at,
+                pair.end.project_id,
+                pair.end.id,
+                pair.end.ended_at,
                 False,
             )
-            for _, end_call in calls
+            for pair in parse_result.calls
         ]
 
-        self._otel_convert_and_insert_rows(calls, write_target)
+        self._otel_convert_and_insert_rows(parse_result.calls, write_target)
 
         # Run callbacks and flush
         for cb in event_callbacks:
             cb()
         self._flush_kafka_producer()
 
-        if rejected_spans > 0:
-            # Join the first 20 errors and return them delimited by ';'
+        if parse_result.rejected:
+            error_messages = [
+                f"Rejected span (name='{r.name}' trace_id='{r.trace_id}' span_id='{r.span_id}'): {r.error}"
+                for r in parse_result.rejected
+            ]
             joined_errors = "; ".join(error_messages[:20]) + (
                 "; ..." if len(error_messages) > 20 else ""
             )
             return tsi.OTelExportRes(
                 partial_success=tsi.ExportTracePartialSuccess(
-                    rejected_spans=rejected_spans,
+                    rejected_spans=len(parse_result.rejected),
                     error_message=joined_errors,
                 )
             )
@@ -583,16 +588,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     )
     def _otel_parse_and_convert_spans(
         self, req: tsi.OTelExportReq
-    ) -> tuple[
-        list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]],
-        int,
-        list[str],
-    ]:
-        calls: list[
-            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
-        ] = []
-        rejected_spans = 0
-        error_messages: list[str] = []
+    ) -> tsi.OTelSpanParseResult:
+        result = tsi.OTelSpanParseResult()
         for processed_span in req.processed_spans:
             wb_run_id = processed_span.run_id
 
@@ -608,7 +605,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     try:
                         span = Span.from_proto(proto_span, resource)
                     except AttributePathConflictError as e:
-                        rejected_spans += 1
+                        # Record and skip malformed spans so we can partially accept the batch
                         try:
                             trace_id = proto_span.trace_id.hex()
                             span_id = proto_span.span_id.hex()
@@ -617,32 +614,33 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             trace_id = ""
                             span_id = ""
                             name = ""
-                        span_ident = (
-                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                        result.rejected.append(
+                            tsi.RejectedOTelSpan(
+                                error=str(e),
+                                name=name,
+                                trace_id=trace_id,
+                                span_id=span_id,
+                            )
                         )
-                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
-                        )
+                    start, end = span.to_call(
+                        req.project_id,
+                        wb_user_id=req.wb_user_id,
+                        wb_run_id=wb_run_id,
                     )
-        return calls, rejected_spans, error_messages
+                    result.calls.append(tsi.CallPair(start=start, end=end))
+        return result
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_resolve_ops")
     def _otel_resolve_ops(
         self,
         req: tsi.OTelExportReq,
-        calls: list[
-            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
-        ],
+        calls: list[tsi.CallPair],
     ) -> None:
         obj_id_idx_map = defaultdict(list)
-        for idx, (start_call, _) in enumerate(calls):
-            op_name = object_creation_utils.make_safe_name(start_call.op_name)
+        for idx, pair in enumerate(calls):
+            op_name = object_creation_utils.make_safe_name(pair.start.op_name)
             obj_id_idx_map[op_name].append(idx)
 
         existing_ops = self._get_existing_ops_from_spans(
@@ -653,7 +651,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         for op_name, op_ref_uri in existing_ops.items():
             for idx in obj_id_idx_map[op_name]:
-                calls[idx][0].op_name = op_ref_uri
+                calls[idx].start.op_name = op_ref_uri
             obj_id_idx_map.pop(op_name)
 
         if obj_id_idx_map:
@@ -677,7 +675,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     version=object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST,
                 ).uri
                 for idx in idxs:
-                    calls[idx][0].op_name = op_ref_uri
+                    calls[idx].start.op_name = op_ref_uri
                 cached_op_refs[op_name] = op_ref_uri
 
             with self._op_ref_cache_lock:
@@ -689,29 +687,29 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     )
     def _otel_convert_and_insert_rows(
         self,
-        calls: list[
-            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
-        ],
+        calls: list[tsi.CallPair],
         write_target: WriteTarget,
     ) -> None:
         if write_target == WriteTarget.CALLS_COMPLETE:
             rows = [
                 _ch_complete_call_to_row(
-                    _start_end_calls_to_ch_complete_insertable(start, end)
+                    _start_end_calls_to_ch_complete_insertable(pair.start, pair.end)
                 )
-                for start, end in calls
+                for pair in calls
             ]
             self._insert_call_complete_batch(rows)
         else:
             rows = []
-            for start, end in calls:
+            for pair in calls:
                 rows.append(
                     _ch_call_to_row(
-                        _start_call_for_insert_to_ch_insertable_start_call(start)
+                        _start_call_for_insert_to_ch_insertable_start_call(pair.start)
                     )
                 )
                 rows.append(
-                    _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
+                    _ch_call_to_row(
+                        _end_call_for_insert_to_ch_insertable_end_call(pair.end)
+                    )
                 )
             self._insert_call_batch(rows)
 
