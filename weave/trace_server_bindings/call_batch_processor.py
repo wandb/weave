@@ -43,6 +43,12 @@ MAX_BATCH_SIZE = 1000
 EAGER_CALL_ID_TTL_SECONDS = 24 * 60 * 60
 # Timeout for flush: wait this long for in-flight calls to complete before dropping
 FLUSH_TIMEOUT_SECONDS = 60
+# Default max queue size for ready-to-send items
+DEFAULT_MAX_QUEUE_SIZE = 10_000
+# How often to poll during flush while waiting for pending items to pair
+FLUSH_POLL_INTERVAL_SECONDS = 0.1
+# Log every Nth dropped item to avoid log spam
+DROP_LOG_FREQUENCY = 1000
 
 
 class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
@@ -60,7 +66,7 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
         eager_processor_fn: Callable[[list[StartBatchItem | EndBatchItem]], None],
         max_batch_size: int = MAX_BATCH_SIZE,
         min_batch_interval: float = 1.0,
-        max_queue_size: int = 10_000,
+        max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
         max_pending_calls: int = DEFAULT_MAX_PENDING_CALLS,
         enable_disk_fallback: bool = False,
         disk_fallback_path: str = ".weave_client_dropped_items_log.jsonl",
@@ -182,7 +188,7 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
                 pending_count = len(self._pending_starts) + len(self._pending_ends)
             if pending_count == 0:
                 break
-            time.sleep(0.1)
+            time.sleep(FLUSH_POLL_INTERVAL_SECONDS)
 
         # Shutdown, processing thread will drain queue then exit
         self.stop_accepting_work_event.set()
@@ -337,7 +343,7 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
                 f"Total dropped items: {self._dropped_item_count}."
             )
             # Only log and report to Sentry on first drop and every 1000th thereafter
-            if self._dropped_item_count % 1000 == 1:
+            if self._dropped_item_count % DROP_LOG_FREQUENCY == 1:
                 log_warning_with_sentry(error_message)
             self._write_item_to_disk(item, error_message)
 

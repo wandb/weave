@@ -19,8 +19,8 @@ class LlmJudgeActionConfig(BaseModel):
     def validate_response_schema(cls, v: dict) -> dict:  # noqa: N805
         try:
             jsonschema.validate(None, v)
-        except jsonschema.exceptions.SchemaError as e:
-            raise e
+        except jsonschema.exceptions.SchemaError:
+            raise
         except jsonschema.exceptions.ValidationError:
             pass  # we don't care that `None` does not conform
         return v

@@ -21,6 +21,9 @@ from weave.compat.wandb.wandb_thin.util import app_url
 
 logger = logging.getLogger(__name__)
 
+# Minimum length for a valid W&B API key
+MIN_API_KEY_LENGTH = 40
+
 
 def _normalize_host(host: str) -> str:
     """Normalize host input to a netrc-safe machine name.
@@ -377,9 +380,9 @@ def _validate_api_key(api_key: str) -> None:
     else:  # normal style
         key = api_key
 
-    if len(key) < 40:
+    if len(key) < MIN_API_KEY_LENGTH:
         raise ValueError(
-            f"API key must be at least 40 characters long, yours was {len(key)}"
+            f"API key must be at least {MIN_API_KEY_LENGTH} characters long, yours was {len(key)}"
         ) from None
 
 

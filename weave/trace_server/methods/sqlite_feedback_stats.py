@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from weave.trace_server import sqlite_trace_server as _sqlite_ts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.stats_query_base import (
+    GRANULARITY_1H,
     auto_select_granularity_seconds,
     ensure_max_buckets,
 )
@@ -148,7 +149,7 @@ def sqlite_feedback_stats(
         return tsi.FeedbackStatsRes(
             start=req.start,
             end=end,
-            granularity=3600,
+            granularity=GRANULARITY_1H,
             timezone=req.timezone or "UTC",
             buckets=[],
         )

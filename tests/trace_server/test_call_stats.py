@@ -50,7 +50,7 @@ def create_call_with_usage(
     """Helper to create a call with usage data in the summary."""
     call_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
-    project_id = client._project_id()
+    project_id = client.project_id
 
     if started_at is None:
         started_at = _BASE_TIME
@@ -89,7 +89,7 @@ def create_call_with_usage(
 
 def test_call_stats_usage_sum_aggregation(client: weave_client.WeaveClient):
     """Test basic SUM aggregation across multiple calls with known usage data."""
-    project_id = client._project_id()
+    project_id = client.project_id
     model_name = "gpt-4o-test"
     op_name = f"weave:///{project_id}/op/test_op:abc123"
 
@@ -179,7 +179,7 @@ def test_call_stats_date_range_limit_validation():
 
 def test_call_stats_multiple_models(client: weave_client.WeaveClient):
     """Test that different models are tracked and aggregated separately."""
-    project_id = client._project_id()
+    project_id = client.project_id
     op_name = f"weave:///{project_id}/op/multi_model_op:def456"
 
     start_time = _BASE_TIME
@@ -242,7 +242,7 @@ def test_call_stats_multiple_models(client: weave_client.WeaveClient):
 
 def test_call_stats_all_aggregation_types(client: weave_client.WeaveClient):
     """Test SUM, AVG, MIN, MAX, COUNT aggregations compute correctly."""
-    project_id = client._project_id()
+    project_id = client.project_id
     model_name = "gpt-4o-agg-test"
     op_name = f"weave:///{project_id}/op/agg_test_op:ghi789"
 
@@ -340,7 +340,7 @@ def test_call_stats_all_aggregation_types(client: weave_client.WeaveClient):
 
 def test_call_stats_percentiles(client: weave_client.WeaveClient):
     """Test percentile calculations (p50, p95, p99) with varied data."""
-    project_id = client._project_id()
+    project_id = client.project_id
     model_name = "gpt-4o-pct-test"
     op_name = f"weave:///{project_id}/op/pct_test_op:jkl012"
 
@@ -404,7 +404,7 @@ def test_call_stats_percentiles(client: weave_client.WeaveClient):
 
 def test_call_stats_time_buckets(client: weave_client.WeaveClient):
     """Test that calls are grouped into correct time buckets based on started_at."""
-    project_id = client._project_id()
+    project_id = client.project_id
     model_name = "gpt-4o-bucket-test"
     op_name = f"weave:///{project_id}/op/bucket_test_op:mno345"
 
@@ -471,7 +471,7 @@ def test_call_stats_time_buckets(client: weave_client.WeaveClient):
 
 def test_call_stats_op_names_filter(client: weave_client.WeaveClient):
     """Test op_names filter works correctly."""
-    project_id = client._project_id()
+    project_id = client.project_id
     model_name = "gpt-4o-filter-test"
 
     start_time = _BASE_TIME
@@ -517,7 +517,7 @@ def test_call_stats_op_names_filter(client: weave_client.WeaveClient):
 
 def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
     """Test trace_roots_only filter excludes child calls."""
-    project_id = client._project_id()
+    project_id = client.project_id
     model_name = "gpt-4o-roots-test"
 
     start_time = _BASE_TIME
@@ -607,7 +607,7 @@ def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
 
 def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
     """Test trace_ids filter limits to specific traces."""
-    project_id = client._project_id()
+    project_id = client.project_id
     model_name = "gpt-4o-trace-filter-test"
 
     start_time = _BASE_TIME
@@ -697,7 +697,7 @@ def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):
 
 def test_call_stats_call_metrics(client: weave_client.WeaveClient):
     """Test call-level metrics (latency, call_count, error_count)."""
-    project_id = client._project_id()
+    project_id = client.project_id
     op_name = f"weave:///{project_id}/op/call_metrics_test:xyz123"
 
     start_time = _BASE_TIME
@@ -835,7 +835,7 @@ def test_call_stats_date_range_limit_query_layer(client: weave_client.WeaveClien
     end_time = _BASE_TIME
     start_time = end_time - datetime.timedelta(days=32)
     req = tsi.CallStatsReq.model_construct(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         start=start_time,
         end=end_time,
         granularity=3600,

@@ -66,9 +66,9 @@ class TestInsertCosts(unittest.TestCase):
         mock_file_open.assert_called_once()
         args, kwargs = mock_file_open.call_args
         opened_file_path = args[0]
-        self.assertTrue(opened_file_path.endswith(insert_costs.COST_FILE))
+        assert opened_file_path.endswith(insert_costs.COST_FILE)
         mock_json_load.assert_called_once()
-        self.assertEqual(result, self.sample_costs_json)
+        assert result == self.sample_costs_json
 
     @patch("weave.trace_server.costs.insert_costs.get_current_costs")
     def test_filter_out_current_costs(self, mock_get_current_costs):
@@ -85,7 +85,7 @@ class TestInsertCosts(unittest.TestCase):
 
         # Assertions
         mock_get_current_costs.assert_called_once_with(self.client)
-        self.assertEqual(filtered_costs, expected_filtered_costs)
+        assert filtered_costs == expected_filtered_costs
 
     @patch("weave.trace_server.costs.insert_costs.uuid.uuid4")
     @patch("weave.trace_server.costs.insert_costs.datetime")

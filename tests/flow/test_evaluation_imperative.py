@@ -652,7 +652,7 @@ def test_evaluation_invalid_model_name_fixable(model_name):
 
 @pytest.mark.parametrize("model_name", [""])
 def test_evaluation_invalid_model_name_not_fixable(model_name):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="name cannot be empty"):
         weave.EvaluationLogger(model=model_name)
 
 
@@ -718,8 +718,8 @@ def test_evaluation_logger_set_view(client):
     assert "views" in evaluate_call.summary["weave"]
     views = evaluate_call.summary["weave"]["views"]
     assert len(views) == 2
-    assert views["report"] == to_json(content, client._project_id(), client)
-    assert views["report2"] == to_json(content2, client._project_id(), client)
+    assert views["report"] == to_json(content, client.project_id, client)
+    assert views["report2"] == to_json(content2, client.project_id, client)
 
 
 def test_evaluation_logger_set_view_string(client):

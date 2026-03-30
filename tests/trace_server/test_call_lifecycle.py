@@ -15,7 +15,7 @@ def test_call_update_out_of_order(client: weave_client.WeaveClient):
     # Only step 3 should actually have the result in the query.
 
     call_id = str(uuid.uuid4())
-    project_id = client._project_id()
+    project_id = client.project_id
 
     def get_calls():
         res = client.server.calls_query(

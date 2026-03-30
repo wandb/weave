@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator, Iterable, Iterator, Sequence
 from threading import Lock
-from typing import Any, TypeVar, overload
+from typing import TypeVar, overload
 
 T = TypeVar("T")
 
@@ -150,7 +150,7 @@ class ThreadSafeLazyList(Sequence[T]):  # noqa: PLW1641
 
         return _iter()
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Sequence):
             return False
         if len(self) != len(other):

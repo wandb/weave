@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 U = TypeVar("U")
+
+DEFAULT_SHORT_STR_LIMIT = 25
 ItemReturnType = tuple[int, T, U]
 
 _shown_warnings = set()
@@ -262,7 +264,7 @@ def make_memorable_name() -> str:
     return f"{adj}-{noun}"
 
 
-def short_str(obj: Any, limit: int = 25) -> str:
+def short_str(obj: Any, limit: int = DEFAULT_SHORT_STR_LIMIT) -> str:
     str_val = str(obj)
     if len(str_val) > limit:
         return str_val[:limit] + "..."

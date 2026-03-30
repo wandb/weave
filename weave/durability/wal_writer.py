@@ -5,6 +5,8 @@ import os
 import threading
 import time
 
+from typing_extensions import Self
+
 from weave.durability.wal import WALDirectoryManager, WALRecord
 from weave.durability.wal_lock import acquire_lock, release_lock
 
@@ -99,7 +101,7 @@ class _JSONLWALFileWriter:
         if self._unsynced > 0:
             self._fsync()
 
-    def __enter__(self) -> _JSONLWALFileWriter:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -214,7 +216,7 @@ class JSONLWALWriter:
             self._writer.close()
             self._closed = True
 
-    def __enter__(self) -> JSONLWALWriter:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:

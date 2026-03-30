@@ -19,6 +19,8 @@ import logging
 import os
 import sys
 
+from weave.telemetry.trace_sentry import log_warning
+
 logger = logging.getLogger(__name__)
 
 LOCK_EXT = ".lock"
@@ -63,10 +65,8 @@ def acquire_lock(wal_path: str, lock_ext: str = LOCK_EXT) -> str:
                 f"Lock file {path} is held by living process {existing_pid}"
             ) from exc
         # Stale lock from a crashed writer — safe to overwrite.
-        logger.warning(
-            "Lock file %s contains stale PID %s — overwriting.",
-            path,
-            existing_pid,
+        log_warning(
+            f"WAL stale lock {path} contains stale PID {existing_pid}; overwriting"
         )
         with open(path, "w", encoding="utf-8") as f:
             f.write(str(os.getpid()))
@@ -103,6 +103,17 @@ def release_lock(lock_path: str) -> None:
         logger.warning(
             "Lock file %s was already missing on release. This may indicate "
             "external tampering or a logic error.",
+            lock_path,
+        )
+    except PermissionError:
+        # On Windows, the sender thread may have the lock file open for
+        # reading (in _read_lock_pid / is_writer_alive) at the moment we
+        # try to unlink.  Windows forbids deleting files with open handles.
+        # The sender's next drain cycle will see the stale PID and treat
+        # the file as safe to clean up, so this is not a data-loss risk.
+        logger.debug(
+            "Cannot remove lock file %s (still open by another thread/process), "
+            "will be cleaned up by the sender.",
             lock_path,
         )
 

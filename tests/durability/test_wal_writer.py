@@ -176,5 +176,5 @@ class TestJSONLWALFileWriter:
             assert json.loads(f.readline()) == {"ctx": True}
 
         # Further writes raise because the file is closed.
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="closed file"):
             writer.write({"after": True})
