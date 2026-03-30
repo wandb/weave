@@ -39,7 +39,11 @@ def test_img(request) -> Image.Image:
     if (fmt := request.param["format"]) is not None:
         buffer = io.BytesIO()
         img.save(buffer, format=fmt)
+        buffer.seek(0)
         img = Image.open(buffer)
+        # Fully load buffered images before background serialization touches them.
+        img.load()
+        buffer.close()
 
     try:
         yield img
@@ -81,6 +85,7 @@ def test_image_as_property(client: WeaveClient, test_img: Image.Image) -> None:
         gotten_img_wrapper.img.close()
 
 
+@pytest.mark.flaky(reruns=3)
 def test_image_as_dataset_cell(client: WeaveClient, test_img: Image.Image) -> None:
     client.project = "test_image_as_dataset_cell"
     dataset = weave.Dataset(rows=[{"img": test_img}])

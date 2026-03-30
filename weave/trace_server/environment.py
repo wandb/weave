@@ -3,6 +3,18 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# Default port numbers
+DEFAULT_KAFKA_BROKER_PORT = 9092
+DEFAULT_CLICKHOUSE_PORT = 8123
+
+# Scoring worker defaults
+DEFAULT_SCORING_WORKER_BATCH_SIZE = 100
+DEFAULT_SCORING_WORKER_BATCH_TIMEOUT = 5
+
+# ClickHouse async insert timeout defaults (milliseconds)
+DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS = 100
+DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS = 1000
+
 # Kafka Settings
 
 
@@ -13,7 +25,7 @@ def kafka_broker_host() -> str:
 
 def kafka_broker_port() -> int:
     """The port of the kafka broker."""
-    return int(os.environ.get("KAFKA_BROKER_PORT", "9092"))
+    return int(os.environ.get("KAFKA_BROKER_PORT", str(DEFAULT_KAFKA_BROKER_PORT)))
 
 
 def kafka_client_user() -> str | None:
@@ -59,12 +71,20 @@ def wf_enable_online_eval() -> bool:
 
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", "100"))
+    return int(
+        os.environ.get(
+            "WF_SCORING_WORKER_BATCH_SIZE", str(DEFAULT_SCORING_WORKER_BATCH_SIZE)
+        )
+    )
 
 
 def wf_scoring_worker_batch_timeout() -> int:
     """The timeout for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", "5"))
+    return int(
+        os.environ.get(
+            "WF_SCORING_WORKER_BATCH_TIMEOUT", str(DEFAULT_SCORING_WORKER_BATCH_TIMEOUT)
+        )
+    )
 
 
 def wf_scoring_worker_check_cancellation() -> bool:
@@ -124,7 +144,7 @@ def wf_clickhouse_host() -> str:
 
 def wf_clickhouse_port() -> int:
     """The port of the clickhouse server."""
-    return int(os.environ.get("WF_CLICKHOUSE_PORT", "8123"))
+    return int(os.environ.get("WF_CLICKHOUSE_PORT", str(DEFAULT_CLICKHOUSE_PORT)))
 
 
 def wf_clickhouse_user() -> str:
@@ -221,7 +241,7 @@ def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
     env_key = "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS"
     val = os.environ.get(env_key)
     if val is None:
-        return 100
+        return DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS
     try:
         return int(val)
     except ValueError:
@@ -229,7 +249,7 @@ def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
             "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '%s' is not valid",
             val,
         )
-        return 100
+        return DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS
 
 
 def wf_clickhouse_disable_lightweight_update() -> bool:
@@ -256,7 +276,7 @@ def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
     env_key = "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS"
     val = os.environ.get(env_key)
     if val is None:
-        return 1000
+        return DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS
     try:
         return int(val)
     except ValueError:
@@ -264,7 +284,7 @@ def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
             "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '%s' is not valid",
             val,
         )
-        return 1000
+        return DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS
 
 
 # BYOB Settings

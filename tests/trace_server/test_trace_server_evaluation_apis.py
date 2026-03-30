@@ -48,7 +48,7 @@ async def test_evaluation_status(client):
     def get_status():
         client.flush()
         return client.server.evaluation_status(
-            EvaluationStatusReq(project_id=client._project_id(), call_id=eval_call_id)
+            EvaluationStatusReq(project_id=client.project_id, call_id=eval_call_id)
         ).status
 
     @weave.op
@@ -285,7 +285,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     the evaluation through the evaluate_model API.
     """
     is_sqlite = client_is_sqlite(client)
-    project_id = client._project_id()
+    project_id = client.project_id
     entity, project = from_project_id(project_id)
 
     def evaluate_model_wrapped(req: EvaluateModelReq):
@@ -398,7 +398,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
 
 
 def test_eval_results_query_basic(client):
-    project_id = client._project_id()
+    project_id = client.project_id
     entity, project = from_project_id(project_id)
 
     scorer_res = client.server.scorer_create(
@@ -459,7 +459,7 @@ def test_eval_results_query_basic(client):
 
 
 def test_eval_results_query_nonexistent_eval_root(client):
-    project_id = client._project_id()
+    project_id = client.project_id
 
     res = client.server.eval_results_query(
         EvalResultsQueryReq(
@@ -473,7 +473,7 @@ def test_eval_results_query_nonexistent_eval_root(client):
 
 
 def test_eval_results_query_multiple_evals(client):
-    project_id = client._project_id()
+    project_id = client.project_id
 
     run_a = client.server.evaluation_run_create(
         EvaluationRunCreateReq(

@@ -2,12 +2,12 @@ default_stages: [pre-push]
 
 repos:
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.20.0
+    rev: v3.21.2
     hooks:
       - id: pyupgrade
         args: ["--py310-plus"]
   - repo: https://github.com/Instagram/Fixit
-    rev: v2.1.0
+    rev: v2.2.1
     hooks:
       - id: fixit-fix
   - repo: local
@@ -19,7 +19,7 @@ repos:
         always_run: true
         pass_filenames: false
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.3
+    rev: v0.15.5
     hooks:
       # Run the linter.
       - id: ruff-check
@@ -44,7 +44,7 @@ repos:
         always_run: true
         pass_filenames: false
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.17.0"
+    rev: "v1.19.1"
     hooks:
       - id: mypy
         additional_dependencies:
@@ -55,7 +55,7 @@ repos:
         always_run: true
         pass_filenames: false
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-added-large-files
       - id: check-added-large-files
@@ -70,13 +70,13 @@ repos:
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#debug-statements
       - id: debug-statements
   - repo: https://github.com/crate-ci/typos
-    rev: v1.34.0
+    rev: v1.44.0
     hooks:
       - id: typos
         # Excluding extra things to make initial reviews easier, starting with `examples``
         exclude: "(cassettes|examples|tests|tools)"
   - repo: https://github.com/oxipng/oxipng
-    rev: v9.1.5
+    rev: v10.1.0
     hooks:
       - id: oxipng
         args: ["-o", "4", "--strip", "safe", "--alpha"]

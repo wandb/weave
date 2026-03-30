@@ -101,7 +101,7 @@ async def test_basic_evaluation(client):
 
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -170,7 +170,7 @@ async def test_basic_evaluation(client):
 
     objs = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(base_object_classes=["Model"]),
         )
     )
@@ -359,7 +359,7 @@ async def test_evaluation_data_topology(client):
 
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             include_feedback=True,
         )
     )
@@ -687,7 +687,7 @@ async def test_eval_supports_non_op_funcs(client):
 
     # calls = client.server.calls_query(
     #     tsi.CallsQueryReq(
-    #         project_id=client._project_id(),
+    #         project_id=client.project_id,
     #     )
     # )
     # assert len(calls.calls) == 4
@@ -1009,7 +1009,7 @@ async def test_feedback_is_correctly_linked(client):
     res = await eval.evaluate(predict)
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             include_feedback=True,
             filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
         )
@@ -1051,7 +1051,7 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
     res = await eval.evaluate(predict)
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             include_feedback=True,
             filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
         )

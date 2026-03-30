@@ -8,6 +8,9 @@ from collections.abc import Iterator
 from weave.durability.wal import WALEntry
 from weave.telemetry.trace_sentry import log_warning
 
+# Max bytes to preview when logging corrupt WAL lines
+CORRUPT_LINE_PREVIEW_LENGTH = 100
+
 _active_consumers: set[str] = set()
 
 
@@ -72,7 +75,11 @@ class JSONLWALConsumer:
                         # For trailing truncation (crash mid-write), the line
                         # won't end with \n so readline() returns it as the
                         # last line and we skip it here.
-                        preview = line[:100].decode("utf-8", errors="replace").rstrip()
+                        preview = (
+                            line[:CORRUPT_LINE_PREVIEW_LENGTH]
+                            .decode("utf-8", errors="replace")
+                            .rstrip()
+                        )
                         log_warning(
                             f"WAL corrupt record skipped at offset {offset} "
                             f"in {self._path}: {preview}"

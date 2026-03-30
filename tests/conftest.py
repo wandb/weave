@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
@@ -24,6 +23,8 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+
+pytest_plugins = ["tests.trace_server.conftest"]
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"

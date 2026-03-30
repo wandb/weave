@@ -136,7 +136,60 @@ def test_object_query_builder_sort():
         builder.add_order("created_at", "INVALID")
 
 
-STATIC_METADATA_QUERY_PART = """
+def _expected_metadata_query(where_clause: str, outer_clauses: str = "") -> str:
+    """Build expected SQL for metadata query tests.
+
+    Args:
+        where_clause: The WHERE condition for latest_row_per_digest
+            (e.g. "ov.project_id = {project_id: String}").
+        outer_clauses: Optional WHERE/ORDER/LIMIT/OFFSET after the final SELECT.
+    """
+    return f"""
+WITH latest_row_per_digest AS (
+    SELECT
+        ov.project_id,
+        ov.object_id,
+        ov.created_at,
+        COALESCE(fc.first_created_at, ov.created_at) AS _first_created_at,
+        ov.deleted_at,
+        ov.kind,
+        ov.base_object_class,
+        ov.leaf_object_class,
+        ov.refs,
+        ov.digest,
+        ov.wb_user_id,
+        if (ov.kind = 'op', 1, 0) AS is_op,
+        row_number() OVER (
+            PARTITION BY ov.project_id, ov.kind, ov.object_id, ov.digest
+            ORDER BY ov.created_at DESC, (ov.deleted_at IS NULL) ASC
+        ) AS rn
+    FROM object_versions AS ov
+    LEFT JOIN (
+        SELECT object_id, digest, min(first_created_at) AS first_created_at
+        FROM object_version_first_seen
+        WHERE project_id = {{project_id: String}}
+        GROUP BY object_id, digest
+    ) AS fc USING (object_id, digest)
+    WHERE {where_clause}
+),
+object_versions_with_index AS (
+    SELECT
+        *,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY _first_created_at ASC, digest ASC
+        ) - 1 AS version_index,
+        count(*) OVER (
+            PARTITION BY project_id, kind, object_id
+        ) AS version_count,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
+        ) AS row_num,
+        if (row_num = 1, 1, 0) AS is_latest
+    FROM latest_row_per_digest
+    WHERE rn = 1
+)
 SELECT
     project_id,
     object_id,
@@ -152,54 +205,8 @@ SELECT
     wb_user_id,
     version_count,
     is_op
-FROM (
-    SELECT
-        project_id,
-        object_id,
-        created_at,
-        deleted_at,
-        kind,
-        base_object_class,
-        leaf_object_class,
-        refs,
-        digest,
-        wb_user_id,
-        is_op,
-        row_number() OVER (
-            PARTITION BY project_id,
-            kind,
-            object_id
-            ORDER BY created_at ASC
-        ) - 1 AS version_index,
-        count(*) OVER (
-            PARTITION BY project_id, kind, object_id
-        ) as version_count,
-        row_number() OVER (
-            PARTITION BY project_id, kind, object_id
-            ORDER BY (deleted_at IS NULL) DESC, created_at DESC
-        ) AS row_num,
-        if (row_num = 1, 1, 0) AS is_latest
-    FROM (
-        SELECT
-            project_id,
-            object_id,
-            created_at,
-            deleted_at,
-            kind,
-            base_object_class,
-            leaf_object_class,
-            refs,
-            digest,
-            wb_user_id,
-            if (kind = 'op', 1, 0) AS is_op,
-            row_number() OVER (
-                PARTITION BY project_id,
-                kind,
-                object_id,
-                digest
-                ORDER BY created_at DESC, (deleted_at IS NULL) ASC
-            ) AS rn
-        FROM object_versions"""
+FROM object_versions_with_index AS main
+{outer_clauses}"""
 
 
 def assert_sql(exp_query, actual_query):
@@ -216,13 +223,11 @@ def test_object_query_builder_metadata_query_basic():
     query = builder.make_metadata_query()
     parameters = builder.parameters
 
-    expected_query = f"""{STATIC_METADATA_QUERY_PART}
-        WHERE project_id = {{project_id: String}}
+    expected_query = _expected_metadata_query(
+        "ov.project_id = {project_id: String}",
+        """WHERE ((is_latest = 1) AND (deleted_at IS NULL))
+ORDER BY created_at ASC""",
     )
-    WHERE rn = 1
-) as main
-WHERE ((is_latest = 1) AND (deleted_at IS NULL))
-ORDER BY created_at ASC"""
 
     assert_sql(query, expected_query)
     assert parameters == {"project_id": "test_project"}
@@ -244,15 +249,13 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
     query = builder.make_metadata_query()
     parameters = builder.parameters
 
-    expected_query = f"""{STATIC_METADATA_QUERY_PART}
-        WHERE project_id = {{project_id: String}} AND object_id = {{object_id: String}}
-    )
-    WHERE rn = 1
-) as main
-WHERE ((((digest = {{version_digest_0: String}}) OR (digest = {{version_digest_1: String}}) OR (version_index = {{version_index_2: Int64}}))) AND (base_object_class IN {{base_object_classes: Array(String)}}) AND (deleted_at IS NULL))
+    expected_query = _expected_metadata_query(
+        "ov.project_id = {project_id: String} AND object_id = {object_id: String}",
+        """WHERE ((((digest = {version_digest_0: String}) OR (digest = {version_digest_1: String}) OR (version_index = {version_index_2: Int64}))) AND (base_object_class IN {base_object_classes: Array(String)}) AND (deleted_at IS NULL))
 ORDER BY created_at DESC
 LIMIT 10
-OFFSET 5"""
+OFFSET 5""",
+    )
 
     assert_sql(query, expected_query)
     assert parameters == {
@@ -274,13 +277,11 @@ def test_objects_query_metadata_op():
     query = builder.make_metadata_query()
     parameters = builder.parameters
 
-    expected_query = f"""{STATIC_METADATA_QUERY_PART}
-        WHERE project_id = {{project_id: String}} AND object_id = {{object_id: String}}
+    expected_query = _expected_metadata_query(
+        "ov.project_id = {project_id: String} AND object_id = {object_id: String}",
+        """WHERE ((is_op = 1) AND (version_index = {version_index_0: Int64}) AND (deleted_at IS NULL))
+ORDER BY created_at ASC""",
     )
-    WHERE rn = 1
-) as main
-WHERE ((is_op = 1) AND (version_index = {{version_index_0: Int64}}) AND (deleted_at IS NULL))
-ORDER BY created_at ASC"""
 
     assert_sql(query, expected_query)
     assert parameters == {

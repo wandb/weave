@@ -12,6 +12,8 @@ LOG_STRING_NOCOLOR = "wandb"
 ERROR_STRING = click.style("ERROR", bg="red", fg="green")
 WARN_STRING = click.style("WARNING", fg="yellow")
 PRINTED_MESSAGES = set()  # type: ignore
+# Cap on tracked messages to prevent unbounded memory growth
+MAX_PRINTED_MESSAGES = 1000
 
 
 def termlog(
@@ -70,6 +72,6 @@ def _log(
     if not repeat and line in PRINTED_MESSAGES:
         return
     # Repeated line tracking limited to 1k messages
-    if len(PRINTED_MESSAGES) < 1000:
+    if len(PRINTED_MESSAGES) < MAX_PRINTED_MESSAGES:
         PRINTED_MESSAGES.add(line)
     click.echo(line, file=sys.stderr, nl=newline)

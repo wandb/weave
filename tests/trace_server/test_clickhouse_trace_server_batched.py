@@ -71,7 +71,7 @@ def test_clickhouse_storage_size_query_generation():
 
 
 def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
-    trace_server,
+    ch_server,
 ):
     """Filter with thread_ids=[] against real ClickHouse: query runs and returns 0 rows.
 
@@ -79,16 +79,12 @@ def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
     server. The query builder emits thread_id IN ([]) which ClickHouse accepts and
     returns no rows. Skips when trace_server is SQLite.
     """
-    server = trace_server._internal_trace_server
-    if not isinstance(server, chts.ClickHouseTraceServer):
-        pytest.skip("ClickHouse-only test: run with --trace-server=clickhouse")
-
     req = tsi.CallsQueryReq(
         project_id="test_project",
         filter=tsi.CallsFilter(thread_ids=[]),
         limit=100,
     )
-    result = list(server.calls_query_stream(req))
+    result = list(ch_server.calls_query_stream(req))
 
     # Empty thread_ids -> IN [] -> no rows from ClickHouse
     assert result == []
@@ -1137,3 +1133,79 @@ def test_file_batch_clears_on_insert_failure():
             f"Memory leak: _file_batch retained {len(server._file_batch)} items "
             f"after failed insert. Batch should be cleared on any exception."
         )
+
+
+# ── version_index ordering with MV-backed _first_created_at ─────────
+
+
+def _make_project_id(prefix: str) -> str:
+    raw = f"test/{prefix}_{uuid.uuid4().hex[:8]}"
+    return base64.b64encode(raw.encode()).decode()
+
+
+def _obj_create(server, project_id, obj_id, val):
+    return server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(project_id=project_id, object_id=obj_id, val=val)
+        )
+    )
+
+
+def _objs_query(server, project_id, obj_id):
+    return server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[obj_id]),
+        )
+    ).objs
+
+
+def test_version_index_stable_on_republish(ch_server):
+    """Republishing old content should not shift version indices.
+
+    This verifies that the MV-backed _first_created_at anchors each digest
+    to its original creation time, so re-inserting digest A doesn't push
+    it to the end of the version ordering.
+    """
+    project_id = _make_project_id("vidx")
+    obj_id = "vidx_obj"
+
+    r0 = _obj_create(ch_server, project_id, obj_id, {"v": "A"})
+    r1 = _obj_create(ch_server, project_id, obj_id, {"v": "B"})
+    r2 = _obj_create(ch_server, project_id, obj_id, {"v": "C"})
+
+    # Re-publish A — inserts a duplicate row, but _first_created_at
+    # from the MV should still return A's original timestamp
+    _obj_create(ch_server, project_id, obj_id, {"v": "A"})
+
+    objs = _objs_query(ch_server, project_id, obj_id)
+    assert len(objs) == 3
+
+    by_digest = {o.digest: o for o in objs}
+    assert by_digest[r0.digest].version_index == 0
+    assert by_digest[r1.digest].version_index == 1
+    assert by_digest[r2.digest].version_index == 2
+
+
+def test_delete_preserves_version_index_gaps(ch_server):
+    """Deleting a version should leave a gap, not shift indices."""
+    project_id = _make_project_id("vidx")
+    obj_id = "vidx_gap"
+
+    digests = []
+    for i in range(3):
+        r = _obj_create(ch_server, project_id, obj_id, {"i": i})
+        digests.append(r.digest)
+
+    ch_server.obj_delete(
+        tsi.ObjDeleteReq(project_id=project_id, object_id=obj_id, digests=[digests[1]])
+    )
+
+    non_deleted = [
+        o for o in _objs_query(ch_server, project_id, obj_id) if o.deleted_at is None
+    ]
+    assert len(non_deleted) == 2
+
+    by_digest = {o.digest: o for o in non_deleted}
+    assert by_digest[digests[0]].version_index == 0
+    assert by_digest[digests[2]].version_index == 2

@@ -1,9 +1,20 @@
 import io
 import wave
 
+from weave.integrations.openai_realtime.audio_buffer import (
+    DEFAULT_AUDIO_CHANNELS,
+    DEFAULT_SAMPLE_RATE_HZ,
+)
+
+# Bytes per sample for 16-bit PCM audio
+DEFAULT_SAMPLE_WIDTH_BYTES = 2
+
 
 def pcm_to_wav(
-    pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, sample_width: int = 2
+    pcm_data: bytes,
+    sample_rate: int = DEFAULT_SAMPLE_RATE_HZ,
+    channels: int = DEFAULT_AUDIO_CHANNELS,
+    sample_width: int = DEFAULT_SAMPLE_WIDTH_BYTES,
 ) -> bytes:
     """Convert raw PCM audio data to WAV format.
 
