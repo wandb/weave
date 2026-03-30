@@ -1,7 +1,7 @@
 """Distributed migration lock backed by a ClickHouse MergeTree table.
 
 On multi-replica deployments, init containers race to apply migrations.
-This module provides a simple advisory lock: one replica INSERTs a lock row,
+This module provides a simple advisory lock: one replica INSERTTs a lock row,
 others see it and wait (with backoff) until it expires or is released.
 
 The lock is best-effort — ClickHouse reads are eventually consistent, so
@@ -13,6 +13,8 @@ the race window to near-zero without adding external dependencies.
 import logging
 import re
 import uuid
+from collections.abc import Generator
+from contextlib import contextmanager
 
 from clickhouse_connect.driver.client import Client as CHClient
 from tenacity import (
@@ -28,7 +30,7 @@ logger = logging.getLogger(__name__)
 LOCK_TABLE = "migration_lock"
 
 # How long a lock is valid before it's considered stale.
-LOCK_TTL_SECONDS = 90
+LOCK_TTL_SECONDS = 600
 
 # Column definitions shared between cloud/replicated/distributed table creation.
 LOCK_TABLE_COLUMNS = """
@@ -41,6 +43,10 @@ LOCK_TABLE_COLUMNS = """
 LOCK_WAIT_INITIAL_DELAY_SECONDS = 0.5
 LOCK_WAIT_MAX_DELAY_SECONDS = 5.0
 LOCK_WAIT_TIMEOUT_SECONDS = 120.0
+
+# Force linearizable reads so insert-then-verify sees our own write on
+# ReplicatedMergeTree.  No-op on plain MergeTree (single-node).
+CONSISTENT_READ_SETTINGS: dict[str, int] = {"select_sequential_consistency": 1}
 
 HOLDER_PATTERN = re.compile(r"^[0-9a-f]{12}$")
 
@@ -78,12 +84,13 @@ def try_acquire(ch_client: CHClient, management_db: str, holder: str) -> bool:
     """
     _validate_holder(holder)
 
-    # Check for existing unexpired lock
+    # Check for existing unexpired lock (earliest wins).
     result = ch_client.query(
         f"SELECT holder, acquired_at FROM {management_db}.{LOCK_TABLE} "
         f"WHERE lock_id = 'migration' "
         f"AND acquired_at > now64(3) - INTERVAL {LOCK_TTL_SECONDS} SECOND "
-        f"ORDER BY acquired_at DESC LIMIT 1"
+        f"ORDER BY acquired_at ASC LIMIT 1",
+        settings=CONSISTENT_READ_SETTINGS,
     )
     if result.result_rows:
         existing_holder = result.result_rows[0][0]
@@ -108,9 +115,14 @@ def try_acquire(ch_client: CHClient, management_db: str, holder: str) -> bool:
         f"SELECT holder FROM {management_db}.{LOCK_TABLE} "
         f"WHERE lock_id = 'migration' "
         f"AND acquired_at > now64(3) - INTERVAL {LOCK_TTL_SECONDS} SECOND "
-        f"ORDER BY acquired_at ASC LIMIT 1"
+        f"ORDER BY acquired_at ASC LIMIT 1",
+        settings=CONSISTENT_READ_SETTINGS,
     )
-    if verify.result_rows and verify.result_rows[0][0] != holder:
+    if not verify.result_rows:
+        # Insert not yet visible — retry rather than assuming success.
+        logger.info("Verify returned no rows after insert, retrying...")
+        return False
+    if verify.result_rows[0][0] != holder:
         logger.info(
             "Lost lock race to %s, backing off...",
             verify.result_rows[0][0],
@@ -169,3 +181,19 @@ def acquire_with_retry(
 
     logger.info("Acquired migration lock (holder=%s)", holder)
     return holder
+
+
+@contextmanager
+def migration_lock(
+    ch_client: CHClient,
+    management_db: str,
+    timeout_seconds: float = LOCK_WAIT_TIMEOUT_SECONDS,
+) -> Generator[str]:
+    """Context manager that acquires and releases the migration lock."""
+    holder = acquire_with_retry(
+        ch_client, management_db, timeout_seconds=timeout_seconds
+    )
+    try:
+        yield holder
+    finally:
+        release(ch_client, management_db, holder)

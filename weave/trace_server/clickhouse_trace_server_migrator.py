@@ -101,9 +101,8 @@ from weave.trace_server.migration_lock import (
     LOCK_TABLE,
     LOCK_TABLE_COLUMNS,
     LOCK_TTL_SECONDS,
-    acquire_with_retry,
     create_lock_table_sql,
-    release,
+    migration_lock,
 )
 
 logger = logging.getLogger(__name__)
@@ -256,11 +255,8 @@ class BaseClickHouseTraceServerMigrator(ABC):
             target_db: The database to migrate
             target_version: The target version to migrate to (None = latest)
         """
-        holder = acquire_with_retry(self.ch_client, self.management_db)
-        try:
+        with migration_lock(self.ch_client, self.management_db):
             self._apply_migrations_locked(target_db, target_version)
-        finally:
-            release(self.ch_client, self.management_db, holder)
 
     def _apply_migrations_locked(
         self, target_db: str, target_version: int | None = None

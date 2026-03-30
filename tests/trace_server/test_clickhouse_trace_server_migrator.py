@@ -47,14 +47,15 @@ def _make_ch_client(database_engine: str = "Atomic") -> Mock:
 @pytest.fixture
 def mock_migration_lock():
     """Bypass the distributed migration lock for tests that call apply_migrations."""
-    with (
-        patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.acquire_with_retry",
-            return_value="aabbccdd0011",
-        ),
-        patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.release",
-        ),
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _noop_lock(*_args, **_kwargs):
+        yield "aabbccdd0011"
+
+    with patch(
+        "weave.trace_server.clickhouse_trace_server_migrator.migration_lock",
+        _noop_lock,
     ):
         yield
 
