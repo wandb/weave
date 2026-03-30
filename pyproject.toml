@@ -408,7 +408,7 @@ dev = [
   "tomlkit",
   "python-multipart",
   # linting
-  "pre-commit",
+  "prek",
   "jupyter",
   "ty>=0.0.2",
 ]
