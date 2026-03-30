@@ -1,5 +1,6 @@
 import json
 import sys
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -9,9 +10,14 @@ from tests.trace.util import client_is_sqlite
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient, generate_id
+from weave.trace_server.eval_results_helpers import apply_row_selection
 from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     EvalResultsQueryReq,
+    EvalResultsRow,
+    EvalResultsRowEvaluation,
+    EvalResultsSortBy,
+    EvalResultsTrial,
     EvaluateModelReq,
     EvaluateModelRes,
     EvaluationRunCreateReq,
@@ -578,3 +584,294 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
     for call in refs_read_batch_calls:
         # only resolve refs for the paginated slice, not all rows
         assert len(call.refs) <= 2
+
+
+def _make_row(
+    digest: str,
+    scores: dict[str, Any] | None = None,
+    model_output: Any | None = None,
+    raw_data_row: Any | None = None,
+    eval_call_id: str = "eval-1",
+) -> EvalResultsRow:
+    trial = EvalResultsTrial(
+        predict_and_score_call_id=f"pas-{digest}",
+        scores=scores or {},
+        model_output=model_output,
+    )
+    return EvalResultsRow(
+        row_digest=digest,
+        raw_data_row=raw_data_row,
+        evaluations=[
+            EvalResultsRowEvaluation(
+                evaluation_call_id=eval_call_id,
+                trials=[trial],
+            )
+        ],
+    )
+
+
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+def test_sort_nulls_last(direction):
+    rows = [
+        _make_row("a", scores={"s": 0.5}),
+        _make_row("b", scores={}),
+        _make_row("c", scores={"s": 0.1}),
+        _make_row("d", scores={"other": 1.0}),
+    ]
+    result, _ = apply_row_selection(
+        rows,
+        ["eval-1"],
+        False,
+        0,
+        None,
+        sort_by=[EvalResultsSortBy(field="scores.s", direction=direction)],
+    )
+    vals = [r.evaluations[0].trials[0].scores.get("s") for r in result]
+    if direction == "asc":
+        assert vals == [0.1, 0.5, None, None]
+    else:
+        assert vals == [0.5, 0.1, None, None]
+
+
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+def test_sort_mixed_types_no_crash(direction):
+    rows = [
+        _make_row("a", scores={"s": 0.9}),
+        _make_row("b", scores={"s": "excellent"}),
+        _make_row("c", scores={"s": 0.1}),
+        _make_row("d", scores={"s": "bad"}),
+    ]
+    result, total = apply_row_selection(
+        rows,
+        ["eval-1"],
+        False,
+        0,
+        None,
+        sort_by=[EvalResultsSortBy(field="scores.s", direction=direction)],
+    )
+    assert total == 4
+    assert len(result) == 4
+    assert {r.row_digest for r in result} == {"a", "b", "c", "d"}
+
+
+def test_eval_results_sort_with_pagination(client: WeaveClient):
+    """Sort by score descending, then page through results."""
+    project_id = client.project_id
+
+    scorer_res = client.server.scorer_create(
+        ScorerCreateReq(
+            project_id=project_id,
+            name="page_scorer",
+            op_source_code="def score(output):\n    return 1",
+        )
+    )
+    entity, project_name = from_project_id(project_id)
+    scorer_ref = f"weave:///{entity}/{project_name}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://sort-page-test",
+            model="model://sort-page-test",
+        )
+    )
+
+    for i, score_val in enumerate([10.0, 50.0, 30.0, 40.0, 20.0]):
+        pred = client.server.prediction_create(
+            PredictionCreateReq(
+                project_id=project_id,
+                model="model://sort-page-test",
+                inputs={"x": f"input_{i}"},
+                output=f"output_{i}",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        client.server.score_create(
+            ScoreCreateReq(
+                project_id=project_id,
+                prediction_id=pred.prediction_id,
+                scorer=scorer_ref,
+                value=score_val,
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        client.server.prediction_finish(
+            PredictionFinishReq(
+                project_id=project_id,
+                prediction_id=pred.prediction_id,
+            )
+        )
+
+    def query_page(offset):
+        return client.server.eval_results_query(
+            EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                sort_by=[EvalResultsSortBy(field="scores.page_scorer", direction="desc")],
+                limit=2,
+                offset=offset,
+            )
+        )
+
+    def scores_from(res):
+        return [r.evaluations[0].trials[0].scores["page_scorer"] for r in res.rows]
+
+    page1 = query_page(0)
+    assert page1.total_rows == 5
+    assert scores_from(page1) == [50.0, 40.0]
+
+    page2 = query_page(2)
+    assert scores_from(page2) == [30.0, 20.0]
+
+    page3 = query_page(4)
+    assert scores_from(page3) == [10.0]
+
+
+def test_eval_results_sort_by_input_field(client: WeaveClient):
+    project_id = client.project_id
+
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://input-sort-test",
+            model="model://input-sort-test",
+        )
+    )
+
+    for val in ["cherry", "apple", "banana"]:
+        pred = client.server.prediction_create(
+            PredictionCreateReq(
+                project_id=project_id,
+                model="model://input-sort-test",
+                inputs={"fruit": val},
+                output="ok",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        client.server.prediction_finish(
+            PredictionFinishReq(
+                project_id=project_id,
+                prediction_id=pred.prediction_id,
+            )
+        )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_raw_data_rows=True,
+            sort_by=[EvalResultsSortBy(field="inputs.fruit", direction="asc")],
+        )
+    )
+    vals = [row.raw_data_row["fruit"] for row in res.rows]
+    assert vals == ["apple", "banana", "cherry"]
+
+
+def test_sort_aggregates_across_trials():
+    """Multiple trials per evaluation are averaged, not first-trial-wins."""
+    rows = [
+        EvalResultsRow(
+            row_digest="a",
+            evaluations=[
+                EvalResultsRowEvaluation(
+                    evaluation_call_id="eval-1",
+                    trials=[
+                        EvalResultsTrial(predict_and_score_call_id="t1", scores={"s": 0.2}),
+                        EvalResultsTrial(predict_and_score_call_id="t2", scores={"s": 0.8}),
+                    ],
+                )
+            ],
+        ),
+        EvalResultsRow(
+            row_digest="b",
+            evaluations=[
+                EvalResultsRowEvaluation(
+                    evaluation_call_id="eval-1",
+                    trials=[
+                        EvalResultsTrial(predict_and_score_call_id="t3", scores={"s": 0.9}),
+                        EvalResultsTrial(predict_and_score_call_id="t4", scores={"s": 0.9}),
+                    ],
+                )
+            ],
+        ),
+    ]
+    # Row a: mean(0.2, 0.8) = 0.5, Row b: mean(0.9, 0.9) = 0.9
+    result, _ = apply_row_selection(
+        rows,
+        ["eval-1"],
+        False,
+        0,
+        None,
+        sort_by=[EvalResultsSortBy(field="scores.s", direction="desc")],
+    )
+    assert [r.row_digest for r in result] == ["b", "a"]
+
+
+def test_sort_scoped_to_evaluation_with_multiple_trials():
+    """Combines evaluation scoping + trial aggregation: the compare page scenario.
+
+    Each row has two evals with multiple trials each. Sorting by one eval's
+    score should average only that eval's trials and ignore the other eval.
+    """
+    rows = [
+        EvalResultsRow(
+            row_digest="x",
+            evaluations=[
+                EvalResultsRowEvaluation(
+                    evaluation_call_id="eval-A",
+                    trials=[
+                        EvalResultsTrial(predict_and_score_call_id="t1", scores={"s": 0.2}),
+                        EvalResultsTrial(predict_and_score_call_id="t2", scores={"s": 0.4}),
+                    ],
+                ),
+                EvalResultsRowEvaluation(
+                    evaluation_call_id="eval-B",
+                    trials=[
+                        EvalResultsTrial(predict_and_score_call_id="t3", scores={"s": 0.9}),
+                        EvalResultsTrial(predict_and_score_call_id="t4", scores={"s": 0.7}),
+                    ],
+                ),
+            ],
+        ),
+        EvalResultsRow(
+            row_digest="y",
+            evaluations=[
+                EvalResultsRowEvaluation(
+                    evaluation_call_id="eval-A",
+                    trials=[
+                        EvalResultsTrial(predict_and_score_call_id="t5", scores={"s": 0.8}),
+                        EvalResultsTrial(predict_and_score_call_id="t6", scores={"s": 0.6}),
+                    ],
+                ),
+                EvalResultsRowEvaluation(
+                    evaluation_call_id="eval-B",
+                    trials=[
+                        EvalResultsTrial(predict_and_score_call_id="t7", scores={"s": 0.1}),
+                        EvalResultsTrial(predict_and_score_call_id="t8", scores={"s": 0.3}),
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+    # Sort by eval-A asc: x=mean(0.2,0.4)=0.3, y=mean(0.8,0.6)=0.7 → [x, y]
+    res_a, _ = apply_row_selection(
+        rows,
+        ["eval-A", "eval-B"],
+        False,
+        0,
+        None,
+        sort_by=[EvalResultsSortBy(field="scores.s", direction="asc", evaluation_call_id="eval-A")],
+    )
+    assert [r.row_digest for r in res_a] == ["x", "y"]
+
+    # Sort by eval-B asc: x=mean(0.9,0.7)=0.8, y=mean(0.1,0.3)=0.2 → [y, x]
+    res_b, _ = apply_row_selection(
+        rows,
+        ["eval-A", "eval-B"],
+        False,
+        0,
+        None,
+        sort_by=[EvalResultsSortBy(field="scores.s", direction="asc", evaluation_call_id="eval-B")],
+    )
+    assert [r.row_digest for r in res_b] == ["y", "x"]

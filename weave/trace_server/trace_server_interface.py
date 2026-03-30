@@ -2663,6 +2663,16 @@ class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
 
 
+class EvalResultsSortBy(SortBy):
+    evaluation_call_id: str | None = Field(
+        default=None,
+        description=(
+            "Scope sort to a specific evaluation's trials. "
+            "When null, uses all evaluations (appropriate for single-eval views)."
+        ),
+    )
+
+
 class EvalResultsQueryBody(BaseModelStrict):
     evaluation_call_ids: list[str] | None = Field(
         default=None,
@@ -2719,6 +2729,10 @@ class EvalResultsQueryBody(BaseModelStrict):
     offset: int = Field(
         default=0,
         description="Optional row-level page offset applied after grouping and intersection.",
+    )
+    sort_by: list[EvalResultsSortBy] | None = Field(
+        default=None,
+        description=("Sort rows by one or more fields"),
     )
 
     @model_validator(mode="after")

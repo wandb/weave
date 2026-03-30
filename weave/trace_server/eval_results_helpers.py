@@ -7,6 +7,7 @@ a TraceServerInterface and perform DB access via calls_query_stream and
 refs_read_batch.
 """
 
+import functools
 import json
 import logging
 from collections import defaultdict
@@ -319,6 +320,7 @@ def finalize_rows(
     require_intersection: bool,
     offset: int,
     limit: int | None,
+    sort_by: list[tsi.EvalResultsSortBy] | None = None,
 ) -> tuple[list[tsi.EvalResultsRow], int]:
     """Attach evaluations to rows, apply intersection filter, sort, and paginate."""
     for row_digest, eval_entries in row_eval_map.items():
@@ -327,7 +329,112 @@ def finalize_rows(
 
     rows = list(row_map.values())
 
-    return apply_row_selection(rows, eval_root_ids, require_intersection, offset, limit)
+    return apply_row_selection(
+        rows, eval_root_ids, require_intersection, offset, limit, sort_by
+    )
+
+
+def _aggregate_values(values: list[Any]) -> Any:
+    """Aggregate multiple trial values into a single sortable value.
+    This is essentially a port of what we do on the frontend for aggregating values.
+    """
+    if not values:
+        return None
+    if all(isinstance(v, str) for v in values):
+        return None
+    if len(values) == 1 and isinstance(values[0], bool):
+        return values[0]
+    nums = []
+    for v in values:
+        if isinstance(v, bool):
+            nums.append(1 if v else 0)
+        elif isinstance(v, (int, float)):
+            nums.append(v)
+        else:
+            nums.append(0)
+    return sum(nums) / len(nums)
+
+
+def _extract_sort_value(
+    row: tsi.EvalResultsRow,
+    field: str,
+    evaluation_call_id: str | None = None,
+) -> Any:
+    """Extract an aggregated sortable value from an EvalResultsRow.
+
+    Scopes to a specific evaluation when evaluation_call_id is set,
+    then aggregates across all trials in the scoped evaluations.
+    """
+    parts = field.split(".", 1)
+    prefix = parts[0]
+    rest = parts[1] if len(parts) > 1 else None
+
+    if prefix == "inputs" and rest:
+        if isinstance(row.raw_data_row, dict):
+            return tsc.get_nested_key(row.raw_data_row, rest)
+        return None
+
+    evals = row.evaluations
+    if evaluation_call_id:
+        evals = [
+            e for e in row.evaluations if e.evaluation_call_id == evaluation_call_id
+        ]
+
+    all_trials = [t for e in evals for t in e.trials]
+    if not all_trials:
+        return None
+
+    trial_values: list[Any] = []
+    if prefix == "scores" and rest:
+        trial_values = [tsc.get_nested_key(t.scores, rest) for t in all_trials]
+    elif prefix == "output" and rest:
+        trial_values = [
+            tsc.get_nested_key(t.model_output, rest)
+            for t in all_trials
+            if isinstance(t.model_output, dict)
+        ]
+    else:
+        return None
+
+    return _aggregate_values([v for v in trial_values if v is not None])
+
+
+def _compare_values(a: Any, b: Any) -> int:
+    """Compare two non-None values, returning -1/0/1."""
+    try:
+        if a < b:
+            return -1
+        if a > b:
+            return 1
+    except TypeError:
+        return 0
+    else:
+        return 0
+
+
+def _make_row_comparator(
+    sort_by: list[tsi.EvalResultsSortBy],
+) -> Callable[[tsi.EvalResultsRow, tsi.EvalResultsRow], int]:
+    """Build a comparator for rows. Nulls always sort last regardless of direction."""
+
+    def cmp(row_a: tsi.EvalResultsRow, row_b: tsi.EvalResultsRow) -> int:
+        for sb in sort_by:
+            val_a = _extract_sort_value(row_a, sb.field, sb.evaluation_call_id)
+            val_b = _extract_sort_value(row_b, sb.field, sb.evaluation_call_id)
+            a_none = val_a is None
+            b_none = val_b is None
+            if a_none and b_none:
+                continue
+            if a_none:
+                return 1
+            if b_none:
+                return -1
+            result = _compare_values(val_a, val_b)
+            if result != 0:
+                return -result if sb.direction == "desc" else result
+        return 0
+
+    return cmp
 
 
 def apply_row_selection(
@@ -336,6 +443,7 @@ def apply_row_selection(
     require_intersection: bool,
     offset: int,
     limit: int | None,
+    sort_by: list[tsi.EvalResultsSortBy] | None = None,
 ) -> tuple[list[tsi.EvalResultsRow], int]:
     """Apply intersection filtering, stable sort, and pagination to grouped rows."""
     selected_rows = rows
@@ -349,7 +457,11 @@ def apply_row_selection(
             )
         ]
 
-    selected_rows.sort(key=lambda row: row.row_digest)
+    if sort_by:
+        selected_rows.sort(key=functools.cmp_to_key(_make_row_comparator(sort_by)))
+    else:
+        selected_rows.sort(key=lambda row: row.row_digest)
+
     total_rows = len(selected_rows)
     start = max(offset, 0)
     end = start + limit if limit is not None else None
@@ -405,6 +517,7 @@ def eval_results_grouped_rows(
         req.require_intersection,
         req.offset,
         req.limit,
+        req.sort_by,
     )
 
 
@@ -439,7 +552,7 @@ def eval_results_query(
         evaluation_run_ids=req.evaluation_run_ids,
         require_intersection=False,
         include_raw_data_rows=req.include_raw_data_rows if req.include_rows else False,
-        resolve_row_refs=False,  # ref resolution happens after pagination slice
+        resolve_row_refs=False,
         include_rows=True,
         include_summary=False,
         summary_require_intersection=None,
@@ -452,14 +565,26 @@ def eval_results_query(
     total_rows = 0
     warnings: list[str] = []
     if req.include_rows:
+        # for inputs.*, we need to resolve resolve weave refs before sorting.
+        sort_needs_resolved_inputs = req.sort_by and any(
+            sb.field.startswith("inputs.") for sb in req.sort_by
+        )
+        if sort_needs_resolved_inputs and req.include_raw_data_rows:
+            warnings = resolve_eval_row_refs(server, all_rows, req.project_id)
+
         rows, total_rows = apply_row_selection(
             all_rows,
             eval_root_ids,
             req.require_intersection,
             req.offset,
             req.limit,
+            req.sort_by,
         )
-        if req.include_raw_data_rows and req.resolve_row_refs:
+        if (
+            req.include_raw_data_rows
+            and req.resolve_row_refs
+            and not sort_needs_resolved_inputs
+        ):
             warnings = resolve_eval_row_refs(server, rows, req.project_id)
 
     summary: tsi.EvalResultsSummaryRes | None = None
