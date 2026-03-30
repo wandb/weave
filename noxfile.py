@@ -32,9 +32,7 @@ def lint(session: nox.Session):
 
     if ruff_only:
         # Run only ruff checks on all files
-        session.run(
-            "prek", "run", "--hook-stage=pre-push", "ruff-check", "--all-files"
-        )
+        session.run("prek", "run", "--hook-stage=pre-push", "ruff-check", "--all-files")
         session.run(
             "prek", "run", "--hook-stage=pre-push", "ruff-format", "--all-files"
         )
