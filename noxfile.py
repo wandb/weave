@@ -48,14 +48,24 @@ def lint(session: nox.Session):
     if not checks:
         checks = list(all_checks)
 
-    # Sync once up front, then run tools from .venv/bin directly.
-    session.run("uv", "sync", "--group", "dev", "--frozen", external=True)
+    # Sync the project venv for tools that need project deps (ty, pyright).
+    # ruff and mypy run via uvx (isolated), so they don't need the venv.
+    needs_venv = {"ty", "pyright"}
+    if needs_venv & set(checks):
+        session.run("uv", "sync", "--group", "dev", "--frozen", external=True)
     venv_bin = ".venv/bin/"
+
+    # mypy stubs — match what .pre-commit-config.yaml installs
+    mypy_with = [
+        "--with", "types-pkg-resources==0.1.3",
+        "--with", "types-all",
+        "--with", "wandb>=0.15.5,<0.19.0",
+    ]  # fmt: skip
 
     failed = []
     for check in checks:
         if check == "ruff":
-            ruff_check = [f"{venv_bin}ruff", "check", "--config=pyproject.toml"]
+            ruff_check = ["uvx", "ruff", "check", "--config=pyproject.toml"]
             if not no_fix:
                 ruff_check.append("--fix")
             ruff_check.append(".")
@@ -63,7 +73,7 @@ def lint(session: nox.Session):
                 session.run(*ruff_check, external=True)
             except nox.command.CommandFailed:
                 failed.append("ruff check")
-            ruff_fmt = [f"{venv_bin}ruff", "format", "--config=pyproject.toml"]
+            ruff_fmt = ["uvx", "ruff", "format", "--config=pyproject.toml"]
             if no_fix:
                 ruff_fmt.append("--check")
             ruff_fmt.append(".")
@@ -74,7 +84,9 @@ def lint(session: nox.Session):
         elif check == "mypy":
             try:
                 session.run(
-                    f"{venv_bin}mypy",
+                    "uvx",
+                    *mypy_with,
+                    "mypy",
                     "--config-file=pyproject.toml",
                     ".",
                     external=True,

@@ -421,6 +421,8 @@ dev = [
   "jupyter",
   "ruff>=0.12.3",
   "mypy>=1.17.0",
+  "types-pkg-resources==0.1.3",
+  "types-all",
   "pyright>=1.1.387",
   "ty>=0.0.2",
 ]
