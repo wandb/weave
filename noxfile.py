@@ -22,110 +22,53 @@ INCOMPATIBLE_SHARDS = {
 NUM_TRACE_SERVER_SHARDS = 4
 
 
-@nox.session(venv_backend="none")
+@nox.session
 def lint(session: nox.Session):
-    """Run linters directly — no pre-commit, no stashing.
+    """Run pre-commit hooks on all files — no stashing, matches CI exactly.
 
     Usage:
-        nox -e lint                     # all checks (safe auto-fix by default)
-        nox -e lint -- ruff             # just ruff
-        nox -e lint -- ruff mypy        # pick any combo
-        nox -e lint -- --no-fix         # check-only, no auto-fix
+        nox -e lint                     # all hooks on all files
+        nox -e lint -- ruff-check       # run a specific hook by name
+        nox -e lint -- dry-run          # quick test on a single file
     """
-    all_checks = ("ruff", "mypy", "ty", "pyright")
-    checks = []
-    no_fix = False
-    for arg in session.posargs:
-        if arg == "--no-fix":
-            no_fix = True
-        elif arg in all_checks:
-            checks.append(arg)
-        else:
-            session.error(
-                f"Unknown arg: {arg!r}. Valid: {', '.join(all_checks)}, --no-fix"
-            )
+    session.run("uv", "sync", "--active", "--group", "dev", "--frozen")
 
-    if not checks:
-        checks = list(all_checks)
+    dry_run = session.posargs and "dry-run" in session.posargs
 
-    # Sync the project venv for tools that need project deps (ty, pyright).
-    # ruff and mypy run via uvx (isolated), so they don't need the venv.
-    needs_venv = {"ty", "pyright"}
-    if needs_venv & set(checks):
-        session.run("uv", "sync", "--group", "dev", "--frozen", external=True)
-    venv_bin = ".venv/bin/"
-
-    # mypy stubs — match what .pre-commit-config.yaml installs
-    mypy_with = [
-        "--with", "types-pkg-resources==0.1.3",
-        "--with", "types-all",
-        "--with", "wandb>=0.15.5,<0.19.0",
-    ]  # fmt: skip
-
-    failed = []
-    for check in checks:
-        if check == "ruff":
-            ruff_check = ["uvx", "ruff", "check", "--config=pyproject.toml"]
-            if not no_fix:
-                ruff_check.append("--fix")
-            ruff_check.append(".")
-            try:
-                session.run(*ruff_check, external=True)
-            except nox.command.CommandFailed:
-                failed.append("ruff check")
-            ruff_fmt = ["uvx", "ruff", "format", "--config=pyproject.toml"]
-            if no_fix:
-                ruff_fmt.append("--check")
-            ruff_fmt.append(".")
-            try:
-                session.run(*ruff_fmt, external=True)
-            except nox.command.CommandFailed:
-                failed.append("ruff format")
-        elif check == "mypy":
-            try:
-                session.run(
-                    "uvx",
-                    *mypy_with,
-                    "mypy",
-                    "--config-file=pyproject.toml",
-                    ".",
-                    external=True,
-                )
-            except nox.command.CommandFailed:
-                failed.append("mypy")
-        elif check == "ty":
-            try:
-                session.run(f"{venv_bin}ty", "check", external=True)
-            except nox.command.CommandFailed:
-                failed.append("ty")
-        elif check == "pyright":
-            try:
-                session.run(f"{venv_bin}pyright", external=True)
-            except nox.command.CommandFailed:
-                failed.append("pyright")
-
-    if failed:
-        session.error(f"Failed: {', '.join(failed)}")
+    if dry_run:
+        session.run(
+            "pre-commit",
+            "run",
+            "--hook-stage",
+            "pre-push",
+            "--files",
+            "./weave/__init__.py",
+        )
+    else:
+        # --all-files skips pre-commit's stash/unstash cycle, so it works
+        # on the working tree as-is — safe for automation and dirty worktrees.
+        cmd = ["pre-commit", "run", "--hook-stage=pre-push", "--all-files"]
+        # Allow running a specific hook: nox -e lint -- ruff-check
+        for arg in session.posargs:
+            cmd.append(arg)
+        session.run(*cmd)
 
 
 @nox.session
 def lint_full(session: nox.Session):
-    """Run all pre-commit hooks (stashes unstaged changes). Used by CI."""
+    """Run pre-commit hooks on staged files only (stashes unstaged changes).
+
+    Usage:
+        nox -e lint_full                # staged files (stashes unstaged)
+        nox -e lint_full -- --all-files # all files
+        nox -e lint_full -- dry-run     # quick test on a single file
+    """
     session.run("uv", "sync", "--active", "--group", "dev", "--frozen")
 
     dry_run = session.posargs and "dry-run" in session.posargs
     all_files = session.posargs and "--all-files" in session.posargs
-    ruff_only = session.posargs and "--ruff-only" in session.posargs
 
-    if ruff_only:
-        # Run only ruff checks on all files
-        session.run(
-            "pre-commit", "run", "--hook-stage=pre-push", "ruff-check", "--all-files"
-        )
-        session.run(
-            "pre-commit", "run", "--hook-stage=pre-push", "ruff-format", "--all-files"
-        )
-    elif dry_run:
+    if dry_run:
         session.run(
             "pre-commit",
             "run",
@@ -135,10 +78,8 @@ def lint_full(session: nox.Session):
             "./weave/__init__.py",
         )
     elif all_files:
-        # Allow running on all files if explicitly requested
         session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
     else:
-        # Default: run only on staged files for faster execution
         session.run("pre-commit", "run", "--hook-stage=pre-push")
 
 
