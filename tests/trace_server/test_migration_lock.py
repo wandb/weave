@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+import clickhouse_connect
 import pytest
 
 from weave.trace_server.migration_lock import (
@@ -241,10 +242,8 @@ def test_lock_ttl_is_600s():
 
 
 @pytest.fixture
-def real_ch_lock(ensure_clickhouse_db):
+def real_ch_lock(require_clickhouse, ensure_clickhouse_db):
     """Real ClickHouse client + lock table for integration tests."""
-    import clickhouse_connect
-
     host, port = next(ensure_clickhouse_db())
     client = clickhouse_connect.get_client(host=host, port=port)
     mgmt_db = "test_lock_integ"
