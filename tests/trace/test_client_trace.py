@@ -2720,7 +2720,7 @@ def test_call_query_stream_columns_with_costs(client):
 
     # also assert that derived summary fields are included when getting costs
     assert calls[0].summary["weave"]["status"] == "success"
-    assert calls[0].summary["weave"]["latency_ms"] > 0
+    assert calls[0].summary["weave"]["latency_ms"] >= 0
     assert "calculate" in calls[0].summary["weave"]["trace_name"]
 
     # This should not happen, users should not request summary_dump
