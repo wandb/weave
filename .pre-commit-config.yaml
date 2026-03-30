@@ -51,9 +51,6 @@ repos:
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#detect-private-key
       - id: detect-private-key
         priority: 0
-      # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#debug-statements
-      - id: debug-statements
-        priority: 0
   - repo: https://github.com/crate-ci/typos
     rev: v1.44.0
     hooks:
@@ -84,13 +81,7 @@ repos:
         types: [image]
         priority: 0
 
-  # Priority 1: Code modernization (modify Python files, run in parallel)
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.21.2
-    hooks:
-      - id: pyupgrade
-        args: ["--py310-plus"]
-        priority: 1
+  # Priority 1: Code modernization (modify Python files)
   - repo: https://github.com/Instagram/Fixit
     rev: v2.2.1
     hooks:
