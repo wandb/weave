@@ -507,6 +507,40 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
             f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
         )
 
+    # Also test $contains on feedback fields (substring matching).
+    # model_output values are: "a", "x", "c", "y" for ids[0..3].
+    # expected values are: "a", "b", "c", "d" for ids[0..3].
+    model_output_field = (
+        "feedback.[wandb.runnable.my_scorer].payload.output.model_output"
+    )
+    model_ref = get_ref(my_model).uri
+    for substr, expected_ids in [
+        # "a" appears as model_output for ids[0] only
+        ("a", [ids[0]]),
+        # "x" appears as model_output for ids[1] only
+        ("x", [ids[1]]),
+    ]:
+        calls = client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.CallsFilter(op_names=[model_ref]),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": model_output_field},
+                            "substr": {"$literal": substr},
+                        }
+                    }
+                },
+            )
+        )
+
+        found_ids = [c.id for c in calls]
+        assert found_ids == expected_ids, (
+            f"Filtering by {model_output_field} $contains '{substr}' failed, "
+            f"expected {expected_ids}, got {found_ids}"
+        )
+
 
 class MatchAnyDatetime:  # noqa: PLW1641
     def __eq__(self, other):
@@ -550,20 +584,20 @@ async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
 async def test_filter_by_wildcard_feedback_with_multiple_items(
     client: WeaveClient,
 ) -> None:
-    """Test that wildcard feedback filtering searches across ALL feedback entries.
+    """Test that wildcard feedback filtering finds values across multiple feedback entries.
 
-    Regression test for a bug where filtering with feedback.[*].payload.X used
-    any() which only checked one arbitrary feedback row, missing matches in other
-    feedback entries on the same call.
+    Each scorer writes to a unique nested path within its output. The wildcard
+    feedback filter uses anyIf() to pick the non-empty value from whichever
+    feedback row has data at the requested path.
     """
 
     @weave.op
     def my_scorer_a(x: int, output: str) -> dict:
-        return {"label": "scorer_a", "score": x * 10}
+        return {"scorer_a": {"is_match": True, "score": x * 10}}
 
     @weave.op
     def my_scorer_b(x: int, output: str) -> dict:
-        return {"label": "scorer_b", "score": x * 100}
+        return {"scorer_b": {"is_match": True, "score": x * 100}}
 
     @weave.op
     def my_model(x: int) -> str:
@@ -580,11 +614,10 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     model_ref = get_ref(my_model).uri
 
     # Each call now has 2 feedback items (one per scorer).
-    # Wildcard filter should search across BOTH feedback entries.
+    # Each scorer writes to a unique key, so anyIf picks the non-empty value
+    # from the correct feedback row.
 
-    # Filter for scorer_b's label — should match all 3 calls.
-    # With the old any() approach, this could miss scorer_b if any() picked
-    # scorer_a's feedback row arbitrarily.
+    # Filter for scorer_b's is_match — should match all 3 calls.
     calls = list(
         client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -592,21 +625,22 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
                 filter=tsi.CallsFilter(op_names=[model_ref]),
                 query={
                     "$expr": {
-                        "$contains": {
-                            "input": {"$getField": "feedback.[*].payload.output.label"},
-                            "substr": {"$literal": "scorer_b"},
-                            "case_insensitive": False,
-                        }
+                        "$eq": [
+                            {
+                                "$getField": "feedback.[*].payload.output.scorer_b.is_match"
+                            },
+                            {"$literal": "true"},
+                        ]
                     }
                 },
             )
         )
     )
     assert len(calls) == 3, (
-        f"Expected all 3 calls to match wildcard filter for scorer_b label, got {len(calls)}"
+        f"Expected all 3 calls to match wildcard filter for scorer_b.is_match, got {len(calls)}"
     )
 
-    # Also verify scorer_a is findable via the same wildcard path
+    # Also verify scorer_a is findable via its own unique path
     calls = list(
         client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -614,18 +648,19 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
                 filter=tsi.CallsFilter(op_names=[model_ref]),
                 query={
                     "$expr": {
-                        "$contains": {
-                            "input": {"$getField": "feedback.[*].payload.output.label"},
-                            "substr": {"$literal": "scorer_a"},
-                            "case_insensitive": False,
-                        }
+                        "$eq": [
+                            {
+                                "$getField": "feedback.[*].payload.output.scorer_a.is_match"
+                            },
+                            {"$literal": "true"},
+                        ]
                     }
                 },
             )
         )
     )
     assert len(calls) == 3, (
-        f"Expected all 3 calls to match wildcard filter for scorer_a label, got {len(calls)}"
+        f"Expected all 3 calls to match wildcard filter for scorer_a.is_match, got {len(calls)}"
     )
 
     # Filter using a specific scorer type (non-wildcard) still works
@@ -638,9 +673,9 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
                     "$expr": {
                         "$eq": [
                             {
-                                "$getField": "feedback.[wandb.runnable.my_scorer_a].payload.output.label"
+                                "$getField": "feedback.[wandb.runnable.my_scorer_a].payload.output.scorer_a.is_match"
                             },
-                            {"$literal": "scorer_a"},
+                            {"$literal": "true"},
                         ]
                     }
                 },
