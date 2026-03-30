@@ -688,6 +688,24 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, "/genai/conversations/chat")
         return tsi.GenAIConversationChatRes.model_validate(r.json())
 
+    def genai_turn_stats(self, req: tsi.GenAITurnStatsReq) -> tsi.GenAITurnStatsRes:
+        return self._generic_request(
+            "/genai/turns/stats",
+            req,
+            tsi.GenAITurnStatsReq,
+            tsi.GenAITurnStatsRes,
+        )
+
+    def genai_conversation_stats(
+        self, req: tsi.GenAIConversationStatsReq
+    ) -> tsi.GenAIConversationStatsRes:
+        return self._generic_request(
+            "/genai/conversations/stats",
+            req,
+            tsi.GenAIConversationStatsReq,
+            tsi.GenAIConversationStatsRes,
+        )
+
     def genai_annotations_upsert(
         self, req: tsi.GenAIAnnotationsUpsertReq
     ) -> tsi.GenAIAnnotationsUpsertRes:

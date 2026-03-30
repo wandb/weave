@@ -431,14 +431,14 @@ The chat view is a **read-time projection** — computed from stored spans, neve
 
 #### Message types
 
-| Type | Source | Content |
-|------|--------|---------|
-| `user_message` | User input from `input_messages` | User's text + content refs (attachments) |
-| `agent_message` | Assistant output from `output_messages` | Agent response + token counts + duration |
-| `tool_call` | `execute_tool` span | Tool name, arguments, result, duration |
-| `agent_handoff` | `transfer_to_*` tool or `handoff` span | Target agent name |
-| `agent_start` | `invoke_agent` span | Agent name, model, system prompt, tool definitions |
-| `context_compacted` | Compaction attributes on span | Summary, items before/after |
+| Type                | Source                                  | Content                                            |
+| ------------------- | --------------------------------------- | -------------------------------------------------- |
+| `user_message`      | User input from `input_messages`        | User's text + content refs (attachments)           |
+| `agent_message`     | Assistant output from `output_messages` | Agent response + token counts + duration           |
+| `tool_call`         | `execute_tool` span                     | Tool name, arguments, result, duration             |
+| `agent_handoff`     | `transfer_to_*` tool or `handoff` span  | Target agent name                                  |
+| `agent_start`       | `invoke_agent` span                     | Agent name, model, system prompt, tool definitions |
+| `context_compacted` | Compaction attributes on span           | Summary, items before/after                        |
 
 #### Multi-turn conversations
 
@@ -448,12 +448,12 @@ For a `conversation_id`, load all spans, partition by `trace_id`, sort traces by
 
 The projection output maps cleanly to ATIF:
 
-| Chat message type | ATIF step |
-|---|---|
-| `user_message` | `{source: "user", message: "..."}` |
-| `agent_message` | `{source: "agent", message: "..."}` |
-| `tool_call` | `{source: "agent", tool_calls: [...], observation: {...}}` |
-| `agent_start` | System instructions → `{source: "system", message: "..."}` |
+| Chat message type | ATIF step                                                  |
+| ----------------- | ---------------------------------------------------------- |
+| `user_message`    | `{source: "user", message: "..."}`                         |
+| `agent_message`   | `{source: "agent", message: "..."}`                        |
+| `tool_call`       | `{source: "agent", tool_calls: [...], observation: {...}}` |
+| `agent_start`     | System instructions → `{source: "system", message: "..."}` |
 
 Export endpoint: `GET /genai/conversations/{id}/export?format=atif` runs the projection, maps to ATIF steps, returns a valid ATIF trajectory document.
 
@@ -585,10 +585,12 @@ Project
 Top-level segmented control: **Agents | Conversations | Turns**
 
 **Agents section:**
+
 - Table: agent name, invocations, tokens, errors, models, last seen
 - Click row → agent detail: time-series metrics chart (invocations, tokens, errors over time), recent conversations, configuration (system prompt, tools)
 
 **Conversations section:**
+
 - Table: conversation name, turns, tokens, agents, provider, last activity
 - Filter bar: provider, agent, time range
 - Search: full text across messages
@@ -596,6 +598,7 @@ Top-level segmented control: **Agents | Conversations | Turns**
 - Click row → conversation detail: chat trajectory view (the projection), with turn navigation
 
 **Turns section:**
+
 - Flat table of all spans: operation, agent, model, tokens, duration, status, timestamp
 - Filterable by operation type, model, agent, provider, time range
 - Click row → span detail: raw attributes, messages, tool call data
@@ -605,6 +608,7 @@ Top-level segmented control: **Agents | Conversations | Turns**
 Split pane: conversation list on left, chat view on right (resizable divider).
 
 Chat view renders `GenAIChatMessage[]` from the projection:
+
 - User messages (left-aligned, distinct style)
 - Agent messages (right-aligned, with model badge, token count, duration)
 - Tool calls (indented, collapsible arguments/result)
@@ -632,11 +636,11 @@ The imperative SDK uses ATIF-like semantics (`user()`, `assistant()`, `tool_call
 
 ATIF and OTel aren't competing — they're different layers of the same system:
 
-| Layer | Format | Role |
-|-------|--------|------|
-| **User-facing API** | ATIF-like semantics | What SDK users think in — steps, messages, tool calls. What gets imported/exported as shareable JSON files. |
-| **Wire format** | OTel spans (OTLP) or structured JSON | What flows from client to server. |
-| **Storage** | `genai_spans` (OTel-shaped typed columns) | What ClickHouse stores and queries against. |
+| Layer               | Format                                    | Role                                                                                                        |
+| ------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **User-facing API** | ATIF-like semantics                       | What SDK users think in — steps, messages, tool calls. What gets imported/exported as shareable JSON files. |
+| **Wire format**     | OTel spans (OTLP) or structured JSON      | What flows from client to server.                                                                           |
+| **Storage**         | `genai_spans` (OTel-shaped typed columns) | What ClickHouse stores and queries against.                                                                 |
 
 The question is the middle layer: should the SDK emit OTel spans, or structured JSON that the server converts to spans?
 

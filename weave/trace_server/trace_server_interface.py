@@ -716,12 +716,14 @@ class GenAIAgentMetricsReq(BaseModel):
     start: str | None = None
     end: str | None = None
     granularity_seconds: int = 3600
+    group_by: str = ""
 
 
 class GenAIAgentMetricsBucket(BaseModel):
     """A single time bucket of agent metrics."""
 
     timestamp: str
+    group: str = ""
     invocation_count: int = 0
     span_count: int = 0
     input_tokens: int = 0
@@ -913,12 +915,14 @@ class GenAIScoreStatsReq(BaseModel):
     start: str | None = None
     end: str | None = None
     granularity_seconds: int = 3600
+    group_by: str = ""
 
 
 class GenAIScoreStatsBucket(BaseModel):
     """Aggregated score counts for one time bucket."""
 
     timestamp: str
+    group: str = ""
     total: int = 0
     pass_count: int = 0
     fail_count: int = 0
@@ -931,6 +935,149 @@ class GenAIScoreStatsRes(BaseModel):
 
     buckets: list[GenAIScoreStatsBucket] = Field(default_factory=list)
     totals: GenAIScoreStatsBucket | None = None
+
+
+# ---------------------------------------------------------------------------
+# GenAI stats — time-bucketed analytics across spans, conversations, scores
+# ---------------------------------------------------------------------------
+
+
+class GenAICustomAttrFilter(BaseModel):
+    """Filter on a custom attribute stored in ``genai_span_attributes``.
+
+    Attributes:
+        attr_key: Key of the attribute to filter on.
+        operator: Comparison operator; default is equality (``eq``).
+        value: Value to compare against (string, integer, or float).
+    """
+
+    attr_key: str
+    operator: str = "eq"
+    value: str | int | float = ""
+
+
+class GenAIStatsBucket(BaseModel):
+    """Common time bucket for GenAI stats endpoints.
+
+    Attributes:
+        timestamp: Bucket start as an ISO timestamp string.
+        group: Grouping dimension value when the request uses ``group_by``.
+        count: Number of items (e.g. spans) in the bucket.
+        input_tokens: Sum of input tokens in the bucket.
+        output_tokens: Sum of output tokens in the bucket.
+        error_count: Number of errors in the bucket.
+        avg_duration_ms: Average duration in milliseconds.
+    """
+
+    timestamp: str
+    group: str = ""
+    count: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    error_count: int = 0
+    avg_duration_ms: float = 0.0
+
+
+class GenAITurnStatsReq(BaseModel):
+    """Request for time-bucketed turn (span) statistics.
+
+    Attributes:
+        project_id: Project to query.
+        start: Optional ISO range start.
+        end: Optional ISO range end.
+        granularity_seconds: Bucket width in seconds.
+        group_by: Optional dimension name to group buckets (empty for none).
+        operation_names: Filter by OpenTelemetry operation names.
+        agent_names: Filter by agent name.
+        provider_names: Filter by provider name.
+        request_models: Filter by model name.
+        tool_names: Filter by tool name.
+        conversation_ids: Restrict to these conversations.
+        status_codes: Filter by status code.
+        custom_filters: Additional filters on ``genai_span_attributes``.
+    """
+
+    project_id: str
+    start: str | None = None
+    end: str | None = None
+    granularity_seconds: int = 3600
+    group_by: str = ""
+    operation_names: list[str] = Field(default_factory=list)
+    agent_names: list[str] = Field(default_factory=list)
+    provider_names: list[str] = Field(default_factory=list)
+    request_models: list[str] = Field(default_factory=list)
+    tool_names: list[str] = Field(default_factory=list)
+    conversation_ids: list[str] = Field(default_factory=list)
+    status_codes: list[str] = Field(default_factory=list)
+    custom_filters: list[GenAICustomAttrFilter] = Field(default_factory=list)
+
+
+class GenAITurnStatsRes(BaseModel):
+    """Response with time-bucketed turn statistics.
+
+    Attributes:
+        buckets: One entry per time bucket (and optional group).
+    """
+
+    buckets: list[GenAIStatsBucket] = Field(default_factory=list)
+
+
+class GenAIConversationStatsReq(BaseModel):
+    """Request for time-bucketed conversation statistics.
+
+    Attributes:
+        project_id: Project to query.
+        start: Optional ISO range start.
+        end: Optional ISO range end.
+        granularity_seconds: Bucket width in seconds.
+        group_by: Optional dimension name to group buckets (empty for none).
+        conversation_ids: Restrict to these conversations.
+        agent_names: Filter by agent name.
+        provider_names: Filter by provider name.
+        custom_filters: Additional filters on ``genai_span_attributes``.
+    """
+
+    project_id: str
+    start: str | None = None
+    end: str | None = None
+    granularity_seconds: int = 3600
+    group_by: str = ""
+    conversation_ids: list[str] = Field(default_factory=list)
+    agent_names: list[str] = Field(default_factory=list)
+    provider_names: list[str] = Field(default_factory=list)
+    custom_filters: list[GenAICustomAttrFilter] = Field(default_factory=list)
+
+
+class GenAIConversationStatsBucket(BaseModel):
+    """Time bucket for conversation-level stats.
+
+    Attributes:
+        timestamp: Bucket start as an ISO timestamp string.
+        group: Grouping dimension value when the request uses ``group_by``.
+        conversation_count: Number of distinct conversations.
+        turn_count: Total turns (spans) in the bucket.
+        input_tokens: Sum of input tokens.
+        output_tokens: Sum of output tokens.
+        error_count: Number of errors.
+    """
+
+    timestamp: str
+    group: str = ""
+    conversation_count: int = 0
+    turn_count: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    error_count: int = 0
+
+
+class GenAIConversationStatsRes(BaseModel):
+    """Response with time-bucketed conversation statistics.
+
+    Attributes:
+        buckets: One entry per time bucket (and optional group).
+    """
+
+    buckets: list[GenAIConversationStatsBucket] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -3658,6 +3805,10 @@ class TraceServerInterface(Protocol):
     def genai_scores_insert(self, req: GenAIScoresInsertReq) -> GenAIScoresInsertRes: ...
     def genai_scores_query(self, req: GenAIScoresQueryReq) -> GenAIScoresQueryRes: ...
     def genai_score_stats(self, req: GenAIScoreStatsReq) -> GenAIScoreStatsRes: ...
+    def genai_turn_stats(self, req: GenAITurnStatsReq) -> GenAITurnStatsRes: ...
+    def genai_conversation_stats(
+        self, req: GenAIConversationStatsReq
+    ) -> GenAIConversationStatsRes: ...
     def genai_search(self, req: GenAISearchReq) -> GenAISearchRes: ...
 
     # GenAI structured ingest API

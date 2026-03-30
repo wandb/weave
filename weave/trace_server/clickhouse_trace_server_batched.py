@@ -1792,6 +1792,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.GenAIScoreStatsReq
     ) -> tsi.GenAIScoreStatsRes:
         """Aggregate score counts into time buckets."""
+        _ALLOWED_SCORE_GROUP_BY = {"signal_name", "entity_type", "outcome"}
+
         conditions = ["project_id = {project_id:String}"]
         parameters: dict[str, Any] = {"project_id": req.project_id}
         if req.signal_name:
@@ -1815,11 +1817,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         parameters["granularity"] = gran
         where = " AND ".join(conditions)
 
+        group_by_col = ""
+        group_select = ""
+        group_by_extra = ""
+        if req.group_by and req.group_by in _ALLOWED_SCORE_GROUP_BY:
+            group_by_col = req.group_by
+            group_select = f",\n                {group_by_col} AS group_value"
+            group_by_extra = ", group_value"
+
         bucket_query = f"""
             SELECT
                 toString(toStartOfInterval(
                     scored_at, toIntervalSecond({{granularity:UInt32}})
-                )) AS ts,
+                )) AS ts{group_select},
                 count() AS total,
                 countIf(outcome = 'pass') AS pass_count,
                 countIf(outcome = 'fail') AS fail_count,
@@ -1827,21 +1837,35 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 countIf(outcome = 'unknown') AS unknown_count
             FROM genai_scores
             WHERE {where}
-            GROUP BY ts
-            ORDER BY ts
+            GROUP BY ts{group_by_extra}
+            ORDER BY ts{group_by_extra}
         """
         bucket_result = self.ch_client.query(bucket_query, parameters=parameters)
-        buckets = [
-            tsi.GenAIScoreStatsBucket(
-                timestamp=row[0],
-                total=int(row[1]),
-                pass_count=int(row[2]),
-                fail_count=int(row[3]),
-                error_count=int(row[4]),
-                unknown_count=int(row[5]),
-            )
-            for row in bucket_result.result_rows
-        ]
+        if group_by_col:
+            buckets = [
+                tsi.GenAIScoreStatsBucket(
+                    timestamp=row[0],
+                    group=str(row[1]),
+                    total=int(row[2]),
+                    pass_count=int(row[3]),
+                    fail_count=int(row[4]),
+                    error_count=int(row[5]),
+                    unknown_count=int(row[6]),
+                )
+                for row in bucket_result.result_rows
+            ]
+        else:
+            buckets = [
+                tsi.GenAIScoreStatsBucket(
+                    timestamp=row[0],
+                    total=int(row[1]),
+                    pass_count=int(row[2]),
+                    fail_count=int(row[3]),
+                    error_count=int(row[4]),
+                    unknown_count=int(row[5]),
+                )
+                for row in bucket_result.result_rows
+            ]
 
         totals_query = f"""
             SELECT
@@ -1867,6 +1891,249 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         return tsi.GenAIScoreStatsRes(buckets=buckets, totals=totals)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_turn_stats"
+    )
+    def genai_turn_stats(
+        self, req: tsi.GenAITurnStatsReq
+    ) -> tsi.GenAITurnStatsRes:
+        """Aggregate turn (span) metrics into time buckets."""
+        _ALLOWED_GROUP_BY = {
+            "operation_name", "provider_name", "agent_name", "request_model",
+            "response_model", "tool_name", "conversation_id", "status_code",
+        }
+        _ATTR_FILTER_OPS = {
+            "eq": "=", "ne": "!=", "gt": ">", "lt": "<",
+            "gte": ">=", "lte": "<=",
+        }
+
+        granularity = max(req.granularity_seconds, 60)
+        conditions = ["s.project_id = {project_id:String}"]
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "granularity": granularity,
+        }
+
+        if req.start:
+            conditions.append("s.started_at >= parseDateTimeBestEffort({start_time:String})")
+            parameters["start_time"] = req.start
+        if req.end:
+            conditions.append("s.started_at < parseDateTimeBestEffort({end_time:String})")
+            parameters["end_time"] = req.end
+
+        _LIST_FILTERS: dict[str, str] = {
+            "operation_names": "operation_name",
+            "agent_names": "agent_name",
+            "provider_names": "provider_name",
+            "request_models": "request_model",
+            "tool_names": "tool_name",
+            "conversation_ids": "conversation_id",
+            "status_codes": "status_code",
+        }
+        for field_name, col_name in _LIST_FILTERS.items():
+            values = getattr(req, field_name, [])
+            if values:
+                param_key = f"f_{col_name}"
+                conditions.append(
+                    f"s.{col_name} IN {{{param_key}:Array(String)}}"
+                )
+                parameters[param_key] = values
+
+        join_clauses: list[str] = []
+        for i, cf in enumerate(req.custom_filters):
+            alias = f"cf{i}"
+            key_param = f"{alias}_key"
+            val_param = f"{alias}_val"
+            parameters[key_param] = cf.attr_key
+            op = _ATTR_FILTER_OPS.get(cf.operator, "=")
+
+            if isinstance(cf.value, int):
+                val_col = "int_value"
+                val_type = "Int64"
+            elif isinstance(cf.value, float):
+                val_col = "float_value"
+                val_type = "Float64"
+            else:
+                val_col = "string_value"
+                val_type = "String"
+
+            parameters[val_param] = cf.value
+            join_clauses.append(
+                f"LEFT JOIN genai_span_attributes {alias}"
+                f" ON s.span_id = {alias}.span_id"
+                f" AND s.project_id = {alias}.project_id"
+                f" AND {alias}.attr_key = {{{key_param}:String}}"
+            )
+            conditions.append(f"{alias}.span_id IS NOT NULL")
+            conditions.append(
+                f"{alias}.{val_col} {op} {{{val_param}:{val_type}}}"
+            )
+
+        group_by_col = ""
+        group_select = ""
+        group_by_extra = ""
+        if req.group_by and req.group_by in _ALLOWED_GROUP_BY:
+            group_by_col = req.group_by
+            group_select = f",\n                s.{group_by_col} AS group_value"
+            group_by_extra = ", group_value"
+
+        where = " AND ".join(conditions)
+        joins = "\n            ".join(join_clauses)
+
+        query = f"""
+            SELECT
+                toStartOfInterval(s.started_at, INTERVAL {{granularity:UInt32}} SECOND) AS bucket{group_select},
+                count() AS cnt,
+                sum(s.input_tokens) AS input_tokens,
+                sum(s.output_tokens) AS output_tokens,
+                countIf(s.status_code = 'ERROR') AS error_count,
+                avg(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)) AS avg_duration_ms
+            FROM genai_spans s
+            {joins}
+            WHERE {where}
+            GROUP BY bucket{group_by_extra}
+            ORDER BY bucket ASC
+        """
+        result = self.ch_client.query(query, parameters=parameters)
+        buckets = []
+        for row in result.result_rows:
+            idx = 1
+            group = ""
+            if group_by_col:
+                group = str(row[idx])
+                idx += 1
+            buckets.append(tsi.GenAIStatsBucket(
+                timestamp=str(row[0]),
+                group=group,
+                count=int(row[idx]),
+                input_tokens=int(row[idx + 1]),
+                output_tokens=int(row[idx + 2]),
+                error_count=int(row[idx + 3]),
+                avg_duration_ms=float(row[idx + 4]) if row[idx + 4] else 0.0,
+            ))
+        return tsi.GenAITurnStatsRes(buckets=buckets)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_conversation_stats"
+    )
+    def genai_conversation_stats(
+        self, req: tsi.GenAIConversationStatsReq
+    ) -> tsi.GenAIConversationStatsRes:
+        """Aggregate conversation-level metrics into time buckets."""
+        _ALLOWED_GROUP_BY = {
+            "operation_name", "provider_name", "agent_name", "request_model",
+            "response_model", "tool_name", "conversation_id", "status_code",
+        }
+        _ATTR_FILTER_OPS = {
+            "eq": "=", "ne": "!=", "gt": ">", "lt": "<",
+            "gte": ">=", "lte": "<=",
+        }
+
+        granularity = max(req.granularity_seconds, 60)
+        conditions = [
+            "s.project_id = {project_id:String}",
+            "s.conversation_id != ''",
+        ]
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "granularity": granularity,
+        }
+
+        if req.start:
+            conditions.append("s.started_at >= parseDateTimeBestEffort({start_time:String})")
+            parameters["start_time"] = req.start
+        if req.end:
+            conditions.append("s.started_at < parseDateTimeBestEffort({end_time:String})")
+            parameters["end_time"] = req.end
+
+        _LIST_FILTERS: dict[str, str] = {
+            "conversation_ids": "conversation_id",
+            "agent_names": "agent_name",
+            "provider_names": "provider_name",
+        }
+        for field_name, col_name in _LIST_FILTERS.items():
+            values = getattr(req, field_name, [])
+            if values:
+                param_key = f"f_{col_name}"
+                conditions.append(
+                    f"s.{col_name} IN {{{param_key}:Array(String)}}"
+                )
+                parameters[param_key] = values
+
+        join_clauses: list[str] = []
+        for i, cf in enumerate(req.custom_filters):
+            alias = f"cf{i}"
+            key_param = f"{alias}_key"
+            val_param = f"{alias}_val"
+            parameters[key_param] = cf.attr_key
+            op = _ATTR_FILTER_OPS.get(cf.operator, "=")
+
+            if isinstance(cf.value, int):
+                val_col = "int_value"
+                val_type = "Int64"
+            elif isinstance(cf.value, float):
+                val_col = "float_value"
+                val_type = "Float64"
+            else:
+                val_col = "string_value"
+                val_type = "String"
+
+            parameters[val_param] = cf.value
+            join_clauses.append(
+                f"LEFT JOIN genai_span_attributes {alias}"
+                f" ON s.span_id = {alias}.span_id"
+                f" AND s.project_id = {alias}.project_id"
+                f" AND {alias}.attr_key = {{{key_param}:String}}"
+            )
+            conditions.append(f"{alias}.span_id IS NOT NULL")
+            conditions.append(
+                f"{alias}.{val_col} {op} {{{val_param}:{val_type}}}"
+            )
+
+        group_by_col = ""
+        group_select = ""
+        group_by_extra = ""
+        if req.group_by and req.group_by in _ALLOWED_GROUP_BY:
+            group_by_col = req.group_by
+            group_select = f",\n                s.{group_by_col} AS group_value"
+            group_by_extra = ", group_value"
+
+        where = " AND ".join(conditions)
+        joins = "\n            ".join(join_clauses)
+
+        query = f"""
+            SELECT
+                toStartOfInterval(s.started_at, INTERVAL {{granularity:UInt32}} SECOND) AS bucket{group_select},
+                uniq(s.conversation_id) AS conversation_count,
+                uniq(s.trace_id) AS turn_count,
+                sum(s.input_tokens) AS input_tokens,
+                sum(s.output_tokens) AS output_tokens,
+                countIf(s.status_code = 'ERROR') AS error_count
+            FROM genai_spans s
+            {joins}
+            WHERE {where}
+            GROUP BY bucket{group_by_extra}
+            ORDER BY bucket ASC
+        """
+        result = self.ch_client.query(query, parameters=parameters)
+        buckets = []
+        for row in result.result_rows:
+            idx = 1
+            group = ""
+            if group_by_col:
+                group = str(row[idx])
+                idx += 1
+            buckets.append(tsi.GenAIConversationStatsBucket(
+                timestamp=str(row[0]),
+                group=group,
+                conversation_count=int(row[idx]),
+                turn_count=int(row[idx + 1]),
+                input_tokens=int(row[idx + 2]),
+                output_tokens=int(row[idx + 3]),
+                error_count=int(row[idx + 4]),
+            ))
+        return tsi.GenAIConversationStatsRes(buckets=buckets)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_agents_query")
     def genai_agents_query(
@@ -1996,6 +2263,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         agent had a root invoke_agent span, so they include tokens from
         child chat/tool spans even if those don't carry agent_name.
         """
+        _ALLOWED_GROUP_BY = {
+            "operation_name", "provider_name", "agent_name", "request_model",
+            "response_model", "tool_name", "conversation_id", "status_code",
+        }
+
         granularity = max(req.granularity_seconds, 60)
         parameters: dict[str, Any] = {
             "project_id": req.project_id,
@@ -2005,17 +2277,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         time_conditions = []
         if req.start:
-            time_conditions.append("AND a.started_at >= {start_time:String}")
+            time_conditions.append("AND a.started_at >= parseDateTimeBestEffort({start_time:String})")
             parameters["start_time"] = req.start
         if req.end:
-            time_conditions.append("AND a.started_at < {end_time:String}")
+            time_conditions.append("AND a.started_at < parseDateTimeBestEffort({end_time:String})")
             parameters["end_time"] = req.end
 
         time_clause = " ".join(time_conditions)
 
+        group_by_col = ""
+        group_select = ""
+        group_by_extra = ""
+        if req.group_by and req.group_by in _ALLOWED_GROUP_BY:
+            group_by_col = req.group_by
+            group_select = f",\n                a.{group_by_col} AS group_value"
+            group_by_extra = ", group_value"
+
         query = f"""
             SELECT
-                toStartOfInterval(a.started_at, INTERVAL {{granularity:UInt32}} SECOND) AS bucket,
+                toStartOfInterval(a.started_at, INTERVAL {{granularity:UInt32}} SECOND) AS bucket{group_select},
                 count()                            AS invocation_count,
                 uniq(a.trace_id)                   AS span_count,
                 sum(t.trace_input)                 AS input_tokens,
@@ -2035,20 +2315,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
               AND a.agent_name = {{agent_name:String}}
               AND a.operation_name = 'invoke_agent'
               {time_clause}
-            GROUP BY bucket
+            GROUP BY bucket{group_by_extra}
             ORDER BY bucket ASC
         """
         query_result = self.ch_client.query(query, parameters=parameters)
         buckets = []
         for row in query_result.result_rows:
+            idx = 1
+            group = ""
+            if group_by_col:
+                group = str(row[idx])
+                idx += 1
             buckets.append(tsi.GenAIAgentMetricsBucket(
                 timestamp=str(row[0]),
-                invocation_count=int(row[1]),
-                span_count=int(row[2]),
-                input_tokens=int(row[3]),
-                output_tokens=int(row[4]),
-                error_count=int(row[5]),
-                avg_duration_ms=float(row[6]) if row[6] else 0.0,
+                group=group,
+                invocation_count=int(row[idx]),
+                span_count=int(row[idx + 1]),
+                input_tokens=int(row[idx + 2]),
+                output_tokens=int(row[idx + 3]),
+                error_count=int(row[idx + 4]),
+                avg_duration_ms=float(row[idx + 5]) if row[idx + 5] else 0.0,
             ))
         return tsi.GenAIAgentMetricsRes(
             agent_name=req.agent_name,

@@ -2325,6 +2325,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             "genai_score_stats is not implemented for SQLite trace server"
         )
 
+    def genai_turn_stats(self, req: tsi.GenAITurnStatsReq) -> tsi.GenAITurnStatsRes:
+        raise NotImplementedError("genai_turn_stats not supported in SQLite")
+
+    def genai_conversation_stats(
+        self, req: tsi.GenAIConversationStatsReq
+    ) -> tsi.GenAIConversationStatsRes:
+        raise NotImplementedError("genai_conversation_stats not supported in SQLite")
+
     def genai_annotations_upsert(
         self, req: tsi.GenAIAnnotationsUpsertReq
     ) -> tsi.GenAIAnnotationsUpsertRes:

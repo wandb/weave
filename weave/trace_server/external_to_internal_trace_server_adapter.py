@@ -261,6 +261,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.genai_score_stats(req)
 
+    def genai_turn_stats(self, req: tsi.GenAITurnStatsReq) -> tsi.GenAITurnStatsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.genai_turn_stats(req)
+
+    def genai_conversation_stats(
+        self, req: tsi.GenAIConversationStatsReq
+    ) -> tsi.GenAIConversationStatsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.genai_conversation_stats(req)
+
     def genai_annotations_upsert(
         self, req: tsi.GenAIAnnotationsUpsertReq
     ) -> tsi.GenAIAnnotationsUpsertRes:

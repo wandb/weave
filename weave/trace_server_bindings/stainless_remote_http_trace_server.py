@@ -528,6 +528,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             "GenAI conversation chat is not yet supported."
         )
 
+    def genai_turn_stats(self, req: tsi.GenAITurnStatsReq) -> tsi.GenAITurnStatsRes:
+        raise NotImplementedError
+
+    def genai_conversation_stats(
+        self, req: tsi.GenAIConversationStatsReq
+    ) -> tsi.GenAIConversationStatsRes:
+        raise NotImplementedError
+
     def genai_annotations_upsert(
         self, req: tsi.GenAIAnnotationsUpsertReq
     ) -> tsi.GenAIAnnotationsUpsertRes:
