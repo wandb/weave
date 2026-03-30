@@ -1,7 +1,39 @@
 default_stages: [pre-push]
 
 repos:
-  # Priority 0: Fast file checks (run in parallel)
+  # Priority 0: Type checkers (slowest — start immediately, run in parallel)
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty (type checker)
+        entry: uv run ty check
+        language: python
+        always_run: true
+        pass_filenames: false
+        priority: 0
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.387
+    hooks:
+      - id: pyright
+        additional_dependencies: [".[tests]"]
+        exclude: ".github/scripts/validate_docs_coverage.py"
+        always_run: true
+        pass_filenames: false
+        priority: 0
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: "v1.19.1"
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          [types-pkg-resources==0.1.3, types-all, wandb>=0.15.5, wandb<0.19.0]
+        # Note: You have to update pyproject.toml[tool.mypy] too!
+        args: ["--config-file=pyproject.toml", "."]
+        exclude: (.*pyi$)|(tests)|(examples)|(.github/scripts/validate_docs_coverage.py)
+        always_run: true
+        pass_filenames: false
+        priority: 0
+
+  # Priority 0: Read-only checks (fast, run alongside type checkers)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -29,6 +61,8 @@ repos:
         # Excluding extra things to make initial reviews easier, starting with `examples``
         exclude: "(cassettes|examples|tests|tools)"
         priority: 0
+
+  # Priority 0: Asset-modifying hooks (non-Python files, no conflict with type checkers)
   - repo: https://github.com/oxipng/oxipng
     rev: v10.1.0
     hooks:
@@ -50,7 +84,7 @@ repos:
         types: [image]
         priority: 0
 
-  # Priority 1: Code modernization (run in parallel, before formatting)
+  # Priority 1: Code modernization (modify Python files, run in parallel)
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
     hooks:
@@ -64,10 +98,10 @@ repos:
         priority: 1
 
   # Priority 2: Linting with auto-fix (must run before formatter)
+  # Priority 3: Formatting (runs after linting fixes)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.5
     hooks:
-      # Run the linter.
       - id: ruff-check
         types_or: [python, pyi, jupyter]
         args: [--fix, --exit-non-zero-on-fix, --config=pyproject.toml]
@@ -75,7 +109,6 @@ repos:
         always_run: true
         pass_filenames: false
         priority: 2
-      # Run the formatter (priority 3: after linting fixes).
       - id: ruff-format
         args: [--config=pyproject.toml]
         types_or: [python, pyi, jupyter]
@@ -83,35 +116,3 @@ repos:
         always_run: true
         pass_filenames: false
         priority: 3
-
-  # Priority 4: Type checkers (slow, run in parallel with each other)
-  - repo: local
-    hooks:
-      - id: ty
-        name: ty (type checker)
-        entry: uv run ty check
-        language: python
-        always_run: true
-        pass_filenames: false
-        priority: 4
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.387
-    hooks:
-      - id: pyright
-        additional_dependencies: [".[tests]"]
-        exclude: ".github/scripts/validate_docs_coverage.py"
-        always_run: true
-        pass_filenames: false
-        priority: 4
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.19.1"
-    hooks:
-      - id: mypy
-        additional_dependencies:
-          [types-pkg-resources==0.1.3, types-all, wandb>=0.15.5, wandb<0.19.0]
-        # Note: You have to update pyproject.toml[tool.mypy] too!
-        args: ["--config-file=pyproject.toml", "."]
-        exclude: (.*pyi$)|(tests)|(examples)|(.github/scripts/validate_docs_coverage.py)
-        always_run: true
-        pass_filenames: false
-        priority: 4
