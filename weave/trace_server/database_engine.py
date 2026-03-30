@@ -27,7 +27,7 @@ ENGINE_DISCOVERY_INITIAL_DELAY_SECONDS = 0.1
 ENGINE_DISCOVERY_MAX_WAIT_SECONDS = 3.0
 ENGINE_DISCOVERY_MAX_DELAY_SECONDS = 0.8
 
-_ENGINE_QUERY = "SELECT engine FROM system.databases WHERE name = %(db_name)s"
+ENGINE_QUERY = "SELECT engine FROM system.databases WHERE name = %(db_name)s"
 
 
 class EngineDiscoveryError(RuntimeError):
@@ -45,7 +45,7 @@ def get_database_engine(
     """
     try:
         result = ch_client.query(
-            _ENGINE_QUERY,
+            ENGINE_QUERY,
             parameters={"db_name": db_name},
         )
     except Exception as exc:
