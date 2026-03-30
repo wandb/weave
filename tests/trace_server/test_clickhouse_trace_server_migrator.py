@@ -336,14 +336,12 @@ def test_engine_discovery_init_behavior():
     )
     cloud_client.query.assert_not_called()
 
-    # Replicated mode accepts a custom wait budget
-    replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
+    # Replicated mode uses ENGINE_DISCOVERY_MAX_WAIT_SECONDS constant
+    ReplicatedClickHouseTraceServerMigrator(
         _make_ch_client(),
         replicated_cluster="test_cluster",
-        database_engine_discovery_max_wait_seconds=1.5,
         migration_dir=DEFAULT_MIGRATION_DIR,
     )
-    assert replicated_migrator.database_engine_discovery_max_wait_seconds == 1.5
 
     # Replicated mode surfaces a clear error when system.databases is inaccessible
     denied_client = Mock()
@@ -423,14 +421,19 @@ def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
     timeout_client.database = "original_db"
     timeout_client.query.return_value = query_result_empty
 
-    with pytest.raises(
-        MigrationError,
-        match="after executing `CREATE DATABASE IF NOT EXISTS db_management",
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_migrator.ENGINE_DISCOVERY_MAX_WAIT_SECONDS",
+            0.15,
+        ),
+        pytest.raises(
+            MigrationError,
+            match="after executing `CREATE DATABASE IF NOT EXISTS db_management",
+        ),
     ):
         ReplicatedClickHouseTraceServerMigrator(
             timeout_client,
             replicated_cluster="test_cluster",
-            database_engine_discovery_max_wait_seconds=0.15,
             migration_dir=DEFAULT_MIGRATION_DIR,
         )
 

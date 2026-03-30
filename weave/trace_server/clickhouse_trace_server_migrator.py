@@ -516,7 +516,6 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
-        database_engine_discovery_max_wait_seconds: float | None = None,
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
@@ -529,31 +528,20 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             if replicated_cluster is None
             else replicated_cluster
         )
-        self.database_engine_discovery_max_wait_seconds = (
-            ENGINE_DISCOVERY_MAX_WAIT_SECONDS
-            if database_engine_discovery_max_wait_seconds is None
-            else database_engine_discovery_max_wait_seconds
-        )
 
         # Validate configuration
         if not self._is_safe_identifier(self.replicated_cluster):
             raise MigrationError(f"Invalid cluster name: {self.replicated_cluster}")
-        if self.database_engine_discovery_max_wait_seconds <= 0:
-            raise MigrationError(
-                "database_engine_discovery_max_wait_seconds must be positive"
-            )
 
         logger.info(
             "%s ReplicatedClickHouseTraceServerMigrator initialized with: "
             "replicated_cluster=%s, "
             "replicated_path=%s, "
-            "management_db=%s, "
-            "database_engine_discovery_max_wait_seconds=%s",
+            "management_db=%s",
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             self.replicated_cluster,
             self.replicated_path,
             management_db,
-            self.database_engine_discovery_max_wait_seconds,
         )
 
         self._replicated_db_engine_cache: dict[str, bool] = {}
@@ -581,7 +569,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             engine = wait_for_database_engine(
                 self.ch_client,
                 db_name,
-                max_wait_seconds=self.database_engine_discovery_max_wait_seconds,
+                max_wait_seconds=ENGINE_DISCOVERY_MAX_WAIT_SECONDS,
                 context=db_sql,
             )
         except EngineDiscoveryError as exc:
@@ -784,7 +772,6 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
-        database_engine_discovery_max_wait_seconds: float | None = None,
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
@@ -798,7 +785,6 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             replicated_path,
             replicated_cluster,
             management_db,
-            database_engine_discovery_max_wait_seconds,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
         )
@@ -1229,7 +1215,6 @@ def get_clickhouse_trace_server_migrator(
     replicated_cluster: str | None = None,
     use_distributed: bool | None = None,
     management_db: str = "db_management",
-    database_engine_discovery_max_wait_seconds: float | None = None,
     migration_dir: str | None = None,
     post_migration_hook: PostMigrationHook
     | None = _default_trace_server_costs_post_migration_hook,
@@ -1243,9 +1228,6 @@ def get_clickhouse_trace_server_migrator(
         replicated_cluster: Cluster name for replication
         use_distributed: Whether to use distributed tables (requires replicated=True)
         management_db: Database name for migration management
-        database_engine_discovery_max_wait_seconds: Maximum time to wait for
-            system.databases to report the created DB engine in replicated /
-            distributed mode
         migration_dir: Absolute path to a directory containing `*.up.sql` / `*.down.sql`
         post_migration_hook: Optional callable run after migrations; defaults to the Weave costs backfill hook (pass None to disable)
 
@@ -1265,7 +1247,6 @@ def get_clickhouse_trace_server_migrator(
         "replicated_cluster=%s, "
         "replicated_path=%s, "
         "management_db=%s, "
-        "database_engine_discovery_max_wait_seconds=%s, "
         "migration_dir=%s, "
         "post_migration_hook=%s",
         replicated,
@@ -1273,7 +1254,6 @@ def get_clickhouse_trace_server_migrator(
         replicated_cluster,
         replicated_path,
         management_db,
-        database_engine_discovery_max_wait_seconds,
         migration_dir,
         "none" if post_migration_hook is None else "callable",
     )
@@ -1296,7 +1276,6 @@ def get_clickhouse_trace_server_migrator(
             replicated_path,
             replicated_cluster,
             management_db,
-            database_engine_discovery_max_wait_seconds,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
         )
@@ -1306,7 +1285,6 @@ def get_clickhouse_trace_server_migrator(
             replicated_path,
             replicated_cluster,
             management_db,
-            database_engine_discovery_max_wait_seconds,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
         )
