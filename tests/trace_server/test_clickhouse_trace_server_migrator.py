@@ -327,13 +327,16 @@ def test_create_db_sql(mock_costs):
         )
 
 
-def test_cloud_init_does_not_query_system_databases():
-    ch_client = Mock()
-    CloudClickHouseTraceServerMigrator(ch_client, migration_dir=DEFAULT_MIGRATION_DIR)
-    ch_client.query.assert_not_called()
+def test_engine_discovery_init_behavior():
+    """Cloud mode skips system.databases; replicated mode queries it and is configurable."""
+    # Cloud mode never touches system.databases
+    cloud_client = Mock()
+    CloudClickHouseTraceServerMigrator(
+        cloud_client, migration_dir=DEFAULT_MIGRATION_DIR
+    )
+    cloud_client.query.assert_not_called()
 
-
-def test_replicated_engine_wait_budget_is_configurable():
+    # Replicated mode accepts a custom wait budget
     replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
         _make_ch_client(),
         replicated_cluster="test_cluster",
@@ -342,45 +345,53 @@ def test_replicated_engine_wait_budget_is_configurable():
     )
     assert replicated_migrator.database_engine_discovery_max_wait_seconds == 1.5
 
-
-def test_replicated_init_reports_system_database_permissions_error():
-    ch_client = Mock()
-    ch_client.query.side_effect = DatabaseError("access denied to system.databases")
-
+    # Replicated mode surfaces a clear error when system.databases is inaccessible
+    denied_client = Mock()
+    denied_client.query.side_effect = DatabaseError("access denied to system.databases")
     with pytest.raises(
         MigrationError, match="require SELECT access to system.databases"
     ):
         ReplicatedClickHouseTraceServerMigrator(
-            ch_client,
+            denied_client,
             replicated_cluster="test_cluster",
             migration_dir=DEFAULT_MIGRATION_DIR,
         )
 
 
 def test_replicated_management_table_follows_database_engine(replicated_migrator):
-    # Replicated DBs should rely on the DB engine and omit both ON CLUSTER and
-    # explicit ReplicatedMergeTree conversion.
+    """Management table DDL adapts to the database engine type."""
+
+    def _normalize(sql: str) -> str:
+        return " ".join(sql.split())
+
+    # Replicated DB: plain MergeTree, no ON CLUSTER (auto-replicated)
     replicated_migrator._replicated_db_engine_cache[
         replicated_migrator.management_db
     ] = True
+    assert _normalize(replicated_migrator._create_management_table_sql()) == _normalize(
+        """CREATE TABLE IF NOT EXISTS db_management.migrations
+           ( db_name String, curr_version UInt64, partially_applied_version UInt64 NULL, )
+           ENGINE = MergeTree() ORDER BY (db_name)"""
+    )
 
-    replicated_sql = replicated_migrator._create_management_table_sql()
-    assert "ENGINE = MergeTree()" in replicated_sql
-    assert "ReplicatedMergeTree" not in replicated_sql
-    assert "ON CLUSTER" not in replicated_sql
-
-    # Atomic DBs still need explicit ReplicatedMergeTree + ON CLUSTER.
+    # Atomic DB: explicit ReplicatedMergeTree + ON CLUSTER
     replicated_migrator._replicated_db_engine_cache[
         replicated_migrator.management_db
     ] = False
-
-    atomic_sql = replicated_migrator._create_management_table_sql()
-    assert "ENGINE = ReplicatedMergeTree()" in atomic_sql
-    assert "ON CLUSTER test_cluster" in atomic_sql
+    assert _normalize(replicated_migrator._create_management_table_sql()) == _normalize(
+        """CREATE TABLE IF NOT EXISTS db_management.migrations
+           ON CLUSTER test_cluster
+           ( db_name String, curr_version UInt64, partially_applied_version UInt64 NULL, )
+           ENGINE = ReplicatedMergeTree() ORDER BY (db_name)"""
+    )
 
 
 @patch("weave.trace_server.database_engine.time.sleep")
-def test_replicated_init_waits_for_management_db_engine_visibility(mock_sleep):
+def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
+    """Engine discovery retries until visible, then uses the result for DDL.
+    When it never appears, the error includes the CREATE DATABASE statement.
+    """
+    # Succeeds after retries: engine becomes visible on the 3rd query
     ch_client = Mock()
     ch_client.database = "original_db"
     query_result_empty = Mock()
@@ -401,27 +412,23 @@ def test_replicated_init_waits_for_management_db_engine_visibility(mock_sleep):
 
     assert migrator._replicated_db_engine_cache[migrator.management_db] is True
     assert mock_sleep.call_count == 2
-
+    # Management table DDL should use plain MergeTree (Replicated DB auto-converts)
     create_table_sql = ch_client.command.call_args_list[1][0][0]
     assert "ENGINE = MergeTree()" in create_table_sql
     assert "ReplicatedMergeTree" not in create_table_sql
     assert "ON CLUSTER" not in create_table_sql
 
-
-@patch("weave.trace_server.database_engine.time.sleep")
-def test_replicated_init_timeout_error_includes_create_statement(mock_sleep):
-    ch_client = Mock()
-    ch_client.database = "original_db"
-    query_result_empty = Mock()
-    query_result_empty.result_rows = []
-    ch_client.query.return_value = query_result_empty
+    # Times out: engine never becomes visible, error includes the SQL context
+    timeout_client = Mock()
+    timeout_client.database = "original_db"
+    timeout_client.query.return_value = query_result_empty
 
     with pytest.raises(
         MigrationError,
         match="after executing `CREATE DATABASE IF NOT EXISTS db_management",
     ):
         ReplicatedClickHouseTraceServerMigrator(
-            ch_client,
+            timeout_client,
             replicated_cluster="test_cluster",
             database_engine_discovery_max_wait_seconds=0.15,
             migration_dir=DEFAULT_MIGRATION_DIR,
@@ -1145,50 +1152,31 @@ def test_drop_table_replicated(replicated_migrator):
     assert call_sql == "DROP TABLE IF EXISTS my_table ON CLUSTER test_cluster"
 
 
-def test_replicated_db_engine_skips_on_cluster(replicated_migrator):
-    """When the target database uses the Replicated engine, ON CLUSTER must be
-    omitted from DDL — the engine auto-replicates DDL and ON CLUSTER causes
-    ClickHouse error 80 (INCORRECT_QUERY).
-    """
-    replicated_migrator._replicated_db_engine_cache["test_db"] = True
+def test_ddl_adapts_to_database_engine(replicated_migrator, distributed_migrator):
+    """DDL is passed through on Replicated engines, gets ON CLUSTER + ReplicatedMergeTree on Atomic."""
+    create_sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id"
 
-    replicated_migrator._execute_migration_command(
-        "test_db",
-        "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id",
+    # Replicated engine: SQL passed through as-is (DB auto-converts and auto-replicates)
+    replicated_migrator._replicated_db_engine_cache["test_db"] = True
+    replicated_migrator._execute_migration_command("test_db", create_sql)
+    assert replicated_migrator.ch_client.command.call_args_list[0][0][0] == create_sql
+    replicated_migrator.ch_client.command.reset_mock()
+
+    # Atomic engine: explicit ON CLUSTER + ReplicatedMergeTree
+    replicated_migrator._replicated_db_engine_cache["test_db"] = False
+    replicated_migrator._execute_migration_command("test_db", create_sql)
+    assert (
+        replicated_migrator.ch_client.command.call_args_list[0][0][0]
+        == "CREATE TABLE test ON CLUSTER test_cluster (id Int32) ENGINE = ReplicatedMergeTree() ORDER BY id"
     )
 
-    call_sql = replicated_migrator.ch_client.command.call_args_list[0][0][0]
-    # When the DB uses ENGINE = Replicated, the SQL should be passed through as-is:
-    # no ReplicatedMergeTree conversion (DB handles it) and no ON CLUSTER (auto-replicated).
-    assert "ReplicatedMergeTree" not in call_sql
-    assert "ON CLUSTER" not in call_sql
-    assert "MergeTree" in call_sql
-
-
-def test_replicated_db_engine_skips_on_cluster_distributed(distributed_migrator):
-    """Distributed migrator also skips ON CLUSTER for Replicated database engine."""
+    # Distributed migrator also skips ON CLUSTER for Replicated engine
     distributed_migrator._replicated_db_engine_cache["test_db"] = True
-
     distributed_migrator._execute_migration_command(
         "test_db", "DROP TABLE IF EXISTS my_table"
     )
-
-    # All emitted SQL should omit ON CLUSTER
     for c in distributed_migrator.ch_client.command.call_args_list:
         assert "ON CLUSTER" not in c[0][0]
-
-
-def test_non_replicated_db_engine_keeps_on_cluster(replicated_migrator):
-    """When the database does NOT use the Replicated engine, ON CLUSTER is kept."""
-    replicated_migrator._replicated_db_engine_cache["test_db"] = False
-
-    replicated_migrator._execute_migration_command(
-        "test_db",
-        "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id",
-    )
-
-    call_sql = replicated_migrator.ch_client.command.call_args_list[0][0][0]
-    assert "ON CLUSTER test_cluster" in call_sql
 
 
 def test_index_operations_only_on_local_tables_distributed(distributed_migrator):
