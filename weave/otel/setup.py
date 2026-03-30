@@ -240,6 +240,12 @@ def setup_tracing(
     for proc in processors or []:
         provider.add_span_processor(proc)
 
+    if not genai_endpoint:
+        wf_url = os.environ.get("WF_TRACE_SERVER_URL", "")
+        if wf_url:
+            genai_endpoint = f"{wf_url.rstrip('/')}/otel/v1/genai/traces"
+            logger.debug("Auto-detected genai_endpoint from WF_TRACE_SERVER_URL: %s", genai_endpoint)
+
     if genai_endpoint:
         if enable_live:
             from weave.otel.live_processor import LiveSpanProcessor

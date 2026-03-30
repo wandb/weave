@@ -8,15 +8,13 @@
 #     "weave",
 # ]
 # ///
-"""OpenAI Agents SDK — multi-turn conversation with compaction, all OTel traced.
+"""OpenAI Agents SDK — multi-turn conversation with handoffs, all OTel traced.
 
 Demonstrates:
   - Multi-turn conversation via SQLiteSession (context carries across turns)
-  - Automatic context compaction via OpenAIResponsesCompactionSession
   - Subagent handoffs: TriageAgent routes to WeatherBot, TravelAdvisor, Translator
   - Tool calls within a persistent conversation
   - Automatic system prompt, tool definition, and reasoning token capture
-  - Compaction tracking (weave.compaction.* attributes)
   - Conversation stitching via gen_ai.conversation.id
 
 All of this is set up with a single ``instrument()`` call — agent metadata
@@ -29,18 +27,16 @@ The conversation is designed so each turn builds on prior context:
   4. Book flights to the recommended city (handoff to TravelAdvisor)
   5. Find a hotel there (requires knowing destination from turn 4)
   6. Translate the recommendation to Japanese (handoff to Translator)
-  7. Summarize everything discussed (tests full context recall / compaction)
+  7. Summarize everything discussed (tests full context recall)
 
 Usage:
-    uv run --python 3.12 openai_agents_example.py
-    uv run --python 3.12 openai_agents_example.py --genai-endpoint http://localhost:6345/otel/v1/genai/traces
+    devall uv run --group otel-genai python examples/otel_genai/openai_agents_example.py
 """
 
 import argparse
 import asyncio
 
 from agents import Agent, Runner, SQLiteSession, function_tool
-from agents.memory import OpenAIResponsesCompactionSession
 
 from weave.agents import setup_tracing
 from weave.agents.instrumentors.openai_agents import instrument
@@ -155,13 +151,8 @@ CONVERSATION = [
 
 
 async def run_conversation() -> None:
-    """Run a multi-turn conversation with context carryover and compaction."""
-    underlying = SQLiteSession("trip-planning-session")
-
-    session = OpenAIResponsesCompactionSession(
-        session_id="trip-planning-session",
-        underlying_session=underlying,
-    )
+    """Run a multi-turn conversation with context carryover."""
+    session = SQLiteSession("trip-planning-session")
 
     for i, query in enumerate(CONVERSATION, 1):
         print(f"\n{'=' * 60}")
@@ -175,7 +166,6 @@ async def run_conversation() -> None:
     items = await session.get_items()
     print(f"\n{'=' * 60}")
     print(f"Session has {len(items)} items after {len(CONVERSATION)} turns")
-    print("(compaction reduces this from what would otherwise be much larger)")
     print(f"{'=' * 60}")
 
 

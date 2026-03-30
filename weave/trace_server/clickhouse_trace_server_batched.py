@@ -1963,6 +1963,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"LEFT JOIN genai_span_attributes {alias}"
                 f" ON s.span_id = {alias}.span_id"
                 f" AND s.project_id = {alias}.project_id"
+                f" AND s.started_at = {alias}.started_at"
                 f" AND {alias}.attr_key = {{{key_param}:String}}"
             )
             conditions.append(f"{alias}.span_id IS NOT NULL")
@@ -2084,6 +2085,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"LEFT JOIN genai_span_attributes {alias}"
                 f" ON s.span_id = {alias}.span_id"
                 f" AND s.project_id = {alias}.project_id"
+                f" AND s.started_at = {alias}.started_at"
                 f" AND {alias}.attr_key = {{{key_param}:String}}"
             )
             conditions.append(f"{alias}.span_id IS NOT NULL")

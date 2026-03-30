@@ -85,11 +85,12 @@ def generate_image(prompt: str) -> str:
     """
     client = openai.OpenAI()
     result = client.images.generate(
-        model="gpt-image-1",
+        model="dall-e-3",
         prompt=prompt,
         n=1,
         size="1024x1024",
-        quality="low",
+        quality="standard",
+        response_format="b64_json",
     )
 
     image_data = result.data[0]
