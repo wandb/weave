@@ -688,22 +688,6 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, "/genai/conversations/chat")
         return tsi.GenAIConversationChatRes.model_validate(r.json())
 
-    def genai_span_start(
-        self, req: tsi.GenAISpanStartReq
-    ) -> tsi.GenAISpanStartRes:
-        """Notify the server that a span has started."""
-        r = self._post_request_executor("/genai/span/start", req)
-        handle_response_error(r, "/genai/span/start")
-        return tsi.GenAISpanStartRes.model_validate(r.json())
-
-    def genai_active_spans(
-        self, req: tsi.GenAIActiveSpansReq
-    ) -> tsi.GenAIActiveSpansRes:
-        """List currently in-progress spans."""
-        r = self._post_request_executor("/genai/spans/active", req)
-        handle_response_error(r, "/genai/spans/active")
-        return tsi.GenAIActiveSpansRes.model_validate(r.json())
-
     def genai_annotations_upsert(
         self, req: tsi.GenAIAnnotationsUpsertReq
     ) -> tsi.GenAIAnnotationsUpsertRes:

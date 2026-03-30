@@ -528,18 +528,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             "GenAI conversation chat is not yet supported."
         )
 
-    def genai_span_start(
-        self, req: tsi.GenAISpanStartReq
-    ) -> tsi.GenAISpanStartRes:
-        """Notify the server that a span has started."""
-        raise NotImplementedError("GenAI span start is not yet supported.")
-
-    def genai_active_spans(
-        self, req: tsi.GenAIActiveSpansReq
-    ) -> tsi.GenAIActiveSpansRes:
-        """List currently in-progress spans."""
-        raise NotImplementedError("GenAI active spans is not yet supported.")
-
     def genai_annotations_upsert(
         self, req: tsi.GenAIAnnotationsUpsertReq
     ) -> tsi.GenAIAnnotationsUpsertRes:

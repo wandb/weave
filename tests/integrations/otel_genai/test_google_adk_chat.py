@@ -20,7 +20,7 @@ from collections.abc import Generator
 import pytest
 
 from tests.integrations.otel_genai.conftest import otel_spans_to_genai_schemas
-from weave.otel.instrumentors.google_adk import instrument, uninstrument
+from weave.agents.instrumentors.google_adk import instrument, uninstrument
 from weave.trace_server.genai_chat_view import build_chat_messages
 
 

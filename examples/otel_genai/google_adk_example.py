@@ -37,8 +37,8 @@ import argparse
 import asyncio
 import tempfile
 
-from weave.otel import log_content, setup_tracing
-from weave.otel.instrumentors.google_adk import instrument
+from weave.agents import log_content, setup_tracing
+from weave.agents.instrumentors.google_adk import instrument
 
 # ---------------------------------------------------------------------------
 # Tools

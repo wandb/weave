@@ -21,7 +21,7 @@ import pytest
 from agents import Agent, Runner, function_tool
 
 from tests.integrations.otel_genai.conftest import otel_spans_to_genai_schemas
-from weave.otel.instrumentors.openai_agents import instrument, uninstrument
+from weave.agents.instrumentors.openai_agents import instrument, uninstrument
 from weave.trace_server.genai_chat_view import build_chat_messages
 
 

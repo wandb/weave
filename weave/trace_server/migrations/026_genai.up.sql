@@ -1,12 +1,3 @@
--- =============================================================================
--- Consolidated GenAI migration: spans, attributes EAV, agents, annotations.
--- Replaces former migrations 026-030.
--- =============================================================================
-
-
--- ---------------------------------------------------------------------------
--- 1. genai_spans — completed GenAI/OTel spans (written once when span ends)
--- ---------------------------------------------------------------------------
 CREATE TABLE genai_spans (
     -- Core span identity
     project_id          String,
@@ -26,8 +17,8 @@ CREATE TABLE genai_spans (
     status_message      String DEFAULT '',
 
     -- GenAI classification (extracted from semconv)
-    operation_name      LowCardinality(String) DEFAULT '',
-    provider_name       LowCardinality(String) DEFAULT '',
+    operation_name      String DEFAULT '',
+    provider_name       String DEFAULT '',
 
     -- Agent info
     agent_name          String DEFAULT '',
@@ -55,7 +46,7 @@ CREATE TABLE genai_spans (
 
     -- Tool info
     tool_name           String DEFAULT '',
-    tool_type           LowCardinality(String) DEFAULT '',
+    tool_type           String DEFAULT '',
     tool_call_id        String DEFAULT '',
     tool_description    String DEFAULT '',
     tool_definitions    String DEFAULT '',
@@ -69,8 +60,8 @@ CREATE TABLE genai_spans (
     request_top_p       Float64 DEFAULT 0,
 
     -- Normalized messages (all provider formats resolved at extraction time)
-    input_messages  Array(Tuple(role LowCardinality(String), content String, tool_call_id String, tool_name String)) DEFAULT [],
-    output_messages Array(Tuple(role LowCardinality(String), content String, tool_call_id String, tool_name String)) DEFAULT [],
+    input_messages  Array(Tuple(role String, content String, tool_call_id String, tool_name String)) DEFAULT [],
+    output_messages Array(Tuple(role String, content String, tool_call_id String, tool_name String)) DEFAULT [],
 
     -- System instructions as plain text array
     system_instructions Array(String) DEFAULT [],
@@ -78,6 +69,14 @@ CREATE TABLE genai_spans (
     -- Tool call data (single invocation per span, kept as JSON)
     tool_call_arguments String DEFAULT '',
     tool_call_result    String DEFAULT '',
+
+    -- Evaluation (OTel GenAI eval semconv — operation_name = 'evaluation')
+    evaluation_name         String DEFAULT '',
+    evaluation_score        Float64 DEFAULT 0,
+    evaluation_label        String DEFAULT '',
+    evaluation_explanation  String DEFAULT '',
+    evaluated_span_id       String DEFAULT '',
+    evaluated_trace_id      String DEFAULT '',
 
     -- Compaction tracking
     compaction_summary       String DEFAULT '',
@@ -98,6 +97,7 @@ CREATE TABLE genai_spans (
     wb_user_id          String DEFAULT '',
 
     -- Skip indexes for common filter patterns
+    INDEX idx_span_id   span_id TYPE bloom_filter GRANULARITY 1,
     INDEX idx_trace_id  trace_id TYPE bloom_filter GRANULARITY 1,
     INDEX idx_parent    parent_span_id TYPE bloom_filter GRANULARITY 1,
     INDEX idx_op        operation_name TYPE set(20) GRANULARITY 4,
@@ -105,36 +105,17 @@ CREATE TABLE genai_spans (
     INDEX idx_agent     agent_name TYPE set(100) GRANULARITY 4,
     INDEX idx_model     request_model TYPE set(100) GRANULARITY 4,
     INDEX idx_conv      conversation_id TYPE set(100) GRANULARITY 4,
-    INDEX idx_tool      tool_name TYPE set(100) GRANULARITY 4
-) ENGINE = ReplacingMergeTree(created_at)
+    INDEX idx_tool      tool_name TYPE set(100) GRANULARITY 4,
+    INDEX idx_eval_name evaluation_name TYPE set(100) GRANULARITY 4,
+    INDEX idx_eval_label evaluation_label TYPE set(10) GRANULARITY 4
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(started_at)
 ORDER BY (project_id, started_at, span_id)
 SETTINGS min_bytes_for_wide_part=0, enable_block_number_column=1, enable_block_offset_column=1;
 
 
 -- ---------------------------------------------------------------------------
--- 2. genai_span_starts — in-progress span notifications (TTL auto-cleanup)
--- ---------------------------------------------------------------------------
-CREATE TABLE genai_span_starts (
-    project_id     String,
-    trace_id       String,
-    span_id        String,
-    parent_span_id String DEFAULT '',
-    span_name      String,
-    span_kind      Enum8('UNSPECIFIED'=0,'INTERNAL'=1,'SERVER'=2,'CLIENT'=3,'PRODUCER'=4,'CONSUMER'=5),
-    operation_name LowCardinality(String) DEFAULT '',
-    agent_name     String DEFAULT '',
-    request_model  String DEFAULT '',
-    started_at     DateTime64(6),
-    created_at     DateTime64(3) DEFAULT now64(3),
-    INDEX idx_trace trace_id TYPE bloom_filter GRANULARITY 1
-) ENGINE = MergeTree()
-ORDER BY (project_id, started_at, span_id)
-TTL toDateTime(started_at) + INTERVAL 1 HOUR;
-
-
--- ---------------------------------------------------------------------------
--- 3. genai_span_attributes — EAV table for typed, indexable span attributes
+-- 2. genai_span_attributes — EAV table for typed, indexable span attributes
 --
 -- Stores every non-semconv attribute as a typed row so we can filter, sort,
 -- and aggregate on arbitrary user-supplied attributes without parsing JSON.
@@ -142,17 +123,14 @@ TTL toDateTime(started_at) + INTERVAL 1 HOUR;
 -- ORDER BY (project_id, attr_key, started_at, span_id):
 --   - Prefix (project_id, attr_key) fast-paths "find spans where key X = Y"
 --   - started_at enables partition pruning for time-range scans
---   - span_id gives uniqueness for ReplacingMergeTree dedup
---
--- value_type enum selects which typed column holds the real value:
---   string=1, int=2, float=3, bool=4, json=5
+--   - span_id gives uniqueness
 -- ---------------------------------------------------------------------------
 CREATE TABLE genai_span_attributes (
     project_id      String,
     started_at      DateTime64(6),
     span_id         String,
     attr_source     Enum8('span'=1, 'resource'=2) DEFAULT 'span',
-    attr_key        LowCardinality(String),
+    attr_key        String,
 
     value_type      Enum8('string'=1, 'int'=2, 'float'=3, 'bool'=4, 'json'=5),
     string_value    String DEFAULT '',
@@ -167,18 +145,18 @@ CREATE TABLE genai_span_attributes (
     INDEX idx_sval   string_value TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_ival   int_value TYPE minmax GRANULARITY 4,
     INDEX idx_fval   float_value TYPE minmax GRANULARITY 4
-) ENGINE = ReplacingMergeTree(created_at)
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(started_at)
 ORDER BY (project_id, attr_key, started_at, span_id)
 SETTINGS min_bytes_for_wide_part=0;
 
 
 -- ---------------------------------------------------------------------------
--- 4. genai_agents — per-agent aggregated stats (auto-populated by MV)
+-- 3. genai_agents — per-agent aggregated stats (auto-populated by MV)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS genai_agents (
     project_id              String,
-    agent_name              LowCardinality(String),
+    agent_name              String,
 
     invocation_count        UInt64 DEFAULT 0,
     span_count              UInt64 DEFAULT 0,
@@ -226,7 +204,7 @@ WHERE agent_name != '';
 
 
 -- ---------------------------------------------------------------------------
--- 5. genai_conversations — per-conversation aggregated stats (auto-populated by MV)
+-- 4. genai_conversations — per-conversation aggregated stats (auto-populated by MV)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS genai_conversations (
     project_id              String,
@@ -274,14 +252,68 @@ WHERE conversation_id != '';
 
 
 -- ---------------------------------------------------------------------------
--- 6. entity_annotations — EAV annotations on any entity (spans, agents, …)
+-- 5. genai_scores — evaluation/signal results with typed outcome column
+--
+-- Purpose-built for signal analytics. Each row is one score from one
+-- evaluator on one entity. outcome is Enum8 — countIf(outcome = 'pass')
+-- is a 1-byte integer comparison, not a string scan.
+--
+-- Sort key (project_id, signal_name, scored_at, score_id) optimized for
+-- "pass rate for signal X in the last 7 days" — a prefix scan on a
+-- contiguous range.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS genai_scores (
+    project_id          String,
+    score_id            String,
+
+    -- What was scored
+    entity_type         String,
+    entity_id           String,
+    conversation_id     String DEFAULT '',
+
+    -- The evaluation
+    signal_name         String,
+    outcome             Enum8('pass'=1, 'fail'=2, 'error'=3, 'unknown'=4),
+    score_value         Float64 DEFAULT 0,
+    label               String DEFAULT '',
+    explanation         String DEFAULT '',
+
+    -- Scorer metadata
+    scorer_model        String DEFAULT '',
+    scorer_prompt       String DEFAULT '',
+    input_tokens        UInt64 DEFAULT 0,
+    output_tokens       UInt64 DEFAULT 0,
+    duration_ms         UInt64 DEFAULT 0,
+
+    -- Time
+    scored_at           DateTime64(3),
+    created_at          DateTime64(3) DEFAULT now64(3),
+
+    -- Auth
+    wb_user_id          String DEFAULT '',
+
+    -- Indexes
+    INDEX idx_entity    entity_id TYPE bloom_filter GRANULARITY 1,
+    INDEX idx_conv      conversation_id TYPE bloom_filter GRANULARITY 1,
+    INDEX idx_signal    signal_name TYPE set(200) GRANULARITY 4,
+    INDEX idx_outcome   outcome TYPE set(10) GRANULARITY 4
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(scored_at)
+ORDER BY (project_id, signal_name, scored_at, score_id);
+
+
+-- ---------------------------------------------------------------------------
+-- 6. entity_annotations — generic EAV metadata on any entity
+--
+-- For display names, human labels, arbitrary tags. NOT for signal scores
+-- (those go in genai_scores).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS entity_annotations (
     project_id          String,
-    entity_type         LowCardinality(String),
+    entity_type         String,
     entity_id           String,
-    namespace           LowCardinality(String),
-    key                 LowCardinality(String),
+    namespace           String,
+    key                 String,
 
     string_value        String DEFAULT '',
     float_value         Float64 DEFAULT 0,
@@ -289,7 +321,7 @@ CREATE TABLE IF NOT EXISTS entity_annotations (
     json_value          String DEFAULT '',
     value_type          Enum8('string'=1,'float'=2,'int'=3,'json'=4),
 
-    source              LowCardinality(String) DEFAULT '',
+    source              String DEFAULT '',
     source_id           String DEFAULT '',
     updated_at          DateTime64(3) DEFAULT now64(3),
 
@@ -302,3 +334,47 @@ CREATE TABLE IF NOT EXISTS entity_annotations (
 ) ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (project_id, entity_type, entity_id, namespace, key)
 SETTINGS do_not_merge_across_partitions_select_final = 1;
+
+
+-- ---------------------------------------------------------------------------
+-- 7. genai_message_search — per-message full-text search index
+--
+-- One row per unique (project_id, content_digest). Same message text across
+-- repeated input_messages histories deduplicates via ReplacingMergeTree.
+-- Populated at ingest time alongside genai_spans.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS genai_message_search (
+    project_id          String,
+    content_digest      String,
+
+    -- Message identity
+    conversation_id     String DEFAULT '',
+    trace_id            String,
+    span_id             String,
+    role                String DEFAULT '',
+    started_at          DateTime64(6),
+
+    -- Full message text (searchable)
+    content             String,
+
+    -- Denormalized metadata for filtering within search results
+    agent_name          String DEFAULT '',
+    conversation_name   String DEFAULT '',
+    wb_user_id          String DEFAULT '',
+    provider_name       String DEFAULT '',
+    request_model       String DEFAULT '',
+    operation_name      String DEFAULT '',
+
+    created_at          DateTime64(3) DEFAULT now64(3),
+
+    -- Skip indexes for text search acceleration
+    INDEX idx_content   content TYPE ngrambf_v1(3, 512, 2, 0) GRANULARITY 1,
+    INDEX idx_agent     agent_name TYPE ngrambf_v1(3, 256, 2, 0) GRANULARITY 1,
+    INDEX idx_conv_name conversation_name TYPE ngrambf_v1(3, 256, 2, 0) GRANULARITY 1,
+    INDEX idx_role      role TYPE set(10) GRANULARITY 4,
+    INDEX idx_conv_id   conversation_id TYPE set(100) GRANULARITY 4,
+    INDEX idx_trace_id  trace_id TYPE bloom_filter GRANULARITY 1
+) ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(started_at)
+ORDER BY (project_id, content_digest)
+SETTINGS min_bytes_for_wide_part = 0;

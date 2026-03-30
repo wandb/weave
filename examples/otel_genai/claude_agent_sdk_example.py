@@ -34,8 +34,8 @@ import os
 
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
 
-from weave.otel import setup_tracing
-from weave.otel.instrumentors.claude_agent_sdk import instrument
+from weave.agents import setup_tracing
+from weave.agents.instrumentors.claude import instrument
 
 
 def print_messages(msg: object) -> None:

@@ -13,7 +13,7 @@
 Weave provides a one-call setup that configures the OTel SDK, exporters, and optional processors:
 
 ```python
-from weave.otel import setup_tracing
+from weave.agents import setup_tracing
 
 provider = setup_tracing(
     service_name="my-agent",
@@ -35,8 +35,8 @@ Auth headers (`wandb-api-key`) are derived from `WANDB_API_KEY`.
 
 ```python
 from agents import Agent, Runner, function_tool
-from weave.otel import setup_tracing
-from weave.otel.instrumentors.openai_agents import instrument
+from weave.agents import setup_tracing
+from weave.agents.instrumentors.openai_agents import instrument
 
 @function_tool
 def get_weather(city: str) -> str:
@@ -71,15 +71,15 @@ Key points:
 - System prompts, tool definitions, and handoff descriptions are auto-discovered from the Agent objects passed via `agents=`.
 - Sets `gen_ai.operation.name` directly on each span (`invoke_agent`, `chat`, `execute_tool`, `handoff`, `guardrail`).
 - Conversation stitching via `gen_ai.conversation.id` is built in when `conversation=` is set.
-- Images from `image_generation_call` response items are auto-captured via `weave.otel.log_content`.
+- Images from `image_generation_call` response items are auto-captured via `weave.agents.log_content`.
 - Reasoning tokens are captured from `usage.output_tokens_details.reasoning_tokens` on Response spans.
 
 ### 3. Google ADK
 
 ```python
 from google.adk.agents import LlmAgent
-from weave.otel import setup_tracing
-from weave.otel.instrumentors.google_adk import instrument
+from weave.agents import setup_tracing
+from weave.agents.instrumentors.google_adk import instrument
 
 provider = setup_tracing(
     service_name="google-adk-example",
@@ -115,8 +115,8 @@ Key points:
 
 ```python
 from claude_agent_sdk import ClaudeAgentOptions, query
-from weave.otel import setup_tracing
-from weave.otel.instrumentors.claude_agent_sdk import instrument
+from weave.agents import setup_tracing
+from weave.agents.instrumentors.claude import instrument
 
 provider = setup_tracing(
     service_name="claude-agent-example",
@@ -161,7 +161,7 @@ To get multi-turn conversation stitching in the Weave UI:
 3. **Optionally name the conversation** — pass `name=` to `ConversationIdInjector` to set `gen_ai.conversation.name` for display in the UI.
 
 ```python
-from weave.otel import ConversationIdInjector
+from weave.agents import ConversationIdInjector
 
 processors=[
     ConversationIdInjector(name="trip-planning"),

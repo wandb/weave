@@ -237,19 +237,29 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.genai_conversation_chat(req)
 
-    def genai_span_start(
-        self, req: tsi.GenAISpanStartReq
-    ) -> tsi.GenAISpanStartRes:
+    def genai_conversation_export_atif(
+        self, req: tsi.GenAIExportATIFReq
+    ) -> tsi.GenAIExportATIFRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.genai_span_start(req)
+        return self._internal_trace_server.genai_conversation_export_atif(req)
 
-    def genai_active_spans(
-        self, req: tsi.GenAIActiveSpansReq
-    ) -> tsi.GenAIActiveSpansRes:
+    def genai_scores_insert(
+        self, req: tsi.GenAIScoresInsertReq
+    ) -> tsi.GenAIScoresInsertRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
-            self._internal_trace_server.genai_active_spans, req, req.project_id
-        )
+        return self._internal_trace_server.genai_scores_insert(req)
+
+    def genai_scores_query(
+        self, req: tsi.GenAIScoresQueryReq
+    ) -> tsi.GenAIScoresQueryRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.genai_scores_query(req)
+
+    def genai_score_stats(
+        self, req: tsi.GenAIScoreStatsReq
+    ) -> tsi.GenAIScoreStatsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.genai_score_stats(req)
 
     def genai_annotations_upsert(
         self, req: tsi.GenAIAnnotationsUpsertReq

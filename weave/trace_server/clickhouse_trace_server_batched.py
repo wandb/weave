@@ -7,6 +7,7 @@ import json
 import logging
 import threading
 import time
+import uuid
 from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
@@ -144,6 +145,23 @@ from weave.trace_server.file_storage import (
     store_in_bucket,
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
+from weave.trace_server.genai_chat_view import build_trace_chat
+from weave.trace_server.genai_export_atif import chat_messages_to_atif
+from weave.trace_server.genai_ingest_atif import atif_to_conversation_req
+from weave.trace_server.genai_ingest_openhands import openhands_to_conversation_req
+from weave.trace_server.genai_schema import (
+    ALL_GENAI_ATTR_INSERT_COLUMNS,
+    ALL_GENAI_SEARCH_INSERT_COLUMNS,
+    ALL_GENAI_SPAN_INSERT_COLUMNS,
+    ALL_GENAI_SPAN_SELECT_COLUMNS,
+    GenAIMessageSearchRow,
+    GenAISpanAttributeRow,
+    GenAISpanCHInsertable,
+)
+from weave.trace_server.genai_structured_ingest import (
+    build_conversation_ingest_response,
+    structured_turns_to_spans,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
@@ -168,22 +186,6 @@ from weave.trace_server.model_providers.model_providers import (
     VERTEX_PROVIDER_NAMES,
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
-)
-from weave.trace_server.genai_chat_view import build_trace_chat
-from weave.trace_server.genai_ingest_atif import atif_to_conversation_req
-from weave.trace_server.genai_ingest_openhands import openhands_to_conversation_req
-from weave.trace_server.genai_schema import (
-    ALL_GENAI_ATTR_INSERT_COLUMNS,
-    ALL_GENAI_SEARCH_INSERT_COLUMNS,
-    ALL_GENAI_SPAN_INSERT_COLUMNS,
-    ALL_GENAI_SPAN_SELECT_COLUMNS,
-    GenAIMessageSearchRow,
-    GenAISpanAttributeRow,
-    GenAISpanCHInsertable,
-)
-from weave.trace_server.genai_structured_ingest import (
-    build_conversation_ingest_response,
-    structured_turns_to_spans,
 )
 
 _GENAI_SPAN_COLS = ", ".join(ALL_GENAI_SPAN_SELECT_COLUMNS)
@@ -896,6 +898,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         _propagate_trace_fields(results)
 
+        if results:
+            results = self._dedup_genai_spans(results, req.project_id)
+
         rows = [_genai_span_to_row(r.span) for r in results]
         if rows:
             self._insert_genai_span_batch(rows)
@@ -957,6 +962,49 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     exc_info=True,
                     extra={"span_id": span.span_id, "project_id": project_id},
                 )
+
+    def _dedup_genai_spans(
+        self,
+        results: list[Any],
+        project_id: str,
+    ) -> list[Any]:
+        """Filter out spans that already exist in genai_spans.
+
+        Uses the bloom_filter index on span_id for fast existence checks.
+        Only needed for the OTel ingest path where exporters may retry.
+        """
+        span_ids = [r.span.span_id for r in results]
+        if not span_ids:
+            return results
+
+        query = """
+            SELECT span_id
+            FROM genai_spans
+            WHERE project_id = {project_id:String}
+              AND span_id IN {span_ids:Array(String)}
+        """
+        parameters = {"project_id": project_id, "span_ids": span_ids}
+        try:
+            query_result = self.ch_client.query(query, parameters=parameters)
+            existing = {row[0] for row in query_result.result_rows}
+        except Exception:
+            logger.warning(
+                "Dedup check failed, proceeding without dedup",
+                exc_info=True,
+            )
+            return results
+
+        if not existing:
+            return results
+
+        filtered = [r for r in results if r.span.span_id not in existing]
+        if len(filtered) < len(results):
+            logger.info(
+                "Dedup filtered %d/%d spans",
+                len(results) - len(filtered),
+                len(results),
+            )
+        return filtered
 
     def _insert_genai_span_batch(
         self,
@@ -1565,6 +1613,261 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             turns=turns,
         )
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_conversation_export_atif"
+    )
+    def genai_conversation_export_atif(
+        self, req: tsi.GenAIExportATIFReq
+    ) -> tsi.GenAIExportATIFRes:
+        """Export a conversation as an ATIF trajectory via the chat projection."""
+        chat = self.genai_conversation_chat(
+            tsi.GenAIConversationChatReq(
+                project_id=req.project_id,
+                conversation_id=req.conversation_id,
+            )
+        )
+        all_messages: list[tsi.GenAIChatMessage] = []
+        agent_name = ""
+        model = ""
+        for turn in chat.turns:
+            all_messages.extend(turn.messages)
+            if not agent_name:
+                for m in turn.messages:
+                    if m.agent_name:
+                        agent_name = m.agent_name
+                        break
+            if not model:
+                for m in turn.messages:
+                    if m.model:
+                        model = m.model
+                        break
+        traj = chat_messages_to_atif(
+            all_messages,
+            agent_name=agent_name,
+            model=model,
+            conversation_id=chat.conversation_id,
+        )
+        return tsi.GenAIExportATIFRes(trajectory=traj)
+
+    def _normalize_score_outcome(self, outcome: str) -> str:
+        o = (outcome or "unknown").lower()
+        if o in {"pass", "fail", "error", "unknown"}:
+            return o
+        return "unknown"
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_scores_insert"
+    )
+    def genai_scores_insert(
+        self, req: tsi.GenAIScoresInsertReq
+    ) -> tsi.GenAIScoresInsertRes:
+        """Insert rows into ``genai_scores``."""
+        if not req.scores:
+            return tsi.GenAIScoresInsertRes(inserted=0)
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        rows: list[list[Any]] = []
+        for s in req.scores:
+            sid = s.score_id or str(uuid.uuid4())
+            if s.scored_at:
+                try:
+                    scored_at = datetime.datetime.fromisoformat(
+                        s.scored_at.replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    scored_at = now
+            else:
+                scored_at = now
+            rows.append(
+                [
+                    req.project_id,
+                    sid,
+                    s.entity_type,
+                    s.entity_id,
+                    s.conversation_id,
+                    s.signal_name,
+                    self._normalize_score_outcome(s.outcome),
+                    float(s.score_value),
+                    s.label,
+                    s.explanation,
+                    s.scorer_model,
+                    s.scorer_prompt,
+                    int(s.input_tokens),
+                    int(s.output_tokens),
+                    int(s.duration_ms),
+                    scored_at,
+                    "",
+                ]
+            )
+
+        self.ch_client.insert(
+            "genai_scores",
+            rows,
+            column_names=[
+                "project_id",
+                "score_id",
+                "entity_type",
+                "entity_id",
+                "conversation_id",
+                "signal_name",
+                "outcome",
+                "score_value",
+                "label",
+                "explanation",
+                "scorer_model",
+                "scorer_prompt",
+                "input_tokens",
+                "output_tokens",
+                "duration_ms",
+                "scored_at",
+                "wb_user_id",
+            ],
+        )
+        return tsi.GenAIScoresInsertRes(inserted=len(rows))
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_scores_query"
+    )
+    def genai_scores_query(
+        self, req: tsi.GenAIScoresQueryReq
+    ) -> tsi.GenAIScoresQueryRes:
+        """Query ``genai_scores`` with optional filters."""
+        conditions = ["project_id = {project_id:String}"]
+        parameters: dict[str, Any] = {
+            "project_id": req.project_id,
+            "limit": min(req.limit, 10000),
+            "offset": req.offset,
+        }
+        if req.signal_name:
+            conditions.append("signal_name = {signal_name:String}")
+            parameters["signal_name"] = req.signal_name
+        if req.entity_type:
+            conditions.append("entity_type = {entity_type:String}")
+            parameters["entity_type"] = req.entity_type
+        if req.entity_ids:
+            conditions.append("entity_id IN {entity_ids:Array(String)}")
+            parameters["entity_ids"] = req.entity_ids
+        if req.outcome:
+            conditions.append("outcome = {outcome:String}")
+            parameters["outcome"] = self._normalize_score_outcome(req.outcome)
+
+        where = " AND ".join(conditions)
+        query = f"""
+            SELECT project_id, score_id, entity_type, entity_id, conversation_id,
+                   signal_name, toString(outcome) AS outcome, score_value, label,
+                   explanation, scorer_model, input_tokens, output_tokens,
+                   duration_ms, toString(scored_at) AS scored_at
+            FROM genai_scores
+            WHERE {where}
+            ORDER BY scored_at DESC, score_id
+            LIMIT {{limit:UInt64}} OFFSET {{offset:UInt64}}
+        """
+        result = self.ch_client.query(query, parameters=parameters)
+        scores = [
+            tsi.GenAIScoreRow(
+                project_id=row[0],
+                score_id=row[1],
+                entity_type=row[2],
+                entity_id=row[3],
+                conversation_id=row[4],
+                signal_name=row[5],
+                outcome=row[6],
+                score_value=float(row[7]),
+                label=row[8],
+                explanation=row[9],
+                scorer_model=row[10],
+                input_tokens=int(row[11]),
+                output_tokens=int(row[12]),
+                duration_ms=int(row[13]),
+                scored_at=row[14],
+            )
+            for row in result.result_rows
+        ]
+        return tsi.GenAIScoresQueryRes(scores=scores)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.genai_score_stats"
+    )
+    def genai_score_stats(
+        self, req: tsi.GenAIScoreStatsReq
+    ) -> tsi.GenAIScoreStatsRes:
+        """Aggregate score counts into time buckets."""
+        conditions = ["project_id = {project_id:String}"]
+        parameters: dict[str, Any] = {"project_id": req.project_id}
+        if req.signal_name:
+            conditions.append("signal_name = {signal_name:String}")
+            parameters["signal_name"] = req.signal_name
+        if req.entity_type:
+            conditions.append("entity_type = {entity_type:String}")
+            parameters["entity_type"] = req.entity_type
+        if req.start:
+            conditions.append(
+                "scored_at >= parseDateTime64BestEffort({start:String})"
+            )
+            parameters["start"] = req.start
+        if req.end:
+            conditions.append(
+                "scored_at <= parseDateTime64BestEffort({end:String})"
+            )
+            parameters["end"] = req.end
+
+        gran = max(1, min(req.granularity_seconds, 7 * 86400))
+        parameters["granularity"] = gran
+        where = " AND ".join(conditions)
+
+        bucket_query = f"""
+            SELECT
+                toString(toStartOfInterval(
+                    scored_at, toIntervalSecond({{granularity:UInt32}})
+                )) AS ts,
+                count() AS total,
+                countIf(outcome = 'pass') AS pass_count,
+                countIf(outcome = 'fail') AS fail_count,
+                countIf(outcome = 'error') AS error_count,
+                countIf(outcome = 'unknown') AS unknown_count
+            FROM genai_scores
+            WHERE {where}
+            GROUP BY ts
+            ORDER BY ts
+        """
+        bucket_result = self.ch_client.query(bucket_query, parameters=parameters)
+        buckets = [
+            tsi.GenAIScoreStatsBucket(
+                timestamp=row[0],
+                total=int(row[1]),
+                pass_count=int(row[2]),
+                fail_count=int(row[3]),
+                error_count=int(row[4]),
+                unknown_count=int(row[5]),
+            )
+            for row in bucket_result.result_rows
+        ]
+
+        totals_query = f"""
+            SELECT
+                count() AS total,
+                countIf(outcome = 'pass') AS pass_count,
+                countIf(outcome = 'fail') AS fail_count,
+                countIf(outcome = 'error') AS error_count,
+                countIf(outcome = 'unknown') AS unknown_count
+            FROM genai_scores
+            WHERE {where}
+        """
+        totals_result = self.ch_client.query(totals_query, parameters=parameters)
+        totals: tsi.GenAIScoreStatsBucket | None = None
+        if totals_result.result_rows:
+            tr = totals_result.result_rows[0]
+            totals = tsi.GenAIScoreStatsBucket(
+                timestamp="",
+                total=int(tr[0]),
+                pass_count=int(tr[1]),
+                fail_count=int(tr[2]),
+                error_count=int(tr[3]),
+                unknown_count=int(tr[4]),
+            )
+
+        return tsi.GenAIScoreStatsRes(buckets=buckets, totals=totals)
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_agents_query")
     def genai_agents_query(
         self, req: tsi.GenAIAgentsQueryReq
@@ -1751,81 +2054,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             agent_name=req.agent_name,
             buckets=buckets,
         )
-
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_span_start")
-    def genai_span_start(
-        self, req: tsi.GenAISpanStartReq
-    ) -> tsi.GenAISpanStartRes:
-        """Insert a lightweight span-start notification for live streaming."""
-        row = [
-            req.project_id,
-            req.trace_id,
-            req.span_id,
-            req.parent_span_id,
-            req.span_name,
-            req.span_kind,
-            req.operation_name,
-            req.agent_name,
-            req.request_model,
-            req.started_at,
-        ]
-        self.ch_client.insert(
-            "genai_span_starts",
-            [row],
-            column_names=[
-                "project_id",
-                "trace_id",
-                "span_id",
-                "parent_span_id",
-                "span_name",
-                "span_kind",
-                "operation_name",
-                "agent_name",
-                "request_model",
-                "started_at",
-            ],
-        )
-        return tsi.GenAISpanStartRes()
-
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_active_spans")
-    def genai_active_spans(
-        self, req: tsi.GenAIActiveSpansReq
-    ) -> tsi.GenAIActiveSpansRes:
-        """Return in-progress spans (started but not yet completed)."""
-        parameters: dict[str, Any] = {
-            "project_id": req.project_id,
-            "limit": min(req.limit, 500),
-        }
-        query = """
-            SELECT
-                s.project_id,
-                s.trace_id,
-                s.span_id,
-                s.parent_span_id,
-                s.span_name,
-                s.span_kind,
-                s.started_at,
-                s.operation_name,
-                s.agent_name,
-                s.request_model
-            FROM genai_span_starts s
-            LEFT JOIN genai_spans g
-                ON s.project_id = g.project_id
-               AND s.trace_id   = g.trace_id
-               AND s.span_id    = g.span_id
-            WHERE g.span_id IS NULL
-              AND s.project_id = {project_id:String}
-            ORDER BY s.started_at DESC
-            LIMIT {limit:UInt64}
-        """
-        query_result = self.ch_client.query(query, parameters=parameters)
-        col_names = query_result.column_names
-        spans = []
-        for row in query_result.result_rows:
-            row_dict = dict(zip(col_names, row))
-            row_dict["status_code"] = "UNSET"
-            spans.append(tsi.GenAISpanSchema(**row_dict))
-        return tsi.GenAIActiveSpansRes(spans=spans)
 
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched.genai_annotations_upsert"

@@ -42,8 +42,8 @@ import asyncio
 from agents import Agent, Runner, SQLiteSession, function_tool
 from agents.memory import OpenAIResponsesCompactionSession
 
-from weave.otel import setup_tracing
-from weave.otel.instrumentors.openai_agents import instrument
+from weave.agents import setup_tracing
+from weave.agents.instrumentors.openai_agents import instrument
 
 # ---------------------------------------------------------------------------
 # Tools

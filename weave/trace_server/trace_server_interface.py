@@ -525,40 +525,6 @@ class GenAISearchRes(BaseModel):
     total_conversations: int
 
 
-class GenAISpanStartReq(BaseModel):
-    """Lightweight notification that a span has opened (in-progress)."""
-
-    project_id: str
-    trace_id: str
-    span_id: str
-    parent_span_id: str = ""
-    span_name: str = ""
-    span_kind: str = "UNSPECIFIED"
-    operation_name: str = ""
-    agent_name: str = ""
-    request_model: str = ""
-    started_at: datetime.datetime
-
-
-class GenAISpanStartRes(BaseModel):
-    """Acknowledgement of a span start notification."""
-
-    ok: bool = True
-
-
-class GenAIActiveSpansReq(BaseModel):
-    """Request to list in-progress spans for a project."""
-
-    project_id: str
-    limit: int = 100
-
-
-class GenAIActiveSpansRes(BaseModel):
-    """Response containing in-progress spans (started but not yet completed)."""
-
-    spans: list[GenAISpanSchema]
-
-
 class GenAIChatMessage(BaseModel):
     """A single element in the structured agent trajectory / chat view.
 
@@ -859,6 +825,115 @@ class GenAIAnnotationsQueryRes(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# GenAI scores
+# ---------------------------------------------------------------------------
+
+
+class GenAIScoreInsert(BaseModel):
+    """A single score to insert into ``genai_scores``.
+
+    ``entity_type`` is one of ``span``, ``conversation``, or ``trace``.
+    ``outcome`` is one of ``pass``, ``fail``, ``error``, or ``unknown``.
+    """
+
+    score_id: str = ""
+    entity_type: str  # 'span', 'conversation', 'trace'
+    entity_id: str
+    conversation_id: str = ""
+    signal_name: str
+    outcome: str  # 'pass', 'fail', 'error', 'unknown'
+    score_value: float = 0.0
+    label: str = ""
+    explanation: str = ""
+    scorer_model: str = ""
+    scorer_prompt: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    duration_ms: int = 0
+    scored_at: str = ""  # ISO timestamp
+
+
+class GenAIScoresInsertReq(BaseModel):
+    """Insert one or more scores into ``genai_scores``."""
+
+    project_id: str
+    scores: list[GenAIScoreInsert]
+
+
+class GenAIScoresInsertRes(BaseModel):
+    """Result of inserting scores."""
+
+    inserted: int
+
+
+class GenAIScoreRow(BaseModel):
+    """A score row read from ``genai_scores``."""
+
+    project_id: str = ""
+    score_id: str = ""
+    entity_type: str = ""
+    entity_id: str = ""
+    conversation_id: str = ""
+    signal_name: str = ""
+    outcome: str = ""
+    score_value: float = 0.0
+    label: str = ""
+    explanation: str = ""
+    scorer_model: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    duration_ms: int = 0
+    scored_at: str = ""
+
+
+class GenAIScoresQueryReq(BaseModel):
+    """Query scores from ``genai_scores`` with optional filters."""
+
+    project_id: str
+    signal_name: str = ""
+    entity_type: str = ""
+    entity_ids: list[str] = Field(default_factory=list)
+    outcome: str = ""
+    limit: int = 100
+    offset: int = 0
+
+
+class GenAIScoresQueryRes(BaseModel):
+    """Response containing matching score rows."""
+
+    scores: list[GenAIScoreRow]
+
+
+class GenAIScoreStatsReq(BaseModel):
+    """Request for time-bucketed score statistics."""
+
+    project_id: str
+    signal_name: str = ""
+    entity_type: str = ""
+    start: str | None = None
+    end: str | None = None
+    granularity_seconds: int = 3600
+
+
+class GenAIScoreStatsBucket(BaseModel):
+    """Aggregated score counts for one time bucket."""
+
+    timestamp: str
+    total: int = 0
+    pass_count: int = 0
+    fail_count: int = 0
+    error_count: int = 0
+    unknown_count: int = 0
+
+
+class GenAIScoreStatsRes(BaseModel):
+    """Response with time-bucketed score statistics and optional overall totals."""
+
+    buckets: list[GenAIScoreStatsBucket] = Field(default_factory=list)
+    totals: GenAIScoreStatsBucket | None = None
+
+
+# ---------------------------------------------------------------------------
 # GenAI structured conversation ingest
 # ---------------------------------------------------------------------------
 
@@ -1030,6 +1105,19 @@ class GenAIATIFIngestRes(BaseModel):
     conversation_id: str
     trace_ids: list[str]
     span_count: int
+
+
+class GenAIExportATIFReq(BaseModel):
+    """Export a stored conversation as an ATIF trajectory."""
+
+    project_id: str = ""
+    conversation_id: str = ""
+
+
+class GenAIExportATIFRes(BaseModel):
+    """ATIF document built from the conversation chat projection."""
+
+    trajectory: ATIFTrajectory = Field(default_factory=ATIFTrajectory)
 
 
 # ---------------------------------------------------------------------------
@@ -3558,12 +3646,6 @@ class TraceServerInterface(Protocol):
     def genai_traces_chat(
         self, req: GenAITraceChatReq
     ) -> GenAITraceChatRes: ...
-    def genai_span_start(
-        self, req: GenAISpanStartReq
-    ) -> GenAISpanStartRes: ...
-    def genai_active_spans(
-        self, req: GenAIActiveSpansReq
-    ) -> GenAIActiveSpansRes: ...
     def genai_annotations_upsert(
         self, req: GenAIAnnotationsUpsertReq
     ) -> GenAIAnnotationsUpsertRes: ...
@@ -3573,6 +3655,9 @@ class TraceServerInterface(Protocol):
     def genai_annotations_query(
         self, req: GenAIAnnotationsQueryReq
     ) -> GenAIAnnotationsQueryRes: ...
+    def genai_scores_insert(self, req: GenAIScoresInsertReq) -> GenAIScoresInsertRes: ...
+    def genai_scores_query(self, req: GenAIScoresQueryReq) -> GenAIScoresQueryRes: ...
+    def genai_score_stats(self, req: GenAIScoreStatsReq) -> GenAIScoreStatsRes: ...
     def genai_search(self, req: GenAISearchReq) -> GenAISearchRes: ...
 
     # GenAI structured ingest API
@@ -3585,6 +3670,9 @@ class TraceServerInterface(Protocol):
     def genai_ingest_openhands(
         self, req: GenAIOpenHandsIngestReq
     ) -> GenAIOpenHandsIngestRes: ...
+    def genai_conversation_export_atif(
+        self, req: GenAIExportATIFReq
+    ) -> GenAIExportATIFRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

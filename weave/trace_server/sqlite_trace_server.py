@@ -2293,20 +2293,36 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             "genai_conversation_chat is not implemented for SQLite trace server"
         )
 
-    def genai_span_start(
-        self, req: tsi.GenAISpanStartReq
-    ) -> tsi.GenAISpanStartRes:
+    def genai_conversation_export_atif(
+        self, req: tsi.GenAIExportATIFReq
+    ) -> tsi.GenAIExportATIFRes:
         """Not implemented for SQLite trace server."""
         raise NotImplementedError(
-            "genai_span_start is not implemented for SQLite trace server"
+            "genai_conversation_export_atif is not implemented for SQLite trace server"
         )
 
-    def genai_active_spans(
-        self, req: tsi.GenAIActiveSpansReq
-    ) -> tsi.GenAIActiveSpansRes:
+    def genai_scores_insert(
+        self, req: tsi.GenAIScoresInsertReq
+    ) -> tsi.GenAIScoresInsertRes:
         """Not implemented for SQLite trace server."""
         raise NotImplementedError(
-            "genai_active_spans is not implemented for SQLite trace server"
+            "genai_scores_insert is not implemented for SQLite trace server"
+        )
+
+    def genai_scores_query(
+        self, req: tsi.GenAIScoresQueryReq
+    ) -> tsi.GenAIScoresQueryRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_scores_query is not implemented for SQLite trace server"
+        )
+
+    def genai_score_stats(
+        self, req: tsi.GenAIScoreStatsReq
+    ) -> tsi.GenAIScoreStatsRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_score_stats is not implemented for SQLite trace server"
         )
 
     def genai_annotations_upsert(

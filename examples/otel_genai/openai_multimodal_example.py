@@ -36,8 +36,8 @@ import openai
 import requests as http_requests
 from agents import Agent, Runner, function_tool
 
-from weave.otel import log_content, setup_tracing
-from weave.otel.instrumentors.openai_agents import instrument
+from weave.agents import log_content, setup_tracing
+from weave.agents.instrumentors.openai_agents import instrument
 
 # ---------------------------------------------------------------------------
 # Tools

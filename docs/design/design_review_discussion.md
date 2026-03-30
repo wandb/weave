@@ -495,15 +495,95 @@ The existing integrations already have all the information — the OpenAI patche
 
 The question is whether this is worth the SDK complexity. If new users default to GenAI mode and existing users are fine with calls, maintaining two emission modes in every integration might be cost without clear payoff. It could make sense as a migration path if we eventually want all LLM data in `genai_spans`, but it's not obvious we need to force that. Worth revisiting once we see how adoption of the GenAI schema plays out.
 
+### Phase 4: Evaluation spans (design)
+
+The OTel GenAI spec already defines a standard for evaluation results as spans ([PR #2563](https://github.com/open-telemetry/semantic-conventions/pull/2563), merged August 2025). The key attributes:
+
+- `gen_ai.operation.name` = `"evaluation"`
+- `gen_ai.evaluation.name` — the metric name (e.g., "no-hallucination")
+- `gen_ai.evaluation.score.value` — numeric score (Float64)
+- `gen_ai.evaluation.score.label` — categorical label ("pass", "fail", etc.)
+- `gen_ai.evaluation.explanation` — free-form reasoning from the judge
+
+The evaluation span **links to the evaluated span** via OTel span links (`links[]` with the target's `trace_id` + `span_id`).
+
+**Why this matters for signals:** Signal scores are LLM calls — the scoring worker calls a judge model and gets a pass/fail result. That judge call has `request_model`, `input_tokens`, `output_tokens`, `input_messages`, `output_messages`. Storing it as a GenAI span with `operation_name = 'evaluation'` captures both the evaluation result AND the judge call's full trace data in one row, in the same `genai_spans` table with the same typed columns and indexes.
+
+This replaces the current approach of writing signal outputs to `entity_annotations` (a generic EAV store where the classifier result is buried in a `json_value` string). With evaluation spans:
+
+- **`evaluation_label` is a typed column** — `countIf(evaluation_label = 'pass')` is a fast indexed scan, no JSON parsing.
+- **Time-series analytics work** — the span's `started_at` is in the sort key. "Pass rate for signal X over the last 7 days" is a simple `GROUP BY toStartOfDay(started_at)` query.
+- **Materialized views** can pre-aggregate evaluation counts by signal name + time bucket + outcome, just like `genai_agents` and `genai_conversations`.
+- **The scoring cost is tracked** — token usage, model, latency of the judge call are all typed columns on the same row.
+- **Ecosystem compatible** — anyone emitting OTel GenAI evaluation spans writes to the same pipeline.
+
+The `entity_annotations` table stays as a generic metadata store (display names, human labels, arbitrary tags) but is no longer the home for high-scale classifier outputs.
+
+### Phase 5: Imperative logging SDK — `weave.log()` (design)
+
+The current ingest model is **batch**: you post a complete trajectory (all turns) in a single request. But agents work incrementally — steps happen one at a time, and the trajectory isn't complete until the conversation ends (if it ever does). We need an imperative API that lets instrumentors log events as they happen.
+
+**SDK surface:**
+
+```python
+import weave
+
+conv = weave.conversation("session-123", agent_name="my-agent", model="gpt-4o")
+
+# Log messages as they happen
+conv.user("What's the weather in Tokyo?")
+conv.assistant("Let me check that for you.")
+conv.tool_call("get_weather", arguments={"city": "Tokyo"}, result="Clear, 75°F")
+conv.assistant("It's clear and 75°F in Tokyo right now.")
+conv.flush()  # sends the accumulated turn to the server
+
+# Next turn in the same conversation
+conv.user("What about Osaka?")
+conv.assistant("Checking Osaka now.")
+conv.tool_call("get_weather", arguments={"city": "Osaka"}, result="Partly cloudy, 72°F")
+conv.assistant("Osaka is partly cloudy at 72°F.")
+conv.flush()
+```
+
+Or for instrumentors working with ATIF-style steps:
+
+```python
+conv = weave.conversation("session-123")
+conv.step(source="user", message="What's the weather?")
+conv.step(source="agent", message="Let me check.", tool_calls=[...])
+conv.step(source="agent", message="It's 75°F.", metrics={"prompt_tokens": 100, "completion_tokens": 50})
+conv.flush()
+```
+
+**Architecture: client buffers, server stays stateless.**
+
+The SDK buffers events in-process and groups them into turns (splitting on user messages, same logic as the ATIF adapter). On `flush()`, it converts the buffered events into a `GenAIStructuredTurn` and POSTs to the existing `/genai/conversations/ingest` endpoint. No new server endpoint needed — the server receives complete turns, same as today.
+
+Key properties:
+
+- **Format-agnostic.** The `conversation` object accepts messages, steps, or raw dicts. The SDK normalizes to the structured turn format on flush.
+- **Automatic flushing.** `flush()` can be called explicitly, or the SDK can auto-flush when it detects a turn boundary (next user message after agent content), on a timer, or on process exit via `atexit`.
+- **Conversation linking.** The `conversation_id` ties all turns together. The server appends new turns to the existing conversation (each turn is a new trace within the same `conversation_id`).
+- **No server state.** The server doesn't accumulate events or manage sessions. Each `flush()` is an independent POST of one or more complete turns. This keeps the server simple and horizontally scalable.
+- **Works alongside OTel.** If you're also running OTel instrumentation (e.g., OpenAI Agents SDK), the imperative log and the auto-instrumented spans land in the same `genai_spans` table, linked by `conversation_id`. You can use both: auto-instrumentation for framework-managed agents, `weave.log()` for custom agent loops you control.
+
+**What this enables:**
+
+- **IDE agent logging.** The daemon currently translates IDE hook events into OTel spans. With `weave.log()`, it could use the simpler imperative API instead — each tool use, each agent message logged directly.
+- **Custom agent loops.** If you're building an agent loop in a `while` loop (not using a framework), `weave.log()` is the natural instrumentation — no OTel SDK required.
+- **Notebook / REPL workflows.** Log conversational interactions interactively, see them in Sink immediately after each `flush()`.
+- **Non-Python instrumentors.** The same API pattern works in TypeScript, Go, or any language — buffer locally, POST JSON to the ingest endpoint.
+
 ### Summary
 
 | Phase                            | What                                                                                                                     | Status                                   |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
 | **1. Ship Sink**                 | `genai_spans` for OTel/agent workloads, Weave calls unchanged for `@weave.op()`                                          | Implemented (on branch)                  |
 | **2. Signals + scoring**         | Sink scoring worker, Signals tab, preset classifiers, score display across Sink tabs                                     | Implemented (on branch)                  |
-| **3. Evals on GenAI data**       | Eval pipelines reading GenAI spans, scoring, writing annotations                                                         | Next — builds on signals worker          |
-| **4. Stats + alerting APIs**     | Deterministic analytics endpoints on typed columns (tokens/cost/latency aggregations, anomaly detection, alerting rules) | Next — typed columns make this tractable |
-| **5. Maybe: OTel emitting mode** | Weave integrations emit structured GenAI spans instead of JSON blobs                                                     | Revisit based on adoption                |
+| **3. Evals as GenAI spans**      | Scoring worker emits evaluation spans (OTel GenAI eval semconv) instead of annotations. Typed columns for outcomes.       | Design (this doc)                        |
+| **4. Imperative logging SDK**    | `weave.log()` / `weave.conversation()` — client-side buffering with turn-level flush to existing ingest endpoint          | Design (this doc)                        |
+| **5. Stats + alerting APIs**     | Deterministic analytics endpoints on typed columns (tokens/cost/latency aggregations, anomaly detection, alerting rules) | Next — typed columns make this tractable |
+| **6. Maybe: OTel emitting mode** | Weave integrations emit structured GenAI spans instead of JSON blobs                                                     | Revisit based on adoption                |
 
 ---
 
