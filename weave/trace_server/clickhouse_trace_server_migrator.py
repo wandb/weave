@@ -629,6 +629,12 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         * **Atomic engine** — the database does not auto-replicate, so we must
           explicitly rewrite ``MergeTree`` → ``ReplicatedMergeTree`` and add
           ``ON CLUSTER`` to every DDL statement.
+
+        In the distributed migrator, ``db_management`` is intentionally Atomic
+        so the migrations table can use an explicit ``ReplicatedMergeTree``
+        with a shared ZooKeeper path across all shards.  A Replicated-engine
+        database would auto-assign per-shard ZK paths, causing each shard to
+        track migration state independently instead of sharing it.
         """
         if self._uses_replicated_db_engine(target_db):
             return sql_query

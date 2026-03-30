@@ -386,7 +386,7 @@ def test_replicated_management_table_follows_database_engine(replicated_migrator
     )
 
 
-@patch("weave.trace_server.database_engine.time.sleep")
+@patch("tenacity.nap.time.sleep")
 def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
     """Engine discovery retries until visible, then uses the result for DDL.
     When it never appears, the error includes the CREATE DATABASE statement.
