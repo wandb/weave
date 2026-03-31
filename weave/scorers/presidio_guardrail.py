@@ -48,7 +48,7 @@ class PresidioScorer(weave.Scorer):
     _analyzer: Optional["AnalyzerEngine"] = PrivateAttr(default=None)
     _anonymizer: Optional["AnonymizerEngine"] = PrivateAttr(default=None)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
         from presidio_anonymizer import AnonymizerEngine
 
@@ -78,7 +78,9 @@ class PresidioScorer(weave.Scorer):
 
             if invalid_entities:
                 logger.warning(
-                    f"\nThe following entities are not available and will be ignored: {invalid_entities}\nContinuing with valid entities: {valid_entities}"
+                    "\nThe following entities are not available and will be ignored: %s\nContinuing with valid entities: %s",
+                    invalid_entities,
+                    valid_entities,
                 )
                 self.selected_entities = valid_entities
         else:
@@ -133,7 +135,7 @@ class PresidioScorer(weave.Scorer):
             anonymized_text = anonymized_result.text
         return anonymized_text
 
-    @weave.op
+    @weave.op(kind="guardrail")
     def score(
         self, *, output: str, entities: list[str] | None = None, **kwargs: Any
     ) -> WeaveScorerResult:

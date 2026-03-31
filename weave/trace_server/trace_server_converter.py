@@ -18,7 +18,9 @@ class InvalidInternalRef(ValueError):
 
 
 def universal_ext_to_int_ref_converter(
-    obj: A, convert_ext_to_int_project_id: Callable[[str], str]
+    obj: A,
+    convert_ext_to_int_project_id: Callable[[str], str],
+    verify_internal_project_id: Callable[[str], bool] | None = None,
 ) -> A:
     """Takes any object and recursively replaces all external references with
     internal references. The external references are expected to be in the
@@ -29,6 +31,11 @@ def universal_ext_to_int_ref_converter(
         obj: The object to convert.
         convert_ext_to_int_project_id: A function that takes an external
             project ID and returns the internal project ID.
+        verify_internal_project_id: Optional callback that returns True if
+            the given internal project_id should be accepted. Callers
+            typically build this to accept the request's own project_id
+            (fast set check) and fall back to an access check for
+            cross-project refs.
 
     Returns:
         The object with all external references replaced with internal
@@ -55,12 +62,26 @@ def universal_ext_to_int_ref_converter(
     def mapper(obj: B) -> B:
         if isinstance(obj, str):
             if obj.startswith(weave_prefix):
-                return cast(B, replace_ref(obj))
+                result = replace_ref(obj)
+                return cast(B, result)
             elif obj.startswith(weave_internal_prefix):
-                # It is important to raise here as this would be the result of
-                # an external client attempting to write internal refs directly.
-                # We want to maintain full control over the internal refs.
-                raise InvalidExternalRef("Encountered unexpected ref format.")
+                # Internal refs are only accepted when the verify callback
+                # confirms the project_id is valid. Without this check, a
+                # malicious client could embed refs to arbitrary private
+                # projects.
+                rest = obj[len(weave_internal_prefix) :]
+                parts = rest.split("/", 2)
+                if len(parts) < 2:
+                    raise InvalidExternalRef(
+                        "Invalid internal ref format: missing project_id or kind."
+                    )
+                ref_project_id = parts[0]
+                if (
+                    verify_internal_project_id is not None
+                    and verify_internal_project_id(ref_project_id)
+                ):
+                    return obj
+                raise InvalidExternalRef("Encountered unexpected internal ref format.")
         return obj
 
     return _map_values(obj, mapper)

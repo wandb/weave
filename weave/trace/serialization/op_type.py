@@ -40,6 +40,9 @@ MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{4,}>", re.ASCII)
 
 CODE_DEP_ERROR_SENTINEL = "<error>"
 
+# Maximum recursion depth when resolving code dependencies
+MAX_CODE_DEPS_RECURSION_DEPTH = 20
+
 
 def arg_names(args: ast.arguments) -> set[str]:
     arg_names = set()
@@ -169,10 +172,8 @@ class RefJSONEncoder(json.JSONEncoder):
     SPECIAL_REF_TOKEN = "__WEAVE_REF__"
 
     def default(self, o: Any) -> Any:
-        if isinstance(o, (ObjectRef)):
+        if isinstance(o, ObjectRef):
             ref_code = f"weave.ref('{o!s}')"
-
-        if ref_code is not None:
             # This will be a quoted json string in the json.dumps result. We put special
             # tokens in so we can remove the quotes in the final result
             return f"{self.SPECIAL_REF_TOKEN}{ref_code}.get(){self.SPECIAL_REF_TOKEN}"
@@ -325,7 +326,7 @@ def get_code_deps_safe(
     try:
         return _get_code_deps(fn, artifact, {}, depth)
     except Exception as e:
-        logger.info(f"Error getting code deps for {fn}: {e}")
+        logger.info("Error getting code deps for %s: %s", fn, e)
         return {
             "import_code": [],
             "code": [CODE_DEP_ERROR_SENTINEL],
@@ -340,7 +341,7 @@ def _get_code_deps(
     depth: int = 0,
 ) -> GetCodeDepsResult:
     warnings: list[str] = []
-    if depth > 20:
+    if depth > MAX_CODE_DEPS_RECURSION_DEPTH:
         warnings = [
             "Recursion depth exceeded in get_code_deps, this may indicate circular dependencies, which are not yet handled."
         ]
@@ -453,7 +454,7 @@ def _get_code_deps(
                     if should_redact(var_name):
                         json_val = REDACTED_VALUE
                     else:
-                        json_val = to_json(var_value, client._project_id(), client)
+                        json_val = to_json(var_value, client.project_id, client)
                         if _has_memory_address(json_val):
                             json_val = _replace_memory_address(json_val)
                 except Exception as e:
@@ -632,7 +633,7 @@ def load_instance(
     try:
         mod = __import__(import_name, fromlist=[module_dir])
     except Exception as e:
-        logger.info(f"Op loading exception. This might be fine! {e}")
+        logger.info("Op loading exception. This might be fine! %s", e)
         import traceback
 
         traceback.print_exc()
@@ -652,7 +653,11 @@ def load_instance(
     last_op_function = find_last_weave_op_function(inspect.getsource(mod))
     if last_op_function is None:
         logger.info(
-            f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=}"
+            "Unexpected Weave module saved in: %s. No op defs found. All members: %s. module_dir=%s import_name=%s",
+            module_path,
+            dir(mod),
+            module_dir,
+            import_name,
         )
         return None
 

@@ -11,13 +11,19 @@ from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient, generate_id
 from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
+    EvalResultsQueryReq,
     EvaluateModelReq,
     EvaluateModelRes,
+    EvaluationRunCreateReq,
     EvaluationStatusComplete,
     EvaluationStatusNotFound,
     EvaluationStatusReq,
     EvaluationStatusRunning,
     ObjCreateReq,
+    PredictionCreateReq,
+    PredictionFinishReq,
+    ScoreCreateReq,
+    ScorerCreateReq,
     TableCreateReq,
     TraceServerInterface,
     TraceStatus,
@@ -42,7 +48,7 @@ async def test_evaluation_status(client):
     def get_status():
         client.flush()
         return client.server.evaluation_status(
-            EvaluationStatusReq(project_id=client._project_id(), call_id=eval_call_id)
+            EvaluationStatusReq(project_id=client.project_id, call_id=eval_call_id)
         ).status
 
     @weave.op
@@ -126,7 +132,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             project=project,
             name=model_object_id,
             _digest=model_create_res.digest,
-        ).uri()
+        ).uri
 
     def create_dataset() -> str:
         """Create a test dataset and return its reference URI."""
@@ -166,7 +172,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             project=project,
             name=dataset_object_id,
             _digest=dataset_create_res.digest,
-        ).uri()
+        ).uri
 
     def create_scorer() -> str:
         """Create a test scorer and return its reference URI."""
@@ -201,7 +207,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             project=project,
             name=scorer_model_object_id,
             _digest=scorer_model_create_res.digest,
-        ).uri()
+        ).uri
 
         # Then create the scorer
         scorer_object_id = "test_eval_llm_judge_scorer"
@@ -228,7 +234,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             project=project,
             name=scorer_object_id,
             _digest=scorer_create_res.digest,
-        ).uri()
+        ).uri
 
     def create_evaluation(dataset_ref: str, scorer_ref: str) -> str:
         """Create a test evaluation and return its reference URI."""
@@ -257,7 +263,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             project=project,
             name=evaluation_object_id,
             _digest=evaluation_create_res.digest,
-        ).uri()
+        ).uri
 
     model_ref_uri = create_model()
     evaluation_ref_uri = create_evaluation(create_dataset(), create_scorer())
@@ -279,7 +285,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     the evaluation through the evaluate_model API.
     """
     is_sqlite = client_is_sqlite(client)
-    project_id = client._project_id()
+    project_id = client.project_id
     entity, project = from_project_id(project_id)
 
     def evaluate_model_wrapped(req: EvaluateModelReq):
@@ -389,3 +395,186 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
             "LLMAsAJudgeScorer": {"score": {"mean": 9.0}},
             "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
         }
+
+
+def test_eval_results_query_basic(client):
+    project_id = client.project_id
+    entity, project = from_project_id(project_id)
+
+    scorer_res = client.server.scorer_create(
+        ScorerCreateReq(
+            project_id=project_id,
+            name="basic_scorer",
+            op_source_code="def score(output):\n    return 1",
+        )
+    )
+    scorer_ref = (
+        f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+    )
+
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://basic",
+            model="model://basic",
+        )
+    )
+    pred = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model="model://basic",
+            inputs={"x": 1},
+            output="result",
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.score_create(
+        ScoreCreateReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+            scorer=scorer_ref,
+            value=0.9,
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+        )
+    )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+        )
+    )
+
+    assert res.total_rows == 1
+    assert len(res.rows) == 1
+    trial = res.rows[0].evaluations[0].trials[0]
+    assert "basic_scorer" in trial.scores
+    assert trial.scores["basic_scorer"] == 0.9
+
+
+def test_eval_results_query_nonexistent_eval_root(client):
+    project_id = client.project_id
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=["00000000-0000-0000-0000-000000000000"],
+        )
+    )
+
+    assert res.total_rows == 0
+    assert res.rows == []
+
+
+def test_eval_results_query_multiple_evals(client):
+    project_id = client.project_id
+
+    run_a = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://multi-a",
+            model="model://multi-a",
+        )
+    )
+    run_b = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://multi-b",
+            model="model://multi-b",
+        )
+    )
+
+    for run, model in [(run_a, "model://multi-a"), (run_b, "model://multi-b")]:
+        pred = client.server.prediction_create(
+            PredictionCreateReq(
+                project_id=project_id,
+                model=model,
+                inputs={"x": "shared"},
+                output="out",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        client.server.prediction_finish(
+            PredictionFinishReq(
+                project_id=project_id,
+                prediction_id=pred.prediction_id,
+            )
+        )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run_a.evaluation_run_id, run_b.evaluation_run_id],
+        )
+    )
+
+    assert res.total_rows == 1
+    assert len(res.rows) == 1
+    assert {e.evaluation_call_id for e in res.rows[0].evaluations} == {
+        run_a.evaluation_run_id,
+        run_b.evaluation_run_id,
+    }
+
+
+def test_eval_results_resolve_refs_only_for_paginated_rows(client):
+    """Verify that resolve_row_refs only resolves refs for the paginated slice"""
+    project_id = client.project_id
+
+    # create an eval with 5 rows
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://ref-resolve-test",
+            model="model://ref-resolve-test",
+        )
+    )
+    for i in range(5):
+        pred = client.server.prediction_create(
+            PredictionCreateReq(
+                project_id=project_id,
+                model="model://ref-resolve-test",
+                inputs={"x": f"input_{i}"},
+                output=f"output_{i}",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        client.server.prediction_finish(
+            PredictionFinishReq(
+                project_id=project_id,
+                prediction_id=pred.prediction_id,
+            )
+        )
+
+    original_refs_read_batch = client.server.refs_read_batch
+    refs_read_batch_calls = []
+
+    def tracking_refs_read_batch(req):
+        refs_read_batch_calls.append(req)
+        return original_refs_read_batch(req)
+
+    with mock.patch.object(
+        client.server, "refs_read_batch", side_effect=tracking_refs_read_batch
+    ):
+        paginated_res = client.server.eval_results_query(
+            EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                include_raw_data_rows=True,
+                resolve_row_refs=True,
+                limit=2,
+                offset=0,
+            )
+        )
+
+    assert paginated_res.total_rows == 5
+    assert len(paginated_res.rows) == 2
+
+    for call in refs_read_batch_calls:
+        # only resolve refs for the paginated slice, not all rows
+        assert len(call.refs) <= 2

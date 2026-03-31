@@ -779,7 +779,7 @@ class SavedView:
             table.add_row("Description", self.base.description)
         if self.ref:
             table.add_row("URL", self.ui_url())
-            table.add_row("Ref", self.ref.uri())
+            table.add_row("Ref", self.ref.uri)
         table.add_row("View type", self.view_type)
         if self.base.definition.filter is not None:
             table.add_row(

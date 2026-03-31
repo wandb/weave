@@ -52,7 +52,7 @@ def test_ref_parsing_external_sanitized():
         _extra=("key", string_with_every_char()),
     )
 
-    ref_str = ref_start.uri()
+    ref_str = ref_start.uri
     exp_ref = f"{refs_internal.WEAVE_SCHEME}:///{ref_start.entity}/{ref_start.project}/object/{ref_start.name}:{ref_start.digest}/{ref_start.extra[0]}/{quote(ref_start.extra[1])}"
     assert ref_str == exp_ref
 
@@ -78,7 +78,7 @@ def test_ref_parsing_internal_sanitized():
         extra=["key", string_with_every_char()],
     )
 
-    ref_str = ref_start.uri()
+    ref_str = ref_start.uri
     exp_ref = f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///{ref_start.project_id}/object/{ref_start.name}:{ref_start.version}/{ref_start.extra[0]}/{quote(ref_start.extra[1])}"
     assert ref_str == exp_ref
 

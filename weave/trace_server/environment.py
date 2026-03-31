@@ -3,6 +3,18 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# Default port numbers
+DEFAULT_KAFKA_BROKER_PORT = 9092
+DEFAULT_CLICKHOUSE_PORT = 8123
+
+# Scoring worker defaults
+DEFAULT_SCORING_WORKER_BATCH_SIZE = 100
+DEFAULT_SCORING_WORKER_BATCH_TIMEOUT = 5
+
+# ClickHouse async insert timeout defaults (milliseconds)
+DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS = 100
+DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS = 1000
+
 # Kafka Settings
 
 
@@ -13,7 +25,7 @@ def kafka_broker_host() -> str:
 
 def kafka_broker_port() -> int:
     """The port of the kafka broker."""
-    return int(os.environ.get("KAFKA_BROKER_PORT", "9092"))
+    return int(os.environ.get("KAFKA_BROKER_PORT", str(DEFAULT_KAFKA_BROKER_PORT)))
 
 
 def kafka_client_user() -> str | None:
@@ -34,7 +46,7 @@ def kafka_producer_max_buffer_size() -> int | None:
     try:
         return int(size)
     except ValueError:
-        logger.exception(f"KAFKA_PRODUCER_MAX_BUFFER_SIZE value '{size}' is not valid")
+        logger.exception("KAFKA_PRODUCER_MAX_BUFFER_SIZE value '%s' is not valid", size)
         return None
 
 
@@ -59,12 +71,20 @@ def wf_enable_online_eval() -> bool:
 
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", "100"))
+    return int(
+        os.environ.get(
+            "WF_SCORING_WORKER_BATCH_SIZE", str(DEFAULT_SCORING_WORKER_BATCH_SIZE)
+        )
+    )
 
 
 def wf_scoring_worker_batch_timeout() -> int:
     """The timeout for the scoring worker."""
-    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", "5"))
+    return int(
+        os.environ.get(
+            "WF_SCORING_WORKER_BATCH_TIMEOUT", str(DEFAULT_SCORING_WORKER_BATCH_TIMEOUT)
+        )
+    )
 
 
 def wf_scoring_worker_check_cancellation() -> bool:
@@ -101,6 +121,19 @@ def wf_scoring_worker_debounced_scoring_max_sampling_rate() -> float:
     return max(0.0, min(1.0, rate))
 
 
+def wf_scoring_worker_debounced_scoring_max_call_history() -> int:
+    """Max number of prior calls to fetch per task when aggregation_method is 'all_messages'. 0 = disabled."""
+    default = 0
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_DEBOUNCED_SCORING_MAX_CALL_HISTORY", str(default)
+    )
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(0, value)
+
+
 # Clickhouse Settings
 
 
@@ -111,7 +144,7 @@ def wf_clickhouse_host() -> str:
 
 def wf_clickhouse_port() -> int:
     """The port of the clickhouse server."""
-    return int(os.environ.get("WF_CLICKHOUSE_PORT", "8123"))
+    return int(os.environ.get("WF_CLICKHOUSE_PORT", str(DEFAULT_CLICKHOUSE_PORT)))
 
 
 def wf_clickhouse_user() -> str:
@@ -180,7 +213,7 @@ def wf_clickhouse_max_memory_usage() -> int | None:
     try:
         return int(mem)
     except ValueError:
-        logger.exception(f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not valid")
+        logger.exception("WF_CLICKHOUSE_MAX_MEMORY_USAGE value '%s' is not valid", mem)
         return None
 
 
@@ -193,7 +226,7 @@ def wf_clickhouse_max_execution_time() -> int | None:
         return int(time)
     except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not valid"
+            "WF_CLICKHOUSE_MAX_EXECUTION_TIME value '%s' is not valid", time
         )
         return None
 
@@ -208,14 +241,28 @@ def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
     env_key = "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS"
     val = os.environ.get(env_key)
     if val is None:
-        return 100
+        return DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS
     try:
         return int(val)
     except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '{val}' is not valid"
+            "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS value '%s' is not valid",
+            val,
         )
-        return 100
+        return DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS
+
+
+def wf_clickhouse_disable_lightweight_update() -> bool:
+    """Disable ClickHouse lightweight UPDATE/DELETE support.
+
+    Set to 'true' for old ClickHouse versions that do not support the
+    allow_experimental_lightweight_update setting. When disabled, endpoints
+    that rely on lightweight updates will return a 502 error.
+    """
+    return (
+        os.environ.get("WF_CLICKHOUSE_DISABLE_LIGHTWEIGHT_UPDATE", "false").lower()
+        == "true"
+    )
 
 
 def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
@@ -229,14 +276,15 @@ def wf_clickhouse_async_insert_busy_timeout_max_ms() -> int:
     env_key = "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS"
     val = os.environ.get(env_key)
     if val is None:
-        return 1000
+        return DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS
     try:
         return int(val)
     except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '{val}' is not valid"
+            "WF_CLICKHOUSE_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS value '%s' is not valid",
+            val,
         )
-        return 1000
+        return DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS
 
 
 # BYOB Settings
@@ -353,3 +401,11 @@ def inference_service_base_url() -> str:
     return os.environ.get(
         "INFERENCE_SERVICE_BASE_URL", "https://api.inference.wandb.ai/v1"
     )
+
+
+# Redis Settings
+
+
+def redis_url() -> str | None:
+    """Redis connection URL (e.g., redis://127.0.0.1:6379)."""
+    return os.environ.get("WEAVE_REDIS_URL")

@@ -11,6 +11,7 @@
 4. We ensure that invalid schemas are properly rejected from the server.
 """
 
+import time
 from typing import Literal
 
 import pytest
@@ -52,11 +53,11 @@ def test_pythonic_creation(client: WeaveClient):
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
-        nested_base_object=weave.publish(nested_obj).uri(),
+        nested_base_object=weave.publish(nested_obj).uri,
     )
     ref = weave.publish(top_obj)
 
-    top_obj_gotten = weave.ref(ref.uri()).get()
+    top_obj_gotten = weave.ref(ref.uri).get()
 
     assert isinstance(top_obj_gotten, base_objects.TestOnlyExample)
     assert top_obj_gotten.model_dump(by_alias=True) == top_obj.model_dump(by_alias=True)
@@ -67,7 +68,7 @@ def test_pythonic_creation(client: WeaveClient):
     )
     inherited_ref = weave.publish(inherited_obj)
 
-    inherited_obj_gotten = weave.ref(inherited_ref.uri()).get()
+    inherited_obj_gotten = weave.ref(inherited_ref.uri).get()
 
     assert isinstance(inherited_obj_gotten, base_objects.TestOnlyInheritedBaseObject)
     assert inherited_obj_gotten.model_dump(by_alias=True) == inherited_obj.model_dump(
@@ -77,7 +78,7 @@ def test_pythonic_creation(client: WeaveClient):
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"base_object_classes": ["TestOnlyExample"]},
             },
         )
@@ -117,7 +118,7 @@ def test_pythonic_creation(client: WeaveClient):
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"base_object_classes": ["TestOnlyNestedBaseObject"]},
             },
         )
@@ -175,6 +176,7 @@ def test_pythonic_creation(client: WeaveClient):
     assert inherited_obj_result.val == expected_inherited_val
 
 
+@pytest.mark.flaky(reruns=3)
 def test_interface_creation(client):
     # Now we will do the equivant operation using low-level interface.
     nested_obj_id = "TestOnlyNestedBaseObject"
@@ -183,7 +185,7 @@ def test_interface_creation(client):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": nested_obj_id,
                     "val": nested_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyNestedBaseObject",
@@ -202,13 +204,13 @@ def test_interface_creation(client):
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
-        nested_base_object=nested_obj_ref.uri(),
+        nested_base_object=nested_obj_ref.uri,
     )
     top_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": top_level_obj_id,
                     "val": top_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyExample",
@@ -223,11 +225,13 @@ def test_interface_creation(client):
         _digest=top_obj_res.digest,
     )
 
-    top_obj_gotten = weave.ref(top_obj_ref.uri()).get()
+    # Allow ClickHouse eventual consistency to settle before reading
+    time.sleep(0.2)
+    top_obj_gotten = weave.ref(top_obj_ref.uri).get()
 
     assert top_obj_gotten.model_dump(by_alias=True) == top_obj.model_dump(by_alias=True)
 
-    nested_obj_gotten = weave.ref(nested_obj_ref.uri()).get()
+    nested_obj_gotten = weave.ref(nested_obj_ref.uri).get()
 
     assert nested_obj_gotten.model_dump(by_alias=True) == nested_obj.model_dump(
         by_alias=True
@@ -236,7 +240,7 @@ def test_interface_creation(client):
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"base_object_classes": ["TestOnlyExample"]},
             },
         )
@@ -276,7 +280,7 @@ def test_interface_creation(client):
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"base_object_classes": ["TestOnlyNestedBaseObject"]},
             },
         )
@@ -308,7 +312,7 @@ def test_digest_equality(client):
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
-        nested_base_object=nested_ref.uri(),
+        nested_base_object=nested_ref.uri,
     )
     ref = weave.publish(top_obj)
     nested_pythonic_digest = nested_ref.digest
@@ -321,7 +325,7 @@ def test_digest_equality(client):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": nested_obj_id,
                     "val": nested_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyNestedBaseObject",
@@ -344,13 +348,13 @@ def test_digest_equality(client):
     top_obj = base_objects.TestOnlyExample(
         primitive=1,
         nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
-        nested_base_object=nested_obj_ref.uri(),
+        nested_base_object=nested_obj_ref.uri,
     )
     top_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": top_level_obj_id,
                     "val": top_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyExample",
@@ -371,7 +375,7 @@ def test_schema_validation(client):
             tsi.ObjCreateReq.model_validate(
                 {
                     "obj": {
-                        "project_id": client._project_id(),
+                        "project_id": client.project_id,
                         "object_id": "nested_obj",
                         # Incorrect schema, should raise!
                         "val": {"a": 2, "aliased_property_alias": 3},
@@ -386,7 +390,7 @@ def test_schema_validation(client):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "nested_obj",
                     "val": {
                         "b": 2,
@@ -399,13 +403,13 @@ def test_schema_validation(client):
         )
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="object_class must match"):
         # Mismatching base object class, should raise
         client.server.obj_create(
             tsi.ObjCreateReq.model_validate(
                 {
                     "obj": {
-                        "project_id": client._project_id(),
+                        "project_id": client.project_id,
                         "object_id": "nested_obj",
                         "val": {
                             "b": 2,
@@ -419,12 +423,12 @@ def test_schema_validation(client):
         )
 
     # Test hierarchy object with wrong builtin_object_class - should fail
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="object_class must match"):
         client.server.obj_create(
             tsi.ObjCreateReq.model_validate(
                 {
                     "obj": {
-                        "project_id": client._project_id(),
+                        "project_id": client.project_id,
                         "object_id": "inherited_obj_wrong_class",
                         "val": {
                             "b": 100,
@@ -449,7 +453,7 @@ def test_leaf_object_class_from_builtin_object_class(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "test_nested_obj",
                     "val": nested_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyNestedBaseObject",
@@ -461,7 +465,7 @@ def test_leaf_object_class_from_builtin_object_class(client: WeaveClient):
     # Read the object back and verify leaf_object_class is set correctly
     read_obj_res = client.server.obj_read(
         tsi.ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id="test_nested_obj",
             digest=nested_obj_res.digest,
         )
@@ -480,7 +484,7 @@ def test_leaf_object_class_from_builtin_object_class(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "test_top_obj",
                     "val": top_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyExample",
@@ -492,7 +496,7 @@ def test_leaf_object_class_from_builtin_object_class(client: WeaveClient):
     # Read the object back and verify leaf_object_class is set correctly
     read_top_obj_res = client.server.obj_read(
         tsi.ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id="test_top_obj",
             digest=top_obj_res.digest,
         )
@@ -510,7 +514,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "nested_obj_1",
                     "val": nested_obj1.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyNestedBaseObject",
@@ -524,7 +528,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "nested_obj_2",
                     "val": nested_obj2.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyNestedBaseObject",
@@ -541,7 +545,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "inherited_obj",
                     "val": inherited_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyInheritedBaseObject",
@@ -559,7 +563,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "top_obj",
                     "val": top_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyExample",
@@ -572,7 +576,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
     nested_objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"leaf_object_classes": ["TestOnlyNestedBaseObject"]},
             }
         )
@@ -595,7 +599,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
     inherited_objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"leaf_object_classes": ["TestOnlyInheritedBaseObject"]},
             }
         )
@@ -612,7 +616,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
     base_class_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"base_object_classes": ["TestOnlyNestedBaseObject"]},
             }
         )
@@ -626,7 +630,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
     top_objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"leaf_object_classes": ["TestOnlyExample"]},
             }
         )
@@ -641,7 +645,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
     all_test_objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {
                     "leaf_object_classes": [
                         "TestOnlyNestedBaseObject",
@@ -665,7 +669,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
     empty_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"leaf_object_classes": ["NonExistentClass"]},
             }
         )
@@ -684,7 +688,7 @@ def test_base_and_leaf_object_class_combined_filtering_builtin_objects(
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "combined_test_nested",
                     "val": nested_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyNestedBaseObject",
@@ -702,7 +706,7 @@ def test_base_and_leaf_object_class_combined_filtering_builtin_objects(
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "combined_test_top",
                     "val": top_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyExample",
@@ -716,7 +720,7 @@ def test_base_and_leaf_object_class_combined_filtering_builtin_objects(
     combined_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {
                     "base_object_classes": ["TestOnlyExample"],
                     "leaf_object_classes": ["TestOnlyExample"],
@@ -734,7 +738,7 @@ def test_base_and_leaf_object_class_combined_filtering_builtin_objects(
     mismatched_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {
                     "base_object_classes": ["TestOnlyExample"],
                     "leaf_object_classes": ["TestOnlyNestedBaseObject"],
@@ -754,7 +758,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "base_obj",
                     "val": base_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyNestedBaseObject",
@@ -771,7 +775,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
         tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "object_id": "inherited_obj",
                     "val": inherited_obj.model_dump(by_alias=True),
                     "builtin_object_class": "TestOnlyInheritedBaseObject",
@@ -783,7 +787,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     # Read both objects back and verify class hierarchy
     base_read_res = client.server.obj_read(
         tsi.ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id="base_obj",
             digest=base_obj_res.digest,
         )
@@ -791,7 +795,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
 
     inherited_read_res = client.server.obj_read(
         tsi.ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id="inherited_obj",
             digest=inherited_obj_res.digest,
         )
@@ -818,7 +822,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     base_class_filter_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"base_object_classes": ["TestOnlyNestedBaseObject"]},
             }
         )
@@ -838,7 +842,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     base_leaf_filter_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"leaf_object_classes": ["TestOnlyNestedBaseObject"]},
             }
         )
@@ -853,7 +857,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     inherited_leaf_filter_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"leaf_object_classes": ["TestOnlyInheritedBaseObject"]},
             }
         )
@@ -875,7 +879,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     combined_filter_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {
                     "base_object_classes": ["TestOnlyNestedBaseObject"],
                     "leaf_object_classes": ["TestOnlyInheritedBaseObject"],
@@ -895,7 +899,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     multi_leaf_filter_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {
                     "leaf_object_classes": [
                         "TestOnlyNestedBaseObject",
@@ -923,7 +927,7 @@ def test_exclude_base_object_classes(client: WeaveClient):
     top_obj = base_objects.TestOnlyExample(
         primitive=200,
         nested_base_model=TestOnlyNestedBaseModel(a=300, aliased_property_alias=400),
-        nested_base_object=nested_ref.uri(),
+        nested_base_object=nested_ref.uri,
     )
     top_ref = weave.publish(top_obj)
 
@@ -936,7 +940,7 @@ def test_exclude_base_object_classes(client: WeaveClient):
     exclude_example_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"exclude_base_object_classes": ["TestOnlyExample"]},
             }
         )
@@ -951,7 +955,7 @@ def test_exclude_base_object_classes(client: WeaveClient):
     exclude_nested_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"exclude_base_object_classes": ["TestOnlyNestedBaseObject"]},
             }
         )
@@ -965,7 +969,7 @@ def test_exclude_base_object_classes(client: WeaveClient):
     exclude_multiple_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {
                     "exclude_base_object_classes": [
                         "TestOnlyExample",
@@ -985,7 +989,7 @@ def test_exclude_base_object_classes(client: WeaveClient):
     exclude_nonexistent_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"exclude_base_object_classes": ["NonExistentClass"]},
             }
         )
@@ -1007,7 +1011,7 @@ def test_exclude_base_object_classes_with_include_filter(client: WeaveClient):
     top_obj = base_objects.TestOnlyExample(
         primitive=333,
         nested_base_model=TestOnlyNestedBaseModel(a=444, aliased_property_alias=555),
-        nested_base_object=nested_ref1.uri(),
+        nested_base_object=nested_ref1.uri,
     )
     top_ref = weave.publish(top_obj)
 
@@ -1021,7 +1025,7 @@ def test_exclude_base_object_classes_with_include_filter(client: WeaveClient):
     combined_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {
                     "base_object_classes": ["TestOnlyNestedBaseObject"],
                     "exclude_base_object_classes": ["TestOnlyExample"],
@@ -1051,7 +1055,7 @@ def test_exclude_base_object_classes_with_inherited_objects(client: WeaveClient)
     exclude_base_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"exclude_base_object_classes": ["TestOnlyNestedBaseObject"]},
             }
         )

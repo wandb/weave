@@ -21,6 +21,9 @@ from weave.compat.wandb.wandb_thin.util import app_url
 
 logger = logging.getLogger(__name__)
 
+# Minimum length for a valid W&B API key
+MIN_API_KEY_LENGTH = 40
+
 
 def _normalize_host(host: str) -> str:
     """Normalize host input to a netrc-safe machine name.
@@ -71,7 +74,7 @@ def _set_setting(key: str, value: str) -> None:
         with open(settings_path, "w", encoding="utf-8") as f:
             settings.write(f)
     except Exception as e:
-        logger.warning(f"Failed to write setting {key}: {e}")
+        logger.warning("Failed to write setting %s: %s", key, e)
 
 
 def _clear_setting(key: str) -> None:
@@ -92,7 +95,7 @@ def _clear_setting(key: str) -> None:
             with open(settings_path, "w", encoding="utf-8") as f:
                 settings.write(f)
     except Exception as e:
-        logger.warning(f"Failed to clear setting {key}: {e}")
+        logger.warning("Failed to clear setting %s: %s", key, e)
 
 
 def login(
@@ -197,7 +200,7 @@ class _WandbLogin:
         host_str = f" to {self._host}" if self._host != "api.wandb.ai" else ""
         login_state_str = f"W&B API key is configured{host_str}"
         login_info_str = "Use `wandb login --relogin` to force relogin"
-        logger.info(f"{login_state_str}. {login_info_str}")
+        logger.info("%s. %s", login_state_str, login_info_str)
 
     def try_save_api_key(self, key: str) -> None:
         """Saves the API key to disk for future use.
@@ -210,7 +213,7 @@ class _WandbLogin:
                 netrc = Netrc()
                 netrc.add_or_update_entry(self._host, "user", key)
             except Exception as e:
-                logger.warning(f"Failed to save API key: {e}")
+                logger.warning("Failed to save API key: %s", e)
 
     def _prompt_api_key(
         self, referrer: str | None = None
@@ -226,7 +229,7 @@ class _WandbLogin:
         url = app_url(f"https://{self._host}")
         authorize_url = f"{url}/authorize?ref={referrer}"
         logger.info("Logging into Weights & Biases")
-        logger.info(f"You can find your API key in your browser here: {authorize_url}")
+        logger.info("You can find your API key in your browser here: %s", authorize_url)
         logger.info("Paste an API key from your profile and hit enter:")
 
         try:
@@ -377,9 +380,9 @@ def _validate_api_key(api_key: str) -> None:
     else:  # normal style
         key = api_key
 
-    if len(key) < 40:
+    if len(key) < MIN_API_KEY_LENGTH:
         raise ValueError(
-            f"API key must be at least 40 characters long, yours was {len(key)}"
+            f"API key must be at least {MIN_API_KEY_LENGTH} characters long, yours was {len(key)}"
         ) from None
 
 

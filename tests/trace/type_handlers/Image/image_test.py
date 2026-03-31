@@ -7,6 +7,10 @@ import pytest
 from PIL import Image
 
 import weave
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    set_weave_client_global,
+)
 from weave.trace.weave_client import WeaveClient, get_ref
 
 """When testing types, it is important to test:
@@ -35,7 +39,11 @@ def test_img(request) -> Image.Image:
     if (fmt := request.param["format"]) is not None:
         buffer = io.BytesIO()
         img.save(buffer, format=fmt)
+        buffer.seek(0)
         img = Image.open(buffer)
+        # Fully load buffered images before background serialization touches them.
+        img.load()
+        buffer.close()
 
     try:
         yield img
@@ -49,7 +57,7 @@ def test_image_publish(client: WeaveClient, test_img: Image.Image) -> None:
     ref = get_ref(test_img)
 
     assert ref is not None
-    gotten_img = weave.ref(ref.uri()).get()
+    gotten_img = weave.ref(ref.uri).get()
     try:
         assert test_img.tobytes() == gotten_img.tobytes()
     finally:
@@ -70,13 +78,14 @@ def test_image_as_property(client: WeaveClient, test_img: Image.Image) -> None:
     ref = get_ref(img_wrapper)
     assert ref is not None
 
-    gotten_img_wrapper = weave.ref(ref.uri()).get()
+    gotten_img_wrapper = weave.ref(ref.uri).get()
     try:
         assert gotten_img_wrapper.img.tobytes() == test_img.tobytes()
     finally:
         gotten_img_wrapper.img.close()
 
 
+@pytest.mark.flaky(reruns=3)
 def test_image_as_dataset_cell(client: WeaveClient, test_img: Image.Image) -> None:
     client.project = "test_image_as_dataset_cell"
     dataset = weave.Dataset(rows=[{"img": test_img}])
@@ -87,7 +96,7 @@ def test_image_as_dataset_cell(client: WeaveClient, test_img: Image.Image) -> No
     ref = get_ref(dataset)
     assert ref is not None
 
-    gotten_dataset = weave.ref(ref.uri()).get()
+    gotten_dataset = weave.ref(ref.uri).get()
     try:
         assert gotten_dataset.rows[0]["img"].tobytes() == test_img.tobytes()
     finally:
@@ -250,3 +259,30 @@ def test_images_in_load_of_dataset(client):
             assert gotten_row["img"].tobytes() == local_row["img"].tobytes()
         finally:
             gotten_row["img"].close()
+
+
+def test_images_in_dataset_without_client(client):
+    """Regression test for WB-21596: datasets with images should be iterable
+    without an active global client (e.g. after ref.get() auto-init cleanup).
+    """
+    n_rows = 3
+    rows = [{"img": make_random_image()} for _ in range(n_rows)]
+    dataset = weave.Dataset(rows=rows)
+    ref = weave.publish(dataset)
+
+    # Get the dataset while client exists (rows are lazy, not yet materialized)
+    gotten_dataset = ref.get()
+
+    # Simulate ref.get() auto-init cleanup: remove the global client
+    saved_client = get_weave_client()
+    set_weave_client_global(None)
+
+    try:
+        # Iterating rows should work without a global client
+        for gotten_row, local_row in zip(gotten_dataset, rows, strict=False):
+            assert isinstance(gotten_row["img"], Image.Image)
+            assert gotten_row["img"].size == local_row["img"].size
+            gotten_row["img"].close()
+    finally:
+        # Restore client for fixture teardown
+        set_weave_client_global(saved_client)

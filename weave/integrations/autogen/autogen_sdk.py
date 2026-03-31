@@ -227,7 +227,8 @@ def _create_wrapper_async_generator(
                     yield value
             except Exception as e:
                 logger.exception(
-                    f"Error in autogen async gen wrapper for {fn.__name__}",
+                    "Error in autogen async gen wrapper for %s",
+                    fn.__name__,
                     stacklevel=2,
                 )
                 # Fall back to the original function if our instrumentation fails
@@ -265,7 +266,8 @@ def _create_wrapper_async(
                 return await op(*args, **kwargs)
             except Exception as e:
                 logger.exception(
-                    f"Error in autogen async wrapper for {fn.__name__}",
+                    "Error in autogen async wrapper for %s",
+                    fn.__name__,
                     stacklevel=2,
                 )
                 # Fall back to the original function if our instrumentation fails
@@ -302,7 +304,8 @@ def _create_wrapper_sync(
                 return op(*args, **kwargs)
             except Exception as e:
                 logger.exception(
-                    f"Error in autogen sync wrapper for {fn.__name__}",
+                    "Error in autogen sync wrapper for %s",
+                    fn.__name__,
                     stacklevel=2,
                 )
                 # Fall back to the original function if our instrumentation fails
@@ -366,23 +369,31 @@ def _get_symbol_patcher(
         module = importlib.import_module(module_path)
     except ModuleNotFoundError as e:
         logger.warning(
-            f"Module {module_path} not found, skipping patching for {class_name}: {e}"
+            "Module %s not found, skipping patching for %s: %s",
+            module_path,
+            class_name,
+            e,
         )
         return None
     except ImportError as e:
         logger.warning(
-            f"Could not import module {module_path}, skipping patching for {class_name}: {e}"
+            "Could not import module %s, skipping patching for %s: %s",
+            module_path,
+            class_name,
+            e,
         )
         return None
 
     if not hasattr(module, class_name):
-        logger.error(f"Class {class_name} not found in {module_path}")
+        logger.error("Class %s not found in %s", class_name, module_path)
         return None
 
     cls = getattr(module, class_name)
 
     if not hasattr(cls, method_name):
-        logger.error(f"Method {method_name} not found in {module_path}.{class_name}")
+        logger.error(
+            "Method %s not found in %s.%s", method_name, module_path, class_name
+        )
         return None
 
     display_name = f"{module_path}.{class_name}.{method_name}"
@@ -427,12 +438,18 @@ def _get_class_and_subclass_patchers(
         module = importlib.import_module(module_path)
     except ModuleNotFoundError as e:
         logger.warning(
-            f"Module {module_path} not found, skipping patching for {class_name}: {e}"
+            "Module %s not found, skipping patching for %s: %s",
+            module_path,
+            class_name,
+            e,
         )
         return patchers  # Return empty list, skip patching for this module
     except ImportError as e:
         logger.warning(
-            f"Could not import module {module_path}, skipping patching for {class_name}: {e}"
+            "Could not import module %s, skipping patching for %s: %s",
+            module_path,
+            class_name,
+            e,
         )
         return patchers
 
@@ -491,11 +508,15 @@ def _get_class_and_subclass_patchers(
                     patchers.append(patcher)
 
     except AttributeError as e:
-        logger.warning(f"Class {class_name} not found in {module_path}, skipping: {e}")
+        logger.warning(
+            "Class %s not found in %s, skipping: %s", class_name, module_path, e
+        )
         return patchers
     except Exception as e:
         logger.exception(
-            f"Unexpected error creating patchers for {module_path}.{class_name}",
+            "Unexpected error creating patchers for %s.%s",
+            module_path,
+            class_name,
             stacklevel=2,
         )
         return patchers
@@ -527,17 +548,18 @@ def _preload_autogen_extensions() -> None:
                 importlib.import_module(name)
             except (ImportError, ModuleNotFoundError) as e:
                 # Only log at debug level, and don't include stack trace
-                logger.debug(f"Optional extension module not loaded: {name} ({e})")
+                logger.debug("Optional extension module not loaded: %s (%s)", name, e)
             except Exception as e:
                 # Unexpected errors should still be logged as warnings
                 logger.exception(
-                    f"Unexpected error loading extension module {name}",
+                    "Unexpected error loading extension module %s",
+                    name,
                     stacklevel=2,
                 )
 
     except Exception as e:
         # Don't fail if preloading fails
-        logger.warning(f"Error preloading autogen extensions: {e}", stacklevel=2)
+        logger.warning("Error preloading autogen extensions: %s", e, stacklevel=2)
 
 
 def get_autogen_patcher(
@@ -599,7 +621,9 @@ def get_autogen_patcher(
                     patchers.extend(class_patchers)
                 except Exception as e:
                     logger.exception(
-                        f"Failed to create patchers for {module_config['module_path']}.{class_config['class_name']}",
+                        "Failed to create patchers for %s.%s",
+                        module_config["module_path"],
+                        class_config["class_name"],
                         stacklevel=2,
                     )
 

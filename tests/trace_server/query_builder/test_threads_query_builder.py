@@ -614,15 +614,21 @@ def test_validate_and_map_sort_field():
     )
 
     # Test invalid fields - call IDs should not be sortable since they're just identifiers
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(
+        ValueError, match="Unsupported sort field: first_turn_id"
+    ) as exc_info:
         _validate_and_map_sort_field("first_turn_id")
     assert "Unsupported sort field: first_turn_id" in str(exc_info.value)
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(
+        ValueError, match="Unsupported sort field: last_turn_id"
+    ) as exc_info:
         _validate_and_map_sort_field("last_turn_id")
     assert "Unsupported sort field: last_turn_id" in str(exc_info.value)
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(
+        ValueError, match="Unsupported sort field: invalid_field"
+    ) as exc_info:
         _validate_and_map_sort_field("invalid_field")
     assert "Unsupported sort field: invalid_field" in str(exc_info.value)
     assert (
@@ -633,8 +639,8 @@ def test_validate_and_map_sort_field():
 
 def test_sort_field_validation_in_query():
     """Test that invalid sort fields raise errors in query generation."""
-    with pytest.raises(ValueError):
-        invalid_sort = [SortBy(field="nonexistent_field", direction="asc")]
+    invalid_sort = [SortBy(field="nonexistent_field", direction="asc")]
+    with pytest.raises(ValueError, match="Unsupported sort field"):
         make_threads_query_sqlite(project_id="test_project", sort_by=invalid_sort)
 
 

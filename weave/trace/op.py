@@ -8,6 +8,7 @@ import logging
 import random
 import sys
 import traceback
+import types
 import weakref
 from collections import defaultdict
 from collections.abc import (
@@ -32,7 +33,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec, TypeIs, Unpack
+from typing_extensions import ParamSpec, Self, TypeIs, Unpack
 
 from weave.trace import box, settings
 from weave.trace.context import call_context, weave_client_context
@@ -86,6 +87,17 @@ class DisplayNameFuncError(ValueError): ...
 
 
 class OpCallError(Exception): ...
+
+
+def _restore_call_stack(snapshot: list[Call]) -> None:
+    """Restore the call stack to a previous snapshot.
+
+    Used to undo any partial modifications made by _create_call before it
+    raised.  A full snapshot-restore is safer than popping a single call
+    because it handles the (unlikely) case where multiple calls were pushed.
+    """
+    if call_context.get_call_stack() != snapshot:
+        call_context._call_stack.set(snapshot)
 
 
 # Call, original function output, exception if occurred
@@ -416,10 +428,10 @@ def is_placeholder_call(call: Call) -> TypeIs[NoOpCall]:
 
 
 def _set_python_function_type_on_weave_dict(
-    __weave: WeaveKwargs, type_str: str
+    weave: WeaveKwargs, /, type_str: str
 ) -> None:
     weave_dict = (
-        __weave.setdefault("attributes", {})
+        weave.setdefault("attributes", {})
         .setdefault("weave", {})
         .setdefault("python", {})
     )
@@ -458,11 +470,13 @@ def _call_sync_func(
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
     # If the parent was traced (sampled in), the child will be too.
+    call_stack_snapshot = call_context.get_call_stack().copy()
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
-        raise e
+        raise
     except Exception as e:
+        _restore_call_stack(call_stack_snapshot)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -585,11 +599,13 @@ async def _call_async_func(
     _set_python_function_type_on_weave_dict(__weave, "async_function")
 
     # Proceed with tracing
+    call_stack_snapshot = call_context.get_call_stack().copy()
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
-        raise e
+        raise
     except Exception as e:
+        _restore_call_stack(call_stack_snapshot)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -717,6 +733,7 @@ def _call_sync_gen(
     _set_python_function_type_on_weave_dict(__weave, "generator")
 
     # Proceed with tracing
+    call_stack_snapshot = call_context.get_call_stack().copy()
     try:
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
@@ -724,6 +741,7 @@ def _call_sync_gen(
     except OpCallError:
         raise
     except Exception:
+        _restore_call_stack(call_stack_snapshot)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -895,7 +913,7 @@ def _call_sync_gen(
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
                 nonlocal e
-                raise e
+                raise e  # noqa: TRY201 - bare raise invalid outside exception handler
             # This will never actually yield anything but is needed for typing
             yield from []
 
@@ -937,6 +955,7 @@ async def _call_async_gen(
     _set_python_function_type_on_weave_dict(__weave, "async_generator")
 
     # Proceed with tracing
+    call_stack_snapshot = call_context.get_call_stack().copy()
     try:
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
@@ -944,6 +963,7 @@ async def _call_async_gen(
     except OpCallError:
         raise
     except Exception:
+        _restore_call_stack(call_stack_snapshot)
         if get_raise_on_captured_errors():
             raise
         log_once(
@@ -1120,7 +1140,7 @@ async def _call_async_gen(
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
                 nonlocal e
-                raise e
+                raise e  # noqa: TRY201 - bare raise invalid outside exception handler
             # This will never actually yield anything but is needed for typing
             for _ in []:
                 yield _
@@ -1582,7 +1602,7 @@ class _IteratorWrapper(Generic[V]):
             return object.__getattribute__(self, name)
         return getattr(self._iterator_or_ctx_manager, name)
 
-    def __enter__(self) -> _IteratorWrapper:
+    def __enter__(self) -> Self:
         if hasattr(self._iterator_or_ctx_manager, "__enter__"):
             # let's enter the context manager to get the stream iterator
             self._iterator_or_ctx_manager = self._iterator_or_ctx_manager.__enter__()
@@ -1590,9 +1610,9 @@ class _IteratorWrapper(Generic[V]):
 
     def __exit__(
         self,
-        exc_type: Exception | None,
+        exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: Any,
+        traceback: types.TracebackType | None,
     ) -> None:
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
@@ -1602,7 +1622,7 @@ class _IteratorWrapper(Generic[V]):
             self._iterator_or_ctx_manager.__exit__(exc_type, exc_value, traceback)
         self._call_on_close_once()
 
-    async def __aenter__(self) -> _IteratorWrapper:
+    async def __aenter__(self) -> Self:
         if hasattr(
             self._iterator_or_ctx_manager, "__aenter__"
         ):  # let's enter the context manager
@@ -1613,9 +1633,9 @@ class _IteratorWrapper(Generic[V]):
 
     async def __aexit__(
         self,
-        exc_type: Exception | None,
+        exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: Any,
+        traceback: types.TracebackType | None,
     ) -> None:
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)

@@ -39,7 +39,7 @@ def run_storage_test(client: WeaveClient):
         # Create a new trace
         res = client.server.file_create(
             FileCreateReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 name="test.txt",
                 content=TEST_CONTENT,
             )
@@ -49,7 +49,7 @@ def run_storage_test(client: WeaveClient):
 
         # Get the file
         file = client.server.file_content_read(
-            FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+            FileContentReadReq(project_id=client.project_id, digest=res.digest)
         )
         assert file.content == TEST_CONTENT
         return res
@@ -116,7 +116,7 @@ class TestS3Storage:
             # Create a new trace
             res = client.server.file_create(
                 FileCreateReq(
-                    project_id=client._project_id(),
+                    project_id=client.project_id,
                     name="test.txt",
                     content=large_file,
                 )
@@ -126,7 +126,7 @@ class TestS3Storage:
 
             # Get the file
             file = client.server.file_content_read(
-                FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+                FileContentReadReq(project_id=client.project_id, digest=res.digest)
             )
             assert file.content == large_file
             return res.digest
@@ -286,7 +286,7 @@ class TestGCSStorage:
             # First write should succeed
             res1 = client.server.file_create(
                 FileCreateReq(
-                    project_id=client._project_id(),
+                    project_id=client.project_id,
                     name="test.txt",
                     content=TEST_CONTENT,
                 )
@@ -296,7 +296,7 @@ class TestGCSStorage:
             # Second write with same content should be skipped (no error, no upload)
             res2 = client.server.file_create(
                 FileCreateReq(
-                    project_id=client._project_id(),
+                    project_id=client.project_id,
                     name="test.txt",
                     content=TEST_CONTENT,
                 )
@@ -308,7 +308,7 @@ class TestGCSStorage:
 
             # Verify we can still read the content
             file = client.server.file_content_read(
-                FileContentReadReq(project_id=client._project_id(), digest=res1.digest)
+                FileContentReadReq(project_id=client.project_id, digest=res1.digest)
             )
             assert file.content == TEST_CONTENT
 
@@ -382,14 +382,14 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
     def create_and_read_file(content: bytes):
         res = client.server.file_create(
             FileCreateReq(
-                project_id=client._project_id(), name="test.txt", content=content
+                project_id=client.project_id, name="test.txt", content=content
             )
         )
         assert res.digest is not None
         assert res.digest != ""
 
         file = client.server.file_content_read(
-            FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+            FileContentReadReq(project_id=client.project_id, digest=res.digest)
         )
         assert file.content == content
 
@@ -471,7 +471,7 @@ def test_file_storage_retry_limit(client: WeaveClient):
             # GCS should fail after 3 attempts, then fall back to database storage
             result = client.server.file_create(
                 FileCreateReq(
-                    project_id=client._project_id(),
+                    project_id=client.project_id,
                     name="test.txt",
                     content=TEST_CONTENT,
                 )

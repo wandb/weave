@@ -80,8 +80,11 @@ def test_nested_calls_print_single_link(client):
     assert s.count(TRACE_CALL_EMOJI) == 1
 
     # And that link should be the "outer" call
-    s = s.strip("\n")
-    _, call_id = s.rsplit("/", 1)
+    # Extract only the line containing the trace emoji (other log lines may be captured)
+    emoji_line = next(
+        line for line in s.strip().splitlines() if TRACE_CALL_EMOJI in line
+    )
+    _, call_id = emoji_line.rsplit("/", 1)
 
     call = client.get_call(call_id)
     assert "outer" in call.op_name

@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from weave.shared.digest import compute_file_digest, compute_object_digest
+
 OP_SOURCE_FILE_NAME = "obj.py"
 PLACEHOLDER_OP_SOURCE = """def func(*args, **kwargs):
     ... # Code-capture unavailable for this op
@@ -149,6 +151,16 @@ def build_op_val(file_digest: str, load_op: str | None = None) -> dict[str, Any]
     if load_op is not None:
         result["load_op"] = load_op
     return result
+
+
+# Precomputed constants for OTEL placeholder ops.
+# All OTEL ops use the same placeholder source, so these digests are fixed
+# across all op names, projects, and server instances — compute once at import.
+_OTEL_PLACEHOLDER_FILE_DIGEST: str = compute_file_digest(
+    PLACEHOLDER_OP_SOURCE.encode("utf-8")
+)
+_OTEL_PLACEHOLDER_OP_VAL: dict[str, Any] = build_op_val(_OTEL_PLACEHOLDER_FILE_DIGEST)
+OTEL_PLACEHOLDER_OP_DIGEST: str = compute_object_digest(_OTEL_PLACEHOLDER_OP_VAL)
 
 
 def build_dataset_val(

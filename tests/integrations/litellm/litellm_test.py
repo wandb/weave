@@ -24,7 +24,7 @@ class Nearly:  # noqa: PLW1641
     def __init__(self, v: float) -> None:
         self.v = v
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return abs(self.v - other) < 2
 
 
@@ -265,7 +265,7 @@ def test_model_predict(
 
     # Create instances with different models
     claude_translator = TranslatorModel(
-        model="claude-3-5-sonnet-20240620", temperature=0.1
+        model="anthropic/claude-3-5-sonnet-20240620", temperature=0.1
     )
 
     res = claude_translator.predict("There is a bug in my code!", "Spanish")

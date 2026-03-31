@@ -75,7 +75,7 @@ export async function login(apiKey: string, host?: string) {
  * @param project - The W&B project name (can be project or entity/project). If you don't
  *                   specify a W&B team (e.g., 'team/project'), your default entity is used.
  *                   To find or update your default entity, refer to User Settings at
- *                   https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team
+ *                   https://docs.wandb.ai/platform/app/settings-page/user-settings#default-team
  * @param settings - (Optional) Weave tracing settings
  * @returns A promise that resolves to the initialized Weave client.
  * @throws {Error} If the initialization fails

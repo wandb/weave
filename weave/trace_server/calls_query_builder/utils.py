@@ -19,7 +19,7 @@ def param_slot(param_name: str, param_type: str) -> str:
     return f"{{{param_name}:{param_type}}}"
 
 
-def timestamp_to_datetime_str(timestamp: int | float) -> str:
+def timestamp_to_datetime_str(timestamp: float) -> str:
     """Convert a unix timestamp to a ClickHouse-compatible datetime string.
 
     Args:
@@ -46,7 +46,7 @@ def safely_format_sql(
     try:
         return sqlparse.format(sql, reindent=True)
     except:
-        logger.info(f"Failed to format SQL: {sql}")
+        logger.info("Failed to format SQL: %s", sql)
         return sql
 
 

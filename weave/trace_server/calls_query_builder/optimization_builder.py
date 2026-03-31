@@ -418,7 +418,7 @@ def process_query_to_optimization_sql(
     )
 
 
-def _create_like_pattern_for_value(value: str | int | float | bool) -> str:
+def _create_like_pattern_for_value(value: str | float | bool) -> str:
     """Creates a LIKE pattern for a value based on its type in JSON format.
 
     Args:

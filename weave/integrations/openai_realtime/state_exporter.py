@@ -19,6 +19,8 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 from weave.type_wrappers.Content import Content
 
+FIFO_TIMER_INTERVAL_SECONDS = 0.05
+
 logger = logging.getLogger(__name__)
 
 # Content types that represent audio output from the model.
@@ -649,7 +651,7 @@ class StateExporter(BaseModel):
             response_parent = session_call
 
         else:
-            logger.warning(f"Could not find session for response - {response_id}")
+            logger.warning("Could not find session for response - %s", response_id)
             # Will not happen in GA but potentially possible in Beta
             response_parent = None
 
@@ -847,7 +849,7 @@ class StateExporter(BaseModel):
                     # If more remain and head not ready, a new timer will be scheduled
                     pass
 
-            self.fifo_timer = threading.Timer(0.05, _cb)
+            self.fifo_timer = threading.Timer(FIFO_TIMER_INTERVAL_SECONDS, _cb)
             self.fifo_timer.start()
 
     def _advance_fifo(self) -> None:

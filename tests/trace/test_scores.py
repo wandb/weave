@@ -30,7 +30,7 @@ def test_send_score_call(client):
 
     query_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             include_feedback=True,
         )
     )
@@ -39,7 +39,7 @@ def test_send_score_call(client):
     assert len(calls) == 2
     feedback = calls[0].summary["weave"]["feedback"][0]
     assert feedback["feedback_type"] == "wandb.runnable.my_score"
-    assert feedback["weave_ref"] == get_ref(call).uri()
-    assert feedback["runnable_ref"] == get_ref(my_score).uri()
-    assert feedback["call_ref"] == get_ref(score_call).uri()
+    assert feedback["weave_ref"] == get_ref(call).uri
+    assert feedback["runnable_ref"] == get_ref(my_score).uri
+    assert feedback["call_ref"] == get_ref(score_call).uri
     assert feedback["payload"] == {"output": score_res}

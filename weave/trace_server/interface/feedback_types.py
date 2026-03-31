@@ -2,13 +2,15 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+MAX_FEEDBACK_NOTE_LENGTH = 1024
+
 
 class FeedbackPayloadReactionReq(BaseModel):
     emoji: str
 
 
 class FeedbackPayloadNoteReq(BaseModel):
-    note: str = Field(min_length=1, max_length=1024)
+    note: str = Field(min_length=1, max_length=MAX_FEEDBACK_NOTE_LENGTH)
 
 
 FEEDBACK_PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {

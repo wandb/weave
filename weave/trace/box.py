@@ -7,7 +7,7 @@ does not box None and bool which simplify checks for trace users.
 from __future__ import annotations
 
 import datetime
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from weave.trace.refs import Ref
 
@@ -32,7 +32,7 @@ class BoxedStr(str):
 class BoxedDatetime(datetime.datetime):  # noqa: PLW1641
     ref: Ref | None = None
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, datetime.datetime)
             and self.timestamp() == other.timestamp()
@@ -42,7 +42,7 @@ class BoxedDatetime(datetime.datetime):  # noqa: PLW1641
 class BoxedTimedelta(datetime.timedelta):  # noqa: PLW1641
     ref: Ref | None = None
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, datetime.timedelta)
             and self.total_seconds() == other.total_seconds()

@@ -228,7 +228,7 @@ def test_saved_view_load(client):
     saved_view = weave.SavedView("traces", "My saved view")
     saved_view.show_column("attributes.weave.client_version")
     saved_view.save()
-    uri = saved_view.ref.uri()
+    uri = saved_view.ref.uri
     loaded_view = weave.SavedView.load(uri)
     assert loaded_view.label == saved_view.label
     assert loaded_view.view_type == saved_view.view_type

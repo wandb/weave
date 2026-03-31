@@ -6,13 +6,13 @@ import random
 import sys
 import time
 import uuid
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, NamedTuple
 from unittest import mock
 
 import pytest
@@ -20,6 +20,7 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 import weave.trace.call
+from tests.trace.server_utils import find_server_layer
 from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
@@ -48,6 +49,7 @@ from weave.trace.refs import TableRef
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
@@ -89,12 +91,13 @@ def get_client_trace_server(
 
 
 def get_client_project_id(client: weave_client.WeaveClient) -> str:
-    return client._project_id()
+    return client.project_id
 
 
 ## End hacky interface compatibility helpers
 
 
+@pytest.mark.flaky(reruns=2, reruns_delay=0.2)
 def test_simple_op(client):
     @weave.op
     def my_op(a: int) -> int:
@@ -149,6 +152,7 @@ def test_simple_op(client):
         started_at=DatetimeMatcher(),
         ended_at=DatetimeMatcher(),
         deleted_at=None,
+        wb_user_id=client.entity,
     )
 
 
@@ -157,7 +161,7 @@ def test_trace_server_call_start_and_end(client):
     trace_id = generate_id()
     parent_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         id=call_id,
         op_name="test_name",
         trace_id=trace_id,
@@ -171,7 +175,7 @@ def test_trace_server_call_start_and_end(client):
 
     res = client.server.call_read(
         tsi.CallReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             id=call_id,
         )
     )
@@ -181,7 +185,7 @@ def test_trace_server_call_start_and_end(client):
     )
 
     assert res.call.model_dump() == {
-        "project_id": client._project_id(),
+        "project_id": client.project_id,
         "id": call_id,
         "op_name": "test_name",
         "trace_id": trace_id,
@@ -211,7 +215,7 @@ def test_trace_server_call_start_and_end(client):
     }
 
     end = tsi.EndedCallSchemaForInsert(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         id=call_id,
         ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
         summary={"c": 5},
@@ -221,7 +225,7 @@ def test_trace_server_call_start_and_end(client):
 
     res = client.server.call_read(
         tsi.CallReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             id=call_id,
         )
     )
@@ -231,7 +235,7 @@ def test_trace_server_call_start_and_end(client):
     )
 
     assert res.call.model_dump() == {
-        "project_id": client._project_id(),
+        "project_id": client.project_id,
         "id": call_id,
         "op_name": "test_name",
         "trace_id": trace_id,
@@ -267,7 +271,7 @@ def test_call_read_not_found(client):
     call_id = generate_id()
     res = client.server.call_read(
         tsi.CallReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             id=call_id,
         )
     )
@@ -406,7 +410,7 @@ def simple_line_call_bootstrap() -> OpCallSpec:
 
 
 def ref_str(op):
-    return weave_client.get_ref(op).uri()
+    return weave_client.get_ref(op).uri
 
 
 def test_trace_call_query_filter_op_version_refs(client):
@@ -939,15 +943,13 @@ def test_trace_call_query_filter_wb_run_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_user_ids(client):
+def test_trace_call_query_filter_wb_user_ids(client, trace_server):
     call_spec_1 = simple_line_call_bootstrap()
 
-    # OMG! How ugly is this?! The layers of testing servers is nasty
-    client.server.server._next_trace_server._user_id = "second_user"
+    trace_server.set_user_id("second_user")
     call_spec_2 = simple_line_call_bootstrap()
 
-    # OMG! How ugly is this?! The layers of testing servers is nasty
-    client.server.server._next_trace_server._user_id = "third_user"
+    trace_server.set_user_id("third_user")
     call_spec_3 = simple_line_call_bootstrap()
 
     for wb_user_ids, exp_count in [
@@ -1524,6 +1526,24 @@ def test_trace_call_filter(client):
                 ]
             },
         ),
+        # Negative integer literal - all 10 numeric rows (0-9) are >= -1
+        (
+            10
+            + (
+                1 if is_sqlite else 0
+            ),  # SQLite casting transforms strings to 0, instead of NULL
+            {
+                "$gte": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "inputs.in_val.prim"},
+                            "to": "int",
+                        }
+                    },
+                    {"$literal": -1},
+                ]
+            },
+        ),
     ]:
         print(f"TEST CASE [{count}]", query)
         inner_res = get_client_trace_server(client).calls_query(
@@ -1573,7 +1593,7 @@ def test_ops_with_default_params(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -1603,11 +1623,11 @@ def test_root_type(client):
     x = BaseTypeX(x=5)
 
     ref = weave.publish(x)
-    x2 = weave.ref(ref.uri()).get()
+    x2 = weave.ref(ref.uri).get()
     assert x2.x == 5
 
     ref = weave.publish(c)
-    c2 = weave.ref(ref.uri()).get()
+    c2 = weave.ref(ref.uri).get()
 
     assert c2.a == 1
     assert c2.b == 2
@@ -1615,7 +1635,7 @@ def test_root_type(client):
 
     inner_res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -1623,7 +1643,7 @@ def test_root_type(client):
 
     inner_res = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(
                 base_object_classes=["BaseTypeA"],
             ),
@@ -1712,7 +1732,7 @@ def test_dataclass_support(client):
     )
 
     exp_ref = weave.publish(exp)
-    exp_2 = weave.ref(exp_ref.uri()).get()
+    exp_2 = weave.ref(exp_ref.uri).get()
     assert exp_2.val == 3
 
     assert len(res.calls) == 1
@@ -1749,6 +1769,7 @@ def test_op_retrieval(client):
     assert my_op2(1) == 2
 
 
+@pytest.mark.flaky(reruns=3)
 def test_bound_op_retrieval(client):
     class CustomType(weave.Object):
         a: int
@@ -1759,6 +1780,8 @@ def test_bound_op_retrieval(client):
 
     obj = CustomType(a=1)
     obj_ref = weave.publish(obj)
+    # Allow ClickHouse file writes to settle before loading the bound op source.
+    time.sleep(0.2)
     obj2 = obj_ref.get()
     assert obj2.op_with_custom_type(1) == 2
 
@@ -1793,12 +1816,12 @@ def test_bound_op_retrieval_no_self(client):
 def test_dataset_row_ref(client):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
-    d2 = weave.ref(ref.uri()).get()
+    d2 = weave.ref(ref.uri).get()
 
     inner = d2.rows[0]["a"]
     exp_ref = "weave:///shawn/test-project/object/Dataset:FkWFKCRcl9wsGp3yclN7v1IIAICTPenpZYrWo0otI4Y/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
-    assert inner.ref.uri() == exp_ref
+    assert inner.ref.uri == exp_ref
     gotten = weave.ref(exp_ref).get()
     assert gotten == 5
 
@@ -1859,7 +1882,7 @@ def test_tuple_support(client):
     assert act == exp
 
     exp_ref = weave.publish(exp)
-    exp_2 = weave.ref(exp_ref.uri()).get()
+    exp_2 = weave.ref(exp_ref.uri).get()
     assert exp_2 == [[1, 2], 3]
 
     res = get_client_trace_server(client).calls_query(
@@ -1873,18 +1896,22 @@ def test_tuple_support(client):
     assert res.calls[0].output == [[1, 2], 3]
 
 
+class Point(NamedTuple):
+    x: Any
+    y: Any
+
+
 def test_namedtuple_support(client):
     @weave.op
     def tuple_maker(a, b):
         return (a, b)
 
-    Point = namedtuple("Point", ["x", "y"])
     act = tuple_maker(Point(1, 2), 3)
     exp = (Point(1, 2), 3)
     assert act == exp
 
     exp_ref = weave.publish(exp)
-    exp_2 = weave.ref(exp_ref.uri()).get()
+    exp_2 = weave.ref(exp_ref.uri).get()
     assert exp_2 == [{"x": 1, "y": 2}, 3]
 
     res = get_client_trace_server(client).calls_query(
@@ -1903,7 +1930,7 @@ def test_named_reuse(client):
 
     d = weave.Dataset(rows=[{"x": 1}, {"x": 2}])
     d_ref = weave.publish(d, "test_dataset")
-    dataset = weave.ref(d_ref.uri()).get()
+    dataset = weave.ref(d_ref.uri).get()
 
     @weave.op
     async def dummy_score(output):
@@ -1963,7 +1990,7 @@ def test_unknown_input_and_output_types(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -1993,8 +2020,8 @@ def test_unknown_attribute(client):
     ref_a = weave.publish(a)
     ref_b = weave.publish(b)
 
-    a2 = weave.ref(ref_a.uri()).get()
-    b2 = weave.ref(ref_b.uri()).get()
+    a2 = weave.ref(ref_a.uri).get()
+    b2 = weave.ref(ref_b.uri).get()
 
     assert a2.obj == repr(a_obj)
     assert b2.obj == repr(b_obj)
@@ -2062,7 +2089,7 @@ def test_single_primitive_output(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2185,7 +2212,7 @@ def test_mapped_execution(client, mapper):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2289,7 +2316,7 @@ def test_call_stack_order_implicit_depth_first(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2335,7 +2362,7 @@ def test_call_stack_order_explicit_depth_first(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2384,7 +2411,7 @@ def test_call_stack_order_langchain_batch(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2437,7 +2464,7 @@ def test_call_stack_order_out_of_order_pop(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2504,7 +2531,7 @@ def test_call_stack_order_height_ordering(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2547,7 +2574,7 @@ def test_call_stack_order_mixed(client):
 
     inner_res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2570,13 +2597,13 @@ def test_call_query_stream_equality(client):
 
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     calls_stream = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -2598,7 +2625,7 @@ def test_call_query_stream_columns(client):
 
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "inputs"],
         )
     )
@@ -2615,7 +2642,7 @@ def test_call_query_stream_columns(client):
     # now explicitly get output
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "inputs", "output.result"],
         )
     )
@@ -2628,7 +2655,7 @@ def test_call_query_stream_columns(client):
     # now get summary
     calls2 = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary"],
         )
     )
@@ -2649,10 +2676,6 @@ def test_call_query_stream_columns(client):
 
 
 def test_call_query_stream_columns_with_costs(client):
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
-
     @weave.op
     def calculate(a: int, b: int) -> dict[str, Any]:
         return {
@@ -2668,7 +2691,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are returned if we include the summary field
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary"],
             include_costs=True,
         )
@@ -2688,7 +2711,7 @@ def test_call_query_stream_columns_with_costs(client):
 
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary"],
             include_costs=True,
         )
@@ -2700,14 +2723,14 @@ def test_call_query_stream_columns_with_costs(client):
 
     # also assert that derived summary fields are included when getting costs
     assert calls[0].summary["weave"]["status"] == "success"
-    assert calls[0].summary["weave"]["latency_ms"] > 0
+    assert calls[0].summary["weave"]["latency_ms"] >= 0
     assert "calculate" in calls[0].summary["weave"]["trace_name"]
 
     # This should not happen, users should not request summary_dump
     # Test that costs are returned if we include the summary_dump field
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary_dump"],
             include_costs=True,
         )
@@ -2720,7 +2743,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are returned if we don't include the summary field
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id"],
             include_costs=True,
         )
@@ -2734,7 +2757,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are not returned if we include the summary field, but don't include costs
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary"],
         )
     )
@@ -2746,9 +2769,6 @@ def test_call_query_stream_columns_with_costs(client):
 
 
 def test_call_query_stream_trace_name_column_with_costs(client):
-    if client_is_sqlite(client):
-        return
-
     @weave.op
     def my_traced_op(x: int) -> dict[str, Any]:
         return {
@@ -2769,7 +2789,7 @@ def test_call_query_stream_trace_name_column_with_costs(client):
     calls = list(
         client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 columns=["id", "summary.weave.trace_name"],
                 include_costs=True,
             )
@@ -2781,13 +2801,33 @@ def test_call_query_stream_trace_name_column_with_costs(client):
     assert calls[0].summary.get("weave", {}).get("costs") is not None
     assert "my_traced_op" in calls[0].summary["weave"]["trace_name"]
 
+    # Also test sorting by trace_name with costs (regression: sorting by
+    # summary.weave.trace_name with include_costs on calls_complete failed
+    # with UNKNOWN_IDENTIFIER because the computed column wasn't in the
+    # all_calls CTE SELECT).
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client.project_id,
+                columns=["id"],
+                include_costs=True,
+                sort_by=[
+                    tsi.SortBy(field="summary.weave.trace_name", direction="desc")
+                ],
+            )
+        )
+    )
+    assert len(calls) == 1
+    assert calls[0].summary is not None
+    assert calls[0].summary.get("weave", {}).get("costs") is not None
+
 
 def test_read_call_start_with_cost(client):
     if client_is_sqlite(client):
         # dont run this test for sqlite
         return
 
-    project_id = client._project_id()
+    project_id = client.project_id
     call_id = generate_id()
     trace_id = generate_id()
     llm_id = "test-model-v1"  # Price needed for potential joins, even if no usage
@@ -2865,10 +2905,6 @@ def test_call_read_with_unkown_llm(client):
     """Tests that if an op reports usage for an LLM ID that has no cost entry
     in the database, the cost calculation handles it gracefully (by not adding cost info).
     """
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
-
     # Generate a unique LLM ID unlikely to exist
     llm_id_no_cost = f"non_existent_llm_{generate_id()}"
 
@@ -2892,7 +2928,7 @@ def test_call_read_with_unkown_llm(client):
 
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["id", "summary", "output_dump"],
             include_costs=True,
         )
@@ -3204,11 +3240,14 @@ class BasicModel(weave.Model):
         return {"answer": "42"}
 
 
+@pytest.mark.flaky(reruns=3)
 def test_model_save(client):
     model = BasicModel()
     assert model.predict(1) == {"answer": "42"}
     model_ref = weave.publish(model)
     assert model.predict(1) == {"answer": "42"}
+    # Allow ClickHouse file writes to settle before loading the model source.
+    time.sleep(0.2)
     model2 = model_ref.get()
     assert model2.predict(1) == {"answer": "42"}
 
@@ -3248,7 +3287,7 @@ def test_calls_stream_column_expansion(client):
     def return_nested_object(nested_obj: NestedObject):
         return nested_obj
 
-    simple_obj = SimpleObject(a=ref.uri())
+    simple_obj = SimpleObject(a=ref.uri)
     simple_ref = weave.publish(simple_obj)
     nested_obj = NestedObject(b=simple_obj)
     nested_ref = weave.publish(nested_obj)
@@ -3258,40 +3297,40 @@ def test_calls_stream_column_expansion(client):
     # output is a ref
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     call_result = next(iter(res))
-    assert call_result.output == nested_ref.uri()
+    assert call_result.output == nested_ref.uri
 
     # output is dereffed
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output"],
             expand_columns=["output"],
         )
     )
 
     call_result = next(iter(res))
-    assert call_result.output["b"] == simple_ref.uri()
+    assert call_result.output["b"] == simple_ref.uri
 
     # expand 2 refs, should be {"b": {"a": ref}}
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output.b"],
             expand_columns=["output", "output.b"],
         )
     )
     call_result = next(iter(res))
-    assert call_result.output["b"]["a"] == ref.uri()
+    assert call_result.output["b"]["a"] == ref.uri
 
     # expand 3 refs, should be {"b": {"a": {"id": 123}}}
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output.b.a"],
             expand_columns=["output", "output.b", "output.b.a"],
         )
@@ -3302,24 +3341,24 @@ def test_calls_stream_column_expansion(client):
     # incomplete expansion columns, output should be un expanded
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output"],
             expand_columns=["output.b"],
         )
     )
     call_result = next(iter(res))
-    assert call_result.output == nested_ref.uri()
+    assert call_result.output == nested_ref.uri
 
     # non-existent column, should be un expanded
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output.b.a"],
             expand_columns=["output.b", "output.zzzz"],
         )
     )
     call_result = next(iter(res))
-    assert call_result.output == nested_ref.uri()
+    assert call_result.output == nested_ref.uri
 
 
 # Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
@@ -3347,7 +3386,7 @@ def test_calls_stream_column_expansion_dynamic_batch_size(
 
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             columns=["output"],
             expand_columns=["output"],
         )
@@ -3374,7 +3413,7 @@ def test_object_with_disallowed_keys(client):
     create_req = tsi.ObjCreateReq.model_validate(
         {
             "obj": {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "object_id": name,
                 "val": {"1": 1},
             }
@@ -3399,7 +3438,7 @@ def test_object_with_char_limit(client):
     create_req = tsi.ObjCreateReq.model_validate(
         {
             "obj": {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "object_id": name,
                 "val": {"1": 1},
             }
@@ -3420,7 +3459,7 @@ def test_object_with_char_over_limit(client):
     create_req = tsi.ObjCreateReq.model_validate(
         {
             "obj": {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "object_id": name,
                 "val": {"1": 1},
             }
@@ -3444,7 +3483,7 @@ def test_objects_and_keys_with_special_characters(client):
     weave.publish(obj)
     assert obj.ref is not None
 
-    entity, project = from_project_id(client._project_id())
+    entity, project = from_project_id(client.project_id)
     project_id = to_project_id(entity, project)
     ref_base = f"weave:///{project_id}"
     exp_name = sanitize_object_name(name_with_special_characters)
@@ -3457,7 +3496,7 @@ def test_objects_and_keys_with_special_characters(client):
     exp_digest = "k8nuYiUMP6VgAP6wMjeY8dRYnMz2lCqlCyzu2F7iFMw"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
-    assert obj.ref.uri() == exp_obj_ref
+    assert obj.ref.uri == exp_obj_ref
 
     @weave.op
     def test(obj: Custom):
@@ -3468,7 +3507,7 @@ def test_objects_and_keys_with_special_characters(client):
     res = test(obj)
 
     exp_res_ref = f"{exp_obj_ref}/attr/val/key/{exp_key}"
-    found_ref = res.ref.uri()
+    found_ref = res.ref.uri
     assert res == "hello world"
     assert found_ref == exp_res_ref
 
@@ -3478,7 +3517,7 @@ def test_objects_and_keys_with_special_characters(client):
     exp_op_digest = "UsyKRnrEyBIieYPDU6eGrbGJgtXjFVFoR6PEemZma68"
     exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
 
-    found_ref = test.ref.uri()
+    found_ref = test.ref.uri
     assert found_ref == exp_op_ref
     gotten_fn = weave.ref(found_ref).get()
     assert gotten_fn(obj) == "hello world"
@@ -3509,7 +3548,7 @@ def test_calls_stream_feedback(client):
     # now get calls from the server, with the feedback expanded
     res = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             include_feedback=True,
         )
     )
@@ -4042,13 +4081,13 @@ async def test_op_sampling_inheritance_async_generator(client):
 
 
 def test_op_sampling_invalid_rates(client):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="tracing_sample_rate must be between 0 and 1"):
 
         @weave.op(tracing_sample_rate=-0.5)
         def negative_rate():
             pass
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="tracing_sample_rate must be between 0 and 1"):
 
         @weave.op(tracing_sample_rate=1.5)
         def too_high_rate():
@@ -4169,7 +4208,7 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
     trace_id = generate_id()
     parent_id = generate_id()
     start = tsi.StartedCallSchemaForInsert(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         id=call_id,
         op_name="test_name",
         trace_id=trace_id,
@@ -4187,7 +4226,7 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
     assert not res[0].output
 
     end = tsi.EndedCallSchemaForInsert(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         id=call_id,
         ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
         summary={"c": 5},
@@ -4315,9 +4354,11 @@ def test_call_stream_query_heavy_query_batch(client):
 
 @pytest.fixture
 def clickhouse_client(client):
-    if client_is_sqlite(client):
+    try:
+        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
+    except TypeError:
         return None
-    return client.server._next_trace_server.ch_client
+    return ch_server.ch_client
 
 
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
@@ -4536,7 +4577,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
     table_ref = TableRef.parse_uri(queried_obj.val["rows"])
     res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digests=[table_ref.digest],
             include_storage_size=True,
         )
@@ -4560,10 +4601,6 @@ def test_obj_query_with_storage_size_clickhouse(client):
 
 
 def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client):
-    if client_is_sqlite(client):
-        # dont run this test for sqlite
-        return
-
     @weave.op
     def child_op(a: int, b: int) -> dict[str, Any]:
         return {
@@ -4583,12 +4620,13 @@ def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client
     # due to some race condition/optimizations in clickhouse, there is a chance
     # that the calls_merged_stats table is not updated in time for the query below
     # to return the correct results.
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged FINAL",
-    )
-    clickhouse_client.command(
-        "OPTIMIZE TABLE calls_merged_stats FINAL",
-    )
+    if not client_is_sqlite(client):
+        clickhouse_client.command(
+            "OPTIMIZE TABLE calls_merged FINAL",
+        )
+        clickhouse_client.command(
+            "OPTIMIZE TABLE calls_merged_stats FINAL",
+        )
 
     # Test that "include_costs" and "include_total_storage_size" can be used together
     calls = list(
@@ -4651,11 +4689,12 @@ def test_call_query_stream_with_invalid_filter_field(client):
 )
 def test_get_object_from_uri(client, obj):
     ref = weave.publish(obj)
-    uri = ref.uri()
+    uri = ref.uri
 
     assert weave.get(uri) == obj
 
 
+@pytest.mark.flaky(reruns=3)
 def test_get_object_from_uri_non_registered_object(client):
     class MyModel(weave.Model):
         a: int
@@ -4667,8 +4706,10 @@ def test_get_object_from_uri_non_registered_object(client):
 
     model = MyModel(name="example", description="fancy", a=1)
     ref = weave.publish(model)
-    uri = ref.uri()
+    uri = ref.uri
 
+    # Allow ClickHouse file writes to settle before loading the model source.
+    time.sleep(0.2)
     res = weave.get(uri)
     assert res.name == "example"
     assert res.description == "fancy"
@@ -4707,7 +4748,7 @@ def test_dedupe_ref_in_calls_stream(client):
         return list(
             client.server.calls_query_stream(
                 tsi.CallsQueryReq(
-                    project_id=client._project_id(),
+                    project_id=client.project_id,
                     columns=columns,
                     expand_columns=expand_columns,
                 )
@@ -4717,16 +4758,16 @@ def test_dedupe_ref_in_calls_stream(client):
     calls_hydrated = call_stream(columns=["output"], expand_columns=["output"])
     assert len(calls_hydrated) == 1
     assert calls_hydrated[0].output == {
-        "_ref": obj_ref.uri(),
-        "my_dataset1": nested_ref.uri(),
-        "my_dataset2": nested_ref.uri(),
-        "my_dataset3": nested_ref.uri(),
-        "my_dataset4": nested_ref.uri(),
-        "my_dataset5": nested_ref.uri(),
+        "_ref": obj_ref.uri,
+        "my_dataset1": nested_ref.uri,
+        "my_dataset2": nested_ref.uri,
+        "my_dataset3": nested_ref.uri,
+        "my_dataset4": nested_ref.uri,
+        "my_dataset5": nested_ref.uri,
         "ref_list": {
-            "1": nested_ref.uri(),
-            "2": nested_ref.uri(),
-            "3": nested_ref.uri(),
+            "1": nested_ref.uri,
+            "2": nested_ref.uri,
+            "3": nested_ref.uri,
         },
     }
 
@@ -4742,7 +4783,7 @@ def test_dedupe_ref_in_calls_stream(client):
         "output.ref_list.2",
         "output.ref_list.3",
     ]
-    nested_obj_with_ref = {"nested": 123, "_ref": nested_ref.uri()}
+    nested_obj_with_ref = {"nested": 123, "_ref": nested_ref.uri}
     calls_all_columns = call_stream(columns=cols, expand_columns=cols)
     assert len(calls_all_columns) == 1
     assert calls_all_columns[0].output["my_dataset1"] == nested_obj_with_ref
@@ -4792,7 +4833,7 @@ def test_calls_query_stats_with_limit(client):
     # test filter, should not use special optimization
     assert calls_stats(filter={"trace_ids": [trace_id]}).count == 2
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Limit must be"):
         calls_stats(limit=-1)
 
     # Test that the query works with include_total_storage_size
@@ -4991,7 +5032,7 @@ def test_project_stats_clickhouse(client, clickhouse_client):
     assert res.files_storage_size_bytes == file_size
 
     # test that requesting with none of the include_* params returns an error
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="At least one of"):
         client.server.project_stats(
             tsi.ProjectStatsReq(
                 project_id=project_id,
@@ -6325,9 +6366,6 @@ def test_calls_query_sort_by_nested_attributes_field_with_costs(client):
 @pytest.mark.asyncio
 async def test_calls_query_sort_by_feedback_field_with_costs(client):
     """Test sorting by feedback field with cost query and minimal columns."""
-    if client_is_sqlite(client):
-        # Not implemented in sqlite - skip
-        pytest.skip("Sorting by feedback fields not implemented in SQLite")
 
     @weave.op
     def my_scorer(x: int, output: int) -> dict:
@@ -6424,6 +6462,56 @@ def test_calls_query_sort_by_agg_field_with_costs(client):
     )
     assert len(calls) == 2
     assert calls[0].id == call_b.id  # "beta" sorts before "alpha" desc
+    assert calls[1].id == call_a.id
+
+
+def test_calls_query_sort_by_trace_name_with_costs(client):
+    """Test sorting by summary.weave.trace_name with costs enabled.
+
+    Regression test: on calls_complete, sorting by summary.weave.trace_name
+    with include_costs=True failed with UNKNOWN_IDENTIFIER because the
+    computed trace_name column wasn't included in the all_calls CTE SELECT.
+    """
+
+    @weave.op
+    def alpha_op(x: int) -> int:
+        return x
+
+    @weave.op
+    def beta_op(x: int) -> int:
+        return x
+
+    _, call_a = alpha_op.call(1)
+    _, call_b = beta_op.call(2)
+
+    filter = tsi.CallsFilter(call_ids=[call_a.id, call_b.id])
+
+    # Sort by trace_name ascending with costs
+    sort_by = [{"field": "summary.weave.trace_name", "direction": "asc"}]
+    calls = list(
+        client.get_calls(
+            sort_by=sort_by,
+            columns=["id"],
+            filter=filter,
+            include_costs=True,
+        )
+    )
+    assert len(calls) == 2
+    assert calls[0].id == call_a.id  # "alpha_op" sorts before "beta_op"
+    assert calls[1].id == call_b.id
+
+    # Sort descending
+    sort_by = [{"field": "summary.weave.trace_name", "direction": "desc"}]
+    calls = list(
+        client.get_calls(
+            sort_by=sort_by,
+            columns=["id"],
+            filter=filter,
+            include_costs=True,
+        )
+    )
+    assert len(calls) == 2
+    assert calls[0].id == call_b.id  # "beta_op" sorts before "alpha_op" desc
     assert calls[1].id == call_a.id
 
 

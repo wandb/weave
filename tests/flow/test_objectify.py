@@ -45,7 +45,7 @@ def test_ref_get(client, obj):
     ref = weave.publish(obj)
 
     obj_cls = type(obj)
-    obj2 = obj_cls.from_uri(ref.uri())
+    obj2 = obj_cls.from_uri(ref.uri)
     obj3 = ref.get()
     assert isinstance(obj2, obj_cls)
     assert isinstance(obj3, obj_cls)
@@ -79,7 +79,7 @@ async def test_gotten_methods(client):
     await ev.evaluate(model)
     ref = weave.publish(ev)
 
-    ev2 = weave.Evaluation.from_uri(ref.uri())
+    ev2 = weave.Evaluation.from_uri(ref.uri)
     await ev2.evaluate(model)
 
     # Ensure that the Evaluation object we get back is equivalent to the one published.
@@ -96,7 +96,7 @@ async def test_gotten_methods(client):
     # TODO: Replace with client version of this query when available
     res = client.server.objs_query(
         ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=ObjectVersionFilter(object_ids=relevant_object_ids),
         )
     )

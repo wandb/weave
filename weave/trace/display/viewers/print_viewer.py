@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import types
 from typing import Any
 
 from typing_extensions import Self
@@ -16,6 +17,8 @@ from weave.trace.display.protocols import (
     TextProtocol,
 )
 from weave.trace.display.types import Style
+
+DEFAULT_TERMINAL_WIDTH = 80
 
 
 class CaptureContext:
@@ -33,7 +36,12 @@ class CaptureContext:
         sys.stdout = self._capture_buffer
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         sys.stdout = self._original_stdout
 
     def get(self) -> str:
@@ -64,7 +72,7 @@ class PrintViewer:
         print(output, end=end, file=self._file)
 
     def rule(self, title: str = "", style: str | Style | None = None) -> None:
-        width = 80  # Default width
+        width = DEFAULT_TERMINAL_WIDTH
         if title:
             padding = (width - len(title) - 2) // 2
             rule = "─" * padding + f" {title} " + "─" * padding
@@ -286,7 +294,12 @@ class PrintProgress:
         self.start()
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Context manager exit."""
         self.stop()
 

@@ -95,7 +95,7 @@ def test_completions_create(client):
                 res = client.server.completions_create(
                     tsi.CompletionsCreateReq.model_validate(
                         {
-                            "project_id": client._project_id(),
+                            "project_id": client.project_id,
                             "inputs": inputs,
                         }
                     )

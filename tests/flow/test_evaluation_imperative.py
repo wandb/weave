@@ -652,7 +652,7 @@ def test_evaluation_invalid_model_name_fixable(model_name):
 
 @pytest.mark.parametrize("model_name", [""])
 def test_evaluation_invalid_model_name_not_fixable(model_name):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="name cannot be empty"):
         weave.EvaluationLogger(model=model_name)
 
 
@@ -718,8 +718,8 @@ def test_evaluation_logger_set_view(client):
     assert "views" in evaluate_call.summary["weave"]
     views = evaluate_call.summary["weave"]["views"]
     assert len(views) == 2
-    assert views["report"] == to_json(content, client._project_id(), client)
-    assert views["report2"] == to_json(content2, client._project_id(), client)
+    assert views["report"] == to_json(content, client.project_id, client)
+    assert views["report2"] == to_json(content2, client.project_id, client)
 
 
 def test_evaluation_logger_set_view_string(client):
@@ -1139,3 +1139,15 @@ def test_log_example_after_log_summary_raises_error(client):
             output="another answer",
             scores={"score": 0.5},
         )
+
+
+def test_evaluation_logger_with_weave_disabled(client, monkeypatch):
+    """Test that EvaluationLogger works when WEAVE_DISABLED=true (WB-32259)."""
+    monkeypatch.setenv("WEAVE_DISABLED", "true")
+
+    ev = EvaluationLogger(model="my-model")
+    pred = ev.log_prediction(inputs={"q": "Hello"}, output="Hi there!")
+    pred.log_score("correctness", 0.9)
+    pred.finish()
+    ev.log_summary({"avg_score": 0.9})
+    ev.finish()

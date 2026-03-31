@@ -14,13 +14,13 @@ def test_op_return_sync_empty(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -35,13 +35,13 @@ async def test_op_return_async_empty(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -55,13 +55,13 @@ def test_op_return_sync_obj(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == 1
 
@@ -76,13 +76,13 @@ async def test_op_return_async_obj(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == 1
 
@@ -114,13 +114,13 @@ def test_op_return_sync_generator(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, -1, -1))
 
@@ -139,13 +139,13 @@ async def test_op_return_async_generator(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, -1, -1))
 
@@ -172,13 +172,13 @@ def test_op_return_sync_iterator(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, -1, -1))
 
@@ -206,13 +206,13 @@ async def test_op_return_async_iterator(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, -1, -1))
 
@@ -229,13 +229,13 @@ def test_op_return_sync_generator_never_iter(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -254,13 +254,13 @@ async def test_op_return_async_generator_never_iter(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -286,13 +286,13 @@ def test_op_return_sync_iterator_never_iter(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -319,13 +319,13 @@ async def test_op_return_async_iterator_never_iter(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output is None
 
@@ -344,13 +344,13 @@ def test_op_return_sync_generator_partial(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
 
@@ -371,13 +371,13 @@ async def test_op_return_async_generator_partial(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
 
@@ -405,13 +405,13 @@ def test_op_return_sync_iterator_partial(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
 
@@ -440,13 +440,13 @@ async def test_op_return_async_iterator_partial(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
 
@@ -469,13 +469,13 @@ def test_op_return_sync_generator_exception(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
     assert res.calls[0].exception is not None
@@ -500,13 +500,13 @@ async def test_op_return_async_generator_exception(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
     assert res.calls[0].exception is not None
@@ -539,13 +539,13 @@ def test_op_return_sync_iterator_exception(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
     assert res.calls[0].exception is not None
@@ -579,13 +579,13 @@ async def test_op_return_async_iterator_exception(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
     obj_ref = get_ref(fn)
     assert obj_ref is not None
-    assert res.calls[0].op_name == obj_ref.uri()
+    assert res.calls[0].op_name == obj_ref.uri
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
     assert res.calls[0].exception is not None

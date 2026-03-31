@@ -80,7 +80,7 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
     )
 
     # Construct the URI
-    action_ref_uri = published_ref.uri()
+    action_ref_uri = published_ref.uri
 
     @weave.op
     def example_op(input: str) -> str:
@@ -97,7 +97,7 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
             client.server.actions_execute_batch(
                 ActionsExecuteBatchReq.model_validate(
                     {
-                        "project_id": client._project_id(),
+                        "project_id": client.project_id,
                         "action_ref": action_ref_uri,
                         "call_ids": [call.id],
                     }
@@ -171,7 +171,7 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
     )
 
     # Construct the URI
-    action_ref_uri = published_ref.uri()
+    action_ref_uri = published_ref.uri
 
     @weave.op
     def example_op(input: str) -> str:
@@ -188,7 +188,7 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
             client.server.actions_execute_batch(
                 ActionsExecuteBatchReq.model_validate(
                     {
-                        "project_id": client._project_id(),
+                        "project_id": client.project_id,
                         "action_ref": action_ref_uri,
                         "call_ids": [call.id],
                     }

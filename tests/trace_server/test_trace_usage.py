@@ -4,7 +4,6 @@ from typing import Any
 
 import pytest
 
-from tests.trace.util import client_is_sqlite
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server import usage_utils
@@ -47,11 +46,6 @@ _LEAF_USAGE = {
         "requests": 1,
     }
 }
-
-
-def skip_if_sqlite(client: weave_client.WeaveClient) -> None:
-    if client_is_sqlite(client):
-        pytest.skip("trace_usage is only implemented in ClickHouse")
 
 
 def _usage_summary(
@@ -104,7 +98,7 @@ def _create_call(
     started_at: datetime.datetime,
     usage: dict[str, dict[str, Any]] | None,
 ) -> None:
-    project_id = client._project_id()
+    project_id = client.project_id
     client.server.call_start(
         tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
@@ -139,7 +133,7 @@ def _create_unfinished_call(
     parent_id: str | None,
     started_at: datetime.datetime,
 ) -> None:
-    project_id = client._project_id()
+    project_id = client.project_id
     client.server.call_start(
         tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
@@ -443,9 +437,7 @@ def test_aggregate_usage_handles_missing_summaries(
 
 
 def test_trace_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> None:
-    skip_if_sqlite(client)
-
-    project_id = client._project_id()
+    project_id = client.project_id
     trace_id = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
 
@@ -497,9 +489,7 @@ def test_trace_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> N
 
 
 def test_trace_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:
-    skip_if_sqlite(client)
-
-    project_id = client._project_id()
+    project_id = client.project_id
     trace_id = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
 
@@ -539,9 +529,7 @@ def test_trace_usage_include_costs_flag(client: weave_client.WeaveClient) -> Non
 def test_trace_usage_returns_unfinished_call_ids(
     client: weave_client.WeaveClient,
 ) -> None:
-    skip_if_sqlite(client)
-
-    project_id = client._project_id()
+    project_id = client.project_id
     trace_id = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
 
@@ -575,9 +563,7 @@ def test_trace_usage_returns_unfinished_call_ids(
 
 
 def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> None:
-    skip_if_sqlite(client)
-
-    project_id = client._project_id()
+    project_id = client.project_id
     trace_id = str(uuid.uuid4())
     trace_id_two = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -639,9 +625,7 @@ def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> N
 
 
 def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:
-    skip_if_sqlite(client)
-
-    project_id = client._project_id()
+    project_id = client.project_id
     trace_id = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
 
@@ -681,9 +665,7 @@ def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> Non
 def test_calls_usage_returns_unfinished_call_ids(
     client: weave_client.WeaveClient,
 ) -> None:
-    skip_if_sqlite(client)
-
-    project_id = client._project_id()
+    project_id = client.project_id
     trace_id = str(uuid.uuid4())
     trace_id_two = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -747,9 +729,7 @@ def test_calls_usage_handles_missing_usage(
     middle_usage: dict[str, dict[str, Any]] | None,
     leaf_usage: dict[str, dict[str, Any]] | None,
 ) -> None:
-    skip_if_sqlite(client)
-
-    project_id = client._project_id()
+    project_id = client.project_id
     trace_id = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
 

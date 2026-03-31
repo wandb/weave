@@ -171,7 +171,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
         # Set the context to None to simulate missing secret fetcher
         token = _secret_fetcher_context.set(None)
         try:
-            with self.assertRaises(InvalidRequest) as context:
+            with pytest.raises(InvalidRequest) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
                     provider_name=self.provider_id,
@@ -179,10 +179,8 @@ class TestGetCustomProviderInfo(unittest.TestCase):
                     obj_read_func=self.mock_obj_read_func,
                 )
 
-            self.assertIn(
-                "No secret fetcher found",
-                str(context.exception),
-                "Expected error message about missing secret fetcher not found",
+            assert "No secret fetcher found" in str(context.value), (
+                "Expected error message about missing secret fetcher not found"
             )
         finally:
             _secret_fetcher_context.reset(token)
@@ -198,7 +196,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
 
         token = _secret_fetcher_context.set(self.mock_secret_fetcher)
         try:
-            with self.assertRaises(InvalidRequest) as context:
+            with pytest.raises(InvalidRequest) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
                     provider_name=self.provider_id,
@@ -206,10 +204,8 @@ class TestGetCustomProviderInfo(unittest.TestCase):
                     obj_read_func=self.mock_obj_read_func,
                 )
 
-            self.assertIn(
-                "Failed to fetch provider model information",
-                str(context.exception),
-                "Expected error message about failed provider fetch not found",
+            assert "Failed to fetch provider model information" in str(context.value), (
+                "Expected error message about failed provider fetch not found"
             )
         finally:
             _secret_fetcher_context.reset(token)
@@ -234,7 +230,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
 
         token = _secret_fetcher_context.set(self.mock_secret_fetcher)
         try:
-            with self.assertRaises(InvalidRequest) as context:
+            with pytest.raises(InvalidRequest) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
                     provider_name=self.provider_id,
@@ -242,10 +238,8 @@ class TestGetCustomProviderInfo(unittest.TestCase):
                     obj_read_func=self.mock_obj_read_func,
                 )
 
-            self.assertIn(
-                "Could not find Provider",
-                str(context.exception),
-                "Expected error message about incorrect provider type not found",
+            assert "Could not find Provider" in str(context.value), (
+                "Expected error message about incorrect provider type not found"
             )
         finally:
             _secret_fetcher_context.reset(token)
@@ -270,7 +264,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
 
         token = _secret_fetcher_context.set(self.mock_secret_fetcher)
         try:
-            with self.assertRaises(InvalidRequest) as context:
+            with pytest.raises(InvalidRequest) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
                     provider_name=self.provider_id,
@@ -278,10 +272,8 @@ class TestGetCustomProviderInfo(unittest.TestCase):
                     obj_read_func=self.mock_obj_read_func,
                 )
 
-            self.assertIn(
-                "Could not find Provider",
-                str(context.exception),
-                "Expected error message about incorrect provider model type not found",
+            assert "Could not find Provider" in str(context.value), (
+                "Expected error message about incorrect provider model type not found"
             )
         finally:
             _secret_fetcher_context.reset(token)
@@ -381,11 +373,11 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             chunks = list(stream)
 
             # Verify the chunks
-            self.assertEqual(len(chunks), 3)
-            self.assertEqual(chunks[0]["choices"][0]["delta"]["content"], "Hello")
-            self.assertEqual(chunks[1]["choices"][0]["delta"]["content"], " world")
-            self.assertEqual(chunks[2]["choices"][0]["finish_reason"], "stop")
-            self.assertIn("usage", chunks[2])
+            assert len(chunks) == 3
+            assert chunks[0]["choices"][0]["delta"]["content"] == "Hello"
+            assert chunks[1]["choices"][0]["delta"]["content"] == " world"
+            assert chunks[2]["choices"][0]["finish_reason"] == "stop"
+            assert "usage" in chunks[2]
 
     def test_streaming_error_handling(self):
         """Test error handling in streaming completion."""
@@ -409,7 +401,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             )
 
             # Get the stream and expect an exception
-            with self.assertRaises(StreamingException):
+            with pytest.raises(StreamingException):
                 list(self.server.completions_create_stream(req))
 
     def test_streaming_with_call_tracking(self):
@@ -452,8 +444,11 @@ class TestLLMCompletionStreaming(unittest.TestCase):
                 "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(
-                chts.ClickHouseTraceServer, "_insert_call"
-            ) as mock_insert_call,
+                chts.ClickHouseTraceServer, "_insert_call_complete"
+            ) as mock_insert_complete,
+            patch.object(
+                chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+            ) as mock_update_end,
         ):
             # Mock the litellm completion stream
             mock_stream = MagicMock()
@@ -477,19 +472,17 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             chunks = list(stream)
 
             # Verify the chunks
-            self.assertEqual(len(chunks), 3)  # Meta chunk + 2 content chunks
-            self.assertIn("_meta", chunks[0])
-            self.assertIn("weave_call_id", chunks[0]["_meta"])
-            self.assertEqual(chunks[1]["choices"][0]["delta"]["content"], "Hello")
-            self.assertEqual(chunks[2]["choices"][0]["finish_reason"], "stop")
+            assert len(chunks) == 3  # Meta chunk + 2 content chunks
+            assert "_meta" in chunks[0]
+            assert "weave_call_id" in chunks[0]["_meta"]
+            assert chunks[1]["choices"][0]["delta"]["content"] == "Hello"
+            assert chunks[2]["choices"][0]["finish_reason"] == "stop"
 
-            # Verify call tracking
-            self.assertEqual(mock_insert_call.call_count, 2)  # Start and end calls
-            start_call = mock_insert_call.call_args_list[0][0][0]
-            end_call = mock_insert_call.call_args_list[1][0][0]
-            self.assertEqual(start_call.project_id, "dGVzdF9wcm9qZWN0")
-            self.assertEqual(end_call.project_id, "dGVzdF9wcm9qZWN0")
-            self.assertEqual(end_call.id, start_call.id)
+            # Verify call tracking via calls_complete (empty project)
+            mock_insert_complete.assert_called_once()
+            mock_update_end.assert_called_once()
+            start_call = mock_insert_complete.call_args[0][0]
+            assert start_call.project_id == "dGVzdF9wcm9qZWN0"
 
     def test_custom_provider_streaming(self):
         """Test streaming completion with a custom provider."""
@@ -603,18 +596,17 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             chunks = list(stream)
 
             # Verify the chunks
-            self.assertEqual(len(chunks), 2)
-            self.assertEqual(chunks[0]["choices"][0]["delta"]["content"], "Custom")
-            self.assertEqual(chunks[1]["choices"][0]["finish_reason"], "stop")
+            assert len(chunks) == 2
+            assert chunks[0]["choices"][0]["delta"]["content"] == "Custom"
+            assert chunks[1]["choices"][0]["finish_reason"] == "stop"
 
             # Verify litellm was called with correct parameters
             mock_litellm.assert_called_once()
             call_args = mock_litellm.call_args[1]
-            self.assertEqual(
-                call_args.get("api_base") or call_args.get("base_url"),
-                "https://api.custom.com",
-            )
-            self.assertEqual(call_args["extra_headers"], {"X-Custom": "value"})
+            assert (
+                call_args.get("api_base") or call_args.get("base_url")
+            ) == "https://api.custom.com"
+            assert call_args["extra_headers"] == {"X-Custom": "value"}
 
     def test_missing_api_key(self):
         """Test handling of missing API key in streaming completion."""
@@ -637,7 +629,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             )
 
             # Get the stream and expect an exception
-            with self.assertRaises(MissingLLMApiKeyError):
+            with pytest.raises(MissingLLMApiKeyError):
                 list(self.server.completions_create_stream(req))
 
 
@@ -695,11 +687,11 @@ class TestPromptResolution(unittest.TestCase):
         )
 
         # Template variables should NOT be substituted (that's handled separately)
-        self.assertEqual(len(messages), 2)
-        self.assertEqual(messages[0]["role"], "system")
-        self.assertEqual(messages[0]["content"], "You are {assistant_name}.")
-        self.assertEqual(messages[1]["role"], "user")
-        self.assertEqual(messages[1]["content"], "Hello!")
+        assert len(messages) == 2
+        assert messages[0]["role"] == "system"
+        assert messages[0]["content"] == "You are {assistant_name}."
+        assert messages[1]["role"] == "user"
+        assert messages[1]["content"] == "Hello!"
 
     def test_resolve_prompt_messages_invalid_prompt(self):
         """Test error handling when prompt object is not a Prompt or MessagesPrompt."""
@@ -729,14 +721,14 @@ class TestPromptResolution(unittest.TestCase):
         )
 
         # Should raise InvalidRequest when object is not a Prompt or MessagesPrompt
-        with self.assertRaises(InvalidRequest) as context:
+        with pytest.raises(InvalidRequest) as context:
             resolve_prompt_messages(
                 prompt=prompt_uri,
                 project_id=self.project_id,
                 obj_read_func=mock_obj_read,
             )
 
-        self.assertIn("is not a Prompt or MessagesPrompt", str(context.exception))
+        assert "is not a Prompt or MessagesPrompt" in str(context.value)
 
 
 class TestStreamingWithPrompts(unittest.TestCase):
@@ -845,9 +837,9 @@ class TestStreamingWithPrompts(unittest.TestCase):
             chunks = list(stream)
 
             # Verify the chunks
-            self.assertEqual(len(chunks), 2)
-            self.assertEqual(chunks[0]["choices"][0]["delta"]["content"], "Hello")
-            self.assertEqual(chunks[1]["choices"][0]["finish_reason"], "stop")
+            assert len(chunks) == 2
+            assert chunks[0]["choices"][0]["delta"]["content"] == "Hello"
+            assert chunks[1]["choices"][0]["finish_reason"] == "stop"
 
             # Verify obj_read was called to resolve the prompt
             mock_obj_read.assert_called_once()
@@ -944,9 +936,9 @@ class TestStreamingWithPrompts(unittest.TestCase):
             chunks = list(stream)
 
             # Verify the chunks
-            self.assertEqual(len(chunks), 2)
-            self.assertEqual(chunks[0]["choices"][0]["delta"]["content"], "Mathematics")
-            self.assertEqual(chunks[1]["choices"][0]["finish_reason"], "stop")
+            assert len(chunks) == 2
+            assert chunks[0]["choices"][0]["delta"]["content"] == "Mathematics"
+            assert chunks[1]["choices"][0]["finish_reason"] == "stop"
 
             # Verify litellm was called with substituted messages
             mock_litellm.assert_called_once()
@@ -954,9 +946,9 @@ class TestStreamingWithPrompts(unittest.TestCase):
             messages = call_kwargs["inputs"].messages
 
             # Should have 2 messages with template vars replaced
-            self.assertEqual(len(messages), 2)
-            self.assertEqual(messages[0]["content"], "You are MathBot.")
-            self.assertEqual(messages[1]["content"], "Tell me about mathematics.")
+            assert len(messages) == 2
+            assert messages[0]["content"] == "You are MathBot."
+            assert messages[1]["content"] == "Tell me about mathematics."
 
     @pytest.mark.disable_logging_error_check
     def test_streaming_with_prompt_error(self):
@@ -987,9 +979,9 @@ class TestStreamingWithPrompts(unittest.TestCase):
             chunks = list(stream)
 
             # Should have exactly one error chunk
-            self.assertEqual(len(chunks), 1)
-            self.assertIn("error", chunks[0])
-            self.assertIn("Failed to resolve and apply prompt", chunks[0]["error"])
+            assert len(chunks) == 1
+            assert "error" in chunks[0]
+            assert "Failed to resolve and apply prompt" in chunks[0]["error"]
 
 
 class TestResolveAndApplyPrompt(unittest.TestCase):
@@ -1051,17 +1043,17 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         )
 
         # Check combined messages (prompt + user, with template vars applied)
-        self.assertEqual(len(combined), 3)
-        self.assertEqual(combined[0]["role"], "system")
-        self.assertEqual(combined[0]["content"], "You are TestBot.")
-        self.assertEqual(combined[1]["role"], "user")
-        self.assertEqual(combined[1]["content"], "Answer in Spanish.")
-        self.assertEqual(combined[2]["role"], "user")
-        self.assertEqual(combined[2]["content"], "My question: What is 2+2?")
+        assert len(combined) == 3
+        assert combined[0]["role"] == "system"
+        assert combined[0]["content"] == "You are TestBot."
+        assert combined[1]["role"] == "user"
+        assert combined[1]["content"] == "Answer in Spanish."
+        assert combined[2]["role"] == "user"
+        assert combined[2]["content"] == "My question: What is 2+2?"
 
         # Check initial messages (original user messages before template vars)
-        self.assertEqual(len(initial), 1)
-        self.assertEqual(initial[0]["content"], "My question: {question}")
+        assert len(initial) == 1
+        assert initial[0]["content"] == "My question: {question}"
 
     def test_resolve_and_apply_prompt_only_prompt_no_template_vars(self):
         """Test with only prompt, no user messages or template vars."""
@@ -1101,11 +1093,11 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         )
 
         # Should just have the prompt messages
-        self.assertEqual(len(combined), 1)
-        self.assertEqual(combined[0]["content"], "You are a helpful assistant.")
+        assert len(combined) == 1
+        assert combined[0]["content"] == "You are a helpful assistant."
 
         # No initial messages
-        self.assertEqual(len(initial), 0)
+        assert len(initial) == 0
 
     def test_resolve_and_apply_prompt_only_messages_and_template_vars(self):
         """Test with only user messages and template vars, no prompt."""
@@ -1132,13 +1124,13 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         )
 
         # Should have messages with template vars applied
-        self.assertEqual(len(combined), 2)
-        self.assertEqual(combined[0]["content"], "You are ChatBot.")
-        self.assertEqual(combined[1]["content"], "Hello Alice!")
+        assert len(combined) == 2
+        assert combined[0]["content"] == "You are ChatBot."
+        assert combined[1]["content"] == "Hello Alice!"
 
         # Initial messages should be untouched
-        self.assertEqual(len(initial), 2)
-        self.assertEqual(initial[0]["content"], "You are {assistant_name}.")
+        assert len(initial) == 2
+        assert initial[0]["content"] == "You are {assistant_name}."
 
     def test_resolve_and_apply_prompt_only_messages_no_template_vars(self):
         """Test with only user messages, no prompt or template vars."""
@@ -1160,9 +1152,9 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         )
 
         # Should just pass through the messages unchanged
-        self.assertEqual(len(combined), 1)
-        self.assertEqual(combined[0]["content"], "Hello!")
-        self.assertEqual(initial, user_messages)
+        assert len(combined) == 1
+        assert combined[0]["content"] == "Hello!"
+        assert initial == user_messages
 
     def test_resolve_and_apply_prompt_empty_inputs(self):
         """Test with all inputs empty/None."""
@@ -1180,8 +1172,8 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         )
 
         # Should return empty lists
-        self.assertEqual(len(combined), 0)
-        self.assertEqual(len(initial), 0)
+        assert len(combined) == 0
+        assert len(initial) == 0
 
     def test_resolve_and_apply_prompt_prompt_not_found(self):
         """Test error handling when prompt reference cannot be found."""
@@ -1195,7 +1187,7 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
             f"weave-trace-internal:///{self.project_id}/object/missing-prompt:digest-1"
         )
 
-        with self.assertRaises(NotFoundError) as context:
+        with pytest.raises(NotFoundError) as context:
             resolve_and_apply_prompt(
                 prompt=prompt_uri,
                 messages=None,
@@ -1204,7 +1196,7 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
                 obj_read_func=mock_obj_read,
             )
 
-        self.assertIn("Object not found", str(context.exception))
+        assert "Object not found" in str(context.value)
 
     def test_resolve_and_apply_prompt_invalid_prompt_type(self):
         """Test error handling when prompt reference is not a Prompt object."""
@@ -1232,7 +1224,7 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
             f"weave-trace-internal:///{self.project_id}/object/test-obj:digest-1"
         )
 
-        with self.assertRaises(InvalidRequest) as context:
+        with pytest.raises(InvalidRequest) as context:
             resolve_and_apply_prompt(
                 prompt=prompt_uri,
                 messages=None,
@@ -1241,7 +1233,7 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
                 obj_read_func=mock_obj_read,
             )
 
-        self.assertIn("is not a Prompt or MessagesPrompt", str(context.exception))
+        assert "is not a Prompt or MessagesPrompt" in str(context.value)
 
     def test_resolve_and_apply_prompt_template_vars_with_empty_messages(self):
         """Test that template vars are skipped when there are no messages."""
@@ -1262,8 +1254,8 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         )
 
         # Should return empty lists (template vars skipped when no messages)
-        self.assertEqual(len(combined), 0)
-        self.assertEqual(len(initial), 0)
+        assert len(combined) == 0
+        assert len(initial) == 0
 
     def test_resolve_and_apply_prompt_skips_assistant_messages(self):
         """Test that template variable substitution is skipped for assistant messages."""
@@ -1294,23 +1286,23 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         )
 
         # Should have 4 messages
-        self.assertEqual(len(combined), 4)
+        assert len(combined) == 4
 
         # System message should have template vars applied
-        self.assertEqual(combined[0]["role"], "system")
-        self.assertEqual(combined[0]["content"], "You are ChatBot.")
+        assert combined[0]["role"] == "system"
+        assert combined[0]["content"] == "You are ChatBot."
 
         # First user message should have template vars applied
-        self.assertEqual(combined[1]["role"], "user")
-        self.assertEqual(combined[1]["content"], "Hello Alice!")
+        assert combined[1]["role"] == "user"
+        assert combined[1]["content"] == "Hello Alice!"
 
         # Assistant message should NOT have template vars applied (kept as-is)
-        self.assertEqual(combined[2]["role"], "assistant")
-        self.assertEqual(combined[2]["content"], '{"response": "My name is ChatBot."}')
+        assert combined[2]["role"] == "assistant"
+        assert combined[2]["content"] == '{"response": "My name is ChatBot."}'
 
         # Second user message should have template vars applied
-        self.assertEqual(combined[3]["role"], "user")
-        self.assertEqual(combined[3]["content"], "Yes, my name is Alice.")
+        assert combined[3]["role"] == "user"
+        assert combined[3]["content"] == "Yes, my name is Alice."
 
 
 @pytest.fixture
@@ -1509,6 +1501,180 @@ def test_completions_usage_captured_in_summary(
         assert usage["prompt_tokens"] == 10
         assert usage["completion_tokens"] == 5
         assert usage["total_tokens"] == 15
+
+
+@pytest.mark.parametrize(
+    (
+        "write_target",
+        "expect_complete_called",
+        "expect_update_end_called",
+        "expect_insert_call_called",
+    ),
+    [
+        pytest.param(
+            "CALLS_COMPLETE",
+            True,
+            True,
+            False,
+            id="stream_routes_to_calls_complete",
+        ),
+        pytest.param(
+            "CALLS_MERGED",
+            False,
+            False,
+            True,
+            id="stream_routes_to_calls_merged",
+        ),
+    ],
+)
+def test_streaming_completions_write_target_routing(
+    completions_mock_server,
+    completions_secret_fetcher,
+    write_target,
+    expect_complete_called,
+    expect_update_end_called,
+    expect_insert_call_called,
+):
+    """Verify completions_create_stream routes writes to the correct table based on write target."""
+    target = getattr(WriteTarget, write_target)
+
+    mock_chunks = [
+        {
+            "choices": [
+                {"delta": {"content": "Hi"}, "finish_reason": None, "index": 0}
+            ],
+            "id": "test-id",
+            "model": "gpt-3.5-turbo",
+            "created": 1234567890,
+        },
+        {
+            "choices": [{"delta": {}, "finish_reason": "stop", "index": 0}],
+            "id": "test-id",
+            "model": "gpt-3.5-turbo",
+            "created": 1234567890,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11},
+        },
+    ]
+
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+        ) as mock_litellm,
+        patch.object(
+            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
+        ) as mock_resolve,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+        ) as mock_update_end,
+        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+    ):
+        mock_stream = MagicMock()
+        mock_stream.__iter__.return_value = mock_chunks
+        mock_litellm.return_value = mock_stream
+        mock_resolve.return_value = target
+
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say hello"}],
+            ),
+            track_llm_call=True,
+        )
+
+        stream = completions_mock_server.completions_create_stream(req)
+        chunks = list(stream)
+
+        mock_resolve.assert_called_once()
+
+        # First chunk is always the meta chunk with call id
+        assert "_meta" in chunks[0]
+        assert "weave_call_id" in chunks[0]["_meta"]
+
+        assert mock_insert_complete.called == expect_complete_called
+        assert mock_update_end.called == expect_update_end_called
+        assert mock_insert_call.called == expect_insert_call_called
+
+        if expect_complete_called:
+            # Start was written to calls_complete
+            ch_start = mock_insert_complete.call_args[0][0]
+            assert ch_start.op_name == "weave.completions_create"
+            assert ch_start.ended_at is None  # start-only row
+
+            # End was updated via lightweight UPDATE
+            end_call = mock_update_end.call_args[0][0]
+            assert end_call.ended_at is not None
+
+        if expect_insert_call_called:
+            # calls_merged: start + end via _insert_call
+            assert mock_insert_call.call_count == 2
+
+
+@pytest.mark.parametrize(
+    ("write_target", "expect_complete_called", "expect_update_end_called"),
+    [
+        pytest.param("CALLS_COMPLETE", True, True, id="stream_error_calls_complete"),
+        pytest.param("CALLS_MERGED", False, False, id="stream_error_calls_merged"),
+    ],
+)
+def test_streaming_completions_error_routes_correctly(
+    completions_mock_server,
+    completions_secret_fetcher,
+    write_target,
+    expect_complete_called,
+    expect_update_end_called,
+):
+    """Verify streaming errors are captured in both write paths."""
+    target = getattr(WriteTarget, write_target)
+
+    def _error_stream():
+        yield {
+            "choices": [
+                {"delta": {"content": "Hi"}, "finish_reason": None, "index": 0}
+            ],
+            "id": "test-id",
+            "model": "gpt-3.5-turbo",
+            "created": 1234567890,
+        }
+        raise RuntimeError("stream died")
+
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+        ) as mock_litellm,
+        patch.object(
+            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
+        ) as mock_resolve,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+        ) as mock_update_end,
+        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+    ):
+        mock_litellm.return_value = _error_stream()
+        mock_resolve.return_value = target
+
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say hello"}],
+            ),
+            track_llm_call=True,
+        )
+
+        stream = completions_mock_server.completions_create_stream(req)
+        # Consume — the wrapper records end call in finally before re-raising
+        with pytest.raises(RuntimeError, match="stream died"):
+            list(stream)
+
+        assert mock_insert_complete.called == expect_complete_called
+        assert mock_update_end.called == expect_update_end_called
 
 
 if __name__ == "__main__":

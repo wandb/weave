@@ -728,7 +728,8 @@ def test_query_calls_complete_with_costs_and_attributes_order() -> None:
         """
         WITH all_calls AS
           (SELECT calls_complete.id AS id,
-                  calls_complete.started_at AS started_at
+                  calls_complete.started_at AS started_at,
+                  calls_complete.attributes_dump AS attributes_dump
            FROM calls_complete PREWHERE calls_complete.project_id = {pb_3:String}
            WHERE 1
              AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
@@ -1008,5 +1009,111 @@ def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
             "pb_2": "default",
             "pb_3": "",
             "pb_4": 1,
+        },
+    )
+
+
+def test_query_calls_complete_with_costs_and_trace_name_order() -> None:
+    """Test calls_complete with costs and summary.weave.trace_name ordering.
+
+    Regression test: ordering by summary.weave.trace_name with costs on
+    calls_complete used to fail with UNKNOWN_IDENTIFIER because the computed
+    trace_name column was not included in the all_calls CTE SELECT.
+    """
+    cq = CallsQuery(
+        project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
+        include_costs=True,
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_order("summary.weave.trace_name", "DESC")
+
+    assert_sql(
+        cq,
+        """
+        WITH all_calls AS
+          (SELECT calls_complete.id AS id,
+                  calls_complete.started_at AS started_at,
+                  CASE
+                      WHEN calls_complete.display_name != {pb_0:String} THEN calls_complete.display_name
+                      WHEN calls_complete.op_name IS NOT NULL
+                           AND calls_complete.op_name LIKE 'weave-trace-internal:///%' THEN regexpExtract(toString(calls_complete.op_name), '/([^/:]*):', 1)
+                      ELSE calls_complete.op_name
+                  END AS `summary.weave.trace_name`
+           FROM calls_complete PREWHERE calls_complete.project_id = {pb_3:String}
+           WHERE 1
+             AND (calls_complete.deleted_at = {pb_1:DateTime64(3)})
+           ORDER BY CASE
+                        WHEN calls_complete.display_name != {pb_2:String} THEN calls_complete.display_name
+                        WHEN calls_complete.op_name IS NOT NULL
+                             AND calls_complete.op_name LIKE 'weave-trace-internal:///%' THEN regexpExtract(toString(calls_complete.op_name), '/([^/:]*):', 1)
+                        ELSE calls_complete.op_name
+                    END DESC),
+             llm_usage AS
+          (-- From the all_calls we get the usage data for LLMs
+         SELECT *,
+                ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
+                arrayJoin(if(usage_raw != ''
+                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                kv.1 AS llm_id,
+                JSONExtractInt(kv.2, 'requests') AS requests,
+                (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
+                (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
+                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+           FROM all_calls),
+             ranked_prices AS
+          (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
+         SELECT *,
+                llm_token_prices.id,
+                llm_token_prices.pricing_level,
+                llm_token_prices.pricing_level_id,
+                llm_token_prices.provider_id,
+                llm_token_prices.llm_id,
+                llm_token_prices.effective_date,
+                llm_token_prices.prompt_token_cost,
+                llm_token_prices.completion_token_cost,
+                llm_token_prices.prompt_token_cost_unit,
+                llm_token_prices.completion_token_cost_unit,
+                llm_token_prices.created_by,
+                llm_token_prices.created_at,
+                ROW_NUMBER() OVER (PARTITION BY llm_usage.id, llm_usage.llm_id
+                                   ORDER BY CASE -- Order by effective_date
+                                                WHEN llm_usage.started_at >= llm_token_prices.effective_date THEN 1
+                                                ELSE 2
+                                            END, CASE -- Order by pricing level then by effective_date
+                                                 -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_PARAM THEN 1
+                                                     WHEN llm_token_prices.pricing_level = 'project'
+                                                          AND llm_token_prices.pricing_level_id = 'UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=' THEN 2
+                                                     WHEN llm_token_prices.pricing_level = 'default'
+                                                          AND llm_token_prices.pricing_level_id = 'default' THEN 3
+                                                     ELSE 4
+                                                 END, llm_token_prices.effective_date DESC) AS rank
+           FROM llm_usage
+           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+                                          AND ((llm_token_prices.pricing_level_id = {pb_4:String})
+                                               OR (llm_token_prices.pricing_level_id = {pb_5:String})
+                                               OR (llm_token_prices.pricing_level_id = {pb_6:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
+        SELECT id,
+               started_at,
+               `summary.weave.trace_name`,
+               if(any(llm_id) = 'weave_dummy_llm_id'
+                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
+        FROM ranked_prices
+        WHERE (rank = {pb_7:UInt64})
+        GROUP BY id,
+                 started_at,
+                 `summary.weave.trace_name`
+        ORDER BY `summary.weave.trace_name` DESC
+        """,
+        {
+            "pb_0": "",
+            "pb_1": SENTINEL_DATETIME,
+            "pb_2": "",
+            "pb_3": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
+            "pb_4": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
+            "pb_5": "default",
+            "pb_6": "",
+            "pb_7": 1,
         },
     )

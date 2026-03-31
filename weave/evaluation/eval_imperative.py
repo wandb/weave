@@ -8,12 +8,15 @@ import json
 import keyword
 import logging
 import re
+import types
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock
 from types import MethodType
 from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
+
+from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation, default_evaluation_display_name
@@ -26,7 +29,7 @@ from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op, as_op, op
+from weave.trace.op import Op, as_op, is_tracing_setting_disabled, op
 from weave.trace.table import Table
 from weave.trace.util import Thread
 from weave.trace.view_utils import set_call_view
@@ -35,6 +38,8 @@ from weave.utils.sentinel import NOT_SET, _NotSetType
 
 if TYPE_CHECKING:
     from weave.trace.call import Call
+
+DEFAULT_SCORER_CACHE_SIZE = 1000
 
 T = TypeVar("T")
 ID = str
@@ -60,7 +65,7 @@ def _cleanup_evaluation(eval_logger: EvaluationLogger) -> None:
         if not eval_logger._is_finalized:
             eval_logger.finish()
     except Exception:
-        logger.error("Error during cleanup of EvaluationLogger", exc_info=True)
+        logger.exception("Error during cleanup of EvaluationLogger")
 
 
 atexit.register(_cleanup_all_evaluations)
@@ -210,7 +215,7 @@ class ScorerCache:
     _cached_scorers_lock: Any
     _max_size: int
 
-    def __init__(self, max_size: int = 1000) -> None:
+    def __init__(self, max_size: int = DEFAULT_SCORER_CACHE_SIZE) -> None:
         self._cached_scorers = {}
         self._cached_scorers_lock = Lock()
         self._max_size = max_size
@@ -262,7 +267,7 @@ class _LogScoreContext:
         """Set the score value that will be logged on exit."""
         self._score_value = val
 
-    def __enter__(self) -> _LogScoreContext:
+    def __enter__(self) -> Self:
         """Enter context and set call stack to include the score call."""
         # Set call stack to include the score call so operations become children
         self._call_stack_context = call_context.set_call_stack(
@@ -275,7 +280,12 @@ class _LogScoreContext:
         self._call_stack_context.__enter__()
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Exit context, restore call stack, and finish the score call."""
         try:
             # scorer is guaranteed to be a Scorer instance here because it was prepared in _create_score_call
@@ -407,8 +417,10 @@ class ScoreLogger:
             scorer_name = cast(str, scorer.name)
             if scorer_name not in self.predefined_scorers:
                 logger.warning(
-                    f"Scorer '{scorer_name}' is not in the predefined scorers list. "
-                    f"Expected one of: {sorted(self.predefined_scorers)}"
+                    "Scorer '%s' is not in the predefined scorers list. "
+                    "Expected one of: %s",
+                    scorer_name,
+                    sorted(self.predefined_scorers),
                 )
 
         return scorer
@@ -548,6 +560,11 @@ class ScoreLogger:
 
         scorer = self._prepare_scorer(scorer)
 
+        if is_tracing_setting_disabled():
+            scorer_name = cast(str, scorer.name)
+            self._captured_scores[scorer_name] = score
+            return
+
         @op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
             # TODO: can't use score here because it will cause version mismatch
@@ -578,13 +595,18 @@ class ScoreLogger:
         """Set the output value that will be used when finishing."""
         self._predict_output = value
 
-    def __enter__(self) -> ScoreLogger:
+    def __enter__(self) -> Self:
         """Enter context manager and set call stack to predict_call."""
         self._call_stack_context = call_context.set_call_stack([self.predict_call])
         self._call_stack_context.__enter__()
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Exit context manager, restore call stack, and automatically finish."""
         try:
             if not self._has_finished:
@@ -782,9 +804,7 @@ class EvaluationLogger:
             wc.finish_call(self._evaluate_call, output=output, exception=exception)
         except Exception:
             # Log error but continue cleanup
-            logger.error(
-                "Failed to finish evaluation call during finalization.", exc_info=True
-            )
+            logger.exception("Failed to finish evaluation call during finalization.")
 
         self._is_finalized = True
 
@@ -943,7 +963,7 @@ class EvaluationLogger:
                     with attributes(IMPERATIVE_EVAL_MARKER):
                         self._pseudo_evaluation.summarize()
             except Exception:
-                logger.error("Error during execution of summarize op.", exc_info=True)
+                logger.exception("Error during execution of summarize op.")
                 # Even if summarize fails, try to finalize with the calculated summary
 
         self._finalize_evaluation(output=final_summary)

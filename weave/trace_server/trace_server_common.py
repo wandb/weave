@@ -18,7 +18,7 @@ def make_feedback_query_req(
     call_refs = []
     for call in calls:
         ref = ri.InternalCallRef(project_id=call["project_id"], id=call["id"])
-        call_refs.append(ref.uri())
+        call_refs.append(ref.uri)
 
     # construct mogo style query
     query = tsi.Query(
@@ -230,10 +230,10 @@ def digest_is_content_hash(digest: str) -> bool:
     False
     """
     # Weave digest: 43-char modified base64url
-    if len(digest) == 43 and digest.isalnum():
+    if len(digest) == WEAVE_DIGEST_LENGTH and digest.isalnum():
         return True
     # Hex SHA-256: 64 hex chars
-    if len(digest) == 64:
+    if len(digest) == HEX_SHA256_DIGEST_LENGTH:
         try:
             int(digest, 16)
         except ValueError:
@@ -241,6 +241,11 @@ def digest_is_content_hash(digest: str) -> bool:
         return True
     return False
 
+
+# Length of a Weave digest (modified base64url encoding of SHA-256)
+WEAVE_DIGEST_LENGTH = 43
+# Length of a hex-encoded SHA-256 digest
+HEX_SHA256_DIGEST_LENGTH = 64
 
 MAX_FILTER_LENGTH = 1000
 

@@ -7,6 +7,8 @@ from typing import Any, Optional
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 
+from weave.trace_server.validation_util import CHValidationError
+
 # =============================================================================
 # Error Codes - Machine-readable codes for client-side error detection
 # =============================================================================
@@ -147,6 +149,12 @@ class InvalidExternalRef(Error):
     pass
 
 
+class DigestMismatchError(Error):
+    """Raised when a client-provided digest does not match the server-computed digest."""
+
+    pass
+
+
 class ProjectNotFound(Error):
     """Raised when a project is not found."""
 
@@ -270,6 +278,7 @@ class ErrorRegistry:
         self.register(InvalidRequest, 400)
         self.register(CallsCompleteModeRequired, 400)
         self.register(InvalidExternalRef, 400)
+        self.register(DigestMismatchError, 409)
         self.register(QueryNoCommonTypeError, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
         self.register(InvalidIdFormat, 400)
@@ -289,12 +298,17 @@ class ErrorRegistry:
         self.register(InsertTooLarge, 413)
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
 
+        # 501
+        self.register(LightweightUpdateNotAllowedError, 501)
+
         # 502
         self.register(QueryMemoryLimitExceededError, 502)
-        self.register(LightweightUpdateNotAllowedError, 502)
 
         # 504
         self.register(QueryTimeoutExceededError, 504)
+
+        # Validation errors
+        self.register(CHValidationError, 400)
 
         # Standard library exceptions
         self.register(ValueError, 400)

@@ -372,7 +372,7 @@ def _worker_loop(
             except KeyboardInterrupt:
                 break
             except Exception as e:
-                logger.error(f"Error in worker loop: {e}", exc_info=True)
+                logger.exception("Error in worker loop")
                 response_queue.put((None, e))
                 break
 
@@ -421,7 +421,7 @@ def _execute_function(
             result = asyncio.run(result)
 
     except Exception as e:
-        logger.error(f"Error executing function: {e}", exc_info=True)
+        logger.exception("Error executing function")
         return None, e
 
     return result, None
@@ -436,9 +436,9 @@ def _cleanup_client(client: WeaveClient) -> None:
     try:
         client.finish(use_progress_bar=False)
     except Exception as e:
-        logger.error(f"Error finishing client: {e}", exc_info=True)
+        logger.exception("Error finishing client")
 
     try:
         set_weave_client_global(None)
     except Exception as e:
-        logger.error(f"Error resetting client: {e}", exc_info=True)
+        logger.exception("Error resetting client")

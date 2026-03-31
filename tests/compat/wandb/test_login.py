@@ -19,12 +19,6 @@ from weave.compat.wandb.wandb_thin.login import (
     _validate_api_key,
     _WandbLogin,
 )
-from weave.wandb_interface.context import (
-    from_environment,
-    get_wandb_api_context,
-    reset_wandb_api_context,
-    set_wandb_api_context,
-)
 from weave.wandb_interface.project_creator import _ensure_project_exists
 
 
@@ -406,38 +400,6 @@ def test_full_login_flow_without_netrc(
         mock_netrc.add_or_update_entry.assert_called_once_with(  # New creds are saved
             "api.wandb.ai", "user", api_key
         )
-
-
-def test_wandb_context():
-    """Test that the wandb context can be set and retrieved without errors."""
-    token = set_wandb_api_context("test_user", "test_key", None, None)
-
-    try:
-        context = get_wandb_api_context()
-        assert context is not None
-        assert context.user_id == "test_user"
-        assert context.api_key == "test_key"
-    finally:
-        if token:
-            reset_wandb_api_context(token)
-
-    # Verify context is cleared
-    context_after = get_wandb_api_context()
-    assert context_after is None
-
-
-def test_auth_from_env_environment():
-    """Test authentication from environment."""
-    with patch("weave.trace.env.weave_wandb_api_key", return_value="test_api_key"):
-        with from_environment():
-            context = get_wandb_api_context()
-            assert context is not None
-            assert context.api_key == "test_api_key"
-            assert context.user_id == "admin"
-
-        # After context manager, context should be cleared
-        context_after = get_wandb_api_context()
-        assert context_after is None
 
 
 def test_project_create_if_not_exists(mock_wandb_api):

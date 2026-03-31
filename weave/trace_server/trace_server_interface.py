@@ -23,6 +23,17 @@ from weave.trace_server.common_interface import (
 )
 from weave.trace_server.interface.query import Query
 
+# Re-exported from service_interface for backwards compatibility.
+# New code should import from weave.trace_server.service_interface directly.
+from weave.trace_server.service_interface import (  # noqa: F401
+    EnsureProjectExistsRes,
+    ProjectsInfoReq,
+    ProjectsInfoRes,
+)
+
+DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
+MAX_FEEDBACK_SAMPLE_LIMIT = 5000
+
 
 class ExtraKeysTypedDict(TypedDict):
     pass
@@ -91,6 +102,10 @@ class SummaryMap(SummaryInsertMap, total=False):
     weave: WeaveSummarySchema | None
 
 
+def _exclude_if_none(value: object) -> bool:
+    return value is None
+
+
 class CallSchema(BaseModel):
     id: str
     project_id: str
@@ -131,6 +146,7 @@ class CallSchema(BaseModel):
 
     # WB Metadata
     wb_user_id: str | None = None
+    wb_username: str | None = Field(default=None, exclude_if=_exclude_if_none)
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
@@ -293,10 +309,15 @@ class ObjSchemaForInsert(BaseModel):
     set_base_object_class: str | None = Field(
         exclude=True, default=None, deprecated=True
     )
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed digest for server-side validation. "
+        "If provided, the server will verify it matches the server-computed digest.",
+    )
 
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
         if self.set_base_object_class is not None and self.builtin_object_class is None:
             self.builtin_object_class = self.set_base_object_class
@@ -305,6 +326,10 @@ class ObjSchemaForInsert(BaseModel):
 class TableSchemaForInsert(BaseModel):
     project_id: str
     rows: list[dict[str, Any]]
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed table digest for server-side validation.",
+    )
 
 
 class ProcessedResourceSpans(BaseModel):
@@ -565,6 +590,11 @@ class CallsQueryReq(BaseModelStrict):
         description="Beta, subject to change. If true, the response will"
         " include the total storage size for a trace.",
     )
+    include_usernames: bool | None = Field(
+        default=False,
+        description="If true, the response will attempt to resolve each call's "
+        "wb_user_id to a username for the duration of this request.",
+    )
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
@@ -798,31 +828,40 @@ class ObjRemoveTagsRes(BaseModel):
     pass
 
 
-class ObjSetAliasReq(BaseModelStrict):
+class ObjSetAliasesReq(BaseModelStrict):
     project_id: str
     object_id: str
     digest: str
-    alias: str
+    aliases: list[str]
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
     @model_validator(mode="after")
-    def validate_alias(self) -> "ObjSetAliasReq":
-        validate_alias_name(self.alias)
+    def validate_aliases(self) -> "ObjSetAliasesReq":
+        self.aliases = list(dict.fromkeys(self.aliases))
+        for alias in self.aliases:
+            validate_alias_name(alias)
         return self
 
 
-class ObjSetAliasRes(BaseModel):
+class ObjSetAliasesRes(BaseModel):
     pass
 
 
-class ObjRemoveAliasReq(BaseModelStrict):
+class ObjRemoveAliasesReq(BaseModelStrict):
     project_id: str
     object_id: str
-    alias: str
+    aliases: list[str]
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
+    @model_validator(mode="after")
+    def validate_aliases(self) -> "ObjRemoveAliasesReq":
+        self.aliases = list(dict.fromkeys(self.aliases))
+        for alias in self.aliases:
+            validate_alias_name(alias)
+        return self
 
-class ObjRemoveAliasRes(BaseModel):
+
+class ObjRemoveAliasesRes(BaseModel):
     pass
 
 
@@ -855,6 +894,10 @@ class TableCreateReq(BaseModelStrict):
 class TableCreateFromDigestsReq(BaseModelStrict):
     project_id: str
     row_digests: list[str]
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed table digest for server-side validation.",
+    )
 
 
 class TableCreateFromDigestsRes(BaseModel):
@@ -1185,10 +1228,198 @@ class FeedbackCreateBatchRes(BaseModel):
     res: list[FeedbackCreateRes]
 
 
+FeedbackValueType = Literal["numeric", "boolean", "categorical"]
+"""Value type for a discovered or specified feedback payload path."""
+
+
+class AggregationType(str, Enum):
+    """Aggregation functions supported by feedback and call stats metrics."""
+
+    SUM = "sum"
+    AVG = "avg"
+    MIN = "min"
+    MAX = "max"
+    COUNT = "count"
+    COUNT_TRUE = "count_true"
+    COUNT_FALSE = "count_false"
+
+
+_FEEDBACK_AGGREGATION_DEFAULTS: dict[str, list[AggregationType]] = {
+    "numeric": [AggregationType.AVG, AggregationType.MIN, AggregationType.MAX],
+    "boolean": [AggregationType.COUNT_TRUE, AggregationType.COUNT_FALSE],
+    "categorical": [AggregationType.COUNT],
+}
+
+
+class FeedbackMetricSpec(BaseModelStrict):
+    """Specification for a feedback payload metric to aggregate."""
+
+    json_path: str = Field(
+        description="Dot path into payload_dump (e.g. 'output', 'output.score')."
+    )
+    value_type: FeedbackValueType = Field(
+        default="numeric",
+        description="Type of value at path. numeric: avg/min/max; boolean: count_true/count_false.",
+    )
+    aggregations: list[AggregationType] = Field(
+        default_factory=list,
+        description=(
+            "Aggregation functions to compute. If empty, defaults are chosen "
+            "based on value_type: numeric->avg/min/max, boolean->count_true/count_false."
+        ),
+    )
+    percentiles: list[float] = Field(
+        default_factory=list,
+        description=(
+            "Percentile values to compute (0–100), e.g. [5, 50, 95]. "
+            "Only applicable for numeric value_type fields; ignored for boolean/categorical."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _apply_default_aggregations(self) -> "FeedbackMetricSpec":
+        """Auto-select aggregations based on value_type when none are provided."""
+        if not self.aggregations:
+            self.aggregations = list(
+                _FEEDBACK_AGGREGATION_DEFAULTS.get(self.value_type, [])
+            )
+        return self
+
+
+MAX_FEEDBACK_STATS_RANGE_DAYS = 31
+MAX_FEEDBACK_STATS_RANGE = datetime.timedelta(days=MAX_FEEDBACK_STATS_RANGE_DAYS)
+
+
+class _FeedbackFilterBase(BaseModelStrict):
+    """Shared filter fields for feedback statistics and schema discovery requests."""
+
+    project_id: str
+    start: datetime.datetime = Field(
+        description="Inclusive start time (UTC, ISO 8601)."
+    )
+    end: datetime.datetime | None = Field(
+        default=None,
+        description="Exclusive end time (UTC, ISO 8601). Defaults to now if omitted.",
+    )
+    feedback_type: str | None = Field(
+        default=None, description="Filter by feedback_type."
+    )
+    trigger_ref: str | None = Field(
+        default=None,
+        description="Filter by trigger_ref (exact or prefix match for all-versions).",
+    )
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "_FeedbackFilterBase":
+        """Ensure feedback requests are bounded to a safe date range."""
+        # Normalize tz-naive datetimes to UTC so comparisons are always
+        # between tz-aware values and don't raise TypeError.
+        start = self.start
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=datetime.timezone.utc)
+        end = self.end
+        if end is not None and end.tzinfo is None:
+            end = end.replace(tzinfo=datetime.timezone.utc)
+        end = end or datetime.datetime.now(datetime.timezone.utc)
+        if end < start:
+            raise ValueError("Feedback request end must be after start")
+        if end - start > MAX_FEEDBACK_STATS_RANGE:
+            raise ValueError(
+                f"Feedback request date range cannot exceed {MAX_FEEDBACK_STATS_RANGE_DAYS} days"
+            )
+        return self
+
+
+class FeedbackStatsReq(_FeedbackFilterBase):
+    """Request for aggregated feedback statistics over time buckets."""
+
+    granularity: int | None = Field(
+        default=None,
+        description="Bucket size in seconds. If omitted, auto-selected based on time range.",
+    )
+    timezone: str = Field(
+        default="UTC", description="IANA timezone for bucket alignment."
+    )
+    metrics: list[FeedbackMetricSpec] = Field(
+        default_factory=list,
+        description="Metrics to aggregate from payload_dump.",
+    )
+
+
+class FeedbackStatsRes(BaseModel):
+    """Response with time-series feedback statistics."""
+
+    start: datetime.datetime = Field(
+        description="Resolved start time (always UTC, regardless of the requested timezone)."
+    )
+    end: datetime.datetime = Field(
+        description="Resolved end time (always UTC, regardless of the requested timezone)."
+    )
+    granularity: int = Field(description="Bucket size used (in seconds)")
+    timezone: str = Field(description="Timezone used for bucket alignment")
+    buckets: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Time-bucketed aggregations. Each dict has 'timestamp' (ISO string), "
+            "'count' (int), and '{agg}_{slug}' keys for each requested metric+aggregation."
+        ),
+    )
+    window_stats: dict[str, dict[str, float | None]] | None = Field(
+        default=None,
+        description=(
+            "Aggregations over the full query window, keyed by metric slug "
+            "(e.g. 'output_score'). Each value maps agg name to result."
+        ),
+    )
+
+
+# --- Feedback payload schema (discovered paths for stats) ---
+
+
+class FeedbackPayloadPath(BaseModelStrict):
+    """Discovered path in feedback payload with inferred type."""
+
+    json_path: str = Field(description="Dot path into payload (e.g. 'output.score').")
+    value_type: FeedbackValueType = Field(
+        default="numeric",
+        description="Inferred type of value at path.",
+    )
+
+
+class FeedbackPayloadSchemaReq(_FeedbackFilterBase):
+    """Request for feedback payload schema discovery."""
+
+    sample_limit: int = Field(
+        default=DEFAULT_FEEDBACK_SAMPLE_LIMIT,
+        ge=1,
+        le=MAX_FEEDBACK_SAMPLE_LIMIT,
+        description=(
+            "Max distinct trigger_refs to sample when discovering the payload schema. "
+            "Each distinct trigger_ref (monitor/source) typically has a fixed payload "
+            "structure, so sampling one payload per ref is usually enough to see the "
+            "full schema. 2 000 covers virtually all real-world projects while keeping "
+            "the query fast; the hard cap of 5 000 prevents runaway scans."
+        ),
+    )
+
+
+class FeedbackPayloadSchemaRes(BaseModel):
+    """Response with discovered feedback payload paths and types."""
+
+    paths: list[FeedbackPayloadPath] = Field(
+        default_factory=list,
+        description="Discovered leaf paths with inferred value types.",
+    )
+
+
 class FileCreateReq(BaseModelStrict):
     project_id: str
     name: str
     content: bytes
+    expected_digest: str | None = Field(
+        None,
+        description="Client-computed file digest for server-side validation.",
+    )
 
 
 class FileCreateRes(BaseModel):
@@ -1210,26 +1441,6 @@ class FileContentReadRes(BaseModel):
 
 class FilesStatsRes(BaseModel):
     total_size_bytes: int
-
-
-class EnsureProjectExistsRes(BaseModel):
-    project_name: str
-
-
-class ProjectsInfoReq(BaseModelStrict):
-    project_ids: list[str] = Field(
-        description="External project IDs in 'entity/project' format.",
-        examples=[["entity-a/project-a", "entity-b/project-b"]],
-    )
-
-
-class ProjectsInfoRes(BaseModel):
-    external_project_id: str = Field(
-        description="External project ID in 'entity/project' format.",
-    )
-    internal_project_id: str = Field(
-        description="Internal project ID.",
-    )
 
 
 class CostCreateInput(BaseModelStrict):
@@ -2568,9 +2779,9 @@ class EvalResultsScorerStats(BaseModel):
             "token_distance.passed. None for root-level scalar scorers."
         ),
     )
-    value_type: Literal["binary", "continuous"] | None = Field(
+    value_type: Literal["binary", "continuous", "text"] | None = Field(
         default=None,
-        description="Type of the leaf value: binary (bool) or continuous (number).",
+        description="Type of the leaf value: binary (bool), continuous (number), or text (string).",
     )
     trial_count: int = 0
     numeric_count: int = 0
@@ -2598,11 +2809,6 @@ class EvalResultsSummaryRes(BaseModel):
 
 
 class TraceServerInterface(Protocol):
-    def ensure_project_exists(
-        self, entity: str, project: str
-    ) -> EnsureProjectExistsRes:
-        return EnsureProjectExistsRes(project_name=project)
-
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
@@ -2634,8 +2840,8 @@ class TraceServerInterface(Protocol):
     # Tag and Alias API
     def obj_add_tags(self, req: ObjAddTagsReq) -> ObjAddTagsRes: ...
     def obj_remove_tags(self, req: ObjRemoveTagsReq) -> ObjRemoveTagsRes: ...
-    def obj_set_alias(self, req: ObjSetAliasReq) -> ObjSetAliasRes: ...
-    def obj_remove_alias(self, req: ObjRemoveAliasReq) -> ObjRemoveAliasRes: ...
+    def obj_set_aliases(self, req: ObjSetAliasesReq) -> ObjSetAliasesRes: ...
+    def obj_remove_aliases(self, req: ObjRemoveAliasesReq) -> ObjRemoveAliasesRes: ...
     def tags_list(self, req: TagsListReq) -> TagsListRes: ...
     def aliases_list(self, req: AliasesListReq) -> AliasesListRes: ...
 
@@ -2670,6 +2876,10 @@ class TraceServerInterface(Protocol):
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
+    def feedback_stats(self, req: FeedbackStatsReq) -> FeedbackStatsRes: ...
+    def feedback_payload_schema(
+        self, req: FeedbackPayloadSchemaReq
+    ) -> FeedbackPayloadSchemaRes: ...
 
     # Action API
     def actions_execute_batch(
@@ -2831,16 +3041,6 @@ class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):
     """
 
     pass
-
-
-class AggregationType(str, Enum):
-    """Basic aggregation functions for metrics."""
-
-    SUM = "sum"
-    AVG = "avg"
-    MIN = "min"
-    MAX = "max"
-    COUNT = "count"
 
 
 UsageMetric = Literal[

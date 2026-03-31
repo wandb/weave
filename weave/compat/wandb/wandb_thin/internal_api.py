@@ -16,26 +16,20 @@ from weave.wandb_interface.context import get_wandb_api_context
 
 logger = logging.getLogger(__name__)
 
+TCP_CONNECTION_POOL_LIMIT = 50
+
 
 class Api:
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
         from gql.transport.httpx import HTTPXTransport
 
-        wandb_context = get_wandb_api_context()
-        headers = {}
-        cookies = None
         auth = None
-        if wandb_context is not None:
-            if wandb_context.headers:
-                headers.update(wandb_context.headers)
-            cookies = wandb_context.cookies
-            if wandb_context.api_key is not None:
-                auth = httpx.BasicAuth("api", wandb_context.api_key)
+        api_key = get_wandb_api_context()
+        if api_key is not None:
+            auth = httpx.BasicAuth("api", api_key)
         url_base = env.wandb_base_url()
         transport = HTTPXTransport(
             url=url_base + "/graphql",
-            headers=headers,
-            cookies=cookies,
             auth=auth,
             verify=env.ssl_verify(),
         )
@@ -224,21 +218,16 @@ class ApiAsync:
     def __init__(self) -> None:
         import aiohttp
 
-        self.connector = aiohttp.TCPConnector(limit=50, ssl=env.ssl_verify())
+        self.connector = aiohttp.TCPConnector(limit=TCP_CONNECTION_POOL_LIMIT, ssl=env.ssl_verify())
 
     async def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
         import aiohttp
         from gql.transport.aiohttp import AIOHTTPTransport
 
-        wandb_context = get_wandb_api_context()
-        headers = None
-        cookies = None
         auth = None
-        if wandb_context is not None:
-            headers = wandb_context.headers
-            cookies = wandb_context.cookies
-            if wandb_context.api_key is not None:
-                auth = aiohttp.BasicAuth("api", wandb_context.api_key)
+        api_key = get_wandb_api_context()
+        if api_key is not None:
+            auth = aiohttp.BasicAuth("api", api_key)
         # TODO: This is currently used by our FastAPI auth helper, there's probably a better way.
         api_key_override = kwargs.pop("api_key", None)
         if api_key_override:
@@ -250,8 +239,6 @@ class ApiAsync:
                 "connector": self.connector,
                 "connector_owner": False,
             },
-            headers=headers,
-            cookies=cookies,
             auth=auth,
         )
         # Warning: we do not use the recommended context manager pattern, because we're

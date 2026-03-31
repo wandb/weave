@@ -160,7 +160,7 @@ class Evaluation(Object):
 
         return cls(**field_values)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         # Determine output key based on scorer types
         scorers = self.scorers or []
         if _has_oldstyle_scorers(scorers):
@@ -248,8 +248,8 @@ class Evaluation(Object):
         async def eval_example(example: dict) -> dict:
             try:
                 eval_row = await self.predict_and_score(model, example)
-            except OpCallError as e:
-                raise e
+            except OpCallError:
+                raise
             except Exception:
                 logger.info("Predict and score failed")
                 traceback.print_exc()
@@ -266,7 +266,7 @@ class Evaluation(Object):
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            logger.info(f"Evaluated {n_complete} of {num_rows} examples")
+            logger.info("Evaluated %s of %s examples", n_complete, num_rows)
             normalized_eval_row: dict[str, Any]
             if eval_row is None:
                 normalized_eval_row = {self._output_key: None, "scores": {}}
@@ -299,7 +299,7 @@ class Evaluation(Object):
 
         summary_str = _safe_summarize_to_str(summary)
         if summary_str:
-            logger.info(f"Evaluation summary {summary_str}")
+            logger.info("Evaluation summary %s", summary_str)
 
         return summary
 
@@ -331,10 +331,10 @@ class Evaluation(Object):
             raise ValueError("Evaluation has no ref, please run the evaluation first!")
 
         evaluate_op_name = "Evaluation.evaluate"
-        eval_op_ref = f"weave:///{client._project_id()}/op/{evaluate_op_name}:*"
+        eval_op_ref = f"weave:///{client.project_id}/op/{evaluate_op_name}:*"
         return client.get_calls(
             filter=CallsFilter(
-                input_refs=[self.ref.uri()],
+                input_refs=[self.ref.uri],
                 op_names=[eval_op_ref],
             ),
         )

@@ -82,26 +82,27 @@ async def test_simple_client_create_with_exception(
         _ = await openai_model_client.create(
             [UserMessage(content="Hello, how are you?", source="user")]
         )
-        calls = list(client.get_calls())
-        assert len(calls) == 3
-        flattened = flatten_calls(calls)
-        assert len(flattened) == 4
-        got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
-        exp = [
-            ("autogen_ext.OpenAIChatCompletionClient.create", 0),
-            ("openai.chat.completions.create", 1),
-            ("openai.chat.completions.create", 0),
-            ("openai.chat.completions.create", 0),
-        ]
-        assert got == exp
-        summary = calls[0].summary
-        assert "status_counts" in summary
-        assert summary["status_counts"]["success"] == 0
-        assert summary["status_counts"]["error"] == 2
-        assert "weave" in summary
-        assert summary["weave"]["status"] == "error"
-        assert summary["weave"]["trace_name"] == exp[0][0]
-        assert summary["weave"]["latency_ms"] > 0
+
+    calls = list(client.get_calls())
+    assert len(calls) == 3
+    flattened = flatten_calls(calls)
+    assert len(flattened) == 4
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+    exp = [
+        ("autogen_ext.OpenAIChatCompletionClient.create", 0),
+        ("openai.chat.completions.create", 1),
+        ("openai.chat.completions.create", 0),
+        ("openai.chat.completions.create", 0),
+    ]
+    assert got == exp
+    summary = calls[0].summary
+    assert "status_counts" in summary
+    assert summary["status_counts"]["success"] == 0
+    assert summary["status_counts"]["error"] == 2
+    assert "weave" in summary
+    assert summary["weave"]["status"] == "error"
+    assert summary["weave"]["trace_name"] == exp[0][0]
+    assert summary["weave"]["latency_ms"] > 0
 
 
 @pytest.mark.skip_clickhouse_client

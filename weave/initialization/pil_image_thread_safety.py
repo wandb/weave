@@ -50,7 +50,7 @@ def apply_threadsafe_patch_to_pil_image() -> None:
     except ImportError:
         pass
     except Exception as e:
-        logger.info(f"Failed to patch PIL.ImageFile.ImageFile: Unexpected error - {e}")
+        logger.info("Failed to patch PIL.ImageFile.ImageFile: Unexpected error - %s", e)
     else:
         _patched = True
 
@@ -124,7 +124,8 @@ def undo_threadsafe_patch_to_pil_image() -> None:
         pass
     except Exception as e:
         logger.info(
-            f"Failed to unpatch PIL.ImageFile.ImageFile: Unable to restore original methods - {e}"
+            "Failed to unpatch PIL.ImageFile.ImageFile: Unable to restore original methods - %s",
+            e,
         )
     else:
         _patched = False

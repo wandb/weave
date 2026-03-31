@@ -4,7 +4,7 @@ import signal
 import subprocess
 import tempfile
 import time
-import typing
+from collections.abc import Callable, Generator
 
 import pytest
 
@@ -12,9 +12,7 @@ from tests.trace_server.conftest_lib.container_management import check_server_up
 from weave.trace_server import environment as ts_env
 
 
-def ensure_clickhouse_db_container_running(
-    host: str, port: int
-) -> typing.Callable[[], None]:
+def ensure_clickhouse_db_container_running(host: str, port: int) -> Callable[[], None]:
     """ClickHouse server fixture that automatically starts a server if one isn't already running.
 
     This fixture checks if a ClickHouse server is already running on the configured host/port.
@@ -91,9 +89,7 @@ def ensure_clickhouse_db_container_running(
     return cleanup
 
 
-def ensure_clickhouse_db_process_running(
-    host: str, port: int
-) -> typing.Callable[[], None]:
+def ensure_clickhouse_db_process_running(host: str, port: int) -> Callable[[], None]:
     """ClickHouse server fixture that automatically starts a server process if one isn't already running.
 
     This fixture checks if a ClickHouse server is already running on the configured host/port.
@@ -185,8 +181,8 @@ def ensure_clickhouse_db_process_running(
 @pytest.fixture(scope="session")
 def ensure_clickhouse_db(
     request,
-) -> typing.Callable[[], typing.Generator[tuple[str, int], None, None]]:
-    def ensure_clickhouse_db_inner() -> typing.Generator[tuple[str, int], None, None]:
+) -> Callable[[], Generator[tuple[str, int], None, None]]:
+    def ensure_clickhouse_db_inner() -> Generator[tuple[str, int], None, None]:
         host, port = ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
         if os.environ.get("CI"):
             yield host, port

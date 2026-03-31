@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+PYPI_REQUEST_TIMEOUT_SECONDS = 3
+
 if TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]
 
@@ -74,7 +76,7 @@ def _parse_version(version: str) -> packaging.version.Version:
     return parse_version(version)
 
 
-def _sync_get_with_timeout(url: str, timeout: int | float) -> httpx.Response | None:
+def _sync_get_with_timeout(url: str, timeout: float) -> httpx.Response | None:
     """Make a synchronous GET request with a timeout."""
     try:
         with httpx.Client() as client:
@@ -89,7 +91,9 @@ def _find_available(
     pypi_url = f"https://pypi.org/pypi/{module_name}/json"
     yanked_dict = {}
     try:
-        response = _sync_get_with_timeout(pypi_url, timeout=3)
+        response = _sync_get_with_timeout(
+            pypi_url, timeout=PYPI_REQUEST_TIMEOUT_SECONDS
+        )
         if not response:
             return None
         data = response.json()

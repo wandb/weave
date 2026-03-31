@@ -353,7 +353,7 @@ class TestWeaveContent:
             Content.from_path("/non/existent/file.txt")
 
         # Test with invalid base64
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid base64 data provided"):
             Content.from_base64("not-valid-base64!")
 
     def test_content_with_kwargs(self):

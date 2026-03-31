@@ -418,8 +418,8 @@ def test_general_arg_variations(client, fn, arg_variations):
 
         res = client.server.calls_query(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
-                filter=tsi.CallsFilter(op_names=[wrapped_fn.ref.uri()]),
+                project_id=client.project_id,
+                filter=tsi.CallsFilter(op_names=[wrapped_fn.ref.uri]),
             )
         )
 
@@ -442,11 +442,11 @@ def test_no_args(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
-    assert res.calls[0].op_name == my_op.ref.uri()
+    assert res.calls[0].op_name == my_op.ref.uri
     assert res.calls[0].inputs == {}
 
 
@@ -459,11 +459,11 @@ def test_args_concrete(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
-    assert res.calls[0].op_name == my_op.ref.uri()
+    assert res.calls[0].op_name == my_op.ref.uri
     assert res.calls[0].inputs == {"val": 1}
     assert res.calls[0].output == [1]
 
@@ -478,14 +478,14 @@ def test_args_concrete_splat(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
-    assert res.calls[0].op_name == my_op.ref.uri()
+    assert res.calls[0].op_name == my_op.ref.uri
     assert res.calls[0].inputs == {"val": 1, "args": []}
     assert res.calls[0].output == [1, []]
-    assert res.calls[1].op_name == my_op.ref.uri()
+    assert res.calls[1].op_name == my_op.ref.uri
     assert res.calls[1].inputs == {"val": 1, "args": [2, 3]}
     assert res.calls[1].output == [1, [2, 3]]
 
@@ -502,20 +502,20 @@ def test_args_concrete_splats(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
-    assert res.calls[0].op_name == my_op.ref.uri()
+    assert res.calls[0].op_name == my_op.ref.uri
     assert res.calls[0].inputs == {"val": 1, "args": [], "kwargs": {}}
     assert res.calls[0].output == [1, [], {}]
-    assert res.calls[1].op_name == my_op.ref.uri()
+    assert res.calls[1].op_name == my_op.ref.uri
     assert res.calls[1].inputs == {"val": 1, "args": [2, 3], "kwargs": {}}
     assert res.calls[1].output == [1, [2, 3], {}]
-    assert res.calls[2].op_name == my_op.ref.uri()
+    assert res.calls[2].op_name == my_op.ref.uri
     assert res.calls[2].inputs == {"val": 1, "args": [], "kwargs": {"a": 2, "b": 3}}
     assert res.calls[2].output == [1, [], {"a": 2, "b": 3}]
-    assert res.calls[3].op_name == my_op.ref.uri()
+    assert res.calls[3].op_name == my_op.ref.uri
     assert res.calls[3].inputs == {"val": 1, "args": [2, 3], "kwargs": {"a": 4, "b": 5}}
     assert res.calls[3].output == [1, [2, 3], {"a": 4, "b": 5}]
 
@@ -531,17 +531,17 @@ def test_args_concrete_splat_concrete(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
-    assert res.calls[0].op_name == my_op.ref.uri()
+    assert res.calls[0].op_name == my_op.ref.uri
     assert res.calls[0].inputs == {"val": 1, "args": [], "a": 0}
     assert res.calls[0].output == [1, [], 0]
-    assert res.calls[1].op_name == my_op.ref.uri()
+    assert res.calls[1].op_name == my_op.ref.uri
     assert res.calls[1].inputs == {"val": 1, "args": [], "a": 2}
     assert res.calls[1].output == [1, [], 2]
-    assert res.calls[2].op_name == my_op.ref.uri()
+    assert res.calls[2].op_name == my_op.ref.uri
     assert res.calls[2].inputs == {"val": 1, "args": [2, 3], "a": 4}
     assert res.calls[2].output == [1, [2, 3], 4]
 
@@ -558,19 +558,19 @@ def test_args_concrete_splat_concrete_splat(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
-    assert res.calls[0].op_name == my_op.ref.uri()
+    assert res.calls[0].op_name == my_op.ref.uri
     assert res.calls[0].inputs == {"val": 1, "args": [], "a": 0, "kwargs": {}}
     assert res.calls[0].output == [1, [], 0, {}]
-    assert res.calls[1].op_name == my_op.ref.uri()
+    assert res.calls[1].op_name == my_op.ref.uri
     assert res.calls[1].inputs == {"val": 1, "args": [], "a": 2, "kwargs": {}}
     assert res.calls[1].output == [1, [], 2, {}]
-    assert res.calls[2].op_name == my_op.ref.uri()
+    assert res.calls[2].op_name == my_op.ref.uri
     assert res.calls[2].inputs == {"val": 1, "args": [2, 3], "a": 4, "kwargs": {}}
     assert res.calls[2].output == [1, [2, 3], 4, {}]
-    assert res.calls[3].op_name == my_op.ref.uri()
+    assert res.calls[3].op_name == my_op.ref.uri
     assert res.calls[3].inputs == {"val": 1, "args": [2, 3], "a": 4, "kwargs": {"b": 5}}
     assert res.calls[3].output == [1, [2, 3], 4, {"b": 5}]
