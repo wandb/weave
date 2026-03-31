@@ -37,10 +37,8 @@ def test_clickhouse_type_mismatch_returns_400() -> None:
     )
     exc = CHDatabaseError(error_msg)
 
-    # Should raise InvalidRequest (which maps to 400), not re-raise the original
     with pytest.raises(InvalidRequest, match="Cannot convert"):
         handle_clickhouse_query_error(exc)
 
-    # Verify the mapped status code through the registry
     result = handle_server_exception(InvalidRequest(error_msg))
     assert result.status_code == 400

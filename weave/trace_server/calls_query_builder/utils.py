@@ -38,30 +38,6 @@ def timestamp_to_datetime_str(timestamp: float) -> str:
     ).strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
-def maybe_iso_to_ch_datetime_str(value: str) -> str | None:
-    """Try to parse an ISO 8601 date string and convert to ClickHouse format.
-
-    Only converts strings that use the ISO 'T' separator (e.g. "2026-03-31T15:38:50.164Z").
-    Strings already in ClickHouse format ("2026-03-31 15:38:50") are left alone.
-
-    Returns the ClickHouse-compatible datetime string if the value is a valid ISO date,
-    or None if it cannot be parsed or doesn't need conversion.
-
-    Examples:
-        >>> maybe_iso_to_ch_datetime_str("2026-03-31T15:38:50.164Z")
-        '2026-03-31 15:38:50.164000'
-        >>> maybe_iso_to_ch_datetime_str("2024-03-01 00:00:00")  # already CH format
-        >>> maybe_iso_to_ch_datetime_str("not-a-date")
-    """
-    if "T" not in value:
-        return None
-    try:
-        dt = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
-        return dt.astimezone(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
-    except (ValueError, AttributeError):
-        return None
-
-
 def safely_format_sql(
     sql: str,
     logger: logging.Logger,

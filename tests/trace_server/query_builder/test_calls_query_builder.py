@@ -2338,7 +2338,7 @@ def test_maybe_convert_datetime_operands() -> None:
     )
     assert ops[1].literal_ == 1709251200
 
-    # Test: string literal already in ClickHouse format → should NOT convert
+    # Test: string literal compared to started_at → should NOT convert (already a string)
     ops = _maybe_convert_datetime_operands(
         [
             tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
@@ -2346,53 +2346,6 @@ def test_maybe_convert_datetime_operands() -> None:
         ]
     )
     assert ops[1].literal_ == "2024-03-01 00:00:00"
-
-    # Test: ISO date string with 'Z' suffix compared to started_at → should convert
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
-            tsi_query.LiteralOperation(
-                **{"$literal": "2026-03-31T15:38:50.164Z"}
-            ),
-        ]
-    )
-    assert isinstance(ops[1], tsi_query.LiteralOperation)
-    assert ops[1].literal_ == "2026-03-31 15:38:50.164000"
-
-    # Test: ISO date string with timezone offset compared to ended_at → should convert
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "ended_at"}),
-            tsi_query.LiteralOperation(
-                **{"$literal": "2026-03-31T15:38:50.164+00:00"}
-            ),
-        ]
-    )
-    assert isinstance(ops[1], tsi_query.LiteralOperation)
-    assert ops[1].literal_ == "2026-03-31 15:38:50.164000"
-
-    # Test: ISO date string with no fractional seconds → should convert
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
-            tsi_query.LiteralOperation(
-                **{"$literal": "2026-03-31T15:38:50Z"}
-            ),
-        ]
-    )
-    assert isinstance(ops[1], tsi_query.LiteralOperation)
-    assert ops[1].literal_ == "2026-03-31 15:38:50.000000"
-
-    # Test: ISO date string compared to non-datetime field → should NOT convert
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "wb_user_id"}),
-            tsi_query.LiteralOperation(
-                **{"$literal": "2026-03-31T15:38:50.164Z"}
-            ),
-        ]
-    )
-    assert ops[1].literal_ == "2026-03-31T15:38:50.164Z"
 
     # Test: None literal compared to deleted_at → should NOT convert
     ops = _maybe_convert_datetime_operands(
