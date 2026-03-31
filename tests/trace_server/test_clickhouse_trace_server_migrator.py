@@ -1,5 +1,6 @@
 import os
 import types
+from contextlib import contextmanager
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -47,7 +48,6 @@ def _make_ch_client(database_engine: str = "Atomic") -> Mock:
 @pytest.fixture
 def mock_migration_lock():
     """Bypass the distributed migration lock for tests that call apply_migrations."""
-    from contextlib import contextmanager
 
     @contextmanager
     def _noop_lock(*_args, **_kwargs):
