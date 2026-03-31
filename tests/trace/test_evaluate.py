@@ -260,6 +260,8 @@ async def test_basic_evaluation_with_scorer_styles(
     assert result == expected_result
 
     # Verify individual prediction outputs
+    # Allow time for call data to be fully persisted before querying
+    time.sleep(0.2)
     predict_and_score_calls = list(evaluation.predict_and_score.calls())
     assert len(predict_and_score_calls) == 3
     outputs = [c.output for c in predict_and_score_calls]
@@ -477,6 +479,9 @@ def test_evaluate_table_order(client):
     # Verify the overall results
     assert result["output"] == {"mean": 2}  # Average of 0-99
     assert result["score_simple"] == {"true_count": 5, "true_fraction": 1.0}
+
+    # Allow time for call data to be fully persisted before querying
+    time.sleep(0.2)
 
     # Get all prediction calls and verify order
     predict_and_score_calls = list(evaluation.predict_and_score.calls())
