@@ -6,7 +6,6 @@ import importlib
 from unittest.mock import MagicMock, patch
 
 import httpx
-import pytest
 
 from weave.trace.env import WEAVE_INSECURE_DISABLE_SSL, ssl_verify
 
@@ -89,8 +88,9 @@ class TestInternalApiSslVerify:
                 {"gql.transport.httpx": MagicMock(HTTPXTransport=mock_transport_cls)},
             ),
         ):
-            from weave.compat.wandb.wandb_thin.internal_api import Api
             import gql
+
+            from weave.compat.wandb.wandb_thin.internal_api import Api
 
             api = Api()
             api.query(gql.gql("{ viewer { username } }"))
@@ -121,8 +121,9 @@ class TestInternalApiSslVerify:
                 {"gql.transport.httpx": MagicMock(HTTPXTransport=mock_transport_cls)},
             ),
         ):
-            from weave.compat.wandb.wandb_thin.internal_api import Api
             import gql
+
+            from weave.compat.wandb.wandb_thin.internal_api import Api
 
             api = Api()
             api.query(gql.gql("{ viewer { username } }"))
