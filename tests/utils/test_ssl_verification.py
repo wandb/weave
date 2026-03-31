@@ -38,23 +38,33 @@ class TestSslVerifyEnv:
 
 
 class TestHttpxClientSslVerify:
-    """The global httpx.Client in http_requests respects ssl_verify()."""
+    """The global httpx.Client in http_requests respects ssl_verify().
+
+    The http_requests module creates a module-level `client = httpx.Client(verify=...)`
+    at import time, so we must reload the module after changing the env var to
+    re-create the client with the new SSL setting. After the test we reload again
+    to restore the default client for other tests.
+    """
 
     def test_client_verify_disabled(self, monkeypatch):
         monkeypatch.setenv(WEAVE_INSECURE_DISABLE_SSL, "true")
+        # Reload to re-create the module-level httpx.Client with verify=False.
         importlib.reload(http_requests)
         try:
-            # httpx stores verify as an ssl_context on the transport pool
+            # httpx bakes the verify flag into an ssl_context on the transport pool;
+            # CERT_NONE means SSL certificate verification is disabled.
             transport = http_requests.client._transport
             assert isinstance(transport, httpx.HTTPTransport)
             pool = transport._pool
             assert pool._ssl_context.verify_mode.name == "CERT_NONE"
         finally:
-            # Restore default state
+            # Restore the module-level client to its default (verify=True) state
+            # so other tests aren't affected.
             monkeypatch.delenv(WEAVE_INSECURE_DISABLE_SSL, raising=False)
             importlib.reload(http_requests)
 
     def test_client_verify_enabled_by_default(self):
+        # Without WEAVE_INSECURE_DISABLE_SSL set, the client should verify certs.
         transport = http_requests.client._transport
         assert isinstance(transport, httpx.HTTPTransport)
         pool = transport._pool
