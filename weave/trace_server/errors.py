@@ -410,8 +410,7 @@ def handle_clickhouse_query_error(e: Exception) -> None:
         ) from e
     if "TYPE_MISMATCH" in error_str:
         raise InvalidRequest(
-            "Cannot execute query due to a type mismatch. "
-            + error_str
+            "Cannot execute query due to a type mismatch. " + error_str
         ) from e
     if "BAD_QUERY_PARAMETER" in error_str:
         raise BadQueryParameterError(
