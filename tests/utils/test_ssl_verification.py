@@ -5,9 +5,12 @@ from __future__ import annotations
 import importlib
 from unittest.mock import MagicMock, patch
 
+import gql
 import httpx
 
+from weave.compat.wandb.wandb_thin.internal_api import Api
 from weave.trace.env import WEAVE_INSECURE_DISABLE_SSL, ssl_verify
+from weave.utils import http_requests
 
 
 class TestSslVerifyEnv:
@@ -39,8 +42,6 @@ class TestHttpxClientSslVerify:
 
     def test_client_verify_disabled(self, monkeypatch):
         monkeypatch.setenv(WEAVE_INSECURE_DISABLE_SSL, "true")
-        from weave.utils import http_requests
-
         importlib.reload(http_requests)
         try:
             # httpx stores verify as an ssl_context on the transport pool
@@ -54,8 +55,6 @@ class TestHttpxClientSslVerify:
             importlib.reload(http_requests)
 
     def test_client_verify_enabled_by_default(self):
-        from weave.utils import http_requests
-
         transport = http_requests.client._transport
         assert isinstance(transport, httpx.HTTPTransport)
         pool = transport._pool
@@ -65,7 +64,7 @@ class TestHttpxClientSslVerify:
 class TestInternalApiSslVerify:
     """The wandb thin API client passes ssl_verify() to gql transports."""
 
-    def test_httpx_transport_gets_verify_false(self, monkeypatch):
+    def test_httpx_transport_gets_verify_false_if_ssl_disabled(self, monkeypatch):
         monkeypatch.setenv(WEAVE_INSECURE_DISABLE_SSL, "true")
 
         mock_transport_cls = MagicMock()
@@ -88,10 +87,6 @@ class TestInternalApiSslVerify:
                 {"gql.transport.httpx": MagicMock(HTTPXTransport=mock_transport_cls)},
             ),
         ):
-            import gql
-
-            from weave.compat.wandb.wandb_thin.internal_api import Api
-
             api = Api()
             api.query(gql.gql("{ viewer { username } }"))
 
@@ -121,10 +116,6 @@ class TestInternalApiSslVerify:
                 {"gql.transport.httpx": MagicMock(HTTPXTransport=mock_transport_cls)},
             ),
         ):
-            import gql
-
-            from weave.compat.wandb.wandb_thin.internal_api import Api
-
             api = Api()
             api.query(gql.gql("{ viewer { username } }"))
 
