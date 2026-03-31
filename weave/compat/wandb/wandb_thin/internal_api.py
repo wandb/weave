@@ -218,7 +218,9 @@ class ApiAsync:
     def __init__(self) -> None:
         import aiohttp
 
-        self.connector = aiohttp.TCPConnector(limit=TCP_CONNECTION_POOL_LIMIT, ssl=env.ssl_verify())
+        self.connector = aiohttp.TCPConnector(
+            limit=TCP_CONNECTION_POOL_LIMIT, ssl=env.ssl_verify()
+        )
 
     async def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
         import aiohttp
