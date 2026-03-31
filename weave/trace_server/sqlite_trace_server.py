@@ -846,12 +846,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
                 prompt_cost = float(best_row["prompt_token_cost"] or 0.0)
                 completion_cost = float(best_row["completion_token_cost"] or 0.0)
-                cache_read_cost = float(best_row.get("cache_read_input_token_cost") or 0.0)
-                cache_creation_cost = float(best_row.get("cache_creation_input_token_cost") or 0.0)
+                cache_read_cost = float(
+                    best_row.get("cache_read_input_token_cost") or 0.0
+                )
+                cache_creation_cost = float(
+                    best_row.get("cache_creation_input_token_cost") or 0.0
+                )
                 prompt_tokens = usage["prompt_tokens"]
                 completion_tokens = usage["completion_tokens"]
                 cache_read_input_tokens = usage.get("cache_read_input_tokens", 0)
-                cache_creation_input_tokens = usage.get("cache_creation_input_tokens", 0)
+                cache_creation_input_tokens = usage.get(
+                    "cache_creation_input_tokens", 0
+                )
 
                 call_costs[llm_id] = {
                     "prompt_tokens": prompt_tokens,
@@ -862,8 +868,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     "total_tokens": usage["total_tokens"],
                     "prompt_tokens_total_cost": prompt_tokens * prompt_cost,
                     "completion_tokens_total_cost": completion_tokens * completion_cost,
-                    "cache_read_input_tokens_total_cost": cache_read_input_tokens * cache_read_cost,
-                    "cache_creation_input_tokens_total_cost": cache_creation_input_tokens * cache_creation_cost,
+                    "cache_read_input_tokens_total_cost": cache_read_input_tokens
+                    * cache_read_cost,
+                    "cache_creation_input_tokens_total_cost": cache_creation_input_tokens
+                    * cache_creation_cost,
                     "prompt_token_cost": prompt_cost,
                     "completion_token_cost": completion_cost,
                     "cache_read_input_token_cost": cache_read_cost,
