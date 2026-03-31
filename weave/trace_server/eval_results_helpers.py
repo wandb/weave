@@ -344,7 +344,7 @@ def _aggregate_values(values: list[Any]) -> Any:
         return None
     if len(values) == 1 and isinstance(values[0], bool):
         return values[0]
-    nums = []
+    nums: list[int | float] = []
     for v in values:
         if isinstance(v, bool):
             nums.append(1 if v else 0)
