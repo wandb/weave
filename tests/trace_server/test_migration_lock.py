@@ -5,7 +5,6 @@ import pytest
 
 from weave.trace_server.migration_lock import (
     CONSISTENT_READ_SETTINGS,
-    LOCK_TTL_SECONDS,
     MigrationLockError,
     _generate_holder_id,
     _validate_holder,
@@ -46,126 +45,110 @@ def _make_ch_client(
 
 
 # ---------------------------------------------------------------------------
-# try_acquire
+# try_acquire — all outcomes
 # ---------------------------------------------------------------------------
 
 
-def test_try_acquire_succeeds_when_verify_confirms():
+@pytest.mark.parametrize(
+    ("initial_rows", "verify_rows", "expected", "should_insert"),
+    [
+        # No lock held, verify confirms we won → acquire succeeds
+        ([], "self", True, True),
+        # No lock held, verify shows another holder won the race → back off
+        ([], "other", False, True),
+        # No lock held, verify returns empty (insert not yet visible) → retry
+        ([], [], False, True),
+        # Lock held by another holder → don't even try to insert
+        ("other_held", None, False, False),
+        # Lock already held by us (idempotent re-acquire) → no insert needed
+        ("self_held", None, True, False),
+    ],
+    ids=[
+        "win_race",
+        "lose_race",
+        "insert_not_visible",
+        "held_by_other",
+        "idempotent_reacquire",
+    ],
+)
+def test_try_acquire_outcomes(initial_rows, verify_rows, expected, should_insert):
     holder = _generate_holder_id()
-    ch_client = _make_ch_client(initial_rows=[], verify_rows=[(holder,)])
+    other = _generate_holder_id()
 
-    assert try_acquire(ch_client, MANAGEMENT_DB, holder) is True
-    ch_client.insert.assert_called_once()
-    assert ch_client.query.call_count == 2
+    # Resolve symbolic row values to actual rows
+    if initial_rows == "other_held":
+        initial_rows = [(other, "2026-01-01 00:00:00")]
+    elif initial_rows == "self_held":
+        initial_rows = [(holder, "2026-01-01 00:00:00")]
 
+    if verify_rows == "self":
+        verify_rows = [(holder,)]
+    elif verify_rows == "other":
+        verify_rows = [(other,)]
 
-def test_try_acquire_returns_false_when_held_by_another():
-    other_holder = _generate_holder_id()
-    ch_client = _make_ch_client(initial_rows=[(other_holder, "2026-01-01 00:00:00")])
-    holder = _generate_holder_id()
+    ch_client = _make_ch_client(
+        initial_rows=initial_rows,
+        verify_rows=verify_rows,
+    )
 
-    assert try_acquire(ch_client, MANAGEMENT_DB, holder) is False
-    ch_client.insert.assert_not_called()
+    assert try_acquire(ch_client, MANAGEMENT_DB, holder) is expected
 
+    if should_insert:
+        ch_client.insert.assert_called_once()
+    else:
+        ch_client.insert.assert_not_called()
 
-def test_try_acquire_returns_true_when_held_by_self():
-    holder = _generate_holder_id()
-    ch_client = _make_ch_client(initial_rows=[(holder, "2026-01-01 00:00:00")])
-
-    assert try_acquire(ch_client, MANAGEMENT_DB, holder) is True
-    ch_client.insert.assert_not_called()
-
-
-def test_try_acquire_detects_race_via_verify():
-    """After INSERT, if verify SELECT shows another holder won, back off."""
-    other_holder = _generate_holder_id()
-    holder = _generate_holder_id()
-    ch_client = _make_ch_client(initial_rows=[], verify_rows=[(other_holder,)])
-
-    assert try_acquire(ch_client, MANAGEMENT_DB, holder) is False
-    ch_client.insert.assert_called_once()
-
-
-def test_try_acquire_retries_when_verify_returns_empty():
-    """If verify returns no rows (insert not yet visible), return False to retry."""
-    holder = _generate_holder_id()
-    ch_client = _make_ch_client(initial_rows=[], verify_rows=[])
-
-    assert try_acquire(ch_client, MANAGEMENT_DB, holder) is False
-    ch_client.insert.assert_called_once()
-
-
-def test_try_acquire_passes_consistent_read_settings():
-    """Both queries should use select_sequential_consistency=1."""
-    holder = _generate_holder_id()
-    ch_client = _make_ch_client(initial_rows=[], verify_rows=[(holder,)])
-
-    try_acquire(ch_client, MANAGEMENT_DB, holder)
-
+    # All queries must use consistent read settings
     for call in ch_client.query.call_args_list:
         assert call.kwargs.get("settings") == CONSISTENT_READ_SETTINGS
 
 
 # ---------------------------------------------------------------------------
-# release
+# Full lifecycle: context manager acquire → use → release
 # ---------------------------------------------------------------------------
 
 
-def test_release_issues_delete():
+def test_migration_lock_acquires_releases_and_handles_errors():
+    """The context manager should acquire, yield the holder, release on exit,
+    and swallow release errors gracefully.
+    """
     ch_client = Mock()
-    holder = _generate_holder_id()
-    release(ch_client, MANAGEMENT_DB, holder)
-    ch_client.command.assert_called_once()
-    call_sql = ch_client.command.call_args[0][0]
-    assert "DELETE" in call_sql
-    assert "migration_lock" in call_sql
 
-
-def test_release_swallows_errors():
-    ch_client = Mock()
-    ch_client.command.side_effect = RuntimeError("connection lost")
-    holder = _generate_holder_id()
-    # Should not raise
-    release(ch_client, MANAGEMENT_DB, holder)
-
-
-# ---------------------------------------------------------------------------
-# acquire_with_retry
-# ---------------------------------------------------------------------------
-
-
-def test_acquire_with_retry_succeeds_immediately():
-    holder = _generate_holder_id()
-    ch_client = _make_ch_client(initial_rows=[], verify_rows=[(holder,)])
-    # acquire_with_retry generates its own holder, so mock both queries
-    # to return success for any holder.
-    ch_client.query.side_effect = None
     empty_result = Mock()
     empty_result.result_rows = []
+    call_count = 0
 
-    def _query_side_effect(sql, **kwargs):
-        if ch_client.query.call_count % 2 == 1:
+    def _query_side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
             return empty_result
-        # verify query — return the holder that was just inserted
-        insert_data = ch_client.insert.call_args[1].get(
-            "data",
-            ch_client.insert.call_args[0][1]
-            if len(ch_client.insert.call_args[0]) > 1
-            else None,
-        )
+        inserted = ch_client.insert.call_args.kwargs["data"][0]
         result = Mock()
-        if insert_data:
-            result.result_rows = [(insert_data[0][1],)]
-        else:
-            result.result_rows = []
+        result.result_rows = [(inserted[1],)]
         return result
 
     ch_client.query.side_effect = _query_side_effect
-    holder_id = acquire_with_retry(ch_client, MANAGEMENT_DB, timeout_seconds=5.0)
-    assert len(holder_id) == 12
+
+    # Happy path: acquire + release
+    with migration_lock(ch_client, MANAGEMENT_DB, timeout_seconds=5.0) as holder:
+        assert len(holder) == 12
+        ch_client.insert.assert_called_once()
+
+    ch_client.command.assert_called_once()
+    assert ch_client.command.call_args[0][0] == (
+        "ALTER TABLE db_management.migration_lock "
+        "DELETE WHERE lock_id = 'migration' AND holder = %(holder)s"
+    )
+
+    # Release swallows errors (lock will expire via TTL)
+    release_holder = _generate_holder_id()
+    error_client = Mock()
+    error_client.command.side_effect = RuntimeError("connection lost")
+    release(error_client, MANAGEMENT_DB, release_holder)  # should not raise
 
 
-def test_acquire_with_retry_times_out():
+def test_acquire_with_retry_times_out_when_lock_held():
     other_holder = _generate_holder_id()
     ch_client = _make_ch_client(initial_rows=[(other_holder, "2026-01-01 00:00:00")])
 
@@ -174,66 +157,19 @@ def test_acquire_with_retry_times_out():
 
 
 # ---------------------------------------------------------------------------
-# migration_lock context manager
+# Holder validation — SQL injection defense
 # ---------------------------------------------------------------------------
 
 
-def test_migration_lock_context_manager_acquires_and_releases():
-    ch_client = Mock()
+def test_holder_validation():
+    # Rejects SQL injection attempts, empty strings, and oversized values
+    for bad_input in ["'; DROP TABLE --", "", "too_long_holder_id_12345"]:
+        with pytest.raises(ValueError, match="Invalid holder ID"):
+            _validate_holder(bad_input)
 
-    # The context manager calls acquire_with_retry which generates its own
-    # holder, so we dynamically return the inserted holder in the verify query.
-    empty_result = Mock()
-    empty_result.result_rows = []
-
-    call_count = 0
-
-    def _query_side_effect(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            # Initial check — no lock held
-            return empty_result
-        # Verify — return whoever was just inserted
-        inserted = ch_client.insert.call_args.kwargs["data"][0]
-        result = Mock()
-        result.result_rows = [(inserted[1],)]  # holder column
-        return result
-
-    ch_client.query.side_effect = _query_side_effect
-
-    with migration_lock(ch_client, MANAGEMENT_DB, timeout_seconds=5.0) as holder:
-        assert len(holder) == 12
-        ch_client.insert.assert_called_once()
-
-    # After exiting, release should have been called
-    ch_client.command.assert_called_once()
-    assert "DELETE" in ch_client.command.call_args[0][0]
-
-
-# ---------------------------------------------------------------------------
-# validation
-# ---------------------------------------------------------------------------
-
-
-def test_validate_holder_rejects_bad_input():
-    with pytest.raises(ValueError, match="Invalid holder ID"):
-        _validate_holder("'; DROP TABLE --")
-
-    with pytest.raises(ValueError, match="Invalid holder ID"):
-        _validate_holder("")
-
-    with pytest.raises(ValueError, match="Invalid holder ID"):
-        _validate_holder("too_long_holder_id_12345")
-
-
-def test_validate_holder_accepts_valid():
+    # Accepts well-formed holder IDs
     _validate_holder(_generate_holder_id())
     _validate_holder("abcdef012345")
-
-
-def test_lock_ttl_is_600s():
-    assert LOCK_TTL_SECONDS == 600
 
 
 # ---------------------------------------------------------------------------
