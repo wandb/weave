@@ -707,7 +707,9 @@ def test_eval_results_sort_with_pagination(client: WeaveClient):
             EvalResultsQueryReq(
                 project_id=project_id,
                 evaluation_call_ids=[run.evaluation_run_id],
-                sort_by=[EvalResultsSortBy(field="scores.page_scorer", direction="desc")],
+                sort_by=[
+                    EvalResultsSortBy(field="scores.page_scorer", direction="desc")
+                ],
                 limit=2,
                 offset=offset,
             )
@@ -768,7 +770,7 @@ def test_eval_results_sort_by_input_field(client: WeaveClient):
 
 
 def test_sort_aggregates_across_trials():
-    """Multiple trials per evaluation are averaged, not first-trial-wins."""
+    """Multiple trials per evaluation are averaged."""
     rows = [
         EvalResultsRow(
             row_digest="a",
@@ -776,8 +778,12 @@ def test_sort_aggregates_across_trials():
                 EvalResultsRowEvaluation(
                     evaluation_call_id="eval-1",
                     trials=[
-                        EvalResultsTrial(predict_and_score_call_id="t1", scores={"s": 0.2}),
-                        EvalResultsTrial(predict_and_score_call_id="t2", scores={"s": 0.8}),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t1", scores={"s": 0.2}
+                        ),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t2", scores={"s": 0.8}
+                        ),
                     ],
                 )
             ],
@@ -788,8 +794,12 @@ def test_sort_aggregates_across_trials():
                 EvalResultsRowEvaluation(
                     evaluation_call_id="eval-1",
                     trials=[
-                        EvalResultsTrial(predict_and_score_call_id="t3", scores={"s": 0.9}),
-                        EvalResultsTrial(predict_and_score_call_id="t4", scores={"s": 0.9}),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t3", scores={"s": 0.9}
+                        ),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t4", scores={"s": 0.9}
+                        ),
                     ],
                 )
             ],
@@ -808,11 +818,7 @@ def test_sort_aggregates_across_trials():
 
 
 def test_sort_scoped_to_evaluation_with_multiple_trials():
-    """Combines evaluation scoping + trial aggregation: the compare page scenario.
-
-    Each row has two evals with multiple trials each. Sorting by one eval's
-    score should average only that eval's trials and ignore the other eval.
-    """
+    """This test is essentially what the compare page should do"""
     rows = [
         EvalResultsRow(
             row_digest="x",
@@ -820,15 +826,23 @@ def test_sort_scoped_to_evaluation_with_multiple_trials():
                 EvalResultsRowEvaluation(
                     evaluation_call_id="eval-A",
                     trials=[
-                        EvalResultsTrial(predict_and_score_call_id="t1", scores={"s": 0.2}),
-                        EvalResultsTrial(predict_and_score_call_id="t2", scores={"s": 0.4}),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t1", scores={"s": 0.2}
+                        ),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t2", scores={"s": 0.4}
+                        ),
                     ],
                 ),
                 EvalResultsRowEvaluation(
                     evaluation_call_id="eval-B",
                     trials=[
-                        EvalResultsTrial(predict_and_score_call_id="t3", scores={"s": 0.9}),
-                        EvalResultsTrial(predict_and_score_call_id="t4", scores={"s": 0.7}),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t3", scores={"s": 0.9}
+                        ),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t4", scores={"s": 0.7}
+                        ),
                     ],
                 ),
             ],
@@ -839,15 +853,23 @@ def test_sort_scoped_to_evaluation_with_multiple_trials():
                 EvalResultsRowEvaluation(
                     evaluation_call_id="eval-A",
                     trials=[
-                        EvalResultsTrial(predict_and_score_call_id="t5", scores={"s": 0.8}),
-                        EvalResultsTrial(predict_and_score_call_id="t6", scores={"s": 0.6}),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t5", scores={"s": 0.8}
+                        ),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t6", scores={"s": 0.6}
+                        ),
                     ],
                 ),
                 EvalResultsRowEvaluation(
                     evaluation_call_id="eval-B",
                     trials=[
-                        EvalResultsTrial(predict_and_score_call_id="t7", scores={"s": 0.1}),
-                        EvalResultsTrial(predict_and_score_call_id="t8", scores={"s": 0.3}),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t7", scores={"s": 0.1}
+                        ),
+                        EvalResultsTrial(
+                            predict_and_score_call_id="t8", scores={"s": 0.3}
+                        ),
                     ],
                 ),
             ],
@@ -861,7 +883,11 @@ def test_sort_scoped_to_evaluation_with_multiple_trials():
         False,
         0,
         None,
-        sort_by=[EvalResultsSortBy(field="scores.s", direction="asc", evaluation_call_id="eval-A")],
+        sort_by=[
+            EvalResultsSortBy(
+                field="scores.s", direction="asc", evaluation_call_id="eval-A"
+            )
+        ],
     )
     assert [r.row_digest for r in res_a] == ["x", "y"]
 
@@ -872,6 +898,10 @@ def test_sort_scoped_to_evaluation_with_multiple_trials():
         False,
         0,
         None,
-        sort_by=[EvalResultsSortBy(field="scores.s", direction="asc", evaluation_call_id="eval-B")],
+        sort_by=[
+            EvalResultsSortBy(
+                field="scores.s", direction="asc", evaluation_call_id="eval-B"
+            )
+        ],
     )
     assert [r.row_digest for r in res_b] == ["y", "x"]
