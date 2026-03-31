@@ -79,6 +79,12 @@ ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
+-- IMPORTANT: `calls_complete` has had `source` since v2, but `calls_complete_stats` missed the matching aggregate column.
+-- Fix it here so existing deployments pick it up during this upgrade, then populate it from `calls_complete.source` below.
+ALTER TABLE calls_complete_stats
+    ADD COLUMN IF NOT EXISTS source SimpleAggregateFunction(any, Enum8('direct' = 1, 'dual' = 2, 'migration' = 3))
+    DEFAULT 'direct';
+
 ALTER TABLE calls_complete_stats MODIFY TTL expire_at DELETE;
 
 -- Step 9: Update calls_merged_stats_view to propagate expire_at
@@ -134,6 +140,7 @@ SELECT
     anySimpleState(calls_complete.wb_run_step_end) as wb_run_step_end,
     anySimpleState(calls_complete.thread_id) as thread_id,
     anySimpleState(calls_complete.turn_id) as turn_id,
+    anySimpleState(calls_complete.source) as source,
     minSimpleState(calls_complete.created_at) as created_at,
     maxSimpleState(calls_complete.updated_at) as updated_at,
     argMaxState(calls_complete.display_name, calls_complete.created_at) as display_name,
