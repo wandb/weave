@@ -106,7 +106,9 @@ def _extract_call_usage(
         )
         requests = _safe_int(usage.get("requests"))
         total_tokens = _safe_int(usage.get("total_tokens"))
-        cache_read_input_tokens = _safe_int(usage.get("cache_read_input_tokens"))
+        cache_read_input_tokens = _safe_int(
+            usage.get("cache_read_input_tokens")
+        )
         cache_creation_input_tokens = _safe_int(
             usage.get("cache_creation_input_tokens")
         )
@@ -217,11 +219,13 @@ def _has_usage(usage: tsi.LLMAggregatedUsage, include_costs: bool) -> bool:
     if has_tokens or has_cache_tokens:
         return True
     if include_costs:
-        has_cost = (usage.prompt_tokens_total_cost or 0.0) or (
-            usage.completion_tokens_total_cost or 0.0
+        has_cost = (
+            (usage.prompt_tokens_total_cost or 0.0)
+            or (usage.completion_tokens_total_cost or 0.0)
         )
-        has_cache_cost = (usage.cache_read_input_tokens_total_cost or 0.0) or (
-            usage.cache_creation_input_tokens_total_cost or 0.0
+        has_cache_cost = (
+            (usage.cache_read_input_tokens_total_cost or 0.0)
+            or (usage.cache_creation_input_tokens_total_cost or 0.0)
         )
         return bool(has_cost or has_cache_cost)
     return False
