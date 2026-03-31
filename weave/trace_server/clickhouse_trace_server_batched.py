@@ -1089,13 +1089,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         prices: dict[str, dict[str, float]] = {}
         for row in result.result_rows:
-            (
-                llm_id,
-                prompt_cost,
-                completion_cost,
-                cache_read_cost,
-                cache_creation_cost,
-            ) = row
+            llm_id, prompt_cost, completion_cost, cache_read_cost, cache_creation_cost = row
             prices[llm_id] = {
                 "prompt_token_cost": float(prompt_cost) if prompt_cost else 0.0,
                 "completion_token_cost": float(completion_cost)
@@ -1139,20 +1133,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             prompt_cost = model_prices.get("prompt_token_cost", 0.0)
             completion_cost = model_prices.get("completion_token_cost", 0.0)
             cache_read_cost = model_prices.get("cache_read_input_token_cost", 0.0)
-            cache_creation_cost = model_prices.get(
-                "cache_creation_input_token_cost", 0.0
-            )
+            cache_creation_cost = model_prices.get("cache_creation_input_token_cost", 0.0)
 
             input_tokens = bucket.get("sum_input_tokens", 0) or 0
             output_tokens = bucket.get("sum_output_tokens", 0) or 0
             cache_read_tokens = bucket.get("sum_cache_read_input_tokens", 0) or 0
-            cache_creation_tokens = (
-                bucket.get("sum_cache_creation_input_tokens", 0) or 0
-            )
-
-            # Subtract cache tokens from input: they are billed at cache
-            # rates, not the regular prompt rate.
-            net_input_tokens = input_tokens - cache_read_tokens - cache_creation_tokens
+            cache_creation_tokens = bucket.get("sum_cache_creation_input_tokens", 0) or 0
 
             if "input_cost" in requested_cost_metrics:
                 bucket["sum_input_cost"] = net_input_tokens * prompt_cost
