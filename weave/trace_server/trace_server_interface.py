@@ -1446,6 +1446,8 @@ class FilesStatsRes(BaseModel):
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
+    cache_read_input_token_cost: float = 0
+    cache_creation_input_token_cost: float = 0
     prompt_token_cost_unit: str | None = Field(
         "USD", description="The unit of the cost for the prompt tokens"
     )

@@ -85,12 +85,14 @@ def build_model_prices_query(
         SQL string and parameters dict.
     """
     sql = f"""
-    SELECT llm_id, prompt_token_cost, completion_token_cost
+    SELECT llm_id, prompt_token_cost, completion_token_cost, cache_read_input_token_cost, cache_creation_input_token_cost
     FROM (
         SELECT
             llm_id,
             prompt_token_cost,
             completion_token_cost,
+            cache_read_input_token_cost,
+            cache_creation_input_token_cost,
             ROW_NUMBER() OVER (
                 PARTITION BY llm_id
                 ORDER BY
