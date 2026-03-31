@@ -1,0 +1,96 @@
+# serializer version: 1
+# name: test_dictify_complex
+  dict({
+    '__class__': dict({
+      'module': 'test_serialize',
+      'name': 'Points',
+      'qualname': 'test_dictify_complex.<locals>.Points',
+    }),
+    'points': list([
+      dict({
+        '__class__': dict({
+          'module': 'test_serialize',
+          'name': 'Point',
+          'qualname': 'test_dictify_complex.<locals>.Point',
+        }),
+        'x': 1,
+        'y': 2,
+      }),
+      dict({
+        '__class__': dict({
+          'module': 'test_serialize',
+          'name': 'Point',
+          'qualname': 'test_dictify_complex.<locals>.Point',
+        }),
+        'x': 3,
+        'y': 4,
+      }),
+    ]),
+  })
+# ---
+# name: test_dictify_sanitizes
+  dict({
+    '__class__': dict({
+      'module': 'test_serialize',
+      'name': 'MyClass',
+      'qualname': 'test_dictify_sanitizes.<locals>.MyClass',
+    }),
+    'api_key': 'REDACTED',
+  })
+# ---
+# name: test_dictify_sanitizes_nested
+  dict({
+    '__class__': dict({
+      'module': 'test_serialize',
+      'name': 'MyClassB',
+      'qualname': 'test_dictify_sanitizes_nested.<locals>.MyClassB',
+    }),
+    'a': dict({
+      '__class__': dict({
+        'module': 'test_serialize',
+        'name': 'MyClassA',
+        'qualname': 'test_dictify_sanitizes_nested.<locals>.MyClassA',
+      }),
+      'api_key': 'REDACTED',
+    }),
+  })
+# ---
+# name: test_dictify_simple
+  dict({
+    '__class__': dict({
+      'module': 'test_serialize',
+      'name': 'Point',
+      'qualname': 'test_dictify_simple.<locals>.Point',
+    }),
+    'x': 1,
+    'y': 2,
+  })
+# ---
+# name: test_to_json_pydantic_class
+  dict({
+    'properties': dict({
+      'date': dict({
+        'title': 'Date',
+        'type': 'string',
+      }),
+      'name': dict({
+        'title': 'Name',
+        'type': 'string',
+      }),
+      'participants': dict({
+        'items': dict({
+          'type': 'string',
+        }),
+        'title': 'Participants',
+        'type': 'array',
+      }),
+    }),
+    'required': list([
+      'name',
+      'date',
+      'participants',
+    ]),
+    'title': 'CalendarEvent',
+    'type': 'object',
+  })
+# ---

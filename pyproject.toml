@@ -486,6 +486,7 @@ test = [
   "weave[trace_server]",
   "moto[s3]>=5.0.0",
   "respx",
+  "syrupy>=4.0.0",
 ]
 
 [tool.uv]

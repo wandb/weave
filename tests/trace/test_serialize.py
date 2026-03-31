@@ -13,7 +13,7 @@ from weave.trace.serialization.serialize import (
 )
 
 
-def test_dictify_simple() -> None:
+def test_dictify_simple(snapshot) -> None:
     class Point:
         x: int
         y: int
@@ -25,18 +25,10 @@ def test_dictify_simple() -> None:
     pt = Point()
     pt.x = 1
     pt.y = 2
-    assert dictify(pt) == {
-        "__class__": {
-            "module": "test_serialize",
-            "qualname": "test_dictify_simple.<locals>.Point",
-            "name": "Point",
-        },
-        "x": 1,
-        "y": 2,
-    }
+    assert dictify(pt) == snapshot
 
 
-def test_dictify_complex() -> None:
+def test_dictify_complex(snapshot) -> None:
     @dataclass
     class Point:
         x: int
@@ -47,33 +39,7 @@ def test_dictify_complex() -> None:
             self.points = [Point(1, 2), Point(3, 4)]
 
     pts = Points()
-    assert dictify(pts) == {
-        "__class__": {
-            "module": "test_serialize",
-            "qualname": "test_dictify_complex.<locals>.Points",
-            "name": "Points",
-        },
-        "points": [
-            {
-                "__class__": {
-                    "module": "test_serialize",
-                    "qualname": "test_dictify_complex.<locals>.Point",
-                    "name": "Point",
-                },
-                "x": 1,
-                "y": 2,
-            },
-            {
-                "__class__": {
-                    "module": "test_serialize",
-                    "qualname": "test_dictify_complex.<locals>.Point",
-                    "name": "Point",
-                },
-                "x": 3,
-                "y": 4,
-            },
-        ],
-    }
+    assert dictify(pts) == snapshot
 
 
 def test_dictify_maxdepth() -> None:
@@ -161,23 +127,16 @@ def test_fallback_encode_dictify_fails() -> None:
     assert fallback_encode(pt) == repr(pt)
 
 
-def test_dictify_sanitizes() -> None:
+def test_dictify_sanitizes(snapshot) -> None:
     @dataclass
     class MyClass:
         api_key: str
 
     instance = MyClass("sk-1234567890qwertyuiop")
-    assert dictify(instance) == {
-        "__class__": {
-            "module": "test_serialize",
-            "qualname": "test_dictify_sanitizes.<locals>.MyClass",
-            "name": "MyClass",
-        },
-        "api_key": "REDACTED",
-    }
+    assert dictify(instance) == snapshot
 
 
-def test_dictify_sanitizes_nested() -> None:
+def test_dictify_sanitizes_nested(snapshot) -> None:
     @dataclass
     class MyClassA:
         api_key: str
@@ -187,21 +146,7 @@ def test_dictify_sanitizes_nested() -> None:
         a: MyClassA
 
     instance = MyClassB(MyClassA("sk-1234567890qwertyuiop"))
-    assert dictify(instance) == {
-        "__class__": {
-            "module": "test_serialize",
-            "qualname": "test_dictify_sanitizes_nested.<locals>.MyClassB",
-            "name": "MyClassB",
-        },
-        "a": {
-            "__class__": {
-                "module": "test_serialize",
-                "qualname": "test_dictify_sanitizes_nested.<locals>.MyClassA",
-                "name": "MyClassA",
-            },
-            "api_key": "REDACTED",
-        },
-    }
+    assert dictify(instance) == snapshot
 
 
 def test_is_pydantic_model_class() -> None:
@@ -230,7 +175,7 @@ def test_is_pydantic_model_class() -> None:
     assert is_pydantic_model_class(CalendarEvent)
 
 
-def test_to_json_pydantic_class(client) -> None:
+def test_to_json_pydantic_class(client, snapshot) -> None:
     """We expect to_json to return the Pydantic schema for the class."""
 
     class CalendarEvent(BaseModel):
@@ -240,20 +185,7 @@ def test_to_json_pydantic_class(client) -> None:
 
     project_id = "entity/project"
     serialized = to_json(CalendarEvent, project_id, client, use_dictify=False)
-    assert serialized == {
-        "properties": {
-            "name": {"title": "Name", "type": "string"},
-            "date": {"title": "Date", "type": "string"},
-            "participants": {
-                "items": {"type": "string"},
-                "title": "Participants",
-                "type": "array",
-            },
-        },
-        "required": ["name", "date", "participants"],
-        "title": "CalendarEvent",
-        "type": "object",
-    }
+    assert serialized == snapshot
 
 
 def test_to_json_object_excludes_ref(client) -> None:
