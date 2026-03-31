@@ -4,7 +4,6 @@ import clickhouse_connect
 import pytest
 
 from weave.trace_server.migration_lock import (
-    CONSISTENT_READ_SETTINGS,
     MigrationLockError,
     _generate_holder_id,
     _validate_holder,
@@ -98,9 +97,6 @@ def test_try_acquire_outcomes(initial_rows, verify_rows, expected, should_insert
     else:
         ch_client.insert.assert_not_called()
 
-    # All queries must use consistent read settings
-    for call in ch_client.query.call_args_list:
-        assert call.kwargs.get("settings") == CONSISTENT_READ_SETTINGS
 
 
 # ---------------------------------------------------------------------------

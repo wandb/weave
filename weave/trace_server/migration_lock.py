@@ -44,10 +44,6 @@ LOCK_WAIT_INITIAL_DELAY_SECONDS = 0.5
 LOCK_WAIT_MAX_DELAY_SECONDS = 5.0
 LOCK_WAIT_TIMEOUT_SECONDS = 120.0
 
-# Force linearizable reads so insert-then-verify sees our own write on
-# ReplicatedMergeTree.  No-op on plain MergeTree (single-node).
-CONSISTENT_READ_SETTINGS: dict[str, int] = {"select_sequential_consistency": 1}
-
 HOLDER_PATTERN = re.compile(r"^[0-9a-f]{12}$")
 
 
@@ -84,13 +80,13 @@ def try_acquire(ch_client: CHClient, management_db: str, holder: str) -> bool:
     """
     _validate_holder(holder)
 
-    # Check for existing unexpired lock (earliest wins).
+    # No special read settings needed: ch_client routes insert + verify to the
+    # same node, and idempotent DDL is the ultimate safety net.
     result = ch_client.query(
         f"SELECT holder, acquired_at FROM {management_db}.{LOCK_TABLE} "
         f"WHERE lock_id = 'migration' "
         f"AND acquired_at > now64(3) - INTERVAL {LOCK_TTL_SECONDS} SECOND "
         f"ORDER BY acquired_at ASC LIMIT 1",
-        settings=CONSISTENT_READ_SETTINGS,
     )
     if result.result_rows:
         existing_holder = result.result_rows[0][0]
@@ -116,7 +112,6 @@ def try_acquire(ch_client: CHClient, management_db: str, holder: str) -> bool:
         f"WHERE lock_id = 'migration' "
         f"AND acquired_at > now64(3) - INTERVAL {LOCK_TTL_SECONDS} SECOND "
         f"ORDER BY acquired_at ASC LIMIT 1",
-        settings=CONSISTENT_READ_SETTINGS,
     )
     if not verify.result_rows:
         # Insert not yet visible — retry rather than assuming success.
