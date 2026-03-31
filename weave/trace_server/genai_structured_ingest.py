@@ -96,6 +96,38 @@ def _turn_to_spans(
 
     spans: list[GenAISpanCHInsertable] = [root_span]
 
+    # Create a chat span for the LLM call within this turn.
+    # In OTel-instrumented agents, each LLM call is a separate chat span.
+    # The structured ingest emulates this so model-level analytics work.
+    if turn.model or output_msgs:
+        chat_span_id = _new_id()
+        chat_start = base_time + datetime.timedelta(microseconds=500)
+        chat_end = end_time - datetime.timedelta(microseconds=500)
+        chat_span = GenAISpanCHInsertable(
+            project_id=project_id,
+            trace_id=trace_id,
+            span_id=chat_span_id,
+            parent_span_id=root_span_id,
+            span_name=f"chat {turn.model}" if turn.model else "chat",
+            span_kind="CLIENT",
+            started_at=chat_start,
+            ended_at=chat_end,
+            status_code="OK",
+            operation_name="chat",
+            provider_name=provider_name,
+            agent_name=agent_name,
+            request_model=turn.model,
+            response_model=turn.model,
+            input_tokens=turn.input_tokens,
+            output_tokens=turn.output_tokens,
+            total_tokens=turn.input_tokens + turn.output_tokens,
+            conversation_id=conversation_id,
+            conversation_name=conversation_name,
+            input_messages=input_msgs,
+            output_messages=output_msgs,
+        )
+        spans.append(chat_span)
+
     for i, tc in enumerate(turn.tool_calls):
         tc_span_id = _new_id()
         tc_start = base_time + datetime.timedelta(milliseconds=i + 1)
