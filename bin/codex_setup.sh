@@ -9,7 +9,7 @@ set -e  # Exit on any error
 #   This script sets up a complete development environment for Weave, including:
 #   - uv (Python package manager)
 #   - nox (testing automation)
-#   - pre-commit (code quality hooks)
+#   - prek (code quality hooks)
 #   - ClickHouse database server
 #   - Test environments for all shards
 #   - Lint environment
@@ -48,16 +48,16 @@ install_global_tools() {
     # Install tools sequentially for clear debugging output
     echo "  Installing nox..."
     uv tool install nox
-    echo "  Installing pre-commit..."
-    uv tool install pre-commit
+    echo "  Installing prek..."
+    uv tool install prek
     echo "✓ Global tools installed successfully"
 }
 
-setup_precommit() {
-    echo "Setting up pre-commit hooks..."
-    # Dry-run precommit on a single file to force dependency installation
-    pre-commit run --hook-stage pre-push --files ./weave/__init__.py
-    echo "✓ Pre-commit setup completed"
+setup_prek() {
+    echo "Setting up prek hooks..."
+    # Dry-run prek on a single file to force dependency installation
+    prek run --hook-stage pre-push --files ./weave/__init__.py
+    echo "✓ Prek setup completed"
 }
 
 #------------------------------------------------------------------------------
@@ -198,8 +198,8 @@ main() {
     install_lint_environment
     echo ""
     
-    echo "🔧 Setting up pre-commit hooks..."
-    setup_precommit
+    echo "🔧 Setting up prek hooks..."
+    setup_prek
     echo ""
     
     echo "=================================================="
@@ -210,7 +210,7 @@ main() {
     echo "  🛠️  Development tools installed:"
     echo "     • uv (Python package manager)"
     echo "     • nox (testing automation)" 
-    echo "     • pre-commit (code quality hooks)"
+    echo "     • prek (code quality hooks)"
     echo "     • Test environments for all shards"
     echo "     • Lint environment configured"
     echo "     • ClickHouse database server"
@@ -223,7 +223,7 @@ main() {
     echo ""
     echo "  🚀 Next steps:"
     echo "     • Run tests: nox -e tests"
-    echo "     • Check code quality: pre-commit run --all-files"
+    echo "     • Check code quality: prek run --all-files"
     echo "     • Start coding in your Weave development environment!"
     echo ""
     echo "Happy coding! 🎉"

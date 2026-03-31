@@ -347,13 +347,13 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         if self.feedback_type == "*":
             res = inner
             if use_agg_fn:
-                # Concat values from all feedback rows so filters search across every entry
+                # Pick any non-empty value from across all feedback rows.
                 if self.extra_path:
                     extracted = json_dump_field_as_sql(
                         pb, "feedback", inner, self.extra_path, cast
                     )
-                    return f"arrayStringConcat(groupArray({extracted}), ', ')"
-                return f"arrayStringConcat(groupArray({inner}), ', ')"
+                    return f"anyIf({extracted}, {extracted} != '')"
+                return f"any({inner})"
         else:
             param_name = pb.add_param(self.feedback_type)
             if use_agg_fn:

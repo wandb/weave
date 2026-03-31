@@ -520,3 +520,61 @@ def test_eval_results_query_multiple_evals(client):
         run_a.evaluation_run_id,
         run_b.evaluation_run_id,
     }
+
+
+def test_eval_results_resolve_refs_only_for_paginated_rows(client):
+    """Verify that resolve_row_refs only resolves refs for the paginated slice"""
+    project_id = client.project_id
+
+    # create an eval with 5 rows
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://ref-resolve-test",
+            model="model://ref-resolve-test",
+        )
+    )
+    for i in range(5):
+        pred = client.server.prediction_create(
+            PredictionCreateReq(
+                project_id=project_id,
+                model="model://ref-resolve-test",
+                inputs={"x": f"input_{i}"},
+                output=f"output_{i}",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        client.server.prediction_finish(
+            PredictionFinishReq(
+                project_id=project_id,
+                prediction_id=pred.prediction_id,
+            )
+        )
+
+    original_refs_read_batch = client.server.refs_read_batch
+    refs_read_batch_calls = []
+
+    def tracking_refs_read_batch(req):
+        refs_read_batch_calls.append(req)
+        return original_refs_read_batch(req)
+
+    with mock.patch.object(
+        client.server, "refs_read_batch", side_effect=tracking_refs_read_batch
+    ):
+        paginated_res = client.server.eval_results_query(
+            EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                include_raw_data_rows=True,
+                resolve_row_refs=True,
+                limit=2,
+                offset=0,
+            )
+        )
+
+    assert paginated_res.total_rows == 5
+    assert len(paginated_res.rows) == 2
+
+    for call in refs_read_batch_calls:
+        # only resolve refs for the paginated slice, not all rows
+        assert len(call.refs) <= 2

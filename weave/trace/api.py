@@ -59,7 +59,7 @@ def init(
     Args:
         project_name: The name of the Weights & Biases team and project to log to. If you don't
             specify a team, your default entity is used.
-            To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
+            To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/platform/app/settings-page/user-settings#default-team) in the W&B Models documentation.
         settings: Configuration for the Weave client generally. Can be a UserSettings instance or a dict
             with any of the following keys (all optional). All settings can also be configured
             via environment variables using the prefix WEAVE_ (e.g., WEAVE_DISABLED=true).
@@ -133,7 +133,7 @@ def init(
             "    weave.init('%s')\n"
             "    weave.integrations.patch_openai()\n"
             "----------------------------------------\n"
-            "See https://docs.wandb.ai/guides/integrations for more information.",
+            "See https://docs.wandb.ai/models/integrations for more information.",
             project_name,
         )
 
