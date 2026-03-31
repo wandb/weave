@@ -56,6 +56,7 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
 )
 from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
+    maybe_iso_to_ch_datetime_str,
     param_slot,
     safe_alias,
     safely_format_sql,
@@ -1968,7 +1969,8 @@ def _maybe_convert_datetime_operands(
         return operands
 
     field_idx = None
-    literal_idx = None
+    numeric_literal_idx = None
+    string_literal_idx = None
 
     for i, op in enumerate(operands):
         if (
@@ -1976,22 +1978,39 @@ def _maybe_convert_datetime_operands(
             and op.get_field_ in DATETIME_COLUMN_FIELDS
         ):
             field_idx = i
-        elif isinstance(op, tsi_query.LiteralOperation) and isinstance(
-            op.literal_, (int, float)
-        ):
-            literal_idx = i
+        elif isinstance(op, tsi_query.LiteralOperation):
+            if isinstance(op.literal_, (int, float)):
+                numeric_literal_idx = i
+            elif isinstance(op.literal_, str):
+                string_literal_idx = i
 
-    if field_idx is None or literal_idx is None:
+    if field_idx is None:
         return operands
 
     # Convert numeric timestamp to datetime string for proper DateTime64 comparison
-    timestamp = operands[literal_idx].literal_
-    assert isinstance(timestamp, (int, float))
-    datetime_str = timestamp_to_datetime_str(timestamp)
+    if numeric_literal_idx is not None:
+        timestamp = operands[numeric_literal_idx].literal_
+        assert isinstance(timestamp, (int, float))
+        datetime_str = timestamp_to_datetime_str(timestamp)
+        new_operands = list(operands)
+        new_operands[numeric_literal_idx] = tsi_query.LiteralOperation(
+            **{"$literal": datetime_str}
+        )
+        return new_operands
 
-    new_operands = list(operands)
-    new_operands[literal_idx] = tsi_query.LiteralOperation(**{"$literal": datetime_str})
-    return new_operands
+    # Convert ISO date strings (e.g. "2026-03-31T15:38:50.164Z") to ClickHouse format
+    if string_literal_idx is not None:
+        raw = operands[string_literal_idx].literal_
+        assert isinstance(raw, str)
+        converted = maybe_iso_to_ch_datetime_str(raw)
+        if converted is not None and converted != raw:
+            new_operands = list(operands)
+            new_operands[string_literal_idx] = tsi_query.LiteralOperation(
+                **{"$literal": converted}
+            )
+            return new_operands
+
+    return operands
 
 
 def _extract_field_name(operand: "tsi_query.Operand") -> str | None:
