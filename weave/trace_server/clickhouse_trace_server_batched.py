@@ -969,9 +969,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_id: str,
     ) -> None:
         """Enqueue Kafka events for spans from the structured ingest path."""
+        if not wf_env.wf_enable_genai_online_eval():
+            return
         producer = self.kafka_producer
         if producer is None:
+            logger.info("Kafka producer is None, skipping genai_span_ended events for structured ingest")
             return
+        logger.info("Publishing %d genai_span_ended events for project %s", len(spans), project_id)
 
         for span in spans:
             event = tsi.GenAISpanEndedEvent(
