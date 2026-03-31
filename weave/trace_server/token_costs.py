@@ -24,9 +24,7 @@ if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import OrderField
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
-DUMMY_LLM_USAGE = (
-    '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}'
-)
+DUMMY_LLM_USAGE = '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}'
 ESCAPED_DUMMY_LLM_USAGE = DUMMY_LLM_USAGE.replace('"', '\\"')
 
 
@@ -205,7 +203,9 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
     prompt_tokens = """(if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens"""
     completion_tokens = """(if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens"""
     total_tokens = "JSONExtractInt(kv.2, 'total_tokens') AS total_tokens"
-    cache_read_input_tokens = "JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens"
+    cache_read_input_tokens = (
+        "JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens"
+    )
     cache_creation_input_tokens = "JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens"
 
     select_query = (
