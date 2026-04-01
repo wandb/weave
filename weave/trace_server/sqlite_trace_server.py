@@ -239,6 +239,12 @@ def _cost_usage_from_summary(
             "requests": _safe_int_for_costs(usage.get("requests")),
             # Match ClickHouse: keep total_tokens as-reported rather than deriving it.
             "total_tokens": _safe_int_for_costs(usage.get("total_tokens")),
+            "cache_read_input_tokens": _safe_int_for_costs(
+                usage.get("cache_read_input_tokens")
+            ),
+            "cache_creation_input_tokens": _safe_int_for_costs(
+                usage.get("cache_creation_input_tokens")
+            ),
         }
     return normalized_usage
 
