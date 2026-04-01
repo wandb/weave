@@ -17,7 +17,6 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
-from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
@@ -248,10 +247,6 @@ CH_POOL_COUNT = 2
 CLICKHOUSE_DEFAULT_PORT = 8123
 CLICKHOUSE_SECURE_PORT = 8443
 
-# Op ref cache: in-memory TTL cache for resolved op refs
-OP_REF_CACHE_MAX_SIZE = 50_000
-OP_REF_CACHE_TTL_SECONDS = 300
-
 # Max error messages to include in OTel export partial success responses
 MAX_OTEL_ERROR_MESSAGES = 20
 
@@ -308,10 +303,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
-        self._op_ref_cache: TTLCache[tuple[str, str], str] = TTLCache(
-            maxsize=OP_REF_CACHE_MAX_SIZE, ttl=OP_REF_CACHE_TTL_SECONDS
-        )
-        self._op_ref_cache_lock = threading.Lock()
+        self._inserted_ops: set[tuple[str, str]] = set()
+        self._inserted_ops_lock = threading.Lock()
         self._placeholder_file_projects: set[str] = set()
         self._database_ensured = False
 
@@ -461,63 +454,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
         return "calls_complete"
 
-    def _get_existing_ops_from_spans(
-        self, seen_ids: set[str], project_id: str, limit: int | None = None
-    ) -> dict[str, str]:
-        """Look up existing op ref URIs, using an in-memory TTL cache to skip repeated CH queries.
-
-        Returns a dict of op_name -> op_ref_uri for all ops that already exist
-        (either from cache or from CH).
-        """
-        resolved: dict[str, str] = {}
-        uncached_ids: set[str] = set()
-
-        # Check cache first
-        with self._op_ref_cache_lock:
-            for op_name in seen_ids:
-                cached_uri = self._op_ref_cache.get((project_id, op_name))
-                if cached_uri is not None:
-                    resolved[op_name] = cached_uri
-                else:
-                    uncached_ids.add(op_name)
-
-        # Query CH only for uncached ops
-        if uncached_ids:
-            obj_version_filter = tsi.ObjectVersionFilter(
-                object_ids=list(uncached_ids),
-                latest_only=True,
-                is_op=True,
-            )
-            ch_results = self.objs_query(
-                tsi.ObjQueryReq(
-                    project_id=project_id,
-                    filter=obj_version_filter,
-                    metadata_only=True,
-                    limit=limit,
-                ),
-            ).objs
-
-            # Populate cache and resolved dict with CH results
-            with self._op_ref_cache_lock:
-                for obj in ch_results:
-                    uri = ri.InternalOpRef(
-                        project_id=project_id,
-                        name=obj.object_id,
-                        version=obj.digest,
-                    ).uri
-                    self._op_ref_cache[project_id, obj.object_id] = uri
-                    resolved[obj.object_id] = uri
-
-        return resolved
-
-    def _cache_op_ref(self, project_id: str, op_name: str, uri: str) -> None:
-        """Cache a resolved op ref URI."""
-        with self._op_ref_cache_lock:
-            self._op_ref_cache[project_id, op_name] = uri
-
     def _ensure_placeholder_file_exists(self, project_id: str) -> None:
         """Write the OTEL placeholder source file at most once per project per process."""
-        with self._op_ref_cache_lock:
+        with self._inserted_ops_lock:
             if project_id in self._placeholder_file_projects:
                 return
             self._placeholder_file_projects.add(project_id)
@@ -581,51 +520,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
 
-        obj_id_idx_map = defaultdict(list)
+        obj_id_idx_map: dict[str, list[int]] = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
             op_name = object_creation_utils.make_safe_name(start_call.op_name)
             obj_id_idx_map[op_name].append(idx)
 
-        existing_ops = self._get_existing_ops_from_spans(
-            seen_ids=set(obj_id_idx_map.keys()),
-            project_id=req.project_id,
-            limit=len(calls),
-        )
+        # Idempotent write: insert placeholder ops for any op names this
+        # process hasn't seen yet.  ReplacingMergeTree + the deduped view
+        # collapse duplicates, so blind-inserting is safe and avoids all
+        # CH reads on the hot path.
+        with self._inserted_ops_lock:
+            new_ops = {
+                name
+                for name in obj_id_idx_map
+                if (req.project_id, name) not in self._inserted_ops
+            }
 
-        for op_name, op_ref_uri in existing_ops.items():
-            # Modify each of the matched start calls in place
-            for idx in obj_id_idx_map[op_name]:
-                calls[idx][0].op_name = op_ref_uri
-            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
-            obj_id_idx_map.pop(op_name)
-
-        if obj_id_idx_map:
+        if new_ops:
             self._ensure_placeholder_file_exists(req.project_id)
-            obj_creation_batch = [
+            self.obj_create_batch([
                 tsi.ObjSchemaForInsert(
                     project_id=req.project_id,
                     object_id=op_name,
                     val=object_creation_utils._OTEL_PLACEHOLDER_OP_VAL,
                     wb_user_id=req.wb_user_id,
                 )
-                for op_name in obj_id_idx_map.keys()
-            ]
-            self.obj_create_batch(obj_creation_batch)
+                for op_name in new_ops
+            ])
+            with self._inserted_ops_lock:
+                self._inserted_ops.update(
+                    (req.project_id, name) for name in new_ops
+                )
 
-            cached_op_refs = {}
-            for op_name, idxs in obj_id_idx_map.items():
-                op_ref_uri = ri.InternalOpRef(
-                    project_id=req.project_id,
-                    name=op_name,
-                    version=object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST,
-                ).uri
-                for idx in idxs:
-                    calls[idx][0].op_name = op_ref_uri
-                cached_op_refs[op_name] = op_ref_uri
-
-            with self._op_ref_cache_lock:
-                for op_name, op_ref_uri in cached_op_refs.items():
-                    self._op_ref_cache[req.project_id, op_name] = op_ref_uri
+        # Construct all ref URIs deterministically — no CH read needed
+        for op_name, idxs in obj_id_idx_map.items():
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=op_name,
+                version=object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST,
+            ).uri
+            for idx in idxs:
+                calls[idx][0].op_name = op_ref_uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
@@ -1742,11 +1677,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def obj_create_batch(
         self, batch: list[tsi.ObjSchemaForInsert]
     ) -> list[tsi.ObjCreateRes]:
-        """This method is for the special case where all objects are known to use a placeholder.
-        We lose any knowledge of what version the created object is in return for an enormous
-        performance increase for operations like OTel ingest.
+        """Batch-insert objects using a fixed placeholder digest.
 
-        This should **ONLY** be used when we know an object will never have more than one version.
+        Skips version numbering in exchange for a large performance gain (no CH reads).
+        Used by OTel ingest. If a real op with the same object_id already exists,
+        the placeholder will be inserted as an additional version and may become
+        ``is_latest``. This is acceptable because call display and filtering are
+        digest-agnostic.
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
