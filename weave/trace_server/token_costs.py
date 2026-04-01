@@ -418,13 +418,15 @@ def _build_cost_summary_dump_snippet() -> str:
                 f""" '"{field}":', toString({field}), ',', """
                 for field in cost_numeric_fields
             ],
-            # These numeric fields are derived or mapped to another name
+            # These numeric fields are derived or mapped to another name.
+            # prompt_tokens_total_cost subtracts cache_read_input_tokens because
+            # cached tokens are billed at the cache rate, not the regular input rate.
             """
             '"prompt_token_cost":', toString(prompt_token_cost), ',',
             '"completion_token_cost":', toString(completion_token_cost), ',',
             '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
             '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
-            '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',',
+            '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens) * prompt_token_cost), ',',
             '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
             '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
             '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
