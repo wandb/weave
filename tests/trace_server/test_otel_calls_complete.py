@@ -422,7 +422,10 @@ def test_otel_export_uses_placeholder_even_with_existing_real_op(
     calls = _fetch_calls_stream(trace_server, project_id)
     assert len(calls) == 1
     # OTel uses the placeholder digest, not the real op's digest
-    assert f"/op/{op_name}:{object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST}" in calls[0].op_name
+    assert (
+        f"/op/{op_name}:{object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST}"
+        in calls[0].op_name
+    )
     assert real_op.digest != object_creation_utils.OTEL_PLACEHOLDER_OP_DIGEST
 
     objs = trace_server.objs_query(

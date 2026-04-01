@@ -538,19 +538,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if new_ops:
             self._ensure_placeholder_file_exists(req.project_id)
-            self.obj_create_batch([
-                tsi.ObjSchemaForInsert(
-                    project_id=req.project_id,
-                    object_id=op_name,
-                    val=object_creation_utils._OTEL_PLACEHOLDER_OP_VAL,
-                    wb_user_id=req.wb_user_id,
-                )
-                for op_name in new_ops
-            ])
+            self.obj_create_batch(
+                [
+                    tsi.ObjSchemaForInsert(
+                        project_id=req.project_id,
+                        object_id=op_name,
+                        val=object_creation_utils._OTEL_PLACEHOLDER_OP_VAL,
+                        wb_user_id=req.wb_user_id,
+                    )
+                    for op_name in new_ops
+                ]
+            )
             with self._inserted_ops_lock:
-                self._inserted_ops.update(
-                    (req.project_id, name) for name in new_ops
-                )
+                self._inserted_ops.update((req.project_id, name) for name in new_ops)
 
         # Construct all ref URIs deterministically — no CH read needed
         for op_name, idxs in obj_id_idx_map.items():
@@ -1682,8 +1682,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Skips version numbering in exchange for a large performance gain (no CH reads).
         Used by OTel ingest. If a real op with the same object_id already exists,
         the placeholder will be inserted as an additional version and may become
-        ``is_latest``. This is acceptable because call display and filtering are
-        digest-agnostic.
+        is_latest. This is acceptable because this case is very rare, and call
+        display/filtering can be digest-agnostic.
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
