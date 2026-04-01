@@ -32,15 +32,13 @@ def lint(session: nox.Session):
 
     if ruff_only:
         # Run only ruff checks on all files
+        session.run("prek", "run", "--hook-stage=pre-push", "ruff-check", "--all-files")
         session.run(
-            "pre-commit", "run", "--hook-stage=pre-push", "ruff-check", "--all-files"
-        )
-        session.run(
-            "pre-commit", "run", "--hook-stage=pre-push", "ruff-format", "--all-files"
+            "prek", "run", "--hook-stage=pre-push", "ruff-format", "--all-files"
         )
     elif dry_run:
         session.run(
-            "pre-commit",
+            "prek",
             "run",
             "--hook-stage",
             "pre-push",
@@ -49,10 +47,10 @@ def lint(session: nox.Session):
         )
     elif all_files:
         # Allow running on all files if explicitly requested
-        session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
+        session.run("prek", "run", "--hook-stage=pre-push", "--all-files")
     else:
         # Default: run only on staged files for faster execution
-        session.run("pre-commit", "run", "--hook-stage=pre-push")
+        session.run("prek", "run", "--hook-stage=pre-push")
 
 
 # Shards that don't have corresponding optional dependencies in pyproject.toml

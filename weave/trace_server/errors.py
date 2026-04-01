@@ -408,6 +408,10 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "Example: filtering calls by inputs.integer_value = 1 without using $convert -> "
             "Correct: {$expr: {$eq: [{$convert: {input: {$getField: 'inputs.integer_value'}, to: 'double'}}, {$literal: 1}]}}"
         ) from e
+    if "TYPE_MISMATCH" in error_str:
+        raise InvalidRequest(
+            "Cannot execute query due to a type mismatch. " + error_str
+        ) from e
     if "BAD_QUERY_PARAMETER" in error_str:
         raise BadQueryParameterError(
             "Bad query parameter. "

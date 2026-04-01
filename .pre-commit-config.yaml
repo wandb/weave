@@ -1,15 +1,7 @@
 default_stages: [pre-push]
 
 repos:
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.21.2
-    hooks:
-      - id: pyupgrade
-        args: ["--py310-plus"]
-  - repo: https://github.com/Instagram/Fixit
-    rev: v2.2.1
-    hooks:
-      - id: fixit-fix
+  # Priority 0: Type checkers (slowest — start immediately, run in parallel)
   - repo: local
     hooks:
       - id: ty
@@ -18,23 +10,7 @@ repos:
         language: python
         always_run: true
         pass_filenames: false
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.5
-    hooks:
-      # Run the linter.
-      - id: ruff-check
-        types_or: [python, pyi, jupyter]
-        args: [--fix, --exit-non-zero-on-fix, --config=pyproject.toml]
-        exclude: ".github/scripts/validate_docs_coverage.py"
-        always_run: true
-        pass_filenames: false
-      # Run the formatter.
-      - id: ruff-format
-        args: [--config=pyproject.toml]
-        types_or: [python, pyi, jupyter]
-        exclude: ".github/scripts/validate_docs_coverage.py"
-        always_run: true
-        pass_filenames: false
+        priority: 0
   - repo: https://github.com/RobertCraigie/pyright-python
     rev: v1.1.387
     hooks:
@@ -43,6 +19,7 @@ repos:
         exclude: ".github/scripts/validate_docs_coverage.py"
         always_run: true
         pass_filenames: false
+        priority: 0
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: "v1.19.1"
     hooks:
@@ -54,32 +31,41 @@ repos:
         exclude: (.*pyi$)|(tests)|(examples)|(.github/scripts/validate_docs_coverage.py)
         always_run: true
         pass_filenames: false
+        priority: 0
+
+  # Priority 0: Read-only checks (fast, run alongside type checkers)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-added-large-files
       - id: check-added-large-files
         args: ["--maxkb=2048"]
+        priority: 0
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-json
       - id: check-json
         exclude: (.*pyi$)|(tests)|(examples)
+        priority: 0
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-yaml
       - id: check-yaml
+        priority: 0
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#detect-private-key
       - id: detect-private-key
-      # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#debug-statements
-      - id: debug-statements
+        priority: 0
   - repo: https://github.com/crate-ci/typos
     rev: v1.44.0
     hooks:
       - id: typos
         # Excluding extra things to make initial reviews easier, starting with `examples``
         exclude: "(cassettes|examples|tests|tools)"
+        priority: 0
+
+  # Priority 0: Asset-modifying hooks (non-Python files, no conflict with type checkers)
   - repo: https://github.com/oxipng/oxipng
     rev: v10.1.0
     hooks:
       - id: oxipng
         args: ["-o", "4", "--strip", "safe", "--alpha"]
+        priority: 0
   - repo: local
     hooks:
       - id: jupyter-nb-clear-output
@@ -87,8 +73,37 @@ repos:
         files: ^examples/.*\.ipynb$
         language: system
         entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace
+        priority: 0
       - id: strip-exif
         name: Strip EXIF data
         entry: uv run scripts/strip_exif.py
         language: python
         types: [image]
+        priority: 0
+
+  # Priority 1: Code modernization (modify Python files)
+  - repo: https://github.com/Instagram/Fixit
+    rev: v2.2.1
+    hooks:
+      - id: fixit-fix
+        priority: 1
+
+  # Priority 2: Linting with auto-fix (must run before formatter)
+  # Priority 3: Formatting (runs after linting fixes)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.5
+    hooks:
+      - id: ruff-check
+        types_or: [python, pyi, jupyter]
+        args: [--fix, --exit-non-zero-on-fix, --config=pyproject.toml]
+        exclude: ".github/scripts/validate_docs_coverage.py"
+        always_run: true
+        pass_filenames: false
+        priority: 2
+      - id: ruff-format
+        args: [--config=pyproject.toml]
+        types_or: [python, pyi, jupyter]
+        exclude: ".github/scripts/validate_docs_coverage.py"
+        always_run: true
+        pass_filenames: false
+        priority: 3

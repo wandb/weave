@@ -381,15 +381,14 @@ def resolve_eval_row_refs(
 
 @_trace_wrap("eval_results_helpers.eval_results_grouped_rows")
 def eval_results_grouped_rows(
-    server: tsi.TraceServerInterface,
     req: tsi.EvalResultsQueryReq,
     eval_root_ids: list[str],
     all_calls: list[tsi.CallSchema],
-) -> tuple[list[tsi.EvalResultsRow], int, list[str]]:
-    """Build grouped eval rows before pagination. Performs DB access via server."""
+) -> tuple[list[tsi.EvalResultsRow], int]:
+    """Build grouped eval rows before pagination."""
     predict_and_score_calls = filter_predict_and_score_calls(all_calls, eval_root_ids)
     if not predict_and_score_calls:
-        return [], 0, []
+        return [], 0
 
     predict_and_score_calls_set = {call.id for call in predict_and_score_calls}
     child_calls = [c for c in all_calls if c.parent_id in predict_and_score_calls_set]
@@ -399,11 +398,7 @@ def eval_results_grouped_rows(
         predict_and_score_calls, child_by_parent, req.include_raw_data_rows
     )
 
-    warnings: list[str] = []
-    if req.include_raw_data_rows and req.resolve_row_refs:
-        warnings = resolve_eval_row_refs(server, list(row_map.values()), req.project_id)
-
-    rows, total = finalize_rows(
+    return finalize_rows(
         row_map,
         row_eval_map,
         eval_root_ids,
@@ -411,7 +406,6 @@ def eval_results_grouped_rows(
         req.offset,
         req.limit,
     )
-    return rows, total, warnings
 
 
 @_trace_wrap("eval_results_helpers.fetch_eval_root_metadata")
@@ -445,19 +439,18 @@ def eval_results_query(
         evaluation_run_ids=req.evaluation_run_ids,
         require_intersection=False,
         include_raw_data_rows=req.include_raw_data_rows if req.include_rows else False,
-        resolve_row_refs=req.resolve_row_refs if req.include_rows else False,
+        resolve_row_refs=False,  # ref resolution happens after pagination slice
         include_rows=True,
         include_summary=False,
         summary_require_intersection=None,
         limit=None,
         offset=0,
     )
-    all_rows, _, warnings = eval_results_grouped_rows(
-        server, all_rows_req, eval_root_ids, all_calls
-    )
+    all_rows, _ = eval_results_grouped_rows(all_rows_req, eval_root_ids, all_calls)
 
     rows: list[tsi.EvalResultsRow] = []
     total_rows = 0
+    warnings: list[str] = []
     if req.include_rows:
         rows, total_rows = apply_row_selection(
             all_rows,
@@ -466,6 +459,8 @@ def eval_results_query(
             req.offset,
             req.limit,
         )
+        if req.include_raw_data_rows and req.resolve_row_refs:
+            warnings = resolve_eval_row_refs(server, rows, req.project_id)
 
     summary: tsi.EvalResultsSummaryRes | None = None
     if req.include_summary:

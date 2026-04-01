@@ -549,7 +549,7 @@ def test_query_with_simple_feedback_filter() -> None:
 
 
 def test_query_with_wildcard_feedback_filter() -> None:
-    """Test that wildcard feedback filter uses groupArray instead of any()."""
+    """Test that wildcard feedback filter uses anyIf to pick a non-empty value."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_condition(
@@ -582,8 +582,9 @@ def test_query_with_wildcard_feedback_filter() -> None:
             (calls_merged.project_id,
             calls_merged.id)
         HAVING
-            (((arrayStringConcat(groupArray(coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
-            {pb_0:String}), 'null'), '')), ', ') = {pb_1:String}))
+            (((anyIf(coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_0:String}), 'null'), ''), coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_0:String}), 'null'), '') != '') = {pb_1:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                     AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
@@ -596,7 +597,7 @@ def test_query_with_wildcard_feedback_filter() -> None:
 
 
 def test_query_with_wildcard_feedback_filter_no_extra_path() -> None:
-    """Test wildcard feedback filter without extra path uses groupArray directly."""
+    """Test wildcard feedback filter without extra path uses any() directly."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_condition(
@@ -629,7 +630,7 @@ def test_query_with_wildcard_feedback_filter_no_extra_path() -> None:
             (calls_merged.project_id,
             calls_merged.id)
         HAVING
-            (((arrayStringConcat(groupArray(feedback.runnable_ref), ', ') = {pb_0:String}))
+            (((any(feedback.runnable_ref) = {pb_0:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                     AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
