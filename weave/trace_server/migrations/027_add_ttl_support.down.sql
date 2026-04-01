@@ -71,7 +71,7 @@ ALTER TABLE calls_merged_stats DROP COLUMN IF EXISTS expire_at;
 ALTER TABLE calls_complete_stats DROP COLUMN IF EXISTS expire_at;
 ALTER TABLE calls_complete_stats DROP COLUMN IF EXISTS source;
 
--- Step 5: Revert calls_merged_view to migration 020 state (without expire_at)
+-- Step 5: Revert calls_merged_view (remove expire_at)
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
         id,
@@ -107,11 +107,10 @@ ALTER TABLE calls_merged DROP COLUMN expire_at;
 -- Step 7: Drop expire_at column from call_parts
 ALTER TABLE call_parts DROP COLUMN expire_at;
 
--- Step 8: Rename expire_at back to ttl_at on calls_complete (restore migration 024 state)
+-- Step 8: Rename expire_at back to ttl_at on calls_complete
 ALTER TABLE calls_complete RENAME COLUMN expire_at TO ttl_at;
 
--- Step 8b: Explicitly restore TTL expression to reference the original column name.
--- RENAME COLUMN may not update TTL expressions on all ClickHouse versions.
+-- Step 8b: Re-apply TTL expression after column rename.
 ALTER TABLE calls_complete MODIFY TTL toDateTime(ttl_at) DELETE;
 
 -- Step 9: Drop project_ttl_settings table

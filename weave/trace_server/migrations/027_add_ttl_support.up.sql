@@ -18,19 +18,18 @@ SETTINGS
     enable_block_number_column = 1,
     enable_block_offset_column = 1;
 
--- Step 1b: Rename existing ttl_at column on calls_complete (created by migration 024) to expire_at
+-- Step 1b: Rename ttl_at to expire_at on calls_complete
 ALTER TABLE calls_complete RENAME COLUMN ttl_at TO expire_at;
 
--- Step 1c: Explicitly update the TTL expression on calls_complete to reference the renamed column.
--- RENAME COLUMN may not update TTL expressions on all ClickHouse versions.
--- toDateTime() wrapper ensures compatibility with CH < 25.6 (PR #80710).
+-- Step 1c: Re-apply TTL expression after column rename.
+-- toDateTime() wrapper required for CH < 25.6 compatibility (PR #80710).
 ALTER TABLE calls_complete MODIFY TTL toDateTime(expire_at) DELETE;
 
--- Step 2: Add expire_at to call_parts (v1 raw storage)
+-- Step 2: Add expire_at to call_parts
 ALTER TABLE call_parts
     ADD COLUMN expire_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
--- Step 3: Add expire_at to calls_merged (v1 aggregated table)
+-- Step 3: Add expire_at to calls_merged
 ALTER TABLE calls_merged
     ADD COLUMN expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
@@ -67,10 +66,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         id;
 
 -- Step 5: Enable TTL deletion on call_parts and calls_merged.
--- toDateTime() wrapper required: ClickHouse < 25.6 rejects DateTime64 and
--- SimpleAggregateFunction columns in TTL expressions with error 450
--- (BAD_TTL_EXPRESSION). toDateTime() casts to plain DateTime which all
--- versions accept. See: https://github.com/ClickHouse/ClickHouse/pull/80710
+-- toDateTime() wrapper required for CH < 25.6 compatibility (PR #80710).
 ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE;
 ALTER TABLE calls_merged MODIFY TTL toDateTime(expire_at) DELETE;
 
@@ -85,8 +81,7 @@ ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
--- IMPORTANT: `calls_complete` has had `source` since v2, but `calls_complete_stats` missed the matching aggregate column.
--- Fix it here so existing deployments pick it up during this upgrade, then populate it from `calls_complete.source` below.
+-- Add missing source column to calls_complete_stats (was present on calls_complete but not propagated here).
 ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS source SimpleAggregateFunction(any, Enum8('direct' = 1, 'dual' = 2, 'migration' = 3))
     DEFAULT 'direct';
