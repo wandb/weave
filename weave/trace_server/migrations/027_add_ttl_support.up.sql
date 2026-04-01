@@ -66,25 +66,21 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     GROUP BY project_id,
         id;
 
--- Step 5: Enable TTL deletion on call_parts.
--- toDateTime() wrapper required: expire_at is DateTime64(3) which is rejected by
--- ClickHouse < 25.6 with error 450 (BAD_TTL_EXPRESSION). Only plain DateTime/Date
--- are accepted natively; toDateTime() casts DateTime64 -> DateTime.
--- See: https://github.com/ClickHouse/ClickHouse/pull/80710
---
--- Note: calls_merged, calls_merged_stats, and calls_complete_stats use
--- SimpleAggregateFunction(min, DateTime64(3)) for expire_at. MODIFY TTL
--- cannot be used on SimpleAggregateFunction columns. Aggregated tables
--- retain data independently of source table TTL deletion and will need
--- separate cleanup (future work).
+-- Step 5: Enable TTL deletion on call_parts and calls_merged.
+-- toDateTime() wrapper required: ClickHouse < 25.6 rejects DateTime64 and
+-- SimpleAggregateFunction columns in TTL expressions with error 450
+-- (BAD_TTL_EXPRESSION). toDateTime() casts to plain DateTime which all
+-- versions accept. See: https://github.com/ClickHouse/ClickHouse/pull/80710
 ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE;
+ALTER TABLE calls_merged MODIFY TTL toDateTime(expire_at) DELETE;
 
--- Step 6: Add expire_at column to calls_merged_stats
+-- Step 6: Add expire_at column and TTL to calls_merged_stats
 ALTER TABLE calls_merged_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
+ALTER TABLE calls_merged_stats MODIFY TTL toDateTime(expire_at) DELETE;
 
--- Step 7: Add expire_at column to calls_complete_stats
+-- Step 7: Add expire_at column and TTL to calls_complete_stats
 ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
@@ -94,6 +90,7 @@ ALTER TABLE calls_complete_stats
 ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS source SimpleAggregateFunction(any, Enum8('direct' = 1, 'dual' = 2, 'migration' = 3))
     DEFAULT 'direct';
+ALTER TABLE calls_complete_stats MODIFY TTL toDateTime(expire_at) DELETE;
 
 -- Step 8: Update calls_merged_stats_view to propagate expire_at
 ALTER TABLE calls_merged_stats_view MODIFY QUERY

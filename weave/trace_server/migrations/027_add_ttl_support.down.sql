@@ -1,7 +1,10 @@
 -- Rollback Migration 027: Remove TTL support
 
--- Step 1: Remove TTL clauses
+-- Step 1: Remove TTL clauses from all tables that had MODIFY TTL in the up migration
 ALTER TABLE call_parts REMOVE TTL;
+ALTER TABLE calls_merged REMOVE TTL;
+ALTER TABLE calls_merged_stats REMOVE TTL;
+ALTER TABLE calls_complete_stats REMOVE TTL;
 
 -- Step 2: Revert calls_merged_stats_view (without expire_at)
 ALTER TABLE calls_merged_stats_view MODIFY QUERY
