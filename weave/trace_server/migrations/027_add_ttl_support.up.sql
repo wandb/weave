@@ -61,20 +61,19 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     GROUP BY project_id,
         id;
 
--- Step 5: Enable TTL deletion on calls_merged
-ALTER TABLE calls_merged MODIFY TTL expire_at DELETE;
-
--- Step 6: Enable TTL deletion on call_parts
+-- Step 5: Enable TTL deletion on call_parts (plain DateTime64 column, safe for all MergeTree variants)
+-- calls_complete already has TTL from migration 024 - RENAME COLUMN (Step 1b) updates the expression.
+-- calls_merged/calls_merged_stats/calls_complete_stats use AggregatingMergeTree with
+-- SimpleAggregateFunction(min, DateTime64(3)) for expire_at. MODIFY TTL is not safe on
+-- SimpleAggregateFunction columns. These tables are cleaned up via query-time filtering.
 ALTER TABLE call_parts MODIFY TTL expire_at DELETE;
 
--- Step 7: Add expire_at column and TTL to calls_merged_stats
+-- Step 6: Add expire_at column to calls_merged_stats (for query-time filtering, no table-level TTL)
 ALTER TABLE calls_merged_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
-ALTER TABLE calls_merged_stats MODIFY TTL expire_at DELETE;
-
--- Step 8: Add expire_at column and TTL to calls_complete_stats
+-- Step 7: Add expire_at column to calls_complete_stats (for query-time filtering, no table-level TTL)
 ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
@@ -85,9 +84,7 @@ ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS source SimpleAggregateFunction(any, Enum8('direct' = 1, 'dual' = 2, 'migration' = 3))
     DEFAULT 'direct';
 
-ALTER TABLE calls_complete_stats MODIFY TTL expire_at DELETE;
-
--- Step 9: Update calls_merged_stats_view to propagate expire_at
+-- Step 8: Update calls_merged_stats_view to propagate expire_at
 ALTER TABLE calls_merged_stats_view MODIFY QUERY
 SELECT
     call_parts.project_id,
@@ -118,7 +115,7 @@ GROUP BY
     call_parts.project_id,
     call_parts.id;
 
--- Step 10: Update calls_complete_stats_view to propagate expire_at
+-- Step 9: Update calls_complete_stats_view to propagate expire_at
 ALTER TABLE calls_complete_stats_view MODIFY QUERY
 SELECT
     calls_complete.project_id,

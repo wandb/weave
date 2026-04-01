@@ -1,10 +1,7 @@
 -- Rollback Migration 027: Remove TTL support
 
--- Step 1: Remove TTL clauses
-ALTER TABLE calls_merged REMOVE TTL;
+-- Step 1: Remove TTL clause from call_parts (the only table with MODIFY TTL in the up migration)
 ALTER TABLE call_parts REMOVE TTL;
-ALTER TABLE calls_merged_stats REMOVE TTL;
-ALTER TABLE calls_complete_stats REMOVE TTL;
 
 -- Step 2: Revert calls_merged_stats_view (without expire_at)
 ALTER TABLE calls_merged_stats_view MODIFY QUERY
@@ -36,7 +33,7 @@ GROUP BY
     call_parts.project_id,
     call_parts.id;
 
--- Step 3: Revert calls_complete_stats_view (without expire_at)
+-- Step 3: Revert calls_complete_stats_view (without expire_at or source)
 ALTER TABLE calls_complete_stats_view MODIFY QUERY
 SELECT
     calls_complete.project_id,
@@ -66,9 +63,10 @@ GROUP BY
     calls_complete.project_id,
     calls_complete.id;
 
--- Step 4: Drop expire_at from stats tables
+-- Step 4: Drop expire_at and source from stats tables
 ALTER TABLE calls_merged_stats DROP COLUMN IF EXISTS expire_at;
 ALTER TABLE calls_complete_stats DROP COLUMN IF EXISTS expire_at;
+ALTER TABLE calls_complete_stats DROP COLUMN IF EXISTS source;
 
 -- Step 5: Revert calls_merged_view to migration 020 state (without expire_at)
 ALTER TABLE calls_merged_view MODIFY QUERY
@@ -100,14 +98,14 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     GROUP BY project_id,
         id;
 
--- Step 3: Drop expire_at column from calls_merged
+-- Step 6: Drop expire_at column from calls_merged
 ALTER TABLE calls_merged DROP COLUMN expire_at;
 
--- Step 4: Drop expire_at column from call_parts
+-- Step 7: Drop expire_at column from call_parts
 ALTER TABLE call_parts DROP COLUMN expire_at;
 
--- Step 5: Rename expire_at back to ttl_at on calls_complete (restore migration 024 state)
+-- Step 8: Rename expire_at back to ttl_at on calls_complete (restore migration 024 state)
 ALTER TABLE calls_complete RENAME COLUMN expire_at TO ttl_at;
 
--- Step 6: Drop project_ttl_settings table
+-- Step 9: Drop project_ttl_settings table
 DROP TABLE IF EXISTS project_ttl_settings;
