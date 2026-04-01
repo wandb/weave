@@ -196,8 +196,7 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
             # Consume the generator to trigger the make_accumulator call
-            res = await do_test()
-            l = [item async for item in res]
+            _ = [item async for item in await do_test()]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -270,8 +269,7 @@ async def test_resilience_to_accumulator_accumulation_errors_async(
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
-            res = await do_test()
-            l = [item async for item in res]
+            _ = [item async for item in await do_test()]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -359,8 +357,7 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
             # Consume the generator
-            gen = await do_test()
-            _ = [i async for i in gen]
+            _ = [i async for i in await do_test()]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -455,8 +452,7 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
             # Consume the generator to trigger the make_accumulator call
-            res = await do_test()
-            l = [item async for item in res]
+            _ = [item async for item in await do_test()]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -504,13 +500,11 @@ async def test_resilience_to_accumulator_internal_errors_async(client):
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
-            res = await do_test()
-            l = [item async for item in res]
+            _ = [item async for item in await do_test()]
 
     with raise_on_captured_errors(False):
         with pytest.raises(DummyTestException):
-            res = await do_test()
-            l = [item async for item in res]
+            _ = [item async for item in await do_test()]
 
 
 # =============================================================================

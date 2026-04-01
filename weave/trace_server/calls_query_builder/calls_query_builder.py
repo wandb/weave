@@ -35,6 +35,8 @@ from typing_extensions import Self
 
 from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    split_exact_and_wildcard_values,
+    wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import ch_sentinel_values
 from weave.trace_server import trace_server_interface as tsi
@@ -343,10 +345,15 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         """
         inner = super().as_sql(pb, "feedback")
         if self.feedback_type == "*":
-            # If we are aggregating (calls_merged) use any, non-aggregate uses directly
             res = inner
             if use_agg_fn:
-                res = f"any({inner})"
+                # Pick any non-empty value from across all feedback rows.
+                if self.extra_path:
+                    extracted = json_dump_field_as_sql(
+                        pb, "feedback", inner, self.extra_path, cast
+                    )
+                    return f"anyIf({extracted}, {extracted} != '')"
+                return f"any({inner})"
         else:
             param_name = pb.add_param(self.feedback_type)
             if use_agg_fn:
@@ -505,6 +512,7 @@ class WhereFilters(BaseModel):
     parent_ids: str = ""
     op_name: str = ""
     trace_id: str = ""
+    children_of_eval_ids: str = ""
     thread_id: str = ""
     turn_id: str = ""
     heavy_filter: str = ""
@@ -525,6 +533,7 @@ class WhereFilters(BaseModel):
             self.parent_ids,
             self.op_name,
             self.trace_id,
+            self.children_of_eval_ids,
             self.thread_id,
             self.turn_id,
             self.heavy_filter,
@@ -768,6 +777,7 @@ class Condition(BaseModel):
 
 
 class HardCodedFilter(BaseModel):
+    # serves as a sql-generation utility for CallsFilter, and should stay in sync with the CallsFilter class.
     filter: tsi.CallsFilter
 
     def is_useful(self) -> bool:
@@ -824,6 +834,7 @@ class CallsQuery(BaseModel):
     include_storage_size: bool = False
     include_total_storage_size: bool = False
     read_table: ReadTable = ReadTable.CALLS_MERGED
+    eval_root_ids: list[str] | None = None
 
     @property
     def use_agg_fn(self) -> bool:
@@ -1264,6 +1275,9 @@ class CallsQuery(BaseModel):
         trace_id = process_trace_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias
         )
+        children_of_eval_ids = process_children_of_eval_ids_to_sql(
+            self.eval_root_ids, pb, table_alias, self.project_id, self.read_table
+        )
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
         )
@@ -1319,6 +1333,7 @@ class CallsQuery(BaseModel):
             id_subquery=id_subquery,
             op_name=op_name,
             trace_id=trace_id,
+            children_of_eval_ids=children_of_eval_ids,
             thread_id=thread_id,
             turn_id=turn_id,
             wb_run_id=wb_run_id,
@@ -2230,6 +2245,57 @@ def process_trace_id_filter_to_sql(
     return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
 
 
+def process_children_of_eval_ids_to_sql(
+    eval_root_ids: list[str] | None,
+    param_builder: ParamBuilder,
+    table_alias: str,
+    project_id: str = "",
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
+) -> str:
+    """Fetch direct children of eval root IDs and their children for the eval results dataset."""
+    if not eval_root_ids:
+        return ""
+    assert_parameter_length_less_than_max("eval_root_ids", len(eval_root_ids))
+
+    parent_id_field = get_field_by_name("parent_id")
+    if not isinstance(parent_id_field, CallsMergedAggField):
+        raise TypeError("parent_id is not an aggregate field")
+    parent_id_field_sql = parent_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    eval_root_ids_param = param_slot(
+        param_builder.add_param(eval_root_ids), "Array(String)"
+    )
+
+    # we generate a nested CallsQuery to find all instances of the PredictandScore calls
+    # that are children of the eval root IDs. this is then used as a WHERE clause
+    # in the outer query to return both the PredictandScore calls and their children (scorers/predict calls).
+    eval_root_children_cq = CallsQuery(project_id=project_id, read_table=read_table)
+    eval_root_children_cq.add_field("id")
+    eval_root_children_cq.set_hardcoded_filter(
+        HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
+    )
+    eval_root_children_subquery = eval_root_children_cq.as_sql(param_builder)
+
+    # for the calls-merged table, each call is stored as split start/end rows.
+    # end-rows have parent_id as NULL, so we need to do this.
+    parent_id_conditions = (
+        f"{parent_id_field_sql} IN {eval_root_ids_param}"
+        f" OR {parent_id_field_sql} IN ({eval_root_children_subquery})"
+    )
+    if read_table == ReadTable.CALLS_MERGED:
+        parent_null = parent_id_field.null_check_sql(
+            param_builder, table_alias, read_table, use_agg_fn=False
+        )
+        parent_id_conditions += f" OR {parent_null}"
+
+    return (
+        f" AND ({parent_id_conditions})"
+        f" AND {table_alias}.id NOT IN {eval_root_ids_param}"
+    )
+
+
 def process_thread_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
@@ -2378,8 +2444,10 @@ def process_ref_filters_to_sql(
             raise TypeError(f"{field_name} is not an aggregate field")
 
         field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
-        param = param_builder.add_param(refs)
-        ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
+        ref_filter_sql = combine_conditions(
+            _build_clickhouse_ref_match_conditions(refs, field_sql, param_builder),
+            "OR",
+        )
         return f"{ref_filter_sql} OR length({field_sql}) = 0"
 
     ref_filters = []
@@ -2502,14 +2570,26 @@ def process_calls_filter_to_conditions(
     # the output_refs, so lets keep both for clarity
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
+        input_refs_sql = get_field_sql("input_refs")
         conditions.append(
-            f"hasAny({get_field_sql('input_refs')}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+            combine_conditions(
+                _build_clickhouse_ref_match_conditions(
+                    filter.input_refs, input_refs_sql, param_builder
+                ),
+                "OR",
+            )
         )
 
     if filter.output_refs:
         assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
+        output_refs_sql = get_field_sql("output_refs")
         conditions.append(
-            f"hasAny({get_field_sql('output_refs')}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+            combine_conditions(
+                _build_clickhouse_ref_match_conditions(
+                    filter.output_refs, output_refs_sql, param_builder
+                ),
+                "OR",
+            )
         )
 
     if filter.parent_ids:
@@ -2547,6 +2627,23 @@ def process_calls_filter_to_conditions(
         )
 
     return conditions
+
+
+def _build_clickhouse_ref_match_conditions(
+    refs: list[str], field_sql: str, param_builder: ParamBuilder
+) -> list[str]:
+    exact_refs, wildcard_refs = split_exact_and_wildcard_values(refs)
+    or_conditions: list[str] = []
+    if exact_refs:
+        or_conditions.append(
+            f"hasAny({field_sql}, {param_slot(param_builder.add_param(exact_refs), 'Array(String)')})"
+        )
+    for ref in wildcard_refs:
+        ref_prefix = wildcard_version_value_to_ref_prefix(ref)
+        or_conditions.append(
+            f"arrayExists(x -> startsWith(x, {param_slot(param_builder.add_param(ref_prefix), 'String')}), {field_sql})"
+        )
+    return or_conditions
 
 
 ######### STATS QUERY HANDLING ##########

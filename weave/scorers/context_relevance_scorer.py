@@ -10,6 +10,7 @@ from weave.scorers.scorer_types import HuggingFaceScorer
 from weave.scorers.utils import load_local_model_weights
 
 CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.55
+DEFAULT_MODEL_MAX_LENGTH = 1280
 
 
 class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
@@ -66,7 +67,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         default=False,
         description="Whether to return all spans.",
     )
-    model_max_length: int = 1280
+    model_max_length: int = DEFAULT_MODEL_MAX_LENGTH
 
     def load_model(self) -> None:
         from transformers import AutoModelForTokenClassification

@@ -14,11 +14,13 @@ from weave.trace_server.trace_server_interface import FileCreateReq, FileCreateR
 K = TypeVar("K")  # Key type
 V = TypeVar("V")  # Value type
 
+DEFAULT_FILE_CACHE_SIZE = 1000
+
 
 class ThreadSafeLRUCache(Generic[K, V]):
     """Thread-safe LRU cache implementation using OrderedDict."""
 
-    def __init__(self, max_size: int = 1000) -> None:
+    def __init__(self, max_size: int = DEFAULT_FILE_CACHE_SIZE) -> None:
         """Initialize an LRU cache with a maximum size.
 
         Args:
@@ -113,7 +115,7 @@ class ThreadSafeLRUCache(Generic[K, V]):
 class WeaveClientSendFileCache:
     """Cache for file create requests and responses with LRU eviction policy."""
 
-    def __init__(self, max_size: int = 1000) -> None:
+    def __init__(self, max_size: int = DEFAULT_FILE_CACHE_SIZE) -> None:
         """Initialize the file cache with a maximum size.
 
         Args:

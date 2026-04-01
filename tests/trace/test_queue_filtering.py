@@ -42,7 +42,7 @@ def test_filter_calls_by_queue_inner_join_behavior(client):
 
     # Create queue and add only calls 2-6 (5 calls out of 10)
     create_req = tsi.AnnotationQueueCreateReq(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         name="Test Queue",
         description="Test queue filtering",
         scorer_refs=["weave:///entity/project/scorer/test:abc123"],
@@ -52,7 +52,7 @@ def test_filter_calls_by_queue_inner_join_behavior(client):
     queue_id = queue_res.id
 
     add_req = tsi.AnnotationQueueAddCallsReq(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         queue_id=queue_id,
         call_ids=call_ids[2:7],
         display_fields=["input.x", "output"],
@@ -73,7 +73,7 @@ def test_filter_calls_by_queue_inner_join_behavior(client):
     )
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id(), query=query)
+        tsi.CallsQueryReq(project_id=client.project_id, query=query)
     )
 
     # Should return exactly the 5 calls we added
@@ -110,7 +110,7 @@ def test_filter_calls_by_multiple_distinct_queues(client):
     # Create two queues with non-overlapping calls
     queue1_res = client.server.annotation_queue_create(
         tsi.AnnotationQueueCreateReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             name="Queue 1",
             scorer_refs=["weave:///entity/project/scorer/test:abc"],
             wb_user_id="test_user",
@@ -118,7 +118,7 @@ def test_filter_calls_by_multiple_distinct_queues(client):
     )
     queue2_res = client.server.annotation_queue_create(
         tsi.AnnotationQueueCreateReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             name="Queue 2",
             scorer_refs=["weave:///entity/project/scorer/test:def"],
             wb_user_id="test_user",
@@ -128,7 +128,7 @@ def test_filter_calls_by_multiple_distinct_queues(client):
     # Add calls 0-2 to queue1, calls 3-5 to queue2
     client.server.annotation_queue_add_calls(
         tsi.AnnotationQueueAddCallsReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             queue_id=queue1_res.id,
             call_ids=call_ids[:3],
             display_fields=["input.x"],
@@ -137,7 +137,7 @@ def test_filter_calls_by_multiple_distinct_queues(client):
     )
     client.server.annotation_queue_add_calls(
         tsi.AnnotationQueueAddCallsReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             queue_id=queue2_res.id,
             call_ids=call_ids[3:],
             display_fields=["input.x"],
@@ -148,7 +148,7 @@ def test_filter_calls_by_multiple_distinct_queues(client):
     # Query queue1
     res1 = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             query=tsi.Query(
                 **{
                     "$expr": {
@@ -165,7 +165,7 @@ def test_filter_calls_by_multiple_distinct_queues(client):
     # Query queue2
     res2 = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             query=tsi.Query(
                 **{
                     "$expr": {
@@ -220,7 +220,7 @@ def test_filter_calls_by_queue_combined_with_other_filters(client):
     # Create queue with 2 calls from each op
     queue_res = client.server.annotation_queue_create(
         tsi.AnnotationQueueCreateReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             name="Mixed Queue",
             scorer_refs=["weave:///entity/project/scorer/test:xyz"],
             wb_user_id="test_user",
@@ -229,7 +229,7 @@ def test_filter_calls_by_queue_combined_with_other_filters(client):
 
     client.server.annotation_queue_add_calls(
         tsi.AnnotationQueueAddCallsReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             queue_id=queue_res.id,
             call_ids=include_ids[:2] + exclude_ids[:2],
             display_fields=["input.x"],
@@ -262,7 +262,7 @@ def test_filter_calls_by_queue_combined_with_other_filters(client):
     )
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id(), query=query)
+        tsi.CallsQueryReq(project_id=client.project_id, query=query)
     )
 
     # Should return only the 2 op_include calls in the queue
@@ -301,7 +301,7 @@ def test_filter_calls_by_nonexistent_queue(client):
     )
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id(), query=query)
+        tsi.CallsQueryReq(project_id=client.project_id, query=query)
     )
 
     # Should return no calls

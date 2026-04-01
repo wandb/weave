@@ -112,21 +112,14 @@ def init_weave(
             current_client.finish()
             weave_client_context.set_weave_client_global(None)
 
-    from weave.wandb_interface import (
-        context as wandb_context_module,  # type: ignore
-    )
+    from weave.wandb_interface.context import get_wandb_api_context
 
-    # Must init to read ensure we've read auth from the environment, in
-    # case we're on a new thread.
-    wandb_context_module.init()
-    wandb_context = wandb_context_module.get_wandb_api_context()
-    if wandb_context is None:
+    api_key = get_wandb_api_context()
+    if api_key is None:
         url = wandb.app_url(env.wandb_base_url())
         logger.info("Please login to Weights & Biases (%s) to continue...", url)
         wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
-
-        wandb_context_module.init()
-        wandb_context = wandb_context_module.get_wandb_api_context()
+        api_key = get_wandb_api_context()
 
     # Resolve entity name after authentication is ensured
     entity_name, project_name = get_entity_project_from_project_name(project_name)
@@ -134,10 +127,6 @@ def init_weave(
     if wb_run_context:
         wandb_run_id = f"{entity_name}/{project_name}/{wb_run_context.run_id}"
         check_wandb_run_matches(wandb_run_id, entity_name, project_name)
-
-    api_key = None
-    if wandb_context is not None and wandb_context.api_key is not None:
-        api_key = wandb_context.api_key
 
     remote_server = init_weave_get_server(api_key)
     if not _weave_is_available(remote_server):

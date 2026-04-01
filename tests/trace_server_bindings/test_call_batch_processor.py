@@ -206,7 +206,7 @@ def test_missing_trace_id_raises_value_error() -> None:
     end_item = _make_end_item("call-1")
 
     processor.enqueue([start_item])
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="missing trace_id"):
         processor.enqueue([end_item])
 
     with patch(

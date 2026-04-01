@@ -35,7 +35,7 @@ def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
                 rows=data,
-                project_id=client._project_id(),
+                project_id=client.project_id,
             ),
         )
     )
@@ -50,7 +50,7 @@ def test_table_query(client: WeaveClient):
 
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=digest,
         )
     )
@@ -69,7 +69,7 @@ def test_table_query_stream(client: WeaveClient):
 
     res = client.server.table_query_stream(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=digest,
         )
     )
@@ -91,7 +91,7 @@ def test_table_query_stream(client: WeaveClient):
 def test_table_query_invalid_digest(client: WeaveClient):
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest="invalid",
         )
     )
@@ -105,7 +105,7 @@ def test_table_query_filter_by_row_digests(client: WeaveClient):
     filtered_digests = row_digests[2:5]
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=digest,
             filter=tsi.TableRowFilter(row_digests=filtered_digests),
         )
@@ -123,7 +123,7 @@ def test_table_query_invalid_row_digest(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=digest,
             filter=tsi.TableRowFilter(row_digests=["invalid"]),
         )
@@ -137,7 +137,7 @@ def test_table_query_limit(client: WeaveClient):
 
     limit = 5
     res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=digest, limit=limit)
+        tsi.TableQueryReq(project_id=client.project_id, digest=digest, limit=limit)
     )
 
     result_vals = [r.val for r in res.rows]
@@ -155,7 +155,7 @@ def test_table_query_offset(client: WeaveClient):
 
     offset = 3
     res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=digest, offset=offset)
+        tsi.TableQueryReq(project_id=client.project_id, digest=digest, offset=offset)
     )
 
     result_vals = [r.val for r in res.rows]
@@ -173,7 +173,7 @@ def test_table_query_sort_by_column(client: WeaveClient):
 
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=digest,
             sort_by=[SortBy(field="id", direction="desc")],
         )
@@ -199,7 +199,7 @@ def test_table_query_sort_by_nested_column(client: WeaveClient):
 
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=digest,
             sort_by=[SortBy(field="nested_col.prop_a", direction="asc")],
         )
@@ -223,7 +223,7 @@ def test_table_query_combined(client: WeaveClient):
     offset = 2
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=digest,
             limit=limit,
             offset=offset,
@@ -249,7 +249,7 @@ def test_table_query_multiple_sort_criteria(client: WeaveClient):
 
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=digest,
             sort_by=[
                 SortBy(field="col_0", direction="asc"),
@@ -273,7 +273,7 @@ def test_table_query_stats(client: WeaveClient):
 
     stats_res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digests=[digest],
         )
     )
@@ -286,7 +286,7 @@ def test_table_query_stats_empty(client: WeaveClient):
 
     stats_res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digests=[digest],
         )
     )
@@ -299,7 +299,7 @@ def test_table_query_stats_missing(client: WeaveClient):
 
     stats_res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digests=["missing"],
         )
     )
@@ -317,7 +317,7 @@ def generate_duplication_simple_table_data(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
                 rows=data,
-                project_id=client._project_id(),
+                project_id=client.project_id,
             ),
         )
     )
@@ -335,13 +335,13 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     # Test res1 (copy_count=1)
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=res1["digest"],
         )
     )
     stats_res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digests=[res1["digest"]],
         )
     )
@@ -351,7 +351,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     # Test filtered query for res1
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=res1["digest"],
             filter=tsi.TableRowFilter(row_digests=[res1["row_digests"][0]]),
         )
@@ -362,13 +362,13 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     # Test res2 (copy_count=2)
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=res2["digest"],
         )
     )
     stats_res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digests=[res2["digest"]],
         )
     )
@@ -378,7 +378,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     # Test filtered query for res2
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=res2["digest"],
             filter=tsi.TableRowFilter(row_digests=[res2["row_digests"][0]]),
         )
@@ -389,13 +389,13 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     # Test res3 (copy_count=3)
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=res3["digest"],
         )
     )
     stats_res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digests=[res3["digest"]],
         )
     )
@@ -405,7 +405,7 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     # Test filtered query for res3
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=res3["digest"],
             filter=tsi.TableRowFilter(row_digests=[res3["row_digests"][0]]),
         )
@@ -421,7 +421,7 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
                 rows=data,
-                project_id=client._project_id(),
+                project_id=client.project_id,
             ),
         )
     )
@@ -431,7 +431,7 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
                 rows=data,
-                project_id=client._project_id(),
+                project_id=client.project_id,
             ),
         )
     )
@@ -443,7 +443,7 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
 
     res = client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=res1.digest,
             sort_by=[SortBy(field="val", direction="asc")],
         )
@@ -462,7 +462,7 @@ def test_table_query_stats_with_storage_size(client: WeaveClient):
 
     stats_res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digests=[digest],
             include_storage_size=True,
         )

@@ -8,7 +8,7 @@ def test_anonymous_op(client: weave_client.WeaveClient) -> str:
 
     call_res = client.server.calls_query(
         CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
     calls = call_res.calls
@@ -33,7 +33,7 @@ def test_anonymous_op_with_config(client: weave_client.WeaveClient) -> str:
 
     call_res = client.server.calls_query(
         CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
     calls = call_res.calls

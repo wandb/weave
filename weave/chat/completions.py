@@ -55,7 +55,7 @@ class Completions:
         max_tokens: int | None | NotGiven = NOT_GIVEN,
         n: int | None | NotGiven = NOT_GIVEN,
         presence_penalty: float | None | NotGiven = NOT_GIVEN,
-        stream: Literal[False] | Literal[True] | None | NotGiven = NOT_GIVEN,
+        stream: Literal[False, True] | None | NotGiven = NOT_GIVEN,
         stream_options: ChatCompletionStreamOptionsParam | None | NotGiven = NOT_GIVEN,
         temperature: float | None | NotGiven = NOT_GIVEN,
         top_p: float | None | NotGiven = NOT_GIVEN,
@@ -171,13 +171,8 @@ class Completions:
         self,
         **kwargs: Any,
     ) -> ChatCompletion | ChatCompletionChunkStream:
-        cur_ctx = get_wandb_api_context()
-        if not cur_ctx:
-            # I don't think this should happen.
-            raise ValueError("No context found")
-        api_key = cur_ctx.api_key
+        api_key = get_wandb_api_context()
         if not api_key:
-            # I don't think this should happen.
             raise ValueError("No API key found")
 
         messages = kwargs["messages"]
@@ -281,6 +276,6 @@ class Completions:
             d = d["response"]
         try:
             return ChatCompletion.model_validate(d)
-        except ValidationError as e:
+        except ValidationError:
             print(d)
-            raise e
+            raise
