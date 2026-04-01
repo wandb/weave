@@ -79,12 +79,12 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 -- separate cleanup (future work).
 ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE;
 
--- Step 6: Add expire_at column to calls_merged_stats (for query-time filtering, no table-level TTL)
+-- Step 6: Add expire_at column to calls_merged_stats
 ALTER TABLE calls_merged_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
--- Step 7: Add expire_at column to calls_complete_stats (for query-time filtering, no table-level TTL)
+-- Step 7: Add expire_at column to calls_complete_stats
 ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);

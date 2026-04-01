@@ -1,6 +1,6 @@
 -- Rollback Migration 027: Remove TTL support
 
--- Step 1: Remove TTL clause from call_parts (the only table with MODIFY TTL in the up migration)
+-- Step 1: Remove TTL clauses
 ALTER TABLE call_parts REMOVE TTL;
 
 -- Step 2: Revert calls_merged_stats_view (without expire_at)
@@ -107,7 +107,7 @@ ALTER TABLE call_parts DROP COLUMN expire_at;
 -- Step 8: Rename expire_at back to ttl_at on calls_complete (restore migration 024 state)
 ALTER TABLE calls_complete RENAME COLUMN expire_at TO ttl_at;
 
--- Step 8b: Explicitly restore TTL expression to reference ttl_at (mirrors up Step 1c).
+-- Step 8b: Explicitly restore TTL expression to reference the original column name.
 -- RENAME COLUMN may not update TTL expressions on all ClickHouse versions.
 ALTER TABLE calls_complete MODIFY TTL toDateTime(ttl_at) DELETE;
 
