@@ -71,9 +71,12 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 -- ClickHouse < 25.6 with error 450 (BAD_TTL_EXPRESSION). Only plain DateTime/Date
 -- are accepted natively; toDateTime() casts DateTime64 -> DateTime.
 -- See: https://github.com/ClickHouse/ClickHouse/pull/80710
--- calls_merged/calls_merged_stats/calls_complete_stats use AggregatingMergeTree with
--- SimpleAggregateFunction(min, DateTime64(3)) for expire_at — MODIFY TTL is not safe on
--- these column types. Those tables are cleaned up via query-time filtering.
+--
+-- Note: calls_merged, calls_merged_stats, and calls_complete_stats use
+-- SimpleAggregateFunction(min, DateTime64(3)) for expire_at. MODIFY TTL
+-- cannot be used on SimpleAggregateFunction columns. Aggregated tables
+-- retain data independently of source table TTL deletion and will need
+-- separate cleanup (future work).
 ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE;
 
 -- Step 6: Add expire_at column to calls_merged_stats (for query-time filtering, no table-level TTL)
