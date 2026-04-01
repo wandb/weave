@@ -250,6 +250,11 @@ CLICKHOUSE_SECURE_PORT = 8443
 # Max error messages to include in OTel export partial success responses
 MAX_OTEL_ERROR_MESSAGES = 20
 
+# OTel placeholder inserts are idempotent (RMT deduplicates), so we use a
+# tight flush timeout to avoid blocking the hot path.  In the future we could
+# go fully fire-and-forget with wait_for_async_insert=0.
+OTEL_ASYNC_INSERT_TIMEOUT_MS = 100
+
 # Cache size for ref expansion during call streaming
 REF_EXPANSION_CACHE_SIZE = 1000
 
@@ -1736,6 +1741,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "object_versions",
             data=ch_insert_batch,
             column_names=ALL_OBJ_INSERT_COLUMNS,
+            settings={
+                "async_insert_busy_timeout_max_ms": OTEL_ASYNC_INSERT_TIMEOUT_MS,
+            },
         )
 
         return obj_results
