@@ -98,7 +98,6 @@ def test_try_acquire_outcomes(initial_rows, verify_rows, expected, should_insert
         ch_client.insert.assert_not_called()
 
 
-
 # ---------------------------------------------------------------------------
 # Full lifecycle: context manager acquire → use → release
 # ---------------------------------------------------------------------------
