@@ -39,6 +39,7 @@ import {Call, CallState, InternalCall} from './call';
 import {CallRef} from './refs';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
+const DEFAULT_GET_CALLS_LIMIT = 1000;
 
 /**
  * Serialized representation of a file blob stored in the Weave content store.
@@ -76,7 +77,7 @@ export interface GetCallsOptions {
   expandColumns?: string[];
 }
 
-function isGetCallsOptions(
+function maybeIsGetCallsOptions(
   value: CallsFilter | GetCallsOptions | undefined
 ): value is GetCallsOptions {
   if (value == null) {
@@ -93,34 +94,6 @@ function isGetCallsOptions(
     'columns' in value ||
     'expandColumns' in value
   );
-}
-
-function normalizeGetCallsRequest(
-  filterOrOptions: CallsFilter | GetCallsOptions = {},
-  includeCosts: boolean = false,
-  limit: number = 1000
-): CallsQueryReq {
-  if (isGetCallsOptions(filterOrOptions)) {
-    return {
-      filter: filterOrOptions.filter,
-      query: filterOrOptions.query,
-      include_costs: filterOrOptions.includeCosts,
-      include_feedback: filterOrOptions.includeFeedback,
-      limit: filterOrOptions.limit ?? 1000,
-      offset: filterOrOptions.offset,
-      sort_by: filterOrOptions.sortBy,
-      columns: filterOrOptions.columns,
-      expand_columns: filterOrOptions.expandColumns,
-      project_id: '',
-    };
-  }
-
-  return {
-    filter: filterOrOptions,
-    include_costs: includeCosts,
-    limit,
-    project_id: '',
-  };
 }
 
 function generateTraceId(): string {
@@ -303,29 +276,49 @@ export class WeaveClient {
     callId: string,
     includeCosts: boolean = false
   ): Promise<Call> {
-    const calls = await this.getCalls({call_ids: [callId]}, includeCosts);
+    const calls = await this.getCalls({
+      filter: {call_ids: [callId]},
+      includeCosts,
+    });
     if (calls.length === 0) {
       throw new Error(`Call not found: ${callId}`);
     }
     return calls[0];
   }
+
+  private reconcileCallArgs(
+    options: GetCallsOptions | CallsFilter,
+    includeCosts?: boolean,
+    limit?: number
+  ): GetCallsOptions {
+    let reconciledCallArgs: GetCallsOptions;
+    if (maybeIsGetCallsOptions(options)) {
+      reconciledCallArgs = options;
+    } else {
+      reconciledCallArgs = {
+        filter: options,
+        includeCosts,
+        limit,
+      };
+    }
+
+    return reconciledCallArgs;
+  }
+
+  public async getCalls(options: GetCallsOptions): Promise<Call[]>;
   public async getCalls(
-    filter?: CallsFilter,
+    options: CallsFilter,
     includeCosts?: boolean,
     limit?: number
   ): Promise<Call[]>;
-  public async getCalls(options: GetCallsOptions): Promise<Call[]>;
   public async getCalls(
-    filterOrOptions: CallsFilter | GetCallsOptions = {},
-    includeCosts: boolean = false,
-    limit: number = 1000
+    options: GetCallsOptions | CallsFilter,
+    includeCosts?: boolean,
+    limit?: number
   ): Promise<Call[]> {
+    const callOpts = this.reconcileCallArgs(options, includeCosts, limit);
     const calls: Call[] = [];
-    const iterator = this.getCallsIteratorInternal(
-      filterOrOptions,
-      includeCosts,
-      limit
-    );
+    const iterator = this.getCallsIteratorInternal(callOpts);
     for await (const call of iterator) {
       const internalCall = new InternalCall();
       internalCall.updateWithCallSchemaData(call);
@@ -333,8 +326,9 @@ export class WeaveClient {
     }
     return calls;
   }
+
   public getCallsIterator(
-    filter?: CallsFilter,
+    options: CallsFilter,
     includeCosts?: boolean,
     limit?: number
   ): AsyncIterableIterator<CallSchema>;
@@ -342,20 +336,29 @@ export class WeaveClient {
     options: GetCallsOptions
   ): AsyncIterableIterator<CallSchema>;
   public getCallsIterator(
-    filterOrOptions: CallsFilter | GetCallsOptions = {},
-    includeCosts: boolean = false,
-    limit: number = 1000
+    options: GetCallsOptions | CallsFilter,
+    includeCosts?: boolean,
+    limit?: number
   ): AsyncIterableIterator<CallSchema> {
-    return this.getCallsIteratorInternal(filterOrOptions, includeCosts, limit);
+    const callOpts = this.reconcileCallArgs(options, includeCosts, limit);
+    return this.getCallsIteratorInternal(callOpts);
   }
 
   private async *getCallsIteratorInternal(
-    filterOrOptions: CallsFilter | GetCallsOptions = {},
-    includeCosts: boolean = false,
-    limit: number = 1000
+    options: GetCallsOptions = {}
   ): AsyncIterableIterator<CallSchema> {
-    const req = normalizeGetCallsRequest(filterOrOptions, includeCosts, limit);
-    req.project_id = this.projectId;
+    const req: CallsQueryReq = {
+      filter: options.filter,
+      query: options.query,
+      include_costs: options.includeCosts,
+      include_feedback: options.includeFeedback,
+      limit: options.limit ?? DEFAULT_GET_CALLS_LIMIT,
+      offset: options.offset,
+      sort_by: options.sortBy,
+      columns: options.columns,
+      expand_columns: options.expandColumns,
+      project_id: this.projectId,
+    };
 
     const resp =
       await this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost(req);
