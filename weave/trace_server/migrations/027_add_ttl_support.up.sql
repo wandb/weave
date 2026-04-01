@@ -21,6 +21,11 @@ SETTINGS
 -- Step 1b: Rename existing ttl_at column on calls_complete (created by migration 024) to expire_at
 ALTER TABLE calls_complete RENAME COLUMN ttl_at TO expire_at;
 
+-- Step 1c: Explicitly update the TTL expression on calls_complete to reference the renamed column.
+-- RENAME COLUMN may not update TTL expressions on all ClickHouse versions.
+-- toDateTime() wrapper ensures compatibility with CH < 25.6 (PR #80710).
+ALTER TABLE calls_complete MODIFY TTL toDateTime(expire_at) DELETE;
+
 -- Step 2: Add expire_at to call_parts (v1 raw storage)
 ALTER TABLE call_parts
     ADD COLUMN expire_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
@@ -61,12 +66,15 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     GROUP BY project_id,
         id;
 
--- Step 5: Enable TTL deletion on call_parts (plain DateTime64 column, safe for all MergeTree variants)
--- calls_complete already has TTL from migration 024 - RENAME COLUMN (Step 1b) updates the expression.
+-- Step 5: Enable TTL deletion on call_parts.
+-- toDateTime() wrapper required: expire_at is DateTime64(3) which is rejected by
+-- ClickHouse < 25.6 with error 450 (BAD_TTL_EXPRESSION). Only plain DateTime/Date
+-- are accepted natively; toDateTime() casts DateTime64 -> DateTime.
+-- See: https://github.com/ClickHouse/ClickHouse/pull/80710
 -- calls_merged/calls_merged_stats/calls_complete_stats use AggregatingMergeTree with
--- SimpleAggregateFunction(min, DateTime64(3)) for expire_at. MODIFY TTL is not safe on
--- SimpleAggregateFunction columns. These tables are cleaned up via query-time filtering.
-ALTER TABLE call_parts MODIFY TTL expire_at DELETE;
+-- SimpleAggregateFunction(min, DateTime64(3)) for expire_at — MODIFY TTL is not safe on
+-- these column types. Those tables are cleaned up via query-time filtering.
+ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE;
 
 -- Step 6: Add expire_at column to calls_merged_stats (for query-time filtering, no table-level TTL)
 ALTER TABLE calls_merged_stats

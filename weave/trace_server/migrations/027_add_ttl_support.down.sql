@@ -107,5 +107,9 @@ ALTER TABLE call_parts DROP COLUMN expire_at;
 -- Step 8: Rename expire_at back to ttl_at on calls_complete (restore migration 024 state)
 ALTER TABLE calls_complete RENAME COLUMN expire_at TO ttl_at;
 
+-- Step 8b: Explicitly restore TTL expression to reference ttl_at (mirrors up Step 1c).
+-- RENAME COLUMN may not update TTL expressions on all ClickHouse versions.
+ALTER TABLE calls_complete MODIFY TTL toDateTime(ttl_at) DELETE;
+
 -- Step 9: Drop project_ttl_settings table
 DROP TABLE IF EXISTS project_ttl_settings;
