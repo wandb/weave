@@ -50,6 +50,8 @@ class LLMUsageSchema(TypedDict, total=False):
     output_tokens: int | None
     requests: int | None
     total_tokens: int | None
+    cache_creation_input_tokens: int | None
+    cache_read_input_tokens: int | None
 
 
 class LLMCostSchema(LLMUsageSchema, total=False):
