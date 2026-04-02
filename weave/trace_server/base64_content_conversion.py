@@ -1,9 +1,11 @@
 """Base64 content conversion utilities for trace server.
 
 This module handles automatic detection and replacement of base64 encoded content
-with content objects stored in bucket storage.
+with content objects stored in bucket storage, and the reverse operation of
+restoring content objects back to base64 for LLM API calls.
 """
 
+import base64
 import json
 import logging
 import re
@@ -16,6 +18,7 @@ from weave.trace_server.trace_server_interface import (
     CallEndV2Req,
     CallStartReq,
     CompletedCallSchemaForInsert,
+    FileContentReadReq,
     FileCreateReq,
     TraceServerInterface,
 )
@@ -227,3 +230,83 @@ def process_complete_call_to_content(
         complete_call.output, complete_call.project_id, trace_server
     )
     return complete_call
+
+
+_CONTENT_WEAVE_TYPE = "weave.type_wrappers.Content.content.Content"
+
+
+def _is_content_object(val: Any) -> bool:
+    """Check if a value is a CustomWeaveType Content object dict."""
+    return (
+        isinstance(val, dict)
+        and val.get("_type") == "CustomWeaveType"
+        and isinstance(val.get("weave_type"), dict)
+        and val["weave_type"].get("type") == _CONTENT_WEAVE_TYPE
+        and isinstance(val.get("files"), dict)
+    )
+
+
+@ddtrace.tracer.wrap(name="restore_content_objects_to_base64")
+def restore_content_objects_to_base64(
+    vals: T,
+    project_id: str,
+    trace_server: TraceServerInterface,
+) -> T:
+    """Restore CustomWeaveType Content objects back to data URL strings.
+
+    This is the reverse of replace_base64_with_content_objects. It finds
+    CustomWeaveType Content objects in the data structure and reads their stored
+    file data, converting back to data URL strings suitable for sending to LLMs.
+
+    Args:
+        vals: Value to process (can be dict, list, or primitive)
+        project_id: Project ID for file storage lookup
+        trace_server: Trace server instance for file reading
+
+    Returns:
+        Processed value with Content objects replaced by data URL strings.
+    """
+
+    def _restore_one(val: dict) -> Any:
+        files = val.get("files", {})
+        metadata_digest = files.get("metadata.json")
+        content_digest = files.get("content")
+
+        if not metadata_digest or not content_digest:
+            return val
+
+        try:
+            metadata_res = trace_server.file_content_read(
+                FileContentReadReq(project_id=project_id, digest=metadata_digest)
+            )
+            metadata = json.loads(metadata_res.content)
+            mimetype = metadata.get("mimetype", "application/octet-stream")
+
+            content_res = trace_server.file_content_read(
+                FileContentReadReq(project_id=project_id, digest=content_digest)
+            )
+            b64_data = base64.b64encode(content_res.content).decode("ascii")
+            return f"data:{mimetype};base64,{b64_data}"
+        except Exception as e:
+            logger.warning("Failed to restore Content object to data URL: %s", e)
+            return val
+
+    def _visit(v: Any) -> Any:
+        if _is_content_object(v):
+            return _restore_one(v)
+        if isinstance(v, dict):
+            # Handle Weave's custom ContentMessage format: {type: "image", image: <content_object>}
+            # The frontend stores images as {type: K, [K]: CustomWeaveTypePayload} where K is
+            # the content type. Convert to the standard OpenAI image_url format so litellm
+            # can forward it to any LLM provider.
+            content_type = v.get("type")
+            if content_type == "image" and _is_content_object(v.get("image")):
+                data_url = _restore_one(v["image"])
+                if isinstance(data_url, str):
+                    return {"type": "image_url", "image_url": {"url": data_url}}
+            return {k: _visit(item) for k, item in v.items()}
+        if isinstance(v, list):
+            return [_visit(item) for item in v]
+        return v
+
+    return _visit(vals)
