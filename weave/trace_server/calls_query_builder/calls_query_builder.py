@@ -130,8 +130,6 @@ class OrderLimitOffsetResult(NamedTuple):
     needs_feedback: bool
 
 
-
-
 class WhereFilters(BaseModel):
     """Container for all WHERE clause optimization filters.
 
@@ -409,8 +407,6 @@ class Condition(BaseModel):
             query_for_condition, ParamBuilder(), table_alias, expand_cols
         )
         return object_ref_conditions
-
-
 
 
 class CallsQuery(BaseModel):
@@ -1312,10 +1308,6 @@ class CallsQuery(BaseModel):
         {body}
         """
         return safely_format_sql(raw_sql, logger)
-
-
-
-
 
 
 def process_children_of_eval_ids_to_sql(
