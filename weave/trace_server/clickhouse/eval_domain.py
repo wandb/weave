@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 """Evaluation domain methods for the ClickHouse trace server."""
+# mypy: disable-error-code="attr-defined"
 
 import datetime
 from collections.abc import Iterator
@@ -26,18 +25,8 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 OBJ_READ_RETRY_ATTEMPTS = 3
 
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from weave.trace_server.clickhouse_trace_server_batched import (
-        ClickHouseTraceServer,
-    )
-
-
 class EvalDomainMixin:
-    def scorer_create(
-        self: ClickHouseTraceServer, req: tsi.ScorerCreateReq
-    ) -> tsi.ScorerCreateRes:
+    def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
         """Create a scorer object by first creating its score op, then creating the scorer object.
 
         The scorer object references the op that implements the scoring logic.
@@ -104,9 +93,7 @@ class EvalDomainMixin:
             scorer=scorer_ref,
         )
 
-    def scorer_read(
-        self: ClickHouseTraceServer, req: tsi.ScorerReadReq
-    ) -> tsi.ScorerReadRes:
+    def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
         """Get a scorer object by delegating to obj_read with retry logic."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -116,9 +103,7 @@ class EvalDomainMixin:
         result = self._obj_read_with_retry(obj_req)
         return tsc.scorer_read_res_from_obj(result.obj)
 
-    def scorer_list(
-        self: ClickHouseTraceServer, req: tsi.ScorerListReq
-    ) -> Iterator[tsi.ScorerReadRes]:
+    def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
         """List scorer objects by delegating to objs_query with Scorer filtering."""
         scorer_filter = tsi.ObjectVersionFilter(
             base_object_classes=["Scorer"], is_op=False
@@ -134,9 +119,7 @@ class EvalDomainMixin:
         for obj in obj_res.objs:
             yield tsc.scorer_read_res_from_obj(obj)
 
-    def scorer_delete(
-        self: ClickHouseTraceServer, req: tsi.ScorerDeleteReq
-    ) -> tsi.ScorerDeleteRes:
+    def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
         """Delete scorer objects by delegating to obj_delete."""
         obj_delete_req = tsi.ObjDeleteReq(
             project_id=req.project_id,
@@ -147,7 +130,7 @@ class EvalDomainMixin:
         return tsi.ScorerDeleteRes(num_deleted=result.num_deleted)
 
     def evaluation_create(
-        self: ClickHouseTraceServer, req: tsi.EvaluationCreateReq
+        self, req: tsi.EvaluationCreateReq
     ) -> tsi.EvaluationCreateRes:
         """Create an evaluation object.
 
@@ -232,9 +215,7 @@ class EvalDomainMixin:
             evaluation_ref=evaluation_ref,
         )
 
-    def evaluation_read(
-        self: ClickHouseTraceServer, req: tsi.EvaluationReadReq
-    ) -> tsi.EvaluationReadRes:
+    def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
         """Get an evaluation object by delegating to obj_read with retry logic."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -266,7 +247,7 @@ class EvalDomainMixin:
         )
 
     def evaluation_list(
-        self: ClickHouseTraceServer, req: tsi.EvaluationListReq
+        self, req: tsi.EvaluationListReq
     ) -> Iterator[tsi.EvaluationReadRes]:
         """List evaluation objects by delegating to objs_query with Evaluation filtering."""
         # Query the objects
@@ -308,7 +289,7 @@ class EvalDomainMixin:
             )
 
     def evaluation_delete(
-        self: ClickHouseTraceServer, req: tsi.EvaluationDeleteReq
+        self, req: tsi.EvaluationDeleteReq
     ) -> tsi.EvaluationDeleteRes:
         """Delete evaluation objects by delegating to obj_delete."""
         obj_delete_req = tsi.ObjDeleteReq(
@@ -321,9 +302,7 @@ class EvalDomainMixin:
 
     # Model V2 API
 
-    def model_create(
-        self: ClickHouseTraceServer, req: tsi.ModelCreateReq
-    ) -> tsi.ModelCreateRes:
+    def model_create(self, req: tsi.ModelCreateReq) -> tsi.ModelCreateRes:
         """Create a model object.
 
         Args:
@@ -385,9 +364,7 @@ class EvalDomainMixin:
             model_ref=model_ref,
         )
 
-    def model_read(
-        self: ClickHouseTraceServer, req: tsi.ModelReadReq
-    ) -> tsi.ModelReadRes:
+    def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
         """Read a model object.
 
         Args:
@@ -444,9 +421,7 @@ class EvalDomainMixin:
             attributes=attributes if attributes else None,
         )
 
-    def model_list(
-        self: ClickHouseTraceServer, req: tsi.ModelListReq
-    ) -> Iterator[tsi.ModelReadRes]:
+    def model_list(self, req: tsi.ModelListReq) -> Iterator[tsi.ModelReadRes]:
         """List model objects by delegating to objs_query with Model filtering."""
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
@@ -497,9 +472,7 @@ class EvalDomainMixin:
                 attributes=attributes if attributes else None,
             )
 
-    def model_delete(
-        self: ClickHouseTraceServer, req: tsi.ModelDeleteReq
-    ) -> tsi.ModelDeleteRes:
+    def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
         """Delete model objects by delegating to obj_delete.
 
         Args:
@@ -517,7 +490,7 @@ class EvalDomainMixin:
         return tsi.ModelDeleteRes(num_deleted=result.num_deleted)
 
     def evaluation_run_create(
-        self: ClickHouseTraceServer, req: tsi.EvaluationRunCreateReq
+        self, req: tsi.EvaluationRunCreateReq
     ) -> tsi.EvaluationRunCreateRes:
         """Create an evaluation run as a call with special attributes."""
         evaluation_run_id = generate_id()
@@ -563,7 +536,7 @@ class EvalDomainMixin:
         return tsi.EvaluationRunCreateRes(evaluation_run_id=evaluation_run_id)
 
     def evaluation_run_read(
-        self: ClickHouseTraceServer, req: tsi.EvaluationRunReadReq
+        self, req: tsi.EvaluationRunReadReq
     ) -> tsi.EvaluationRunReadRes:
         """Read an evaluation run by reading the underlying call."""
         call_read_req = tsi.CallReadReq(
@@ -588,7 +561,7 @@ class EvalDomainMixin:
         )
 
     def evaluation_run_list(
-        self: ClickHouseTraceServer, req: tsi.EvaluationRunListReq
+        self, req: tsi.EvaluationRunListReq
     ) -> Iterator[tsi.EvaluationRunReadRes]:
         """List evaluation runs by querying calls with evaluation_run attribute."""
         # Build query conditions to filter at database level
@@ -678,7 +651,7 @@ class EvalDomainMixin:
             )
 
     def evaluation_run_delete(
-        self: ClickHouseTraceServer, req: tsi.EvaluationRunDeleteReq
+        self, req: tsi.EvaluationRunDeleteReq
     ) -> tsi.EvaluationRunDeleteRes:
         """Delete evaluation runs by deleting the underlying calls."""
         calls_delete_req = tsi.CallsDeleteReq(
@@ -690,7 +663,7 @@ class EvalDomainMixin:
         return tsi.EvaluationRunDeleteRes(num_deleted=res.num_deleted)
 
     def evaluation_run_finish(
-        self: ClickHouseTraceServer, req: tsi.EvaluationRunFinishReq
+        self, req: tsi.EvaluationRunFinishReq
     ) -> tsi.EvaluationRunFinishRes:
         """Finish an evaluation run by ending the underlying call.
 
@@ -823,7 +796,7 @@ class EvalDomainMixin:
     # Prediction V2 API
 
     def prediction_create(
-        self: ClickHouseTraceServer, req: tsi.PredictionCreateReq
+        self, req: tsi.PredictionCreateReq
     ) -> tsi.PredictionCreateRes:
         """Create a prediction as a call with special attributes.
 
@@ -972,9 +945,7 @@ class EvalDomainMixin:
 
         return tsi.PredictionCreateRes(prediction_id=prediction_id)
 
-    def prediction_read(
-        self: ClickHouseTraceServer, req: tsi.PredictionReadReq
-    ) -> tsi.PredictionReadRes:
+    def prediction_read(self, req: tsi.PredictionReadReq) -> tsi.PredictionReadRes:
         """Read a prediction by reading the underlying call.
 
         Args:
@@ -1025,7 +996,7 @@ class EvalDomainMixin:
         )
 
     def prediction_list(
-        self: ClickHouseTraceServer, req: tsi.PredictionListReq
+        self, req: tsi.PredictionListReq
     ) -> Iterator[tsi.PredictionReadRes]:
         """List predictions by querying calls with prediction attribute.
 
@@ -1108,7 +1079,7 @@ class EvalDomainMixin:
             )
 
     def prediction_delete(
-        self: ClickHouseTraceServer, req: tsi.PredictionDeleteReq
+        self, req: tsi.PredictionDeleteReq
     ) -> tsi.PredictionDeleteRes:
         """Delete predictions by deleting the underlying calls.
 
@@ -1127,7 +1098,7 @@ class EvalDomainMixin:
         return tsi.PredictionDeleteRes(num_deleted=res.num_deleted)
 
     def prediction_finish(
-        self: ClickHouseTraceServer, req: tsi.PredictionFinishReq
+        self, req: tsi.PredictionFinishReq
     ) -> tsi.PredictionFinishRes:
         """Finish a prediction by ending the underlying call.
 
@@ -1258,9 +1229,7 @@ class EvalDomainMixin:
 
     # Score V2 API
 
-    def score_create(
-        self: ClickHouseTraceServer, req: tsi.ScoreCreateReq
-    ) -> tsi.ScoreCreateRes:
+    def score_create(self, req: tsi.ScoreCreateReq) -> tsi.ScoreCreateRes:
         """Create a score as a call with special attributes.
 
         Args:
@@ -1399,9 +1368,7 @@ class EvalDomainMixin:
 
         return tsi.ScoreCreateRes(score_id=score_id)
 
-    def score_read(
-        self: ClickHouseTraceServer, req: tsi.ScoreReadReq
-    ) -> tsi.ScoreReadRes:
+    def score_read(self, req: tsi.ScoreReadReq) -> tsi.ScoreReadRes:
         """Read a score by reading the underlying call.
 
         Args:
@@ -1452,9 +1419,7 @@ class EvalDomainMixin:
             wb_user_id=call.wb_user_id,
         )
 
-    def score_list(
-        self: ClickHouseTraceServer, req: tsi.ScoreListReq
-    ) -> Iterator[tsi.ScoreReadRes]:
+    def score_list(self, req: tsi.ScoreListReq) -> Iterator[tsi.ScoreReadRes]:
         """List scores by querying calls with score attribute.
 
         Args:
@@ -1535,9 +1500,7 @@ class EvalDomainMixin:
                 wb_user_id=call.wb_user_id,
             )
 
-    def score_delete(
-        self: ClickHouseTraceServer, req: tsi.ScoreDeleteReq
-    ) -> tsi.ScoreDeleteRes:
+    def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
         """Delete scores by deleting the underlying calls.
 
         Args:
@@ -1555,7 +1518,7 @@ class EvalDomainMixin:
         return tsi.ScoreDeleteRes(num_deleted=res.num_deleted)
 
     def eval_results_query(
-        self: ClickHouseTraceServer, req: tsi.EvalResultsQueryReq
+        self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         """Return grouped prediction/trial/score data for evaluation results."""
         eval_root_ids = eval_helpers.resolve_eval_root_ids(req)
@@ -1569,9 +1532,7 @@ class EvalDomainMixin:
         )
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
 
-    def evaluate_model(
-        self: ClickHouseTraceServer, req: tsi.EvaluateModelReq
-    ) -> tsi.EvaluateModelRes:
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         if self._evaluate_model_dispatcher is None:
             raise ValueError("Evaluate model dispatcher is not set")
         if req.wb_user_id is None:
@@ -1590,13 +1551,11 @@ class EvalDomainMixin:
         return tsi.EvaluateModelRes(call_id=call_id)
 
     def evaluation_status(
-        self: ClickHouseTraceServer, req: tsi.EvaluationStatusReq
+        self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
-    def calls_score(
-        self: ClickHouseTraceServer, req: tsi.CallsScoreReq
-    ) -> tsi.CallsScoreRes:
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
         """Enqueue scoring jobs for a list of calls.
 
         Publishes the request to Kafka, where it will be consumed by the
