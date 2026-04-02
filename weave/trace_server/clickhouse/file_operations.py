@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 """File storage operations for the ClickHouse trace server."""
+
+from typing import TYPE_CHECKING
 
 import ddtrace
 
@@ -6,7 +10,6 @@ from weave.shared.digest import compute_file_digest
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse.protocol import CHInfraProtocol
 from weave.trace_server.clickhouse.utilities import (
     string_to_int_in_range,
 )
@@ -28,14 +31,16 @@ from weave.trace_server.file_storage import (
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.orm import ParamBuilder
 
+if TYPE_CHECKING:
+    from weave.trace_server.clickhouse_trace_server_batched import (
+        ClickHouseTraceServer,
+    )
 
-class FileOperationsMixin(CHInfraProtocol):
-    # Attributes provided by ClickHouseTraceServer at runtime
-    _file_batch: list[FileChunkCreateCHInsertable]
-    _flush_immediately: bool
-    file_storage_client: FileStorageClient | None
 
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+class FileOperationsMixin:
+    def file_create(
+        self: ClickHouseTraceServer, req: tsi.FileCreateReq
+    ) -> tsi.FileCreateRes:
         digest = compute_file_digest(req.content)
         validate_expected_digest(
             expected=req.expected_digest, actual=digest, label="file"
@@ -64,7 +69,9 @@ class FileOperationsMixin(CHInfraProtocol):
         return tsi.FileCreateRes(digest=digest)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
-    def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
+    def _file_create_clickhouse(
+        self: ClickHouseTraceServer, req: tsi.FileCreateReq, digest: str
+    ) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
         chunks = [
             req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
@@ -88,7 +95,10 @@ class FileOperationsMixin(CHInfraProtocol):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
-        self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
+        self: ClickHouseTraceServer,
+        req: tsi.FileCreateReq,
+        digest: str,
+        client: FileStorageClient,
     ) -> None:
         set_root_span_dd_tags({"storage_provider": "bucket"})
         target_file_storage_uri = store_in_bucket(
@@ -110,7 +120,7 @@ class FileOperationsMixin(CHInfraProtocol):
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_file_chunks")
-    def _flush_file_chunks(self) -> None:
+    def _flush_file_chunks(self: ClickHouseTraceServer) -> None:
         if not self._flush_immediately:
             raise ValueError("File chunks must be flushed immediately")
         try:
@@ -120,7 +130,7 @@ class FileOperationsMixin(CHInfraProtocol):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_file_chunks")
     def _insert_file_chunks(
-        self, file_chunks: list[FileChunkCreateCHInsertable]
+        self: ClickHouseTraceServer, file_chunks: list[FileChunkCreateCHInsertable]
     ) -> None:
         if not self._flush_immediately:
             self._file_batch.extend(file_chunks)
@@ -141,7 +151,9 @@ class FileOperationsMixin(CHInfraProtocol):
                 column_names=ALL_FILE_CHUNK_INSERT_COLUMNS,
             )
 
-    def _should_use_file_storage_for_writes(self, project_id: str) -> bool:
+    def _should_use_file_storage_for_writes(
+        self: ClickHouseTraceServer, project_id: str
+    ) -> bool:
         """Determine if we should use file storage for a project."""
         # Check if we should use file storage based on the ramp percentage
         ramp_pct = wf_env.wf_file_storage_project_ramp_pct()
@@ -165,7 +177,9 @@ class FileOperationsMixin(CHInfraProtocol):
 
         return True
 
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+    def file_content_read(
+        self: ClickHouseTraceServer, req: tsi.FileContentReadReq
+    ) -> tsi.FileContentReadRes:
         # The subquery is responsible for deduplication of file chunks by digest
         query_result = self.ch_client.query(
             """
@@ -246,14 +260,18 @@ class FileOperationsMixin(CHInfraProtocol):
         return tsi.FileContentReadRes(content=bytes)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_read_bucket")
-    def _file_read_bucket(self, file_storage_uri: FileStorageURI) -> bytes:
+    def _file_read_bucket(
+        self: ClickHouseTraceServer, file_storage_uri: FileStorageURI
+    ) -> bytes:
         set_root_span_dd_tags({"storage_provider": "bucket"})
         client = self.file_storage_client
         if client is None:
             raise FileStorageReadError("File storage client is not configured")
         return read_from_bucket(client, file_storage_uri)
 
-    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+    def files_stats(
+        self: ClickHouseTraceServer, req: tsi.FilesStatsReq
+    ) -> tsi.FilesStatsRes:
         pb = ParamBuilder()
 
         project_id_param = pb.add_param(req.project_id)
