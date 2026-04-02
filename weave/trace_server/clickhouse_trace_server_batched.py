@@ -83,43 +83,19 @@ from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
 from weave.trace_server.clickhouse.utilities import (
-    any_value_to_dump as _any_value_to_dump,
-)
-from weave.trace_server.clickhouse.utilities import (
-    convert_to_insert_too_large as _convert_to_insert_too_large,
-)
-from weave.trace_server.clickhouse.utilities import (
-    datetime_to_microseconds as _datetime_to_microseconds,
-)
-from weave.trace_server.clickhouse.utilities import (
-    dict_dump_to_dict as _dict_dump_to_dict,
-)
-from weave.trace_server.clickhouse.utilities import (
-    dict_value_to_dump as _dict_value_to_dump,
-)
-from weave.trace_server.clickhouse.utilities import (
-    ensure_datetimes_have_tz as _ensure_datetimes_have_tz,
-)
-from weave.trace_server.clickhouse.utilities import (
-    ensure_datetimes_have_tz_strict as _ensure_datetimes_have_tz_strict,
-)
-from weave.trace_server.clickhouse.utilities import (
-    log_and_raise_insert_error as _log_and_raise_insert_error,
-)
-from weave.trace_server.clickhouse.utilities import (
-    nullable_any_dump_to_any as _nullable_any_dump_to_any,
-)
-from weave.trace_server.clickhouse.utilities import (
-    num_bytes as _num_bytes,
-)
-from weave.trace_server.clickhouse.utilities import (
-    process_parameters as _process_parameters,
-)
-from weave.trace_server.clickhouse.utilities import (
-    should_retry_empty_query as _should_retry_empty_query,
-)
-from weave.trace_server.clickhouse.utilities import (
-    string_to_int_in_range as _string_to_int_in_range,
+    any_value_to_dump,
+    convert_to_insert_too_large,
+    datetime_to_microseconds,
+    dict_dump_to_dict,
+    dict_value_to_dump,
+    ensure_datetimes_have_tz,
+    ensure_datetimes_have_tz_strict,
+    log_and_raise_insert_error,
+    nullable_any_dump_to_any,
+    num_bytes,
+    process_parameters,
+    should_retry_empty_query,
+    string_to_int_in_range,
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
@@ -984,14 +960,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         output = end_call.output
         output_refs = extract_refs_from_values(output)
-        output_dump = _any_value_to_dump(output)
-        summary_dump = _dict_value_to_dump(dict(end_call.summary))
+        output_dump = any_value_to_dump(output)
+        summary_dump = dict_value_to_dump(dict(end_call.summary))
 
         # Convert datetimes to microseconds since epoch for DateTime64(6) parameters.
         # clickhouse-connect truncates datetime objects to seconds when passing as params,
         # but DateTime64(6) requires microsecond precision for exact matching. This is a
         # hack, not sure why inserting a json dump and passing an explicit param differ
-        ended_at_us = _datetime_to_microseconds(end_call.ended_at)
+        ended_at_us = datetime_to_microseconds(end_call.ended_at)
 
         pb = ParamBuilder()
         project_id_param = pb.add_param(end_call.project_id)
@@ -1010,7 +986,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Add started_at param if provided for more efficient primary key usage
         started_at_param: str | None = None
         if end_call.started_at is not None:
-            started_at_us = _datetime_to_microseconds(end_call.started_at)
+            started_at_us = datetime_to_microseconds(end_call.started_at)
             started_at_param = pb.add_param(started_at_us)
 
         query = build_calls_complete_update_end_query(
@@ -1948,7 +1924,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         delete_insertables = []
         now = datetime.datetime.now(datetime.timezone.utc)
         for obj in object_versions:
-            original_created_at = _ensure_datetimes_have_tz_strict(obj.created_at)
+            original_created_at = ensure_datetimes_have_tz_strict(obj.created_at)
             delete_insertables.append(
                 ObjDeleteCHInsertable(
                     project_id=obj.project_id,
@@ -2641,8 +2617,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ) = row
 
             # Ensure datetimes have timezone info
-            start_time_with_tz = _ensure_datetimes_have_tz(start_time)
-            last_updated_with_tz = _ensure_datetimes_have_tz(last_updated)
+            start_time_with_tz = ensure_datetimes_have_tz(start_time)
+            last_updated_with_tz = ensure_datetimes_have_tz(last_updated)
 
             if start_time_with_tz is None or last_updated_with_tz is None:
                 # Skip threads without valid timestamps
@@ -2725,9 +2701,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ) = row
 
             # Ensure datetimes have timezone info
-            created_at_with_tz = _ensure_datetimes_have_tz(created_at)
-            updated_at_with_tz = _ensure_datetimes_have_tz(updated_at)
-            deleted_at_with_tz = _ensure_datetimes_have_tz(deleted_at)
+            created_at_with_tz = ensure_datetimes_have_tz(created_at)
+            updated_at_with_tz = ensure_datetimes_have_tz(updated_at)
+            deleted_at_with_tz = ensure_datetimes_have_tz(deleted_at)
 
             if created_at_with_tz is None or updated_at_with_tz is None:
                 # Skip queues without valid timestamps
@@ -2771,10 +2747,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=row["name"],
             description=row["description"],
             scorer_refs=row["scorer_refs"],
-            created_at=_ensure_datetimes_have_tz(row["created_at"]),
+            created_at=ensure_datetimes_have_tz(row["created_at"]),
             created_by=row["created_by"],
-            updated_at=_ensure_datetimes_have_tz(row["updated_at"]),
-            deleted_at=_ensure_datetimes_have_tz(row["deleted_at"]),
+            updated_at=ensure_datetimes_have_tz(row["updated_at"]),
+            deleted_at=ensure_datetimes_have_tz(row["deleted_at"]),
         )
 
         return tsi.AnnotationQueueReadRes(queue=queue)
@@ -2825,10 +2801,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 name=row["name"],
                 description=row["description"],
                 scorer_refs=row["scorer_refs"],
-                created_at=_ensure_datetimes_have_tz(row["created_at"]),
+                created_at=ensure_datetimes_have_tz(row["created_at"]),
                 created_by=row["created_by"],
-                updated_at=_ensure_datetimes_have_tz(row["updated_at"]),
-                deleted_at=_ensure_datetimes_have_tz(row["deleted_at"]),
+                updated_at=ensure_datetimes_have_tz(row["updated_at"]),
+                deleted_at=ensure_datetimes_have_tz(row["deleted_at"]),
             )
             return tsi.AnnotationQueueUpdateRes(queue=queue)
 
@@ -2867,7 +2843,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=name,
             description=description,
             scorer_refs=scorer_refs,
-            created_at=_ensure_datetimes_have_tz(row["created_at"]),
+            created_at=ensure_datetimes_have_tz(row["created_at"]),
             created_by=row["created_by"],
             updated_at=updated_at,
             deleted_at=None,  # Can't be deleted since we just updated it
@@ -2922,7 +2898,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=row["name"],
             description=row["description"],
             scorer_refs=row["scorer_refs"],
-            created_at=_ensure_datetimes_have_tz(row["created_at"]),
+            created_at=ensure_datetimes_have_tz(row["created_at"]),
             created_by=row["created_by"],
             updated_at=updated_at,
             deleted_at=deleted_at,
@@ -3398,7 +3374,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=obj.object_id,
             digest=obj.digest,
             version_index=obj.version_index,
-            created_at=_ensure_datetimes_have_tz(obj.created_at),
+            created_at=ensure_datetimes_have_tz(obj.created_at),
             code=code,
         )
 
@@ -3467,7 +3443,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 object_id=obj.object_id,
                 digest=obj.digest,
                 version_index=obj.version_index,
-                created_at=_ensure_datetimes_have_tz(obj.created_at),
+                created_at=ensure_datetimes_have_tz(obj.created_at),
                 code=code,
             )
 
@@ -5606,7 +5582,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ramp_pct = wf_env.wf_file_storage_project_ramp_pct()
         if ramp_pct is not None:
             # If the hash value is less than the ramp percentage, use file storage
-            project_hash_value = _string_to_int_in_range(project_id, 100)
+            project_hash_value = string_to_int_in_range(project_id, 100)
             if project_hash_value < ramp_pct:
                 return True
 
@@ -6528,7 +6504,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         merged = ch_settings.merge_default_query_settings(settings)
 
         summary = None
-        parameters = _process_parameters(parameters)
+        parameters = process_parameters(parameters)
         start = time.monotonic()
         try:
             with self.ch_client.query_rows_stream(
@@ -6576,7 +6552,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Directly queries the database and returns the result."""
         merged = ch_settings.merge_default_query_settings(settings)
 
-        parameters = _process_parameters(parameters)
+        parameters = process_parameters(parameters)
         start = time.monotonic()
         try:
             res = self.ch_client.query(
@@ -6629,7 +6605,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         merged = ch_settings.merge_default_query_settings(settings)
 
-        processed_params = _process_parameters(parameters) if parameters else None
+        processed_params = process_parameters(parameters) if parameters else None
         start = time.monotonic()
         try:
             self.ch_client.command(
@@ -6695,19 +6671,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # InsertTooLarge: raise immediately, no retry
             except ValueError as e:
-                converted = _convert_to_insert_too_large(e)
-                _log_and_raise_insert_error(converted, table, data)
+                converted = convert_to_insert_too_large(e)
+                log_and_raise_insert_error(converted, table, data)
 
             # Empty query error: RETRY (generator was consumed during HTTP retry)
             # We should retry with a fresh generator
             except DatabaseError as e:
-                if _should_retry_empty_query(e, table, attempt):
+                if should_retry_empty_query(e, table, attempt):
                     continue
-                _log_and_raise_insert_error(e, table, data)
+                log_and_raise_insert_error(e, table, data)
 
             # All other errors: raise immediately, no retry
             except Exception as e:
-                _log_and_raise_insert_error(e, table, data)
+                log_and_raise_insert_error(e, table, data)
 
             else:
                 duration_ms = round((time.monotonic() - start) * 1000, 1)
@@ -6852,15 +6828,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ALL_CALL_INSERT_COLUMNS.index(f"{col}_dump")
             for col in ALL_CALL_JSON_COLUMNS
         ]
-        entity_too_large_payload_byte_size = _num_bytes(
+        entity_too_large_payload_byte_size = num_bytes(
             ch_settings.ENTITY_TOO_LARGE_PAYLOAD
         )
 
         for item in batch:
             # Calculate only JSON dump bytes
-            json_idx_size_pairs = [
-                (i, _num_bytes(item[i])) for i in json_column_indices
-            ]
+            json_idx_size_pairs = [(i, num_bytes(item[i])) for i in json_column_indices]
             total_json_bytes = sum(size for _, size in json_idx_size_pairs)
 
             # If over limit, try to optimize by selectively stripping largest JSON values
@@ -6895,8 +6869,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
 
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
-    summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
-    started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
+    summary = nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
+    started_at = ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
 
     # Convert sentinel values back to None for all sentinel-tracked fields.
     # This handles both the calls_merged Nullable path (returns None) and the
@@ -6906,7 +6880,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         raw = ch_call_dict.get(field)
         val = ch_sentinel_values.from_ch_value(field, raw)
         if field in ch_sentinel_values.SENTINEL_DATETIME_FIELDS:
-            val = _ensure_datetimes_have_tz(val)
+            val = ensure_datetimes_have_tz(val)
         sv[field] = val
 
     ended_at = sv["ended_at"]
@@ -6915,13 +6889,13 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     otel_dump = sv["otel_dump"]
 
     # Load attributes from attributes_dump
-    attributes = _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}"))
+    attributes = dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}"))
 
     # For backwards/future compatibility: inject otel_dump into attributes if present
     # Legacy trace servers stored all otel info in attributes, clients expect it
     # TODO(gst): consider returning the raw otel column and reconstructing client side
     if otel_dump:
-        attributes["otel_span"] = _dict_dump_to_dict(otel_dump)
+        attributes["otel_span"] = dict_dump_to_dict(otel_dump)
 
     return {
         "project_id": ch_call_dict.get("project_id"),
@@ -6934,8 +6908,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "started_at": started_at,
         "ended_at": ended_at,
         "attributes": attributes,
-        "inputs": _dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
-        "output": _nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
+        "inputs": dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
+        "output": nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         "summary": make_derived_summary_fields(
             summary=summary or {},
             op_name=ch_call_dict.get("op_name", ""),
@@ -6959,7 +6933,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
     return tsi.ObjSchema(
         project_id=ch_obj.project_id,
         object_id=ch_obj.object_id,
-        created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
+        created_at=ensure_datetimes_have_tz(ch_obj.created_at),
         wb_user_id=ch_obj.wb_user_id,
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
@@ -7006,7 +6980,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
 
     otel_dump_str = None
     if start_call.otel_dump is not None:
-        otel_dump_str = _dict_value_to_dump(start_call.otel_dump)
+        otel_dump_str = dict_value_to_dump(start_call.otel_dump)
 
     return CallStartCHInsertable(
         project_id=start_call.project_id,
@@ -7017,8 +6991,8 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         turn_id=start_call.turn_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
-        attributes_dump=_dict_value_to_dump(start_call.attributes),
-        inputs_dump=_dict_value_to_dump(inputs),
+        attributes_dump=dict_value_to_dump(start_call.attributes),
+        inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         otel_dump=otel_dump_str,
         wb_run_id=start_call.wb_run_id,
@@ -7071,8 +7045,8 @@ def _start_call_insertable_to_complete_start(
         attributes_dump=ch_start.attributes_dump,
         inputs_dump=ch_start.inputs_dump,
         input_refs=ch_start.input_refs,
-        output_dump=_any_value_to_dump(None),
-        summary_dump=_dict_value_to_dump({}),
+        output_dump=any_value_to_dump(None),
+        summary_dump=dict_value_to_dump({}),
         otel_dump=ch_start.otel_dump,
         output_refs=ch_start.output_refs,
         wb_user_id=ch_start.wb_user_id,
@@ -7096,8 +7070,8 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
-        summary_dump=_dict_value_to_dump(dict(end_call.summary)),
-        output_dump=_any_value_to_dump(output),
+        summary_dump=dict_value_to_dump(dict(end_call.summary)),
+        output_dump=any_value_to_dump(output),
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
     )
@@ -7129,7 +7103,7 @@ def _start_end_calls_to_ch_complete_insertable(
 
     otel_dump_str = None
     if start_call.otel_dump is not None:
-        otel_dump_str = _dict_value_to_dump(start_call.otel_dump)
+        otel_dump_str = dict_value_to_dump(start_call.otel_dump)
 
     return CallCompleteCHInsertable(
         project_id=start_call.project_id,
@@ -7143,11 +7117,11 @@ def _start_end_calls_to_ch_complete_insertable(
         started_at=start_call.started_at,
         ended_at=end_call.ended_at,
         exception=end_call.exception,
-        attributes_dump=_dict_value_to_dump(start_call.attributes),
-        inputs_dump=_dict_value_to_dump(inputs),
+        attributes_dump=dict_value_to_dump(start_call.attributes),
+        inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
-        output_dump=_any_value_to_dump(output),
-        summary_dump=_dict_value_to_dump(dict(end_call.summary)),
+        output_dump=any_value_to_dump(output),
+        summary_dump=dict_value_to_dump(dict(end_call.summary)),
         otel_dump=otel_dump_str,
         output_refs=output_refs,
         wb_user_id=start_call.wb_user_id,
@@ -7218,7 +7192,7 @@ def _complete_call_to_ch_insertable(
 
     otel_dump_str = None
     if complete_call.otel_dump is not None:
-        otel_dump_str = _dict_value_to_dump(complete_call.otel_dump)
+        otel_dump_str = dict_value_to_dump(complete_call.otel_dump)
 
     return CallCompleteCHInsertable(
         project_id=complete_call.project_id,
@@ -7232,11 +7206,11 @@ def _complete_call_to_ch_insertable(
         started_at=complete_call.started_at,
         ended_at=complete_call.ended_at,
         exception=complete_call.exception,
-        attributes_dump=_dict_value_to_dump(complete_call.attributes),
-        inputs_dump=_dict_value_to_dump(inputs),
+        attributes_dump=dict_value_to_dump(complete_call.attributes),
+        inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
-        output_dump=_any_value_to_dump(output),
-        summary_dump=_dict_value_to_dump(dict(complete_call.summary)),
+        output_dump=any_value_to_dump(output),
+        summary_dump=dict_value_to_dump(dict(complete_call.summary)),
         otel_dump=otel_dump_str,
         output_refs=output_refs,
         wb_user_id=complete_call.wb_user_id,
