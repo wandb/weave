@@ -583,9 +583,7 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
         assert len(call.refs) <= 2
 
 
-def test_eval_subtree_query_excludes_unrelated_top_level_calls(
-    client, internal_server
-):
+def test_eval_subtree_query_excludes_unrelated_top_level_calls(client, internal_server):
     """Makes sure that _calls_query_stream_for_eval_subtree does not return calls outside the eval tree."""
     project_id = client.project_id
 
