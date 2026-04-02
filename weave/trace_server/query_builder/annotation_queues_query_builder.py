@@ -4,8 +4,7 @@ This module provides query building functions for the queue-based call annotatio
 following the same patterns as threads_query_builder.py and other query builders in the codebase.
 """
 
-from weave.trace_server.calls_query_builder.calls_query_builder import (
-    ReadTable,
+from weave.trace_server.calls_query_builder.mutations import (
     _format_table_name_with_cluster,
 )
 from weave.trace_server.common_interface import (
@@ -13,6 +12,7 @@ from weave.trace_server.common_interface import (
     SortBy,
 )
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable
 
 # Valid sort fields for annotation queues
 VALID_QUEUE_SORT_FIELDS = {

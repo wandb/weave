@@ -1,8 +1,6 @@
 from tests.trace_server.query_builder.utils import assert_sql
-from weave.trace_server.calls_query_builder.calls_query_builder import (
-    CallsQuery,
-    HardCodedFilter,
-)
+from weave.trace_server.calls_query_builder.calls_query_builder import CallsQuery
+from weave.trace_server.calls_query_builder.hardcoded_filters import HardCodedFilter
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.trace_server_interface import CallsFilter

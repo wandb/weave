@@ -7,7 +7,7 @@ is properly added to all table references in the generated SQL.
 import pytest
 import sqlparse
 
-from weave.trace_server.calls_query_builder.calls_query_builder import (
+from weave.trace_server.calls_query_builder.mutations import (
     build_calls_complete_update_end_query,
 )
 from weave.trace_server.clickhouse_trace_server_settings import LOCAL_TABLE_SUFFIX

@@ -23,14 +23,11 @@ from weave.trace_server.calls_query_builder.utils import (
     timestamp_to_datetime_str,
 )
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import clickhouse_cast
+from weave.trace_server.orm import ParamBuilder, clickhouse_cast
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 if TYPE_CHECKING:
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
-        Condition,
-        ParamBuilder,
-    )
+    from weave.trace_server.calls_query_builder.calls_query_builder import Condition
 
 START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
 END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
@@ -134,7 +131,7 @@ class QueryOptimizationProcessor(ABC):
             if result is None:
                 # If any or condition can't be optimized, return
                 # TODO: this should return the non optimized,
-                # non aggreagated condition when available
+                # non aggregated condition when available
                 return None
             conditions.append(result)
 

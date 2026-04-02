@@ -5,6 +5,11 @@ from typing import TYPE_CHECKING, Any
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTE
+from weave.trace_server.calls_query_builder.fields import (
+    CallsMergedDynamicField,
+    CallsMergedFeedbackPayloadField,
+    CallsMergedSummaryField,
+)
 from weave.trace_server.calls_query_builder.utils import safe_alias
 from weave.trace_server.clickhouse_schema import SelectableCHCallSchema
 from weave.trace_server.errors import InvalidRequest
@@ -464,10 +469,6 @@ def _prepare_final_select_fields(
     Returns:
         Final list of field names to select
     """
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
-        CallsMergedFeedbackPayloadField,
-    )
-
     # Filter out summary_dump - we generate it ourselves with cost data
     final_fields = [f for f in select_fields if f != "summary_dump"]
 
@@ -491,10 +492,6 @@ def _needs_feedback_join(order_fields: list["OrderField"]) -> bool:
     Returns:
         True if feedback JOIN is needed
     """
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
-        CallsMergedFeedbackPayloadField,
-    )
-
     return any(
         isinstance(order_field.field, CallsMergedFeedbackPayloadField)
         for order_field in order_fields
@@ -619,12 +616,6 @@ def get_cost_final_select(
     group_by = f"GROUP BY {', '.join(safe_fields)}"
     order_by = ""
     if order_fields:
-        # Circular import avoidance: calls_query_builder imports from token_costs
-        from weave.trace_server.calls_query_builder.calls_query_builder import (
-            CallsMergedDynamicField,
-            CallsMergedSummaryField,
-        )
-
         order_parts = []
         for of in order_fields:
             if isinstance(of.field, CallsMergedSummaryField):
