@@ -116,7 +116,6 @@ class TestJSONLWALFileWriter:
 
         writer.close()
 
-    @pytest.mark.flaky(reruns=3)
     def test_fsync_timeout_triggers_sync(
         self, tmp_path: str, monkeypatch: pytest.MonkeyPatch
     ) -> None:
