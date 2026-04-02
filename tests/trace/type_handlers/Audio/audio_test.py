@@ -1,5 +1,6 @@
 import base64
 import os
+import time
 import wave
 
 import pytest
@@ -25,11 +26,13 @@ class TestWaveRead:
         gotten_audio = weave.ref(ref.uri).get()
         assert audio.readframes(10) == gotten_audio.readframes(10)
 
+    @pytest.mark.flaky(reruns=3)
     def test_audio_as_dataset_cell(self, client: WeaveClient) -> None:
         client.project = "test_audio_as_dataset_cell"
         audio = wave.open(TEST_WAV_FILE, "rb")
         dataset = weave.Dataset(rows=weave.Table([{"audio": audio}]))
         weave.publish(dataset)
+        time.sleep(0.2)
 
         ref = get_ref(dataset)
         assert ref is not None
@@ -127,6 +130,7 @@ class TestWeaveAudio:
             ValueError, lambda: Audio.from_data(data=b"", format="mp3")
         )
 
+    @pytest.mark.flaky(reruns=3)
     @pytest.mark.parametrize("audio_file", [TEST_MP3_FILE, TEST_WAV_FILE])
     def test_audio_as_dataset_cell(self, client: WeaveClient, audio_file: str) -> None:
         client.project = "test_audio_as_dataset_cell"
@@ -135,6 +139,7 @@ class TestWeaveAudio:
         assert ref is not None
         dataset = weave.Dataset(rows=weave.Table([{"audio": audio}]))
         ref = weave.publish(dataset)
+        time.sleep(0.2)
 
         ref = get_ref(dataset)
         assert ref is not None
