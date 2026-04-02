@@ -538,6 +538,57 @@ class TestPythonSpans:
         assert start_call_turn_no_thread.turn_id is None
         assert start_call_turn_no_thread.thread_id is None
 
+    def test_span_to_call_with_cache_tokens(self):
+        """Test that cache token usage attributes flow through to_call summary."""
+        pb_span = create_test_span()
+
+        # Add cache token usage attributes
+        kv_cache_creation = KeyValue()
+        kv_cache_creation.key = "gen_ai.usage.cache_creation.input_tokens"
+        kv_cache_creation.value.int_value = 500
+        pb_span.attributes.append(kv_cache_creation)
+
+        kv_cache_read = KeyValue()
+        kv_cache_read.key = "gen_ai.usage.cache_read.input_tokens"
+        kv_cache_read.value.int_value = 200
+        pb_span.attributes.append(kv_cache_read)
+
+        kv_input = KeyValue()
+        kv_input.key = "gen_ai.usage.input_tokens"
+        kv_input.value.int_value = 100
+        pb_span.attributes.append(kv_input)
+
+        kv_output = KeyValue()
+        kv_output.key = "gen_ai.usage.output_tokens"
+        kv_output.value.int_value = 50
+        pb_span.attributes.append(kv_output)
+
+        py_span = PySpan.from_proto(pb_span)
+        _, end_call = py_span.to_call("test_project")
+
+        # Usage is keyed by model name or "usage" when no model is set
+        usage = end_call.summary["usage"]["usage"]  # type: ignore
+        assert usage["cache_creation_input_tokens"] == 500
+        assert usage["cache_read_input_tokens"] == 200
+        assert usage["input_tokens"] == 100
+        assert usage["output_tokens"] == 50
+
+    def test_span_to_call_with_genai_conversation_id(self):
+        """Test that gen_ai.conversation.id sets thread_id and turn_id."""
+        pb_span = create_test_span()
+
+        kv_conv = KeyValue()
+        kv_conv.key = "gen_ai.conversation.id"
+        kv_conv.value.string_value = "conv-xyz"
+        pb_span.attributes.append(kv_conv)
+
+        py_span = PySpan.from_proto(pb_span)
+        start_call, _ = py_span.to_call("test_project")
+
+        assert start_call.thread_id == "conv-xyz"
+        # is_turn is truthy via conversation.id, so turn_id should be set
+        assert start_call.turn_id == py_span.span_id
+
     def test_traces_data_from_proto(self):
         """Test converting protobuf TracesData to Python TracesData."""
         export_req = create_test_export_request()
@@ -1208,6 +1259,151 @@ class TestSemanticConventionParsing:
         assert usage.get("output_tokens") == 20
         # Verify explicit total_tokens is used instead of calculated value
         assert usage.get("total_tokens") == 35
+
+    def test_genai_semconv_system_instructions(self):
+        """Test that gen_ai.system_instructions takes priority over gen_ai.system."""
+        # gen_ai.system_instructions (new semconv) should take priority
+        attributes = create_attributes(
+            {
+                "gen_ai.system_instructions": "You are a new-style assistant",
+                "gen_ai.system": "You are a legacy assistant",
+            }
+        )
+        extracted = get_weave_attributes(attributes)
+        assert extracted["system"] == "You are a new-style assistant"
+
+        # gen_ai.system still works when system_instructions is absent
+        attributes_legacy = create_attributes(
+            {
+                "gen_ai.system": "You are a legacy assistant",
+            }
+        )
+        extracted_legacy = get_weave_attributes(attributes_legacy)
+        assert extracted_legacy["system"] == "You are a legacy assistant"
+
+    def test_genai_semconv_request_model_fallback(self):
+        """Test that gen_ai.request.model is used when gen_ai.response.model is absent."""
+        # response.model takes priority
+        attributes_both = create_attributes(
+            {
+                "gen_ai.response.model": "gpt-4-actual",
+                "gen_ai.request.model": "gpt-4-requested",
+            }
+        )
+        extracted = get_weave_attributes(attributes_both)
+        assert extracted["model"] == "gpt-4-actual"
+
+        # request.model used as fallback
+        attributes_request_only = create_attributes(
+            {
+                "gen_ai.request.model": "gpt-4-requested",
+            }
+        )
+        extracted_request = get_weave_attributes(attributes_request_only)
+        assert extracted_request["model"] == "gpt-4-requested"
+
+    def test_genai_semconv_provider_name(self):
+        """Test that gen_ai.provider.name takes priority over llm.provider."""
+        attributes = create_attributes(
+            {
+                "gen_ai.provider.name": "anthropic",
+                "llm.provider": "legacy-provider",
+            }
+        )
+        extracted = get_weave_attributes(attributes)
+        assert extracted["provider"] == "anthropic"
+
+        # llm.provider still works as fallback
+        attributes_legacy = create_attributes(
+            {
+                "llm.provider": "legacy-provider",
+            }
+        )
+        extracted_legacy = get_weave_attributes(attributes_legacy)
+        assert extracted_legacy["provider"] == "legacy-provider"
+
+    def test_genai_semconv_operation_name(self):
+        """Test extraction of gen_ai.operation.name attribute."""
+        attributes = create_attributes(
+            {
+                "gen_ai.operation.name": "chat",
+            }
+        )
+        extracted = get_weave_attributes(attributes)
+        assert extracted["operation_name"] == "chat"
+
+    def test_genai_semconv_response_id(self):
+        """Test extraction of gen_ai.response.id attribute."""
+        attributes = create_attributes(
+            {
+                "gen_ai.response.id": "chatcmpl-abc123",
+            }
+        )
+        extracted = get_weave_attributes(attributes)
+        assert extracted["response_id"] == "chatcmpl-abc123"
+
+    def test_genai_semconv_finish_reasons(self):
+        """Test extraction of gen_ai.response.finish_reasons attribute."""
+        attributes = create_attributes(
+            {
+                "gen_ai.response.finish_reasons": ["stop", "length"],
+            }
+        )
+        extracted = get_weave_attributes(attributes)
+        assert extracted["finish_reasons"] == ["stop", "length"]
+
+    def test_genai_semconv_agent_attributes(self):
+        """Test extraction of gen_ai.agent.name and gen_ai.agent.id attributes."""
+        attributes = create_attributes(
+            {
+                "gen_ai.agent.name": "my-agent",
+                "gen_ai.agent.id": "agent-42",
+            }
+        )
+        extracted = get_weave_attributes(attributes)
+        assert extracted["agent_name"] == "my-agent"
+        assert extracted["agent_id"] == "agent-42"
+
+    def test_genai_semconv_cache_token_usage(self):
+        """Test extraction of cache_creation and cache_read token usage."""
+        attributes = create_attributes(
+            {
+                "gen_ai.usage.input_tokens": 100,
+                "gen_ai.usage.output_tokens": 50,
+                "gen_ai.usage.cache_creation.input_tokens": 80,
+                "gen_ai.usage.cache_read.input_tokens": 20,
+            }
+        )
+        usage = get_weave_usage(attributes) or {}
+        assert usage.get("input_tokens") == 100
+        assert usage.get("output_tokens") == 50
+        assert usage.get("cache_creation_input_tokens") == 80
+        assert usage.get("cache_read_input_tokens") == 20
+        assert usage.get("total_tokens") == 150
+
+    def test_genai_semconv_conversation_id_as_thread_and_turn(self):
+        """Test that gen_ai.conversation.id maps to both thread_id and is_turn."""
+        test_conversation_id = "conv-abc-123"
+        attributes = create_attributes(
+            {
+                "gen_ai.conversation.id": test_conversation_id,
+            }
+        )
+        extracted = get_wandb_attributes(attributes)
+        assert extracted["thread_id"] == test_conversation_id
+        # is_turn should be truthy (the conversation id itself)
+        assert extracted["is_turn"]
+
+    def test_genai_semconv_conversation_id_priority_over_wandb(self):
+        """Test that gen_ai.conversation.id takes priority over wandb.thread_id."""
+        attributes = create_attributes(
+            {
+                "gen_ai.conversation.id": "conv-from-semconv",
+                "wandb.thread_id": "thread-from-wandb",
+            }
+        )
+        extracted = get_wandb_attributes(attributes)
+        assert extracted["thread_id"] == "conv-from-semconv"
 
     def test_opentelemetry_cost_calculation(self, client: weave_client.WeaveClient):
         """Test that costs are properly calculated for OTEL spans with usage at query time."""
