@@ -2319,6 +2319,9 @@ def process_children_of_eval_ids_to_sql(
         param_builder.add_param(eval_root_ids), "Array(String)"
     )
 
+    # find all direct children of the eval root ids (predict_and_score, summarize, etc).
+    # used in the WHERE clause to fetch both these children and their children (predict/score calls),
+    # and in the HAVING clause to filter out unrelated top-level calls that leak in via parent_id IS NULL.
     if eval_subcall_cte_name:
         eval_root_children_subquery = f"SELECT id FROM {eval_subcall_cte_name}"
     else:
