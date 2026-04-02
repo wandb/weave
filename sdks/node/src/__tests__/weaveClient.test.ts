@@ -78,6 +78,17 @@ describe('WeaveClient', () => {
         columns: undefined,
         expand_columns: undefined,
       });
+
+      (
+        mockTraceServerApi.calls
+          .callsQueryStreamCallsStreamQueryPost as jest.Mock
+      ).mockClear();
+      mockStreamResponse(mockTraceServerApi, mockCalls);
+
+      // Test that the parameterless call signature is supported.
+      const defaultResult = await client.getCalls();
+
+      expect(defaultResult).toEqual(mockCalls);
     });
 
     it('should fetch and return calls with the options signature', async () => {

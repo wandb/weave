@@ -305,14 +305,14 @@ export class WeaveClient {
     return reconciledCallArgs;
   }
 
-  public async getCalls(options: GetCallsOptions): Promise<Call[]>;
+  public async getCalls(options?: GetCallsOptions): Promise<Call[]>;
   public async getCalls(
-    options: CallsFilter,
+    options?: CallsFilter,
     includeCosts?: boolean,
     limit?: number
   ): Promise<Call[]>;
   public async getCalls(
-    options: GetCallsOptions | CallsFilter,
+    options: GetCallsOptions | CallsFilter = {},
     includeCosts?: boolean,
     limit?: number
   ): Promise<Call[]> {
@@ -328,15 +328,15 @@ export class WeaveClient {
   }
 
   public getCallsIterator(
-    options: CallsFilter,
+    options?: CallsFilter,
     includeCosts?: boolean,
     limit?: number
   ): AsyncIterableIterator<CallSchema>;
   public getCallsIterator(
-    options: GetCallsOptions
+    options?: GetCallsOptions
   ): AsyncIterableIterator<CallSchema>;
   public getCallsIterator(
-    options: GetCallsOptions | CallsFilter,
+    options: GetCallsOptions | CallsFilter = {},
     includeCosts?: boolean,
     limit?: number
   ): AsyncIterableIterator<CallSchema> {
