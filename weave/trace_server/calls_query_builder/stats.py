@@ -6,6 +6,7 @@ special-case optimizations for common hot-path patterns.
 
 import logging
 from collections.abc import KeysView
+from typing import TYPE_CHECKING
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.fields import (
@@ -21,6 +22,9 @@ from weave.trace_server.calls_query_builder.utils import (
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
+
+if TYPE_CHECKING:
+    from weave.trace_server.calls_query_builder.calls_query_builder import CallsQuery
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +47,6 @@ def build_calls_stats_query(
     Returns:
         Tuple of (SQL query string, column names in the result)
     """
-    # Import here to avoid circular dependency: stats -> query -> stats
-    # stats.py uses CallsQuery which is defined in calls_query_builder.py
-    from weave.trace_server.calls_query_builder.calls_query_builder import CallsQuery
-
     aggregated_columns = {"count": "count()"}
 
     # Try optimized special case queries first
@@ -68,7 +68,7 @@ def build_calls_stats_query(
         return (query, aggregated_columns.keys())
 
     # For calls_merged, use subquery wrapping (GROUP BY requires materialization)
-    cq = _build_stats_calls_query(req, read_table, CallsQuery)
+    cq = _build_stats_calls_query(req, read_table)
     inner_query = cq.as_sql(param_builder)
     calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
@@ -78,10 +78,14 @@ def build_calls_stats_query(
 def _build_stats_calls_query(
     req: tsi.CallsQueryStatsReq,
     read_table: ReadTable,
-    calls_query_cls: type,
-) -> "CallsQuery":  # noqa: F821
+) -> "CallsQuery":
     """Build a CallsQuery populated with the stats request's filters and conditions."""
-    cq = calls_query_cls(
+    # Deferred import to avoid circular dependency: stats -> calls_query_builder -> token_costs
+    from weave.trace_server.calls_query_builder.calls_query_builder import (
+        CallsQuery as _CallsQuery,
+    )
+
+    cq = _CallsQuery(
         project_id=req.project_id,
         include_total_storage_size=req.include_total_storage_size or False,
         read_table=read_table,
@@ -114,10 +118,8 @@ def _build_calls_complete_stats_query(
     Uses CallsQuery._build_query_body for filter/condition/JOIN building,
     then composes its own aggregate SELECT clause on top.
     """
-    from weave.trace_server.calls_query_builder.calls_query_builder import CallsQuery
-
     table_name = get_calls_table_name(ReadTable.CALLS_COMPLETE)
-    cq = _build_stats_calls_query(req, ReadTable.CALLS_COMPLETE, CallsQuery)
+    cq = _build_stats_calls_query(req, ReadTable.CALLS_COMPLETE)
 
     # Inject deleted_at sentinel filter for calls_complete (epoch zero = not deleted).
     # This is needed because _build_query_body doesn't inject it automatically --
