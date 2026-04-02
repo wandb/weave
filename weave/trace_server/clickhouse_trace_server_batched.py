@@ -171,6 +171,11 @@ from weave.trace_server.model_providers.model_providers import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
+from weave.trace_server.opentelemetry.types import (
+    CallPair,
+    OTelSpanParseResult,
+    RejectedOTelSpan,
+)
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
@@ -588,8 +593,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     )
     def _otel_parse_and_convert_spans(
         self, req: tsi.OTelExportReq
-    ) -> tsi.OTelSpanParseResult:
-        result = tsi.OTelSpanParseResult()
+    ) -> OTelSpanParseResult:
+        result = OTelSpanParseResult()
         for processed_span in req.processed_spans:
             wb_run_id = processed_span.run_id
 
@@ -615,7 +620,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             span_id = ""
                             name = ""
                         result.rejected.append(
-                            tsi.RejectedOTelSpan(
+                            RejectedOTelSpan(
                                 error=str(e),
                                 name=name,
                                 trace_id=trace_id,
@@ -629,14 +634,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         wb_user_id=req.wb_user_id,
                         wb_run_id=wb_run_id,
                     )
-                    result.calls.append(tsi.CallPair(start=start, end=end))
+                    result.calls.append(CallPair(start=start, end=end))
         return result
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_resolve_ops")
     def _otel_resolve_ops(
         self,
         req: tsi.OTelExportReq,
-        calls: list[tsi.CallPair],
+        calls: list[CallPair],
     ) -> None:
         obj_id_idx_map = defaultdict(list)
         for idx, pair in enumerate(calls):
@@ -687,7 +692,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     )
     def _otel_convert_and_insert_rows(
         self,
-        calls: list[tsi.CallPair],
+        calls: list[CallPair],
         write_target: WriteTarget,
     ) -> None:
         if write_target == WriteTarget.CALLS_COMPLETE:
