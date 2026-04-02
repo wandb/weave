@@ -55,338 +55,6 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Free helper functions
-# ---------------------------------------------------------------------------
-
-
-def update_metadata_from_chunk(
-    chunk: dict[str, Any], aggregated_metadata: dict[str, Any]
-) -> None:
-    """Update aggregated metadata from a chunk."""
-    metadata_fields = [
-        "id",
-        "created",
-        "model",
-        "system_fingerprint",
-        "service_tier",
-        "usage",
-    ]
-
-    for field in metadata_fields:
-        if field in chunk and field not in aggregated_metadata:
-            if field == "service_tier":
-                aggregated_metadata[field] = chunk.get(field, "default")
-            else:
-                aggregated_metadata[field] = chunk[field]
-
-
-def process_tool_call_delta(
-    tool_call_delta: list, tool_calls: list[dict[str, Any]]
-) -> None:
-    """Process tool call delta and update tool_calls list."""
-    for tool_call in tool_call_delta:
-        tool_call_index = tool_call.get("index", 0)
-
-        # Ensure we have enough tool calls in our list
-        while len(tool_calls) <= tool_call_index:
-            tool_calls.append(
-                {
-                    "id": None,
-                    "type": "function",
-                    "function": {"name": "", "arguments": ""},
-                }
-            )
-
-        existing_tool_call = tool_calls[tool_call_index]
-
-        # Update existing tool call fields
-        if tool_call.get("id"):
-            existing_tool_call["id"] = tool_call["id"]
-        if tool_call.get("type"):
-            existing_tool_call["type"] = tool_call["type"]
-
-        if "function" in tool_call:
-            function_data = tool_call["function"]
-            if function_data.get("name"):
-                existing_tool_call["function"]["name"] = function_data["name"]
-            if "arguments" in function_data:
-                existing_tool_call["function"]["arguments"] += function_data[
-                    "arguments"
-                ]
-
-
-def create_tracked_stream_wrapper(
-    insert_call: Callable[[CallEndCHInsertable], None],
-    chunk_iter: Iterator[dict[str, Any]],
-    start_call: CallStartCHInsertable,
-    model_name: str,
-    project_id: str,
-    end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None,
-) -> Iterator[dict[str, Any]]:
-    """Create a wrapper that tracks streaming completion and emits call records."""
-
-    def _stream_wrapper() -> Iterator[dict[str, Any]]:
-        # (1) send meta chunk first so clients can associate stream
-        yield {"_meta": {"weave_call_id": start_call.id}}
-
-        # Initialize accumulation variables for all choices
-        aggregated_output: dict[str, Any] | None = None
-        choice_contents: dict[int, list[str]] = {}  # Track content by choice index
-        choice_tool_calls: dict[
-            int, list[dict[str, Any]]
-        ] = {}  # Track tool calls by choice index
-        choice_reasoning_content: dict[
-            int, list[str]
-        ] = {}  # Track reasoning by choice index
-        choice_finish_reasons: dict[
-            int, str | None
-        ] = {}  # Track finish reasons by choice index
-        aggregated_metadata: dict[str, Any] = {}
-
-        try:
-            for chunk in chunk_iter:
-                yield chunk  # Yield to client immediately
-
-                if not isinstance(chunk, dict):
-                    continue
-
-                # Accumulate metadata from chunks
-                update_metadata_from_chunk(chunk, aggregated_metadata)
-
-                # Process all choices in the chunk
-                choices = chunk.get("choices")
-                if choices:
-                    for choice in choices:
-                        choice_index = choice.get("index", 0)
-
-                        # Initialize choice accumulators if not present
-                        if choice_index not in choice_contents:
-                            choice_contents[choice_index] = []
-                            choice_tool_calls[choice_index] = []
-                            choice_reasoning_content[choice_index] = []
-                            choice_finish_reasons[choice_index] = None
-
-                        # Update finish reason
-                        if "finish_reason" in choice:
-                            choice_finish_reasons[choice_index] = choice[
-                                "finish_reason"
-                            ]
-
-                        delta = choice.get("delta")
-                        if delta and isinstance(delta, dict):
-                            # Accumulate assistant content for this choice
-                            content_piece = delta.get("content")
-                            if content_piece:
-                                choice_contents[choice_index].append(content_piece)
-
-                            # Handle tool calls for this choice
-                            tool_call_delta = delta.get("tool_calls")
-                            if tool_call_delta:
-                                process_tool_call_delta(
-                                    tool_call_delta, choice_tool_calls[choice_index]
-                                )
-
-                            # Handle reasoning content for this choice
-                            reasoning_content_delta = delta.get("reasoning_content")
-                            if reasoning_content_delta:
-                                choice_reasoning_content[choice_index].append(
-                                    reasoning_content_delta
-                                )
-
-        finally:
-            # Build final aggregated output with all choices
-            if choice_contents or choice_tool_calls or choice_reasoning_content:
-                choices_array = _build_choices_array(
-                    choice_contents,
-                    choice_tool_calls,
-                    choice_reasoning_content,
-                    choice_finish_reasons,
-                )
-                aggregated_output = _build_completion_response(
-                    aggregated_metadata,
-                    choices_array,
-                )
-
-            # Prepare summary and end call
-            summary: dict[str, Any] = {}
-            if aggregated_output is not None and model_name is not None:
-                aggregated_output["model"] = model_name
-
-                if "usage" in aggregated_output:
-                    summary["usage"] = {model_name: aggregated_output["usage"]}
-
-            end = tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=start_call.id,
-                ended_at=datetime.datetime.now(),
-                output=aggregated_output,
-                summary=summary,
-            )
-            if end_call_handler is not None:
-                end_call_handler(end)
-            else:
-                end_call_ch = end_call_for_insert_to_ch_insertable(end)
-                insert_call(end_call_ch)
-
-    return _stream_wrapper()
-
-
-@dataclasses.dataclass(frozen=True)
-class CompletionModelInfo:
-    model_name: str
-    api_key: str | None
-    provider: str
-    base_url: str | None
-    extra_headers: dict[str, str]
-    return_type: str | None
-    vertex_credentials: str | None = None
-
-
-def setup_completion_model_info(
-    model_info: LLMModelProviderInfo | None,
-    req: tsi.CompletionsCreateReq,
-    obj_read: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
-) -> CompletionModelInfo:
-    """Extract model setup logic shared between completions_create and completions_create_stream.
-
-    Returns:
-        CompletionModelInfo containing model/provider/credential config.
-
-    Note: api_key can be None for bedrock providers (AWS credentials) or vertex_ai
-    when vertex_credentials is provided.
-    """
-    model_name = req.inputs.model
-    api_key: str | None = None
-    provider: str = "openai"  # Default provider
-    base_url: str | None = None
-    extra_headers: dict[str, str] = {}
-    return_type: str | None = None
-    vertex_credentials: str | None = getattr(req.inputs, "vertex_credentials", None)
-
-    # Check for explicit custom provider prefix
-    is_explicit_custom = model_name.startswith("custom::")
-
-    is_coreweave = (
-        model_info and model_info.get("litellm_provider") == "coreweave"
-    ) or model_name.startswith("coreweave/")
-    if is_coreweave:
-        # See https://docs.litellm.ai/docs/providers/openai_compatible
-        # but ignore the bit about omitting the /v1 because it is actually necessary
-        req.inputs.model = "openai/" + model_name.removeprefix("coreweave/")
-        provider = "custom"
-        base_url = wf_env.inference_service_base_url()
-        # The API key should have been passed in as an extra header.
-        if req.inputs.extra_headers:
-            api_key = req.inputs.extra_headers.pop("api_key", None)
-            extra_headers = req.inputs.extra_headers
-            req.inputs.extra_headers = None
-        return_type = "openai"
-        return CompletionModelInfo(
-            model_name=model_name,
-            api_key=api_key,
-            provider=provider,
-            base_url=base_url,
-            extra_headers=extra_headers,
-            return_type=return_type,
-            vertex_credentials=None,
-        )
-    elif is_explicit_custom:
-        # Custom provider path - model_name format: custom::<provider>::<model>
-        # Parse provider and model names, create sanitized object_id for lookup
-        name_part = model_name.replace("custom::", "")
-
-        if "::" in name_part:
-            # Format: custom::<provider>::<model>
-            provider_name, model_name_part = name_part.split("::", 1)
-
-            # Create sanitized object_id to match what was created during provider setup
-
-            sanitized_provider = sanitize_name_for_object_id(provider_name)
-            sanitized_model = sanitize_name_for_object_id(model_name_part)
-            sanitized_object_id = f"{sanitized_provider}-{sanitized_model}"
-        else:
-            # Fallback: assume it's already in object_id format
-            # Extract names from object_id (this is a fallback case)
-            parts = name_part.split("-", 1) if "-" in name_part else [name_part, ""]
-            provider_name = parts[0]  # May be sanitized
-            model_name_part = parts[1] if len(parts) > 1 else ""
-            sanitized_provider = provider_name  # Already sanitized
-            sanitized_object_id = name_part
-
-        custom_provider_info = get_custom_provider_info(
-            project_id=req.project_id,
-            provider_name=sanitized_provider,
-            model_name=sanitized_object_id,
-            obj_read_func=obj_read,
-        )
-
-        base_url = custom_provider_info.base_url
-        final_model_name = custom_provider_info.actual_model_name
-        provider_model_name = (
-            f"{provider_name}/{final_model_name}"
-            if "::" in name_part
-            else final_model_name
-        )
-
-        # prefix the model name with "ollama/" if it is an ollama model else with openai/
-        req.inputs.model = (
-            "ollama/" + final_model_name
-            if "ollama" in provider_name.lower()
-            else "openai/" + final_model_name
-        )
-
-        return CompletionModelInfo(
-            model_name=provider_model_name,
-            api_key=custom_provider_info.api_key,
-            provider="custom",
-            base_url=base_url,
-            extra_headers=custom_provider_info.extra_headers,
-            return_type=custom_provider_info.return_type,
-            vertex_credentials=None,
-        )
-    elif model_info:
-        secret_name = model_info.get("api_key_name")
-        if not secret_name:
-            raise InvalidRequest(f"No secret name found for model {model_name}")
-
-        secret_fetcher = _secret_fetcher_context.get()
-        if not secret_fetcher:
-            raise InvalidRequest(
-                f"No secret fetcher found, cannot fetch API key for model {model_name}"
-            )
-
-        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        provider = model_info.get("litellm_provider", "openai")
-        is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
-        if is_vertex_provider and vertex_credentials:
-            api_key = None  # Use vertex_credentials instead
-        credentials_satisfied = is_vertex_provider and vertex_credentials
-        if (
-            not api_key
-            and provider not in {"bedrock", "bedrock_converse"}
-            and not credentials_satisfied
-        ):
-            raise MissingLLMApiKeyError(
-                f"No API key {secret_name} found for model {model_name}",
-                api_key_name=secret_name,
-            )
-
-    return CompletionModelInfo(
-        model_name=model_name,
-        api_key=api_key,
-        provider=provider,
-        base_url=base_url,
-        extra_headers=extra_headers,
-        return_type=return_type,
-        vertex_credentials=vertex_credentials,
-    )
-
-
-def sanitize_name_for_object_id(name: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9_-]", "_", name)
-
-
-# ---------------------------------------------------------------------------
 # Mixin class
 # ---------------------------------------------------------------------------
 
@@ -790,3 +458,335 @@ class CompletionsMixin:
         return tsi.ImageGenerationCreateRes(
             response=res.response, weave_call_id=start_call.id
         )
+
+
+# ---------------------------------------------------------------------------
+# Free helper functions
+# ---------------------------------------------------------------------------
+
+
+def update_metadata_from_chunk(
+    chunk: dict[str, Any], aggregated_metadata: dict[str, Any]
+) -> None:
+    """Update aggregated metadata from a chunk."""
+    metadata_fields = [
+        "id",
+        "created",
+        "model",
+        "system_fingerprint",
+        "service_tier",
+        "usage",
+    ]
+
+    for field in metadata_fields:
+        if field in chunk and field not in aggregated_metadata:
+            if field == "service_tier":
+                aggregated_metadata[field] = chunk.get(field, "default")
+            else:
+                aggregated_metadata[field] = chunk[field]
+
+
+def process_tool_call_delta(
+    tool_call_delta: list, tool_calls: list[dict[str, Any]]
+) -> None:
+    """Process tool call delta and update tool_calls list."""
+    for tool_call in tool_call_delta:
+        tool_call_index = tool_call.get("index", 0)
+
+        # Ensure we have enough tool calls in our list
+        while len(tool_calls) <= tool_call_index:
+            tool_calls.append(
+                {
+                    "id": None,
+                    "type": "function",
+                    "function": {"name": "", "arguments": ""},
+                }
+            )
+
+        existing_tool_call = tool_calls[tool_call_index]
+
+        # Update existing tool call fields
+        if tool_call.get("id"):
+            existing_tool_call["id"] = tool_call["id"]
+        if tool_call.get("type"):
+            existing_tool_call["type"] = tool_call["type"]
+
+        if "function" in tool_call:
+            function_data = tool_call["function"]
+            if function_data.get("name"):
+                existing_tool_call["function"]["name"] = function_data["name"]
+            if "arguments" in function_data:
+                existing_tool_call["function"]["arguments"] += function_data[
+                    "arguments"
+                ]
+
+
+def create_tracked_stream_wrapper(
+    insert_call: Callable[[CallEndCHInsertable], None],
+    chunk_iter: Iterator[dict[str, Any]],
+    start_call: CallStartCHInsertable,
+    model_name: str,
+    project_id: str,
+    end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None,
+) -> Iterator[dict[str, Any]]:
+    """Create a wrapper that tracks streaming completion and emits call records."""
+
+    def _stream_wrapper() -> Iterator[dict[str, Any]]:
+        # (1) send meta chunk first so clients can associate stream
+        yield {"_meta": {"weave_call_id": start_call.id}}
+
+        # Initialize accumulation variables for all choices
+        aggregated_output: dict[str, Any] | None = None
+        choice_contents: dict[int, list[str]] = {}  # Track content by choice index
+        choice_tool_calls: dict[
+            int, list[dict[str, Any]]
+        ] = {}  # Track tool calls by choice index
+        choice_reasoning_content: dict[
+            int, list[str]
+        ] = {}  # Track reasoning by choice index
+        choice_finish_reasons: dict[
+            int, str | None
+        ] = {}  # Track finish reasons by choice index
+        aggregated_metadata: dict[str, Any] = {}
+
+        try:
+            for chunk in chunk_iter:
+                yield chunk  # Yield to client immediately
+
+                if not isinstance(chunk, dict):
+                    continue
+
+                # Accumulate metadata from chunks
+                update_metadata_from_chunk(chunk, aggregated_metadata)
+
+                # Process all choices in the chunk
+                choices = chunk.get("choices")
+                if choices:
+                    for choice in choices:
+                        choice_index = choice.get("index", 0)
+
+                        # Initialize choice accumulators if not present
+                        if choice_index not in choice_contents:
+                            choice_contents[choice_index] = []
+                            choice_tool_calls[choice_index] = []
+                            choice_reasoning_content[choice_index] = []
+                            choice_finish_reasons[choice_index] = None
+
+                        # Update finish reason
+                        if "finish_reason" in choice:
+                            choice_finish_reasons[choice_index] = choice[
+                                "finish_reason"
+                            ]
+
+                        delta = choice.get("delta")
+                        if delta and isinstance(delta, dict):
+                            # Accumulate assistant content for this choice
+                            content_piece = delta.get("content")
+                            if content_piece:
+                                choice_contents[choice_index].append(content_piece)
+
+                            # Handle tool calls for this choice
+                            tool_call_delta = delta.get("tool_calls")
+                            if tool_call_delta:
+                                process_tool_call_delta(
+                                    tool_call_delta, choice_tool_calls[choice_index]
+                                )
+
+                            # Handle reasoning content for this choice
+                            reasoning_content_delta = delta.get("reasoning_content")
+                            if reasoning_content_delta:
+                                choice_reasoning_content[choice_index].append(
+                                    reasoning_content_delta
+                                )
+
+        finally:
+            # Build final aggregated output with all choices
+            if choice_contents or choice_tool_calls or choice_reasoning_content:
+                choices_array = _build_choices_array(
+                    choice_contents,
+                    choice_tool_calls,
+                    choice_reasoning_content,
+                    choice_finish_reasons,
+                )
+                aggregated_output = _build_completion_response(
+                    aggregated_metadata,
+                    choices_array,
+                )
+
+            # Prepare summary and end call
+            summary: dict[str, Any] = {}
+            if aggregated_output is not None and model_name is not None:
+                aggregated_output["model"] = model_name
+
+                if "usage" in aggregated_output:
+                    summary["usage"] = {model_name: aggregated_output["usage"]}
+
+            end = tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=start_call.id,
+                ended_at=datetime.datetime.now(),
+                output=aggregated_output,
+                summary=summary,
+            )
+            if end_call_handler is not None:
+                end_call_handler(end)
+            else:
+                end_call_ch = end_call_for_insert_to_ch_insertable(end)
+                insert_call(end_call_ch)
+
+    return _stream_wrapper()
+
+
+@dataclasses.dataclass(frozen=True)
+class CompletionModelInfo:
+    model_name: str
+    api_key: str | None
+    provider: str
+    base_url: str | None
+    extra_headers: dict[str, str]
+    return_type: str | None
+    vertex_credentials: str | None = None
+
+
+def setup_completion_model_info(
+    model_info: LLMModelProviderInfo | None,
+    req: tsi.CompletionsCreateReq,
+    obj_read: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
+) -> CompletionModelInfo:
+    """Extract model setup logic shared between completions_create and completions_create_stream.
+
+    Returns:
+        CompletionModelInfo containing model/provider/credential config.
+
+    Note: api_key can be None for bedrock providers (AWS credentials) or vertex_ai
+    when vertex_credentials is provided.
+    """
+    model_name = req.inputs.model
+    api_key: str | None = None
+    provider: str = "openai"  # Default provider
+    base_url: str | None = None
+    extra_headers: dict[str, str] = {}
+    return_type: str | None = None
+    vertex_credentials: str | None = getattr(req.inputs, "vertex_credentials", None)
+
+    # Check for explicit custom provider prefix
+    is_explicit_custom = model_name.startswith("custom::")
+
+    is_coreweave = (
+        model_info and model_info.get("litellm_provider") == "coreweave"
+    ) or model_name.startswith("coreweave/")
+    if is_coreweave:
+        # See https://docs.litellm.ai/docs/providers/openai_compatible
+        # but ignore the bit about omitting the /v1 because it is actually necessary
+        req.inputs.model = "openai/" + model_name.removeprefix("coreweave/")
+        provider = "custom"
+        base_url = wf_env.inference_service_base_url()
+        # The API key should have been passed in as an extra header.
+        if req.inputs.extra_headers:
+            api_key = req.inputs.extra_headers.pop("api_key", None)
+            extra_headers = req.inputs.extra_headers
+            req.inputs.extra_headers = None
+        return_type = "openai"
+        return CompletionModelInfo(
+            model_name=model_name,
+            api_key=api_key,
+            provider=provider,
+            base_url=base_url,
+            extra_headers=extra_headers,
+            return_type=return_type,
+            vertex_credentials=None,
+        )
+    elif is_explicit_custom:
+        # Custom provider path - model_name format: custom::<provider>::<model>
+        # Parse provider and model names, create sanitized object_id for lookup
+        name_part = model_name.replace("custom::", "")
+
+        if "::" in name_part:
+            # Format: custom::<provider>::<model>
+            provider_name, model_name_part = name_part.split("::", 1)
+
+            # Create sanitized object_id to match what was created during provider setup
+
+            sanitized_provider = sanitize_name_for_object_id(provider_name)
+            sanitized_model = sanitize_name_for_object_id(model_name_part)
+            sanitized_object_id = f"{sanitized_provider}-{sanitized_model}"
+        else:
+            # Fallback: assume it's already in object_id format
+            # Extract names from object_id (this is a fallback case)
+            parts = name_part.split("-", 1) if "-" in name_part else [name_part, ""]
+            provider_name = parts[0]  # May be sanitized
+            model_name_part = parts[1] if len(parts) > 1 else ""
+            sanitized_provider = provider_name  # Already sanitized
+            sanitized_object_id = name_part
+
+        custom_provider_info = get_custom_provider_info(
+            project_id=req.project_id,
+            provider_name=sanitized_provider,
+            model_name=sanitized_object_id,
+            obj_read_func=obj_read,
+        )
+
+        base_url = custom_provider_info.base_url
+        final_model_name = custom_provider_info.actual_model_name
+        provider_model_name = (
+            f"{provider_name}/{final_model_name}"
+            if "::" in name_part
+            else final_model_name
+        )
+
+        # prefix the model name with "ollama/" if it is an ollama model else with openai/
+        req.inputs.model = (
+            "ollama/" + final_model_name
+            if "ollama" in provider_name.lower()
+            else "openai/" + final_model_name
+        )
+
+        return CompletionModelInfo(
+            model_name=provider_model_name,
+            api_key=custom_provider_info.api_key,
+            provider="custom",
+            base_url=base_url,
+            extra_headers=custom_provider_info.extra_headers,
+            return_type=custom_provider_info.return_type,
+            vertex_credentials=None,
+        )
+    elif model_info:
+        secret_name = model_info.get("api_key_name")
+        if not secret_name:
+            raise InvalidRequest(f"No secret name found for model {model_name}")
+
+        secret_fetcher = _secret_fetcher_context.get()
+        if not secret_fetcher:
+            raise InvalidRequest(
+                f"No secret fetcher found, cannot fetch API key for model {model_name}"
+            )
+
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        provider = model_info.get("litellm_provider", "openai")
+        is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
+        if is_vertex_provider and vertex_credentials:
+            api_key = None  # Use vertex_credentials instead
+        credentials_satisfied = is_vertex_provider and vertex_credentials
+        if (
+            not api_key
+            and provider not in {"bedrock", "bedrock_converse"}
+            and not credentials_satisfied
+        ):
+            raise MissingLLMApiKeyError(
+                f"No API key {secret_name} found for model {model_name}",
+                api_key_name=secret_name,
+            )
+
+    return CompletionModelInfo(
+        model_name=model_name,
+        api_key=api_key,
+        provider=provider,
+        base_url=base_url,
+        extra_headers=extra_headers,
+        return_type=return_type,
+        vertex_credentials=vertex_credentials,
+    )
+
+
+def sanitize_name_for_object_id(name: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", name)
