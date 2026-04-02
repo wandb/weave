@@ -1,15 +1,13 @@
-from __future__ import annotations
-
 """Annotation queue methods for the ClickHouse trace server.
 
 This module extracts annotation queue CRUD operations and related
 queue-item / progress-update logic into a mixin class so that
 `ClickHouseTraceServer` can compose them without growing unboundedly.
 """
+# mypy: disable-error-code="attr-defined"
 
 import datetime
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 import ddtrace
@@ -37,11 +35,6 @@ from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_queues_stats_query,
 )
 
-if TYPE_CHECKING:
-    from weave.trace_server.clickhouse_trace_server_batched import (
-        ClickHouseTraceServer,
-    )
-
 
 class AnnotationQueuesMixin:
     """Mixin providing annotation-queue operations for ClickHouseTraceServer.
@@ -63,7 +56,7 @@ class AnnotationQueuesMixin:
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_create")
     def annotation_queue_create(
-        self: ClickHouseTraceServer, req: tsi.AnnotationQueueCreateReq
+        self, req: tsi.AnnotationQueueCreateReq
     ) -> tsi.AnnotationQueueCreateRes:
         """Create a new annotation queue."""
         assert_non_null_wb_user_id(req)
@@ -95,7 +88,7 @@ class AnnotationQueuesMixin:
         name="clickhouse_trace_server_batched.annotation_queues_query_stream"
     )
     def annotation_queues_query_stream(
-        self: ClickHouseTraceServer, req: tsi.AnnotationQueuesQueryReq
+        self, req: tsi.AnnotationQueuesQueryReq
     ) -> Iterator[tsi.AnnotationQueueSchema]:
         """Stream annotation queues for a project."""
         pb = ParamBuilder()
@@ -148,7 +141,7 @@ class AnnotationQueuesMixin:
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_read")
     def annotation_queue_read(
-        self: ClickHouseTraceServer, req: tsi.AnnotationQueueReadReq
+        self, req: tsi.AnnotationQueueReadReq
     ) -> tsi.AnnotationQueueReadRes:
         """Read a specific annotation queue."""
         pb = ParamBuilder()
@@ -182,7 +175,7 @@ class AnnotationQueuesMixin:
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_update")
     def annotation_queue_update(
-        self: ClickHouseTraceServer, req: tsi.AnnotationQueueUpdateReq
+        self, req: tsi.AnnotationQueueUpdateReq
     ) -> tsi.AnnotationQueueUpdateRes:
         """Update an annotation queue.
 
@@ -278,7 +271,7 @@ class AnnotationQueuesMixin:
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_delete")
     def annotation_queue_delete(
-        self: ClickHouseTraceServer, req: tsi.AnnotationQueueDeleteReq
+        self, req: tsi.AnnotationQueueDeleteReq
     ) -> tsi.AnnotationQueueDeleteRes:
         """Soft-delete an annotation queue by setting deleted_at timestamp."""
         pb = ParamBuilder()
@@ -339,7 +332,7 @@ class AnnotationQueuesMixin:
         name="clickhouse_trace_server_batched.annotation_queue_add_calls"
     )
     def annotation_queue_add_calls(
-        self: ClickHouseTraceServer, req: tsi.AnnotationQueueAddCallsReq
+        self, req: tsi.AnnotationQueueAddCallsReq
     ) -> tsi.AnnotationQueueAddCallsRes:
         """Add calls to an annotation queue in batch with duplicate prevention."""
         assert_non_null_wb_user_id(req)
@@ -436,7 +429,7 @@ class AnnotationQueuesMixin:
         name="clickhouse_trace_server_batched.annotation_queue_items_query"
     )
     def annotation_queue_items_query(
-        self: ClickHouseTraceServer, req: tsi.AnnotationQueueItemsQueryReq
+        self, req: tsi.AnnotationQueueItemsQueryReq
     ) -> tsi.AnnotationQueueItemsQueryRes:
         """Query items in an annotation queue with pagination, sorting, and filtering."""
         pb = ParamBuilder()
@@ -486,7 +479,7 @@ class AnnotationQueuesMixin:
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queues_stats")
     def annotation_queues_stats(
-        self: ClickHouseTraceServer, req: tsi.AnnotationQueuesStatsReq
+        self, req: tsi.AnnotationQueuesStatsReq
     ) -> tsi.AnnotationQueuesStatsRes:
         """Get stats for multiple annotation queues."""
         if not req.queue_ids:
@@ -522,7 +515,7 @@ class AnnotationQueuesMixin:
     # ------------------------------------------------------------------
 
     def _fetch_queue_item_for_progress_update(
-        self: ClickHouseTraceServer, project_id: str, queue_id: str, item_id: str
+        self, project_id: str, queue_id: str, item_id: str
     ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
         """Fetch a queue item and return it wrapped in progress update response."""
         pb = ParamBuilder()
@@ -566,7 +559,7 @@ class AnnotationQueuesMixin:
         name="clickhouse_trace_server_batched.annotator_queue_items_progress_update"
     )
     def annotator_queue_items_progress_update(
-        self: ClickHouseTraceServer, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
     ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
         """Update annotation state for a queue item using ClickHouse lightweight update.
 
