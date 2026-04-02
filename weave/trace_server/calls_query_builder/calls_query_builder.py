@@ -1704,6 +1704,8 @@ class CallsQuery(BaseModel):
         having_sql = filter_result.filter_sql
         if self.eval_root_ids and self.read_table == ReadTable.CALLS_MERGED:
             parent_id_field = get_field_by_name("parent_id")
+            if not isinstance(parent_id_field, CallsMergedAggField):
+                raise TypeError("parent_id is not an aggregate field")
             parent_id_agg = parent_id_field.as_sql(pb, table_alias, use_agg_fn=True)
             eval_ids_param = param_slot(
                 pb.add_param(self.eval_root_ids), "Array(String)"
