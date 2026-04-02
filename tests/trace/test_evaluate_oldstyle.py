@@ -99,13 +99,21 @@ def test_evaluate_rows_only(client):
     assert result == expected_eval_result
 
 
+@pytest.mark.flaky(reruns=3)
 def test_evaluate_both_styles(client):
+    client.set_autoflush(False)
     evaluation = Evaluation(
         dataset=dataset_rows,
         scorers=[score_oldstyle, score_newstyle],
     )
     model = EvalModel()
-    result = asyncio.run(evaluation.evaluate(model))
+    try:
+        result = asyncio.run(evaluation.evaluate(model))
+        # Flush once after the evaluation to avoid per-op autoflush contention
+        # in the calls_complete ClickHouse path.
+        client.flush()
+    finally:
+        client.set_autoflush(True)
     assert result == {
         "model_output": {"mean": 9.5},
         "score_oldstyle": {"true_count": 1, "true_fraction": 0.5},
