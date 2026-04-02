@@ -6894,7 +6894,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return final_batch
 
 
-
 def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     summary = _nullable_any_dump_to_any(ch_call_dict.get("summary_dump"))
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
@@ -7247,7 +7246,6 @@ def _complete_call_to_ch_insertable(
     )
 
 
-
 # def _partial_obj_schema_to_ch_obj(
 #     partial_obj: tsi.ObjSchemaForInsert,
 # ) -> ObjCHInsertable:
@@ -7322,7 +7320,6 @@ def find_call_descendants(
     descendants = find_all_descendants(root_ids)
 
     return list(descendants)
-
 
 
 def _update_metadata_from_chunk(
