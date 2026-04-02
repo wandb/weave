@@ -5,12 +5,19 @@ Extracts ``completions_create``, ``completions_create_stream``, and
 helper functions they depend on.
 """
 
+from __future__ import annotations
+
 import dataclasses
 import datetime
 import logging
 import re
 from collections.abc import Callable, Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from weave.trace_server.clickhouse_trace_server_batched import (
+        ClickHouseTraceServer,
+    )
 
 from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
@@ -394,7 +401,7 @@ class CompletionsMixin:
     """Mixin providing completions_create, completions_create_stream, and image_create."""
 
     def completions_create(
-        self, req: tsi.CompletionsCreateReq
+        self: ClickHouseTraceServer, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
         # --- Resolve prompt if provided and set messages
         prompt = getattr(req.inputs, "prompt", None)
@@ -538,7 +545,7 @@ class CompletionsMixin:
     # Streaming variant
     # -------------------------------------------------------------------
     def completions_create_stream(
-        self, req: tsi.CompletionsCreateReq
+        self: ClickHouseTraceServer, req: tsi.CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
         """Stream LLM completion chunks.
 
@@ -674,7 +681,7 @@ class CompletionsMixin:
         )
 
     def image_create(
-        self, req: tsi.ImageGenerationCreateReq
+        self: ClickHouseTraceServer, req: tsi.ImageGenerationCreateReq
     ) -> tsi.ImageGenerationCreateRes:
         """Create images using LLM image generation.
 
