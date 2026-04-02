@@ -4,13 +4,9 @@ Handles conversion of calls, objects, and tables between the trace server
 interface (API) representations and their ClickHouse storage formats.
 """
 
-import datetime
 import json
-from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any, cast
-
-import ddtrace
 
 from weave.shared.trace_server_interface_util import extract_refs_from_values
 from weave.trace_server import ch_sentinel_values
@@ -31,9 +27,7 @@ from weave.trace_server.clickhouse_schema import (
     CallStartCHInsertable,
     SelectableCHObjSchema,
 )
-from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.ids import generate_id
-from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.trace_server_common import make_derived_summary_fields
 
 # ---------------------------------------------------------------------------
@@ -263,39 +257,6 @@ def ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
     ]
 
 
-def maybe_enqueue_minimal_call_end(
-    kafka_producer: KafkaProducer | None,
-    project_id: str,
-    id: str,
-    ended_at: datetime.datetime,
-    flush_immediately: bool = False,
-) -> None:
-    """Enqueue a minimal call end event to Kafka if online eval is enabled.
-
-    This is used for online eval triggers where we only need the call identity,
-    not the full payload. Large fields (output, summary, exception) are stripped.
-
-    Args:
-        kafka_producer: The Kafka producer to use.
-        project_id: The project ID.
-        id: The call ID.
-        ended_at: The call end timestamp.
-        flush_immediately: Whether to flush the producer immediately.
-    """
-    if kafka_producer is None:
-        return
-
-    minimal_end = tsi.EndedCallSchemaForInsert(
-        project_id=project_id,
-        id=id,
-        ended_at=ended_at,
-        output=None,
-        summary={},
-        exception=None,
-    )
-    kafka_producer.produce_call_end(minimal_end, flush_immediately)
-
-
 def complete_call_to_ch_insertable(
     complete_call: tsi.CompletedCallSchemaForInsert,
 ) -> CallCompleteCHInsertable:
@@ -404,48 +365,3 @@ def ch_table_stats_to_table_stats_schema(
         digest=digest,
         storage_size_bytes=storage_size_bytes,
     )
-
-
-# ---------------------------------------------------------------------------
-# Call tree utilities
-# ---------------------------------------------------------------------------
-
-
-@ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.find_call_descendants")
-def find_call_descendants(
-    root_ids: list[str],
-    all_calls: list[tsi.CallSchema],
-) -> list[str]:
-    set_current_span_dd_tags(
-        {
-            "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
-                len(root_ids)
-            ),
-            "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
-                len(all_calls)
-            ),
-        }
-    )
-    # make a map of call_id to children list
-    children_map = defaultdict(list)
-    for call in all_calls:
-        if call.parent_id is not None:
-            children_map[call.parent_id].append(call.id)
-
-    # do DFS to get all descendants
-    def find_all_descendants(root_ids: list[str]) -> set[str]:
-        descendants = set()
-        stack = root_ids
-
-        while stack:
-            current_id = stack.pop()
-            if current_id not in descendants:
-                descendants.add(current_id)
-                stack += children_map.get(current_id, [])
-
-        return descendants
-
-    # Find descendants for each initial id
-    descendants = find_all_descendants(root_ids)
-
-    return list(descendants)
