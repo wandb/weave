@@ -1,3 +1,4 @@
+import datetime
 import json
 from unittest import mock
 
@@ -10,7 +11,10 @@ from tests.trace_server.completions_util import with_simple_mock_litellm_complet
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient, generate_id
 from weave.trace_server.trace_server_interface import (
+    CallEndReq,
     CallsQueryReq,
+    CallStartReq,
+    EndedCallSchemaForInsert,
     EvalResultsQueryReq,
     EvaluateModelReq,
     EvaluateModelRes,
@@ -24,6 +28,7 @@ from weave.trace_server.trace_server_interface import (
     PredictionFinishReq,
     ScoreCreateReq,
     ScorerCreateReq,
+    StartedCallSchemaForInsert,
     TableCreateReq,
     TraceServerInterface,
     TraceStatus,
@@ -576,3 +581,69 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
     for call in refs_read_batch_calls:
         # only resolve refs for the paginated slice, not all rows
         assert len(call.refs) <= 2
+
+
+def test_eval_subtree_query_excludes_unrelated_top_level_calls(client, internal_server):
+    """Makes sure that _calls_query_stream_for_eval_subtree does not return calls outside the eval tree."""
+    project_id = client.project_id
+
+    # create an eval with one prediction
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://subtree-test",
+            model="model://subtree-test",
+        )
+    )
+    pred = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model="model://subtree-test",
+            inputs={"x": 1},
+            output="result",
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+        )
+    )
+
+    # create call unrelated to the eval
+    unrelated_call_id = generate_id()
+    client.server.call_start(
+        CallStartReq(
+            start=StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=unrelated_call_id,
+                trace_id=unrelated_call_id,
+                op_name="unrelated_top_level_op",
+                started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                attributes={},
+                inputs={"foo": "bar"},
+            )
+        )
+    )
+    client.server.call_end(
+        CallEndReq(
+            end=EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=unrelated_call_id,
+                ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                output={"result": "done"},
+                summary={},
+            )
+        )
+    )
+
+    raw_call_ids = {
+        c.id
+        for c in internal_server._calls_query_stream_for_eval_subtree(
+            project_id, [run.evaluation_run_id]
+        )
+    }
+    assert unrelated_call_id not in raw_call_ids, (
+        "Unrelated top-level call leaked into eval subtree query"
+    )

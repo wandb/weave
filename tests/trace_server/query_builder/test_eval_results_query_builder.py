@@ -15,33 +15,41 @@ def test_eval_root_ids_filter_calls_merged() -> None:
     assert_sql(
         cq,
         """
+        WITH eval_subcalls AS
+          (SELECT calls_merged.id AS id
+           FROM calls_merged
+           PREWHERE calls_merged.project_id = {pb_2:String}
+           WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
+                  OR calls_merged.parent_id IS NULL)
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)
+           HAVING (((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                   AND (any(calls_merged.parent_id) IN {pb_0:Array(String)})))
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE (calls_merged.parent_id IN {pb_0:Array(String)}
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE (calls_merged.parent_id IN {pb_3:Array(String)}
                OR calls_merged.parent_id IN
-                 (SELECT calls_merged.id AS id
-                  FROM calls_merged
-                  PREWHERE calls_merged.project_id = {pb_3:String}
-                  WHERE (calls_merged.parent_id IN {pb_2:Array(String)}
-                         OR calls_merged.parent_id IS NULL)
-                  GROUP BY (calls_merged.project_id,
-                            calls_merged.id)
-                  HAVING (((any(calls_merged.deleted_at) IS NULL))
-                          AND ((NOT ((any(calls_merged.started_at) IS NULL))))
-                          AND (any(calls_merged.parent_id) IN {pb_1:Array(String)})))
+                 (SELECT id
+                  FROM eval_subcalls)
                OR calls_merged.parent_id IS NULL)
-          AND calls_merged.id NOT IN {pb_0:Array(String)}
+          AND calls_merged.id NOT IN {pb_3:Array(String)}
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        AND (any(calls_merged.parent_id) IN {pb_4:Array(String)}
+             OR any(calls_merged.parent_id) IN
+               (SELECT id
+                FROM eval_subcalls))
         """,
         {
             "pb_0": ["eval-1", "eval-2"],
             "pb_1": ["eval-1", "eval-2"],
-            "pb_2": ["eval-1", "eval-2"],
-            "pb_3": "project",
+            "pb_2": "project",
+            "pb_3": ["eval-1", "eval-2"],
+            "pb_4": ["eval-1", "eval-2"],
         },
     )
 
@@ -89,35 +97,43 @@ def test_eval_root_ids_combined_with_op_names_filter() -> None:
     assert_sql(
         cq,
         """
+        WITH eval_subcalls AS
+          (SELECT calls_merged.id AS id
+           FROM calls_merged
+           PREWHERE calls_merged.project_id = {pb_2:String}
+           WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
+                  OR calls_merged.parent_id IS NULL)
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)
+           HAVING (((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+                   AND (any(calls_merged.parent_id) IN {pb_0:Array(String)})))
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_4:String}
-        WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE ((calls_merged.op_name IN {pb_3:Array(String)})
                OR (calls_merged.op_name IS NULL))
-          AND (calls_merged.parent_id IN {pb_1:Array(String)}
+          AND (calls_merged.parent_id IN {pb_4:Array(String)}
                OR calls_merged.parent_id IN
-                 (SELECT calls_merged.id AS id
-                  FROM calls_merged
-                  PREWHERE calls_merged.project_id = {pb_4:String}
-                  WHERE (calls_merged.parent_id IN {pb_3:Array(String)}
-                         OR calls_merged.parent_id IS NULL)
-                  GROUP BY (calls_merged.project_id,
-                            calls_merged.id)
-                  HAVING (((any(calls_merged.deleted_at) IS NULL))
-                          AND ((NOT ((any(calls_merged.started_at) IS NULL))))
-                          AND (any(calls_merged.parent_id) IN {pb_2:Array(String)})))
+                 (SELECT id
+                  FROM eval_subcalls)
                OR calls_merged.parent_id IS NULL)
-          AND calls_merged.id NOT IN {pb_1:Array(String)}
+          AND calls_merged.id NOT IN {pb_4:Array(String)}
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        AND (any(calls_merged.parent_id) IN {pb_5:Array(String)}
+             OR any(calls_merged.parent_id) IN
+               (SELECT id
+                FROM eval_subcalls))
         """,
         {
-            "pb_0": ["my_op"],
+            "pb_0": ["eval-1"],
             "pb_1": ["eval-1"],
-            "pb_2": ["eval-1"],
-            "pb_3": ["eval-1"],
-            "pb_4": "project",
+            "pb_2": "project",
+            "pb_3": ["my_op"],
+            "pb_4": ["eval-1"],
+            "pb_5": ["eval-1"],
         },
     )
