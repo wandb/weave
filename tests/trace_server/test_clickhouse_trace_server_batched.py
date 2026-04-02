@@ -960,9 +960,7 @@ def test_ensure_obj_version_exists_retries_eventual_consistency():
             NotFoundError,
             match="Object version test_object:digest-1 not found",
         ):
-            server._ensure_obj_version_exists(
-                "test_project", "test_object", "digest-1"
-            )
+            server._ensure_obj_version_exists("test_project", "test_object", "digest-1")
 
         assert mock_query.call_count == chts.OBJ_READ_RETRY_ATTEMPTS
 
