@@ -242,7 +242,7 @@ def test_completions_create_stream_custom_provider():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
     ):
@@ -376,7 +376,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         patch.object(
@@ -554,7 +554,7 @@ def test_completions_create_stream_multiple_choices():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(
             chts.ClickHouseTraceServer, "_insert_call_complete"
@@ -683,7 +683,7 @@ def test_completions_create_stream_single_choice_unified_wrapper():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(
             chts.ClickHouseTraceServer, "_insert_call_complete"
@@ -816,7 +816,7 @@ def test_completions_create_stream_with_prompt_and_template_vars():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
     ):
