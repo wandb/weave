@@ -587,13 +587,7 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
 
 
 def test_eval_subtree_query_excludes_unrelated_top_level_calls(client):
-    """Makes sure that _calls_query_stream_for_eval_subtree does not return calls outside the eval tree.
-
-    On calls_merged, end rows have parent_id=NULL which can cause unrelated
-    top-level calls to leak into the WHERE clause. The HAVING clause prevents this.
-    On SQLite the code path is different (explicit parent_ids filters), so the
-    leak can't happen — but this test still documents the expected contract.
-    """
+    """Makes sure that _calls_query_stream_for_eval_subtree does not return calls outside the eval tree."""
     project_id = client.project_id
 
     # create an eval with one prediction
