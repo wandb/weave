@@ -21,7 +21,7 @@ by the caller, in the expand_columns parameter.
 2. Process the leaf object reference condition, which filters on the value, or in the case
 of ordering extracts and returns the value, into a CTE. In this way we are starting from the
 bottom of the tree, working our way up to the root.
-3. Then we processe the intermediate object reference conditions, which find all objects
+3. Then we process the intermediate object reference conditions, which find all objects
 with a json path value that matches the intermediate object reference condition, into a CTE.
 4. Finally, the main query filters or orders on the result of the last CTE.
 
@@ -52,6 +52,9 @@ from typing import TYPE_CHECKING, Any, Optional, get_args
 
 from pydantic import BaseModel
 
+from weave.trace_server.calls_query_builder.conditions import (
+    process_query_to_conditions,
+)
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.optimization_builder import (
     QueryOptimizationProcessor,
@@ -63,6 +66,7 @@ from weave.trace_server.calls_query_builder.utils import (
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
+    ParamBuilder,
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
@@ -74,7 +78,6 @@ if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
         Condition,
         OrderField,
-        ParamBuilder,
     )
 
 
@@ -501,10 +504,6 @@ class ObjectRefQueryProcessor:
             )
         else:
             # Handle as normal condition
-            from weave.trace_server.calls_query_builder.calls_query_builder import (
-                process_query_to_conditions,
-            )
-
             filter_conditions = process_query_to_conditions(
                 tsi_query.Query.model_validate({"$expr": {"$and": [operand]}}),
                 self.pb,
