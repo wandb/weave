@@ -6,13 +6,10 @@ import pytest
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.server_utils import find_server_layer
 from tests.trace.util import client_is_sqlite
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient, generate_id
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallsQueryReq,
@@ -586,7 +583,9 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
         assert len(call.refs) <= 2
 
 
-def test_eval_subtree_query_excludes_unrelated_top_level_calls(client):
+def test_eval_subtree_query_excludes_unrelated_top_level_calls(
+    client, internal_server
+):
     """Makes sure that _calls_query_stream_for_eval_subtree does not return calls outside the eval tree."""
     project_id = client.project_id
 
@@ -641,17 +640,12 @@ def test_eval_subtree_query_excludes_unrelated_top_level_calls(client):
         )
     )
 
-    if client_is_sqlite(client):
-        internal_server = find_server_layer(client.server, SqliteTraceServer)
-    else:
-        internal_server = find_server_layer(client.server, ClickHouseTraceServer)
-    raw_calls = list(
-        internal_server._calls_query_stream_for_eval_subtree(
+    raw_call_ids = {
+        c.id
+        for c in internal_server._calls_query_stream_for_eval_subtree(
             project_id, [run.evaluation_run_id]
         )
-    )
-
-    raw_call_ids = {c.id for c in raw_calls}
+    }
     assert unrelated_call_id not in raw_call_ids, (
         "Unrelated top-level call leaked into eval subtree query"
     )

@@ -1629,6 +1629,29 @@ class CallsQuery(BaseModel):
             needs_feedback=needs_feedback,
         )
 
+    def _build_eval_subtree_having(
+        self,
+        existing_having: str,
+        pb: ParamBuilder,
+        table_alias: str,
+    ) -> str:
+        """Build a HAVING clause that filters out rows leaked via parent_id IS NULL.
+        On calls_merged, end rows have parent_id=NULL which causes the WHERE clause
+        to match all top-level calls in the project.
+        """
+        parent_id_field = get_field_by_name("parent_id")
+        if not isinstance(parent_id_field, CallsMergedAggField):
+            raise TypeError("parent_id is not an aggregate field")
+        parent_id_agg = parent_id_field.as_sql(pb, table_alias, use_agg_fn=True)
+        eval_ids_param = param_slot(pb.add_param(self.eval_root_ids), "Array(String)")
+        eval_subtree_having = (
+            f"({parent_id_agg} IN {eval_ids_param}"
+            f" OR {parent_id_agg} IN (SELECT id FROM {CTE_EVAL_SUBCALLS}))"
+        )
+        if existing_having:
+            return f"{existing_having}\n        AND {eval_subtree_having}"
+        return f"HAVING {eval_subtree_having}"
+
     def _build_query_body(
         self,
         pb: ParamBuilder,
@@ -1703,21 +1726,7 @@ class CallsQuery(BaseModel):
         # but don't actually belong to the eval subtree (e.g. top-level calls).
         having_sql = filter_result.filter_sql
         if self.eval_root_ids and self.read_table == ReadTable.CALLS_MERGED:
-            parent_id_field = get_field_by_name("parent_id")
-            if not isinstance(parent_id_field, CallsMergedAggField):
-                raise TypeError("parent_id is not an aggregate field")
-            parent_id_agg = parent_id_field.as_sql(pb, table_alias, use_agg_fn=True)
-            eval_ids_param = param_slot(
-                pb.add_param(self.eval_root_ids), "Array(String)"
-            )
-            eval_subtree_having = (
-                f"({parent_id_agg} IN {eval_ids_param}"
-                f" OR {parent_id_agg} IN (SELECT id FROM {CTE_EVAL_SUBCALLS}))"
-            )
-            if having_sql:
-                having_sql += f"\n        AND {eval_subtree_having}"
-            else:
-                having_sql = f"HAVING {eval_subtree_having}"
+            having_sql = self._build_eval_subtree_having(having_sql, pb, table_alias)
 
         return f"""FROM {table_alias}
         {joins.to_sql()}
