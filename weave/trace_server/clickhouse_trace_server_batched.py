@@ -1465,19 +1465,43 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 raw_res.close()
 
     def _calls_query_stream_for_eval_subtree(
-        self, project_id: str, eval_root_ids: list[str]
+        self,
+        project_id: str,
+        eval_root_ids: list[str],
+        trial_columns: list[tsi.TrialColumn] | None = None,
+        include_raw_data_rows: bool = True,
     ) -> Iterator[tsi.CallSchema]:
-        """Fetch direct children of eval root IDs and their children in one query."""
+        """Fetch direct children of eval root IDs and optionally their children.
+
+        When trial_columns only requires level 1 data (scores, model_output),
+        skips fetching level 2 children and drops heavy columns from the query.
+        """
         read_table = self.table_routing_resolver.resolve_read_table(
             project_id, self.ch_client
         )
-        columns = sorted(
-            [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
-        )
+        needs_children = eval_helpers.trial_columns_need_children(trial_columns)
+
+        columns: list[str] = [*REQUIRED_CALL_COLUMNS, "parent_id"]
+
+        if eval_helpers.trial_columns_need_output(trial_columns):
+            columns.append("output")
+        if include_raw_data_rows:
+            columns.append("inputs")
+        if needs_children:
+            columns.extend(["ended_at", "attributes", "summary", "inputs"])
+        columns = sorted(set(columns))
+
         cq = CallsQuery(project_id=project_id, read_table=read_table)
         for col in columns:
             cq.add_field(col)
-        cq.eval_root_ids = eval_root_ids
+
+        if needs_children:
+            cq.eval_root_ids = eval_root_ids
+        else:  # only need the predict and score calls
+            cq.set_hardcoded_filter(
+                HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
+            )
+
         cq.add_order("started_at", "asc")
         cq.add_order("id", "asc")
         pb = ParamBuilder()
@@ -5139,7 +5163,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
         all_calls = list(
-            self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
+            self._calls_query_stream_for_eval_subtree(
+                req.project_id,
+                eval_root_ids,
+                trial_columns=req.trial_columns,
+                include_raw_data_rows=req.include_raw_data_rows,
+            )
         )
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
 

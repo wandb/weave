@@ -14,6 +14,10 @@ from collections.abc import Callable, Iterable
 from typing import Any, TypeVar
 
 from weave.shared import refs_internal as ri
+from weave.shared.digest import str_digest
+from weave.trace_server import constants
+from weave.trace_server import trace_server_common as tsc
+from weave.trace_server import trace_server_interface as tsi
 
 try:
     import ddtrace
@@ -34,12 +38,45 @@ def _trace_wrap(name: str) -> Callable[[F], F]:
     return decorator  # type: ignore[return-value]
 
 
-from weave.shared.digest import str_digest
-from weave.trace_server import constants
-from weave.trace_server import trace_server_common as tsc
-from weave.trace_server import trace_server_interface as tsi
-
 logger = logging.getLogger(__name__)
+
+# Trial columns that require level 2 child calls to be fetched for the Evaluation.
+TRIAL_COLUMNS_REQUIRING_CHILDREN: frozenset[tsi.TrialColumn] = frozenset(
+    {
+        "model_latency_seconds",
+        "total_tokens",
+        "predict_call_id",
+        "scorer_call_ids",
+    }
+)
+
+# Trial columns that require the output_dump CH column (P&S call output).
+TRIAL_COLUMNS_REQUIRING_OUTPUT: frozenset[tsi.TrialColumn] = frozenset(
+    {
+        "scores",
+        "model_output",
+        "model_latency_seconds",  # fallback latency from output["model_latency"]
+        "scorer_call_ids",  # needs scores keys to match against scorer calls
+    }
+)
+
+
+def trial_columns_need_children(
+    trial_columns: list[tsi.TrialColumn] | None,
+) -> bool:
+    """Return True if the requested trial_columns require level 2 child calls."""
+    if trial_columns is None:
+        return True
+    return any(col in TRIAL_COLUMNS_REQUIRING_CHILDREN for col in trial_columns)
+
+
+def trial_columns_need_output(
+    trial_columns: list[tsi.TrialColumn] | None,
+) -> bool:
+    """Return True if the requested trial_columns require the output_dump column."""
+    if trial_columns is None:
+        return True
+    return any(col in TRIAL_COLUMNS_REQUIRING_OUTPUT for col in trial_columns)
 
 
 def resolve_eval_root_ids(
@@ -390,9 +427,13 @@ def eval_results_grouped_rows(
     if not predict_and_score_calls:
         return [], 0
 
-    predict_and_score_calls_set = {call.id for call in predict_and_score_calls}
-    child_calls = [c for c in all_calls if c.parent_id in predict_and_score_calls_set]
-    child_by_parent = build_child_by_parent(child_calls)
+    child_by_parent: dict[str, list[tsi.CallSchema]] = {}
+    if trial_columns_need_children(req.trial_columns):
+        predict_and_score_calls_set = {call.id for call in predict_and_score_calls}
+        child_calls = [
+            c for c in all_calls if c.parent_id in predict_and_score_calls_set
+        ]
+        child_by_parent = build_child_by_parent(child_calls)
 
     row_map, row_eval_map = build_eval_rows_from_calls(
         predict_and_score_calls, child_by_parent, req.include_raw_data_rows
@@ -445,6 +486,7 @@ def eval_results_query(
         summary_require_intersection=None,
         limit=None,
         offset=0,
+        trial_columns=req.trial_columns,
     )
     all_rows, _ = eval_results_grouped_rows(all_rows_req, eval_root_ids, all_calls)
 

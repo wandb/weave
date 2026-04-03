@@ -2665,6 +2665,16 @@ class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
 
 
+TrialColumn = Literal[
+    "scores",
+    "model_output",
+    "model_latency_seconds",
+    "total_tokens",
+    "predict_call_id",
+    "scorer_call_ids",
+]
+
+
 class EvalResultsQueryBody(BaseModelStrict):
     evaluation_call_ids: list[str] | None = Field(
         default=None,
@@ -2721,6 +2731,12 @@ class EvalResultsQueryBody(BaseModelStrict):
     offset: int = Field(
         default=0,
         description="Optional row-level page offset applied after grouping and intersection.",
+    )
+    trial_columns: list[TrialColumn] | None = Field(
+        default=None,
+        description=(
+            "Which EvalResultsTrial fields to populate. None (default) means all fields. "
+        ),
     )
 
     @model_validator(mode="after")

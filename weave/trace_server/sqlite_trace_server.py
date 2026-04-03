@@ -1352,19 +1352,23 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return iter(self.calls_query(req).calls)
 
     def _calls_query_stream_for_eval_subtree(
-        self, project_id: str, eval_root_ids: list[str]
+        self,
+        project_id: str,
+        eval_root_ids: list[str],
+        trial_columns: list[tsi.TrialColumn] | None = None,
+        include_raw_data_rows: bool = True,
     ) -> Iterator[tsi.CallSchema]:
-        columns = [
-            "id",
-            "parent_id",
-            "op_name",
-            "attributes",
-            "inputs",
-            "output",
-            "summary",
-            "started_at",
-            "ended_at",
-        ]
+        needs_children = eval_helpers.trial_columns_need_children(trial_columns)
+        needs_output = eval_helpers.trial_columns_need_output(trial_columns)
+        columns = ["id", "parent_id", "op_name", "started_at"]
+
+        if needs_output:
+            columns.append("output")
+        if include_raw_data_rows:
+            columns.append("inputs")
+        if needs_children:
+            columns.extend(["ended_at", "attributes", "summary", "inputs"])
+
         eval_root_children = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
@@ -1376,16 +1380,17 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             )
         )
         yield from eval_root_children
-        eval_root_children_ids = [c.id for c in eval_root_children]
-        if eval_root_children_ids:
-            yield from self.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=project_id,
-                    filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
-                    columns=columns,
-                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+        if needs_children:
+            eval_root_children_ids = [c.id for c in eval_root_children]
+            if eval_root_children_ids:
+                yield from self.calls_query_stream(
+                    tsi.CallsQueryReq(
+                        project_id=project_id,
+                        filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
+                        columns=columns,
+                        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                    )
                 )
-            )
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         if req.limit is not None and req.limit < 1:
@@ -4639,7 +4644,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
         all_calls = list(
-            self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
+            self._calls_query_stream_for_eval_subtree(
+                req.project_id,
+                eval_root_ids,
+                trial_columns=req.trial_columns,
+                include_raw_data_rows=req.include_raw_data_rows,
+            )
         )
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
 

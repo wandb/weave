@@ -647,3 +647,139 @@ def test_eval_subtree_query_excludes_unrelated_top_level_calls(client, internal_
     assert unrelated_call_id not in raw_call_ids, (
         "Unrelated top-level call leaked into eval subtree query"
     )
+
+
+@pytest.mark.parametrize(
+    "trial_columns, expect_output, expect_children",
+    [
+        # All fields (default)
+        (None, True, True),
+        # Scores only — output fetched (for scores), level 2 skipped
+        (["scores"], True, False),
+        # Scores + model_output — output fetched, level 2 skipped
+        (["scores", "model_output"], True, False),
+        # predict_call_id only — output NOT fetched, level 2 fetched
+        (["predict_call_id"], False, True),
+        # scorer_call_ids — output IS fetched (needs scores keys to match), level 2 fetched
+        (["scorer_call_ids"], True, True),
+        # Latency + tokens — output fetched (latency fallback), level 2 fetched
+        (["model_latency_seconds", "total_tokens"], True, True),
+        # Everything explicitly listed
+        (
+            [
+                "scores",
+                "model_output",
+                "model_latency_seconds",
+                "total_tokens",
+                "predict_call_id",
+                "scorer_call_ids",
+            ],
+            True,
+            True,
+        ),
+    ],
+    ids=[
+        "all_fields",
+        "scores_only",
+        "scores_and_model_output",
+        "predict_call_id_only",
+        "scorer_call_ids_only",
+        "latency_and_tokens",
+        "all_fields_explicit",
+    ],
+)
+def test_trial_columns_filtering(
+    client,
+    trial_columns,
+    expect_output,
+    expect_children,
+):
+    """Verify trial_columns controls which CH columns and levels are fetched."""
+    project_id = client.project_id
+    entity, project = from_project_id(project_id)
+
+    scorer_res = client.server.scorer_create(
+        ScorerCreateReq(
+            project_id=project_id,
+            name="tc_scorer",
+            op_source_code="def score(output):\n    return 1",
+        )
+    )
+    scorer_ref = (
+        f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+    )
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://tc-test",
+            model="model://tc-test",
+        )
+    )
+    pred = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model="model://tc-test",
+            inputs={"x": 1},
+            output="result",
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.score_create(
+        ScoreCreateReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+            scorer=scorer_ref,
+            value=0.8,
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+        )
+    )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            trial_columns=trial_columns,
+        )
+    )
+
+    assert res.total_rows == 1
+    assert len(res.rows) == 1
+    trial = res.rows[0].evaluations[0].trials[0]
+
+    # Always present
+    assert trial.predict_and_score_call_id is not None
+
+    # output_dump fetched → scores and model_output populated
+    if expect_output:
+        assert trial.scores != {}, "Expected scores from output_dump"
+        assert trial.model_output is not None, "Expected model_output from output_dump"
+    else:
+        assert trial.scores == {}, "output_dump not fetched — scores should be empty"
+        assert trial.model_output is None, (
+            "output_dump not fetched — model_output should be None"
+        )
+
+    # Level 2 children fetched → predict_call_id populated
+    if expect_children:
+        assert trial.predict_call_id is not None, (
+            "Expected predict_call_id from children"
+        )
+    else:
+        assert trial.predict_call_id is None, (
+            "No children — predict_call_id should be None"
+        )
+        assert trial.scorer_call_ids == {}, (
+            "No children — scorer_call_ids should be empty"
+        )
+
+    # scorer_call_ids needs both children AND output (scores keys to match against)
+    if expect_children and expect_output:
+        assert trial.scorer_call_ids != {}, (
+            "Expected scorer_call_ids from children + scores"
+        )
