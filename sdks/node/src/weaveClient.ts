@@ -77,6 +77,13 @@ export interface GetCallsOptions {
   expandColumns?: string[];
 }
 
+/**
+ * Distinguishes the object-based getCalls options form from the legacy
+ * positional filter CallsFilter form by checking for GetCallsOptions-only keys.
+ *
+ * @param value The first argument passed to `getCalls` or `getCallsIterator`.
+ * @returns `true` when the value matches the object-based `GetCallsOptions` shape.
+ */
 function maybeIsGetCallsOptions(
   value: CallsFilter | GetCallsOptions
 ): value is GetCallsOptions {
