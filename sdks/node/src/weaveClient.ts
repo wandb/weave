@@ -78,22 +78,26 @@ export interface GetCallsOptions {
 }
 
 function maybeIsGetCallsOptions(
-  value: CallsFilter | GetCallsOptions | undefined
+  value: CallsFilter | GetCallsOptions
 ): value is GetCallsOptions {
-  if (value == null) {
-    return false;
+  if (value == null) return false;
+  const getCallsOptionsKeys: (keyof GetCallsOptions)[] = [
+    'filter',
+    'query',
+    'includeCosts',
+    'includeFeedback',
+    'limit',
+    'offset',
+    'sortBy',
+    'columns',
+    'expandColumns',
+  ];
+  for (const key of getCallsOptionsKeys) {
+    if (key in value) {
+      return true;
+    }
   }
-  return (
-    'filter' in value ||
-    'query' in value ||
-    'includeCosts' in value ||
-    'includeFeedback' in value ||
-    'limit' in value ||
-    'offset' in value ||
-    'sortBy' in value ||
-    'columns' in value ||
-    'expandColumns' in value
-  );
+  return false;
 }
 
 function generateTraceId(): string {

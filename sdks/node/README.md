@@ -199,28 +199,17 @@ To fetch all calls with default settings, pass an empty object:
 const calls = await client.getCalls({});
 ```
 
-### Breaking Change: `getCalls` Options-Only API
-
-Starting in `v0.14.0`, the Node SDK removes the legacy positional `getCalls`
-signature:
-
-```typescript
-client.getCalls(filter?, includeCosts?, limit?)
-```
-
-The supported API is now:
-
-```typescript
-client.getCalls(options: GetCallsOptions)
-```
-
 #### Upgrade guide
+
+Version 0.13.0 introduces a new signature for getCalls(). getCalls() now supports an object type parameter to specify the call options. The old signature will be deprecated in future releases.
 
 Before:
 
 ```typescript
 await client.getCalls({op_names: ['my-op']}, true, 100);
-await client.getCalls();
+
+await client.getCallsIterator({op_names: ['my-op']}, true, 100);
+
 ```
 
 After:
@@ -231,11 +220,13 @@ await client.getCalls({
   includeCosts: true,
   limit: 100,
 });
-await client.getCalls({});
-```
 
-The same migration applies to `getCallsIterator(...)`, which now also expects a
-single options object.
+await client.getCallsIterator({
+  filter: {op_names: ['my-op']},
+  includeCosts: true,
+  limit: 100,
+});
+```
 
 ## Configuration
 
