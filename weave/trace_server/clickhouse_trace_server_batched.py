@@ -1481,14 +1481,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         needs_children = eval_helpers.trial_columns_need_children(trial_columns)
 
-        columns: list[str] = [*REQUIRED_CALL_COLUMNS, "parent_id"]
+        columns: list[str] = [*REQUIRED_CALL_COLUMNS, "parent_id", "ended_at"]
 
         if eval_helpers.trial_columns_need_output(trial_columns):
             columns.append("output")
         if include_raw_data_rows:
             columns.append("inputs")
         if needs_children:
-            columns.extend(["ended_at", "attributes", "summary", "inputs"])
+            columns.extend(["attributes", "summary", "inputs"])
         columns = sorted(set(columns))
 
         cq = CallsQuery(project_id=project_id, read_table=read_table)
@@ -1497,7 +1497,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if needs_children:
             cq.eval_root_ids = eval_root_ids
-        else:  # only need the predict and score calls
+        else:
             cq.set_hardcoded_filter(
                 HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
             )

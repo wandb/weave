@@ -755,31 +755,17 @@ def test_trial_columns_filtering(
     # Always present
     assert trial.predict_and_score_call_id is not None
 
-    # output_dump fetched → scores and model_output populated
+    # output_dump fetched → scores and model_output populated with actual values
     if expect_output:
-        assert trial.scores != {}, "Expected scores from output_dump"
-        assert trial.model_output is not None, "Expected model_output from output_dump"
+        assert trial.scores == {"tc_scorer": 0.8}
+        assert trial.model_output == "result"
     else:
-        assert trial.scores == {}, "output_dump not fetched — scores should be empty"
-        assert trial.model_output is None, (
-            "output_dump not fetched — model_output should be None"
-        )
+        assert trial.scores == {}
+        assert trial.model_output is None
 
-    # Level 2 children fetched → predict_call_id populated
+    # Level 2 children fetched → predict_call_id is a different call from the P&S parent
     if expect_children:
-        assert trial.predict_call_id is not None, (
-            "Expected predict_call_id from children"
-        )
+        assert trial.predict_call_id != trial.predict_and_score_call_id
     else:
-        assert trial.predict_call_id is None, (
-            "No children — predict_call_id should be None"
-        )
-        assert trial.scorer_call_ids == {}, (
-            "No children — scorer_call_ids should be empty"
-        )
-
-    # scorer_call_ids needs both children AND output (scores keys to match against)
-    if expect_children and expect_output:
-        assert trial.scorer_call_ids != {}, (
-            "Expected scorer_call_ids from children + scores"
-        )
+        assert trial.predict_call_id is None
+        assert trial.scorer_call_ids == {}

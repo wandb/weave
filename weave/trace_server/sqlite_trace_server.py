@@ -1360,14 +1360,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     ) -> Iterator[tsi.CallSchema]:
         needs_children = eval_helpers.trial_columns_need_children(trial_columns)
         needs_output = eval_helpers.trial_columns_need_output(trial_columns)
-        columns = ["id", "parent_id", "op_name", "started_at"]
+        columns = ["id", "parent_id", "op_name", "started_at", "ended_at"]
 
         if needs_output:
             columns.append("output")
         if include_raw_data_rows:
             columns.append("inputs")
         if needs_children:
-            columns.extend(["ended_at", "attributes", "summary", "inputs"])
+            columns.extend(["attributes", "summary", "inputs"])
 
         eval_root_children = list(
             self.calls_query_stream(
