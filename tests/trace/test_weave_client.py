@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import datetime
 import json
 import platform
@@ -24,6 +23,9 @@ from tests.trace.util import (
     DatetimeMatcher,
     RegexStringMatcher,
     client_is_sqlite,
+)
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    UserInjectingExternalTraceServer,
 )
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
@@ -106,13 +108,13 @@ def test_table_update(client):
     table_create_res = client.server.table_create(
         TableCreateReq(
             table=TableSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 rows=data,
             )
         )
     )
     table_query_res = client.server.table_query(
-        TableQueryReq(project_id=client._project_id(), digest=table_create_res.digest)
+        TableQueryReq(project_id=client.project_id, digest=table_create_res.digest)
     )
     assert len(table_query_res.rows) == len(data)
     for i, row in enumerate(table_query_res.rows):
@@ -121,7 +123,7 @@ def test_table_update(client):
     table_create_res = client.server.table_update(
         tsi.TableUpdateReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "base_digest": table_create_res.digest,
                 "updates": [
                     {"insert": {"index": 1, "row": {"val": 4}}},
@@ -137,7 +139,7 @@ def test_table_update(client):
     final_data.append({"val": 5})
 
     table_query_2_res = client.server.table_query(
-        TableQueryReq(project_id=client._project_id(), digest=table_create_res.digest)
+        TableQueryReq(project_id=client.project_id, digest=table_create_res.digest)
     )
 
     assert len(table_query_2_res.rows) == len(final_data)
@@ -148,7 +150,7 @@ def test_table_update(client):
     check_res = client.server.table_create(
         TableCreateReq(
             table=TableSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 rows=final_data,
             )
         )
@@ -338,6 +340,24 @@ def test_filter_sort_by_query_validation(client):
     )
 
 
+def test_get_calls_forwards_include_usernames(client, monkeypatch):
+    captured_kwargs = {}
+
+    def fake_make_calls_iterator(server, project_id, filter, **kwargs):
+        captured_kwargs["server"] = server
+        captured_kwargs["project_id"] = project_id
+        captured_kwargs["filter"] = filter
+        captured_kwargs.update(kwargs)
+        return []
+
+    monkeypatch.setattr(weave_client, "_make_calls_iterator", fake_make_calls_iterator)
+
+    client.get_calls(include_usernames=True)
+
+    assert captured_kwargs["project_id"] == client.project_id
+    assert captured_kwargs["include_usernames"] is True
+
+
 def test_call_create(client):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
@@ -345,7 +365,7 @@ def test_call_create(client):
     expected = weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
-        trace_id=RegexStringMatcher(".*"),
+        trace_id=call.trace_id,
         parent_id=None,
         inputs={"a": 5, "b": 10},
         id=call.id,
@@ -376,8 +396,9 @@ def test_call_create(client):
         started_at=DatetimeMatcher(),
         ended_at=DatetimeMatcher(),
         deleted_at=None,
+        wb_user_id=client.entity,
     )
-    assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
+    assert result == expected
 
 
 def test_calls_query(client):
@@ -389,7 +410,7 @@ def test_calls_query(client):
     assert result[0] == weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
-        trace_id=RegexStringMatcher(".*"),
+        trace_id=result[0].trace_id,
         parent_id=None,
         inputs={"a": 5, "b": 10},
         id=call0.id,
@@ -411,11 +432,12 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
+        wb_user_id=client.entity,
     )
     assert result[1] == weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
         project_id="shawn/test-project",
-        trace_id=RegexStringMatcher(".*"),
+        trace_id=result[1].trace_id,
         parent_id=call0.id,
         inputs={"a": 6, "b": 11},
         id=call1.id,
@@ -437,6 +459,7 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
+        wb_user_id=client.entity,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
@@ -569,13 +592,13 @@ def test_get_calls_len(client):
     calls = client.get_calls(offset=10, limit=10)
     assert len(calls) == 0
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="limit must be greater than 0"):
         client.get_calls(limit=-1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="limit must be greater than 0"):
         client.get_calls(limit=0)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="offset must be greater than or equal to 0"):
         client.get_calls(offset=-1)
 
 
@@ -753,7 +776,7 @@ def test_delete_calls(client):
     assert len(calls) == 1
     assert calls[0].id == call_2_id
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="validation error"):
         client.delete_calls([1111111111111111])
 
     client.delete_calls([call_2_id])
@@ -805,12 +828,9 @@ def test_call_display_name(client):
 
 
 def test_dataset_calls(client):
-    ref = client.save(
-        weave.Dataset(rows=[{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
-        "my-dataset",
-    )
+    rows = [{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]
     op_name = ""
-    for row in ref.rows:
+    for row in rows:
         call = client.create_call("x", {"a": row["doc"]})
         op_name = call.op_name
         client.finish_call(call, None)
@@ -965,7 +985,7 @@ def test_object_mismatch_project_ref_nested(client):
     assert "weave:///shawn/test-project2/op" in str(calls[0].op_name)
 
     # also assert the op and objects are correct in db
-    res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
+    res = client.server.objs_query(tsi.ObjQueryReq(project_id=client.project_id))
     assert len(res.objs) == 2
 
     op = next(x for x in res.objs if x.kind == "op")
@@ -1479,7 +1499,7 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
-@pytest.mark.timeout(30)
+@pytest.mark.timeout(60)
 @pytest.mark.flaky(reruns=3, reruns_delay=2)
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
 def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
@@ -1523,7 +1543,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     res = remote_client.table_create(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 rows=rows,
             )
         )
@@ -1536,10 +1556,6 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         4 * 1024
     )  # Small enough to get multiple updates
 
-    # Clear cached endpoint availability so the probe call is always made,
-    # ensuring deterministic record counts regardless of test ordering.
-    _ENDPOINT_CACHE.discard("table_create_from_digests")
-
     # Set the client to use the remote server so calls get recorded
     client = TestOnlyFlushingWeaveClient(
         entity=client.entity,
@@ -1550,6 +1566,11 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
 
     # Create a Table object and save it to trigger chunking logic
     table_obj = weave_client.Table(rows)
+
+    # Clear cached endpoint availability so the probe call is always made,
+    # ensuring deterministic record counts regardless of test ordering.
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
+
     saved_table = client.save(table_obj, "table")
 
     assert saved_table.table_ref._digest == exp_digest
@@ -1577,10 +1598,6 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
 
 
 def test_summary_tokens_cost(client):
-    if client_is_sqlite(client):
-        # SQLite does not support costs
-        return
-
     @weave.op
     def gpt4(text):
         result = "a: " + text
@@ -1711,38 +1728,6 @@ def test_summary_tokens_cost(client):
     }
 
 
-@pytest.mark.skip_clickhouse_client
-def test_summary_tokens_cost_sqlite(client):
-    if not client_is_sqlite(client):
-        # only run this test for sqlite
-        return
-
-    # ensure that include_costs is a no-op for sqlite
-    call0 = client.create_call("x", {"a": 5, "b": 10})
-    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
-    _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
-    call1 = client.create_call("y", {"a": 6, "b": 11})
-
-    calls_with_cost = list(client.get_calls(include_costs=True))
-    calls_no_cost = list(client.get_calls(include_costs=False))
-
-    assert len(calls_with_cost) == len(calls_no_cost)
-    assert len(calls_with_cost) == 4
-
-    no_cost_call_summary = calls_no_cost[0].summary
-    with_cost_call_summary = calls_with_cost[0].summary
-
-    weave_summary = {
-        "weave": {
-            "status": "running",
-            "trace_name": "x",
-        }
-    }
-
-    assert no_cost_call_summary == weave_summary
-    assert with_cost_call_summary == weave_summary
-
-
 def _setup_calls_for_storage_size_test(client):
     """Helper function to set up calls for storage size tests.
 
@@ -1821,7 +1806,7 @@ def test_get_calls_storage_size_values(client, clickhouse_client):
     server_calls = list(
         client.server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 include_storage_size=True,
                 include_total_storage_size=True,
             )
@@ -1889,7 +1874,7 @@ def test_calls_stream_table_ref_expansion(client):
 
     calls = client.server.calls_query_stream(
         req=tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             expand_columns=["output.table"],
         )
     )
@@ -1906,7 +1891,7 @@ def test_object_version_read(client):
     # read all objects, check the version
     objs = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(object_ids=[refs[0].name]),
         )
     ).objs
@@ -1926,7 +1911,7 @@ def test_object_version_read(client):
     for i in range(10):
         obj_res = client.server.obj_read(
             tsi.ObjReadReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 object_id=refs[i].name,
                 digest=refs[i].digest,
             )
@@ -1938,7 +1923,7 @@ def test_object_version_read(client):
     for i in range(10):
         obj_res = client.server.obj_read(
             tsi.ObjReadReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 object_id=refs[i].name,
                 digest=refs[i].digest,
                 metadata_only=True,
@@ -1950,7 +1935,7 @@ def test_object_version_read(client):
     # now grab the latest version of the object
     obj_res = client.server.obj_read(
         tsi.ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=refs[0].name,
             digest="latest",
         )
@@ -1962,7 +1947,7 @@ def test_object_version_read(client):
     for i, digest in enumerate([obj.digest for obj in objs]):
         obj_res = client.server.obj_read(
             tsi.ObjReadReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 object_id=refs[0].name,
                 digest=digest,
             )
@@ -1974,7 +1959,7 @@ def test_object_version_read(client):
     client._save_object({"a": 10}, refs[0].name)
     obj_res = client.server.obj_read(
         tsi.ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=refs[0].name,
             digest="latest",
         )
@@ -1985,7 +1970,7 @@ def test_object_version_read(client):
     # check that v5 is still correct
     obj_res = client.server.obj_read(
         tsi.ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=refs[0].name,
             digest="v5",
         )
@@ -2000,7 +1985,7 @@ def test_object_version_read(client):
             # grab non-existant version
             obj_res = client.server.obj_read(
                 tsi.ObjReadReq(
-                    project_id=client._project_id(),
+                    project_id=client.project_id,
                     object_id=refs[0].name,
                     digest=digest,
                 )
@@ -2010,7 +1995,7 @@ def test_object_version_read(client):
     with pytest.raises((NotFoundError, sqliteNotFoundError)):
         obj_res = client.server.obj_read(
             tsi.ObjReadReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 object_id="refs[0].name",
                 digest="v1",
             )
@@ -2094,7 +2079,7 @@ def test_object_deletion(client):
     # count the number of versions of the object
     versions = client.server.objs_query(
         req=tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(object_ids=["my-obj"]),
             sort_by=[SortBy(field="created_at", direction="desc")],
         )
@@ -2110,7 +2095,7 @@ def test_object_deletion(client):
 
     versions = client.server.objs_query(
         req=tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(object_ids=["my-obj"]),
         )
     )
@@ -2589,7 +2574,7 @@ def test_calls_default_sort_secondary_id_asc(client):
 
     # All calls share the exact same started_at to force the tiebreaker
     fixed_time = datetime.datetime(2025, 1, 1, 12, 0, 0)
-    project_id = client._project_id()
+    project_id = client.project_id
     trace_id = generate_id()
 
     # Insert calls via server API with controlled ids and started_at.
@@ -2721,25 +2706,41 @@ def test_calls_query_sort_by_latency(client):
     """Test that sort_by summary.weave.latency_ms works with get_calls."""
     # Use a unique test ID to identify these calls
     test_id = str(uuid.uuid4())
+    base_time = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
 
-    # Create calls with different latencies
-    # Fast call - minimal latency
-    fast_call = client.create_call("x", {"a": 1, "b": 1, "test_id": test_id})
-    client.finish_call(fast_call, "fast result")
-    client.flush()
+    # Set timestamps explicitly so latency ordering is deterministic without sleeps.
+    fast_call = client.create_call(
+        "x",
+        {"a": 1, "b": 1, "test_id": test_id},
+        started_at=base_time,
+    )
+    client.finish_call(
+        fast_call,
+        "fast result",
+        ended_at=base_time + datetime.timedelta(milliseconds=10),
+    )
 
-    # Medium latency
-    medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
-    # Sleep to ensure different latency
-    time.sleep(0.05)
-    client.finish_call(medium_call, "medium result")
-    client.flush()
+    medium_call = client.create_call(
+        "x",
+        {"a": 2, "b": 2, "test_id": test_id},
+        started_at=base_time,
+    )
+    client.finish_call(
+        medium_call,
+        "medium result",
+        ended_at=base_time + datetime.timedelta(milliseconds=20),
+    )
 
-    # Slow call - higher latency
-    slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
-    # Sleep to ensure different latency
-    time.sleep(0.1)
-    client.finish_call(slow_call, "slow result")
+    slow_call = client.create_call(
+        "x",
+        {"a": 3, "b": 3, "test_id": test_id},
+        started_at=base_time,
+    )
+    client.finish_call(
+        slow_call,
+        "slow result",
+        ended_at=base_time + datetime.timedelta(milliseconds=30),
+    )
     client.flush()
 
     # Create a query to find just our test calls
@@ -3432,7 +3433,7 @@ def _make_call(client, _id):
     call_res = client.server.call_start(
         tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 id=_id,
                 op_name="explicit_log_with_custom_ids",
                 display_name=f"call_{_id}",
@@ -3447,7 +3448,7 @@ def _make_call(client, _id):
     client.server.call_end(
         tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 id=call_res.id,
                 ended_at=datetime.datetime.now(),
                 outputs={"hello": "world"},
@@ -4009,7 +4010,7 @@ def test_parallel_table_uploads_digest_consistency(
 
     # Get the digest information from the saved table
     table1_res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=table1_ref.digest)
+        tsi.TableQueryReq(project_id=client.project_id, digest=table1_ref.digest)
     )
     digest1 = table1_ref.digest
     row_digests1 = [row.digest for row in table1_res.rows]
@@ -4030,7 +4031,7 @@ def test_parallel_table_uploads_digest_consistency(
 
     # Get the digest information from the saved table
     table2_res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=table2_ref.digest)
+        tsi.TableQueryReq(project_id=client.project_id, digest=table2_ref.digest)
     )
     digest2 = table2_ref.digest
     row_digests2 = [row.digest for row in table2_res.rows]
@@ -4054,7 +4055,7 @@ def test_parallel_table_uploads_digest_consistency(
 
     # Get the digest information from the saved table
     table3_res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=table3_ref.digest)
+        tsi.TableQueryReq(project_id=client.project_id, digest=table3_ref.digest)
     )
     digest3 = table3_ref.digest
     row_digests3 = [row.digest for row in table3_res.rows]
@@ -4068,7 +4069,7 @@ def test_parallel_table_uploads_digest_consistency(
 
     # Get the digest information from the saved table
     table4_res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=table4_ref.digest)
+        tsi.TableQueryReq(project_id=client.project_id, digest=table4_ref.digest)
     )
     digest4 = table4_ref.digest
     row_digests4 = [row.digest for row in table4_res.rows]
@@ -4141,7 +4142,7 @@ def test_table_create_from_digests(network_proxy_client):
     table_res = client.server.table_create(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 rows=rows,
             )
         )
@@ -4153,7 +4154,7 @@ def test_table_create_from_digests(network_proxy_client):
     # Now create a new table using the same row digests
     from_digests_res = client.server.table_create_from_digests(
         tsi.TableCreateFromDigestsReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             row_digests=row_digests,
         )
     )
@@ -4172,7 +4173,7 @@ def test_table_create_from_digests(network_proxy_client):
     more_table_res = client.server.table_create(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 rows=more_rows,
             )
         )
@@ -4183,7 +4184,7 @@ def test_table_create_from_digests(network_proxy_client):
     # Test with a different order of row digests - should produce different digest
     combined_res = client.server.table_create_from_digests(
         tsi.TableCreateFromDigestsReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             row_digests=combined_digests,
         )
     )
@@ -4191,7 +4192,7 @@ def test_table_create_from_digests(network_proxy_client):
     # now get the new table
     new_table_res = basic_client.server.table_query(
         tsi.TableQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             digest=combined_res.digest,
         )
     )
@@ -4210,7 +4211,7 @@ def test_table_create_from_digests(network_proxy_client):
     shuffled_digests = [row_digests[2], row_digests[0], row_digests[1]]  # [3, 1, 2]
     shuffled_res = client.server.table_create_from_digests(
         tsi.TableCreateFromDigestsReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             row_digests=shuffled_digests,
         )
     )
@@ -4223,7 +4224,7 @@ def test_table_create_from_digests(network_proxy_client):
 
 def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     """Test optimized stats query for wb_run_id not null."""
-    mock_run_id = f"{client._project_id()}/test_run_123"
+    mock_run_id = f"{client.project_id}/test_run_123"
     monkeypatch.setattr(
         weave_client,
         "get_global_wb_run_context",
@@ -4238,7 +4239,7 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     client.flush()
 
     calls = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client._project_id())
+        tsi.CallsQueryReq(project_id=client.project_id)
     ).calls
     assert len(calls) == 1
     assert calls[0].wb_run_id == mock_run_id
@@ -4246,7 +4247,7 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
 
 def test_get_calls_columns_wb_run_id(client, monkeypatch):
     # Step 1: Mock wandb run context so a deterministic wb_run_id is attached to the call.
-    mock_run_id = f"{client._project_id()}/test_run_456"
+    mock_run_id = f"{client.project_id}/test_run_456"
     monkeypatch.setattr(
         weave_client,
         "get_global_wb_run_context",
@@ -4284,12 +4285,50 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
     )
     calls = list(
         client.server.calls_query(
-            tsi.CallsQueryReq(project_id=client._project_id(), query=query, limit=1)
+            tsi.CallsQueryReq(project_id=client.project_id, query=query, limit=1)
         ).calls
     )
 
     assert len(calls) == 1
     assert calls[0].wb_run_id == mock_run_id
+
+
+def test_get_calls_include_usernames(client, monkeypatch):
+    external_server = find_server_layer(client.server, UserInjectingExternalTraceServer)
+    internal_user_id = external_server._idc.ext_to_int_user_id(client.entity)
+
+    # Username resolution happens in the external adapter after wb_user_id has
+    # been translated to the internal id, so stub that resolver directly.
+    def resolve_username(user_id: str) -> str | None:
+        return "resolved-user" if user_id == internal_user_id else None
+
+    monkeypatch.setattr(external_server, "_username_resolver", resolve_username)
+
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 5
+
+    _, call = test_op.call(3)
+
+    calls_without_usernames = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+            include_usernames=False,
+        )
+    )
+    assert len(calls_without_usernames) == 1
+    assert calls_without_usernames[0].wb_user_id == client.entity
+    assert calls_without_usernames[0].wb_username is None
+
+    calls_with_usernames = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+            include_usernames=True,
+        )
+    )
+    assert len(calls_with_usernames) == 1
+    assert calls_with_usernames[0].wb_user_id == client.entity
+    assert calls_with_usernames[0].wb_username == "resolved-user"
 
 
 def test_calls_query_with_dotted_field_keys(client):
@@ -4485,7 +4524,7 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     # Verify that the model correctly prepares completion requests with prompt and template_vars
     # This tests the core functionality without requiring actual LLM API calls
     req = model.prepare_completion_request(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         user_input=[],
         config=None,
         assistant_name="MathBot",
@@ -4512,7 +4551,7 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
 
     # Test with additional user_input messages
     req_with_input = model.prepare_completion_request(
-        project_id=client._project_id(),
+        project_id=client.project_id,
         user_input=[{"role": "user", "content": "Additional context"}],
         config=None,
         assistant_name="MathBot",

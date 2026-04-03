@@ -141,7 +141,7 @@ def test_prompt_parameter_default() -> None:
 def test_prompt_parameter_validation_int() -> None:
     prompt = EasyPrompt("{A} + {B}")
     prompt.require("A", min=10, max=100)
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError, match="is less than min") as e:
         prompt.bind(A=0)
     assert str(e.value) == "A (0) is less than min (10)"
 
@@ -149,7 +149,7 @@ def test_prompt_parameter_validation_int() -> None:
 def test_prompt_parameter_validation_oneof() -> None:
     prompt = EasyPrompt("{flavor}")
     prompt.require("flavor", oneof=("vanilla", "strawberry", "chocolate"))
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError, match="must be one of") as e:
         prompt.bind(flavor="mint chip")
     assert (
         str(e.value)

@@ -31,6 +31,9 @@ from weave.trace_server.service_interface import (  # noqa: F401
     ProjectsInfoRes,
 )
 
+DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
+MAX_FEEDBACK_SAMPLE_LIMIT = 5000
+
 
 class ExtraKeysTypedDict(TypedDict):
     pass
@@ -47,6 +50,8 @@ class LLMUsageSchema(TypedDict, total=False):
     output_tokens: int | None
     requests: int | None
     total_tokens: int | None
+    cache_creation_input_tokens: int | None
+    cache_read_input_tokens: int | None
 
 
 class LLMCostSchema(LLMUsageSchema, total=False):
@@ -99,6 +104,10 @@ class SummaryMap(SummaryInsertMap, total=False):
     weave: WeaveSummarySchema | None
 
 
+def _exclude_if_none(value: object) -> bool:
+    return value is None
+
+
 class CallSchema(BaseModel):
     id: str
     project_id: str
@@ -139,6 +148,7 @@ class CallSchema(BaseModel):
 
     # WB Metadata
     wb_user_id: str | None = None
+    wb_username: str | None = Field(default=None, exclude_if=_exclude_if_none)
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
@@ -309,7 +319,7 @@ class ObjSchemaForInsert(BaseModel):
 
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
         if self.set_base_object_class is not None and self.builtin_object_class is None:
             self.builtin_object_class = self.set_base_object_class
@@ -1561,6 +1571,11 @@ class CallsQueryReq(BaseModelStrict):
         description="Beta, subject to change. If true, the response will"
         " include the total storage size for a trace.",
     )
+    include_usernames: bool | None = Field(
+        default=False,
+        description="If true, the response will attempt to resolve each call's "
+        "wb_user_id to a username for the duration of this request.",
+    )
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
@@ -2356,9 +2371,9 @@ class FeedbackPayloadSchemaReq(_FeedbackFilterBase):
     """Request for feedback payload schema discovery."""
 
     sample_limit: int = Field(
-        default=2000,
+        default=DEFAULT_FEEDBACK_SAMPLE_LIMIT,
         ge=1,
-        le=5000,
+        le=MAX_FEEDBACK_SAMPLE_LIMIT,
         description=(
             "Max distinct trigger_refs to sample when discovering the payload schema. "
             "Each distinct trigger_ref (monitor/source) typically has a fixed payload "
@@ -3745,9 +3760,9 @@ class EvalResultsScorerStats(BaseModel):
             "token_distance.passed. None for root-level scalar scorers."
         ),
     )
-    value_type: Literal["binary", "continuous"] | None = Field(
+    value_type: Literal["binary", "continuous", "text"] | None = Field(
         default=None,
-        description="Type of the leaf value: binary (bool) or continuous (number).",
+        description="Type of the leaf value: binary (bool), continuous (number), or text (string).",
     )
     trial_count: int = 0
     numeric_count: int = 0

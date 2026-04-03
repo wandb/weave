@@ -11,7 +11,7 @@ from weave.scorers.prompts import (
     PROMPT_INJECTION_GUARDRAIL_USER_PROMPT,
     PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
 )
-from weave.scorers.scorer_types import LLMScorer
+from weave.scorers.scorer_types import DEFAULT_LLM_MAX_TOKENS, LLMScorer
 
 
 class LLMGuardrailReasoning(BaseModel):
@@ -45,11 +45,11 @@ class PromptInjectionLLMGuardrail(LLMScorer):
         description="Controls randomness in the LLM's responses (0.0 to 1.0)",
     )
     max_tokens: int = Field(
-        default=4096,
+        default=DEFAULT_LLM_MAX_TOKENS,
         description="Maximum number of tokens allowed in the LLM's response",
     )
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         if self.model_id not in SUPPORTED_MODELS:
             warnings.warn(
                 f"The prompting strategy used in this guardrail has been tested with the following models: {', '.join(SUPPORTED_MODELS)}."
@@ -57,7 +57,7 @@ class PromptInjectionLLMGuardrail(LLMScorer):
                 stacklevel=2,
             )
 
-    @weave.op
+    @weave.op(kind="guardrail")
     async def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
         user_prompt = PROMPT_INJECTION_GUARDRAIL_USER_PROMPT.format(
             research_paper_summary=PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,

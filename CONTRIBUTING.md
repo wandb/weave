@@ -119,22 +119,22 @@ uv pip install -e .
 
 ### Linting
 
-We use pre-commit. You can install with:
+We use prek (a fast, drop-in replacement for pre-commit). You can install with:
 
 ```sh
-uv tool install pre-commit
+uv tool install prek
 ```
 
 Then run on staged files (default, faster):
 
 ```sh
-pre-commit run --hook-stage=pre-push
+prek run --hook-stage=pre-push
 ```
 
 Or run on all files (slower but more thorough):
 
 ```sh
-pre-commit run --hook-stage=pre-push --all-files
+prek run --hook-stage=pre-push --all-files
 ```
 
 You can also use the `lint` nox target to run linting:

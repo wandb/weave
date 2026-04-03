@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 R_co = TypeVar("R_co", covariant=True)
 
+DEFAULT_PAGE_SIZE = 1000
+
 
 class FetchFunc(Protocol[T]):
     def __call__(self, offset: int, limit: int) -> list[T]: ...
@@ -31,7 +33,7 @@ class PaginatedIterator(Generic[T, R_co]):
     def __init__(
         self,
         fetch_func: FetchFunc[T],
-        page_size: int = 1000,
+        page_size: int = DEFAULT_PAGE_SIZE,
         transform_func: TransformFunc[T, R_co] | None = None,
         size_func: SizeFunc | None = None,
         limit: int | None = None,

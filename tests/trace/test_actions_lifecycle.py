@@ -45,7 +45,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     res = client.server.feedback_create(
         FeedbackCreateReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "weave_ref": call1.ref.uri,
                 "feedback_type": "wandb.runnable." + action_name,
                 "runnable_ref": action_ref_uri,
@@ -70,7 +70,7 @@ def test_action_lifecycle_word_count(client: WeaveClient):
     res = client.server.actions_execute_batch(
         ActionsExecuteBatchReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "action_ref": action_ref_uri,
                 "call_ids": [call2.id],
             }

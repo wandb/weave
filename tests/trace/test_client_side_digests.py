@@ -198,7 +198,7 @@ class TestClientServerDigestConsistency:
 
         req = tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 rows=rows,
             )
         )
@@ -306,7 +306,7 @@ class TestServerDigestValidation:
 
         req = tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 object_id="digest_obj",
                 val=val,
                 expected_digest=expected_digest,
@@ -330,7 +330,7 @@ class TestServerDigestValidation:
 
         req = tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 rows=rows,
                 expected_digest=expected_digest,
             )
@@ -352,7 +352,7 @@ class TestServerDigestValidation:
         )
 
         req = tsi.FileCreateReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             name="test.txt",
             content=content,
             expected_digest=expected_digest,

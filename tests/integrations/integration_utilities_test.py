@@ -27,7 +27,7 @@ def test_truncate_op_name_too_short_for_hash() -> None:
     chars_to_remove = 1
     for tail_len in range(NON_HASH_LIMIT + 1):
         if tail_len <= chars_to_remove:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match="Unable to create a valid run name"):
                 name, trunc = _truncated_str(
                     tail_len, MAX_OP_NAME_LENGTH + chars_to_remove
                 )
@@ -45,7 +45,7 @@ def test_truncate_op_name_too_short_for_hash() -> None:
     tail_len = NON_HASH_LIMIT
     for chars_to_remove in range(0, tail_len + 1):
         if tail_len <= chars_to_remove:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match="Unable to create a valid run name"):
                 name, trunc = _truncated_str(
                     tail_len, MAX_OP_NAME_LENGTH + chars_to_remove
                 )

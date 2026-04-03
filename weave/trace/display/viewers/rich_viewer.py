@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import types
 from typing import Any
 
 from typing_extensions import Self
@@ -211,7 +212,12 @@ class RichProgress:
         self.start()
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         self.stop()
 
 

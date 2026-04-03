@@ -1,5 +1,3 @@
-from typing import Any
-
 from weave.trace.refs import ObjectRef, OpRef, Ref
 
 
@@ -20,7 +18,7 @@ class ObjectRefStrMatcher:  # noqa: PLW1641
         self.digest = digest
         self.extra = extra
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         other_ref = Ref.parse_uri(other)
         if not isinstance(other_ref, ObjectRef):
             return False

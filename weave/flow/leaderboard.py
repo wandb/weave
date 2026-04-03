@@ -30,7 +30,7 @@ class LeaderboardModelResult:
 def get_leaderboard_results(
     spec: leaderboard.Leaderboard, client: WeaveClient
 ) -> list[LeaderboardModelResult]:
-    entity, project = from_project_id(client._project_id())
+    entity, project = from_project_id(client.project_id)
     calls = client.get_calls(
         filter=CallsFilter(
             op_names=[

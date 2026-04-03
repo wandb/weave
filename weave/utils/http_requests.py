@@ -13,6 +13,8 @@ import httpx
 from httpx import Request, Response
 
 from weave.trace.display.display import Console, Text
+from weave.trace.env import ssl_verify
+from weave.trace.settings import http_timeout
 
 console = Console()
 
@@ -169,20 +171,13 @@ def _log_response(response: Response) -> None:
     pprint_response(response)
 
 
-def _get_http_timeout() -> float:
-    """Get the HTTP timeout from settings."""
-    # Import here to avoid circular imports
-    from weave.trace.settings import http_timeout
-
-    return http_timeout()
-
-
 client = httpx.Client(
     # Use HTTPX's default transport so env proxy handling (including NO_PROXY)
     # works natively.
     event_hooks={"request": [_log_request], "response": [_log_response]},
-    timeout=_get_http_timeout(),
+    timeout=http_timeout(),
     limits=CLIENT_LIMITS,
+    verify=ssl_verify(),
 )
 
 

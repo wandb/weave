@@ -26,17 +26,19 @@ def check_server_up(host, port, num_retries=30) -> bool:
 def _check_server_health(
     base_url: str, endpoint: str, num_retries: int = 1, sleep_time: int = 1
 ) -> bool:
+    last_error = "no response"
     for _ in range(num_retries):
         try:
             with httpx.Client() as client:
                 response = client.get(urllib.parse.urljoin(base_url, endpoint))
                 if response.status_code == 200:
                     return True
-            time.sleep(sleep_time)
-        except httpx.ConnectError:
-            time.sleep(sleep_time)
+                last_error = f"status {response.status_code}"
+        except httpx.HTTPError as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+        time.sleep(sleep_time)
 
     print(
-        f"Server not healthy @ {urllib.parse.urljoin(base_url, endpoint)}: no response"
+        f"Server not healthy @ {urllib.parse.urljoin(base_url, endpoint)}: {last_error}"
     )
     return False

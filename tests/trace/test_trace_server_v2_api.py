@@ -31,7 +31,7 @@ class TestOpsV2API:
 
     def test_op_create(self, client):
         """Test creating an op via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create an op
         req = tsi.OpCreateReq(
@@ -48,7 +48,7 @@ class TestOpsV2API:
 
     def test_op_read(self, client):
         """Test reading an op via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create an op first
         source_code = "def my_test_op():\n    return 'hello world'"
@@ -76,7 +76,7 @@ class TestOpsV2API:
 
     def test_op_list(self, client):
         """Test listing ops via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create multiple ops
         for i in range(3):
@@ -100,7 +100,7 @@ class TestOpsV2API:
 
     def test_op_list_with_limit(self, client):
         """Test listing ops with limit via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create multiple ops
         for i in range(5):
@@ -120,7 +120,7 @@ class TestOpsV2API:
 
     def test_op_delete(self, client):
         """Test deleting an op via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create an op
         create_req = tsi.OpCreateReq(
@@ -143,7 +143,7 @@ class TestOpsV2API:
 
     def test_op_delete_all_versions(self, client):
         """Test deleting all versions of an op via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create multiple versions
         digests = []
@@ -173,7 +173,7 @@ class TestDatasetsV2API:
 
     def test_dataset_create(self, client):
         """Test creating a dataset via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create a dataset
         req = tsi.DatasetCreateReq(
@@ -195,7 +195,7 @@ class TestDatasetsV2API:
 
     def test_dataset_read(self, client):
         """Test reading a dataset via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create a dataset first
         rows = [
@@ -229,7 +229,7 @@ class TestDatasetsV2API:
 
     def test_dataset_list(self, client):
         """Test listing datasets via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create multiple datasets
         for i in range(3):
@@ -253,7 +253,7 @@ class TestDatasetsV2API:
 
     def test_dataset_delete(self, client):
         """Test deleting a dataset via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create a dataset
         create_req = tsi.DatasetCreateReq(
@@ -280,7 +280,7 @@ class TestScorersV2API:
 
     def test_scorer_create(self, client):
         """Test creating a scorer via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create a scorer
         req = tsi.ScorerCreateReq(
@@ -299,7 +299,7 @@ class TestScorersV2API:
 
     def test_scorer_read(self, client):
         """Test reading a scorer via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create a scorer first
         source_code = (
@@ -332,7 +332,7 @@ class TestScorersV2API:
 
     def test_scorer_list(self, client):
         """Test listing scorers via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create multiple scorers
         for i in range(3):
@@ -356,7 +356,7 @@ class TestScorersV2API:
 
     def test_scorer_delete(self, client):
         """Test deleting a scorer via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create a scorer
         create_req = tsi.ScorerCreateReq(
@@ -383,7 +383,7 @@ class TestEvaluationsV2API:
 
     def test_evaluation_create(self, client):
         """Test creating an evaluation via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # First create a dataset
         dataset_req = tsi.DatasetCreateReq(
@@ -416,7 +416,7 @@ class TestEvaluationsV2API:
 
     def test_evaluation_read(self, client):
         """Test reading an evaluation via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create dataset and evaluation first
         dataset_req = tsi.DatasetCreateReq(
@@ -465,7 +465,7 @@ class TestEvaluationsV2API:
 
     def test_evaluation_list(self, client):
         """Test listing evaluations via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create dataset
         dataset_req = tsi.DatasetCreateReq(
@@ -501,7 +501,7 @@ class TestEvaluationsV2API:
 
     def test_evaluation_delete(self, client):
         """Test deleting an evaluation via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create dataset and evaluation
         dataset_req = tsi.DatasetCreateReq(
@@ -535,7 +535,7 @@ class TestEvaluationsV2API:
 
     def test_evaluation_with_scorers(self, client):
         """Test creating an evaluation with scorers."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create dataset
         dataset_req = tsi.DatasetCreateReq(
@@ -593,7 +593,7 @@ class TestV2APIIntegration:
 
     def test_complete_evaluation_workflow(self, client):
         """Test a complete workflow: create dataset, scorers, and evaluation."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Step 1: Create a dataset
@@ -685,7 +685,7 @@ class TestV2APIIntegration:
 
     def test_versioning_workflow(self, client):
         """Test that versioning works correctly across V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create multiple versions of the same op
         versions = []
@@ -725,7 +725,7 @@ class TestModelsV2API:
 
     def test_model_create(self, client):
         """Test creating a model via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create a model
         req = tsi.ModelCreateReq(
@@ -753,7 +753,7 @@ class TestModel(weave.Model):
 
     def test_model_read(self, client):
         """Test reading a model via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create a model first
         source_code = """import weave
@@ -795,7 +795,7 @@ class MyTestModel(weave.Model):
 
     def test_model_list(self, client):
         """Test listing models via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create multiple models
         for i in range(3):
@@ -825,7 +825,7 @@ class ListTestModel{i}(weave.Model):
 
     def test_model_delete(self, client):
         """Test deleting a model via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create a model
         create_req = tsi.ModelCreateReq(
@@ -854,7 +854,7 @@ class DeletableModel(weave.Model):
 
     def test_model_delete_all_versions(self, client):
         """Test deleting all versions of a model via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         # Create multiple versions
         digests = []
@@ -892,7 +892,7 @@ class TestEvaluationRunsV2API:
 
     def test_evaluation_run_create(self, client):
         """Test creating an evaluation run via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create dataset
@@ -940,7 +940,7 @@ class EvalRunModel(weave.Model):
 
     def test_evaluation_run_read(self, client):
         """Test reading an evaluation run via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create necessary components
@@ -995,7 +995,7 @@ class ReadEvalRunModel(weave.Model):
 
     def test_evaluation_run_list(self, client):
         """Test listing evaluation runs via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create dataset
@@ -1052,7 +1052,7 @@ class ListEvalRunModel{i}(weave.Model):
 
     def test_evaluation_run_delete(self, client):
         """Test deleting evaluation runs via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create dataset
@@ -1107,7 +1107,7 @@ class DeleteEvalRunModel(weave.Model):
 
     def test_evaluation_run_finish(self, client):
         """Test finishing an evaluation run via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create dataset
@@ -1167,7 +1167,7 @@ class TestPredictionsV2API:
 
     def test_prediction_create(self, client):
         """Test creating a prediction via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create model
@@ -1198,7 +1198,7 @@ class PredictionTestModel(weave.Model):
 
     def test_prediction_read(self, client):
         """Test reading a prediction via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create model
@@ -1243,7 +1243,7 @@ class ReadPredictionModel(weave.Model):
         Regression test: prediction_read should return {} instead of crashing
         with a Pydantic validation error when call.inputs["inputs"] is None.
         """
-        project_id = client._project_id()
+        project_id = client.project_id
 
         prediction_id = generate_id()
 
@@ -1290,7 +1290,7 @@ class ReadPredictionModel(weave.Model):
 
     def test_prediction_list(self, client):
         """Test listing predictions via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create model
@@ -1331,7 +1331,7 @@ class ListPredictionModel(weave.Model):
 
     def test_prediction_delete(self, client):
         """Test deleting predictions via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create model
@@ -1372,7 +1372,7 @@ class DeletePredictionModel(weave.Model):
 
     def test_prediction_with_evaluation_run(self, client):
         """Test creating a prediction linked to an evaluation run."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create dataset
@@ -1475,7 +1475,7 @@ class TestScoresV2API:
 
     def test_score_create(self, client):
         """Test creating a score via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create scorer
@@ -1524,7 +1524,7 @@ class ScoreTestModel(weave.Model):
 
     def test_score_read(self, client):
         """Test reading a score via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create scorer
@@ -1582,7 +1582,7 @@ class ReadScoreModel(weave.Model):
 
     def test_score_list(self, client):
         """Test listing scores via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create scorer
@@ -1640,7 +1640,7 @@ class ListScoreModel(weave.Model):
 
     def test_score_delete(self, client):
         """Test deleting scores via V2 API."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create scorer
@@ -1698,7 +1698,7 @@ class DeleteScoreModel(weave.Model):
 
     def test_score_with_evaluation_run(self, client):
         """Test creating a score linked to an evaluation run."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         # Create dataset
@@ -1785,7 +1785,7 @@ class TestEvalResultsReadAPI:
 
     def test_eval_results_query_intersection(self, client):
         """Keeps only rows shared by all requested evaluations."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         scorer_res = client.server.scorer_create(
@@ -1904,7 +1904,7 @@ class TestEvalResultsReadAPI:
 
     def test_eval_results_summary_pass_signal(self, client):
         """Aggregates pass-rate stats from scorer outputs with `passed` booleans."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         scorer_res = client.server.scorer_create(
@@ -2007,7 +2007,7 @@ class TestEvalResultsReadAPI:
 
     def test_eval_results_summary_nested_passed_dimension(self, client):
         """Verify scorer_stats emits one entry per flattened leaf (e.g. token_distance.passed)."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         scorer_res = client.server.scorer_create(
@@ -2118,7 +2118,7 @@ class TestEvalResultsReadAPI:
 
     def test_eval_results_from_high_level_evaluation(self, client):
         """Run a real weave.Evaluation then verify eval_results_query and summary."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         class MatchScorer(weave.Scorer):
             @weave.op
@@ -2200,7 +2200,7 @@ class TestEvalResultsReadAPI:
 
     def test_eval_results_from_imperative_evaluation(self, client):
         """Run a real EvaluationLogger then verify eval_results_query and summary."""
-        project_id = client._project_id()
+        project_id = client.project_id
 
         ev = EvaluationLogger()
 
@@ -2271,7 +2271,7 @@ class TestEvalResultsReadAPI:
 
     def test_eval_results_summary_numeric_mean(self, client):
         """Verify numeric aggregation in eval_results_summary."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         scorer_res = client.server.scorer_create(
@@ -2346,7 +2346,7 @@ class TestEvalResultsReadAPI:
 
     def test_eval_results_query_multiple_scorers(self, client):
         """Verify multiple scorers appear in query and summary results."""
-        project_id = client._project_id()
+        project_id = client.project_id
         entity, project = from_project_id(project_id)
 
         scorer_a_res = client.server.scorer_create(
@@ -2480,7 +2480,7 @@ class TestEvalResultsReadAPI:
 
     def test_eval_results_query_combined_sections_match_separate_calls(self, client):
         """Combined eval_results/query sections should match separate query+summary."""
-        project_id = client._project_id()
+        project_id = client.project_id
         ev = EvaluationLogger()
 
         pred1 = ev.log_prediction(inputs={"q": "hello"}, output="world")
@@ -2535,3 +2535,220 @@ class TestEvalResultsReadAPI:
         ]
         assert combined_query.summary is not None
         assert combined_query.summary.model_dump() == separate_summary.model_dump()
+
+    def test_eval_results_summary_text_dimension_scalar(self, client):
+        """A scorer that returns a plain string produces a 'text' scorer_stats entry."""
+        project_id = client.project_id
+        entity, project = from_project_id(project_id)
+
+        scorer_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="reasoning_scorer",
+                op_source_code="def score(output):\n    return 'good'",
+            )
+        )
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        run = client.server.evaluation_run_create(
+            tsi.EvaluationRunCreateReq(
+                project_id=project_id,
+                evaluation="eval://text-scalar",
+                model="model://text-scalar",
+            )
+        )
+        prediction = client.server.prediction_create(
+            tsi.PredictionCreateReq(
+                project_id=project_id,
+                model="model://text-scalar",
+                inputs={"x": "data"},
+                output="some output",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        prediction_call = client.server.call_read(
+            tsi.CallReadReq(project_id=project_id, id=prediction.prediction_id)
+        ).call
+        assert prediction_call is not None
+        assert prediction_call.parent_id is not None
+        predict_and_score_id = prediction_call.parent_id
+
+        score_call_id = generate_id()
+        client.server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=predict_and_score_id,
+                    op_name="ReasoningScorer.score",
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    attributes={
+                        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                            constants.SCORE_ATTR_KEY: "true",
+                            constants.SCORE_SCORER_ATTR_KEY: scorer_ref,
+                        }
+                    },
+                    inputs={"self": scorer_ref},
+                    wb_user_id="test-user",
+                )
+            )
+        )
+        client.server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    output="excellent reasoning here",
+                    summary={},
+                )
+            )
+        )
+        client.server.prediction_finish(
+            tsi.PredictionFinishReq(
+                project_id=project_id, prediction_id=prediction.prediction_id
+            )
+        )
+
+        summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+            )
+        ).summary
+
+        eval_summary = next(
+            e
+            for e in summary.evaluations
+            if e.evaluation_call_id == run.evaluation_run_id
+        )
+        assert len(eval_summary.scorer_stats) == 1
+
+        stats = next(
+            s
+            for s in eval_summary.scorer_stats
+            if s.scorer_key == "reasoning_scorer" and s.path is None
+        )
+        assert stats.value_type == "text"
+        assert stats.trial_count == 1
+        assert stats.numeric_count == 0
+        assert stats.numeric_mean is None
+        assert stats.pass_known_count == 0
+        assert stats.pass_rate is None
+
+    def test_eval_results_summary_text_dimension_mixed_dict(self, client):
+        """A scorer returning a dict with string and bool produces one 'text' and one 'binary' entry."""
+        project_id = client.project_id
+        entity, project = from_project_id(project_id)
+
+        scorer_res = client.server.scorer_create(
+            tsi.ScorerCreateReq(
+                project_id=project_id,
+                name="llm_judge",
+                op_source_code="def score(output):\n    return {'reasoning': 'x', 'passed': True}",
+            )
+        )
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        run = client.server.evaluation_run_create(
+            tsi.EvaluationRunCreateReq(
+                project_id=project_id,
+                evaluation="eval://text-mixed",
+                model="model://text-mixed",
+            )
+        )
+        prediction = client.server.prediction_create(
+            tsi.PredictionCreateReq(
+                project_id=project_id,
+                model="model://text-mixed",
+                inputs={"x": "data"},
+                output="some output",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        prediction_call = client.server.call_read(
+            tsi.CallReadReq(project_id=project_id, id=prediction.prediction_id)
+        ).call
+        assert prediction_call is not None
+        assert prediction_call.parent_id is not None
+        predict_and_score_id = prediction_call.parent_id
+
+        score_call_id = generate_id()
+        client.server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=predict_and_score_id,
+                    op_name="LLMJudge.score",
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    attributes={
+                        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                            constants.SCORE_ATTR_KEY: "true",
+                            constants.SCORE_SCORER_ATTR_KEY: scorer_ref,
+                        }
+                    },
+                    inputs={"self": scorer_ref},
+                    wb_user_id="test-user",
+                )
+            )
+        )
+        client.server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=score_call_id,
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    output={
+                        "reasoning": "the model answered correctly",
+                        "passed": True,
+                    },
+                    summary={},
+                )
+            )
+        )
+        client.server.prediction_finish(
+            tsi.PredictionFinishReq(
+                project_id=project_id, prediction_id=prediction.prediction_id
+            )
+        )
+
+        summary = client.server.eval_results_query(
+            tsi.EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                require_intersection=False,
+                include_rows=False,
+                include_summary=True,
+            )
+        ).summary
+
+        eval_summary = next(
+            e
+            for e in summary.evaluations
+            if e.evaluation_call_id == run.evaluation_run_id
+        )
+        assert len(eval_summary.scorer_stats) == 2
+
+        stats_by_path = {s.path: s for s in eval_summary.scorer_stats}
+
+        reasoning_stats = stats_by_path["reasoning"]
+        assert reasoning_stats.scorer_key == "llm_judge"
+        assert reasoning_stats.value_type == "text"
+        assert reasoning_stats.trial_count == 1
+        assert reasoning_stats.numeric_count == 0
+        assert reasoning_stats.numeric_mean is None
+        assert reasoning_stats.pass_known_count == 0
+        assert reasoning_stats.pass_rate is None
+
+        passed_stats = stats_by_path["passed"]
+        assert passed_stats.scorer_key == "llm_judge"
+        assert passed_stats.value_type == "binary"
+        assert passed_stats.trial_count == 1
+        assert passed_stats.pass_true_count == 1
+        assert passed_stats.pass_rate == 1.0

@@ -36,7 +36,7 @@ def test_human_feedback_basic(client):
     objects = client.server.objs_query(
         ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"base_object_classes": ["AnnotationSpec"]},
             }
         )
@@ -66,7 +66,7 @@ def test_human_feedback_basic(client):
     client.server.feedback_create(
         FeedbackCreateReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "weave_ref": "weave:///entity/project/call/name:digest",
                 "feedback_type": "wandb.annotation." + ref1.name,
                 "annotation_ref": ref1.uri,
@@ -79,7 +79,7 @@ def test_human_feedback_basic(client):
         client.server.feedback_create(
             FeedbackCreateReq.model_validate(
                 {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "weave_ref": "weave:///entity/project/call/name:digest",
                     "feedback_type": "wandb.annotation." + ref1.name,
                     "annotation_ref": ref1.uri,
@@ -108,7 +108,7 @@ def test_field_schema_with_pydantic_model(client):
     objects = client.server.objs_query(
         ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"base_object_classes": ["AnnotationSpec"]},
             }
         )
@@ -146,7 +146,7 @@ def test_field_schema_with_pydantic_model(client):
     client.server.feedback_create(
         FeedbackCreateReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "weave_ref": "weave:///entity/project/call/name:digest",
                 "feedback_type": "wandb.annotation." + ref.name,
                 "annotation_ref": ref.uri,
@@ -165,7 +165,7 @@ def test_field_schema_with_pydantic_model(client):
         client.server.feedback_create(
             FeedbackCreateReq.model_validate(
                 {
-                    "project_id": client._project_id(),
+                    "project_id": client.project_id,
                     "weave_ref": "weave:///entity/project/call/name:digest",
                     "feedback_type": "wandb.annotation." + ref.name,
                     "annotation_ref": ref.uri,
@@ -225,7 +225,7 @@ def test_field_schema_with_pydantic_field(client):
     objects = client.server.objs_query(
         ObjQueryReq.model_validate(
             {
-                "project_id": client._project_id(),
+                "project_id": client.project_id,
                 "filter": {"base_object_classes": ["AnnotationSpec"]},
             }
         )
@@ -494,17 +494,17 @@ def test_annotation_feedback_sdk(client):
     assert feedback[0].annotation_ref == ref.uri
 
     # no annotation_ref
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="reserved for annotation feedback"):
         calls[0].feedback.add("wandb.annotation.number_rating", {"value": 3})
 
     # empty annotation_ref
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="reserved for annotation feedback"):
         calls[0].feedback.add(
             "wandb.annotation.number_rating", {"value": 3}, annotation_ref=""
         )
 
     # invalid annotation_ref
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="feedback_type must conform to the format"):
         calls[0].feedback.add("number_rating", {"value": 3}, annotation_ref="ssss")
 
     # no wandb.annotation prefix

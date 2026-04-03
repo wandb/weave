@@ -40,6 +40,9 @@ MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{4,}>", re.ASCII)
 
 CODE_DEP_ERROR_SENTINEL = "<error>"
 
+# Maximum recursion depth when resolving code dependencies
+MAX_CODE_DEPS_RECURSION_DEPTH = 20
+
 
 def arg_names(args: ast.arguments) -> set[str]:
     arg_names = set()
@@ -338,7 +341,7 @@ def _get_code_deps(
     depth: int = 0,
 ) -> GetCodeDepsResult:
     warnings: list[str] = []
-    if depth > 20:
+    if depth > MAX_CODE_DEPS_RECURSION_DEPTH:
         warnings = [
             "Recursion depth exceeded in get_code_deps, this may indicate circular dependencies, which are not yet handled."
         ]
@@ -451,7 +454,7 @@ def _get_code_deps(
                     if should_redact(var_name):
                         json_val = REDACTED_VALUE
                     else:
-                        json_val = to_json(var_value, client._project_id(), client)
+                        json_val = to_json(var_value, client.project_id, client)
                         if _has_memory_address(json_val):
                             json_val = _replace_memory_address(json_val)
                 except Exception as e:

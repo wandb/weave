@@ -713,7 +713,7 @@ class TestFeedbackMetricSpec:
         assert spec.aggregations == [AggregationType.AVG, AggregationType.MAX]
 
     def test_invalid_aggregation_string_rejected(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="average"):
             FeedbackMetricSpec(json_path="score", aggregations=["average"])  # type: ignore[list-item]
 
     def test_default_aggregations(self):

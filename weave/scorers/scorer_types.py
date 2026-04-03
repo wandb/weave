@@ -9,6 +9,10 @@ from weave.scorers.utils import ensure_hf_imports
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_ROLLING_WINDOW_MAX_TOKENS = 512
+DEFAULT_ROLLING_WINDOW_OVERLAP = 50
+DEFAULT_LLM_MAX_TOKENS = 4096
+
 if TYPE_CHECKING:
     import torch
     from litellm import acompletion, aembedding, amoderation
@@ -37,7 +41,7 @@ class LLMScorer(weave.Scorer):
     _aembedding: "aembedding" = PrivateAttr()
     _amoderation: "amoderation" = PrivateAttr()
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         try:
             from litellm import acompletion, aembedding, amoderation
         except ImportError:
@@ -101,7 +105,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
 
     _pipeline: Optional["Pipeline"] = PrivateAttr(default=None)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         ensure_hf_imports()
         check_cuda(self.device)
         if self._pipeline is None:
@@ -129,7 +133,7 @@ class HuggingFaceScorer(weave.Scorer):
     _model: Optional["PreTrainedModel"] = PrivateAttr(default=None)
     _tokenizer: Optional["PreTrainedTokenizer"] = PrivateAttr(default=None)
 
-    def model_post_init(self, __context: Any = None) -> None:
+    def model_post_init(self, context: Any = None, /) -> None:
         """Template method for post-initialization."""
         check_cuda(self.device)
         ensure_hf_imports()
@@ -171,9 +175,9 @@ class RollingWindowScorer(HuggingFaceScorer):
         aggregation_method: The method to aggregate predictions ("max" or "mean").
     """
 
-    max_tokens: int = 512  # Default maximum tokens per window
+    max_tokens: int = DEFAULT_ROLLING_WINDOW_MAX_TOKENS
     overlap: int = Field(
-        default=50,
+        default=DEFAULT_ROLLING_WINDOW_OVERLAP,
         description="The number of overlapping tokens between consecutive windows",
     )
     aggregation_method: Literal["max", "mean"] = Field(

@@ -9,7 +9,7 @@ from weave.trace_server.common_interface import SortBy
 def _objs_query(client: WeaveClient, object_id: str) -> list[tsi.ObjSchema]:
     objs = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
             sort_by=[SortBy(field="created_at", direction="asc")],
         )
@@ -20,7 +20,7 @@ def _objs_query(client: WeaveClient, object_id: str) -> list[tsi.ObjSchema]:
 def _obj_delete(client: WeaveClient, object_id: str, digests: list[str]) -> int:
     return client.server.obj_delete(
         tsi.ObjDeleteReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=object_id,
             digests=digests,
         )
@@ -188,7 +188,7 @@ def test_read_deleted_object(client: WeaveClient):
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError) as e:
         client.server.obj_read(
             tsi.ObjReadReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 object_id="obj_1",
                 digest=obj1_v2.digest,
             )
@@ -245,7 +245,7 @@ def test_read_deleted_op(client: WeaveClient):
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError) as e:
         client.server.obj_read(
             tsi.ObjReadReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 object_id="my_op",
                 digest=op_ref.digest,
             )
