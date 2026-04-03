@@ -1465,9 +1465,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 raw_res.close()
 
     def _calls_query_stream_for_eval_subtree(
-        self, project_id: str, eval_root_ids: list[str]
+        self,
+        project_id: str,
+        eval_root_ids: list[str],
+        include_children: bool = True,
     ) -> Iterator[tsi.CallSchema]:
-        """Fetch direct children of eval root IDs and their children in one query."""
+        """Fetch direct children of eval root IDs and optionally their children."""
         read_table = self.table_routing_resolver.resolve_read_table(
             project_id, self.ch_client
         )
@@ -1478,6 +1481,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for col in columns:
             cq.add_field(col)
         cq.eval_root_ids = eval_root_ids
+        cq.include_predict_and_score_children = include_children
         cq.add_order("started_at", "asc")
         cq.add_order("id", "asc")
         pb = ParamBuilder()
@@ -5139,7 +5143,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
         all_calls = list(
-            self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
+            self._calls_query_stream_for_eval_subtree(
+                req.project_id,
+                eval_root_ids,
+                req.include_predict_and_score_children,
+            )
         )
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
 

@@ -836,6 +836,7 @@ class CallsQuery(BaseModel):
     include_total_storage_size: bool = False
     read_table: ReadTable = ReadTable.CALLS_MERGED
     eval_root_ids: list[str] | None = None
+    include_predict_and_score_children: bool = True
 
     @property
     def use_agg_fn(self) -> bool:
@@ -1136,7 +1137,9 @@ class CallsQuery(BaseModel):
         # when querying the eval_root_ids on calls_merged, we need the CTE path
         # to avoid duplicate subqueries, so skip the early return.
         needs_eval_cte = (
-            self.eval_root_ids and self.read_table == ReadTable.CALLS_MERGED
+            self.eval_root_ids
+            and self.read_table == ReadTable.CALLS_MERGED
+            and self.include_predict_and_score_children
         )
         if (
             not should_optimize
@@ -1300,7 +1303,9 @@ class CallsQuery(BaseModel):
             self.hardcoded_filter, pb, table_alias
         )
         needs_eval_cte = (
-            self.eval_root_ids and self.read_table == ReadTable.CALLS_MERGED
+            self.eval_root_ids
+            and self.read_table == ReadTable.CALLS_MERGED
+            and self.include_predict_and_score_children
         )
         children_of_eval_ids = process_children_of_eval_ids_to_sql(
             self.eval_root_ids,
@@ -1309,6 +1314,7 @@ class CallsQuery(BaseModel):
             self.project_id,
             self.read_table,
             eval_subcall_cte_name=CTE_EVAL_SUBCALLS if needs_eval_cte else None,
+            include_predict_and_score_children=self.include_predict_and_score_children,
         )
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
@@ -1644,10 +1650,12 @@ class CallsQuery(BaseModel):
             raise TypeError("parent_id is not an aggregate field")
         parent_id_agg = parent_id_field.as_sql(pb, table_alias, use_agg_fn=True)
         eval_ids_param = param_slot(pb.add_param(self.eval_root_ids), "Array(String)")
-        eval_subtree_having = (
-            f"({parent_id_agg} IN {eval_ids_param}"
-            f" OR {parent_id_agg} IN (SELECT id FROM {CTE_EVAL_SUBCALLS}))"
-        )
+        eval_subtree_having = f"{parent_id_agg} IN {eval_ids_param}"
+        if self.include_predict_and_score_children:
+            eval_subtree_having = (
+                f"({eval_subtree_having}"
+                f" OR {parent_id_agg} IN (SELECT id FROM {CTE_EVAL_SUBCALLS}))"
+            )
         if existing_having:
             return f"{existing_having}\n        AND {eval_subtree_having}"
         return f"HAVING {eval_subtree_having}"
@@ -2313,8 +2321,14 @@ def process_children_of_eval_ids_to_sql(
     project_id: str = "",
     read_table: ReadTable = ReadTable.CALLS_MERGED,
     eval_subcall_cte_name: str | None = None,
+    include_predict_and_score_children: bool = True,
 ) -> str:
-    """Fetch direct children of eval root IDs and their children for the eval results dataset."""
+    """Fetch direct children of eval root IDs and optionally their children.
+
+    When include_predict_and_score_children is False, only fetch
+    predict-and-score calls (direct children of eval roots), skipping
+    the nested subquery for their children (predict/scorer calls).
+    """
     if not eval_root_ids:
         return ""
     assert_parameter_length_less_than_max("eval_root_ids", len(eval_root_ids))
@@ -2330,25 +2344,28 @@ def process_children_of_eval_ids_to_sql(
         param_builder.add_param(eval_root_ids), "Array(String)"
     )
 
-    # find all direct children of the eval root ids (predict_and_score, summarize, etc).
-    # used in the WHERE clause to fetch both these children and their children (predict/score calls),
-    # and in the HAVING clause to filter out unrelated top-level calls that leak in via parent_id IS NULL.
-    if eval_subcall_cte_name:
-        eval_root_children_subquery = f"SELECT id FROM {eval_subcall_cte_name}"
-    else:
-        eval_root_children_cq = CallsQuery(project_id=project_id, read_table=read_table)
-        eval_root_children_cq.add_field("id")
-        eval_root_children_cq.set_hardcoded_filter(
-            HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
+    # Level 1: direct children of the eval root ids (predict_and_score, summarize, etc).
+    parent_id_conditions = f"{parent_id_field_sql} IN {eval_root_ids_param}"
+
+    if include_predict_and_score_children:
+        # Level 2: children of the direct children (predict/score calls).
+        if eval_subcall_cte_name:
+            eval_root_children_subquery = f"SELECT id FROM {eval_subcall_cte_name}"
+        else:
+            eval_root_children_cq = CallsQuery(
+                project_id=project_id, read_table=read_table
+            )
+            eval_root_children_cq.add_field("id")
+            eval_root_children_cq.set_hardcoded_filter(
+                HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
+            )
+            eval_root_children_subquery = eval_root_children_cq.as_sql(param_builder)
+        parent_id_conditions += (
+            f" OR {parent_id_field_sql} IN ({eval_root_children_subquery})"
         )
-        eval_root_children_subquery = eval_root_children_cq.as_sql(param_builder)
 
     # for the calls-merged table, each call is stored as split start/end rows.
-    # end-rows have parent_id as NULL, so we need to do this.
-    parent_id_conditions = (
-        f"{parent_id_field_sql} IN {eval_root_ids_param}"
-        f" OR {parent_id_field_sql} IN ({eval_root_children_subquery})"
-    )
+    # end-rows have parent_id as NULL, so we need to include them.
     if read_table == ReadTable.CALLS_MERGED:
         parent_null = parent_id_field.null_check_sql(
             param_builder, table_alias, read_table, use_agg_fn=False

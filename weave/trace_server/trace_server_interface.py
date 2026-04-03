@@ -2714,6 +2714,16 @@ class EvalResultsQueryBody(BaseModelStrict):
             "the value of `require_intersection` is used."
         ),
     )
+    include_predict_and_score_children: bool = Field(
+        default=True,
+        description=(
+            "When true (default), fetch child calls (predict/scorer) of each "
+            "predict-and-score call to populate predict_call_id, scorer_call_ids, "
+            "and more precise latency/token data. When false, these fields are "
+            "derived from the predict-and-score call itself (predict_call_id and "
+            "scorer_call_ids will be null/empty)."
+        ),
+    )
     limit: int | None = Field(
         default=None,
         description="Optional row-level page size applied after grouping and intersection.",

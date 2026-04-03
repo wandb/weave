@@ -88,6 +88,59 @@ def test_eval_root_ids_filter_calls_complete() -> None:
     )
 
 
+def test_eval_root_ids_direct_only_calls_merged() -> None:
+    """direct_only skips the CTE and Level 2 children subquery."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_MERGED)
+    cq.add_field("id")
+    cq.eval_root_ids = ["eval-1", "eval-2"]
+    cq.include_predict_and_score_children = False
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.parent_id IN {pb_0:Array(String)}
+               OR calls_merged.parent_id IS NULL)
+          AND calls_merged.id NOT IN {pb_0:Array(String)}
+        GROUP BY (calls_merged.project_id,
+                  calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        AND any(calls_merged.parent_id) IN {pb_2:Array(String)}
+        """,
+        {
+            "pb_0": ["eval-1", "eval-2"],
+            "pb_1": "project",
+            "pb_2": ["eval-1", "eval-2"],
+        },
+    )
+
+
+def test_eval_root_ids_direct_only_calls_complete() -> None:
+    """direct_only on calls_complete omits Level 2 children subquery."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.eval_root_ids = ["eval-1", "eval-2"]
+    cq.include_predict_and_score_children = False
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE (calls_complete.parent_id IN {pb_1:Array(String)})
+          AND calls_complete.id NOT IN {pb_1:Array(String)}
+          AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": ["eval-1", "eval-2"],
+            "pb_2": "project",
+        },
+    )
+
+
 def test_eval_root_ids_combined_with_op_names_filter() -> None:
     """eval_root_ids composes correctly with other hardcoded filters."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_MERGED)

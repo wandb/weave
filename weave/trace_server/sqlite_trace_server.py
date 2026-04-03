@@ -1352,7 +1352,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return iter(self.calls_query(req).calls)
 
     def _calls_query_stream_for_eval_subtree(
-        self, project_id: str, eval_root_ids: list[str]
+        self,
+        project_id: str,
+        eval_root_ids: list[str],
+        include_children: bool = True,
     ) -> Iterator[tsi.CallSchema]:
         columns = [
             "id",
@@ -1376,16 +1379,17 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             )
         )
         yield from eval_root_children
-        eval_root_children_ids = [c.id for c in eval_root_children]
-        if eval_root_children_ids:
-            yield from self.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=project_id,
-                    filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
-                    columns=columns,
-                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+        if include_children:
+            eval_root_children_ids = [c.id for c in eval_root_children]
+            if eval_root_children_ids:
+                yield from self.calls_query_stream(
+                    tsi.CallsQueryReq(
+                        project_id=project_id,
+                        filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
+                        columns=columns,
+                        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                    )
                 )
-            )
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         if req.limit is not None and req.limit < 1:
@@ -4639,7 +4643,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
         all_calls = list(
-            self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
+            self._calls_query_stream_for_eval_subtree(
+                req.project_id,
+                eval_root_ids,
+                include_children=req.include_predict_and_score_children,
+            )
         )
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
 
