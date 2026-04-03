@@ -71,12 +71,9 @@ export function getApiKey(host: string): string {
 export function getWandbConfigs() {
   // Get base URL from environment or config
   const configBaseUrl = getBaseUrlFromConfig();
-  const {
-    baseUrl,
-    traceBaseUrl,
-    domain,
-    host: resolvedHost,
-  } = getUrls(configBaseUrl);
-  const apiKey = getApiKey(configBaseUrl ? resolvedHost : defaultHost);
+  const host = configBaseUrl ? new URL(configBaseUrl).host : defaultHost;
+
+  const apiKey = getApiKey(host);
+  const {baseUrl, traceBaseUrl, domain, host: resolvedHost} = getUrls(host);
   return {apiKey, baseUrl, traceBaseUrl, domain, resolvedHost};
 }
