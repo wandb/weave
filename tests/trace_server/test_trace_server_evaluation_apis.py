@@ -769,3 +769,48 @@ def test_trial_columns_filtering(
     else:
         assert trial.predict_call_id is None
         assert trial.scorer_call_ids == {}
+
+
+def test_trial_columns_scores_only_preserves_row_digests(client):
+    """Ensure trial_columns=["scores"] with include_raw_data_rows=False
+    still produces distinct rows.
+    """
+    project_id = client.project_id
+
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://digest-test",
+            model="model://digest-test",
+        )
+    )
+    for i in range(3):
+        pred = client.server.prediction_create(
+            PredictionCreateReq(
+                project_id=project_id,
+                model="model://digest-test",
+                inputs={"x": i},
+                output=f"result_{i}",
+                evaluation_run_id=run.evaluation_run_id,
+            )
+        )
+        client.server.prediction_finish(
+            PredictionFinishReq(
+                project_id=project_id,
+                prediction_id=pred.prediction_id,
+            )
+        )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            trial_columns=["scores"],
+            include_raw_data_rows=False,
+        )
+    )
+
+    assert res.total_rows == 3
+    assert len(res.rows) == 3
+    digests = {row.row_digest for row in res.rows}
+    assert len(digests) == 3, f"Expected 3 distinct digests, got {digests}"
