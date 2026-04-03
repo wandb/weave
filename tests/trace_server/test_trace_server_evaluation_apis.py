@@ -650,7 +650,7 @@ def test_eval_subtree_query_excludes_unrelated_top_level_calls(client, internal_
 
 
 @pytest.mark.parametrize(
-    "trial_columns, expect_output, expect_children",
+    ("trial_columns", "expect_output", "expect_children"),
     [
         # All fields (default)
         (None, True, True),
@@ -664,7 +664,7 @@ def test_eval_subtree_query_excludes_unrelated_top_level_calls(client, internal_
         (["scorer_call_ids"], True, True),
         # Latency + tokens — output fetched (latency fallback), level 2 fetched
         (["model_latency_seconds", "total_tokens"], True, True),
-        # Everything explicitly listed
+        # all trial columns, explicitly specified
         (
             [
                 "scores",
