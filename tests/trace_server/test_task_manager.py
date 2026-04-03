@@ -1,6 +1,5 @@
 """Unit tests for TaskManager using fakeredis."""
 
-import json
 from unittest.mock import patch
 
 import fakeredis
@@ -25,17 +24,17 @@ def manager(fake_redis: fakeredis.FakeRedis) -> TaskManager:
 def test_create_task(manager: TaskManager) -> None:
     task = manager.create_task(total_items=10)
 
-    assert task["total_items"] == 10
-    assert task["successful_items"] == 0
-    assert task["failed_items"] == 0
-    assert task["canceled_at"] is None
-    assert task["created_at"]
-    assert task["id"]
+    assert task.total_items == 10
+    assert task.successful_items == 0
+    assert task.failed_items == 0
+    assert task.canceled_at is None
+    assert task.created_at
+    assert task.id
 
 
 def test_get_task_returns_created_task(manager: TaskManager) -> None:
     task = manager.create_task(total_items=5)
-    fetched = manager.get_task(task["id"])
+    fetched = manager.get_task(task.id)
 
     assert fetched == task
 
@@ -46,21 +45,21 @@ def test_get_task_returns_none_for_unknown_id(manager: TaskManager) -> None:
 
 def test_increment_successful_items(manager: TaskManager) -> None:
     task = manager.create_task(total_items=3)
-    manager.increment_successful_items(task["id"])
-    updated = manager.increment_successful_items(task["id"])
+    manager.increment_successful_items(task.id)
+    updated = manager.increment_successful_items(task.id)
 
     assert updated is not None
-    assert updated["successful_items"] == 2
-    assert updated["failed_items"] == 0
+    assert updated.successful_items == 2
+    assert updated.failed_items == 0
 
 
 def test_increment_failed_items(manager: TaskManager) -> None:
     task = manager.create_task(total_items=3)
-    updated = manager.increment_failed_items(task["id"])
+    updated = manager.increment_failed_items(task.id)
 
     assert updated is not None
-    assert updated["failed_items"] == 1
-    assert updated["successful_items"] == 0
+    assert updated.failed_items == 1
+    assert updated.successful_items == 0
 
 
 def test_increment_returns_none_for_unknown_id(manager: TaskManager) -> None:
@@ -70,22 +69,22 @@ def test_increment_returns_none_for_unknown_id(manager: TaskManager) -> None:
 
 def test_complete_task_removes_it(manager: TaskManager) -> None:
     task = manager.create_task(total_items=1)
-    manager.complete_task(task["id"])
+    manager.complete_task(task.id)
 
-    assert manager.get_task(task["id"]) is None
+    assert manager.get_task(task.id) is None
 
 
 def test_cancel_task_sets_canceled_at(manager: TaskManager) -> None:
     task = manager.create_task(total_items=5)
-    assert task["canceled_at"] is None
+    assert task.canceled_at is None
 
-    canceled = manager.cancel_task(task["id"])
+    canceled = manager.cancel_task(task.id)
 
     assert canceled is not None
-    assert canceled["canceled_at"] is not None
-    fetched = manager.get_task(task["id"])
+    assert canceled.canceled_at is not None
+    fetched = manager.get_task(task.id)
     assert fetched is not None
-    assert fetched["canceled_at"] == canceled["canceled_at"]
+    assert fetched.canceled_at == canceled.canceled_at
 
 
 def test_cancel_task_returns_none_for_unknown_id(manager: TaskManager) -> None:
@@ -94,13 +93,13 @@ def test_cancel_task_returns_none_for_unknown_id(manager: TaskManager) -> None:
 
 def test_is_canceled_false_for_new_task(manager: TaskManager) -> None:
     task = manager.create_task(total_items=1)
-    assert manager.is_canceled(task["id"]) is False
+    assert manager.is_canceled(task.id) is False
 
 
 def test_is_canceled_true_after_cancel(manager: TaskManager) -> None:
     task = manager.create_task(total_items=1)
-    manager.cancel_task(task["id"])
-    assert manager.is_canceled(task["id"]) is True
+    manager.cancel_task(task.id)
+    assert manager.is_canceled(task.id) is True
 
 
 def test_is_canceled_false_for_unknown_id(manager: TaskManager) -> None:
@@ -116,9 +115,9 @@ def test_list_tasks_returns_all_tasks(manager: TaskManager) -> None:
     t2 = manager.create_task(total_items=2)
 
     tasks = manager.list_tasks()
-    ids = {t["id"] for t in tasks}
+    ids = {t.id for t in tasks}
 
-    assert ids == {t1["id"], t2["id"]}
+    assert ids == {t1.id, t2.id}
 
 
 def test_list_tasks_isolated_by_project_and_user(
@@ -135,8 +134,8 @@ def test_list_tasks_isolated_by_project_and_user(
 
     assert len(manager_a.list_tasks()) == 1
     assert len(manager_b.list_tasks()) == 1
-    assert manager_a.list_tasks()[0]["total_items"] == 1
-    assert manager_b.list_tasks()[0]["total_items"] == 2
+    assert manager_a.list_tasks()[0].total_items == 1
+    assert manager_b.list_tasks()[0].total_items == 2
 
 
 def test_clear_tasks(manager: TaskManager) -> None:
@@ -150,16 +149,16 @@ def test_clear_tasks(manager: TaskManager) -> None:
 
 def test_task_data_survives_increments(manager: TaskManager) -> None:
     task = manager.create_task(total_items=4)
-    manager.increment_successful_items(task["id"])
-    manager.increment_successful_items(task["id"])
-    manager.increment_failed_items(task["id"])
+    manager.increment_successful_items(task.id)
+    manager.increment_successful_items(task.id)
+    manager.increment_failed_items(task.id)
 
-    final = manager.get_task(task["id"])
+    final = manager.get_task(task.id)
     assert final is not None
-    assert final["successful_items"] == 2
-    assert final["failed_items"] == 1
-    assert final["total_items"] == 4
-    assert final["canceled_at"] is None
+    assert final.successful_items == 2
+    assert final.failed_items == 1
+    assert final.total_items == 4
+    assert final.canceled_at is None
 
 
 def test_task_key_includes_project_and_user(
@@ -172,11 +171,15 @@ def test_task_key_includes_project_and_user(
 
     task = manager.create_task(total_items=1)
     expected_prefix = "weave:task:myentity/myproject:myuser:"
-    matching_keys = [k for k in fake_redis.keys("*") if k.startswith(expected_prefix)]
+    matching_keys = [
+        k
+        for k in fake_redis.keys("*")
+        if k.startswith(expected_prefix) and not k.endswith(":_index")
+    ]
 
     assert len(matching_keys) == 1
-    stored = json.loads(fake_redis.get(matching_keys[0]))
-    assert stored["id"] == task["id"]
+    stored = fake_redis.hgetall(matching_keys[0])
+    assert stored["id"] == task.id
 
 
 def test_task_ttl_is_set(fake_redis: fakeredis.FakeRedis) -> None:
@@ -186,7 +189,7 @@ def test_task_ttl_is_set(fake_redis: fakeredis.FakeRedis) -> None:
         manager = TaskManager(project_id="entity/project", wb_user_id="user123")
 
     task = manager.create_task(total_items=1)
-    key = f"weave:task:entity/project:user123:{task['id']}"
+    key = f"weave:task:entity/project:user123:{task.id}"
     ttl = fake_redis.ttl(key)
 
     assert ttl > 0
