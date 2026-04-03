@@ -542,6 +542,12 @@ def _create_like_optimized_eq_condition(
 
     like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
     if use_null_check and _field_requires_null_check(field):
+        if NotContext.is_in_not_context():
+            # Inside NOT, "OR IS NULL" becomes "AND IS NOT NULL" via De Morgan's
+            # law, which incorrectly excludes unmerged call parts (e.g. end rows
+            # without attributes_dump).  Skip the optimization entirely so the
+            # HAVING clause handles the NOT correctly after GROUP BY merges rows.
+            return None
         return f"({like_condition} OR {table_alias}.{field} IS NULL)"
     return like_condition
 
@@ -591,6 +597,8 @@ def _create_like_optimized_contains_condition(
         field, like_pattern, pb, table_alias, case_insensitive
     )
     if use_null_check and _field_requires_null_check(field):
+        if NotContext.is_in_not_context():
+            return None
         return f"({like_condition} OR {table_alias}.{field} IS NULL)"
     return like_condition
 
@@ -650,6 +658,8 @@ def _create_like_optimized_in_condition(
 
     or_sql = "(" + " OR ".join(like_conditions) + ")"
     if use_null_check and _field_requires_null_check(field):
+        if NotContext.is_in_not_context():
+            return None
         return f"({or_sql} OR {table_alias}.{field} IS NULL)"
     return or_sql
 
