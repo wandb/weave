@@ -1356,7 +1356,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         project_id: str,
         eval_root_ids: list[str],
         trial_columns: list[tsi.TrialColumn] | None = None,
-        include_raw_data_rows: bool = True,
     ) -> Iterator[tsi.CallSchema]:
         needs_children = eval_helpers.trial_columns_need_children(trial_columns)
         needs_output = eval_helpers.trial_columns_need_output(trial_columns)
@@ -4646,7 +4645,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 req.project_id,
                 eval_root_ids,
                 trial_columns=req.trial_columns,
-                include_raw_data_rows=req.include_raw_data_rows,
             )
         )
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)

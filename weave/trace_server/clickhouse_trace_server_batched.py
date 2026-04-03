@@ -1469,7 +1469,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_id: str,
         eval_root_ids: list[str],
         trial_columns: list[tsi.TrialColumn] | None = None,
-        include_raw_data_rows: bool = True,
     ) -> Iterator[tsi.CallSchema]:
         """Fetch direct children of eval root IDs and optionally their children.
 
@@ -5165,7 +5164,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 req.project_id,
                 eval_root_ids,
                 trial_columns=req.trial_columns,
-                include_raw_data_rows=req.include_raw_data_rows,
             )
         )
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
