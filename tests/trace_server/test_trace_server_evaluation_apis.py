@@ -647,3 +647,78 @@ def test_eval_subtree_query_excludes_unrelated_top_level_calls(client, internal_
     assert unrelated_call_id not in raw_call_ids, (
         "Unrelated top-level call leaked into eval subtree query"
     )
+
+
+def test_eval_results_include_predict_and_score_children(client):
+    """Verify include_predict_and_score_children controls child call data."""
+    project_id = client.project_id
+    entity, project = from_project_id(project_id)
+
+    scorer_res = client.server.scorer_create(
+        ScorerCreateReq(
+            project_id=project_id,
+            name="children_test_scorer",
+            op_source_code="def score(output):\n    return 1",
+        )
+    )
+    scorer_ref = (
+        f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+    )
+
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://children-test",
+            model="model://children-test",
+        )
+    )
+    pred = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model="model://children-test",
+            inputs={"x": 1},
+            output="result",
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.score_create(
+        ScoreCreateReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+            scorer=scorer_ref,
+            value=0.8,
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+        )
+    )
+
+    # With children included (default) — predict_call_id and scorer_call_ids populated
+    res_with = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_predict_and_score_children=True,
+        )
+    )
+    trial_with = res_with.rows[0].evaluations[0].trials[0]
+    assert trial_with.predict_call_id is not None
+    assert trial_with.scorer_call_ids != {}
+    assert trial_with.scores["children_test_scorer"] == 0.8
+
+    # scores should still be present.
+    res_without = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_predict_and_score_children=False,
+        )
+    )
+    trial_without = res_without.rows[0].evaluations[0].trials[0]
+    assert trial_without.predict_call_id is None
+    assert trial_without.scorer_call_ids == {}
+    assert trial_without.scores["children_test_scorer"] == 0.8
