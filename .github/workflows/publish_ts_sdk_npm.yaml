@@ -63,6 +63,8 @@ jobs:
 
       - name: Run tests
         working-directory: sdks/node
+        env:
+          WANDB_API_KEY: dummy
         run: pnpm test
 
       - name: Run prettier check
