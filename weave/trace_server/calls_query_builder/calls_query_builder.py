@@ -2365,7 +2365,7 @@ def process_children_of_eval_ids_to_sql(
         )
 
     # for the calls-merged table, each call is stored as split start/end rows.
-    # end-rows have parent_id as NULL, so we need to include them.
+    # end-rows have parent_id as NULL, so we need to do this.
     if read_table == ReadTable.CALLS_MERGED:
         parent_null = parent_id_field.null_check_sql(
             param_builder, table_alias, read_table, use_agg_fn=False
