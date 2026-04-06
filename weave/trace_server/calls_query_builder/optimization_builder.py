@@ -115,6 +115,12 @@ class QueryOptimizationProcessor(ABC):
         conditions = []
         for op in operation.and_:
             result = self.process_operand(op)
+            if result is None:
+                # Bail if any of the predicates can't be optimized.
+                # Note that it's not safe to simply skip these predicates because,
+                # combined with a NOT, the filter may become more restrictive than
+                # intended and we might "optimize" away valid matches.
+                return None
             if result:
                 conditions.append(result)
 
@@ -132,9 +138,7 @@ class QueryOptimizationProcessor(ABC):
         for op in operation.or_:
             result = self.process_operand(op)
             if result is None:
-                # If any or condition can't be optimized, return
-                # TODO: this should return the non optimized,
-                # non aggreagated condition when available
+                # Bail if any of the predicates can't be optimized.
                 return None
             conditions.append(result)
 

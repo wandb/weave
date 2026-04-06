@@ -112,6 +112,42 @@ class TestMaybeUseNullCheck:
         op = tsi_query.NotOperation.model_validate({"$not": [{"$not": [and_body]}]})  # type: ignore [assignment]
         assert apply_processor(processor, op) is not None
 
+        # NOT(AND(NOT(eq_a), eq_b)): eq_b at depth=1 returns None, so AND
+        # bails entirely rather than producing a too-restrictive pre-filter.
+        pb = ParamBuilder()
+        processor = HeavyFieldOptimizationProcessor(
+            pb, "calls_merged", use_null_check=True
+        )
+        op = tsi_query.NotOperation.model_validate(  # type: ignore [assignment]
+            {
+                "$not": [
+                    {
+                        "$and": [
+                            {
+                                "$not": [
+                                    {
+                                        "$eq": [
+                                            {"$getField": "attributes.a"},
+                                            {"$literal": "x"},
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "attributes.b"},
+                                    {"$literal": "y"},
+                                ]
+                            },
+                        ]
+                    }
+                ]
+            }
+        )
+        # eq_b at depth=1 can't be optimized, and dropping it from the AND
+        # would make the pre-filter too restrictive, so the whole thing bails.
+        assert apply_processor(processor, op) is None
+
 
 def test_heavy_field_eq_with_null_check() -> None:
     """Eq on a heavy start/end field adds OR IS NULL outside NOT context."""
