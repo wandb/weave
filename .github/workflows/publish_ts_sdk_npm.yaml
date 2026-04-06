@@ -47,31 +47,24 @@ jobs:
           echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
           echo "package_version=${PACKAGE_VERSION}" >> "$GITHUB_OUTPUT"
 
-      # - name: Verify version is not already published
-      #   env:
-      #     PACKAGE_NAME: ${{ steps.package_meta.outputs.package_name }}
-      #     PACKAGE_VERSION: ${{ steps.package_meta.outputs.package_version }}
-      #   run: |
-      #     if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version > /dev/null 2>&1; then
-      #       echo "Version ${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on npm."
-      #       exit 1
-      #     fi
+      - name: Verify version is not already published
+        env:
+          PACKAGE_NAME: ${{ steps.package_meta.outputs.package_name }}
+          PACKAGE_VERSION: ${{ steps.package_meta.outputs.package_version }}
+        run: |
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version > /dev/null 2>&1; then
+            echo "Version ${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on npm."
+            exit 1
+          fi
 
       - name: Install dependencies
         working-directory: sdks/node
         run: pnpm install --frozen-lockfile
 
-      - name: Dump context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: |
-          echo "=== ENV VARS ==="
-          env | sort
-          echo "=== GITHUB CONTEXT ==="
-          echo "$GITHUB_CONTEXT"
-
       - name: Run tests
         working-directory: sdks/node
+        env:
+          WANDB_API_KEY: dummy
         run: pnpm test
 
       - name: Run prettier check
@@ -82,7 +75,5 @@ jobs:
         working-directory: sdks/node
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        # run: |
-        #   npm publish --access public --tag "${{ inputs.npm_tag }}"
         run: |
-          echo "${{ inputs.npm_tag }}"
+          npm publish --access public --tag "${{ inputs.npm_tag }}"
