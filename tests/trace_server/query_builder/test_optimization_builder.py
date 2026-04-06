@@ -69,6 +69,49 @@ class TestMaybeUseNullCheck:
         )
         assert result == "x LIKE '%y%'"
 
+    def test_nested_not_context(self) -> None:
+        """AND nested inside NOT doesn't reset or alter the NOT depth."""
+        and_body = {
+            "$and": [
+                {
+                    "$eq": [
+                        {"$getField": "attributes.key_a"},
+                        {"$literal": "val_a"},
+                    ]
+                },
+                {
+                    "$eq": [
+                        {"$getField": "attributes.key_b"},
+                        {"$literal": "val_b"},
+                    ]
+                },
+            ]
+        }
+
+        # Bare AND: optimization applies
+        pb = ParamBuilder()
+        processor = HeavyFieldOptimizationProcessor(
+            pb, "calls_merged", use_null_check=True
+        )
+        op = tsi_query.AndOperation.model_validate(and_body)
+        assert apply_processor(processor, op) is not None
+
+        # NOT(AND(...)): single negation, optimization skipped
+        pb = ParamBuilder()
+        processor = HeavyFieldOptimizationProcessor(
+            pb, "calls_merged", use_null_check=True
+        )
+        op = tsi_query.NotOperation.model_validate({"$not": [and_body]})  # type: ignore [assignment]
+        assert apply_processor(processor, op) is None
+
+        # NOT(NOT(AND(...))): double negation cancels, optimization applies
+        pb = ParamBuilder()
+        processor = HeavyFieldOptimizationProcessor(
+            pb, "calls_merged", use_null_check=True
+        )
+        op = tsi_query.NotOperation.model_validate({"$not": [{"$not": [and_body]}]})  # type: ignore [assignment]
+        assert apply_processor(processor, op) is not None
+
 
 def test_heavy_field_eq_with_null_check() -> None:
     """Eq on a heavy start/end field adds OR IS NULL outside NOT context."""
