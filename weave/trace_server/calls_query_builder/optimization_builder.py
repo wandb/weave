@@ -115,14 +115,13 @@ class QueryOptimizationProcessor(ABC):
         conditions = []
         for op in operation.and_:
             result = self.process_operand(op)
-            if result is None:
-                # Bail if any of the predicates can't be optimized.
-                # Note that it's not safe to simply skip these predicates because,
-                # combined with a NOT, the filter may become more restrictive than
-                # intended and we might "optimize" away valid matches.
-                return None
             if result:
                 conditions.append(result)
+            elif NotContext.is_in_not_context():
+                # Bail if any of the predicates can't be optimized while inside a NOT.
+                # Otherwise the filter would become more restrictive than intended and
+                # we would "optimize" away valid matches.
+                return None
 
         if conditions:
             return "(" + " AND ".join(conditions) + ")"
