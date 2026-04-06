@@ -6,8 +6,10 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 )
 from weave.trace_server.calls_query_builder.optimization_builder import (
     HeavyFieldOptimizationProcessor,
+    _maybe_use_null_check,
     apply_processor,
 )
+from weave.trace_server.calls_query_builder.utils import NotContext
 from weave.trace_server.interface import query as tsi_query
 
 
@@ -37,6 +39,35 @@ def test_condition_is_heavy(table_alias: str) -> None:
 
     assert heavy_condition.is_heavy(table_alias) is True
     assert light_condition.is_heavy(table_alias) is False
+
+
+class TestMaybeUseNullCheck:
+    """Unit tests for _maybe_use_null_check helper."""
+
+    def test_adds_null_check_outside_not(self) -> None:
+        result = _maybe_use_null_check(
+            "x LIKE '%y%'", "attributes_dump", "t", use_null_check=True
+        )
+        assert result == "(x LIKE '%y%' OR t.attributes_dump IS NULL)"
+
+    def test_skips_optimization_inside_not(self) -> None:
+        with NotContext.not_context():
+            result = _maybe_use_null_check(
+                "x LIKE '%y%'", "attributes_dump", "t", use_null_check=True
+            )
+        assert result is None
+
+    def test_passes_through_when_null_check_disabled(self) -> None:
+        result = _maybe_use_null_check(
+            "x LIKE '%y%'", "attributes_dump", "t", use_null_check=False
+        )
+        assert result == "x LIKE '%y%'"
+
+    def test_passes_through_for_non_nullable_field(self) -> None:
+        result = _maybe_use_null_check(
+            "x LIKE '%y%'", "op_name", "t", use_null_check=True
+        )
+        assert result == "x LIKE '%y%'"
 
 
 def test_heavy_field_eq_with_null_check() -> None:
