@@ -144,6 +144,53 @@ def apply_resolved_refs_to_rows(
             row_lookup[row_digest].raw_data_row = val
 
 
+def resolve_eval_inputs(
+    calls: list[tsi.CallSchema],
+    eval_root_ids: list[str],
+    table_rows_reader: Callable[[list[str]], dict[str, Any]],
+) -> None:
+    """Resolve dataset-backed inputs on predict-and-score calls in-place.
+
+    For each predict-and-score call whose inputs.example is a dataset ref
+    string, batch-lookup the actual row data via table_rows_reader and
+    replace the ref string with the resolved dict.
+
+    Args:
+        calls: All calls in the eval subtree.
+        eval_root_ids: Eval root call IDs (to identify predict-and-score calls).
+        table_rows_reader: Callback that takes a list of digests and returns
+            {digest: parsed_val}. Provided by the server's table_rows lookup.
+    """
+    eval_root_set = frozenset(eval_root_ids)
+    digests_to_resolve: set[str] = set()
+    for call in calls:
+        if call.parent_id not in eval_root_set:
+            continue
+        if not isinstance(call.inputs, dict):
+            continue
+        example = call.inputs.get("example")
+        if isinstance(example, str):
+            digest, was_ref = extract_row_digest_from_example(example)
+            if was_ref:
+                digests_to_resolve.add(digest)
+
+    if not digests_to_resolve:
+        return
+
+    resolved_map = table_rows_reader(list(digests_to_resolve))
+
+    for call in calls:
+        if call.parent_id not in eval_root_set:
+            continue
+        if not isinstance(call.inputs, dict):
+            continue
+        example = call.inputs.get("example")
+        if isinstance(example, str):
+            digest, was_ref = extract_row_digest_from_example(example)
+            if was_ref and digest in resolved_map:
+                call.inputs["example"] = resolved_map[digest]
+
+
 def extract_row_digest_from_example(example: Any) -> tuple[str, bool]:
     """Extract row digest from dataset refs or derive a stable digest.
 

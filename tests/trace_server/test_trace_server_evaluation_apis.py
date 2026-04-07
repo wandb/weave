@@ -722,3 +722,185 @@ def test_eval_results_include_predict_and_score_children(client):
     assert trial_without.predict_call_id is None
     assert trial_without.scorer_call_ids == {}
     assert trial_without.scores["children_test_scorer"] == 0.8
+
+
+def test_eval_results_resolved_inputs_inline(client):
+    """Inline inputs should be available as dicts in raw_data_row."""
+    project_id = client.project_id
+
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://inline-inputs",
+            model="model://inline-inputs",
+        )
+    )
+    pred = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model="model://inline-inputs",
+            inputs={"question": "What is 2+2?", "expected": "4"},
+            output="4",
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+        )
+    )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_raw_data_rows=True,
+            resolve_row_refs=False,
+        )
+    )
+
+    assert res.total_rows == 1
+    row = res.rows[0]
+    assert isinstance(row.raw_data_row, dict)
+    assert row.raw_data_row["question"] == "What is 2+2?"
+
+
+def test_eval_results_resolved_inputs_dataset_backed(client):
+    """Dataset-backed inputs should be resolved to dicts, not left as ref strings."""
+    project_id = client.project_id
+
+    dataset_rows = [
+        {"question": "What is 2+2?", "expected": "4"},
+        {"question": "What is 3+3?", "expected": "6"},
+    ]
+    table_res = client.server.table_create(
+        TableCreateReq.model_validate(
+            {
+                "table": {
+                    "project_id": project_id,
+                    "rows": dataset_rows,
+                }
+            }
+        )
+    )
+
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://dataset-inputs",
+            model="model://dataset-inputs",
+        )
+    )
+
+    row_digests = table_res.row_digests
+    for i, digest in enumerate(row_digests):
+        ref_str = f"weave-trace-internal:///{project_id}/table/{table_res.digest}/attr/rows/id/{digest}"
+        predict_and_score_id = generate_id()
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=predict_and_score_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=run.evaluation_run_id,
+                    op_name="Evaluation.predict_and_score",
+                    started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                    attributes={},
+                    inputs={"example": ref_str, "model": "model://dataset-inputs"},
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=predict_and_score_id,
+                    ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                    output={"output": f"answer_{i}", "scores": {}},
+                    summary={},
+                )
+            )
+        )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_raw_data_rows=True,
+            resolve_row_refs=True,
+        )
+    )
+
+    assert res.total_rows == 2
+    for row in res.rows:
+        assert isinstance(row.raw_data_row, dict), (
+            f"Expected resolved dict, got {type(row.raw_data_row)}: {row.raw_data_row}"
+        )
+        assert "question" in row.raw_data_row
+
+    questions = {row.raw_data_row["question"] for row in res.rows}
+    assert questions == {"What is 2+2?", "What is 3+3?"}
+
+
+def test_eval_results_dataset_backed_no_resolve(client):
+    """Dataset-backed inputs should remain as ref strings when resolve_row_refs=False."""
+    project_id = client.project_id
+
+    dataset_rows = [{"question": "What is 2+2?"}]
+    table_res = client.server.table_create(
+        TableCreateReq.model_validate(
+            {"table": {"project_id": project_id, "rows": dataset_rows}}
+        )
+    )
+
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://no-resolve",
+            model="model://no-resolve",
+        )
+    )
+
+    digest = table_res.row_digests[0]
+    ref_str = f"weave-trace-internal:///{project_id}/table/{table_res.digest}/attr/rows/id/{digest}"
+    predict_and_score_id = generate_id()
+    client.server.call_start(
+        CallStartReq(
+            start=StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=predict_and_score_id,
+                trace_id=run.evaluation_run_id,
+                parent_id=run.evaluation_run_id,
+                op_name="Evaluation.predict_and_score",
+                started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                attributes={},
+                inputs={"example": ref_str, "model": "model://no-resolve"},
+            )
+        )
+    )
+    client.server.call_end(
+        CallEndReq(
+            end=EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=predict_and_score_id,
+                ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                output={"output": "4", "scores": {}},
+                summary={},
+            )
+        )
+    )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_raw_data_rows=True,
+            resolve_row_refs=False,
+        )
+    )
+
+    assert res.total_rows == 1
+    row = res.rows[0]
+    assert isinstance(row.raw_data_row, str)
+    assert "/attr/rows/id/" in row.raw_data_row
