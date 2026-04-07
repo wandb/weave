@@ -5,6 +5,7 @@ Integer counters use HINCRBY for atomic, thread-safe increments.
 """
 
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -15,6 +16,13 @@ if TYPE_CHECKING:
     from redis import Redis
 
 JOB_TTL_SECONDS = 3600  # 1 hour - prevents orphaned jobs from persisting indefinitely
+
+
+def _get_required_redis_client() -> "Redis":
+    client = get_redis_client()
+    if client is None:
+        raise ValueError("Redis client is not initialized")
+    return client
 
 
 def _make_job_details(data: dict[str, Any]) -> JobDetails:
@@ -35,27 +43,25 @@ class JobID(str):
         return super().__new__(cls, str(uuid.uuid4()))
 
 
+@dataclass(frozen=True)
 class JobManager:
     """Manages job state in Redis for tracking long-running operations."""
 
-    def __init__(self, project_id: str, wb_user_id: str | None) -> None:
-        redis_client = get_redis_client()
+    project_id: str
+    wb_user_id: str | None = "anonymous"
+    _redis_client: "Redis" = field(init=False, repr=False, default_factory=_get_required_redis_client)
 
-        if redis_client is None:
-            raise ValueError("Redis client is not initialized")
-
-        self._redis_client: Redis = redis_client
-
-        self._project_id = project_id
-        self._wb_user_id = wb_user_id or "anonymous"
+    @property
+    def _user_id(self) -> str:
+        return self.wb_user_id or "anonymous"
 
     @property
     def _job_key_prefix(self) -> str:
-        return f"weave:job:{self._project_id}:{self._wb_user_id}:"
+        return f"weave:job:{self.project_id}:{self._user_id}:"
 
     @property
     def _index_key(self) -> str:
-        return f"weave:job:{self._project_id}:{self._wb_user_id}:_index"
+        return f"weave:job:{self.project_id}:{self._user_id}:_index"
 
     def _make_job_key(self, job_id: str) -> str:
         return f"{self._job_key_prefix}{job_id}"
