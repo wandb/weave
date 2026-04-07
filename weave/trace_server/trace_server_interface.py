@@ -3264,3 +3264,9 @@ class CallsUsageRes(BaseModel):
     call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
     # Unique IDs of calls considered for rollup that have not ended yet.
     unfinished_call_ids: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Agent observability types — re-exported from agent_types module
+# ---------------------------------------------------------------------------
+from weave.trace_server.agent_types import *  # noqa: E402, F401, F403

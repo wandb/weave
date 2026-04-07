@@ -1,0 +1,12 @@
+DROP VIEW IF EXISTS genai_conversation_traces_mv;
+DROP VIEW IF EXISTS genai_agent_versions_mv;
+DROP VIEW IF EXISTS genai_conversations_mv;
+DROP VIEW IF EXISTS genai_agents_mv;
+DROP VIEW IF EXISTS genai_traces_mv;
+DROP TABLE IF EXISTS genai_conversation_traces;
+DROP TABLE IF EXISTS genai_agent_versions;
+DROP TABLE IF EXISTS genai_conversations;
+DROP TABLE IF EXISTS genai_agents;
+DROP TABLE IF EXISTS genai_traces;
+DROP TABLE IF EXISTS genai_message_search;
+DROP TABLE IF EXISTS genai_spans;

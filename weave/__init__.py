@@ -67,6 +67,11 @@ from weave.type_handlers.File.file import File
 from weave.type_handlers.Markdown.markdown import Markdown
 from weave.type_wrappers import Content
 
+# GenAI context managers (Tier 2 SDK — emit OTel spans)
+from weave.otel.context_managers import agent as agent  # noqa: F811
+from weave.otel.context_managers import chat as chat
+from weave.otel.context_managers import tool as tool
+
 # Alias for succinct code
 P = EasyPrompt
 
