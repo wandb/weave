@@ -64,20 +64,29 @@ class TaskManager:
         task_id = TaskID()
         key = self._make_task_key(task_id)
 
-        mapping = {
-            "id": task_id,
-            "total_items": total_items,
-            "successful_items": 0,
-            "failed_items": 0,
-            "created_at": datetime.now().isoformat(),
-            "canceled_at": "",
-        }
+        created_at = datetime.now().isoformat()
 
-        self._redis_client.hset(key, mapping=mapping)
+        self._redis_client.hset(
+            key,
+            mapping={
+                "id": str(task_id),
+                "total_items": str(total_items),
+                "successful_items": "0",
+                "failed_items": "0",
+                "created_at": created_at,
+                "canceled_at": "",
+            },
+        )
         self._redis_client.expire(key, TASK_TTL_SECONDS)
         self._redis_client.sadd(self._index_key, task_id)
 
-        return _make_task_details(mapping)
+        return TaskDetails(
+            id=str(task_id),
+            total_items=total_items,
+            successful_items=0,
+            failed_items=0,
+            created_at=created_at,
+        )
 
     def get_task(self, task_id: str) -> TaskDetails | None:
         """Get task details by ID."""
@@ -117,7 +126,9 @@ class TaskManager:
 
     def is_canceled(self, task_id: str) -> bool:
         """Return True if the task has been canceled."""
-        canceled_at = self._redis_client.hget(self._make_task_key(task_id), "canceled_at")
+        canceled_at = self._redis_client.hget(
+            self._make_task_key(task_id), "canceled_at"
+        )
 
         if canceled_at is None:
             return False
