@@ -240,7 +240,7 @@ from weave.trace_server.table_query_builder import (
     make_standard_table_query,
     make_table_stats_query_with_storage_size,
 )
-from weave.trace_server.task_manager import TaskManager
+from weave.trace_server.job_manager import JobManager
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -6369,17 +6369,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsScoreRes()
 
-    def tasks_list(self, req: tsi.TasksListReq) -> tsi.TasksListRes:
-        task_manager = TaskManager(req.project_id, req.wb_user_id)
-        tasks = task_manager.list_tasks()
-        return tsi.TasksListRes(tasks=tasks)
+    def jobs_list(self, req: tsi.JobsListReq) -> tsi.JobsListRes:
+        job_manager = JobManager(req.project_id, req.wb_user_id)
+        jobs = job_manager.list_jobs()
+        return tsi.JobsListRes(jobs=jobs)
 
-    def task_cancel(self, req: tsi.TaskCancelReq) -> tsi.TaskCancelRes:
-        task_manager = TaskManager(req.project_id, req.wb_user_id)
-        task = task_manager.cancel_task(req.task_id)
-        if task is None:
-            raise ValueError(f"Task {req.task_id} not found")
-        return tsi.TaskCancelRes(task=task)
+    def job_cancel(self, req: tsi.JobCancelReq) -> tsi.JobCancelRes:
+        job_manager = JobManager(req.project_id, req.wb_user_id)
+        job = job_manager.cancel_job(req.job_id)
+        if job is None:
+            raise ValueError(f"Job {req.job_id} not found")
+        return tsi.JobCancelRes(job=job)
 
     # Private Methods
     @property

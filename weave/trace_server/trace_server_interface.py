@@ -1936,8 +1936,8 @@ class CallsScoreRes(BaseModel):
     pass
 
 
-class TaskDetails(BaseModelStrict):
-    """Details about a task's progress."""
+class JobDetails(BaseModelStrict):
+    """Details about a job's progress."""
 
     id: str
     total_items: int
@@ -1947,23 +1947,23 @@ class TaskDetails(BaseModelStrict):
     canceled_at: str | None = None
 
 
-class TasksListReq(BaseModelStrict):
+class JobsListReq(BaseModelStrict):
     project_id: str
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class TasksListRes(BaseModel):
-    tasks: list[TaskDetails]
+class JobsListRes(BaseModel):
+    jobs: list[JobDetails]
 
 
-class TaskCancelReq(BaseModelStrict):
+class JobCancelReq(BaseModelStrict):
     project_id: str
-    task_id: str
+    job_id: str
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class TaskCancelRes(BaseModel):
-    task: TaskDetails
+class JobCancelRes(BaseModel):
+    job: JobDetails
 
 
 class OpCreateBody(BaseModel):
@@ -2994,9 +2994,9 @@ class TraceServerInterface(Protocol):
     # Scoring API
     def calls_score(self, req: CallsScoreReq) -> CallsScoreRes: ...
 
-    # Task API
-    def tasks_list(self, req: TasksListReq) -> TasksListRes: ...
-    def task_cancel(self, req: TaskCancelReq) -> TaskCancelRes: ...
+    # Job API
+    def jobs_list(self, req: JobsListReq) -> JobsListRes: ...
+    def job_cancel(self, req: JobCancelReq) -> JobCancelRes: ...
 
 
 class ObjectInterface(Protocol):
