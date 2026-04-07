@@ -8,6 +8,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from redis import Redis
+
 from .redis_client import get_redis_client
 from .trace_server_interface import TaskDetails
 
@@ -36,10 +38,12 @@ class TaskManager:
     """Manages task state in Redis for tracking long-running operations."""
 
     def __init__(self, project_id: str, wb_user_id: str | None) -> None:
-        self._redis_client = get_redis_client()
+        redis_client = get_redis_client()
 
-        if self._redis_client is None:
+        if redis_client is None:
             raise ValueError("Redis client is not initialized")
+
+        self._redis_client: Redis = redis_client
 
         self._project_id = project_id
         self._wb_user_id = wb_user_id or "anonymous"
@@ -77,9 +81,6 @@ class TaskManager:
 
     def get_task(self, task_id: str) -> TaskDetails | None:
         """Get task details by ID."""
-        if self._redis_client is None:
-            return None
-
         data = self._redis_client.hgetall(self._make_task_key(task_id))
 
         if not data:
@@ -111,17 +112,11 @@ class TaskManager:
 
     def complete_task(self, task_id: str) -> None:
         """Mark a task as complete by removing it from Redis."""
-        if self._redis_client is None:
-            return
-
         self._redis_client.delete(self._make_task_key(task_id))
         self._redis_client.srem(self._index_key, task_id)
 
     def is_canceled(self, task_id: str) -> bool:
         """Return True if the task has been canceled."""
-        if self._redis_client is None:
-            return False
-
         canceled_at = self._redis_client.hget(self._make_task_key(task_id), "canceled_at")
 
         if canceled_at is None:
@@ -142,9 +137,6 @@ class TaskManager:
 
     def list_tasks(self) -> list[TaskDetails]:
         """List all tasks for this project and user."""
-        if self._redis_client is None:
-            return []
-
         task_ids = self._redis_client.smembers(self._index_key)
         tasks: list[TaskDetails] = []
         stale_ids: list[str] = []
@@ -164,9 +156,6 @@ class TaskManager:
 
     def clear_tasks(self) -> None:
         """Delete all task keys for this project and user from Redis."""
-        if self._redis_client is None:
-            return
-
         task_ids = self._redis_client.smembers(self._index_key)
 
         if task_ids:
