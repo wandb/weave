@@ -6,8 +6,12 @@ from collections.abc import Callable
 from queue import Empty, Queue
 from threading import Lock
 
-logger = logging.getLogger(__name__)
 from weave.integrations.openai_realtime.state_exporter import StateExporter
+
+logger = logging.getLogger(__name__)
+
+WORKER_JOIN_TIMEOUT_SECONDS = 1.0
+QUEUE_POLL_INTERVAL_SECONDS = 0.1
 
 Handler = Callable[[dict], None]
 
@@ -104,7 +108,7 @@ class ConversationManager:
         # Wake the thread if it's blocked waiting for an item
         self._queue.put_nowait(None)  # type: ignore
         # Don't block indefinitely; thread is daemon and will also exit on main-thread exit
-        self._worker_thread.join(timeout=1.0)
+        self._worker_thread.join(timeout=WORKER_JOIN_TIMEOUT_SECONDS)
         self._worker_thread = None
 
     def _worker(self) -> None:
@@ -114,7 +118,7 @@ class ConversationManager:
         """
         while not self._stop_event.is_set():
             try:
-                event = self._queue.get(timeout=0.1)
+                event = self._queue.get(timeout=QUEUE_POLL_INTERVAL_SECONDS)
             except Empty:
                 continue
             # Sentinel to unblock during shutdown

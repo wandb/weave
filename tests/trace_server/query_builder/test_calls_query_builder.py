@@ -18,6 +18,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_query,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
@@ -543,6 +544,99 @@ def test_query_with_simple_feedback_filter() -> None:
             "pb_1": '$."output"."expected"',
             "pb_2": '$."output"."found"',
             "pb_3": "project",
+        },
+    )
+
+
+def test_query_with_wildcard_feedback_filter() -> None:
+    """Test that wildcard feedback filter uses anyIf to pick a non-empty value."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "feedback.[*].payload.output.label"},
+                    {"$literal": "scorer_b"},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_2:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_2:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {pb_2:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((anyIf(coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_0:String}), 'null'), ''), coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_0:String}), 'null'), '') != '') = {pb_1:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": '$."output"."label"',
+            "pb_1": "scorer_b",
+            "pb_2": "project",
+        },
+    )
+
+
+def test_query_with_wildcard_feedback_filter_no_extra_path() -> None:
+    """Test wildcard feedback filter without extra path uses any() directly."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "feedback.[*].runnable_ref"},
+                    {"$literal": "some_value"},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_1:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_1:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {pb_1:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((any(feedback.runnable_ref) = {pb_0:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "some_value",
+            "pb_1": "project",
         },
     )
 
@@ -2642,59 +2736,69 @@ def test_filter_length_validation():
     """Test that filter length validation works."""
     pb = ParamBuilder()
     cq = CallsQuery(project_id="test/project")
+    cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"op_names": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="request length is greater than max length"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
+    cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"input_refs": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="request length is greater than max length"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
+    cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"output_refs": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="request length is greater than max length"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
+    cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"parent_ids": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="request length is greater than max length"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
+    cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"trace_ids": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="request length is greater than max length"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
+    cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
         filter={"call_ids": ["weave-trace-internal:///%"] * 1001}
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="request length is greater than max length"):
         cq.as_sql(pb)
+
     cq = CallsQuery(project_id="test/project")
+    cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(filter={"thread_ids": ["thread_123"] * 1001})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="request length is greater than max length"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
+    cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123"] * 1001})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="request length is greater than max length"):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
+    cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(filter={"wb_run_ids": ["wb_run_123"] * 1001})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="request length is greater than max length"):
         cq.as_sql(pb)
 
     # Test with too many conditions
@@ -2716,67 +2820,72 @@ def test_disallowed_fields():
     cq = CallsQuery(project_id="test/project")
     # allowed order field
     cq.add_order("id", "ASC")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not allowed in ORDER BY"):
         cq.add_order("storage_size_bytes", "ASC")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not allowed in ORDER BY"):
         cq.add_order("total_storage_size_bytes", "DESC")
     # with bogus direction
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not allowed"):
         cq.add_order("storage_size_bytes", "ASCDESC")
     # now try filtering with disallowed
-    with pytest.raises(ValueError):
-        cq.add_condition(
-            tsi_query.GtOperation.model_validate(
-                {
-                    "$gt": [
-                        {"$getField": "storage_size_bytes"},
-                        {"$literal": 1},
-                    ]
-                }
-            )
+    cq = CallsQuery(project_id="test/project")  # reset
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "storage_size_bytes"},
+                    {"$literal": 1},
+                ]
+            }
         )
+    )
+    with pytest.raises(InvalidFieldError, match="not allowed"):
         cq.as_sql(ParamBuilder())
 
     cq = CallsQuery(project_id="test/project")  # reset
-    with pytest.raises(ValueError):
-        cq.add_condition(
-            tsi_query.GteOperation.model_validate(
-                {
-                    "$gte": [
-                        {"$getField": "total_storage_size_bytes"},
-                        {"$literal": 1},
-                    ]
-                }
-            )
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GteOperation.model_validate(
+            {
+                "$gte": [
+                    {"$getField": "total_storage_size_bytes"},
+                    {"$literal": 1},
+                ]
+            }
         )
+    )
+    with pytest.raises(InvalidFieldError, match="not allowed"):
         cq.as_sql(ParamBuilder())
 
     cq = CallsQuery(project_id="test/project")  # reset
-    with pytest.raises(ValueError):
-        cq.add_condition(
-            tsi_query.LtOperation.model_validate(
-                {
-                    "$lt": [
-                        {"$getField": "storage_size_bytes"},
-                        {"$literal": 1},
-                    ]
-                }
-            )
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.LtOperation.model_validate(
+            {
+                "$lt": [
+                    {"$getField": "storage_size_bytes"},
+                    {"$literal": 1},
+                ]
+            }
         )
+    )
+    with pytest.raises(InvalidFieldError, match="not allowed"):
         cq.as_sql(ParamBuilder())
 
     cq = CallsQuery(project_id="test/project")  # reset
-    with pytest.raises(ValueError):
-        cq.add_condition(
-            tsi_query.LteOperation.model_validate(
-                {
-                    "$lte": [
-                        {"$getField": "total_storage_size_bytes"},
-                        {"$literal": 1},
-                    ]
-                }
-            )
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.LteOperation.model_validate(
+            {
+                "$lte": [
+                    {"$getField": "total_storage_size_bytes"},
+                    {"$literal": 1},
+                ]
+            }
         )
+    )
+    with pytest.raises(InvalidFieldError, match="not allowed"):
         cq.as_sql(ParamBuilder())
 
 

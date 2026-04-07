@@ -344,6 +344,64 @@ class TestDrainAll:
         assert next(consumer.read_pending(), None) is not None
         assert len(mgr.list_files()) == 1
 
+    def test_is_file_active_prevents_deletion(self, tmp_path: str) -> None:
+        """drain_all with is_file_active=always-True drains but never deletes."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with mgr.create_file() as writer:
+            writer.write({"type": "obj_create", "seq": 0})
+
+        received: list[WALRecord] = []
+        total = drain_all(
+            mgr,
+            {"obj_create": received.append},
+            JSONLWALConsumer,
+            is_file_active=lambda _: True,
+        )
+
+        assert total == 1
+        assert received[0]["seq"] == 0
+        # Records were drained, but the file is "active" so it's kept.
+        assert len(mgr.list_files()) == 1
+
+    def test_is_file_active_false_allows_deletion(self, tmp_path: str) -> None:
+        """drain_all with is_file_active=always-False behaves like the default."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with mgr.create_file() as writer:
+            writer.write({"type": "obj_create", "seq": 0})
+
+        total = drain_all(
+            mgr,
+            {"obj_create": lambda r: None},
+            JSONLWALConsumer,
+            is_file_active=lambda _: False,
+        )
+
+        assert total == 1
+        assert mgr.list_files() == []
+
+    def test_is_file_active_selective(self, tmp_path: str) -> None:
+        """drain_all only protects files where is_file_active returns True."""
+        mgr = FileWALDirectoryManager(str(tmp_path))
+        with mgr.create_file() as w1:
+            w1.write({"type": "obj_create", "seq": 0})
+        with mgr.create_file() as w2:
+            w2.write({"type": "obj_create", "seq": 1})
+
+        files = mgr.list_files()
+        assert len(files) == 2
+        protected_path = files[1]  # protect only the second file
+
+        total = drain_all(
+            mgr,
+            {"obj_create": lambda r: None},
+            JSONLWALConsumer,
+            is_file_active=lambda p: p == protected_path,
+        )
+
+        assert total == 2
+        remaining = mgr.list_files()
+        assert remaining == [protected_path]
+
     def test_write_drain_write_drain(self, tmp_path: str) -> None:
         """Writer and consumer operating on the same file sequentially."""
         mgr = FileWALDirectoryManager(str(tmp_path))

@@ -29,6 +29,19 @@ if TYPE_CHECKING:
 # Maximum number of buckets to prevent excessive query results
 MAX_BUCKETS = 10_000
 
+# Time bucket granularity thresholds (in seconds)
+BUCKET_THRESHOLD_2H = 2 * 3600
+BUCKET_THRESHOLD_12H = 12 * 3600
+BUCKET_THRESHOLD_3D = 3 * 86400
+BUCKET_THRESHOLD_14D = 14 * 86400
+
+# Granularity options (in seconds)
+GRANULARITY_5MIN = 300
+GRANULARITY_1H = 3600
+GRANULARITY_6H = 6 * 3600
+GRANULARITY_12H = 12 * 3600
+GRANULARITY_1D = 86400
+
 
 @dataclass(frozen=True)
 class StatsQueryTimeBounds:
@@ -60,16 +73,16 @@ def auto_select_granularity_seconds(delta: datetime.timedelta) -> int:
     """Automatically select appropriate granularity (in seconds) based on time range span."""
     total_seconds = delta.total_seconds()
 
-    if total_seconds <= 2 * 3600:  # <= 2 hours
-        return 300  # 5 minutes
-    elif total_seconds <= 12 * 3600:  # <= 12 hours
-        return 3600  # 1 hour
-    elif total_seconds <= 3 * 86400:  # <= 3 days
-        return 6 * 3600  # 6 hours
-    elif total_seconds <= 14 * 86400:  # <= 14 days
-        return 12 * 3600  # 12 hours
+    if total_seconds <= BUCKET_THRESHOLD_2H:
+        return GRANULARITY_5MIN
+    elif total_seconds <= BUCKET_THRESHOLD_12H:
+        return GRANULARITY_1H
+    elif total_seconds <= BUCKET_THRESHOLD_3D:
+        return GRANULARITY_6H
+    elif total_seconds <= BUCKET_THRESHOLD_14D:
+        return GRANULARITY_12H
     else:
-        return 86400  # 1 day
+        return GRANULARITY_1D
 
 
 def ensure_max_buckets(granularity_seconds: int, time_range_seconds: float) -> int:

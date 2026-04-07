@@ -418,7 +418,7 @@ def test_general_arg_variations(client, fn, arg_variations):
 
         res = client.server.calls_query(
             tsi.CallsQueryReq(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 filter=tsi.CallsFilter(op_names=[wrapped_fn.ref.uri]),
             )
         )
@@ -442,7 +442,7 @@ def test_no_args(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -459,7 +459,7 @@ def test_args_concrete(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -478,7 +478,7 @@ def test_args_concrete_splat(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -502,7 +502,7 @@ def test_args_concrete_splats(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -531,7 +531,7 @@ def test_args_concrete_splat_concrete(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -558,7 +558,7 @@ def test_args_concrete_splat_concrete_splat(client):
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 

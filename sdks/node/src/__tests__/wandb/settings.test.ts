@@ -82,6 +82,29 @@ describe('Settings', () => {
       });
     });
 
+    test('preserves http scheme from WANDB_BASE_URL in environment', () => {
+      process.env.WANDB_BASE_URL = 'http://my-instance.example.com';
+      process.env.WANDB_API_KEY = 'test-api-key';
+
+      const configs = getWandbConfigs();
+      expect(configs).toEqual({
+        apiKey: 'test-api-key',
+        baseUrl: 'http://my-instance.example.com',
+        traceBaseUrl: 'http://my-instance.example.com/traces',
+        resolvedHost: 'my-instance.example.com',
+        domain: 'my-instance.example.com',
+      });
+    });
+
+    test('throws a helpful error when WANDB_BASE_URL is malformed', () => {
+      process.env.WANDB_BASE_URL = 'http://';
+      process.env.WANDB_API_KEY = 'test-api-key';
+
+      expect(() => getWandbConfigs()).toThrow(
+        'Invalid W&B host or URL: "http://". Please check your WANDB_BASE_URL setting or provided host value, and report this case if you believe the input should be supported.'
+      );
+    });
+
     test('reads base URL from config file', () => {
       const mockConfig = `
 [default]
@@ -93,6 +116,25 @@ wandb_base_url = https://custom.wandb.ai
 
       const configs = getWandbConfigs();
       expect(configs.resolvedHost).toBe('custom.wandb.ai');
+    });
+
+    test('preserves http scheme from config file base URL', () => {
+      const mockConfig = `
+[default]
+wandb_base_url = http://my-instance.example.com
+`;
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue(mockConfig);
+      process.env.WANDB_API_KEY = 'test-api-key';
+
+      const configs = getWandbConfigs();
+      expect(configs).toEqual({
+        apiKey: 'test-api-key',
+        baseUrl: 'http://my-instance.example.com',
+        traceBaseUrl: 'http://my-instance.example.com/traces',
+        resolvedHost: 'my-instance.example.com',
+        domain: 'my-instance.example.com',
+      });
     });
 
     test('falls back to default host when no custom URL is configured', () => {

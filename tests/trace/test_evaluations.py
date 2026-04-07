@@ -1,6 +1,5 @@
 import dataclasses
 import random
-import sys
 from typing import Any
 
 import pydantic
@@ -8,13 +7,12 @@ import pytest
 from PIL import Image
 
 import weave
+from tests.conftest import LATENCY_TOL
 from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
 from weave.trace_server import trace_server_interface as tsi
-
-_LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
 
 def flatten_calls(
@@ -101,7 +99,7 @@ async def test_basic_evaluation(client):
 
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
         )
     )
 
@@ -170,7 +168,7 @@ async def test_basic_evaluation(client):
 
     objs = client.server.objs_query(
         tsi.ObjQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(base_object_classes=["Model"]),
         )
     )
@@ -359,7 +357,7 @@ async def test_evaluation_data_topology(client):
 
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             include_feedback=True,
         )
     )
@@ -538,7 +536,7 @@ async def test_evaluation_data_topology(client):
         "nested": {"bool_avg": 0.5},
         "reason": "This is a custom test reason",
     }
-    model_latency = {"mean": pytest.approx(0, abs=_LATENCY_TOL)}
+    model_latency = {"mean": pytest.approx(0, abs=LATENCY_TOL)}
     predict_usage_summary = {
         "usage": {
             "gpt-4o-2024-05-13": {
@@ -679,7 +677,7 @@ async def test_eval_supports_non_op_funcs(client):
 
     evaluation = make_test_eval()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="requires a `Model` or `Op` instance"):
         res = await evaluation.evaluate(function_model)
 
     # In the future, if we want to auto-opify, then uncomment the following assertions:
@@ -687,7 +685,7 @@ async def test_eval_supports_non_op_funcs(client):
 
     # calls = client.server.calls_query(
     #     tsi.CallsQueryReq(
-    #         project_id=client._project_id(),
+    #         project_id=client.project_id,
     #     )
     # )
     # assert len(calls.calls) == 4
@@ -736,7 +734,7 @@ async def test_eval_is_robust_to_missing_values(client):
     assert res == {
         "output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
-        "model_latency": {"mean": pytest.approx(0, abs=max(2, _LATENCY_TOL))},
+        "model_latency": {"mean": pytest.approx(0, abs=LATENCY_TOL)},
     }
 
 
@@ -904,29 +902,28 @@ async def test_evaluation_with_wrong_column_map():
     assert "DummyScorer" in eval_out
     assert eval_out["DummyScorer"]["match"] == {"true_count": 3, "true_fraction": 0.75}
 
-    with pytest.raises(ValueError) as excinfo:
-        # Create the scorer with column_map mapping 'foo'->'col1', 'bar'->'col3'
-        # this is wrong because col3 does not exist
-        dummy_scorer = DummyScorer(column_map={"foo": "col1", "bar": "col3"})
-        evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
+    # Create the scorer with column_map mapping 'foo'->'col1', 'bar'->'col3'
+    # this is wrong because col3 does not exist
+    dummy_scorer = DummyScorer(column_map={"foo": "col1", "bar": "col3"})
+    evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
+    with pytest.raises(ValueError, match="was not found in the dataset columns"):
         await evaluation.predict_and_score(model_function, dataset[0])
-        assert "which is not in the scorer's argument names" in str(excinfo.value)
 
-    with pytest.raises(ValueError) as excinfo:
-        # Create the scorer with column_map missing a column
-        dummy_scorer = DummyScorer(column_map={"foo": "col1"})
-        evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
+    # Create the scorer with column_map missing a column
+    dummy_scorer = DummyScorer(column_map={"foo": "col1"})
+    evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
+    with pytest.raises(
+        ValueError, match="is not found in the dataset columns and is not mapped"
+    ):
         await evaluation.predict_and_score(model_function, dataset[0])
-        assert "is not found in the dataset columns" in str(excinfo.value)
 
-    with pytest.raises(ValueError) as excinfo:
-        # Create the scorer with wrong argument name
-        dummy_scorer = DummyScorer(column_map={"jeez": "col1"})
-        evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
+    # Create the scorer with wrong argument name
+    dummy_scorer = DummyScorer(column_map={"jeez": "col1"})
+    evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
+    with pytest.raises(
+        ValueError, match="is not in the `score` methods' argument names"
+    ):
         await evaluation.predict_and_score(model_function, dataset[0])
-        assert "is not found in the dataset columns and is not mapped" in str(
-            excinfo.value
-        )
 
 
 # Define another dummy scorer
@@ -1010,7 +1007,7 @@ async def test_feedback_is_correctly_linked(client):
     res = await eval.evaluate(predict)
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             include_feedback=True,
             filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
         )
@@ -1052,7 +1049,7 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
     res = await eval.evaluate(predict)
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             include_feedback=True,
             filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
         )

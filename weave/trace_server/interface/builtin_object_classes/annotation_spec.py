@@ -94,8 +94,8 @@ class AnnotationSpec(base_object_def.BaseObject):
         # Validate the schema
         try:
             jsonschema.validate(None, schema)
-        except jsonschema.exceptions.SchemaError as e:
-            raise e
+        except jsonschema.exceptions.SchemaError:
+            raise
         except jsonschema.exceptions.ValidationError:
             pass  # we don't care that `None` does not conform
         return schema

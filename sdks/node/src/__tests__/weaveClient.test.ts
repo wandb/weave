@@ -51,28 +51,112 @@ describe('WeaveClient', () => {
   });
 
   describe('getCalls', () => {
-    it('should fetch and return calls', async () => {
+    it('should fetch and return calls with the legacy signature', async () => {
       const mockCalls = [
         {id: '1', name: 'call1'},
         {id: '2', name: 'call2'},
       ];
       mockStreamResponse(mockTraceServerApi, mockCalls);
 
-      // Call the method
-      const filter = {};
+      const filter = {op_names: ['legacy-op']};
       const includeCosts = true;
       const limit = 500;
       const result = await client.getCalls(filter, includeCosts, limit);
 
-      // Verify the results
       expect(result).toEqual(mockCalls);
       expect(
         mockTraceServerApi.calls.callsQueryStreamCallsStreamQueryPost
       ).toHaveBeenCalledWith({
         project_id: 'test-project',
         filter,
+        query: undefined,
         include_costs: includeCosts,
+        include_feedback: undefined,
         limit,
+        offset: undefined,
+        sort_by: undefined,
+        columns: undefined,
+        expand_columns: undefined,
+      });
+
+      (
+        mockTraceServerApi.calls
+          .callsQueryStreamCallsStreamQueryPost as jest.Mock
+      ).mockClear();
+      mockStreamResponse(mockTraceServerApi, mockCalls);
+
+      // Test that the parameterless call signature is supported.
+      const defaultResult = await client.getCalls();
+
+      expect(defaultResult).toEqual(mockCalls);
+    });
+
+    it('should fetch and return calls with the options signature', async () => {
+      const mockCalls = [
+        {id: '1', name: 'call1'},
+        {id: '2', name: 'call2'},
+      ];
+      mockStreamResponse(mockTraceServerApi, mockCalls);
+
+      const result = await client.getCalls({
+        filter: {},
+        includeCosts: true,
+        limit: 500,
+      });
+
+      expect(result).toEqual(mockCalls);
+      expect(
+        mockTraceServerApi.calls.callsQueryStreamCallsStreamQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        filter: {},
+        query: undefined,
+        include_costs: true,
+        include_feedback: undefined,
+        limit: 500,
+        offset: undefined,
+        sort_by: undefined,
+        columns: undefined,
+        expand_columns: undefined,
+      });
+    });
+
+    it('should support the options form with query parameters', async () => {
+      const mockCalls = [{id: '1', name: 'call1'}];
+      const query = {
+        $expr: {
+          $eq: [{$getField: 'display_name'}, {$literal: 'target-call'}],
+        },
+      };
+      const sortBy = [{field: 'started_at', direction: 'desc' as const}];
+      mockStreamResponse(mockTraceServerApi, mockCalls);
+
+      const result = await client.getCalls({
+        filter: {op_names: ['demo-op']},
+        query,
+        includeCosts: true,
+        includeFeedback: true,
+        limit: 25,
+        offset: 10,
+        sortBy,
+        columns: ['id', 'display_name'],
+        expandColumns: ['inputs.prompt'],
+      });
+
+      expect(result).toEqual(mockCalls);
+      expect(
+        mockTraceServerApi.calls.callsQueryStreamCallsStreamQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        filter: {op_names: ['demo-op']},
+        query,
+        include_costs: true,
+        include_feedback: true,
+        limit: 25,
+        offset: 10,
+        sort_by: sortBy,
+        columns: ['id', 'display_name'],
+        expand_columns: ['inputs.prompt'],
       });
     });
 
@@ -93,9 +177,8 @@ describe('WeaveClient', () => {
         body: stream,
       } as any);
 
-      const result = await client.getCalls();
+      const result = await client.getCalls({});
 
-      // Should process both objects, including the one without newline
       expect(result).toEqual([{id: '1'}, {id: '2'}]);
     });
   });

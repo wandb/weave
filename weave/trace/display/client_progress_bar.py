@@ -8,6 +8,7 @@ import logging
 from collections.abc import Callable
 
 from weave.trace.display import display
+from weave.trace.display.display import DEFAULT_PROGRESS_REFRESH_PER_SECOND
 from weave.trace.weave_client import FlushStatus
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
     # Create a progress bar instance
     progress = display.Progress(
         console=console,
-        refresh_per_second=10,
+        refresh_per_second=DEFAULT_PROGRESS_REFRESH_PER_SECOND,
     )
 
     # Start the progress display

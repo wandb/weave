@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 K = TypeVar("K")
 V = TypeVar("V")
 
+DEFAULT_LRU_CACHE_SIZE = 1000
+DEFAULT_DISK_CACHE_SIZE_BYTES = 1_000_000_000  # 1 GB
+
 
 class CacheProtocol(Protocol[K, V]):
     """Protocol defining the interface for all cache implementations."""
@@ -44,7 +47,7 @@ class CacheProtocol(Protocol[K, V]):
 class LRUCache(Generic[K, V]):
     """Thread-safe LRU cache implementation using OrderedDict."""
 
-    def __init__(self, max_size: int = 1000):
+    def __init__(self, max_size: int = DEFAULT_LRU_CACHE_SIZE):
         """Initialize LRU cache with maximum size.
 
         Args:
@@ -135,7 +138,7 @@ class LRUCache(Generic[K, V]):
 class DiskCache:
     """Wrapper around diskcache.Cache to conform to CacheProtocol."""
 
-    def __init__(self, cache_dir: str, size_limit: int = 1_000_000_000):
+    def __init__(self, cache_dir: str, size_limit: int = DEFAULT_DISK_CACHE_SIZE_BYTES):
         """Initialize disk cache.
 
         Args:

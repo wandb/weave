@@ -555,7 +555,7 @@ def test_bedrock_invoke_exception_handling(
         )
 
         # The call should raise a ValidationException
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="ValidationException") as exc_info:
             bedrock_client.invoke_model(
                 modelId="invalid-model-id",
                 body=body,

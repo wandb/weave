@@ -6,8 +6,11 @@ import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {computeDigest} from './digest';
 import {
   CallSchema,
+  CallsQueryReq,
   CallsFilter,
   EndedCallSchemaForInsert,
+  Query,
+  SortBy,
   StartedCallSchemaForInsert,
   Api as TraceServerApi,
 } from './generated/traceServerApi';
@@ -36,12 +39,73 @@ import {Call, CallState, InternalCall} from './call';
 import {CallRef} from './refs';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
+const DEFAULT_GET_CALLS_LIMIT = 1000;
+
+/**
+ * Serialized representation of a file blob stored in the Weave content store.
+ * Returned by serializedFileBlob/serializedImage/serializedAudio.
+ */
+interface SerializedFileBlob {
+  _type: 'CustomWeaveType';
+  weave_type: {type: string};
+  files: Record<string, string>;
+  load_op: string;
+}
+
+/**
+ * Shape of a single item in the call batch queue.
+ */
+type BatchItem =
+  | {mode: 'start'; data: {start: CallStartParams}}
+  | {mode: 'end'; data: {end: CallEndParams}};
 
 export type CallStackEntry = {
   callId: string;
   traceId: string;
   childSummary: Record<string, any>;
 };
+
+export interface GetCallsOptions {
+  filter?: CallsFilter;
+  query?: Query;
+  includeCosts?: boolean;
+  includeFeedback?: boolean;
+  limit?: number;
+  offset?: number;
+  sortBy?: SortBy[];
+  columns?: string[];
+  expandColumns?: string[];
+}
+
+/**
+ * Distinguishes the object-based getCalls options form from the legacy
+ * positional filter CallsFilter form by checking for GetCallsOptions-only keys.
+ *
+ * @param value The first argument passed to `getCalls` or `getCallsIterator`.
+ * @returns `true` when the value matches the object-based `GetCallsOptions` shape.
+ */
+function maybeIsGetCallsOptions(
+  value: CallsFilter | GetCallsOptions
+): value is GetCallsOptions {
+  if (value == null) return false;
+  const getCallsOptionsKeys: (keyof GetCallsOptions)[] = [
+    'filter',
+    'query',
+    'includeCosts',
+    'includeFeedback',
+    'limit',
+    'offset',
+    'sortBy',
+    'columns',
+    'expandColumns',
+  ];
+  for (const key of getCallsOptionsKeys) {
+    if (key in value) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function generateTraceId(): string {
   return uuidv7();
@@ -89,7 +153,7 @@ const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private attributesContext = new AsyncLocalStorage<Record<string, any>>();
-  private callQueue: Array<{mode: 'start' | 'end'; data: any}> = [];
+  private callQueue: BatchItem[] = [];
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
   private batchProcessingPromises: Set<Promise<void>> = new Set();
@@ -170,10 +234,12 @@ export class WeaveClient {
     this.isBatchProcessing = true;
 
     const batchReq = {
-      batch: batchToProcess.map(item => ({
-        mode: item.mode,
-        req: item.data,
-      })),
+      batch: batchToProcess.map(item => {
+        if (item.mode === 'start') {
+          return {mode: 'start' as const, req: item.data};
+        }
+        return {mode: 'end' as const, req: item.data};
+      }),
     };
 
     try {
@@ -221,19 +287,49 @@ export class WeaveClient {
     callId: string,
     includeCosts: boolean = false
   ): Promise<Call> {
-    const calls = await this.getCalls({call_ids: [callId]}, includeCosts);
+    const calls = await this.getCalls({
+      filter: {call_ids: [callId]},
+      includeCosts,
+    });
     if (calls.length === 0) {
       throw new Error(`Call not found: ${callId}`);
     }
     return calls[0];
   }
+
+  private reconcileCallArgs(
+    options: GetCallsOptions | CallsFilter,
+    includeCosts?: boolean,
+    limit?: number
+  ): GetCallsOptions {
+    let reconciledCallArgs: GetCallsOptions;
+    if (maybeIsGetCallsOptions(options)) {
+      reconciledCallArgs = options;
+    } else {
+      reconciledCallArgs = {
+        filter: options,
+        includeCosts,
+        limit,
+      };
+    }
+
+    return reconciledCallArgs;
+  }
+
+  public async getCalls(options?: GetCallsOptions): Promise<Call[]>;
   public async getCalls(
-    filter: CallsFilter = {},
-    includeCosts: boolean = false,
-    limit: number = 1000
-  ) {
+    options?: CallsFilter,
+    includeCosts?: boolean,
+    limit?: number
+  ): Promise<Call[]>;
+  public async getCalls(
+    options: GetCallsOptions | CallsFilter = {},
+    includeCosts?: boolean,
+    limit?: number
+  ): Promise<Call[]> {
+    const callOpts = this.reconcileCallArgs(options, includeCosts, limit);
     const calls: Call[] = [];
-    const iterator = this.getCallsIterator(filter, includeCosts, limit);
+    const iterator = this.getCallsIteratorInternal(callOpts);
     for await (const call of iterator) {
       const internalCall = new InternalCall();
       internalCall.updateWithCallSchemaData(call);
@@ -241,18 +337,42 @@ export class WeaveClient {
     }
     return calls;
   }
-  public async *getCallsIterator(
-    filter: CallsFilter = {},
-    includeCosts: boolean = false,
-    limit: number = 1000
+
+  public getCallsIterator(
+    options?: CallsFilter,
+    includeCosts?: boolean,
+    limit?: number
+  ): AsyncIterableIterator<CallSchema>;
+  public getCallsIterator(
+    options?: GetCallsOptions
+  ): AsyncIterableIterator<CallSchema>;
+  public getCallsIterator(
+    options: GetCallsOptions | CallsFilter = {},
+    includeCosts?: boolean,
+    limit?: number
   ): AsyncIterableIterator<CallSchema> {
+    const callOpts = this.reconcileCallArgs(options, includeCosts, limit);
+    return this.getCallsIteratorInternal(callOpts);
+  }
+
+  private async *getCallsIteratorInternal(
+    options: GetCallsOptions = {}
+  ): AsyncIterableIterator<CallSchema> {
+    const req: CallsQueryReq = {
+      filter: options.filter,
+      query: options.query,
+      include_costs: options.includeCosts,
+      include_feedback: options.includeFeedback,
+      limit: options.limit ?? DEFAULT_GET_CALLS_LIMIT,
+      offset: options.offset,
+      sort_by: options.sortBy,
+      columns: options.columns,
+      expand_columns: options.expandColumns,
+      project_id: this.projectId,
+    };
+
     const resp =
-      await this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost({
-        project_id: this.projectId,
-        filter,
-        include_costs: includeCosts,
-        limit,
-      });
+      await this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost(req);
 
     const reader = resp.body!.getReader();
     const decoder = new TextDecoder();
@@ -561,11 +681,11 @@ export class WeaveClient {
     typeName: string,
     fileName: string,
     fileContent: Blob
-  ): Promise<any> {
+  ): Promise<SerializedFileBlob> {
     const buffer = await fileContent.arrayBuffer().then(Buffer.from);
     const digest = computeDigest(buffer);
 
-    const placeholder = {
+    const placeholder: SerializedFileBlob = {
       _type: 'CustomWeaveType',
       weave_type: {type: typeName},
       files: {
@@ -590,7 +710,7 @@ export class WeaveClient {
   private async serializedImage(
     imageData: Buffer,
     imageType: ImageType = DEFAULT_IMAGE_TYPE
-  ): Promise<any> {
+  ): Promise<SerializedFileBlob> {
     const blob = new Blob([imageData], {type: `image/${imageType}`});
     return this.serializedFileBlob('PIL.Image.Image', 'image.png', blob);
   }
@@ -598,7 +718,7 @@ export class WeaveClient {
   private async serializedAudio(
     audioData: Buffer,
     audioType: AudioType = DEFAULT_AUDIO_TYPE
-  ): Promise<any> {
+  ): Promise<SerializedFileBlob> {
     const blob = new Blob([audioData], {type: `audio/${audioType}`});
     return this.serializedFileBlob('wave.Wave_read', 'audio.wav', blob);
   }
@@ -616,7 +736,7 @@ export class WeaveClient {
   public async serializeAudio(
     data: Buffer,
     audioType: AudioType = DEFAULT_AUDIO_TYPE
-  ): Promise<any> {
+  ): Promise<SerializedFileBlob> {
     return this.serializedAudio(data, audioType);
   }
 
@@ -729,7 +849,7 @@ export class WeaveClient {
   public async saveOp(
     op: Op<(...args: any[]) => any>,
     objId?: string
-  ): Promise<any> {
+  ): Promise<OpRef> {
     if (op.__savedRef) {
       return op.__savedRef;
     }

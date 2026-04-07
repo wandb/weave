@@ -2,6 +2,7 @@ import contextlib
 import json
 import logging
 import os
+import sys
 from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -13,7 +14,6 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
@@ -25,8 +25,17 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
+pytest_plugins = ["tests.trace_server.conftest"]
+
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
+
+# Tolerance for model_latency assertions in evaluation tests.
+# Set to 2s because TestOnlyFlushingWeaveClient's autoflush after every
+# client method inflates model_latency (which wraps the full async_call_op
+# including flush overhead).  On ClickHouse with concurrent eval rows the
+# flush contention can exceed 1s on loaded CI runners.
+LATENCY_TOL = 10 if sys.platform == "win32" else 2
 
 
 @pytest.fixture(autouse=True)
