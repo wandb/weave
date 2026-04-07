@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import Self
+
 from weave.trace_server.redis_client import get_redis_client
 from weave.trace_server.trace_server_interface import JobDetails
 
@@ -39,7 +41,7 @@ def _make_job_details(data: dict[str, Any]) -> JobDetails:
 class JobID(str):
     """A unique identifier for a job."""
 
-    def __new__(cls) -> "JobID":
+    def __new__(cls) -> Self:
         return super().__new__(cls, str(uuid.uuid4()))
 
 
@@ -49,7 +51,9 @@ class JobManager:
 
     project_id: str
     wb_user_id: str | None = "anonymous"
-    _redis_client: "Redis" = field(init=False, repr=False, default_factory=_get_required_redis_client)
+    _redis_client: "Redis" = field(
+        init=False, repr=False, default_factory=_get_required_redis_client
+    )
 
     @property
     def _user_id(self) -> str:
@@ -133,9 +137,7 @@ class JobManager:
 
     def is_canceled(self, job_id: str) -> bool:
         """Return True if the job has been canceled."""
-        canceled_at = self._redis_client.hget(
-            self._make_job_key(job_id), "canceled_at"
-        )
+        canceled_at = self._redis_client.hget(self._make_job_key(job_id), "canceled_at")
 
         if canceled_at is None:
             return False

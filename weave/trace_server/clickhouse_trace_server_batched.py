@@ -175,6 +175,7 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.job_manager import JobManager
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
@@ -240,7 +241,6 @@ from weave.trace_server.table_query_builder import (
     make_standard_table_query,
     make_table_stats_query_with_storage_size,
 )
-from weave.trace_server.job_manager import JobManager
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
