@@ -6,12 +6,13 @@ Integer counters use HINCRBY for atomic, thread-safe increments.
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from redis import Redis
+from weave.trace_server.redis_client import get_redis_client
+from weave.trace_server.trace_server_interface import TaskDetails
 
-from .redis_client import get_redis_client
-from .trace_server_interface import TaskDetails
+if TYPE_CHECKING:
+    from redis import Redis
 
 TASK_TTL_SECONDS = 3600  # 1 hour - prevents orphaned tasks from persisting indefinitely
 
