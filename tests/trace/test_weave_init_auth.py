@@ -16,11 +16,16 @@ from weave.trace.weave_init import (
 @pytest.fixture(autouse=True)
 def reset_weave_client():
     """Reset the global weave client state before each test."""
-    weave_init._current_inited_client = None
+    from weave.trace.env import set_wandb_base_url
+    from weave.wandb_interface.context import set_wandb_api_context
+
     weave_client_context.set_weave_client_global(None)
+    set_wandb_api_context(None)
+    set_wandb_base_url(None)
     yield
     weave_client_context.set_weave_client_global(None)
-    weave_init._current_inited_client = None
+    set_wandb_api_context(None)
+    set_wandb_base_url(None)
 
 
 @dataclass
@@ -282,8 +287,8 @@ def test_init_weave_with_explicit_params_sets_context(mock_wandb_api):
     mock_wandb_api.default_entity_name.return_value = "test-entity"
     mock_server = _make_mock_server()
 
-    from weave.trace.env import _explicit_base_url
-    from weave.wandb_interface.context import _explicit_api_key
+    import weave.trace.env as env_module
+    import weave.wandb_interface.context as context_module
 
     with (
         patch("weave.trace.weave_init.init_weave_get_server", return_value=mock_server),
@@ -296,7 +301,37 @@ def test_init_weave_with_explicit_params_sets_context(mock_wandb_api):
             api_key="explicit-key",
             base_url="https://api.custom.example.com",
         )
-        # Both should be set in context for downstream use
-        assert _explicit_api_key.get() == "explicit-key"
-        assert _explicit_base_url.get() == "https://api.custom.example.com"
+        # Both should be set as module-level overrides for downstream use
+        assert context_module._explicit_api_key == "explicit-key"
+        assert env_module._explicit_base_url == "https://api.custom.example.com"
         weave_client_context.set_weave_client_global(None)
+
+
+def test_finish_clears_explicit_globals(mock_wandb_api):
+    """weave.finish() must clear explicit api_key and base_url globals so a
+    subsequent init without params falls back to env vars.
+    """
+    mock_wandb_api.default_entity_name.return_value = "test-entity"
+    mock_server = _make_mock_server()
+
+    import weave.trace.env as env_module
+    import weave.wandb_interface.context as context_module
+
+    with (
+        patch("weave.trace.weave_init.init_weave_get_server", return_value=mock_server),
+        patch("weave.trace.weave_init._weave_is_available", return_value=True),
+        patch("weave.trace.weave_init.get_username", return_value="test-user"),
+        patch("weave.trace.weave_init.init_message"),
+    ):
+        weave_init.init_weave(
+            "test-project",
+            api_key="explicit-key",
+            base_url="https://api.custom.example.com",
+        )
+        assert context_module._explicit_api_key == "explicit-key"
+        assert env_module._explicit_base_url == "https://api.custom.example.com"
+
+    # finish() should clear the globals
+    weave_init.finish()
+    assert context_module._explicit_api_key is None
+    assert env_module._explicit_base_url is None

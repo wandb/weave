@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import configparser
-import contextvars
 import logging
 import netrc
 import os
@@ -13,12 +12,11 @@ WEAVE_INSECURE_DISABLE_SSL = "WEAVE_INSECURE_DISABLE_SSL"
 
 logger = logging.getLogger(__name__)
 
-# Context var overrides for runtime configuration via weave.init() params.
-# When set, these override env-based lookups so the SDK can be configured
-# without touching environment variables.
-_explicit_base_url: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "_explicit_base_url", default=None
-)
+# Module-level override for runtime configuration via weave.init() params.
+# When set, overrides env-based lookup so the SDK can be configured without
+# touching environment variables. Uses a plain global (not contextvars) because
+# this value must be visible across threads (e.g. call link generation).
+_explicit_base_url: str | None = None
 
 
 class Settings:
@@ -57,11 +55,12 @@ def get_weave_parallelism() -> int:
 
 def set_wandb_base_url(url: str | None) -> None:
     """Set an explicit base URL that overrides env-based lookup."""
-    _explicit_base_url.set(url)
+    global _explicit_base_url  # noqa: PLW0603
+    _explicit_base_url = url
 
 
 def wandb_base_url() -> str:
-    explicit = _explicit_base_url.get()
+    explicit = _explicit_base_url
     if explicit is not None:
         return explicit.rstrip("/")
     settings = Settings()
