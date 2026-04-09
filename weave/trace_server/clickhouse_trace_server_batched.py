@@ -1150,14 +1150,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 bucket.get("sum_cache_creation_input_tokens", 0) or 0
             )
 
+            # Subtract cache tokens from input: they are billed at cache
+            # rates, not the regular prompt rate.
+            net_input_tokens = (
+                input_tokens - cache_read_tokens - cache_creation_tokens
+            )
+
             if "input_cost" in requested_cost_metrics:
-                bucket["sum_input_cost"] = input_tokens * prompt_cost
+                bucket["sum_input_cost"] = net_input_tokens * prompt_cost
 
             if "output_cost" in requested_cost_metrics:
                 bucket["sum_output_cost"] = output_tokens * completion_cost
 
             if "total_cost" in requested_cost_metrics:
-                input_cost = bucket.get("sum_input_cost", input_tokens * prompt_cost)
+                input_cost = bucket.get(
+                    "sum_input_cost", net_input_tokens * prompt_cost
+                )
                 output_cost = bucket.get(
                     "sum_output_cost", output_tokens * completion_cost
                 )
