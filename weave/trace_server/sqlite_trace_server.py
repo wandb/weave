@@ -875,7 +875,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     # Subtract cached tokens: they are billed at the cache
                     # rate, not the regular input rate.
                     "prompt_tokens_total_cost": (
-                        prompt_tokens - cache_read_input_tokens
+                        prompt_tokens
+                        - cache_read_input_tokens
+                        - cache_creation_input_tokens
                     )
                     * prompt_cost,
                     "completion_tokens_total_cost": completion_tokens * completion_cost,
