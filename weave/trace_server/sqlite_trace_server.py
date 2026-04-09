@@ -239,6 +239,12 @@ def _cost_usage_from_summary(
             "requests": _safe_int_for_costs(usage.get("requests")),
             # Match ClickHouse: keep total_tokens as-reported rather than deriving it.
             "total_tokens": _safe_int_for_costs(usage.get("total_tokens")),
+            "cache_read_input_tokens": _safe_int_for_costs(
+                usage.get("cache_read_input_tokens")
+            ),
+            "cache_creation_input_tokens": _safe_int_for_costs(
+                usage.get("cache_creation_input_tokens")
+            ),
         }
     return normalized_usage
 
@@ -437,6 +443,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 effective_date TEXT NOT NULL,
                 prompt_token_cost REAL NOT NULL,
                 completion_token_cost REAL NOT NULL,
+                cache_read_input_token_cost REAL NOT NULL DEFAULT 0,
+                cache_creation_input_token_cost REAL NOT NULL DEFAULT 0,
                 prompt_token_cost_unit TEXT NOT NULL,
                 completion_token_cost_unit TEXT NOT NULL,
                 created_by TEXT NOT NULL,
@@ -671,6 +679,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 row["effective_date"],
                 row["prompt_token_cost"],
                 row["completion_token_cost"],
+                row.get("cache_read_input_token_cost", 0),
+                row.get("cache_creation_input_token_cost", 0),
                 row["prompt_token_cost_unit"],
                 row["completion_token_cost_unit"],
                 row["created_by"],
@@ -689,11 +699,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 effective_date,
                 prompt_token_cost,
                 completion_token_cost,
+                cache_read_input_token_cost,
+                cache_creation_input_token_cost,
                 prompt_token_cost_unit,
                 completion_token_cost_unit,
                 created_by,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             default_rows,
         )
@@ -767,6 +779,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 effective_date,
                 prompt_token_cost,
                 completion_token_cost,
+                cache_read_input_token_cost,
+                cache_creation_input_token_cost,
                 prompt_token_cost_unit,
                 completion_token_cost_unit,
                 created_by,
@@ -800,6 +814,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         "effective_date",
                         "prompt_token_cost",
                         "completion_token_cost",
+                        "cache_read_input_token_cost",
+                        "cache_creation_input_token_cost",
                         "prompt_token_cost_unit",
                         "completion_token_cost_unit",
                         "created_by",
@@ -836,18 +852,43 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
                 prompt_cost = float(best_row["prompt_token_cost"] or 0.0)
                 completion_cost = float(best_row["completion_token_cost"] or 0.0)
+                cache_read_cost = float(
+                    best_row.get("cache_read_input_token_cost") or 0.0
+                )
+                cache_creation_cost = float(
+                    best_row.get("cache_creation_input_token_cost") or 0.0
+                )
                 prompt_tokens = usage["prompt_tokens"]
                 completion_tokens = usage["completion_tokens"]
+                cache_read_input_tokens = usage.get("cache_read_input_tokens", 0)
+                cache_creation_input_tokens = usage.get(
+                    "cache_creation_input_tokens", 0
+                )
 
                 call_costs[llm_id] = {
                     "prompt_tokens": prompt_tokens,
                     "completion_tokens": completion_tokens,
+                    "cache_read_input_tokens": cache_read_input_tokens,
+                    "cache_creation_input_tokens": cache_creation_input_tokens,
                     "requests": usage["requests"],
                     "total_tokens": usage["total_tokens"],
-                    "prompt_tokens_total_cost": prompt_tokens * prompt_cost,
+                    # Subtract cached tokens: they are billed at the cache
+                    # rate, not the regular input rate.
+                    "prompt_tokens_total_cost": (
+                        prompt_tokens
+                        - cache_read_input_tokens
+                        - cache_creation_input_tokens
+                    )
+                    * prompt_cost,
                     "completion_tokens_total_cost": completion_tokens * completion_cost,
+                    "cache_read_input_tokens_total_cost": cache_read_input_tokens
+                    * cache_read_cost,
+                    "cache_creation_input_tokens_total_cost": cache_creation_input_tokens
+                    * cache_creation_cost,
                     "prompt_token_cost": prompt_cost,
                     "completion_token_cost": completion_cost,
+                    "cache_read_input_token_cost": cache_read_cost,
+                    "cache_creation_input_token_cost": cache_creation_cost,
                     "prompt_token_cost_unit": best_row["prompt_token_cost_unit"],
                     "completion_token_cost_unit": best_row[
                         "completion_token_cost_unit"

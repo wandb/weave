@@ -1697,6 +1697,12 @@ def test_summary_tokens_cost(client):
             "pricing_level": "default",
             "pricing_level_id": "default",
             "created_by": "system",
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens_total_cost": 0.0,
+            "cache_creation_input_tokens_total_cost": 0.0,
+            "cache_read_input_token_cost": 0.0,
+            "cache_creation_input_token_cost": 0.0,
         }
     )
 
@@ -1716,6 +1722,12 @@ def test_summary_tokens_cost(client):
             "pricing_level": "default",
             "pricing_level_id": "default",
             "created_by": "system",
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens_total_cost": 0.0,
+            "cache_creation_input_tokens_total_cost": 0.0,
+            "cache_read_input_token_cost": 0.0,
+            "cache_creation_input_token_cost": 0.0,
         }
     )
 

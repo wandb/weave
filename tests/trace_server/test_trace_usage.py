@@ -15,10 +15,16 @@ _REQUIRED_COST_FIELDS = (
     "output_tokens",
     "requests",
     "total_tokens",
+    "cache_read_input_tokens",
+    "cache_creation_input_tokens",
     "prompt_tokens_total_cost",
     "completion_tokens_total_cost",
+    "cache_read_input_tokens_total_cost",
+    "cache_creation_input_tokens_total_cost",
     "prompt_token_cost",
     "completion_token_cost",
+    "cache_read_input_token_cost",
+    "cache_creation_input_token_cost",
     "prompt_token_cost_unit",
     "completion_token_cost_unit",
     "effective_date",
@@ -778,3 +784,83 @@ def test_calls_usage_handles_missing_usage(
     assert usage.completion_tokens == expected_root[1]
     assert usage.total_tokens == expected_root[2]
     assert usage.requests == expected_root[3]
+
+
+def test_aggregate_usage_with_cache_tokens_rolls_up() -> None:
+    """Cache token counts and costs are extracted, rolled up, and merged correctly."""
+    root_id = "root"
+    child_id = "child"
+
+    calls = [
+        _make_call(
+            root_id,
+            None,
+            _usage_summary(
+                {
+                    "claude-3.5-sonnet": {
+                        "input_tokens": 100,
+                        "output_tokens": 50,
+                        "cache_read_input_tokens": 80,
+                        "cache_creation_input_tokens": 20,
+                        "requests": 1,
+                    }
+                },
+                costs={
+                    "claude-3.5-sonnet": {
+                        "prompt_tokens_total_cost": 0.3,
+                        "completion_tokens_total_cost": 0.15,
+                        "cache_read_input_tokens_total_cost": 0.04,
+                        "cache_creation_input_tokens_total_cost": 0.05,
+                    }
+                },
+            ),
+        ),
+        _make_call(
+            child_id,
+            root_id,
+            _usage_summary(
+                {
+                    "claude-3.5-sonnet": {
+                        "input_tokens": 60,
+                        "output_tokens": 30,
+                        "cache_read_input_tokens": 40,
+                        "cache_creation_input_tokens": 10,
+                        "requests": 1,
+                    }
+                },
+                costs={
+                    "claude-3.5-sonnet": {
+                        "prompt_tokens_total_cost": 0.18,
+                        "completion_tokens_total_cost": 0.09,
+                        "cache_read_input_tokens_total_cost": 0.02,
+                        "cache_creation_input_tokens_total_cost": 0.0,
+                    }
+                },
+            ),
+        ),
+    ]
+
+    # Token counts roll up
+    result = usage_utils.aggregate_usage_with_descendants(calls, include_costs=True)
+    root_usage = result[root_id]["claude-3.5-sonnet"]
+    assert root_usage.prompt_tokens == 160
+    assert root_usage.completion_tokens == 80
+    assert root_usage.cache_read_input_tokens == 120
+    assert root_usage.cache_creation_input_tokens == 30
+    assert root_usage.requests == 2
+
+    # Costs roll up
+    assert root_usage.cache_read_input_tokens_total_cost == pytest.approx(0.06)
+    assert root_usage.cache_creation_input_tokens_total_cost == pytest.approx(0.05)
+
+    child_usage = result[child_id]["claude-3.5-sonnet"]
+    assert child_usage.cache_read_input_tokens == 40
+    assert child_usage.cache_creation_input_tokens == 10
+
+    # Without costs flag, cost fields are None
+    result_no_costs = usage_utils.aggregate_usage_with_descendants(
+        calls, include_costs=False
+    )
+    root_no_costs = result_no_costs[root_id]["claude-3.5-sonnet"]
+    assert root_no_costs.cache_read_input_tokens_total_cost is None
+    assert root_no_costs.cache_creation_input_tokens_total_cost is None

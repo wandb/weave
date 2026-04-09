@@ -1494,6 +1494,12 @@ class TestSemanticConventionParsing:
                 "pricing_level": "default",
                 "pricing_level_id": "default",
                 "created_by": "system",
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens_total_cost": 0,
+                "cache_creation_input_tokens_total_cost": 0,
+                "cache_read_input_token_cost": 0,
+                "cache_creation_input_token_cost": 0,
             }
         )
 

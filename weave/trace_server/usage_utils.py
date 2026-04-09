@@ -106,15 +106,23 @@ def _extract_call_usage(
         )
         requests = _safe_int(usage.get("requests"))
         total_tokens = _safe_int(usage.get("total_tokens"))
+        cache_read_input_tokens = _safe_int(usage.get("cache_read_input_tokens"))
+        cache_creation_input_tokens = _safe_int(
+            usage.get("cache_creation_input_tokens")
+        )
         if total_tokens == 0:
             total_tokens = prompt_tokens + completion_tokens
 
         # Costs are optional and only populated when requested.
         prompt_cost: float | None = None
         completion_cost: float | None = None
+        cache_read_cost: float | None = None
+        cache_creation_cost: float | None = None
         if include_costs:
             prompt_cost = 0.0
             completion_cost = 0.0
+            cache_read_cost = 0.0
+            cache_creation_cost = 0.0
             cost_entry = (
                 costs_map.get(model_name) if isinstance(costs_map, dict) else {}
             )
@@ -123,6 +131,12 @@ def _extract_call_usage(
                 completion_cost = _safe_float(
                     cost_entry.get("completion_tokens_total_cost")
                 )
+                cache_read_cost = _safe_float(
+                    cost_entry.get("cache_read_input_tokens_total_cost")
+                )
+                cache_creation_cost = _safe_float(
+                    cost_entry.get("cache_creation_input_tokens_total_cost")
+                )
 
         # Only store entries that contain any usage (or cost when requested).
         usage_obj = tsi.LLMAggregatedUsage(
@@ -130,8 +144,12 @@ def _extract_call_usage(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
+            cache_read_input_tokens=cache_read_input_tokens,
+            cache_creation_input_tokens=cache_creation_input_tokens,
             prompt_tokens_total_cost=prompt_cost,
             completion_tokens_total_cost=completion_cost,
+            cache_read_input_tokens_total_cost=cache_read_cost,
+            cache_creation_input_tokens_total_cost=cache_creation_cost,
         )
 
         if _has_usage(usage_obj, include_costs):
@@ -154,6 +172,8 @@ def _merge_usage(
             existing.prompt_tokens += usage.prompt_tokens
             existing.completion_tokens += usage.completion_tokens
             existing.total_tokens += usage.total_tokens
+            existing.cache_read_input_tokens += usage.cache_read_input_tokens
+            existing.cache_creation_input_tokens += usage.cache_creation_input_tokens
 
             if include_costs:
                 existing.prompt_tokens_total_cost = (
@@ -162,6 +182,12 @@ def _merge_usage(
                 existing.completion_tokens_total_cost = (
                     existing.completion_tokens_total_cost or 0.0
                 ) + (usage.completion_tokens_total_cost or 0.0)
+                existing.cache_read_input_tokens_total_cost = (
+                    existing.cache_read_input_tokens_total_cost or 0.0
+                ) + (usage.cache_read_input_tokens_total_cost or 0.0)
+                existing.cache_creation_input_tokens_total_cost = (
+                    existing.cache_creation_input_tokens_total_cost or 0.0
+                ) + (usage.cache_creation_input_tokens_total_cost or 0.0)
 
 
 def _safe_int(value: Any) -> int:
@@ -179,16 +205,23 @@ def _safe_float(value: Any) -> float:
 
 
 def _has_usage(usage: tsi.LLMAggregatedUsage, include_costs: bool) -> bool:
-    if (
+    has_tokens = (
         usage.requests
         or usage.prompt_tokens
         or usage.completion_tokens
         or usage.total_tokens
-    ):
+    )
+    has_cache_tokens = (
+        usage.cache_read_input_tokens or usage.cache_creation_input_tokens
+    )
+    if has_tokens or has_cache_tokens:
         return True
     if include_costs:
-        return bool(
-            (usage.prompt_tokens_total_cost or 0.0)
-            or (usage.completion_tokens_total_cost or 0.0)
+        has_cost = (usage.prompt_tokens_total_cost or 0.0) or (
+            usage.completion_tokens_total_cost or 0.0
         )
+        has_cache_cost = (usage.cache_read_input_tokens_total_cost or 0.0) or (
+            usage.cache_creation_input_tokens_total_cost or 0.0
+        )
+        return bool(has_cost or has_cache_cost)
     return False

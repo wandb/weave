@@ -42,6 +42,8 @@ def get_current_costs(
 class CostDetails(TypedDict):
     input: float
     output: float
+    cache_read_input: float
+    cache_creation_input: float
     provider: str
     created_at: str
 
@@ -69,6 +71,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
             provider_id = cost.get("provider", "default")
             input_token_cost = cost.get("input", 0)
             output_token_cost = cost.get("output", 0)
+            cache_read_input_token_cost = cost.get("cache_read_input", 0)
+            cache_creation_input_token_cost = cost.get("cache_creation_input", 0)
             date_str = cost.get(
                 "created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )
@@ -87,6 +91,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
                     "USD",
                     output_token_cost,
                     "USD",
+                    cache_read_input_token_cost,
+                    cache_creation_input_token_cost,
                     "system",
                     created_at,
                 ),
@@ -106,6 +112,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
             "prompt_token_cost_unit",
             "completion_token_cost",
             "completion_token_cost_unit",
+            "cache_read_input_token_cost",
+            "cache_creation_input_token_cost",
             "created_by",
             "created_at",
         ],
