@@ -132,6 +132,7 @@ from weave.trace_server.datadog import (
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
+    ErrorCode,
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
@@ -166,9 +167,13 @@ from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
     _build_completion_response,
+    completion_error_payload_from_exception,
+    completion_error_response_from_exception,
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
+    make_completion_error_payload,
+    make_completion_error_response,
     resolve_and_apply_prompt,
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
@@ -5943,8 +5948,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             except Exception as e:
                 logger.exception("Failed to resolve prompt")
-                return tsi.CompletionsCreateRes(
-                    response={"error": f"Failed to resolve prompt: {e!s}"}
+                is_user_error = isinstance(
+                    e, (InvalidRequest, NotFoundError, ObjectDeletedError)
+                )
+                return make_completion_error_response(
+                    f"Failed to resolve prompt: {e!s}",
+                    error_code=(
+                        ErrorCode.COMPLETION_PROMPT_RESOLUTION_FAILED
+                        if is_user_error
+                        else ErrorCode.COMPLETION_UNEXPECTED_ERROR
+                    ),
+                    error_category="user" if is_user_error else "system",
+                    error_retryable=False,
+                    error_status_code=400 if is_user_error else None,
                 )
 
         # Use shared setup logic
@@ -5954,7 +5970,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 model_info, req, self.obj_read
             )
         except Exception as e:
-            return tsi.CompletionsCreateRes(response={"error": str(e)})
+            if isinstance(
+                e,
+                (
+                    InvalidRequest,
+                    MissingLLMApiKeyError,
+                    NotFoundError,
+                    ObjectDeletedError,
+                ),
+            ):
+                return completion_error_response_from_exception(
+                    e,
+                    default_error_code=ErrorCode.COMPLETION_MODEL_SETUP_FAILED,
+                    default_error_category="user",
+                    default_error_retryable=False,
+                    default_error_status_code=400,
+                )
+            return completion_error_response_from_exception(e)
 
         model_name = completion_model_info.model_name
 
@@ -6091,11 +6123,37 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         except Exception as e:
             logger.exception("Failed to resolve and apply prompt")
 
-            # Yield error as single chunk then stop.
-            def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
-                yield {"error": f"Failed to resolve and apply prompt: {err!s}"}
+            error_payload = make_completion_error_payload(
+                f"Failed to resolve and apply prompt: {e!s}",
+                error_code=(
+                    ErrorCode.COMPLETION_PROMPT_RESOLUTION_FAILED
+                    if isinstance(
+                        e, (InvalidRequest, NotFoundError, ObjectDeletedError)
+                    )
+                    else ErrorCode.COMPLETION_UNEXPECTED_ERROR
+                ),
+                error_category=(
+                    "user"
+                    if isinstance(
+                        e, (InvalidRequest, NotFoundError, ObjectDeletedError)
+                    )
+                    else "system"
+                ),
+                error_retryable=False,
+                error_status_code=(
+                    400
+                    if isinstance(
+                        e, (InvalidRequest, NotFoundError, ObjectDeletedError)
+                    )
+                    else None
+                ),
+            )
 
-            return _single_error_iter(e)
+            # Yield error as single chunk then stop.
+            def _single_error_iter() -> Iterator[dict[str, Any]]:
+                yield error_payload
+
+            return _single_error_iter()
 
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
@@ -6104,11 +6162,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 model_info, req, self.obj_read
             )
         except Exception as e:
-            # Yield error as single chunk then stop.
-            def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
-                yield {"error": str(err)}
+            if isinstance(
+                e,
+                (
+                    InvalidRequest,
+                    MissingLLMApiKeyError,
+                    NotFoundError,
+                    ObjectDeletedError,
+                ),
+            ):
+                error_payload = completion_error_payload_from_exception(
+                    e,
+                    default_error_code=ErrorCode.COMPLETION_MODEL_SETUP_FAILED,
+                    default_error_category="user",
+                    default_error_retryable=False,
+                    default_error_status_code=400,
+                )
+            else:
+                error_payload = completion_error_payload_from_exception(e)
 
-            return _single_error_iter(e)
+            # Yield error as single chunk then stop.
+            def _single_error_iter() -> Iterator[dict[str, Any]]:
+                yield error_payload
+
+            return _single_error_iter()
 
         model_name = completion_model_info.model_name
         api_key = completion_model_info.api_key

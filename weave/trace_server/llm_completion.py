@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from weave.prompt.prompt import format_message_with_template_vars
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
+    ErrorCode,
     InvalidRequest,
     MissingLLMApiKeyError,
     NotFoundError,
@@ -20,6 +21,223 @@ from weave.trace_server.model_providers.model_providers import (
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
+COMPLETION_ERROR_CATEGORY_USER = "user"
+COMPLETION_ERROR_CATEGORY_PROVIDER = "provider"
+COMPLETION_ERROR_CATEGORY_SYSTEM = "system"
+
+
+def _normalize_completion_error_message(message: str) -> str:
+    return message.replace("litellm.", "")
+
+
+def make_completion_error_payload(
+    message: str,
+    *,
+    error_code: str,
+    error_category: str,
+    error_retryable: bool,
+    error_provider: str | None = None,
+    error_status_code: int | None = None,
+    extra_fields: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "error": _normalize_completion_error_message(message),
+        "error_code": error_code,
+        "error_category": error_category,
+        "error_retryable": error_retryable,
+    }
+    if error_provider is not None:
+        payload["error_provider"] = error_provider
+    if error_status_code is not None:
+        payload["error_status_code"] = error_status_code
+    if extra_fields:
+        for key, value in extra_fields.items():
+            if value is not None:
+                payload[key] = value
+    return payload
+
+
+def make_completion_error_response(
+    message: str,
+    *,
+    error_code: str,
+    error_category: str,
+    error_retryable: bool,
+    error_provider: str | None = None,
+    error_status_code: int | None = None,
+    extra_fields: dict[str, Any] | None = None,
+) -> tsi.CompletionsCreateRes:
+    return tsi.CompletionsCreateRes(
+        response=make_completion_error_payload(
+            message,
+            error_code=error_code,
+            error_category=error_category,
+            error_retryable=error_retryable,
+            error_provider=error_provider,
+            error_status_code=error_status_code,
+            extra_fields=extra_fields,
+        )
+    )
+
+
+def completion_error_payload_from_exception(
+    exc: Exception,
+    *,
+    provider_hint: str | None = None,
+    default_error_code: str = ErrorCode.COMPLETION_UNEXPECTED_ERROR,
+    default_error_category: str = COMPLETION_ERROR_CATEGORY_SYSTEM,
+    default_error_retryable: bool = False,
+    default_error_status_code: int | None = None,
+    extra_fields: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    provider = getattr(exc, "llm_provider", None) or provider_hint
+    status_code = getattr(exc, "status_code", None)
+
+    if isinstance(exc, MissingLLMApiKeyError):
+        api_key_name = exc.api_key_name
+        return make_completion_error_payload(
+            str(exc),
+            error_code=exc.error_code,
+            error_category=COMPLETION_ERROR_CATEGORY_USER,
+            error_retryable=False,
+            error_provider=provider,
+            error_status_code=400,
+            extra_fields={
+                "error_api_key": api_key_name,
+                **(extra_fields or {}),
+            },
+        )
+
+    if isinstance(exc, InvalidRequest):
+        return make_completion_error_payload(
+            str(exc),
+            error_code=default_error_code,
+            error_category=default_error_category,
+            error_retryable=default_error_retryable,
+            error_provider=provider,
+            error_status_code=status_code or default_error_status_code,
+            extra_fields=extra_fields,
+        )
+
+    try:
+        import litellm
+    except ImportError:
+        litellm = None
+
+    if litellm is not None:
+        if isinstance(exc, litellm.AuthenticationError):
+            return make_completion_error_payload(
+                getattr(exc, "message", str(exc)),
+                error_code=ErrorCode.COMPLETION_PROVIDER_AUTHENTICATION_ERROR,
+                error_category=COMPLETION_ERROR_CATEGORY_USER,
+                error_retryable=False,
+                error_provider=provider,
+                error_status_code=status_code,
+                extra_fields=extra_fields,
+            )
+        if isinstance(exc, litellm.BadRequestError):
+            return make_completion_error_payload(
+                getattr(exc, "message", str(exc)),
+                error_code=ErrorCode.COMPLETION_PROVIDER_BAD_REQUEST,
+                error_category=COMPLETION_ERROR_CATEGORY_USER,
+                error_retryable=False,
+                error_provider=provider,
+                error_status_code=status_code,
+                extra_fields=extra_fields,
+            )
+        if isinstance(exc, litellm.RateLimitError):
+            return make_completion_error_payload(
+                getattr(exc, "message", str(exc)),
+                error_code=ErrorCode.COMPLETION_PROVIDER_RATE_LIMIT,
+                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+                error_retryable=True,
+                error_provider=provider,
+                error_status_code=status_code,
+                extra_fields=extra_fields,
+            )
+        if isinstance(exc, litellm.Timeout):
+            return make_completion_error_payload(
+                getattr(exc, "message", str(exc)),
+                error_code=ErrorCode.COMPLETION_PROVIDER_TIMEOUT,
+                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+                error_retryable=True,
+                error_provider=provider,
+                error_status_code=status_code,
+                extra_fields=extra_fields,
+            )
+        if isinstance(exc, litellm.APIConnectionError):
+            return make_completion_error_payload(
+                getattr(exc, "message", str(exc)),
+                error_code=ErrorCode.COMPLETION_PROVIDER_CONNECTION_ERROR,
+                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+                error_retryable=True,
+                error_provider=provider,
+                error_status_code=status_code,
+                extra_fields=extra_fields,
+            )
+        if isinstance(exc, litellm.ServiceUnavailableError):
+            return make_completion_error_payload(
+                getattr(exc, "message", str(exc)),
+                error_code=ErrorCode.COMPLETION_PROVIDER_UNAVAILABLE,
+                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+                error_retryable=True,
+                error_provider=provider,
+                error_status_code=status_code,
+                extra_fields=extra_fields,
+            )
+        if isinstance(exc, litellm.InternalServerError):
+            return make_completion_error_payload(
+                getattr(exc, "message", str(exc)),
+                error_code=ErrorCode.COMPLETION_PROVIDER_INTERNAL_ERROR,
+                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+                error_retryable=True,
+                error_provider=provider,
+                error_status_code=status_code,
+                extra_fields=extra_fields,
+            )
+        if isinstance(exc, litellm.APIError):
+            return make_completion_error_payload(
+                getattr(exc, "message", str(exc)),
+                error_code=ErrorCode.COMPLETION_PROVIDER_ERROR,
+                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+                error_retryable=bool(status_code is None or status_code >= 500),
+                error_provider=provider,
+                error_status_code=status_code,
+                extra_fields=extra_fields,
+            )
+
+    return make_completion_error_payload(
+        str(exc),
+        error_code=default_error_code,
+        error_category=default_error_category,
+        error_retryable=default_error_retryable,
+        error_provider=provider,
+        error_status_code=status_code or default_error_status_code,
+        extra_fields=extra_fields,
+    )
+
+
+def completion_error_response_from_exception(
+    exc: Exception,
+    *,
+    provider_hint: str | None = None,
+    default_error_code: str = ErrorCode.COMPLETION_UNEXPECTED_ERROR,
+    default_error_category: str = COMPLETION_ERROR_CATEGORY_SYSTEM,
+    default_error_retryable: bool = False,
+    default_error_status_code: int | None = None,
+    extra_fields: dict[str, Any] | None = None,
+) -> tsi.CompletionsCreateRes:
+    return tsi.CompletionsCreateRes(
+        response=completion_error_payload_from_exception(
+            exc,
+            provider_hint=provider_hint,
+            default_error_code=default_error_code,
+            default_error_category=default_error_category,
+            default_error_retryable=default_error_retryable,
+            default_error_status_code=default_error_status_code,
+            extra_fields=extra_fields,
+        )
+    )
 
 
 def parse_prompt_reference(prompt: str) -> tuple[str, str, str | None]:
@@ -281,9 +499,7 @@ def lite_llm_completion(
 
             return tsi.CompletionsCreateRes(response=res.model_dump())
         except Exception as e:
-            error_message = str(e)
-            error_message = error_message.replace("litellm.", "")
-            return tsi.CompletionsCreateRes(response={"error": error_message})
+            return completion_error_response_from_exception(e, provider_hint=provider)
     elif provider == "custom" and not base_url:
         raise InvalidRequest(
             "Invalid provider configuration: must provide base_url if provider is 'custom'"
@@ -313,9 +529,7 @@ def lite_llm_completion(
         res = litellm.completion(**completion_kwargs)
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
-        error_message = str(e)
-        error_message = error_message.replace("litellm.", "")
-        return tsi.CompletionsCreateRes(response={"error": error_message})
+        return completion_error_response_from_exception(e, provider_hint=provider)
 
 
 def get_bedrock_credentials(
@@ -623,8 +837,7 @@ def lite_llm_completion_stream(
                 else:
                     yield chunk  # type: ignore[return-value]
         except Exception as e:
-            error_message = str(e).replace("litellm.", "")
-            yield {"error": error_message}
+            yield completion_error_payload_from_exception(e, provider_hint=provider)
 
     # If the caller wants a custom return type transformation (currently unused)
     # they can wrap the generator themselves. We just return the raw iterator.

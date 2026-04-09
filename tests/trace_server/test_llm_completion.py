@@ -8,11 +8,15 @@ import pytest
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
+    ErrorCode,
     InvalidRequest,
     MissingLLMApiKeyError,
     NotFoundError,
 )
-from weave.trace_server.llm_completion import get_custom_provider_info
+from weave.trace_server.llm_completion import (
+    completion_error_payload_from_exception,
+    get_custom_provider_info,
+)
 from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import (
     _secret_fetcher_context,
@@ -982,6 +986,12 @@ class TestStreamingWithPrompts(unittest.TestCase):
             assert len(chunks) == 1
             assert "error" in chunks[0]
             assert "Failed to resolve and apply prompt" in chunks[0]["error"]
+            assert (
+                chunks[0]["error_code"] == ErrorCode.COMPLETION_PROMPT_RESOLUTION_FAILED
+            )
+            assert chunks[0]["error_category"] == "user"
+            assert chunks[0]["error_retryable"] is False
+            assert chunks[0]["error_status_code"] == 400
 
 
 class TestResolveAndApplyPrompt(unittest.TestCase):
@@ -1422,7 +1432,15 @@ def test_completions_handles_error_response(
 ):
     """Verify error responses are properly captured in both write paths."""
     target = getattr(WriteTarget, write_target)
-    error_response = {"error": "Rate limit exceeded", "choices": []}
+    error_response = {
+        "error": "Rate limit exceeded",
+        "error_code": ErrorCode.COMPLETION_PROVIDER_RATE_LIMIT,
+        "error_category": "provider",
+        "error_retryable": True,
+        "error_provider": "openai",
+        "error_status_code": 429,
+        "choices": [],
+    }
 
     with (
         patch(
@@ -1453,6 +1471,11 @@ def test_completions_handles_error_response(
         result = completions_mock_server.completions_create(req)
 
         assert result.response["error"] == "Rate limit exceeded"
+        assert result.response["error_code"] == ErrorCode.COMPLETION_PROVIDER_RATE_LIMIT
+        assert result.response["error_category"] == "provider"
+        assert result.response["error_retryable"] is True
+        assert result.response["error_provider"] == "openai"
+        assert result.response["error_status_code"] == 429
 
         if check_exception_field:
             mock_insert_complete.assert_called_once()
@@ -1460,6 +1483,114 @@ def test_completions_handles_error_response(
             assert ch_call.exception == "Rate limit exceeded"
         else:
             mock_insert_batch.assert_called_once()
+
+
+@pytest.mark.disable_logging_error_check
+def test_completions_request_boundary_adds_structured_error_metadata(
+    completions_mock_server,
+    completions_secret_fetcher,
+):
+    """Verify request-boundary failures add metadata without breaking the legacy error field."""
+    # Prompt resolution errors keep the prefixed legacy message and add typed metadata.
+    prompt_req = tsi.CompletionsCreateReq(
+        project_id="test-project",
+        inputs=tsi.CompletionsCreateRequestInputs(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "Say hello"}],
+            prompt="weave-trace-internal:///test-project/object/missing-prompt:digest-1",
+        ),
+        track_llm_call=False,
+    )
+    with patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read:
+        mock_obj_read.side_effect = NotFoundError("Prompt not found")
+        prompt_result = completions_mock_server.completions_create(prompt_req)
+
+    assert (
+        prompt_result.response["error"] == "Failed to resolve prompt: Prompt not found"
+    )
+    assert (
+        prompt_result.response["error_code"]
+        == ErrorCode.COMPLETION_PROMPT_RESOLUTION_FAILED
+    )
+    assert prompt_result.response["error_category"] == "user"
+    assert prompt_result.response["error_retryable"] is False
+    assert prompt_result.response["error_status_code"] == 400
+
+    # Model setup errors preserve the legacy message and expose the structured cause.
+    setup_req = tsi.CompletionsCreateReq(
+        project_id="test-project",
+        inputs=tsi.CompletionsCreateRequestInputs(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "Say hello"}],
+        ),
+        track_llm_call=False,
+    )
+    with patch(
+        "weave.trace_server.clickhouse_trace_server_batched._setup_completion_model_info"
+    ) as mock_setup:
+        mock_setup.side_effect = MissingLLMApiKeyError(
+            "No API key found", api_key_name="GEMINI_API_KEY"
+        )
+        setup_result = completions_mock_server.completions_create(setup_req)
+
+    assert setup_result.response["error"] == "No API key found"
+    assert setup_result.response["error_code"] == ErrorCode.COMPLETION_MISSING_API_KEY
+    assert setup_result.response["error_category"] == "user"
+    assert setup_result.response["error_retryable"] is False
+    assert setup_result.response["error_api_key"] == "GEMINI_API_KEY"
+    assert setup_result.response["error_status_code"] == 400
+
+
+def test_completion_error_payload_from_exception_classifies_provider_failures():
+    """Verify provider exceptions are normalized into a stable completion error contract."""
+    httpx = pytest.importorskip("httpx")
+    litellm = pytest.importorskip("litellm")
+
+    auth_error = litellm.AuthenticationError(
+        "bad key",
+        "gemini",
+        "gemini-2.5-pro",
+        response=httpx.Response(
+            401,
+            request=httpx.Request("POST", "https://example.com"),
+        ),
+    )
+    auth_payload = completion_error_payload_from_exception(auth_error)
+    assert auth_payload["error"] == "AuthenticationError: bad key"
+    assert (
+        auth_payload["error_code"] == ErrorCode.COMPLETION_PROVIDER_AUTHENTICATION_ERROR
+    )
+    assert auth_payload["error_category"] == "user"
+    assert auth_payload["error_retryable"] is False
+    assert auth_payload["error_provider"] == "gemini"
+    assert auth_payload["error_status_code"] == 401
+
+    rate_limit_error = litellm.RateLimitError(
+        "slow down",
+        "openai",
+        "gpt-4o-mini",
+        response=httpx.Response(
+            429,
+            request=httpx.Request("POST", "https://example.com"),
+        ),
+    )
+    rate_limit_payload = completion_error_payload_from_exception(rate_limit_error)
+    assert rate_limit_payload["error"] == "RateLimitError: slow down"
+    assert rate_limit_payload["error_code"] == ErrorCode.COMPLETION_PROVIDER_RATE_LIMIT
+    assert rate_limit_payload["error_category"] == "provider"
+    assert rate_limit_payload["error_retryable"] is True
+    assert rate_limit_payload["error_provider"] == "openai"
+    assert rate_limit_payload["error_status_code"] == 429
+
+    fallback_payload = completion_error_payload_from_exception(
+        RuntimeError("worker blew up"),
+        provider_hint="custom",
+    )
+    assert fallback_payload["error"] == "worker blew up"
+    assert fallback_payload["error_code"] == ErrorCode.COMPLETION_UNEXPECTED_ERROR
+    assert fallback_payload["error_category"] == "system"
+    assert fallback_payload["error_retryable"] is False
+    assert fallback_payload["error_provider"] == "custom"
 
 
 def test_completions_usage_captured_in_summary(
