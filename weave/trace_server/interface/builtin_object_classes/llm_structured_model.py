@@ -16,6 +16,16 @@ from weave.utils.project_id import to_project_id
 
 ResponseFormat = Literal["json_object", "json_schema", "text"]
 
+KNOWN_COMPLETION_ERROR_KEYS = {
+    "error",
+    "error_code",
+    "error_category",
+    "error_retryable",
+    "error_provider",
+    "error_status_code",
+    "error_api_key",
+}
+
 
 def is_response_format(value: Any) -> bool:
     return isinstance(value, str) and value in {"json_object", "text"}
@@ -263,12 +273,57 @@ class LLMStructuredCompletionModel(Model):
         return req
 
 
+class CompletionResponseError(RuntimeError):
+    """Typed exception for completion error payloads returned by `/completions/create`."""
+
+    def __init__(
+        self,
+        error: str,
+        *,
+        error_code: str | None = None,
+        error_category: str | None = None,
+        error_retryable: bool | None = None,
+        error_provider: str | None = None,
+        error_status_code: int | None = None,
+        error_api_key: str | None = None,
+        extra_metadata: dict[str, Any] | None = None,
+    ):
+        self.error = error
+        self.error_code = error_code
+        self.error_category = error_category
+        self.error_retryable = error_retryable
+        self.error_provider = error_provider
+        self.error_status_code = error_status_code
+        self.error_api_key = error_api_key
+        self.extra_metadata = extra_metadata or {}
+        super().__init__(f"LLM API returned an error: {error}")
+
+    @classmethod
+    def from_response_payload(
+        cls, response_payload: dict[str, Any]
+    ) -> "CompletionResponseError":
+        extra_metadata = {
+            key: value
+            for key, value in response_payload.items()
+            if key.startswith("error_") and key not in KNOWN_COMPLETION_ERROR_KEYS
+        }
+        return cls(
+            str(response_payload["error"]),
+            error_code=response_payload.get("error_code"),
+            error_category=response_payload.get("error_category"),
+            error_retryable=response_payload.get("error_retryable"),
+            error_provider=response_payload.get("error_provider"),
+            error_status_code=response_payload.get("error_status_code"),
+            error_api_key=response_payload.get("error_api_key"),
+            extra_metadata=extra_metadata,
+        )
+
+
 def parse_response(
     response_payload: dict, response_format: ResponseFormat | None
 ) -> Message | str | dict[str, Any]:
     if response_payload.get("error"):
-        # Or handle more gracefully depending on desired behavior
-        raise RuntimeError(f"LLM API returned an error: {response_payload['error']}")
+        raise CompletionResponseError.from_response_payload(response_payload)
 
     # Assuming OpenAI-like structure: a list of choices, first choice has the message
     output_message_dict = response_payload["choices"][0]["message"]

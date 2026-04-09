@@ -10,6 +10,7 @@ from weave.trace import object_record, vals
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
+    CompletionResponseError,
     LLMStructuredCompletionModel,
     LLMStructuredCompletionModelDefaultParams,
     Message,
@@ -18,6 +19,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
     cast_to_message,
     cast_to_message_list,
     parse_params_to_litellm_params,
+    parse_response,
 )
 
 
@@ -427,8 +429,13 @@ def test_llm_structured_completion_model_predict_error_handling(
         ),
     )
 
-    with pytest.raises(RuntimeError, match="LLM API returned an error"):
+    with pytest.raises(CompletionResponseError) as exc_info:
         model.predict(user_input="Test")
+    assert str(exc_info.value) == "LLM API returned an error: API rate limit exceeded"
+    assert exc_info.value.error == "API rate limit exceeded"
+    assert exc_info.value.error_code is None
+    assert exc_info.value.error_category is None
+    assert exc_info.value.error_retryable is None
 
     # Test 2: API exception
     mock_client.server.completions_create.side_effect = Exception("Connection failed")
@@ -445,6 +452,73 @@ def test_llm_structured_completion_model_predict_error_handling(
         RuntimeError, match="Failed to extract message from LLM response"
     ):
         model.predict(user_input="Test")
+
+
+def test_parse_response_raises_typed_error_with_structured_metadata():
+    """Structured completion errors should survive the parse boundary."""
+    response_payload = {
+        "error": "AuthenticationError: bad key",
+        "error_code": "COMPLETION_PROVIDER_AUTHENTICATION_ERROR",
+        "error_category": "user",
+        "error_retryable": False,
+        "error_provider": "gemini",
+        "error_status_code": 401,
+        "error_api_key": "GEMINI_API_KEY",
+        "error_trace_id": "trace-123",
+    }
+
+    with pytest.raises(CompletionResponseError) as exc_info:
+        parse_response(response_payload, "text")
+
+    exc = exc_info.value
+    assert str(exc) == "LLM API returned an error: AuthenticationError: bad key"
+    assert exc.error == "AuthenticationError: bad key"
+    assert exc.error_code == "COMPLETION_PROVIDER_AUTHENTICATION_ERROR"
+    assert exc.error_category == "user"
+    assert exc.error_retryable is False
+    assert exc.error_provider == "gemini"
+    assert exc.error_status_code == 401
+    assert exc.error_api_key == "GEMINI_API_KEY"
+    assert exc.extra_metadata == {"error_trace_id": "trace-123"}
+
+
+def test_parse_response_raises_typed_error_for_legacy_payload():
+    r"""Legacy `{\"error\": ...}` payloads should still raise a useful typed exception."""
+    with pytest.raises(CompletionResponseError) as exc_info:
+        parse_response({"error": "API rate limit exceeded"}, "text")
+
+    exc = exc_info.value
+    assert str(exc) == "LLM API returned an error: API rate limit exceeded"
+    assert exc.error == "API rate limit exceeded"
+    assert exc.error_code is None
+    assert exc.error_category is None
+    assert exc.error_retryable is None
+    assert exc.error_provider is None
+    assert exc.error_status_code is None
+    assert exc.error_api_key is None
+    assert exc.extra_metadata == {}
+
+
+def test_parse_response_happy_paths_remain_unchanged():
+    """Text and JSON parsing should remain unchanged for successful payloads."""
+    text_payload = {
+        "choices": [
+            {"message": {"role": "assistant", "content": "hello from text mode"}}
+        ]
+    }
+    json_payload = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": json.dumps({"ok": True, "value": 7}),
+                }
+            }
+        ]
+    }
+
+    assert parse_response(text_payload, "text") == "hello from text mode"
+    assert parse_response(json_payload, "json_object") == {"ok": True, "value": 7}
 
 
 def test_prepare_llm_messages():
