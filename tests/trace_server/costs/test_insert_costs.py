@@ -37,6 +37,8 @@ class TestInsertCosts(unittest.TestCase):
                 "llm_model_1",
                 0.01,
                 0.02,
+                0,
+                0,
                 datetime.strptime("2023-10-01 12:00:00", "%Y-%m-%d %H:%M:%S").replace(
                     tzinfo=timezone.utc
                 ),
@@ -45,6 +47,8 @@ class TestInsertCosts(unittest.TestCase):
                 "llm_model_3",
                 0.02,
                 0.03,
+                0,
+                0,
                 datetime.strptime("2023-10-02 13:30:00", "%Y-%m-%d %H:%M:%S").replace(
                     tzinfo=timezone.utc
                 ),
