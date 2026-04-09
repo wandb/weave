@@ -1,4 +1,5 @@
 """File storage operations for the ClickHouse trace server."""
+# mypy: disable-error-code="attr-defined"
 
 import ddtrace
 
@@ -30,11 +31,6 @@ from weave.trace_server.orm import ParamBuilder
 
 
 class FileOperationsMixin(CHInfraProtocol):
-    # Attributes provided by ClickHouseTraceServer at runtime
-    _file_batch: list[FileChunkCreateCHInsertable]
-    _flush_immediately: bool
-    file_storage_client: FileStorageClient | None
-
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = compute_file_digest(req.content)
         validate_expected_digest(
