@@ -69,16 +69,6 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     return entity_name, project_name
 
 
-"""
-This is the main entrypoint for the weave library. It initializes the weave client
-and sets up the global state for the weave library.
-
-Args:
-    project_name (str): The project name to use for the weave client.
-    ensure_project_exists (bool): If True (default), the client will attempt to create the project if it does not exist.
-"""
-
-
 def _weave_is_available(server: TraceServerClientInterface) -> bool:
     try:
         server.server_info()
@@ -95,7 +85,24 @@ def _weave_is_available(server: TraceServerClientInterface) -> bool:
 def init_weave(
     project_name: str,
     ensure_project_exists: bool = True,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    trace_server_url: str | None = None,
 ) -> weave_client.WeaveClient:
+    """Initialize the weave client and set up global state.
+
+    Args:
+        project_name: The project name to use for the weave client.
+        ensure_project_exists: If True (default), the client will attempt to
+            create the project if it does not exist.
+        api_key: Optional W&B API key. If provided, skips env var / netrc /
+            wandb.login() auth flow.
+        base_url: Optional W&B platform API URL (replaces WANDB_BASE_URL).
+            The trace server URL is derived from this if trace_server_url
+            is not provided.
+        trace_server_url: Optional trace server URL (replaces
+            WF_TRACE_SERVER_URL). If omitted, derived from base_url.
+    """
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
@@ -105,6 +112,9 @@ def init_weave(
         if (
             current_client.project == project_name
             and current_client.ensure_project_exists == ensure_project_exists
+            and api_key is None
+            and base_url is None
+            and trace_server_url is None
         ):
             return current_client
         else:
@@ -112,14 +122,26 @@ def init_weave(
             current_client.finish()
             weave_client_context.set_weave_client_global(None)
 
-    from weave.wandb_interface.context import get_wandb_api_context
+    # Set explicit base_url in context so downstream code (e.g. entity resolution
+    # via wandb.Api(), trace server URL derivation) uses it instead of env vars.
+    if base_url is not None:
+        env.set_wandb_base_url(base_url)
 
-    api_key = get_wandb_api_context()
     if api_key is None:
-        url = wandb.app_url(env.wandb_base_url())
-        logger.info("Please login to Weights & Biases (%s) to continue...", url)
-        wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
+        from weave.wandb_interface.context import get_wandb_api_context
+
         api_key = get_wandb_api_context()
+        if api_key is None:
+            url = wandb.app_url(env.wandb_base_url())
+            logger.info("Please login to Weights & Biases (%s) to continue...", url)
+            wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
+            api_key = get_wandb_api_context()
+    else:
+        # Set explicit api_key in context so downstream code (e.g. entity resolution
+        # via wandb.Api()) uses it instead of reading from env vars.
+        from weave.wandb_interface.context import set_wandb_api_context
+
+        set_wandb_api_context(api_key)
 
     # Resolve entity name after authentication is ensured
     entity_name, project_name = get_entity_project_from_project_name(project_name)
@@ -128,7 +150,7 @@ def init_weave(
         wandb_run_id = f"{entity_name}/{project_name}/{wb_run_context.run_id}"
         check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
-    remote_server = init_weave_get_server(api_key)
+    remote_server = init_weave_get_server(api_key, trace_server_url=trace_server_url)
     if not _weave_is_available(remote_server):
         raise RuntimeError(
             "Weave is not available on the server.  Please contact support."
@@ -173,13 +195,19 @@ def init_weave(
         # In the future, we may want to throw here.
         min_required_version = "0.0.0"
         trace_server_version = None
-    trace_server_url = env.weave_trace_server_url()
-    if not init_message.check_min_weave_version(min_required_version, trace_server_url):
+    effective_trace_server_url = (
+        trace_server_url
+        if trace_server_url is not None
+        else env.weave_trace_server_url()
+    )
+    if not init_message.check_min_weave_version(
+        min_required_version, effective_trace_server_url
+    ):
         return init_weave_disabled()
     if not init_message.check_min_trace_server_version(
         trace_server_version,
         MIN_TRACE_SERVER_VERSION,
-        trace_server_url,
+        effective_trace_server_url,
     ):
         return init_weave_disabled()
     init_message.print_init_message(
@@ -227,16 +255,22 @@ def init_weave_disabled() -> weave_client.WeaveClient:
 def init_weave_get_server(
     api_key: str | None = None,
     should_batch: bool = True,
+    trace_server_url: str | None = None,
 ) -> TraceServerClientInterface:
+    url = (
+        trace_server_url
+        if trace_server_url is not None
+        else env.weave_trace_server_url()
+    )
     res: TraceServerClientInterface
     if should_use_stainless_server():
         from weave.trace_server_bindings.stainless_remote_http_trace_server import (
             StainlessRemoteHTTPTraceServer,
         )
 
-        res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
+        res = StainlessRemoteHTTPTraceServer(url, should_batch)
     else:
-        res = RemoteHTTPTraceServer.from_env(should_batch)
+        res = RemoteHTTPTraceServer(url, should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res
