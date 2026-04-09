@@ -241,6 +241,12 @@ def init_weave_disabled() -> weave_client.WeaveClient:
     if current_client is not None:
         weave_client_context.set_weave_client_global(None)
 
+    # Clear explicit overrides to avoid stale state
+    env.set_wandb_base_url(None)
+    from weave.wandb_interface.context import set_wandb_api_context
+
+    set_wandb_api_context(None)
+
     client = weave_client.WeaveClient(
         "DISABLED",
         "DISABLED",
@@ -280,6 +286,13 @@ def finish() -> None:
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
         weave_client_context.set_weave_client_global(None)
+
+    # Clear explicit overrides so a subsequent weave.init() without params
+    # falls back to env vars / netrc as expected.
+    env.set_wandb_base_url(None)
+    from weave.wandb_interface.context import set_wandb_api_context
+
+    set_wandb_api_context(None)
 
     # Unregister the import hook
     from weave.integrations.patch import unregister_import_hook
