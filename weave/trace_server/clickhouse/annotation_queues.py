@@ -10,11 +10,11 @@ from collections.abc import Iterator
 from zoneinfo import ZoneInfo
 
 import ddtrace
-from weave.trace_server.clickhouse.protocol import CHInfraProtocol
 
 from weave.shared.trace_server_interface_util import assert_non_null_wb_user_id
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse.protocol import CHInfraProtocol
 from weave.trace_server.clickhouse.utilities import (
     ensure_datetimes_have_tz,
 )
