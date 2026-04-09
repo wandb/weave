@@ -15,6 +15,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     QueryBuilderDynamicField,
     QueryBuilderField,
 )
+from weave.trace_server.clickhouse.protocol import CHInfraProtocol
 from weave.trace_server.clickhouse.schema_converters import (
     ch_table_stats_to_table_stats_schema,
 )
@@ -33,7 +34,7 @@ from weave.trace_server.table_query_builder import (
 logger = logging.getLogger(__name__)
 
 
-class TablesMixin:
+class TablesMixin(CHInfraProtocol):
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
         for r in req.table.rows:
