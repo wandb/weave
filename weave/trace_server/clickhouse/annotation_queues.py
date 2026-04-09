@@ -4,13 +4,13 @@ This module extracts annotation queue CRUD operations and related
 queue-item / progress-update logic into a mixin class so that
 `ClickHouseTraceServer` can compose them without growing unboundedly.
 """
-# mypy: disable-error-code="attr-defined"
 
 import datetime
 from collections.abc import Iterator
 from zoneinfo import ZoneInfo
 
 import ddtrace
+from weave.trace_server.clickhouse.protocol import CHInfraProtocol
 
 from weave.shared.trace_server_interface_util import assert_non_null_wb_user_id
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
@@ -36,7 +36,7 @@ from weave.trace_server.query_builder.annotation_queues_query_builder import (
 )
 
 
-class AnnotationQueuesMixin:
+class AnnotationQueuesMixin(CHInfraProtocol):
     """Mixin providing annotation-queue operations for ClickHouseTraceServer.
 
     Relies on the following attributes / methods supplied by the host class
