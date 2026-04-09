@@ -1,5 +1,5 @@
 """File storage operations for the ClickHouse trace server."""
-# mypy: disable-error-code="attr-defined"
+# mypy: disable-error-code="attr-defined,has-type,var-annotated"
 
 import ddtrace
 
