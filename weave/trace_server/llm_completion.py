@@ -119,92 +119,88 @@ def completion_error_payload_from_exception(
             extra_fields=extra_fields,
         )
 
-    try:
-        import litellm
-    except ImportError:
-        litellm = None
+    import litellm
 
-    if litellm is not None:
-        if isinstance(exc, litellm.AuthenticationError):
-            return make_completion_error_payload(
-                getattr(exc, "message", str(exc)),
-                error_code=ErrorCode.COMPLETION_PROVIDER_AUTHENTICATION_ERROR,
-                error_category=COMPLETION_ERROR_CATEGORY_USER,
-                error_retryable=False,
-                error_provider=provider,
-                error_status_code=status_code,
-                extra_fields=extra_fields,
-            )
-        if isinstance(exc, litellm.BadRequestError):
-            return make_completion_error_payload(
-                getattr(exc, "message", str(exc)),
-                error_code=ErrorCode.COMPLETION_PROVIDER_BAD_REQUEST,
-                error_category=COMPLETION_ERROR_CATEGORY_USER,
-                error_retryable=False,
-                error_provider=provider,
-                error_status_code=status_code,
-                extra_fields=extra_fields,
-            )
-        if isinstance(exc, litellm.RateLimitError):
-            return make_completion_error_payload(
-                getattr(exc, "message", str(exc)),
-                error_code=ErrorCode.COMPLETION_PROVIDER_RATE_LIMIT,
-                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
-                error_retryable=True,
-                error_provider=provider,
-                error_status_code=status_code,
-                extra_fields=extra_fields,
-            )
-        if isinstance(exc, litellm.Timeout):
-            return make_completion_error_payload(
-                getattr(exc, "message", str(exc)),
-                error_code=ErrorCode.COMPLETION_PROVIDER_TIMEOUT,
-                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
-                error_retryable=True,
-                error_provider=provider,
-                error_status_code=status_code,
-                extra_fields=extra_fields,
-            )
-        if isinstance(exc, litellm.APIConnectionError):
-            return make_completion_error_payload(
-                getattr(exc, "message", str(exc)),
-                error_code=ErrorCode.COMPLETION_PROVIDER_CONNECTION_ERROR,
-                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
-                error_retryable=True,
-                error_provider=provider,
-                error_status_code=status_code,
-                extra_fields=extra_fields,
-            )
-        if isinstance(exc, litellm.ServiceUnavailableError):
-            return make_completion_error_payload(
-                getattr(exc, "message", str(exc)),
-                error_code=ErrorCode.COMPLETION_PROVIDER_UNAVAILABLE,
-                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
-                error_retryable=True,
-                error_provider=provider,
-                error_status_code=status_code,
-                extra_fields=extra_fields,
-            )
-        if isinstance(exc, litellm.InternalServerError):
-            return make_completion_error_payload(
-                getattr(exc, "message", str(exc)),
-                error_code=ErrorCode.COMPLETION_PROVIDER_INTERNAL_ERROR,
-                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
-                error_retryable=True,
-                error_provider=provider,
-                error_status_code=status_code,
-                extra_fields=extra_fields,
-            )
-        if isinstance(exc, litellm.APIError):
-            return make_completion_error_payload(
-                getattr(exc, "message", str(exc)),
-                error_code=ErrorCode.COMPLETION_PROVIDER_ERROR,
-                error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
-                error_retryable=bool(status_code is None or status_code >= 500),
-                error_provider=provider,
-                error_status_code=status_code,
-                extra_fields=extra_fields,
-            )
+    if isinstance(exc, litellm.AuthenticationError):
+        return make_completion_error_payload(
+            getattr(exc, "message", str(exc)),
+            error_code=ErrorCode.COMPLETION_PROVIDER_AUTHENTICATION_ERROR,
+            error_category=COMPLETION_ERROR_CATEGORY_USER,
+            error_retryable=False,
+            error_provider=provider,
+            error_status_code=status_code,
+            extra_fields=extra_fields,
+        )
+    if isinstance(exc, litellm.BadRequestError):
+        return make_completion_error_payload(
+            getattr(exc, "message", str(exc)),
+            error_code=ErrorCode.COMPLETION_PROVIDER_BAD_REQUEST,
+            error_category=COMPLETION_ERROR_CATEGORY_USER,
+            error_retryable=False,
+            error_provider=provider,
+            error_status_code=status_code,
+            extra_fields=extra_fields,
+        )
+    if isinstance(exc, litellm.RateLimitError):
+        return make_completion_error_payload(
+            getattr(exc, "message", str(exc)),
+            error_code=ErrorCode.COMPLETION_PROVIDER_RATE_LIMIT,
+            error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+            error_retryable=True,
+            error_provider=provider,
+            error_status_code=status_code,
+            extra_fields=extra_fields,
+        )
+    if isinstance(exc, litellm.Timeout):
+        return make_completion_error_payload(
+            getattr(exc, "message", str(exc)),
+            error_code=ErrorCode.COMPLETION_PROVIDER_TIMEOUT,
+            error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+            error_retryable=True,
+            error_provider=provider,
+            error_status_code=status_code,
+            extra_fields=extra_fields,
+        )
+    if isinstance(exc, litellm.APIConnectionError):
+        return make_completion_error_payload(
+            getattr(exc, "message", str(exc)),
+            error_code=ErrorCode.COMPLETION_PROVIDER_CONNECTION_ERROR,
+            error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+            error_retryable=True,
+            error_provider=provider,
+            error_status_code=status_code,
+            extra_fields=extra_fields,
+        )
+    if isinstance(exc, litellm.ServiceUnavailableError):
+        return make_completion_error_payload(
+            getattr(exc, "message", str(exc)),
+            error_code=ErrorCode.COMPLETION_PROVIDER_UNAVAILABLE,
+            error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+            error_retryable=True,
+            error_provider=provider,
+            error_status_code=status_code,
+            extra_fields=extra_fields,
+        )
+    if isinstance(exc, litellm.InternalServerError):
+        return make_completion_error_payload(
+            getattr(exc, "message", str(exc)),
+            error_code=ErrorCode.COMPLETION_PROVIDER_INTERNAL_ERROR,
+            error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+            error_retryable=True,
+            error_provider=provider,
+            error_status_code=status_code,
+            extra_fields=extra_fields,
+        )
+    if isinstance(exc, litellm.APIError):
+        return make_completion_error_payload(
+            getattr(exc, "message", str(exc)),
+            error_code=ErrorCode.COMPLETION_PROVIDER_ERROR,
+            error_category=COMPLETION_ERROR_CATEGORY_PROVIDER,
+            error_retryable=bool(status_code is None or status_code >= 500),
+            error_provider=provider,
+            error_status_code=status_code,
+            extra_fields=extra_fields,
+        )
 
     return make_completion_error_payload(
         str(exc),
