@@ -50,6 +50,8 @@ class LLMUsageSchema(TypedDict, total=False):
     output_tokens: int | None
     requests: int | None
     total_tokens: int | None
+    cache_creation_input_tokens: int | None
+    cache_read_input_tokens: int | None
 
 
 class LLMCostSchema(LLMUsageSchema, total=False):
@@ -2712,6 +2714,16 @@ class EvalResultsQueryBody(BaseModelStrict):
         description=(
             "Optional intersection behavior for the summary section. When null, "
             "the value of `require_intersection` is used."
+        ),
+    )
+    include_predict_and_score_children: bool = Field(
+        default=True,
+        description=(
+            "When true (default), fetch child calls (predict/score) of each "
+            "predict_and_score call to populate predict_call_id, scorer_call_ids, "
+            "and more precise latency/token data. When false, these fields are "
+            "derived from the predict_and_score call itself (predict_call_id and "
+            "scorer_call_ids will be null/empty)."
         ),
     )
     limit: int | None = Field(
