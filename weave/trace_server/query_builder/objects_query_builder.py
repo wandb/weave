@@ -274,10 +274,21 @@ class ObjectMetadataQueryBuilder:
                     HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
                 )"""
         if has_latest:
-            # Check both: explicit "latest" alias in DB, OR computed
-            # is_latest for legacy objects without an alias row.
+            # Check explicit "latest" alias in DB, OR computed is_latest
+            # only for legacy objects that don't have an explicit "latest"
+            # alias row.  Without the NOT IN guard the fallback would
+            # return two rows when explicit-latest diverges from
+            # computed is_latest (e.g. after re-publishing old content).
+            has_explicit_latest = f"""({t}.project_id, {t}.object_id) IN (
+                        SELECT project_id, object_id
+                        FROM aliases
+                        PREWHERE project_id = {{project_id: String}}
+                        WHERE alias = 'latest'
+                        GROUP BY project_id, object_id, alias
+                        HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+                    )"""
             self._conditions.append(f"""
-                (is_latest = 1 OR {alias_subquery})
+                ({alias_subquery} OR (is_latest = 1 AND NOT {has_explicit_latest}))
             """)
             self.parameters["filter_aliases"] = all_aliases
         else:

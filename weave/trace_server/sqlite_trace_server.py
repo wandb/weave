@@ -2026,8 +2026,17 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     + "))"
                 )
                 if has_latest:
-                    conds.append(f"(is_latest = 1 OR {alias_subquery})")
-                    parameters["filter_aliases"] = [req.project_id] + list(all_aliases)
+                    # Only fall back to is_latest for objects that don't
+                    # have an explicit "latest" alias row (legacy objects).
+                    has_explicit_latest = (
+                        "(project_id, object_id) IN "
+                        "(SELECT project_id, object_id FROM aliases "
+                        "WHERE project_id = ? AND alias = 'latest')"
+                    )
+                    conds.append(
+                        f"({alias_subquery} OR (is_latest = 1 AND NOT {has_explicit_latest}))"
+                    )
+                    parameters["filter_aliases"] = [req.project_id] + list(all_aliases) + [req.project_id]
                 else:
                     conds.append(alias_subquery)
                     parameters["filter_aliases"] = [req.project_id] + list(all_aliases)
