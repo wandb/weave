@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
+from threading import Lock
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import pydantic
@@ -175,6 +176,12 @@ if TYPE_CHECKING:
 ALLOW_MIXED_PROJECT_REFS = False
 
 logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class _InflightOpSave:
+    name: str
+    future: Future[ObjectRef]
 
 
 class NoInternalProjectIDError(Exception):
@@ -366,6 +373,8 @@ class WeaveClient:
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
+        self._inflight_op_saves_lock = Lock()
+        self._inflight_op_saves: dict[int, _InflightOpSave] = {}
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -2137,7 +2146,59 @@ class WeaveClient:
         if name is None:
             name = op.name
 
-        return self._save_object_basic(op, name)
+        name = sanitize_object_name(name)
+
+        def get_existing_ref() -> ObjectRef | None:
+            if (ref := get_ref(op)) is None:
+                return None
+            if ALLOW_MIXED_PROJECT_REFS:
+                return ref
+            if ref.project == self.project and ref.entity == self.entity:
+                return ref
+            remove_ref(op)
+            return None
+
+        if existing_ref := get_existing_ref():
+            return existing_ref
+
+        op_id = id(op)
+        created_future: Future[ObjectRef] | None = None
+        inflight_future: Future[ObjectRef]
+
+        with self._inflight_op_saves_lock:
+            if existing_ref := get_existing_ref():
+                return existing_ref
+
+            if inflight := self._inflight_op_saves.get(op_id):
+                if inflight.name != name:
+                    raise ValueError(
+                        f"Concurrent saves of op {op!r} used conflicting names: "
+                        f"{inflight.name!r} vs {name!r}"
+                    )
+                inflight_future = inflight.future
+            else:
+                inflight_future = Future()
+                self._inflight_op_saves[op_id] = _InflightOpSave(
+                    name=name, future=inflight_future
+                )
+                created_future = inflight_future
+
+        if created_future is None:
+            return inflight_future.result()
+
+        try:
+            ref = self._save_object_basic(op, name)
+        except Exception as exc:
+            created_future.set_exception(exc)
+            raise
+        else:
+            created_future.set_result(ref)
+            return ref
+        finally:
+            with self._inflight_op_saves_lock:
+                inflight = self._inflight_op_saves.get(op_id)
+                if inflight is not None and inflight.future is created_future:
+                    del self._inflight_op_saves[op_id]
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
         compute_digests = self._should_compute_client_digests()

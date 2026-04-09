@@ -5,10 +5,14 @@ as the SDK.  Ideally they would be placed next to the trace_server tests, but
 the client serialization requires a client object to serialize.
 """
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 import weave
 from weave.evaluation.eval import Evaluation
 from weave.flow.scorer import Scorer
 from weave.trace.object_record import pydantic_object_record
+from weave.trace.ref_util import remove_ref
 from weave.trace.serialization.serialize import to_json
 from weave.trace.weave_client import WeaveClient, map_to_refs
 from weave.trace_server import object_creation_utils
@@ -27,6 +31,45 @@ def test_helper_serializes_op_same_way_as_sdk(client: WeaveClient) -> None:
         sdk_val["files"][object_creation_utils.OP_SOURCE_FILE_NAME]
     )
     assert helper_val == sdk_val
+
+
+def test_concurrent_save_op_reuses_single_inflight_save(
+    client: WeaveClient, monkeypatch
+) -> None:
+    @weave.op
+    def test_op(x: int) -> int:
+        return x + 1
+
+    remove_ref(test_op)
+
+    save_call_count = 0
+    save_call_count_lock = threading.Lock()
+    release = threading.Event()
+    waiting = 0
+    waiting_lock = threading.Lock()
+    original_save_object_basic = WeaveClient._save_object_basic.__get__(
+        client, type(client)
+    )
+
+    def tracked_save_object_basic(val, name=None, branch="latest"):
+        nonlocal save_call_count, waiting
+        if val is test_op:
+            with save_call_count_lock:
+                save_call_count += 1
+            with waiting_lock:
+                waiting += 1
+                if waiting == 2:
+                    release.set()
+            release.wait(timeout=0.5)
+        return original_save_object_basic(val, name=name, branch=branch)
+
+    monkeypatch.setattr(client, "_save_object_basic", tracked_save_object_basic)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        refs = list(executor.map(lambda _: client._save_op(test_op), range(4)))
+
+    assert save_call_count == 1
+    assert [ref.uri for ref in refs] == [refs[0].uri] * 4
 
 
 def test_helper_serializes_dataset_same_way_as_sdk(client: WeaveClient) -> None:
