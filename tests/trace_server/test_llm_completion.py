@@ -349,7 +349,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         ]
 
         with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock the litellm completion stream
             mock_stream = MagicMock()
@@ -385,7 +385,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         class StreamingException(Exception): ...
 
         with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock litellm to raise an exception
             mock_litellm.side_effect = StreamingException("Test error")
@@ -441,7 +441,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
         with (
             patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+                "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(
                 chts.ClickHouseTraceServer, "_insert_call_complete"
@@ -521,7 +521,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
         with (
             patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+                "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         ):
@@ -611,7 +611,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
     def test_missing_api_key(self):
         """Test handling of missing API key in streaming completion."""
         with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock litellm to raise MissingLLMApiKeyError
             mock_litellm.side_effect = MissingLLMApiKeyError(
@@ -803,7 +803,7 @@ class TestStreamingWithPrompts(unittest.TestCase):
 
         with (
             patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+                "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         ):
@@ -901,7 +901,7 @@ class TestStreamingWithPrompts(unittest.TestCase):
 
         with (
             patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+                "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         ):
@@ -1370,7 +1370,7 @@ def test_completions_write_target_routing(
 
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion"
         ) as mock_litellm,
         patch.object(
             completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
@@ -1426,7 +1426,7 @@ def test_completions_handles_error_response(
 
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion"
         ) as mock_litellm,
         patch.object(
             completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
@@ -1468,7 +1468,7 @@ def test_completions_usage_captured_in_summary(
     """Verify usage data is properly captured in summary for calls_complete."""
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion"
         ) as mock_litellm,
         patch.object(
             completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
@@ -1558,7 +1558,7 @@ def test_streaming_completions_write_target_routing(
 
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(
             completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
@@ -1643,7 +1643,7 @@ def test_streaming_completions_error_routes_correctly(
 
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(
             completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
