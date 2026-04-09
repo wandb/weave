@@ -47,6 +47,9 @@ def init(
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    trace_server_url: str | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -109,6 +112,16 @@ def init(
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
+        api_key: Optional W&B API key. If provided, skips all environment-based
+            authentication (WANDB_API_KEY, ~/.netrc, wandb.login()). The key is also
+            used for entity resolution, so no environment variables are needed.
+        base_url: Optional W&B platform API URL (replaces WANDB_BASE_URL). Used for
+            entity resolution and authentication. If not provided, the trace server URL
+            is derived from this automatically. Example: "https://api.wandb.ai".
+        trace_server_url: Optional trace server URL (replaces WF_TRACE_SERVER_URL).
+            Where trace data is sent. If omitted, derived from base_url. Only needed
+            when the trace server is on a different host than the platform API.
+            Example: "https://trace.wandb.ai".
 
     NOTE: Global postprocessing settings are applied to all ops after each op's own
     postprocessing.  The order is always:
@@ -152,6 +165,9 @@ def init(
 
     return weave_init.init_weave(
         project_name,
+        api_key=api_key,
+        base_url=base_url,
+        trace_server_url=trace_server_url,
     )
 
 
