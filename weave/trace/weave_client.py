@@ -179,7 +179,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
-class _InflightOpSave:
+class InflightOpSave:
     name: str
     future: Future[ObjectRef]
 
@@ -374,7 +374,7 @@ class WeaveClient:
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
         self._inflight_op_saves_lock = Lock()
-        self._inflight_op_saves: dict[int, _InflightOpSave] = {}
+        self._inflight_op_saves: dict[int, InflightOpSave] = {}
 
         if ensure_project_exists:
             resp = self.server.ensure_project_exists(entity, project)
@@ -2147,18 +2147,7 @@ class WeaveClient:
             name = op.name
 
         name = sanitize_object_name(name)
-
-        def get_existing_ref() -> ObjectRef | None:
-            if (ref := get_ref(op)) is None:
-                return None
-            if ALLOW_MIXED_PROJECT_REFS:
-                return ref
-            if ref.project == self.project and ref.entity == self.entity:
-                return ref
-            remove_ref(op)
-            return None
-
-        if existing_ref := get_existing_ref():
+        if existing_ref := self._get_existing_op_ref(op):
             return existing_ref
 
         op_id = id(op)
@@ -2166,7 +2155,7 @@ class WeaveClient:
         inflight_future: Future[ObjectRef]
 
         with self._inflight_op_saves_lock:
-            if existing_ref := get_existing_ref():
+            if existing_ref := self._get_existing_op_ref(op):
                 return existing_ref
 
             if inflight := self._inflight_op_saves.get(op_id):
@@ -2178,7 +2167,9 @@ class WeaveClient:
                 inflight_future = inflight.future
             else:
                 inflight_future = Future()
-                self._inflight_op_saves[op_id] = _InflightOpSave(
+                # Only one thread should perform the actual save for a shared
+                # Op object. Other threads join this future and reuse the ref.
+                self._inflight_op_saves[op_id] = InflightOpSave(
                     name=name, future=inflight_future
                 )
                 created_future = inflight_future
@@ -2199,6 +2190,17 @@ class WeaveClient:
                 inflight = self._inflight_op_saves.get(op_id)
                 if inflight is not None and inflight.future is created_future:
                     del self._inflight_op_saves[op_id]
+
+    def _get_existing_op_ref(self, op: Op) -> ObjectRef | None:
+        """Return the current-project ref for an op, clearing stale refs."""
+        if (ref := get_ref(op)) is None:
+            return None
+        if ALLOW_MIXED_PROJECT_REFS:
+            return ref
+        if ref.project == self.project and ref.entity == self.entity:
+            return ref
+        remove_ref(op)
+        return None
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
         compute_digests = self._should_compute_client_digests()

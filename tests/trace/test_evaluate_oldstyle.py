@@ -102,7 +102,6 @@ def test_evaluate_rows_only(client):
     assert result == expected_eval_result
 
 
-@pytest.mark.flaky(reruns=3)
 def test_evaluate_both_styles(client):
     client.set_autoflush(False)
     evaluation = Evaluation(
