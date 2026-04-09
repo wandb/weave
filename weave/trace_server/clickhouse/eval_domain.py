@@ -3,6 +3,7 @@
 
 import datetime
 from collections.abc import Iterator
+from typing import cast
 
 from weave.shared import refs_internal as ri
 from weave.trace_server import (
@@ -1530,7 +1531,9 @@ class EvalDomainMixin:
         all_calls = list(
             self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
         )
-        return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
+        return eval_helpers.eval_results_query(
+            cast(tsi.TraceServerInterface, self), req, eval_root_ids, all_calls
+        )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         if self._evaluate_model_dispatcher is None:
@@ -1553,7 +1556,7 @@ class EvalDomainMixin:
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
-        return evaluation_status(self, req)
+        return evaluation_status(cast(tsi.TraceServerInterface, self), req)
 
     def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
         """Enqueue scoring jobs for a list of calls.
