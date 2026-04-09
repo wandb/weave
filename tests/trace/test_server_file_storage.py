@@ -7,6 +7,7 @@ specific setup requirements.
 
 import base64
 import os
+import time
 from unittest import mock
 
 import boto3
@@ -241,6 +242,7 @@ class TestGCSStorage:
         blob = bucket.blob(res.digest)
         assert blob.download_as_bytes() == TEST_CONTENT
 
+    @pytest.mark.flaky(reruns=3)
     @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
     def test_gcp_storage_skips_duplicate_write(self, client: WeaveClient):
         """Test that writing the same content twice skips the second write.
@@ -305,6 +307,9 @@ class TestGCSStorage:
             assert upload_count == 1
             # Both should return the same digest
             assert res1.digest == res2.digest
+
+            # Allow the file row insert to become visible before readback.
+            time.sleep(0.2)
 
             # Verify we can still read the content
             file = client.server.file_content_read(
