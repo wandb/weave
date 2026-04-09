@@ -12,7 +12,6 @@ from contextlib import contextmanager
 from functools import partial
 from re import sub
 from typing import Any, TypeVar, cast
-from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
@@ -77,6 +76,7 @@ from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
 from weave.trace_server.clickhouse.annotation_queues import AnnotationQueuesMixin
+from weave.trace_server.clickhouse.costs import CostsMixin
 from weave.trace_server.clickhouse.file_operations import FileOperationsMixin
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_dict_to_call_schema_dict,
@@ -185,7 +185,7 @@ from weave.trace_server.model_providers.model_providers import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
@@ -209,10 +209,7 @@ from weave.trace_server.query_builder.project_query_builder import (
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
-    LLM_TOKEN_PRICES_TABLE,
-    build_model_prices_query,
     get_cost_result_columns,
-    validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
     DynamicBatchProcessor,
@@ -277,6 +274,7 @@ _CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
 class ClickHouseTraceServer(
     AnnotationQueuesMixin,
     FileOperationsMixin,
+    CostsMixin,
     TablesMixin,
     tsi.FullTraceServerInterface,
 ):
@@ -1036,84 +1034,6 @@ class ClickHouseTraceServer(
             count=res_dict.get("count", 0),
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
-
-    def _get_prices_for_models(
-        self, models: set[str], project_id: str
-    ) -> dict[str, dict[str, float]]:
-        """Query llm_token_prices for the given models and return best prices.
-
-        Returns a dict mapping model -> {prompt_token_cost, completion_token_cost}.
-        Uses pricing level priority: project > default, newest effective_date.
-        """
-        if not models:
-            return {}
-
-        try:
-            sql, params = build_model_prices_query(project_id, list(models))
-            settings = None
-            if self.use_distributed_mode:
-                # Use patched settings for distributed bug (more info in ch_settings)
-                settings = ch_settings.CLICKHOUSE_DISTRIBUTED_COST_QUERY_SETTINGS
-            result = self._query(sql, params, settings=settings)
-        except Exception:
-            # If price query fails, return empty prices (costs will be 0)
-            return {}
-
-        prices: dict[str, dict[str, float]] = {}
-        for row in result.result_rows:
-            llm_id, prompt_cost, completion_cost = row
-            prices[llm_id] = {
-                "prompt_token_cost": float(prompt_cost) if prompt_cost else 0.0,
-                "completion_token_cost": float(completion_cost)
-                if completion_cost
-                else 0.0,
-            }
-        return prices
-
-    def _compute_costs_for_buckets(
-        self,
-        usage_buckets: list[dict[str, Any]],
-        project_id: str,
-        requested_cost_metrics: set[str],
-    ) -> None:
-        """Compute cost metrics for usage buckets by multiplying tokens by prices.
-
-        Args:
-            usage_buckets: Buckets with token counts (modified in place).
-            project_id: Project ID for pricing lookup.
-            requested_cost_metrics: Set of cost metrics to compute (input_cost, output_cost, total_cost).
-        """
-        if not requested_cost_metrics or not usage_buckets:
-            return
-
-        # Get unique models from buckets
-        models = {b.get("model", "") for b in usage_buckets if b.get("model")}
-
-        # Query prices for those models
-        prices = self._get_prices_for_models(models, project_id)
-
-        # Compute costs for each bucket
-        for bucket in usage_buckets:
-            model = bucket.get("model", "")
-            model_prices = prices.get(model, {})
-            prompt_cost = model_prices.get("prompt_token_cost", 0.0)
-            completion_cost = model_prices.get("completion_token_cost", 0.0)
-
-            input_tokens = bucket.get("sum_input_tokens", 0) or 0
-            output_tokens = bucket.get("sum_output_tokens", 0) or 0
-
-            if "input_cost" in requested_cost_metrics:
-                bucket["sum_input_cost"] = input_tokens * prompt_cost
-
-            if "output_cost" in requested_cost_metrics:
-                bucket["sum_output_cost"] = output_tokens * completion_cost
-
-            if "total_cost" in requested_cost_metrics:
-                input_cost = bucket.get("sum_input_cost", input_tokens * prompt_cost)
-                output_cost = bucket.get(
-                    "sum_output_cost", output_tokens * completion_cost
-                )
-                bucket["sum_total_cost"] = input_cost + output_cost
 
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
         """Return call statistics grouped by bucket with requested aggregations.
@@ -4509,104 +4429,6 @@ class ClickHouseTraceServer(
                     )
 
         return [r.val for r in extra_results]
-
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        assert_non_null_wb_user_id(req)
-        created_at = datetime.datetime.now(ZoneInfo("UTC"))
-
-        costs = []
-        for llm_id, cost in req.costs.items():
-            cost_id = generate_id()
-
-            row: Row = {
-                "id": cost_id,
-                "created_by": req.wb_user_id,
-                "created_at": created_at,
-                "pricing_level": "project",
-                "pricing_level_id": req.project_id,
-                "provider_id": cost.provider_id if cost.provider_id else "default",
-                "llm_id": llm_id,
-                "effective_date": (
-                    cost.effective_date if cost.effective_date else created_at
-                ),
-                "prompt_token_cost": cost.prompt_token_cost,
-                "completion_token_cost": cost.completion_token_cost,
-                "prompt_token_cost_unit": cost.prompt_token_cost_unit,
-                "completion_token_cost_unit": cost.completion_token_cost_unit,
-            }
-
-            costs.append((cost_id, llm_id))
-
-            prepared = LLM_TOKEN_PRICES_TABLE.insert(row).prepare(
-                database_type="clickhouse"
-            )
-            self._insert(
-                LLM_TOKEN_PRICES_TABLE.name, prepared.data, prepared.column_names
-            )
-
-        return tsi.CostCreateRes(ids=costs)
-
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        expr = {
-            "$and": [
-                (
-                    req.query.expr_
-                    if req.query
-                    else {
-                        "$eq": [
-                            {"$getField": "pricing_level_id"},
-                            {"$literal": req.project_id},
-                        ],
-                    }
-                ),
-                {
-                    "$eq": [
-                        {"$getField": "pricing_level"},
-                        {"$literal": "project"},
-                    ],
-                },
-            ]
-        }
-        query_with_pricing_level = tsi.Query(**{"$expr": expr})
-        query = LLM_TOKEN_PRICES_TABLE.select()
-        query = query.fields(req.fields)
-        query = query.where(query_with_pricing_level)
-        query = query.order_by(req.sort_by)
-        query = query.limit(req.limit).offset(req.offset)
-        prepared = query.prepare(database_type="clickhouse")
-        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
-        results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
-            query_result.result_rows, prepared.fields
-        )
-        return tsi.CostQueryRes(results=results)
-
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        validate_cost_purge_req(req)
-
-        expr = {
-            "$and": [
-                req.query.expr_,
-                {
-                    "$eq": [
-                        {"$getField": "pricing_level_id"},
-                        {"$literal": req.project_id},
-                    ],
-                },
-                {
-                    "$eq": [
-                        {"$getField": "pricing_level"},
-                        {"$literal": "project"},
-                    ],
-                },
-            ]
-        }
-        query_with_pricing_level = tsi.Query(**{"$expr": expr})
-
-        query = LLM_TOKEN_PRICES_TABLE.purge()
-        query = query.where(query_with_pricing_level)
-        prepared = query.prepare(database_type="clickhouse")
-        self.ch_client.query(prepared.sql, prepared.parameters)
-        return tsi.CostPurgeRes()
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
