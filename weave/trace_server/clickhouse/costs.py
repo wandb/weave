@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from weave.shared.trace_server_interface_util import assert_non_null_wb_user_id
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse.protocol import CHInfraProtocol
 from weave.trace_server.ids import generate_id
 from weave.trace_server.orm import Row
 from weave.trace_server.token_costs import (
@@ -16,7 +17,7 @@ from weave.trace_server.token_costs import (
 )
 
 
-class CostsMixin:
+class CostsMixin(CHInfraProtocol):
     # ------------------------------------------------------------------
     # Cost computation helpers (used by call_stats in main file)
     # ------------------------------------------------------------------
