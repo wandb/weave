@@ -343,7 +343,8 @@ class TestAzureStorage:
         mock_blob_client.download_blob.side_effect = mock_download_blob
 
         with mock.patch(
-            "azure.storage.blob.BlobServiceClient", return_value=mock_service_client
+            "weave.trace_server.file_storage.BlobServiceClient",
+            return_value=mock_service_client,
         ) as mock_cls:
             mock_cls.from_connection_string.return_value = mock_service_client
             yield mock_service_client
