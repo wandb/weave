@@ -1,5 +1,6 @@
 """File storage operations for the ClickHouse trace server."""
-# mypy: disable-error-code="attr-defined"
+
+from typing import Protocol
 
 import ddtrace
 
@@ -30,7 +31,23 @@ from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.orm import ParamBuilder
 
 
-class FileOperationsMixin(CHInfraProtocol):
+class CHFileInfraProtocol(CHInfraProtocol, Protocol):
+    """Extends CHInfraProtocol with file-storage-specific attributes."""
+
+    @property
+    def _file_batch(self) -> list[FileChunkCreateCHInsertable]: ...
+
+    @_file_batch.setter
+    def _file_batch(self, value: list[FileChunkCreateCHInsertable]) -> None: ...
+
+    @property
+    def _flush_immediately(self) -> bool: ...
+
+    @property
+    def file_storage_client(self) -> FileStorageClient | None: ...
+
+
+class FileOperationsMixin(CHFileInfraProtocol):
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = compute_file_digest(req.content)
         validate_expected_digest(
