@@ -2416,7 +2416,6 @@ def test_maybe_convert_skips_non_datetime_string_field() -> None:
     ]
     ops = _maybe_convert_datetime_operands(original)
     assert ops == original
-    assert ops[1].literal_ == "2024-03-01"
 
 
 def test_maybe_convert_skips_unparseable_string() -> None:

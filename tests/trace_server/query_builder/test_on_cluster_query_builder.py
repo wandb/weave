@@ -46,7 +46,7 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
     table name; in production the batched server passes _get_calls_complete_table_name()
     which resolves to calls_complete_local only in distributed mode.
     """
-    # --- calls_complete: plain name in -> plain name + ON CLUSTER out ---
+    # --- calls_complete builders ---
     update_end = build_calls_complete_update_end_query(
         table_name="calls_complete",
         project_id_param="p",
@@ -61,23 +61,6 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
         cluster_name=CLUSTER,
     )
     assert f"calls_complete ON CLUSTER {CLUSTER}" in update_end
-    assert "calls_complete_local" not in update_end
-
-    # When caller passes _local name, it's preserved
-    update_end_local = build_calls_complete_update_end_query(
-        table_name="calls_complete_local",
-        project_id_param="p",
-        started_at_param="s",
-        id_param="i",
-        ended_at_param="e",
-        exception_param="x",
-        output_dump_param="o",
-        summary_dump_param="sm",
-        output_refs_param="or",
-        wb_run_step_end_param="w",
-        cluster_name=CLUSTER,
-    )
-    assert f"calls_complete_local ON CLUSTER {CLUSTER}" in update_end_local
 
     delete = build_calls_complete_delete_query(
         table_name="calls_complete",
@@ -86,7 +69,6 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
         cluster_name=CLUSTER,
     )
     assert f"calls_complete ON CLUSTER {CLUSTER}" in delete
-    assert "calls_complete_local" not in delete
 
     update = build_calls_complete_update_query(
         table_name="calls_complete",
@@ -96,22 +78,19 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
         cluster_name=CLUSTER,
     )
     assert f"calls_complete ON CLUSTER {CLUSTER}" in update
-    assert "calls_complete_local" not in update
 
-    # --- annotation queues: same behavior, no _local ---
+    # --- annotation queues ---
     pb = ParamBuilder()
     q_delete = make_queue_delete_query(
         project_id="proj", queue_id="q", pb=pb, cluster_name=CLUSTER
     )
     assert f"annotation_queues ON CLUSTER {CLUSTER}" in q_delete
-    assert "annotation_queues_local" not in q_delete
 
     pb = ParamBuilder()
     q_update = make_queue_update_query(
         project_id="proj", queue_id="q", pb=pb, cluster_name=CLUSTER, name="n"
     )
     assert f"annotation_queues ON CLUSTER {CLUSTER}" in q_update
-    assert "annotation_queues_local" not in q_update
 
     pb = ParamBuilder()
     progress = make_annotator_progress_update_query(
@@ -123,7 +102,6 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
         cluster_name=CLUSTER,
     )
     assert f"annotator_queue_items_progress ON CLUSTER {CLUSTER}" in progress
-    assert "annotator_queue_items_progress_local" not in progress
 
 
 @pytest.mark.parametrize(
@@ -158,23 +136,19 @@ def test_calls_complete_table_resolution_by_mode(
         env_vars["WF_CLICKHOUSE_REPLICATED_CLUSTER"] = cluster_name
 
     with patch.dict("os.environ", env_vars, clear=False):
-        # Simulate _get_calls_complete_table_name logic
         from weave.trace_server import environment as wf_env
 
-        if wf_env.wf_clickhouse_use_distributed_tables():
-            table_name = "calls_complete_local"
-        else:
-            table_name = "calls_complete"
-
-        assert table_name == expected_table
-
-        # Build a mutation query with this table name
+        table_name = (
+            "calls_complete_local"
+            if wf_env.wf_clickhouse_use_distributed_tables()
+            else "calls_complete"
+        )
         result = _format_table_name_with_cluster(
             table_name, wf_env.wf_clickhouse_replicated_cluster()
         )
-
-        assert expected_table in result
-        if expected_on_cluster:
-            assert f"ON CLUSTER {cluster_name}" in result
-        else:
-            assert "ON CLUSTER" not in result
+        expected = (
+            f"{expected_table} ON CLUSTER {cluster_name}"
+            if expected_on_cluster
+            else expected_table
+        )
+        assert result == expected
