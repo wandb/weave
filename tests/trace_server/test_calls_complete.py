@@ -1828,7 +1828,6 @@ def test_feedback_filter_does_not_duplicate_calls_complete(
     project_id = f"{TEST_ENTITY}/calls_complete_feedback_dedup"
     internal_project_id = b64(project_id)
 
-    # Insert a call directly into calls_complete (bypasses routing)
     call_id = _insert_complete_call(
         clickhouse_trace_server.ch_client, internal_project_id
     )
