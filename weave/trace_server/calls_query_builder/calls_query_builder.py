@@ -2799,14 +2799,22 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
     )
 
 
-def _format_table_name_with_cluster(table_name: str, cluster_name: str | None) -> str:
+def _format_table_name_with_cluster(
+    table_name: str,
+    cluster_name: str | None,
+    *,
+    is_distributed: bool = False,
+) -> str:
     """Format a table name with ON CLUSTER clause if cluster_name is provided.
 
     In distributed mode, mutations (UPDATE, DELETE, etc.) must target the local
     table with the ON CLUSTER clause to execute across all cluster nodes.
+    Only distributed tables have a corresponding _local table; non-distributed
+    tables (e.g. annotation_queues) get ON CLUSTER without the _local suffix.
     """
     if cluster_name:
-        return f"{table_name}{LOCAL_TABLE_SUFFIX} ON CLUSTER {cluster_name}"
+        target = f"{table_name}{LOCAL_TABLE_SUFFIX}" if is_distributed else table_name
+        return f"{target} ON CLUSTER {cluster_name}"
     return table_name
 
 
@@ -2865,7 +2873,9 @@ def build_calls_complete_update_end_query(
     where_clause = " AND ".join(where_clauses)
 
     # Format table name with ON CLUSTER if cluster_name is provided
-    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+    formatted_table = _format_table_name_with_cluster(
+        table_name, cluster_name, is_distributed=True
+    )
 
     # Use fromUnixTimestamp64Micro to convert Int64 microseconds to DateTime64(6)
     # This preserves full microsecond precision that would be lost with datetime params
@@ -2890,7 +2900,9 @@ def build_calls_complete_delete_query(
     cluster_name: str | None = None,
 ) -> str:
     """Build the calls_complete DELETE query for call end data."""
-    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+    formatted_table = _format_table_name_with_cluster(
+        table_name, cluster_name, is_distributed=True
+    )
     raw_sql = f"""
         DELETE FROM {formatted_table}
         WHERE project_id = {{{project_id_param}:String}} AND id IN {{{call_ids_param}:Array(String)}}
@@ -2906,7 +2918,9 @@ def build_calls_complete_update_query(
     cluster_name: str | None = None,
 ) -> str:
     """Build the calls_complete UPDATE query for call end data."""
-    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+    formatted_table = _format_table_name_with_cluster(
+        table_name, cluster_name, is_distributed=True
+    )
     raw_sql = f"""
         UPDATE {formatted_table}
         SET display_name = {{{display_name_param}:String}}
