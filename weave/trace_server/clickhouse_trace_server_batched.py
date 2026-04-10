@@ -55,6 +55,35 @@ from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
+
+# GenAI / Agent observability imports
+from weave.trace_server.agent_clickhouse import AgentQueryHandler, AgentWriteHandler
+from weave.trace_server.agent_types import (
+    AgentConversationChatReq,
+    AgentConversationChatRes,
+    AgentConversationsQueryReq,
+    AgentConversationsQueryRes,
+    AgentConversationStatsReq,
+    AgentConversationStatsRes,
+    AgentMetricsReq,
+    AgentMetricsRes,
+    AgentSearchReq,
+    AgentSearchRes,
+    AgentSpansQueryReq,
+    AgentSpansQueryRes,
+    AgentSpansTraceReq,
+    AgentSpansTraceRes,
+    AgentsQueryReq,
+    AgentsQueryRes,
+    AgentTraceChatReq,
+    AgentTraceChatRes,
+    AgentTracesQueryReq,
+    AgentTracesQueryRes,
+    AgentTurnStatsReq,
+    AgentTurnStatsRes,
+    AgentVersionsQueryReq,
+    AgentVersionsQueryRes,
+)
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
@@ -6398,6 +6427,50 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self.kafka_producer.produce_score_calls(req)
 
         return tsi.CallsScoreRes()
+
+    # ---- GenAI / Agent Observability ------------------------------------
+
+    def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
+        return AgentQueryHandler(self.ch_client).spans_query(req)
+
+    def agent_spans_trace(self, req: AgentSpansTraceReq) -> AgentSpansTraceRes:
+        return AgentQueryHandler(self.ch_client).spans_trace(req)
+
+    def agent_traces_query(self, req: AgentTracesQueryReq) -> AgentTracesQueryRes:
+        return AgentQueryHandler(self.ch_client).traces_query(req)
+
+    def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
+        return AgentQueryHandler(self.ch_client).agents_query(req)
+
+    def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
+        return AgentQueryHandler(self.ch_client).agent_versions_query(req)
+
+    def agent_conversations_query(
+        self, req: AgentConversationsQueryReq
+    ) -> AgentConversationsQueryRes:
+        return AgentQueryHandler(self.ch_client).conversations_query(req)
+
+    def agent_turn_stats(self, req: AgentTurnStatsReq) -> AgentTurnStatsRes:
+        return AgentQueryHandler(self.ch_client).turn_stats(req)
+
+    def agent_conversation_stats(
+        self, req: AgentConversationStatsReq
+    ) -> AgentConversationStatsRes:
+        return AgentQueryHandler(self.ch_client).conversation_stats(req)
+
+    def agent_metrics(self, req: AgentMetricsReq) -> AgentMetricsRes:
+        return AgentQueryHandler(self.ch_client).agent_metrics(req)
+
+    def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
+        return AgentQueryHandler(self.ch_client).search(req)
+
+    def agent_traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
+        return AgentWriteHandler(self.ch_client).traces_chat(req)
+
+    def agent_conversation_chat(
+        self, req: AgentConversationChatReq
+    ) -> AgentConversationChatRes:
+        return AgentWriteHandler(self.ch_client).conversation_chat(req)
 
     # Private Methods
     @property
