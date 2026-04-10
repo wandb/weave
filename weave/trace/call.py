@@ -80,7 +80,7 @@ class Call:
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
-    _base_url: str | None = None
+    _base_url: str | None = dataclasses.field(default=None, compare=False, repr=False)
 
     # Size of metadata storage for this call
     storage_size_bytes: int | None = None
