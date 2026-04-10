@@ -153,7 +153,7 @@ def resolve_eval_field_to_sql(
         return "row_digest", {"inputs_dump"}
 
     if field_path.startswith("inputs."):
-        remaining = field_path[len("inputs."):]
+        remaining = field_path[len("inputs.") :]
         parts = split_escaped_field_path(remaining)
         path = _string_param(pb, quote_json_path_parts(parts))
         inner = f"nullIf(JSON_VALUE(resolved_inputs, {path}), 'null')"
@@ -161,7 +161,7 @@ def resolve_eval_field_to_sql(
         return f"any({inner})", {"inputs_dump"}
 
     if field_path.startswith("outputs."):
-        remaining = field_path[len("outputs."):]
+        remaining = field_path[len("outputs.") :]
         parts = ["output"] + split_escaped_field_path(remaining)
         path = _string_param(pb, quote_json_path_parts(parts))
         inner = f"nullIf(JSON_VALUE(output_dump, {path}), 'null')"
@@ -169,7 +169,7 @@ def resolve_eval_field_to_sql(
         return f"any({inner})", {"output_dump"}
 
     if field_path.startswith("scores."):
-        remaining = field_path[len("scores."):]
+        remaining = field_path[len("scores.") :]
         parts = ["scores"] + split_escaped_field_path(remaining)
         path = _string_param(pb, quote_json_path_parts(parts))
         inner = f"nullIf(JSON_VALUE(output_dump, {path}), 'null')"
@@ -283,7 +283,9 @@ def build_ranked_digests_cte(
     page_digests: paginated slice derived from ranked_digests.
     """
     sort_expr = build_sort_expression(sort_by, eval_root_ids, pb)
-    having_clause = _build_having_clause(eval_root_ids, filters, require_intersection, pb)
+    having_clause = _build_having_clause(
+        eval_root_ids, filters, require_intersection, pb
+    )
 
     pagination = ""
     if limit is not None:
