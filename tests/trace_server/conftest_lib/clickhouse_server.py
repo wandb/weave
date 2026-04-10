@@ -89,86 +89,6 @@ def ensure_clickhouse_db_container_running(host: str, port: int) -> Callable[[],
     return cleanup
 
 
-def ensure_clickhouse_db_keeper_container_running(
-    host: str, port: int
-) -> Callable[[], None]:
-    """Start a ClickHouse container with embedded Keeper for replicated-mode tests.
-
-    Uses the same clickhouse_keeper_config.xml as the migrator functional tests
-    to enable Keeper, cluster definitions, and macros needed for ReplicatedMergeTree.
-    """
-    server_up = check_server_up(host, port, 1)
-    started_container = None
-
-    if not server_up:
-        container_name = "weave-python-test-clickhouse-keeper"
-
-        subprocess.run(
-            ["docker", "stop", container_name], capture_output=True, check=False
-        )
-        subprocess.run(
-            ["docker", "rm", container_name], capture_output=True, check=False
-        )
-
-        # Resolve the keeper config path relative to this file
-        config_path = os.path.join(
-            os.path.dirname(__file__), "clickhouse_keeper_config.xml"
-        )
-
-        process = subprocess.Popen(
-            [
-                "docker",
-                "run",
-                "-d",
-                "--rm",
-                "-e",
-                "CLICKHOUSE_DB=default",
-                "-e",
-                "CLICKHOUSE_USER=default",
-                "-e",
-                "CLICKHOUSE_PASSWORD=",
-                "-e",
-                "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
-                "-p",
-                f"{port}:8123",
-                "-v",
-                f"{config_path}:/etc/clickhouse-server/config.d/keeper.xml",
-                "--name",
-                container_name,
-                "--ulimit",
-                "nofile=262144:262144",
-                "clickhouse/clickhouse-server:25.11.2.24",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        stdout, stderr = process.communicate()
-        if process.returncode != 0:
-            pytest.fail(
-                f"Failed to start ClickHouse Keeper container: {stderr.decode()}"
-            )
-
-        started_container = container_name
-
-        server_up = check_server_up(host, port)
-        if not server_up:
-            subprocess.run(
-                ["docker", "stop", container_name], capture_output=True, check=False
-            )
-            pytest.fail(
-                f"ClickHouse Keeper server failed to become healthy on {host}:{port}"
-            )
-
-    def cleanup():
-        if started_container:
-            subprocess.run(
-                ["docker", "stop", started_container], capture_output=True, check=False
-            )
-
-    return cleanup
-
-
 def ensure_clickhouse_db_process_running(host: str, port: int) -> Callable[[], None]:
     """ClickHouse server fixture that automatically starts a server process if one isn't already running.
 
@@ -267,15 +187,7 @@ def ensure_clickhouse_db(
         if os.environ.get("CI"):
             yield host, port
             return
-        use_replicated = request.config.getoption(
-            "--clickhouse-replicated", default=False
-        )
-        if use_replicated:
-            cleanup = ensure_clickhouse_db_keeper_container_running(
-                host=host,
-                port=port,
-            )
-        elif request.config.getoption("--clickhouse-process") == "true":
+        if request.config.getoption("--clickhouse-process") == "true":
             cleanup = ensure_clickhouse_db_process_running(
                 host=host,
                 port=port,
