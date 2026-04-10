@@ -287,8 +287,8 @@ def test_init_weave_reuse_and_reinit(mock_wandb_api):
 
 
 def test_init_weave_env_fallback_paths(mock_wandb_api, monkeypatch):
-    """When api_key is omitted it reads from env; when base_url is omitted it
-    eagerly resolves from WANDB_BASE_URL.
+    """When api_key is omitted it reads from env; base_url stays None
+    (env default is used at point of use by URL helpers).
     """
     mock_wandb_api.default_entity_name.return_value = "test-entity"
     mock_server = _make_mock_server()
@@ -306,7 +306,9 @@ def test_init_weave_env_fallback_paths(mock_wandb_api, monkeypatch):
         client = weave_init.init_weave("test-project")
         mock_ctx.assert_called_once()
         assert client._api_key == "env-key"
-        assert client._base_url == "https://env.example.com"
+        # base_url is None when not explicitly provided; env default is
+        # resolved at point of use by URL helpers.
+        assert client._base_url is None
         client.finish()
 
 
@@ -513,18 +515,18 @@ def test_api_eager_credential_resolution(monkeypatch):
     assert api_default._base_url == "https://env.example.com"
 
 
-def test_client_resolves_env_key_for_completions_and_models(monkeypatch):
-    """WeaveClient eagerly resolves api_key from env so Completions and
-    InferenceModels see it without their own fallback logic.
+def test_client_without_explicit_key_leaves_api_key_none():
+    """WeaveClient with api_key=None stores None; Completions and
+    InferenceModels fall back to env at point of use.
     """
-    monkeypatch.setenv("WANDB_API_KEY", "env-key")
     mock_server = _make_mock_server()
     client = WeaveClient(
         "entity", "project", mock_server, ensure_project_exists=False, api_key=None
     )
 
-    assert Completions(client)._client._api_key == "env-key"
-    assert InferenceModels(client)._client._api_key == "env-key"
+    assert client._api_key is None
+    assert Completions(client)._client._api_key is None
+    assert InferenceModels(client)._client._api_key is None
     client.finish()
 
 
