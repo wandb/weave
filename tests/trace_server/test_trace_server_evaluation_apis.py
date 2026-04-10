@@ -527,7 +527,8 @@ def test_eval_results_query_multiple_evals(client):
 
 def test_eval_results_query_post_hoc_score(client):
     """Verify that scores added via score_create() after prediction_finish()
-    are picked up by eval_results_query."""
+    are picked up by eval_results_query.
+    """
     project_id = client.project_id
     entity, project = from_project_id(project_id)
 

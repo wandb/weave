@@ -527,3 +527,119 @@ async def test_evaluate_with_pydantic_summary(client):
     model = EvalModel()
     result = await evaluation.evaluate(model)
     assert result["MyScorer"].awesome == 3
+
+
+@pytest.mark.asyncio
+async def test_post_hoc_score_appears_in_eval_results(client):
+    """After running a normal Evaluation, adding a score via score_create()
+    should be picked up by eval_results_query rollups.
+    """
+    from weave.trace_server import trace_server_interface as tsi
+    from weave.utils.project_id import from_project_id
+
+    project_id = client.project_id
+    entity, project = from_project_id(project_id)
+
+    # 1. Run a normal evaluation
+    @weave.op
+    async def model_predict(input) -> str:
+        return eval(input)
+
+    @weave.op
+    def original_scorer(target, output):
+        return target == output
+
+    evaluation = Evaluation(
+        dataset=[{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 16}],
+        scorers=[original_scorer],
+    )
+    await evaluation.evaluate(model_predict)
+
+    # 2. Find calls from the evaluation run
+    def op_name_endswith(op_name: str, suffix: str) -> bool:
+        """Match op names like 'weave:///entity/project/op/Name:digest'."""
+        if not op_name:
+            return False
+        # Extract name from ref: last path segment before the colon
+        parts = op_name.rsplit("/", 1)
+        if len(parts) == 2:
+            name_part = parts[1].split(":")[0]
+            return name_part == suffix
+        return op_name == suffix
+
+    calls_res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+        )
+    )
+    all_calls = calls_res.calls
+
+    eval_calls = [
+        c for c in all_calls
+        if op_name_endswith(c.op_name, "Evaluation.evaluate")
+    ]
+    assert len(eval_calls) >= 1
+    eval_call_id = eval_calls[0].id
+
+    # 3. Find predict_and_score calls (direct children of eval root)
+    pas_calls = [
+        c for c in all_calls
+        if c.parent_id == eval_call_id
+        and op_name_endswith(c.op_name, "Evaluation.predict_and_score")
+    ]
+    assert len(pas_calls) == 2
+
+    # Find actual predict calls (children of predict_and_score, not scorers)
+    predict_calls = []
+    for pas_call in pas_calls:
+        children = [c for c in all_calls if c.parent_id == pas_call.id]
+        for child in children:
+            if not op_name_endswith(child.op_name, "original_scorer"):
+                predict_calls.append(child)
+                break
+    assert len(predict_calls) == 2
+
+    # 4. Create a new scorer and add post-hoc scores
+    scorer_res = client.server.scorer_create(
+        tsi.ScorerCreateReq(
+            project_id=project_id,
+            name="post_hoc_scorer",
+            op_source_code="def score(output):\n    return 1.0",
+        )
+    )
+    scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+    for predict_call in predict_calls:
+        client.server.score_create(
+            tsi.ScoreCreateReq(
+                project_id=project_id,
+                prediction_id=predict_call.id,
+                scorer=scorer_ref,
+                value=0.42,
+                evaluation_run_id=eval_call_id,
+            )
+        )
+
+    # 5. Query eval results and verify both original and post-hoc scores appear
+    res = client.server.eval_results_query(
+        tsi.EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[eval_call_id],
+            include_summary=True,
+        )
+    )
+
+    assert res.total_rows == 2
+    for row in res.rows:
+        trial = row.evaluations[0].trials[0]
+        # Original scorer from the eval run
+        assert "original_scorer" in trial.scores
+        # Post-hoc scorer added after eval completed
+        assert "post_hoc_scorer" in trial.scores
+        assert trial.scores["post_hoc_scorer"] == 0.42
+
+    # 6. Verify summary rollups include the post-hoc scorer
+    assert res.summary is not None
+    scorer_keys = {s.scorer_key for s in res.summary.evaluations[0].scorer_stats}
+    assert "original_scorer" in scorer_keys
+    assert "post_hoc_scorer" in scorer_keys
