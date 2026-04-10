@@ -23,7 +23,11 @@ class FakeService:
         )
 
     def ensure_project_exists(
-        self, entity: str, project: str
+        self,
+        entity: str,
+        project: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
 

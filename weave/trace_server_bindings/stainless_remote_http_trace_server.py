@@ -93,12 +93,18 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             )
 
     def ensure_project_exists(
-        self, entity: str, project: str
+        self,
+        entity: str,
+        project: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
     ) -> tsi.EnsureProjectExistsRes:
         # TODO: This should happen in the wandb backend, not here, and it's slow
         # (hundreds of ms)
         return tsi.EnsureProjectExistsRes.model_validate(
-            project_creator.ensure_project_exists(entity, project)
+            project_creator.ensure_project_exists(
+                entity, project, api_key=api_key, base_url=base_url
+            )
         )
 
     @classmethod

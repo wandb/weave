@@ -24,7 +24,7 @@ def reset_weave_client():
 def mock_project_creator():
     """Mock project_creator.ensure_project_exists for all tests that create clients."""
     with patch(
-        "weave.trace.weave_client._ensure_project",
+        "weave.wandb_interface.project_creator.ensure_project_exists",
         return_value={"project_name": "test-project"},
     ):
         yield
@@ -576,8 +576,8 @@ def test_internal_api_uses_client_credentials(mock_wandb_api):
 
 
 def test_project_creator_receives_client_credentials(mock_wandb_api):
-    """WeaveClient.__init__ should pass api_key and base_url to
-    project_creator.ensure_project_exists.
+    """WeaveClient.__init__ should pass api_key and base_url through the server's
+    ensure_project_exists to project_creator.ensure_project_exists.
     """
     mock_wandb_api.default_entity_name.return_value = "test-entity"
     mock_server = _make_mock_server()
@@ -587,17 +587,13 @@ def test_project_creator_receives_client_credentials(mock_wandb_api):
         patch("weave.trace.weave_init._weave_is_available", return_value=True),
         patch("weave.trace.weave_init.get_username", return_value="test-user"),
         patch("weave.trace.weave_init.init_message"),
-        patch(
-            "weave.trace.weave_client._ensure_project",
-            return_value={"project_name": "test-project"},
-        ) as mock_ensure,
     ):
         weave_init.init_weave(
             "test-project",
             api_key="explicit-key",
             base_url="https://explicit.example.com",
         )
-        mock_ensure.assert_called_once_with(
+        mock_server.ensure_project_exists.assert_called_once_with(
             "test-entity",
             "test-project",
             api_key="explicit-key",

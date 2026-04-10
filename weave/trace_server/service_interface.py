@@ -42,6 +42,10 @@ class ServiceInterface(Protocol):
 
     def server_info(self) -> ServerInfoRes: ...
     def ensure_project_exists(
-        self, entity: str, project: str
+        self,
+        entity: str,
+        project: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
     ) -> EnsureProjectExistsRes: ...
     def projects_info(self, req: ProjectsInfoReq) -> list[ProjectsInfoRes]: ...
