@@ -578,13 +578,14 @@ def finish() -> None:
     Following finish, calls of weave.op decorated functions will no longer be logged. You will need to run weave.init() again to resume logging.
 
     """
-    # Capture client before teardown so we can still flush outstanding work.
+    # Flush outstanding work *before* clearing explicit overrides (api_key,
+    # base_url) so that callbacks (e.g. 🍩 call URLs) still see the correct
+    # base URL during flush.
     wc = weave_client_context.get_weave_client()
-    weave_init.finish()
-
-    # Flush any remaining calls
     if wc is not None:
         wc.finish()
+
+    weave_init.finish()
 
 
 __all__ = [
