@@ -363,6 +363,20 @@ jobs:
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server')" -- \
             -m "trace_server and not skip_clickhouse_client" \
             --clickhouse-replicated
+      - name: Run nox (Replicated ClickHouse Calls Complete)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WEAVE_USE_CALLS_COMPLETE: "true"
+          DD_TRACE_ENABLED: false
+          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_calls_complete_only')" -- \
+            -m "trace_server and not skip_clickhouse_client" \
+            --clickhouse-replicated
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
