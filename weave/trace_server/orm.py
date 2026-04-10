@@ -5,7 +5,7 @@ Abstracts away some of their differences and allows building up SQL queries in a
 import datetime
 import json
 import re
-from collections.abc import Hashable, Sequence
+from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, TypeAlias
 
@@ -643,8 +643,14 @@ def _process_query_to_conditions(
     all_columns: Sequence[str],
     json_columns: Sequence[str],
     param_builder: ParamBuilder | None = None,
+    field_resolver: Callable[[str, ParamBuilder], tuple[str, set[str]]] | None = None,
 ) -> tuple[list[str], set[str]]:
-    """Converts a Query to a list of conditions for a clickhouse query."""
+    """Converts a Query to a list of conditions for a clickhouse query.
+
+    field_resolver, when provided, overrides the default field-to-SQL mapping
+    for $getField operators. Used by eval_results to map fields like
+    "scores.accuracy" to aggregated expressions (e.g. avg(...)).
+    """
     pb = param_builder or ParamBuilder()
     conditions = []
     raw_fields_used = set()
@@ -723,13 +729,16 @@ def _process_query_to_conditions(
                 operand.literal_, None, python_value_to_ch_type(operand.literal_)
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            (
-                field,
-                _,
-                fields_used,
-            ) = _transform_external_field_to_internal_field(
-                operand.get_field_, all_columns, json_columns, None, pb
-            )
+            if field_resolver is not None:
+                field, fields_used = field_resolver(operand.get_field_, pb)
+            else:
+                (
+                    field,
+                    _,
+                    fields_used,
+                ) = _transform_external_field_to_internal_field(
+                    operand.get_field_, all_columns, json_columns, None, pb
+                )
             raw_fields_used.update(fields_used)
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):

@@ -1,11 +1,25 @@
 """Query builder for the /eval_results endpoint.
 
-Generates ClickHouse CTEs for resolving dataset-backed inputs via table_rows JOIN.
-
-CTE chain:
+Generates ClickHouse CTEs for the eval_results CTE chain:
   predict_and_score_calls          → filter to predict-and-score calls, extract row_digest
   predict_and_score_calls_resolved → LEFT JOIN table_rows to resolve dataset-backed inputs
+  ranked_digests                   → GROUP BY row_digest, HAVING filters, ROW_NUMBER for sort
+  ranked_digest_count              → total matching rows (for pagination metadata)
+  page_digests                     → paginated slice of ranked_digests
+  page_rows                        → call IDs + resolved_inputs for the page
 """
+
+from functools import partial
+
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.orm import (
+    ParamBuilder,
+    _process_query_to_conditions,
+    quote_json_path_parts,
+    split_escaped_field_path,
+)
 
 # SQL CASE expression for extracting row_digest from predict-and-score call inputs.
 # Dataset-backed rows: extract digest from the ref URI.
@@ -114,3 +128,254 @@ def build_predict_and_score_calls_resolved_cte(
         GROUP BY project_id, digest
     ) AS tr ON tr.digest = predict_and_score_calls.row_digest
 )"""
+
+
+def _string_param(pb: ParamBuilder, value: str) -> str:
+    """Add a deduplicated string param and return its {name:String} slot."""
+    return param_slot(pb.add_param(value), "String")
+
+
+def resolve_eval_field_to_sql(
+    field_path: str,
+    pb: ParamBuilder,
+    evaluation_call_id: str | None = None,
+) -> tuple[str, set[str]]:
+    """Translate an eval_results field path to an aggregated ClickHouse SQL expression.
+
+    Used as a field_resolver callback for _process_query_to_conditions and
+    for building ORDER BY expressions. Results include aggregate functions
+    (avg, any) so they work in HAVING/ORDER BY after GROUP BY row_digest.
+
+    Returns:
+        (sql_expression, set of physical columns used)
+    """
+    if field_path == "row_digest":
+        return "row_digest", {"inputs_dump"}
+
+    if field_path.startswith("inputs."):
+        remaining = field_path[len("inputs."):]
+        parts = split_escaped_field_path(remaining)
+        path = _string_param(pb, quote_json_path_parts(parts))
+        inner = f"nullIf(JSON_VALUE(resolved_inputs, {path}), 'null')"
+        inner = _wrap_with_eval_scope(inner, evaluation_call_id, pb)
+        return f"any({inner})", {"inputs_dump"}
+
+    if field_path.startswith("outputs."):
+        remaining = field_path[len("outputs."):]
+        parts = ["output"] + split_escaped_field_path(remaining)
+        path = _string_param(pb, quote_json_path_parts(parts))
+        inner = f"nullIf(JSON_VALUE(output_dump, {path}), 'null')"
+        inner = _wrap_with_eval_scope(inner, evaluation_call_id, pb)
+        return f"any({inner})", {"output_dump"}
+
+    if field_path.startswith("scores."):
+        remaining = field_path[len("scores."):]
+        parts = ["scores"] + split_escaped_field_path(remaining)
+        path = _string_param(pb, quote_json_path_parts(parts))
+        inner = f"nullIf(JSON_VALUE(output_dump, {path}), 'null')"
+        inner = _wrap_with_eval_scope(inner, evaluation_call_id, pb)
+        return f"avg(toFloat64OrNull({inner}))", {"output_dump"}
+
+    raise InvalidRequest(
+        f"Unsupported eval results field: '{field_path}'. "
+        f"Supported prefixes: scores.*, inputs.*, outputs.*, row_digest."
+    )
+
+
+def _wrap_with_eval_scope(
+    inner_sql: str,
+    evaluation_call_id: str | None,
+    pb: ParamBuilder,
+) -> str:
+    """Wrap an expression with CASE WHEN eval_call_id = ... to scope to one eval."""
+    if evaluation_call_id is None:
+        return inner_sql
+    id_slot = _string_param(pb, evaluation_call_id)
+    return f"CASE WHEN eval_call_id = {id_slot} THEN {inner_sql} ELSE NULL END"
+
+
+def _make_field_resolver(
+    evaluation_call_id: str | None,
+) -> partial[tuple[str, set[str]]]:
+    """Create a field_resolver callback for _process_query_to_conditions."""
+    return partial(resolve_eval_field_to_sql, evaluation_call_id=evaluation_call_id)
+
+
+def build_sort_expression(
+    sort_by: list[tsi.EvalResultsSortBy] | None,
+    eval_root_ids: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Build the ORDER BY expression for ranked_digests.
+
+    Always appends row_digest ASC as a stable tie-breaker.
+    When sort_by is None, returns just the tie-breaker.
+    """
+    if not sort_by:
+        return "row_digest ASC"
+
+    parts: list[str] = []
+    for s in sort_by:
+        direction = "DESC" if s.direction == "desc" else "ASC"
+        if s.mode == "difference" and len(eval_root_ids) > 1:
+            expr = _build_difference_sort(s.field, eval_root_ids, pb)
+        else:
+            expr, _ = resolve_eval_field_to_sql(
+                s.field, pb, evaluation_call_id=s.evaluation_call_id
+            )
+        parts.append(f"{expr} {direction}")
+
+    parts.append("row_digest ASC")
+    return ", ".join(parts)
+
+
+def _build_difference_sort(
+    field_path: str,
+    eval_root_ids: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Build greatest(...) - least(...) expression for difference mode sorting."""
+    per_eval_exprs: list[str] = []
+    for eval_id in eval_root_ids:
+        expr, _ = resolve_eval_field_to_sql(field_path, pb, evaluation_call_id=eval_id)
+        per_eval_exprs.append(expr)
+    joined = ", ".join(per_eval_exprs)
+    return f"greatest({joined}) - least({joined})"
+
+
+def _build_having_clause(
+    eval_root_ids: list[str],
+    filters: list[tsi.EvalResultsFilter] | None,
+    require_intersection: bool,
+    pb: ParamBuilder,
+) -> str:
+    """Build the HAVING clause for ranked_digests."""
+    having_parts: list[str] = ["1=1"]
+
+    if require_intersection and len(eval_root_ids) > 1:
+        num_param = pb.add(len(eval_root_ids), None, "UInt64")
+        having_parts.append(f"countDistinct(eval_call_id) >= {num_param}")
+
+    if filters:
+        for f in filters:
+            resolver = _make_field_resolver(f.evaluation_call_id)
+            conditions, _ = _process_query_to_conditions(
+                f.query, [], [], param_builder=pb, field_resolver=resolver
+            )
+            having_parts.extend(conditions)
+
+    return "\n                    AND ".join(having_parts)
+
+
+def build_ranked_digests_cte(
+    eval_root_ids: list[str],
+    sort_by: list[tsi.EvalResultsSortBy] | None,
+    filters: list[tsi.EvalResultsFilter] | None,
+    require_intersection: bool,
+    limit: int | None,
+    offset: int,
+    pb: ParamBuilder,
+) -> str:
+    """Build ranked_digests, ranked_digest_count, and page_digests CTEs.
+
+    ranked_digests: single grouped projection with HAVING + ROW_NUMBER.
+    ranked_digest_count: total matching rows derived from ranked_digests.
+    page_digests: paginated slice derived from ranked_digests.
+    """
+    sort_expr = build_sort_expression(sort_by, eval_root_ids, pb)
+    having_clause = _build_having_clause(eval_root_ids, filters, require_intersection, pb)
+
+    pagination = ""
+    if limit is not None:
+        pagination += f"\n                LIMIT {limit}"
+        pagination += f"\n                OFFSET {offset}"
+    elif offset > 0:
+        pagination += f"\n                OFFSET {offset}"
+
+    return f"""ranked_digests AS (
+    SELECT row_digest,
+        ROW_NUMBER() OVER(ORDER BY {sort_expr}) AS row_order
+    FROM predict_and_score_calls_resolved
+    GROUP BY row_digest
+    HAVING {having_clause}
+),
+
+ranked_digest_count AS (
+    SELECT count(*) AS total_rows FROM ranked_digests
+),
+
+page_digests AS (
+    SELECT row_digest, row_order
+    FROM ranked_digests
+    ORDER BY row_order{pagination}
+)"""
+
+
+def build_page_rows_cte() -> str:
+    """Build page_rows CTE: call IDs + resolved_inputs for the page."""
+    return """page_rows AS (
+    SELECT
+        predict_and_score_calls_resolved.call_id,
+        predict_and_score_calls_resolved.row_digest,
+        page_digests.row_order,
+        predict_and_score_calls_resolved.resolved_inputs
+    FROM predict_and_score_calls_resolved
+    INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
+)"""
+
+
+def build_eval_results_cte_chain(
+    project_id: str,
+    eval_root_ids: list[str],
+    sort_by: list[tsi.EvalResultsSortBy] | None,
+    filters: list[tsi.EvalResultsFilter] | None,
+    require_intersection: bool,
+    limit: int | None,
+    offset: int,
+    pb: ParamBuilder,
+    read_table: str,
+) -> str:
+    """Build the full CTE chain for eval_results pagination.
+
+    Returns CTE body without the WITH keyword — the caller (CallsQuery.as_sql)
+    prepends WITH when merging with its own CTEs.
+
+    Composes: predict_and_score_calls → predict_and_score_calls_resolved →
+              ranked_digests → ranked_digest_count → page_digests → page_rows
+    """
+    project_id_param = pb.add(project_id, None, "String")
+    eval_root_ids_param = pb.add(eval_root_ids, None, "Array(String)")
+    op_prefix_param = pb.add(PREDICT_AND_SCORE_OP_PREFIX, None, "String")
+
+    inputs_field = (
+        "any(calls_merged.inputs_dump)"
+        if read_table == "calls_merged"
+        else "calls_complete.inputs_dump"
+    )
+
+    calls_cte = build_predict_and_score_calls_cte(
+        project_id_param,
+        eval_root_ids_param,
+        op_prefix_param,
+        inputs_field,
+        read_table,
+    )
+    resolved_cte = build_predict_and_score_calls_resolved_cte(project_id_param)
+    ranked_cte = build_ranked_digests_cte(
+        eval_root_ids,
+        sort_by,
+        filters,
+        require_intersection,
+        limit,
+        offset,
+        pb,
+    )
+    page_rows_cte = build_page_rows_cte()
+
+    return f"""{calls_cte},
+
+{resolved_cte},
+
+{ranked_cte},
+
+{page_rows_cte}"""

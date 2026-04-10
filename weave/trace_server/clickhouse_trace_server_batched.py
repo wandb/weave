@@ -45,6 +45,7 @@ from weave.shared.trace_server_interface_util import (
 from weave.trace_server import (
     ch_sentinel_values,
     constants,
+    eval_results_query_builder,
     object_creation_utils,
     usage_utils,
 )
@@ -245,7 +246,6 @@ from weave.trace_server.query_builder.table_query_builder import (
     make_natural_sort_table_query,
     make_standard_table_query,
     make_table_row_digests_query,
-    make_table_rows_read_batch_query,
     make_table_stats_basic_query,
     make_table_stats_query_with_storage_size,
 )
@@ -1499,40 +1499,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if hasattr(raw_res, "close"):
                 raw_res.close()
 
-    def _calls_query_stream_for_eval_subtree(
-        self,
-        project_id: str,
-        eval_root_ids: list[str],
-        include_children: bool = True,
-    ) -> Iterator[tsi.CallSchema]:
-        """Fetch direct children of eval root IDs and optionally their children."""
-        read_table = self.table_routing_resolver.resolve_read_table(
-            project_id, self._mint_client
-        )
-        columns = sorted(
-            [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
-        )
-        cq = CallsQuery(project_id=project_id, read_table=read_table)
-        for col in columns:
-            cq.add_field(col)
-        cq.eval_root_ids = eval_root_ids
-        cq.include_predict_and_score_children = include_children
-        cq.add_order("started_at", "asc")
-        cq.add_order("id", "asc")
-        pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
-        select_columns = [c.field for c in cq.select_fields]
-        try:
-            for row in raw_res:
-                yield tsi.CallSchema.model_validate(
-                    ch_call_dict_to_call_schema_dict(
-                        dict(zip(select_columns, row, strict=True))
-                    )
-                )
-        finally:
-            if hasattr(raw_res, "close"):
-                raw_res.close()
-
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
         self, project_id: str, calls: list[dict[str, Any]]
@@ -1693,7 +1659,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_id_param = pb.add_param(project_id)
         call_ids_param = pb.add_param(call_ids)
         delete_query = build_calls_complete_delete_query(
-            self._get_calls_complete_table_name(),
+            "calls_complete",
             project_id_param,
             call_ids_param,
             cluster_name=self.clickhouse_cluster_name,
@@ -1747,7 +1713,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ch_sentinel_values.to_ch_value("display_name", display_name)
         )
         update_query = build_calls_complete_update_query(
-            self._get_calls_complete_table_name(),
+            "calls_complete",
             project_id_param,
             call_id_param,
             display_name_param,
@@ -2436,7 +2402,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 sort_fields.append(field)
 
-        yield from self._table_query_stream(
+        rows = self._table_query_stream(
             req.project_id,
             req.digest,
             pb,
@@ -2446,6 +2412,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             limit=req.limit,
             offset=req.offset,
         )
+        yield from rows
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._table_query_stream")
     def _table_query_stream(
@@ -5140,43 +5107,139 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         """Return grouped prediction/trial/score data for evaluation results."""
+        eval_helpers.validate_eval_results_request(req)
         eval_root_ids = eval_helpers.resolve_eval_root_ids(req)
         if not eval_root_ids:
             empty_summary = tsi.EvalResultsSummaryRes() if req.include_summary else None
             return tsi.EvalResultsQueryRes(
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
-        all_calls = list(
-            self._calls_query_stream_for_eval_subtree(
-                req.project_id,
-                eval_root_ids,
-                req.include_predict_and_score_children,
-            )
-        )
-        if req.resolve_row_refs:
-            reader = lambda digests: self._table_rows_read_batch(
-                req.project_id, digests
-            )
-            eval_helpers.resolve_eval_inputs(all_calls, eval_root_ids, reader)
-        return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
+        return self._eval_results_via_cte(req, eval_root_ids)
 
-    def _table_rows_read_batch(
-        self, project_id: str, digests: list[str]
-    ) -> dict[str, Any]:
-        """Batch read table_rows by digest. Returns {digest: parsed_val}."""
-        if len(digests) == 0:
-            return {}
+    def _eval_results_via_cte(
+        self,
+        req: tsi.EvalResultsQueryReq,
+        eval_root_ids: list[str],
+    ) -> tsi.EvalResultsQueryRes:
+        """Sort/filter/paginate eval results with a single ClickHouse query."""
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
+
+        # when summary is requested, fetch all rows
+        ch_limit = None if req.include_summary else req.limit
+        ch_offset = 0 if req.include_summary else req.offset
 
         pb = ParamBuilder()
-        sql = make_table_rows_read_batch_query(project_id, digests, pb)
-        result = self._query(sql, pb.get_params())
-        out: dict[str, Any] = {}
+
+        cte_chain = eval_results_query_builder.build_eval_results_cte_chain(
+            req.project_id,
+            eval_root_ids,
+            req.sort_by,
+            req.filters,
+            req.require_intersection,
+            ch_limit,
+            ch_offset,
+            pb,
+            read_table,
+        )
+
+        columns = sorted(
+            [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
+        )
+        cq = CallsQuery(project_id=req.project_id, read_table=read_table)
+        for col in columns:
+            cq.add_field(col)
+
+        cq.cte_prefix = cte_chain.strip()
+        cq.call_id_subquery = "page_rows"
+        cq.include_predict_and_score_children = req.include_predict_and_score_children
+
+        table_alias = (
+            "calls_merged" if read_table == "calls_merged" else "calls_complete"
+        )
+        cq.extra_joins = [
+            f"LEFT JOIN page_rows ON {table_alias}.id = page_rows.call_id",
+        ]
+        if read_table == "calls_merged":
+            cq.extra_select_sql = [
+                "any(page_rows.row_digest) AS __row_digest",
+                "any(page_rows.row_order) AS __row_order",
+                "any(page_rows.resolved_inputs) AS __resolved_inputs",
+                "(SELECT total_rows FROM ranked_digest_count) AS __total_rows",
+            ]
+        else:
+            cq.extra_select_sql = [
+                "page_rows.row_digest AS __row_digest",
+                "page_rows.row_order AS __row_order",
+                "page_rows.resolved_inputs AS __resolved_inputs",
+                "(SELECT total_rows FROM ranked_digest_count) AS __total_rows",
+            ]
+
+        cq.add_order("id", "asc")
+        query_sql = cq.as_sql(pb)
+        query_params = pb.get_params()
+        result = self.ch_client.query(query_sql, query_params)
+
+        digest_by_call: dict[str, str] = {}
+        order_by_call: dict[str, int] = {}
+        resolved_by_call_id: dict[str, Any] = {}
+        total_rows = 0
+        page_calls: list[tsi.CallSchema] = []
+
         for row in result.result_rows:
-            d, val_dump = row[0], row[1]
-            parsed = try_parse_json(val_dump)
-            if parsed is not None:
-                out[d] = parsed
-        return out
+            row_data = dict(zip(result.column_names, row, strict=True))
+            total_rows = int(row_data.get("__total_rows", 0))
+            row_digest = row_data.get("__row_digest")
+            row_order = row_data.get("__row_order")
+            resolved_raw = row_data.get("__resolved_inputs")
+
+            call_id = row_data.get("id")
+            if row_digest and call_id:
+                digest_by_call[call_id] = row_digest
+                order_by_call[call_id] = int(row_order) if row_order else 0
+            if resolved_raw and call_id and req.resolve_row_refs:
+                parsed = try_parse_json(resolved_raw)
+                if parsed is not None:
+                    resolved_by_call_id[call_id] = parsed
+
+            page_calls.append(
+                tsi.CallSchema.model_validate(
+                    ch_call_dict_to_call_schema_dict(row_data)
+                )
+            )
+
+        for call in page_calls:
+            if call.id in resolved_by_call_id and isinstance(call.inputs, dict):
+                call.inputs["example"] = resolved_by_call_id[call.id]
+
+        rows = eval_helpers.build_sorted_eval_rows(
+            page_calls,
+            eval_root_ids,
+            digest_by_call,
+            order_by_call,
+            req.include_raw_data_rows,
+            req.include_predict_and_score_children,
+        )
+
+        warnings: list[str] = []
+        if rows and req.include_raw_data_rows and req.resolve_row_refs:
+            unresolved = [r.row_digest for r in rows if isinstance(r.raw_data_row, str)]
+            if unresolved:
+                warnings.append(
+                    "Failed to resolve dataset row refs; raw_data_row may contain refs"
+                )
+
+        summary: tsi.EvalResultsSummaryRes | None = None
+        if req.include_summary:
+            eval_call_metadata = eval_helpers.fetch_eval_root_metadata(
+                self, req.project_id, eval_root_ids
+            )
+            summary = eval_helpers.compute_summary_from_rows(rows, eval_call_metadata)
+
+        return tsi.EvalResultsQueryRes(
+            rows=rows, total_rows=total_rows, summary=summary, warnings=warnings
+        )
 
     @staticmethod
     def _read_with_retry(

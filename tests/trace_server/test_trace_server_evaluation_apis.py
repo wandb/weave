@@ -10,12 +10,16 @@ from tests.trace.util import client_is_sqlite
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient, generate_id
+from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallsQueryReq,
     CallStartReq,
     EndedCallSchemaForInsert,
+    EvalResultsFilter,
     EvalResultsQueryReq,
+    EvalResultsSortBy,
     EvaluateModelReq,
     EvaluateModelRes,
     EvaluationRunCreateReq,
@@ -585,6 +589,8 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
 
 def test_eval_subtree_query_excludes_unrelated_top_level_calls(client, internal_server):
     """Makes sure that _calls_query_stream_for_eval_subtree does not return calls outside the eval tree."""
+    if not client_is_sqlite(client):
+        pytest.skip("_calls_query_stream_for_eval_subtree only exists on SQLite")
     project_id = client.project_id
 
     # create an eval with one prediction
@@ -834,3 +840,289 @@ def test_eval_results_dataset_backed_no_resolve(client, predict_and_score_op_nam
     row = res.rows[0]
     assert isinstance(row.raw_data_row, str)
     assert "/attr/rows/id/" in row.raw_data_row
+
+
+def _create_eval_with_scores(client, scores_per_row, eval_name="eval"):
+    """Helper: create an eval run with predict-and-score calls having given scores.
+
+    scores_per_row: list of dicts, e.g. [{"accuracy": 0.9}, {"accuracy": 0.3}]
+    Returns the evaluation_run_id.
+    """
+    project_id = client.project_id
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation=f"eval://{eval_name}",
+            model=f"model://{eval_name}",
+        )
+    )
+    for i, scores in enumerate(scores_per_row):
+        predict_and_score_id = generate_id()
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=predict_and_score_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=run.evaluation_run_id,
+                    op_name="Evaluation.predict_and_score",
+                    started_at=now,
+                    attributes={},
+                    inputs={
+                        "example": {"question": f"q{i}", "idx": i},
+                        "model": f"model://{eval_name}",
+                    },
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=predict_and_score_id,
+                    ended_at=now + datetime.timedelta(seconds=i + 1),
+                    output={
+                        "output": f"answer_{i}",
+                        "scores": scores,
+                        "model_latency": {"mean": float(i + 1)},
+                    },
+                    summary={},
+                )
+            )
+        )
+    return run.evaluation_run_id
+
+
+def test_eval_results_sort_by_score_desc(client):
+    """Sort by scores.accuracy DESC should return highest-scoring row first."""
+    if client_is_sqlite(client):
+        pytest.skip("sort/filter only implemented for ClickHouse")
+    eval_id = _create_eval_with_scores(
+        client,
+        [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
+        eval_name="sort-desc",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+            include_raw_data_rows=True,
+            sort_by=[EvalResultsSortBy(field="scores.accuracy", direction="desc")],
+        )
+    )
+    assert res.total_rows == 3
+    accuracies = [row.evaluations[0].trials[0].scores["accuracy"] for row in res.rows]
+    assert accuracies == [0.9, 0.6, 0.3]
+
+
+def test_eval_results_sort_by_score_asc(client):
+    """Sort by scores.accuracy ASC should return lowest-scoring row first."""
+    if client_is_sqlite(client):
+        pytest.skip("sort/filter only implemented for ClickHouse")
+    eval_id = _create_eval_with_scores(
+        client,
+        [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
+        eval_name="sort-asc",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+            include_raw_data_rows=True,
+            sort_by=[EvalResultsSortBy(field="scores.accuracy", direction="asc")],
+        )
+    )
+    accuracies = [row.evaluations[0].trials[0].scores["accuracy"] for row in res.rows]
+    assert accuracies == [0.3, 0.6, 0.9]
+
+
+def test_eval_results_filter_score_gte(client):
+    """Filter scores.accuracy >= 0.5 should exclude rows below threshold."""
+    if client_is_sqlite(client):
+        pytest.skip("sort/filter only implemented for ClickHouse")
+    eval_id = _create_eval_with_scores(
+        client,
+        [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
+        eval_name="filter-gte",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+            include_raw_data_rows=True,
+            filters=[
+                EvalResultsFilter(
+                    query=Query.model_validate(
+                        {
+                            "$expr": {
+                                "$gte": [
+                                    {"$getField": "scores.accuracy"},
+                                    {"$literal": 0.5},
+                                ]
+                            }
+                        }
+                    ),
+                )
+            ],
+        )
+    )
+    assert res.total_rows == 2
+    accuracies = sorted(
+        row.evaluations[0].trials[0].scores["accuracy"] for row in res.rows
+    )
+    assert accuracies == [0.6, 0.9]
+
+
+def test_eval_results_sort_and_filter_combined(client):
+    """Sort + filter together: filter first, then sort the remaining rows."""
+    if client_is_sqlite(client):
+        pytest.skip("sort/filter only implemented for ClickHouse")
+    eval_id = _create_eval_with_scores(
+        client,
+        [{"accuracy": 0.1}, {"accuracy": 0.5}, {"accuracy": 0.9}, {"accuracy": 0.7}],
+        eval_name="sort-filter",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+            include_raw_data_rows=True,
+            sort_by=[EvalResultsSortBy(field="scores.accuracy", direction="desc")],
+            filters=[
+                EvalResultsFilter(
+                    query=Query.model_validate(
+                        {
+                            "$expr": {
+                                "$gte": [
+                                    {"$getField": "scores.accuracy"},
+                                    {"$literal": 0.4},
+                                ]
+                            }
+                        }
+                    ),
+                )
+            ],
+        )
+    )
+    assert res.total_rows == 3
+    accuracies = [row.evaluations[0].trials[0].scores["accuracy"] for row in res.rows]
+    assert accuracies == [0.9, 0.7, 0.5]
+
+
+def test_eval_results_filter_with_evaluation_call_id_scope(client):
+    """Filter scoped to evaluation_call_id only tests that eval's scores."""
+    if client_is_sqlite(client):
+        pytest.skip("sort/filter only implemented for ClickHouse")
+    eval_id = _create_eval_with_scores(
+        client,
+        [{"accuracy": 0.9}, {"accuracy": 0.3}, {"accuracy": 0.7}],
+        eval_name="scope-single",
+    )
+    res_unfiltered = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+            include_raw_data_rows=True,
+        )
+    )
+    assert res_unfiltered.total_rows == 3
+
+    res_filtered = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+            include_raw_data_rows=True,
+            filters=[
+                EvalResultsFilter(
+                    evaluation_call_id=eval_id,
+                    query=Query.model_validate(
+                        {
+                            "$expr": {
+                                "$gte": [
+                                    {"$getField": "scores.accuracy"},
+                                    {"$literal": 0.5},
+                                ]
+                            }
+                        }
+                    ),
+                )
+            ],
+        )
+    )
+    assert res_filtered.total_rows == 2
+    accuracies = sorted(
+        row.evaluations[0].trials[0].scores["accuracy"] for row in res_filtered.rows
+    )
+    assert accuracies == [0.7, 0.9]
+
+
+def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
+    """Sorting on an unsupported field prefix returns InvalidRequest."""
+    eval_id = _create_eval_with_scores(
+        client, [{"accuracy": 0.5}], eval_name="bad-field"
+    )
+    with pytest.raises(InvalidRequest, match="Unsupported sort field"):
+        client.server.eval_results_query(
+            EvalResultsQueryReq(
+                project_id=client.project_id,
+                evaluation_call_ids=[eval_id],
+                sort_by=[EvalResultsSortBy(field="bogus.field", direction="asc")],
+            )
+        )
+
+
+def test_eval_results_sort_by_output_does_not_error(client):
+    """Sort by outputs.* is accepted and returns all rows without error."""
+    if client_is_sqlite(client):
+        pytest.skip("sort/filter only implemented for ClickHouse")
+    eval_id = _create_eval_with_scores(
+        client,
+        [{"accuracy": 0.1}, {"accuracy": 0.5}, {"accuracy": 0.9}],
+        eval_name="output-sort",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+            include_raw_data_rows=True,
+            sort_by=[EvalResultsSortBy(field="outputs.answer", direction="asc")],
+        )
+    )
+    assert res.total_rows == 3
+    assert len(res.rows) == 3
+
+
+def test_eval_results_summary_with_filter(client):
+    """Summary reflects filtered rows, not all rows."""
+    if client_is_sqlite(client):
+        pytest.skip("sort/filter only implemented for ClickHouse")
+    eval_id = _create_eval_with_scores(
+        client,
+        [{"accuracy": 0.2}, {"accuracy": 0.6}, {"accuracy": 0.9}],
+        eval_name="summary-filter",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+            include_rows=False,
+            include_summary=True,
+            filters=[
+                EvalResultsFilter(
+                    query=Query.model_validate(
+                        {
+                            "$expr": {
+                                "$gte": [
+                                    {"$getField": "scores.accuracy"},
+                                    {"$literal": 0.5},
+                                ]
+                            }
+                        }
+                    ),
+                )
+            ],
+        )
+    )
+    assert res.summary is not None
+    assert res.summary.row_count == 2
