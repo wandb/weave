@@ -358,7 +358,8 @@ jobs:
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace')" -- \
             -m "trace_server and not skip_clickhouse_client" \
-            --clickhouse-replicated
+            --clickhouse-replicated \
+            --ignore=tests/trace/test_obj_tags_aliases.py  # TODO: remove once these tests are consolidated (132 tests, all obj reads/writes, no CH mutations)
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
