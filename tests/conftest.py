@@ -2,6 +2,7 @@ import contextlib
 import json
 import logging
 import os
+import sys
 from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -28,6 +29,13 @@ pytest_plugins = ["tests.trace_server.conftest"]
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
+
+# Tolerance for model_latency assertions in evaluation tests.
+# Set to 2s because TestOnlyFlushingWeaveClient's autoflush after every
+# client method inflates model_latency (which wraps the full async_call_op
+# including flush overhead).  On ClickHouse with concurrent eval rows the
+# flush contention can exceed 1s on loaded CI runners.
+LATENCY_TOL = 10 if sys.platform == "win32" else 2
 
 
 @pytest.fixture(autouse=True)

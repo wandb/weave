@@ -117,7 +117,7 @@ def test_clickhouse_storage_size_schema_conversion():
     }
 
     # Test ClickHouse conversion
-    ch_schema = chts._ch_call_dict_to_call_schema_dict(test_data)
+    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] == 1000
     assert ch_schema["total_storage_size_bytes"] == 2000
 
@@ -149,7 +149,7 @@ def test_clickhouse_storage_size_null_handling():
     }
 
     # Test ClickHouse conversion
-    ch_schema = chts._ch_call_dict_to_call_schema_dict(test_data)
+    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] is None
     assert ch_schema["total_storage_size_bytes"] is None
 

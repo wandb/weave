@@ -37,6 +37,8 @@ class TestInsertCosts(unittest.TestCase):
                 "llm_model_1",
                 0.01,
                 0.02,
+                0,
+                0,
                 datetime.strptime("2023-10-01 12:00:00", "%Y-%m-%d %H:%M:%S").replace(
                     tzinfo=timezone.utc
                 ),
@@ -45,6 +47,8 @@ class TestInsertCosts(unittest.TestCase):
                 "llm_model_3",
                 0.02,
                 0.03,
+                0,
+                0,
                 datetime.strptime("2023-10-02 13:30:00", "%Y-%m-%d %H:%M:%S").replace(
                     tzinfo=timezone.utc
                 ),
@@ -122,6 +126,8 @@ class TestInsertCosts(unittest.TestCase):
                     "USD",
                     cost.get("output", 0),
                     "USD",
+                    cost.get("cache_read_input", 0),
+                    cost.get("cache_creation_input", 0),
                     "system",
                     created_at,
                 )
@@ -142,6 +148,8 @@ class TestInsertCosts(unittest.TestCase):
                 "prompt_token_cost_unit",
                 "completion_token_cost",
                 "completion_token_cost_unit",
+                "cache_read_input_token_cost",
+                "cache_creation_input_token_cost",
                 "created_by",
                 "created_at",
             ],

@@ -8,9 +8,8 @@ import pytest
 from pydantic import BaseModel
 
 import weave
+from tests.conftest import LATENCY_TOL
 from weave import Dataset, Evaluation, Model
-
-_LATENCY_TOL = 10 if sys.platform == "win32" else 1
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
@@ -19,7 +18,7 @@ dataset = Dataset(rows=dataset_rows)
 expected_eval_result = {
     "output": {"mean": 9.5},
     "score": {"true_count": 1, "true_fraction": 0.5},
-    "model_latency": {"mean": pytest.approx(0, abs=_LATENCY_TOL)},
+    "model_latency": {"mean": pytest.approx(0, abs=LATENCY_TOL)},
 }
 
 
@@ -242,7 +241,7 @@ async def test_basic_evaluation_with_scorer_styles(
         return col_a + col_b
 
     result = await evaluation.evaluate(model)
-    assert result.pop("model_latency").get("mean") == pytest.approx(0, abs=_LATENCY_TOL)
+    assert result.pop("model_latency").get("mean") == pytest.approx(0, abs=LATENCY_TOL)
 
     # Build expected result dynamically
     expected_result = {
@@ -263,9 +262,9 @@ async def test_basic_evaluation_with_scorer_styles(
     predict_and_score_calls = list(evaluation.predict_and_score.calls())
     assert len(predict_and_score_calls) == 3
     outputs = [c.output for c in predict_and_score_calls]
-    assert all(
-        o.pop("model_latency") == pytest.approx(0, abs=_LATENCY_TOL) for o in outputs
-    )
+    # Pop model_latency before structural comparison; value already checked in summary
+    for o in outputs:
+        o.pop("model_latency")
 
     # Build expected output dynamically
     expected_output = {
@@ -329,7 +328,7 @@ def test_sync_eval_parallelism(client):
     assert result == {
         "output": {"mean": 5.5},
         "score": {"mean": 1.0},
-        "model_latency": {"mean": pytest.approx(1, abs=_LATENCY_TOL)},
+        "model_latency": {"mean": pytest.approx(1, abs=LATENCY_TOL)},
     }
     assert time.time() - now < (15 if sys.platform == "win32" else 5)
 

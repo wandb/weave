@@ -24,9 +24,7 @@ if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import OrderField
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
-DUMMY_LLM_USAGE = (
-    '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}'
-)
+DUMMY_LLM_USAGE = '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}'
 ESCAPED_DUMMY_LLM_USAGE = DUMMY_LLM_USAGE.replace('"', '\\"')
 
 
@@ -42,6 +40,8 @@ LLM_USAGE_COLUMNS = [
     Column(name="prompt_tokens", type="float"),
     Column(name="completion_tokens", type="float"),
     Column(name="total_tokens", type="float"),
+    Column(name="cache_read_input_tokens", type="float"),
+    Column(name="cache_creation_input_tokens", type="float"),
 ]
 
 
@@ -54,6 +54,8 @@ LLM_TOKEN_PRICES_COLUMNS = [
     Column(name="effective_date", type="datetime"),
     Column(name="prompt_token_cost", type="float"),
     Column(name="completion_token_cost", type="float"),
+    Column(name="cache_read_input_token_cost", type="float"),
+    Column(name="cache_creation_input_token_cost", type="float"),
     Column(name="prompt_token_cost_unit", type="string"),
     Column(name="completion_token_cost_unit", type="string"),
     Column(name="created_by", type="string"),
@@ -81,12 +83,14 @@ def build_model_prices_query(
         SQL string and parameters dict.
     """
     sql = f"""
-    SELECT llm_id, prompt_token_cost, completion_token_cost
+    SELECT llm_id, prompt_token_cost, completion_token_cost, cache_read_input_token_cost, cache_creation_input_token_cost
     FROM (
         SELECT
             llm_id,
             prompt_token_cost,
             completion_token_cost,
+            cache_read_input_token_cost,
+            cache_creation_input_token_cost,
             ROW_NUMBER() OVER (
                 PARTITION BY llm_id
                 ORDER BY
@@ -174,6 +178,8 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
         Column(name="prompt_tokens", type="float"),
         Column(name="completion_tokens", type="float"),
         Column(name="total_tokens", type="float"),
+        Column(name="cache_read_input_tokens", type="float"),
+        Column(name="cache_creation_input_tokens", type="float"),
     ]
 
     all_calls_table = Table(table_alias, cols)
@@ -197,6 +203,10 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
     prompt_tokens = """(if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens"""
     completion_tokens = """(if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens"""
     total_tokens = "JSONExtractInt(kv.2, 'total_tokens') AS total_tokens"
+    cache_read_input_tokens = (
+        "JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens"
+    )
+    cache_creation_input_tokens = "JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens"
 
     select_query = (
         all_calls_table.select()
@@ -210,6 +220,8 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
                 prompt_tokens,
                 completion_tokens,
                 total_tokens,
+                cache_read_input_tokens,
+                cache_creation_input_tokens,
             ]
         )
     )
@@ -396,6 +408,8 @@ def _build_cost_summary_dump_snippet() -> str:
         "completion_tokens",
         "requests",
         "total_tokens",
+        "cache_read_input_tokens",
+        "cache_creation_input_tokens",
     ]
 
     numeric_fields_str = " ".join(
@@ -404,12 +418,18 @@ def _build_cost_summary_dump_snippet() -> str:
                 f""" '"{field}":', toString({field}), ',', """
                 for field in cost_numeric_fields
             ],
-            # These numeric fields are derived or mapped to another name
+            # These numeric fields are derived or mapped to another name.
+            # prompt_tokens_total_cost subtracts cache_read_input_tokens because
+            # cached tokens are billed at the cache rate, not the regular input rate.
             """
             '"prompt_token_cost":', toString(prompt_token_cost), ',',
             '"completion_token_cost":', toString(completion_token_cost), ',',
-            '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',',
+            '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+            '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+            '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',',
             '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+            '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+            '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
         """,
         ]
     )

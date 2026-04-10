@@ -53,14 +53,16 @@ def test_query_light_column_with_costs() -> None:
                         if(
                             usage_raw != '' and usage_raw != '{}',
                             JSONExtractKeysAndValuesRaw(usage_raw),
-                            [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')]
+                            [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')]
                         )
                     ) AS kv,
                     kv.1 AS llm_id,
                     JSONExtractInt(kv.2, 'requests') AS requests,
                     (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
                     (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-                    JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+                    JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
+                    JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
+                    JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
                 FROM all_calls),
             ranked_prices AS (
                 -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
@@ -74,6 +76,8 @@ def test_query_light_column_with_costs() -> None:
                     llm_token_prices.effective_date,
                     llm_token_prices.prompt_token_cost,
                     llm_token_prices.completion_token_cost,
+                    llm_token_prices.cache_read_input_token_cost,
+                    llm_token_prices.cache_creation_input_token_cost,
                     llm_token_prices.prompt_token_cost_unit,
                     llm_token_prices.completion_token_cost_unit,
                     llm_token_prices.created_by,
@@ -119,10 +123,16 @@ def test_query_light_column_with_costs() -> None:
                                         '"completion_tokens":', toString(completion_tokens), ',',
                                         '"requests":', toString(requests), ',',
                                         '"total_tokens":', toString(total_tokens), ',',
+                                        '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',',
+                                        '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',',
                                         '"prompt_token_cost":', toString(prompt_token_cost), ',',
                                         '"completion_token_cost":', toString(completion_token_cost), ',',
-                                        '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',',
+                                        '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',',
                                         '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
                                         '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit),  '",',
                                         '"completion_token_cost_unit":"', toString(completion_token_cost_unit),  '",',
                                         '"effective_date":"', toString(effective_date),  '",',
@@ -213,12 +223,14 @@ def test_query_with_costs_and_attributes_order() -> None:
  SELECT *,
         ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
         arrayJoin(if(usage_raw != ''
-                     and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                     and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')])) AS kv,
         kv.1 AS llm_id,
         JSONExtractInt(kv.2, 'requests') AS requests,
         (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
         (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-        JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+        JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
+        JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
+        JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
    FROM all_calls),
      ranked_prices AS
   (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
@@ -231,6 +243,8 @@ def test_query_with_costs_and_attributes_order() -> None:
         llm_token_prices.effective_date,
         llm_token_prices.prompt_token_cost,
         llm_token_prices.completion_token_cost,
+        llm_token_prices.cache_read_input_token_cost,
+        llm_token_prices.cache_creation_input_token_cost,
         llm_token_prices.prompt_token_cost_unit,
         llm_token_prices.completion_token_cost_unit,
         llm_token_prices.created_by,
@@ -260,7 +274,16 @@ SELECT id,
        attributes_dump,
        `summary.weave.status`,
        if(any(llm_id) = 'weave_dummy_llm_id'
-          or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
+          or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',',
+                                        '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',',
+                                        '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',',
+                                        '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',',
+                                        '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
 FROM ranked_prices
 WHERE (rank = {pb_9:UInt64})
 GROUP BY id,
@@ -325,12 +348,14 @@ def test_query_with_costs_and_dynamic_summary_order() -> None:
  SELECT *,
         ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
         arrayJoin(if(usage_raw != ''
-                     and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                     and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')])) AS kv,
         kv.1 AS llm_id,
         JSONExtractInt(kv.2, 'requests') AS requests,
         (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
         (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-        JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+        JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
+        JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
+        JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
    FROM all_calls),
      ranked_prices AS
   (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
@@ -343,6 +368,8 @@ def test_query_with_costs_and_dynamic_summary_order() -> None:
         llm_token_prices.effective_date,
         llm_token_prices.prompt_token_cost,
         llm_token_prices.completion_token_cost,
+        llm_token_prices.cache_read_input_token_cost,
+        llm_token_prices.cache_creation_input_token_cost,
         llm_token_prices.prompt_token_cost_unit,
         llm_token_prices.completion_token_cost_unit,
         llm_token_prices.created_by,
@@ -370,7 +397,16 @@ def test_query_with_costs_and_dynamic_summary_order() -> None:
 SELECT id,
        started_at,
        if(any(llm_id) = 'weave_dummy_llm_id'
-          or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
+          or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',',
+                                        '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',',
+                                        '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',',
+                                        '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',',
+                                        '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
 FROM ranked_prices
 WHERE (rank = {pb_6:UInt64})
 GROUP BY id,
@@ -435,12 +471,14 @@ def test_query_with_costs_and_feedback_order() -> None:
              SELECT *,
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                     arrayJoin(if(usage_raw != ''
-                                 and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                                 and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')])) AS kv,
                     kv.1 AS llm_id,
                     JSONExtractInt(kv.2, 'requests') AS requests,
                     (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
                     (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-                    JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+                    JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
+                    JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
+                    JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
              FROM all_calls),
              ranked_prices AS
             (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
@@ -453,6 +491,8 @@ def test_query_with_costs_and_feedback_order() -> None:
                     llm_token_prices.effective_date,
                     llm_token_prices.prompt_token_cost,
                     llm_token_prices.completion_token_cost,
+                    llm_token_prices.cache_read_input_token_cost,
+                    llm_token_prices.cache_creation_input_token_cost,
                     llm_token_prices.prompt_token_cost_unit,
                     llm_token_prices.completion_token_cost_unit,
                     llm_token_prices.created_by,
@@ -477,7 +517,16 @@ def test_query_with_costs_and_feedback_order() -> None:
         SELECT id,
                started_at,
                if(any(llm_id) = 'weave_dummy_llm_id'
-                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
+                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',',
+                                        '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',',
+                                        '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',',
+                                        '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',',
+                                        '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
         FROM ranked_prices
         LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', ranked_prices.id))
         WHERE (rank = {pb_8:UInt64})
@@ -547,12 +596,14 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
              SELECT *,
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                     arrayJoin(if(usage_raw != ''
-                                 and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                                 and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')])) AS kv,
                     kv.1 AS llm_id,
                     JSONExtractInt(kv.2, 'requests') AS requests,
                     (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
                     (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-                    JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+                    JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
+                    JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
+                    JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
              FROM all_calls),
              ranked_prices AS
             (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
@@ -565,6 +616,8 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
                     llm_token_prices.effective_date,
                     llm_token_prices.prompt_token_cost,
                     llm_token_prices.completion_token_cost,
+                    llm_token_prices.cache_read_input_token_cost,
+                    llm_token_prices.cache_creation_input_token_cost,
                     llm_token_prices.prompt_token_cost_unit,
                     llm_token_prices.completion_token_cost_unit,
                     llm_token_prices.created_by,
@@ -590,7 +643,16 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
                started_at,
                attributes_dump,
                if(any(llm_id) = 'weave_dummy_llm_id'
-                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }') , '}')) AS summary_dump
+                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',',
+                                        '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',',
+                                        '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',',
+                                        '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',',
+                                        '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }') , '}')) AS summary_dump
         FROM ranked_prices
         WHERE (rank = {pb_6:UInt64})
         GROUP BY id,
@@ -647,12 +709,14 @@ def test_query_calls_complete_with_costs_light_fields() -> None:
          SELECT *,
                 ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                 arrayJoin(if(usage_raw != ''
-                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')])) AS kv,
                 kv.1 AS llm_id,
                 JSONExtractInt(kv.2, 'requests') AS requests,
                 (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
                 (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
+                JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
+                JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
            FROM all_calls),
              ranked_prices AS
           (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
@@ -665,6 +729,8 @@ def test_query_calls_complete_with_costs_light_fields() -> None:
                 llm_token_prices.effective_date,
                 llm_token_prices.prompt_token_cost,
                 llm_token_prices.completion_token_cost,
+                llm_token_prices.cache_read_input_token_cost,
+                llm_token_prices.cache_creation_input_token_cost,
                 llm_token_prices.prompt_token_cost_unit,
                 llm_token_prices.completion_token_cost_unit,
                 llm_token_prices.created_by,
@@ -689,7 +755,16 @@ def test_query_calls_complete_with_costs_light_fields() -> None:
         SELECT id,
                started_at,
                if(any(llm_id) = 'weave_dummy_llm_id'
-                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
+                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',',
+                                        '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',',
+                                        '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',',
+                                        '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',',
+                                        '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
         FROM ranked_prices
         WHERE (rank = {pb_6:UInt64})
         GROUP BY id,
@@ -740,12 +815,14 @@ def test_query_calls_complete_with_costs_and_attributes_order() -> None:
          SELECT *,
                 ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                 arrayJoin(if(usage_raw != ''
-                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')])) AS kv,
                 kv.1 AS llm_id,
                 JSONExtractInt(kv.2, 'requests') AS requests,
                 (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
                 (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
+                JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
+                JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
            FROM all_calls),
              ranked_prices AS
           (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
@@ -758,6 +835,8 @@ def test_query_calls_complete_with_costs_and_attributes_order() -> None:
                 llm_token_prices.effective_date,
                 llm_token_prices.prompt_token_cost,
                 llm_token_prices.completion_token_cost,
+                llm_token_prices.cache_read_input_token_cost,
+                llm_token_prices.cache_creation_input_token_cost,
                 llm_token_prices.prompt_token_cost_unit,
                 llm_token_prices.completion_token_cost_unit,
                 llm_token_prices.created_by,
@@ -783,7 +862,16 @@ def test_query_calls_complete_with_costs_and_attributes_order() -> None:
                started_at,
                attributes_dump,
                if(any(llm_id) = 'weave_dummy_llm_id'
-                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }') , '}')) AS summary_dump
+                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',',
+                                        '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',',
+                                        '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',',
+                                        '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',',
+                                        '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }') , '}')) AS summary_dump
         FROM ranked_prices
         WHERE (rank = {pb_7:UInt64})
         GROUP BY id,
@@ -849,12 +937,14 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
          SELECT *,
                 ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                 arrayJoin(if(usage_raw != ''
-                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')])) AS kv,
                 kv.1 AS llm_id,
                 JSONExtractInt(kv.2, 'requests') AS requests,
                 (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
                 (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
+                JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
+                JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
            FROM all_calls),
              ranked_prices AS
           (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
@@ -867,6 +957,8 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
                 llm_token_prices.effective_date,
                 llm_token_prices.prompt_token_cost,
                 llm_token_prices.completion_token_cost,
+                llm_token_prices.cache_read_input_token_cost,
+                llm_token_prices.cache_creation_input_token_cost,
                 llm_token_prices.prompt_token_cost_unit,
                 llm_token_prices.completion_token_cost_unit,
                 llm_token_prices.created_by,
@@ -891,7 +983,16 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
         SELECT id,
                started_at,
                if(any(llm_id) = 'weave_dummy_llm_id'
-                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
+                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',',
+                                        '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',',
+                                        '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',',
+                                        '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',',
+                                        '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
         FROM ranked_prices
         LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_5:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_5:String}, '/call/', ranked_prices.id))
         WHERE (rank = {pb_9:UInt64})
@@ -953,12 +1054,14 @@ def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
          SELECT *,
                 ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                 arrayJoin(if(usage_raw != ''
-                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')])) AS kv,
                 kv.1 AS llm_id,
                 JSONExtractInt(kv.2, 'requests') AS requests,
                 (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
                 (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
+                JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
+                JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
            FROM all_calls),
              ranked_prices AS
           (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
@@ -971,6 +1074,8 @@ def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
                 llm_token_prices.effective_date,
                 llm_token_prices.prompt_token_cost,
                 llm_token_prices.completion_token_cost,
+                llm_token_prices.cache_read_input_token_cost,
+                llm_token_prices.cache_creation_input_token_cost,
                 llm_token_prices.prompt_token_cost_unit,
                 llm_token_prices.completion_token_cost_unit,
                 llm_token_prices.created_by,
@@ -996,7 +1101,16 @@ def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
                `summary.weave.trace_name`,
                started_at,
                if(any(llm_id) = 'weave_dummy_llm_id'
-                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
+                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',',
+                                        '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',',
+                                        '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',',
+                                        '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',',
+                                        '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
         FROM ranked_prices
         WHERE (rank = {pb_4:UInt64})
         GROUP BY id,
@@ -1055,12 +1169,14 @@ def test_query_calls_complete_with_costs_and_trace_name_order() -> None:
          SELECT *,
                 ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
                 arrayJoin(if(usage_raw != ''
-                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0}')])) AS kv,
+                             and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')])) AS kv,
                 kv.1 AS llm_id,
                 JSONExtractInt(kv.2, 'requests') AS requests,
                 (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
                 (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
+                JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
+                JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
+                JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
            FROM all_calls),
              ranked_prices AS
           (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
@@ -1073,6 +1189,8 @@ def test_query_calls_complete_with_costs_and_trace_name_order() -> None:
                 llm_token_prices.effective_date,
                 llm_token_prices.prompt_token_cost,
                 llm_token_prices.completion_token_cost,
+                llm_token_prices.cache_read_input_token_cost,
+                llm_token_prices.cache_creation_input_token_cost,
                 llm_token_prices.prompt_token_cost_unit,
                 llm_token_prices.completion_token_cost_unit,
                 llm_token_prices.created_by,
@@ -1098,7 +1216,16 @@ def test_query_calls_complete_with_costs_and_trace_name_order() -> None:
                started_at,
                `summary.weave.trace_name`,
                if(any(llm_id) = 'weave_dummy_llm_id'
-                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
+                  or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',',
+                                        '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',',
+                                        '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',',
+                                        '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',',
+                                        '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',',
+                                        '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+                                        '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',',
+                                        '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
+                                        '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
         FROM ranked_prices
         WHERE (rank = {pb_7:UInt64})
         GROUP BY id,
