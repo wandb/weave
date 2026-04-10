@@ -304,7 +304,7 @@ def test_calls_complete_routing_by_residence(
     )
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     if read_table == ReadTable.CALLS_MERGED:
         expected_call_ids = {call.id, *merged_call_ids}
@@ -399,7 +399,7 @@ def test_calls_complete_routing_both_residence_state(
     # Verify resolver detects BOTH residence
     resolver = clickhouse_trace_server.table_routing_resolver
     residence = resolver._get_residence(
-        internal_project_id, clickhouse_trace_server.ch_client
+        internal_project_id, clickhouse_trace_server._mint_client
     )
     assert residence == ProjectDataResidence.BOTH, (
         f"Expected BOTH residence, got {residence}"
@@ -409,7 +409,7 @@ def test_calls_complete_routing_both_residence_state(
     # PART 3: Verify read routing in BOTH state
     # =========================================================================
     read_table = resolver.resolve_read_table(
-        internal_project_id, clickhouse_trace_server.ch_client
+        internal_project_id, clickhouse_trace_server._mint_client
     )
     assert read_table == ReadTable.CALLS_COMPLETE, (
         "BOTH residence should route reads to calls_complete"
@@ -428,7 +428,7 @@ def test_calls_complete_routing_both_residence_state(
     # =========================================================================
     # V2 writes should go to calls_complete
     v2_write_target = resolver.resolve_v2_write_target(
-        internal_project_id, clickhouse_trace_server.ch_client
+        internal_project_id, clickhouse_trace_server._mint_client
     )
     assert v2_write_target == WriteTarget.CALLS_COMPLETE, (
         "BOTH residence should route V2 writes to calls_complete"
@@ -515,7 +515,7 @@ def test_calls_complete_routing_both_residence_state(
     # V1 write target should be COMPLETE (signaling error should be raised)
     # because BOTH state has calls_complete data
     v1_write_target = resolver.resolve_v1_write_target(
-        internal_project_id, clickhouse_trace_server.ch_client
+        internal_project_id, clickhouse_trace_server._mint_client
     )
     assert v1_write_target == WriteTarget.CALLS_COMPLETE, (
         "V1 write target should be CALLS_COMPLETE for BOTH state to trigger error"
@@ -760,7 +760,7 @@ def test_call_start_end_v2_writes_calls_complete_for_empty_project(
     # Verify read-side returns the call with correct data
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     expected_call_ids = {call_id}
     calls = _fetch_calls_stream(trace_server, project_id)
@@ -998,7 +998,7 @@ def test_calls_query_routing_by_residence(
 
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     if seed_complete:
         assert read_table == ReadTable.CALLS_COMPLETE
@@ -1139,7 +1139,7 @@ def test_calls_complete_query_with_status_filter(trace_server, clickhouse_trace_
     # Verify we're reading from calls_complete
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     assert read_table == ReadTable.CALLS_COMPLETE
 
@@ -1432,7 +1432,7 @@ def test_project_stats_with_calls_complete(trace_server, clickhouse_trace_server
     # Verify we're reading from calls_complete
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     assert read_table == ReadTable.CALLS_COMPLETE
 
@@ -1518,10 +1518,10 @@ def test_project_stats_uses_correct_stats_table_based_on_residence(
 
     # Verify project residences
     read_table1 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
-        internal_project1_id, clickhouse_trace_server.ch_client
+        internal_project1_id, clickhouse_trace_server._mint_client
     )
     read_table2 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
-        internal_project2_id, clickhouse_trace_server.ch_client
+        internal_project2_id, clickhouse_trace_server._mint_client
     )
 
     assert read_table1 == ReadTable.CALLS_MERGED
@@ -1635,7 +1635,7 @@ def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
     # Verify we're reading from calls_complete
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     assert read_table == ReadTable.CALLS_COMPLETE
 
