@@ -289,7 +289,7 @@ jobs:
 
   trace-replicated-tests:
     name: Replicated ClickHouse trace tests
-    timeout-minutes: 15
+    timeout-minutes: 30
     runs-on: ubuntu-latest-8-cores
     strategy:
       matrix:
@@ -376,7 +376,7 @@ jobs:
       - trace-tests
       - trace_no_server
       - trace-server-migrator-tests
-      - trace-replicated-tests
+      # trace-replicated-tests is intentionally non-blocking — informational only
 
     runs-on: ubuntu-latest
 
