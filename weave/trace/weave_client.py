@@ -29,7 +29,7 @@ from weave.shared.digest import (
     compute_table_digest,
 )
 from weave.telemetry import trace_sentry
-from weave.trace import settings
+from weave.trace import env, settings
 from weave.trace.call import (
     DEFAULT_CALLS_PAGE_SIZE,
     Call,
@@ -165,6 +165,7 @@ from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
 from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
+from weave.wandb_interface.context import get_wandb_api_context
 
 if TYPE_CHECKING:
     from weave.evaluation.eval import Evaluation
@@ -361,8 +362,15 @@ class WeaveClient:
         self.entity = entity
         self.project = project
         self.server = server
-        self._api_key = api_key
-        self._base_url = base_url
+        # Eagerly resolve credentials so downstream consumers never need
+        # fallback logic.  When the caller provides an explicit api_key we
+        # use it; otherwise we snapshot the current env / netrc value once.
+        self._api_key: str | None = (
+            api_key if api_key is not None else get_wandb_api_context()
+        )
+        self._base_url: str | None = (
+            base_url if base_url is not None else env.wandb_base_url()
+        )
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
         self.project_id_resolver = ProjectIdResolver(server)
