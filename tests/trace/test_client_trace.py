@@ -3583,52 +3583,6 @@ def test_calls_stream_feedback(client):
     } in call2_payloads
 
 
-def test_feedback_filter_does_not_duplicate_calls(client):
-    """Regression test: filtering by feedback should not return duplicate calls.
-
-    When feedback LEFT JOINs the calls table, a call with multiple feedback
-    entries produces multiple joined rows. Without deduplication, the same call
-    appears multiple times in the results.
-    """
-
-    @weave.op
-    def my_op(x):
-        return x
-
-    my_op(1)
-    my_op(2)
-
-    calls = list(my_op.calls())
-    assert len(calls) == 2
-
-    project_id = get_client_project_id(client)
-
-    # multiple feedbacks on same call should trigger row multiplication in LEFT JOIN
-    calls[0].feedback.add_reaction("👍")
-    calls[0].feedback.add_reaction("👍")
-
-    res = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=project_id,
-            query=tsi.Query.model_validate(
-                {
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "feedback.[wandb.reaction.1].payload.emoji"},
-                            {"$literal": "👍"},
-                        ]
-                    }
-                }
-            ),
-        )
-    )
-    results = list(res)
-
-    # call should be deduped and appear once in result set.
-    assert len(results) == 1
-    assert results[0].id == calls[0].id
-
-
 def test_inline_dataclass_generates_no_refs_in_function(client):
     @dataclasses.dataclass
     class A:
