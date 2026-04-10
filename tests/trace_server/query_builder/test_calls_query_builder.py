@@ -2358,26 +2358,34 @@ def test_maybe_convert_datetime_operands() -> None:
     assert original_lit.literal_ == 1709251200
 
 
-def test_maybe_convert_ch_format_literal_unchanged() -> None:
-    """Canonical CH datetime string (timestamp_to_datetime_str shape) is left as-is."""
+@pytest.mark.parametrize(
+    ("literal_in", "expected_literal"),
+    [
+        (
+            "2024-03-01 00:00:00.000000",
+            "2024-03-01 00:00:00.000000",
+        ),
+        (
+            "2024-03-01 00:00:00",
+            "2024-03-01 00:00:00.000000",
+        ),
+        (
+            "2024-03-01T00:00:00Z",
+            "2024-03-01 00:00:00.000000",
+        ),
+    ],
+)
+def test_maybe_convert_string_literal_to_ch_format(
+    literal_in: str, expected_literal: str
+) -> None:
+    """CH-shaped literals are unchanged; ISO 8601 literals map to canonical CH format."""
     ops = _maybe_convert_datetime_operands(
         [
             tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
-            tsi_query.LiteralOperation(**{"$literal": "2024-03-01 00:00:00.000000"}),
+            tsi_query.LiteralOperation(**{"$literal": literal_in}),
         ]
     )
-    assert ops[1].literal_ == "2024-03-01 00:00:00.000000"
-
-
-def test_maybe_convert_iso8601_literal_to_ch_format() -> None:
-    """ISO 8601 datetime literals are rewritten to canonical CH format."""
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
-            tsi_query.LiteralOperation(**{"$literal": "2024-03-01T00:00:00Z"}),
-        ]
-    )
-    assert ops[1].literal_ == "2024-03-01 00:00:00.000000"
+    assert ops[1].literal_ == expected_literal
 
 
 @pytest.mark.parametrize("field", ["started_at", "ended_at", "deleted_at"])
