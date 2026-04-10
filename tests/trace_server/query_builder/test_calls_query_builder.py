@@ -4346,9 +4346,7 @@ def test_query_with_annotation_filter_still_uses_anyif() -> None:
         tsi_query.EqOperation.model_validate(
             {
                 "$eq": [
-                    {
-                        "$getField": "feedback.[wandb.annotation.rating].payload.value"
-                    },
+                    {"$getField": "feedback.[wandb.annotation.rating].payload.value"},
                     {"$literal": "good"},
                 ]
             }
