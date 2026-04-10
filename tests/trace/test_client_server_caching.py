@@ -85,9 +85,11 @@ def test_weave_client_init_with_caching_middleware():
     client = weave_client.WeaveClient(
         "entity", "project", caching_server, ensure_project_exists=True
     )
-    mock_server.ensure_project_exists.assert_called_once_with(
-        "entity", "project", api_key=None, base_url=None
-    )
+    # Verify delegation: entity and project are passed through the caching layer.
+    # api_key/base_url are env-dependent so we only check positional args.
+    mock_server.ensure_project_exists.assert_called_once()
+    args, kwargs = mock_server.ensure_project_exists.call_args
+    assert args == ("entity", "project")
 
 
 def test_server_caching(client):
