@@ -29,6 +29,7 @@ SPAN_FILTERABLE_COLS: frozenset[str] = frozenset(
         "span_kind",
         "trace_id",
         "span_id",
+        "wb_run_id",
     }
 )
 

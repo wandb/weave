@@ -301,7 +301,8 @@ class AgentQueryHandler:
                    cache_creation_input_tokens, cache_read_input_tokens,
                    conversation_id, conversation_name,
                    tool_name, tool_type, tool_call_id,
-                   finish_reasons, error_type, custom_attrs, wb_user_id
+                   finish_reasons, error_type, custom_attrs,
+                   wb_user_id, wb_run_id
             FROM genai_spans s
             WHERE {where}
             ORDER BY {order_by}
@@ -578,6 +579,14 @@ class AgentQueryHandler:
             "conversation_id != ''",
         ]
         parameters: dict[str, Any] = {"project_id": req.project_id}
+
+        add_time_filters(
+            conditions,
+            parameters,
+            start=getattr(req, "start", None),
+            end=getattr(req, "end", None),
+            column="started_at",
+        )
 
         if req.filters:
             f = req.filters
@@ -1044,11 +1053,99 @@ class AgentWriteHandler:
     """ClickHouse write operations for agent data.
 
     Separate from AgentQueryHandler to keep read/write concerns apart.
-    Instantiated with a ClickHouse client and an optional Kafka producer.
+    Instantiated with a ClickHouse client.
     """
 
     def __init__(self, ch_client: CHClient) -> None:
         self._ch = ch_client
+
+    # ------------------------------------------------------------------
+    # OTel ingest
+    # ------------------------------------------------------------------
+
+    def otel_export(self, req: Any) -> Any:
+        """Ingest OTel spans into genai_spans (and message search index).
+
+        Receives ProcessedResourceSpans, extracts GenAI semconv fields via
+        genai_extraction, and batch-inserts into ClickHouse.
+        """
+        from weave.trace_server.opentelemetry.genai_extraction import (
+            extract_genai_span,
+        )
+        from weave.trace_server.opentelemetry.helpers import (
+            AttributePathConflictError,
+        )
+        from weave.trace_server.opentelemetry.python_spans import (
+            Resource,
+            Span,
+        )
+
+        span_rows: list[list[Any]] = []
+        search_rows: list[list[Any]] = []
+        accepted = 0
+        rejected = 0
+        errors: list[str] = []
+
+        for processed_span in req.processed_spans:
+            wb_run_id = getattr(processed_span, "run_id", None) or ""
+            proto_resource_spans = processed_span.resource_spans
+            resource = Resource.from_proto(proto_resource_spans.resource)
+
+            for proto_scope_spans in proto_resource_spans.scope_spans:
+                for proto_span in proto_scope_spans.spans:
+                    try:
+                        span = Span.from_proto(proto_span, resource)
+                    except AttributePathConflictError as e:
+                        rejected += 1
+                        errors.append(str(e))
+                        continue
+
+                    try:
+                        genai_row = extract_genai_span(
+                            span,
+                            project_id=req.project_id,
+                            wb_user_id=req.wb_user_id or "",
+                            wb_run_id=wb_run_id,
+                        )
+                    except Exception as e:
+                        rejected += 1
+                        errors.append(
+                            f"Extraction failed for span {span.span_id}: {e!s}"
+                        )
+                        continue
+
+                    span_rows.append(genai_span_to_row(genai_row))
+
+                    for sr in extract_search_rows(genai_row):
+                        search_rows.append(genai_search_row_to_row(sr))
+
+                    accepted += 1
+
+        if span_rows:
+            self._ch.insert(
+                "genai_spans",
+                data=span_rows,
+                column_names=ALL_GENAI_SPAN_INSERT_COLUMNS,
+            )
+
+        if search_rows:
+            self._ch.insert(
+                "genai_message_search",
+                data=search_rows,
+                column_names=ALL_GENAI_SEARCH_INSERT_COLUMNS,
+            )
+
+        from weave.trace_server.agent_types import GenAIOTelExportRes
+
+        error_msg = "; ".join(errors[:20])
+        if len(errors) > 20:
+            error_msg += "; ..."
+
+        return GenAIOTelExportRes(
+            accepted_spans=accepted,
+            rejected_spans=rejected,
+            error_message=error_msg,
+        )
 
     # ------------------------------------------------------------------
     # Chat projection
