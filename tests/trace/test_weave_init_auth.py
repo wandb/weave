@@ -931,9 +931,7 @@ def test_completions_falls_back_to_env_when_no_client_key():
         "weave.chat.completions.get_wandb_api_context", return_value="env-key"
     ) as mock_ctx:
         api_key = (
-            comp._client._api_key
-            if comp._client._api_key is not None
-            else mock_ctx()
+            comp._client._api_key if comp._client._api_key is not None else mock_ctx()
         )
         assert api_key == "env-key"
         mock_ctx.assert_called_once()
@@ -969,17 +967,19 @@ def test_inference_models_falls_back_to_env_when_no_client_key():
 # --- Coverage: project_creator with explicit credentials ---
 
 
-def test_project_creator_threads_credentials():
-    """ensure_project_exists should pass api_key/base_url to _ensure_project_exists."""
-    with patch(
-        "weave.wandb_interface.project_creator._ensure_project_exists",
-        return_value={"project_name": "proj"},
-    ) as mock_inner:
-        from weave.wandb_interface.project_creator import ensure_project_exists
+def test_project_creator_passes_credentials_to_api():
+    """_ensure_project_exists should construct wandb.Api with api_key and base_url."""
+    from weave.wandb_interface.project_creator import _ensure_project_exists
 
-        ensure_project_exists(
-            "entity", "project", api_key="key", base_url="https://example.com"
+    mock_api = MagicMock()
+    mock_api.project.return_value = {"project": {"name": "proj"}}
+
+    with patch("weave.wandb_interface.project_creator.wandb") as mock_wandb:
+        mock_wandb.Api.return_value = mock_api
+        result = _ensure_project_exists(
+            "entity", "proj", api_key="key", base_url="https://example.com"
         )
-        mock_inner.assert_called_once_with(
-            "entity", "project", api_key="key", base_url="https://example.com"
+        mock_wandb.Api.assert_called_once_with(
+            api_key="key", base_url="https://example.com"
         )
+        assert result == {"project_name": "proj"}
