@@ -1,4 +1,4 @@
--- Rollback Migration 027: Remove TTL support
+-- Rollback Migration 029: Remove TTL support
 
 -- Step 1: Remove TTL clauses from all tables that had MODIFY TTL in the up migration
 ALTER TABLE call_parts REMOVE TTL;
