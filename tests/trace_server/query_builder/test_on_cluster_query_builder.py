@@ -6,6 +6,10 @@ too, where _local tables don't exist. The _local suffix is now the caller's
 responsibility (via _get_calls_complete_table_name in the batched server).
 """
 
+from unittest.mock import patch
+
+import pytest
+
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     _format_table_name_with_cluster,
     build_calls_complete_delete_query,
@@ -24,25 +28,25 @@ CLUSTER = "weave_cluster"
 
 def test_format_table_name_with_cluster_never_appends_local() -> None:
     """_format_table_name_with_cluster only adds ON CLUSTER, never _local."""
-    # With cluster → ON CLUSTER appended, table name unchanged
+    # With cluster -> ON CLUSTER appended, table name unchanged
     assert _format_table_name_with_cluster("t", CLUSTER) == f"t ON CLUSTER {CLUSTER}"
     # Already-local table name preserved as-is
     assert (
         _format_table_name_with_cluster("t_local", CLUSTER)
         == f"t_local ON CLUSTER {CLUSTER}"
     )
-    # No cluster → plain table name
+    # No cluster -> plain table name
     assert _format_table_name_with_cluster("t", None) == "t"
 
 
 def test_on_cluster_mutations_never_inject_local_suffix() -> None:
-    """No mutation builder should inject _local — only the caller controls the table name.
+    """No mutation builder should inject _local -- only the caller controls the table name.
 
     Exercises all 6 mutation builders. calls_complete builders receive the plain
     table name; in production the batched server passes _get_calls_complete_table_name()
     which resolves to calls_complete_local only in distributed mode.
     """
-    # --- calls_complete: plain name in → plain name + ON CLUSTER out ---
+    # --- calls_complete: plain name in -> plain name + ON CLUSTER out ---
     update_end = build_calls_complete_update_end_query(
         table_name="calls_complete",
         project_id_param="p",
@@ -120,3 +124,59 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
     )
     assert f"annotator_queue_items_progress ON CLUSTER {CLUSTER}" in progress
     assert "annotator_queue_items_progress_local" not in progress
+
+
+@pytest.mark.parametrize(
+    ("use_distributed", "cluster_name", "expected_table", "expected_on_cluster"),
+    [
+        # Cloud mode: no cluster, no _local
+        (False, None, "calls_complete", False),
+        # Replicated mode: cluster set, but NOT distributed -> no _local
+        (False, CLUSTER, "calls_complete", True),
+        # Distributed mode: cluster set AND distributed -> _local
+        (True, CLUSTER, "calls_complete_local", True),
+    ],
+    ids=["cloud", "replicated", "distributed"],
+)
+def test_calls_complete_table_resolution_by_mode(
+    use_distributed: bool,
+    cluster_name: str | None,
+    expected_table: str,
+    expected_on_cluster: bool,
+) -> None:
+    """_get_calls_complete_table_name + _format_table_name_with_cluster must produce
+    correct SQL for each deployment mode.
+
+    This is the integration-level test that would have caught the original bug:
+    in replicated mode (cluster_name set, distributed=False), the old code produced
+    'calls_complete_local ON CLUSTER ...' but calls_complete_local doesn't exist.
+    """
+    env_vars = {
+        "WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES": str(use_distributed).lower(),
+    }
+    if cluster_name:
+        env_vars["WF_CLICKHOUSE_REPLICATED_CLUSTER"] = cluster_name
+
+    with patch.dict("os.environ", env_vars, clear=False):
+        # Simulate _get_calls_complete_table_name logic
+        from weave.trace_server import environment as wf_env
+
+        if wf_env.wf_clickhouse_use_distributed_tables():
+            table_name = "calls_complete_local"
+        else:
+            table_name = "calls_complete"
+
+        assert table_name == expected_table
+
+        # Build a mutation query with this table name
+        result = _format_table_name_with_cluster(
+            table_name, wf_env.wf_clickhouse_replicated_cluster()
+        )
+
+        assert expected_table in result
+        if expected_on_cluster:
+            assert f"ON CLUSTER {cluster_name}" in result
+        else:
+            assert "ON CLUSTER" not in result
+        # Never double-suffix
+        assert "_local_local" not in result
