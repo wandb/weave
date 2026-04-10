@@ -70,6 +70,10 @@ def parse_string_to_utc_timestamp(value: str) -> float | None:
     if not s:
         return None
 
+    # Check for a date without a time
+    # string: 'YYYY-MM-DD'
+    # index:   0123456789
+    # length: 10
     if len(s) == 10 and s[4] == "-" and s[7] == "-":
         try:
             d = datetime.date.fromisoformat(s)
