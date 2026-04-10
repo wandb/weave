@@ -301,7 +301,7 @@ def build_eval_rows_from_calls(
                 scores=scores,
                 model_latency_seconds=latency_seconds,
                 total_tokens=extract_total_tokens(
-                    predict_call.summary if predict_call else None
+                    predict_call.summary if predict_call else pas_call.summary
                 ),
                 scorer_call_ids=best_effort_scorer_call_ids(
                     scores if isinstance(scores, dict) else {}, trial_children
@@ -390,9 +390,14 @@ def eval_results_grouped_rows(
     if not predict_and_score_calls:
         return [], 0
 
-    predict_and_score_calls_set = {call.id for call in predict_and_score_calls}
-    child_calls = [c for c in all_calls if c.parent_id in predict_and_score_calls_set]
-    child_by_parent = build_child_by_parent(child_calls)
+    if req.include_predict_and_score_children:
+        predict_and_score_calls_set = {call.id for call in predict_and_score_calls}
+        child_calls = [
+            c for c in all_calls if c.parent_id in predict_and_score_calls_set
+        ]
+        child_by_parent = build_child_by_parent(child_calls)
+    else:
+        child_by_parent = {}
 
     row_map, row_eval_map = build_eval_rows_from_calls(
         predict_and_score_calls, child_by_parent, req.include_raw_data_rows
@@ -442,6 +447,7 @@ def eval_results_query(
         resolve_row_refs=False,  # ref resolution happens after pagination slice
         include_rows=True,
         include_summary=False,
+        include_predict_and_score_children=req.include_predict_and_score_children,
         summary_require_intersection=None,
         limit=None,
         offset=0,

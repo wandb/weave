@@ -117,6 +117,11 @@ class QueryOptimizationProcessor(ABC):
             result = self.process_operand(op)
             if result:
                 conditions.append(result)
+            elif NotContext.is_in_not_context():
+                # Bail if any of the predicates can't be optimized while inside a NOT.
+                # Otherwise the filter would become more restrictive than intended and
+                # we would "optimize" away valid matches.
+                return None
 
         if conditions:
             return "(" + " AND ".join(conditions) + ")"
@@ -132,9 +137,7 @@ class QueryOptimizationProcessor(ABC):
         for op in operation.or_:
             result = self.process_operand(op)
             if result is None:
-                # If any or condition can't be optimized, return
-                # TODO: this should return the non optimized,
-                # non aggreagated condition when available
+                # Bail if any of the predicates can't be optimized.
                 return None
             conditions.append(result)
 
@@ -541,9 +544,7 @@ def _create_like_optimized_eq_condition(
     like_pattern = _create_like_pattern_for_value(literal_value)
 
     like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
-    if use_null_check and _field_requires_null_check(field):
-        return f"({like_condition} OR {table_alias}.{field} IS NULL)"
-    return like_condition
+    return _maybe_use_null_check(like_condition, field, table_alias, use_null_check)
 
 
 def _create_like_optimized_contains_condition(
@@ -590,9 +591,7 @@ def _create_like_optimized_contains_condition(
     like_condition = _create_like_condition(
         field, like_pattern, pb, table_alias, case_insensitive
     )
-    if use_null_check and _field_requires_null_check(field):
-        return f"({like_condition} OR {table_alias}.{field} IS NULL)"
-    return like_condition
+    return _maybe_use_null_check(like_condition, field, table_alias, use_null_check)
 
 
 def _create_like_optimized_in_condition(
@@ -649,9 +648,7 @@ def _create_like_optimized_in_condition(
         like_conditions.append(like_condition)
 
     or_sql = "(" + " OR ".join(like_conditions) + ")"
-    if use_null_check and _field_requires_null_check(field):
-        return f"({or_sql} OR {table_alias}.{field} IS NULL)"
-    return or_sql
+    return _maybe_use_null_check(or_sql, field, table_alias, use_null_check)
 
 
 def _create_datetime_optimization_sql(
@@ -705,3 +702,34 @@ def _create_datetime_optimization_sql(
     return (
         f"{table_alias}.sortable_datetime {op_str} {param_slot(param_name, 'String')}"
     )
+
+
+def _maybe_use_null_check(
+    condition: str,
+    field: str,
+    table_alias: str,
+    use_null_check: bool,
+) -> str | None:
+    """Conditionally append `...OR IS NULL` to a SQL condition.
+    When querying calls_merged, we must pass through certain null values
+    (see `_field_requires_null_check`).
+
+    Returns a wrapped condition e.g. "x LIKE '%y%' OR t.attributes_dump IS NULL";
+    Returns None if the the null check cannot be safely applied (see note below).
+
+    Args:
+        condition: The condition to wrap with `OR IS NULL`, e.g. "x LIKE '%y%'".
+        field: The column name to add the `IS NULL` check to, e.g. "attributes_dump".
+        table_alias: The table name to use in SQL.
+        use_null_check: Whether to add OR IS NULL for start/end fields.
+            True for calls_merged (unmerged parts may have NULL fields).
+            False for calls_complete (every row is a complete call).
+    """
+    if use_null_check and _field_requires_null_check(field):
+        if NotContext.is_in_not_context():
+            # Inside "NOT (...)", adding "OR IS NULL" would invert to "AND IS NOT NULL"
+            # which is the opposite of the intention here. There is no way to safely
+            # include null values inside a "NOT" so we skip the optimization entirely.
+            return None
+        return f"({condition} OR {table_alias}.{field} IS NULL)"
+    return condition

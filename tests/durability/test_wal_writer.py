@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import time
 
 import pytest
 
@@ -117,18 +116,22 @@ class TestJSONLWALFileWriter:
 
         writer.close()
 
-    def test_fsync_timeout_triggers_sync(self, tmp_path: str) -> None:
+    def test_fsync_timeout_triggers_sync(
+        self, tmp_path: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """When fsync_timeout elapses, the next write triggers an fsync."""
         path = os.path.join(str(tmp_path), "test.jsonl")
+        monotonic_values = iter((100.0, 100.0, 100.02, 100.02))
+        monkeypatch.setattr(
+            "weave.durability.wal_writer.time.monotonic",
+            lambda: next(monotonic_values),
+        )
         # Large batch size so count alone won't trigger; short timeout.
         writer = _JSONLWALFileWriter(path, fsync_batch_size=1000, fsync_timeout=0.01)
 
         writer.write({"seq": 0})
         # Batch hasn't filled — 1 unsynced.
         assert writer._unsynced == 1
-
-        # Wait for the timeout to elapse.
-        time.sleep(0.02)
 
         # Next write should trigger fsync due to timeout.
         writer.write({"seq": 1})

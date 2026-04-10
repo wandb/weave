@@ -80,6 +80,7 @@ logger = logging.getLogger(__name__)
 
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
+CTE_EVAL_SUBCALLS = "eval_subcalls"
 
 
 class FilterConditionsResult(NamedTuple):
@@ -835,6 +836,7 @@ class CallsQuery(BaseModel):
     include_total_storage_size: bool = False
     read_table: ReadTable = ReadTable.CALLS_MERGED
     eval_root_ids: list[str] | None = None
+    include_predict_and_score_children: bool = True
 
     @property
     def use_agg_fn(self) -> bool:
@@ -1132,7 +1134,19 @@ class CallsQuery(BaseModel):
         )
 
         # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs and not object_ref_conditions:
+        # when querying the eval_root_ids on calls_merged, we need the CTE path
+        # to avoid duplicate subqueries, so skip the early return.
+        needs_eval_cte = (
+            self.eval_root_ids
+            and self.read_table == ReadTable.CALLS_MERGED
+            and self.include_predict_and_score_children
+        )
+        if (
+            not should_optimize
+            and not self.include_costs
+            and not object_ref_conditions
+            and not needs_eval_cte
+        ):
             return self._as_sql_base_format(pb, table_alias_resolved)
 
         # Use the filtered_calls CTE (two-pass) pattern only for calls_merged
@@ -1146,6 +1160,19 @@ class CallsQuery(BaseModel):
         ctes, field_to_object_join_alias_map = build_object_ref_ctes(
             pb, self.project_id, object_ref_conditions
         )
+
+        # Build a CTE for eval subcalls (direct children of eval roots) so both
+        # the WHERE clause and the HAVING clause can reference it without
+        # duplicating the subquery.
+        if needs_eval_cte:
+            subcall_cq = CallsQuery(
+                project_id=self.project_id, read_table=self.read_table
+            )
+            subcall_cq.add_field("id")
+            subcall_cq.set_hardcoded_filter(
+                HardCodedFilter(filter=tsi.CallsFilter(parent_ids=self.eval_root_ids))
+            )
+            ctes.add_cte(CTE_EVAL_SUBCALLS, subcall_cq.as_sql(pb))
 
         if use_filter_cte:
             # Build two queries: a filter CTE that narrows rows by light
@@ -1275,8 +1302,19 @@ class CallsQuery(BaseModel):
         trace_id = process_trace_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias
         )
+        needs_eval_cte = (
+            self.eval_root_ids
+            and self.read_table == ReadTable.CALLS_MERGED
+            and self.include_predict_and_score_children
+        )
         children_of_eval_ids = process_children_of_eval_ids_to_sql(
-            self.eval_root_ids, pb, table_alias, self.project_id, self.read_table
+            self.eval_root_ids,
+            pb,
+            table_alias,
+            self.project_id,
+            self.read_table,
+            eval_subcall_cte_name=CTE_EVAL_SUBCALLS if needs_eval_cte else None,
+            include_predict_and_score_children=self.include_predict_and_score_children,
         )
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
@@ -1597,6 +1635,31 @@ class CallsQuery(BaseModel):
             needs_feedback=needs_feedback,
         )
 
+    def _build_eval_subtree_having(
+        self,
+        existing_having: str,
+        pb: ParamBuilder,
+        table_alias: str,
+    ) -> str:
+        """Build a HAVING clause that filters out rows leaked via parent_id IS NULL.
+        On calls_merged, end rows have parent_id=NULL which causes the WHERE clause
+        to match all top-level calls in the project.
+        """
+        parent_id_field = get_field_by_name("parent_id")
+        if not isinstance(parent_id_field, CallsMergedAggField):
+            raise TypeError("parent_id is not an aggregate field")
+        parent_id_agg = parent_id_field.as_sql(pb, table_alias, use_agg_fn=True)
+        eval_ids_param = param_slot(pb.add_param(self.eval_root_ids), "Array(String)")
+        eval_subtree_having = f"{parent_id_agg} IN {eval_ids_param}"
+        if self.include_predict_and_score_children:
+            eval_subtree_having = (
+                f"({eval_subtree_having}"
+                f" OR {parent_id_agg} IN (SELECT id FROM {CTE_EVAL_SUBCALLS}))"
+            )
+        if existing_having:
+            return f"{existing_having}\n        AND {eval_subtree_having}"
+        return f"HAVING {eval_subtree_having}"
+
     def _build_query_body(
         self,
         pb: ParamBuilder,
@@ -1667,12 +1730,18 @@ class CallsQuery(BaseModel):
         ):
             where_clause = "WHERE 1"
 
+        # After GROUP BY, filter out rows that leaked in via parent_id IS NULL
+        # but don't actually belong to the eval subtree (e.g. top-level calls).
+        having_sql = filter_result.filter_sql
+        if self.eval_root_ids and self.read_table == ReadTable.CALLS_MERGED:
+            having_sql = self._build_eval_subtree_having(having_sql, pb, table_alias)
+
         return f"""FROM {table_alias}
         {joins.to_sql()}
         PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
         {where_clause}
         {group_by_sql}
-        {filter_result.filter_sql}
+        {having_sql}
         {order_result.order_by_sql}
         {order_result.limit_sql}
         {order_result.offset_sql}"""
@@ -2251,8 +2320,15 @@ def process_children_of_eval_ids_to_sql(
     table_alias: str,
     project_id: str = "",
     read_table: ReadTable = ReadTable.CALLS_MERGED,
+    eval_subcall_cte_name: str | None = None,
+    include_predict_and_score_children: bool = True,
 ) -> str:
-    """Fetch direct children of eval root IDs and their children for the eval results dataset."""
+    """Fetch direct children of eval root IDs and optionally their children.
+
+    When include_predict_and_score_children is False, only fetch
+    predict-and-score calls (direct children of eval roots), skipping
+    the nested subquery for their children (predict/scorer calls).
+    """
     if not eval_root_ids:
         return ""
     assert_parameter_length_less_than_max("eval_root_ids", len(eval_root_ids))
@@ -2268,22 +2344,28 @@ def process_children_of_eval_ids_to_sql(
         param_builder.add_param(eval_root_ids), "Array(String)"
     )
 
-    # we generate a nested CallsQuery to find all instances of the PredictandScore calls
-    # that are children of the eval root IDs. this is then used as a WHERE clause
-    # in the outer query to return both the PredictandScore calls and their children (scorers/predict calls).
-    eval_root_children_cq = CallsQuery(project_id=project_id, read_table=read_table)
-    eval_root_children_cq.add_field("id")
-    eval_root_children_cq.set_hardcoded_filter(
-        HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
-    )
-    eval_root_children_subquery = eval_root_children_cq.as_sql(param_builder)
+    # Level 1: direct children of the eval root ids (predict_and_score, summarize, etc).
+    parent_id_conditions = f"{parent_id_field_sql} IN {eval_root_ids_param}"
+
+    if include_predict_and_score_children:
+        # Level 2: children of the direct children (predict/score calls).
+        if eval_subcall_cte_name:
+            eval_root_children_subquery = f"SELECT id FROM {eval_subcall_cte_name}"
+        else:
+            eval_root_children_cq = CallsQuery(
+                project_id=project_id, read_table=read_table
+            )
+            eval_root_children_cq.add_field("id")
+            eval_root_children_cq.set_hardcoded_filter(
+                HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
+            )
+            eval_root_children_subquery = eval_root_children_cq.as_sql(param_builder)
+        parent_id_conditions += (
+            f" OR {parent_id_field_sql} IN ({eval_root_children_subquery})"
+        )
 
     # for the calls-merged table, each call is stored as split start/end rows.
     # end-rows have parent_id as NULL, so we need to do this.
-    parent_id_conditions = (
-        f"{parent_id_field_sql} IN {eval_root_ids_param}"
-        f" OR {parent_id_field_sql} IN ({eval_root_children_subquery})"
-    )
     if read_table == ReadTable.CALLS_MERGED:
         parent_null = parent_id_field.null_check_sql(
             param_builder, table_alias, read_table, use_agg_fn=False
