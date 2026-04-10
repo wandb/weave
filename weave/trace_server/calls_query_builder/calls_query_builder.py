@@ -59,7 +59,6 @@ from weave.trace_server.calls_query_builder.utils import (
     safely_format_sql,
     timestamp_to_datetime_str,
 )
-from weave.trace_server.clickhouse_trace_server_settings import LOCAL_TABLE_SUFFIX
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
@@ -2799,14 +2798,18 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
     )
 
 
-def _format_table_name_with_cluster(table_name: str, cluster_name: str | None) -> str:
+def _format_table_name_with_cluster(
+    table_name: str,
+    cluster_name: str | None,
+) -> str:
     """Format a table name with ON CLUSTER clause if cluster_name is provided.
 
-    In distributed mode, mutations (UPDATE, DELETE, etc.) must target the local
-    table with the ON CLUSTER clause to execute across all cluster nodes.
+    Callers are responsible for passing the correct table name (e.g.
+    calls_complete_local in distributed mode). This function only appends the
+    ON CLUSTER clause.
     """
     if cluster_name:
-        return f"{table_name}{LOCAL_TABLE_SUFFIX} ON CLUSTER {cluster_name}"
+        return f"{table_name} ON CLUSTER {cluster_name}"
     return table_name
 
 
