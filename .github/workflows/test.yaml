@@ -291,10 +291,10 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  trace-server-replicated-tests:
-    name: Replicated ClickHouse trace_server tests
+  trace-replicated-tests:
+    name: Replicated ClickHouse trace tests
     timeout-minutes: 15
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -360,16 +360,15 @@ jobs:
           DD_TRACE_ENABLED: false
           OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server')" -- \
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace')" -- \
             -m "trace_server and not skip_clickhouse_client" \
-            --clickhouse-replicated \
-            --ignore=tests/trace_server/query_builder
+            --clickhouse-replicated
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
-          flags: trace-server-replicated
-          name: trace-server-replicated-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          flags: trace-replicated
+          name: trace-replicated-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -380,7 +379,7 @@ jobs:
       - trace-tests
       - trace_no_server
       - trace-server-migrator-tests
-      - trace-server-replicated-tests
+      - trace-replicated-tests
 
     runs-on: ubuntu-latest
 
