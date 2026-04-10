@@ -84,7 +84,10 @@ def test_tag_validation():
     # Consecutive spaces rejected
     with pytest.raises(ValidationError):
         tsi.ObjAddTagsReq(
-            project_id="test/proj", object_id="obj", digest="abc123", tags=["two  spaces"]
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
+            tags=["two  spaces"],
         )
 
     # Valid tags accepted: alphanumeric, hyphens, underscores, single spaces, max length
@@ -93,8 +96,13 @@ def test_tag_validation():
         object_id="obj",
         digest="abc123",
         tags=[
-            "reviewed", "my-tag", "my_tag", "Tag123", "a" * 256,
-            "has spaces", "under review",
+            "reviewed",
+            "my-tag",
+            "my_tag",
+            "Tag123",
+            "a" * 256,
+            "has spaces",
+            "under review",
         ],
     )
 
@@ -119,7 +127,9 @@ def test_alias_validation():
     for reserved in ["latest", "v0", "v123"]:
         with pytest.raises(ValidationError):
             tsi.ObjSetAliasesReq(
-                project_id="test/proj", object_id="obj", digest="abc123",
+                project_id="test/proj",
+                object_id="obj",
+                digest="abc123",
                 aliases=[reserved],
             )
 
@@ -127,7 +137,9 @@ def test_alias_validation():
     for bad in ["path/slash", "has:colon"]:
         with pytest.raises(ValidationError):
             tsi.ObjSetAliasesReq(
-                project_id="test/proj", object_id="obj", digest="abc123",
+                project_id="test/proj",
+                object_id="obj",
+                digest="abc123",
                 aliases=[bad],
             )
 
@@ -135,7 +147,9 @@ def test_alias_validation():
     for ws in ["   ", "\t"]:
         with pytest.raises(ValidationError):
             tsi.ObjSetAliasesReq(
-                project_id="test/proj", object_id="obj", digest="abc123",
+                project_id="test/proj",
+                object_id="obj",
+                digest="abc123",
                 aliases=[ws],
             )
 
@@ -148,20 +162,26 @@ def test_alias_validation():
     # Too long (>128 chars) rejected
     with pytest.raises(ValidationError):
         tsi.ObjSetAliasesReq(
-            project_id="test/proj", object_id="obj", digest="abc123",
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
             aliases=["a" * 129],
         )
 
     # Exactly 128 is fine
     tsi.ObjSetAliasesReq(
-        project_id="test/proj", object_id="obj", digest="abc123",
+        project_id="test/proj",
+        object_id="obj",
+        digest="abc123",
         aliases=["a" * 128],
     )
 
     # Valid alias names: broad charset, dots, spaces all OK
     for valid in ["production", "my-deploy.v2", "has spaces"]:
         tsi.ObjSetAliasesReq(
-            project_id="test/proj", object_id="obj", digest="abc123",
+            project_id="test/proj",
+            object_id="obj",
+            digest="abc123",
             aliases=[valid],
         )
 
@@ -208,7 +228,8 @@ def test_server_tag_crud(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=object_id, digest=digest,
+            object_id=object_id,
+            digest=digest,
             tags=["reviewed", "staging"],
         )
     )
@@ -225,7 +246,8 @@ def test_server_tag_crud(client: WeaveClient):
     client.server.obj_remove_tags(
         tsi.ObjRemoveTagsReq(
             project_id=client.project_id,
-            object_id=object_id, digest=digest,
+            object_id=object_id,
+            digest=digest,
             tags=["reviewed"],
         )
     )
@@ -242,14 +264,16 @@ def test_server_tag_crud(client: WeaveClient):
     client.server.obj_remove_tags(
         tsi.ObjRemoveTagsReq(
             project_id=client.project_id,
-            object_id=object_id, digest=digest,
+            object_id=object_id,
+            digest=digest,
             tags=["staging"],
         )
     )
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=object_id, digest=digest,
+            object_id=object_id,
+            digest=digest,
             tags=["staging"],
         )
     )
@@ -267,7 +291,8 @@ def test_server_tag_crud(client: WeaveClient):
         client.server.obj_add_tags(
             tsi.ObjAddTagsReq(
                 project_id=client.project_id,
-                object_id=object_id, digest=digest,
+                object_id=object_id,
+                digest=digest,
                 tags=["staging"],
             )
         )
@@ -284,7 +309,8 @@ def test_server_tag_crud(client: WeaveClient):
     client.server.obj_remove_tags(
         tsi.ObjRemoveTagsReq(
             project_id=client.project_id,
-            object_id=object_id, digest=digest,
+            object_id=object_id,
+            digest=digest,
             tags=["never-added"],
         )
     )
@@ -293,7 +319,8 @@ def test_server_tag_crud(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=object_id, digest=digest,
+            object_id=object_id,
+            digest=digest,
             tags=["latest"],
         )
     )
@@ -320,7 +347,8 @@ def test_server_alias_crud(client: WeaveClient):
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=object_id, digest=digest,
+            object_id=object_id,
+            digest=digest,
             aliases=["production"],
         )
     )
@@ -348,14 +376,16 @@ def test_server_alias_crud(client: WeaveClient):
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=v0.object_id, digest=v0.digest,
+            object_id=v0.object_id,
+            digest=v0.digest,
             aliases=["staging"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=v1.object_id, digest=v1.digest,
+            object_id=v1.object_id,
+            digest=v1.digest,
             aliases=["staging"],
         )
     )
@@ -440,14 +470,16 @@ def test_server_tag_on_deleted_object(client: WeaveClient):
     client.server.obj_delete(
         tsi.ObjDeleteReq(
             project_id=client.project_id,
-            object_id=oid, digests=[digest],
+            object_id=oid,
+            digests=[digest],
         )
     )
     with pytest.raises(NotFoundError):
         client.server.obj_add_tags(
             tsi.ObjAddTagsReq(
                 project_id=client.project_id,
-                object_id=oid, digest=digest,
+                object_id=oid,
+                digest=digest,
                 tags=["should-fail"],
             )
         )
@@ -459,14 +491,16 @@ def test_server_alias_on_deleted_object(client: WeaveClient):
     client.server.obj_delete(
         tsi.ObjDeleteReq(
             project_id=client.project_id,
-            object_id=oid, digests=[digest],
+            object_id=oid,
+            digests=[digest],
         )
     )
     with pytest.raises(NotFoundError):
         client.server.obj_set_aliases(
             tsi.ObjSetAliasesReq(
                 project_id=client.project_id,
-                object_id=oid, digest=digest,
+                object_id=oid,
+                digest=digest,
                 aliases=["should-fail"],
             )
         )
@@ -484,14 +518,16 @@ def test_server_enrichment(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid, digest=digest,
+            object_id=oid,
+            digest=digest,
             tags=["reviewed"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid, digest=digest,
+            object_id=oid,
+            digest=digest,
             aliases=["prod"],
         )
     )
@@ -509,7 +545,8 @@ def test_server_enrichment(client: WeaveClient):
     read_res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client.project_id,
-            object_id=oid, digest=digest,
+            object_id=oid,
+            digest=digest,
         )
     )
     assert read_res.obj.tags is None
@@ -530,7 +567,8 @@ def test_server_enrichment(client: WeaveClient):
     read_res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client.project_id,
-            object_id=oid, digest=digest,
+            object_id=oid,
+            digest=digest,
             include_tags_and_aliases=True,
         )
     )
@@ -543,7 +581,8 @@ def test_server_enrichment(client: WeaveClient):
     read_res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client.project_id,
-            object_id=oid2, digest=digest2,
+            object_id=oid2,
+            digest=digest2,
             include_tags_and_aliases=True,
         )
     )
@@ -569,14 +608,16 @@ def test_server_enrichment(client: WeaveClient):
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=v0.object_id, digest=v0.digest,
+            object_id=v0.object_id,
+            digest=v0.digest,
             aliases=["stable"],
         )
     )
     read_v0 = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client.project_id,
-            object_id=v0.object_id, digest=v0.digest,
+            object_id=v0.object_id,
+            digest=v0.digest,
             include_tags_and_aliases=True,
         )
     )
@@ -597,7 +638,8 @@ def test_server_obj_read_digest_types(client: WeaveClient):
     res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client.project_id,
-            object_id=oid, digest=digest,
+            object_id=oid,
+            digest=digest,
         )
     )
     assert res.obj.digest == digest
@@ -607,21 +649,24 @@ def test_server_obj_read_digest_types(client: WeaveClient):
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid, digest=digest,
+            object_id=oid,
+            digest=digest,
             aliases=["production"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid, digest=digest,
+            object_id=oid,
+            digest=digest,
             aliases=["stable"],
         )
     )
     res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client.project_id,
-            object_id=oid, digest="production",
+            object_id=oid,
+            digest="production",
             include_tags_and_aliases=True,
         )
     )
@@ -637,7 +682,8 @@ def test_server_obj_read_digest_types(client: WeaveClient):
         tsi.ObjQueryReq(
             project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(
-                object_ids=["srv_read_latest"], latest_only=True,
+                object_ids=["srv_read_latest"],
+                latest_only=True,
             ),
         )
     )
@@ -645,14 +691,16 @@ def test_server_obj_read_digest_types(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=v1.object_id, digest=v1.digest,
+            object_id=v1.object_id,
+            digest=v1.digest,
             tags=["deployed"],
         )
     )
     read_res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client.project_id,
-            object_id="srv_read_latest", digest="latest",
+            object_id="srv_read_latest",
+            digest="latest",
             include_tags_and_aliases=True,
         )
     )
@@ -665,7 +713,8 @@ def test_server_obj_read_digest_types(client: WeaveClient):
         client.server.obj_read(
             tsi.ObjReadReq(
                 project_id=client.project_id,
-                object_id=oid, digest="nonexistent-alias",
+                object_id=oid,
+                digest="nonexistent-alias",
             )
         )
 
@@ -684,13 +733,17 @@ def test_server_filter_by_tags(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid1, digest=d1, tags=["alpha"],
+            object_id=oid1,
+            digest=d1,
+            tags=["alpha"],
         )
     )
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid2, digest=d2, tags=["beta"],
+            object_id=oid2,
+            digest=d2,
+            tags=["beta"],
         )
     )
 
@@ -740,7 +793,8 @@ def test_server_filter_by_aliases(client: WeaveClient):
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid, digest=digest,
+            object_id=oid,
+            digest=digest,
             aliases=["production"],
         )
     )
@@ -786,7 +840,8 @@ def test_server_filter_by_aliases(client: WeaveClient):
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=v1.object_id, digest=v1.digest,
+            object_id=v1.object_id,
+            digest=v1.digest,
             aliases=["pinned"],
         )
     )
@@ -820,13 +875,17 @@ def test_server_filter_combined_tags_and_aliases(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid1, digest=d1, tags=["reviewed"],
+            object_id=oid1,
+            digest=d1,
+            tags=["reviewed"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid1, digest=d1, aliases=["production"],
+            object_id=oid1,
+            digest=d1,
+            aliases=["production"],
         )
     )
 
@@ -834,7 +893,9 @@ def test_server_filter_combined_tags_and_aliases(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid2, digest=d2, tags=["reviewed"],
+            object_id=oid2,
+            digest=d2,
+            tags=["reviewed"],
         )
     )
 
@@ -842,7 +903,9 @@ def test_server_filter_combined_tags_and_aliases(client: WeaveClient):
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid3, digest=d3, aliases=["production"],
+            object_id=oid3,
+            digest=d3,
+            aliases=["production"],
         )
     )
 
@@ -850,7 +913,8 @@ def test_server_filter_combined_tags_and_aliases(client: WeaveClient):
         tsi.ObjQueryReq(
             project_id=client.project_id,
             filter=tsi.ObjectVersionFilter(
-                tags=["reviewed"], aliases=["production"],
+                tags=["reviewed"],
+                aliases=["production"],
             ),
         )
     )
@@ -880,7 +944,8 @@ def test_server_version_and_object_isolation(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=v0.object_id, digest=v0.digest,
+            object_id=v0.object_id,
+            digest=v0.digest,
             tags=["v0-only"],
         )
     )
@@ -899,14 +964,16 @@ def test_server_version_and_object_isolation(client: WeaveClient):
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=v0.object_id, digest=v0.digest,
+            object_id=v0.object_id,
+            digest=v0.digest,
             aliases=["stable"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=v1.object_id, digest=v1.digest,
+            object_id=v1.object_id,
+            digest=v1.digest,
             aliases=["canary"],
         )
     )
@@ -930,14 +997,16 @@ def test_server_version_and_object_isolation(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid_a, digest=digest_a,
+            object_id=oid_a,
+            digest=digest_a,
             tags=["only-on-a"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid_b, digest=digest_b,
+            object_id=oid_b,
+            digest=digest_b,
             aliases=["only-on-b"],
         )
     )
@@ -964,25 +1033,33 @@ def test_server_batch_enrichment(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid1, digest=d1, tags=["alpha"],
+            object_id=oid1,
+            digest=d1,
+            tags=["alpha"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid1, digest=d1, aliases=["prod"],
+            object_id=oid1,
+            digest=d1,
+            aliases=["prod"],
         )
     )
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid2, digest=d2, tags=["beta"],
+            object_id=oid2,
+            digest=d2,
+            tags=["beta"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid3, digest=d3, aliases=["canary"],
+            object_id=oid3,
+            digest=d3,
+            aliases=["canary"],
         )
     )
 
@@ -1016,8 +1093,16 @@ def test_server_batch_enrichment(client: WeaveClient):
 def test_server_list_endpoints(client: WeaveClient):
     """List tags and aliases: empty project, distinct sorted, excludes removed."""
     # Empty project
-    assert client.server.tags_list(tsi.TagsListReq(project_id=client.project_id)).tags == []
-    assert client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id)).aliases == []
+    assert (
+        client.server.tags_list(tsi.TagsListReq(project_id=client.project_id)).tags
+        == []
+    )
+    assert (
+        client.server.aliases_list(
+            tsi.AliasesListReq(project_id=client.project_id)
+        ).aliases
+        == []
+    )
 
     # Add overlapping tags/aliases across objects
     oid1, d1 = _publish_obj(client, "srv_list_1")
@@ -1026,13 +1111,17 @@ def test_server_list_endpoints(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid1, digest=d1, tags=["beta", "alpha"],
+            object_id=oid1,
+            digest=d1,
+            tags=["beta", "alpha"],
         )
     )
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid2, digest=d2, tags=["alpha", "gamma"],
+            object_id=oid2,
+            digest=d2,
+            tags=["alpha", "gamma"],
         )
     )
     res = client.server.tags_list(tsi.TagsListReq(project_id=client.project_id))
@@ -1041,13 +1130,17 @@ def test_server_list_endpoints(client: WeaveClient):
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid1, digest=d1, aliases=["production"],
+            object_id=oid1,
+            digest=d1,
+            aliases=["production"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid2, digest=d2, aliases=["canary"],
+            object_id=oid2,
+            digest=d2,
+            aliases=["canary"],
         )
     )
     res = client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id))
@@ -1057,13 +1150,16 @@ def test_server_list_endpoints(client: WeaveClient):
     client.server.obj_remove_tags(
         tsi.ObjRemoveTagsReq(
             project_id=client.project_id,
-            object_id=oid1, digest=d1, tags=["beta"],
+            object_id=oid1,
+            digest=d1,
+            tags=["beta"],
         )
     )
     client.server.obj_remove_aliases(
         tsi.ObjRemoveAliasesReq(
             project_id=client.project_id,
-            object_id=oid1, aliases=["production"],
+            object_id=oid1,
+            aliases=["production"],
         )
     )
     res = client.server.tags_list(tsi.TagsListReq(project_id=client.project_id))
@@ -1247,7 +1343,8 @@ def test_sdk_uri_strings(client: WeaveClient):
 def test_sdk_add_tags_error_nonexistent(client: WeaveClient):
     """SDK add_tags raises NotFoundError on fake ref."""
     fake_ref = ObjectRef(
-        entity="test", project="test",
+        entity="test",
+        project="test",
         name="nonexistent_object",
         _digest="0" * 43,
     )
@@ -1258,7 +1355,8 @@ def test_sdk_add_tags_error_nonexistent(client: WeaveClient):
 def test_sdk_set_aliases_error_nonexistent(client: WeaveClient):
     """SDK set_aliases raises NotFoundError on fake ref."""
     fake_ref = ObjectRef(
-        entity="test", project="test",
+        entity="test",
+        project="test",
         name="nonexistent_object",
         _digest="0" * 43,
     )
@@ -1304,7 +1402,9 @@ def test_weave_tag_functions(client: WeaveClient):
     assert weave.get_tags(ref3) == sorted(weave.get_tags(ref3))
 
     # Tags from publish() and add_tags() combine
-    ref4 = weave.publish({"data": "test4"}, name="tl_tags_combine", tags=["from-publish"])
+    ref4 = weave.publish(
+        {"data": "test4"}, name="tl_tags_combine", tags=["from-publish"]
+    )
     weave.add_tags(ref4, ["from-add"])
     tags = weave.get_tags(ref4)
     assert "from-publish" in tags
@@ -1504,8 +1604,10 @@ def test_publish_with_tags_and_aliases(client: WeaveClient):
     """Tags and aliases set at publish time work with resolution."""
     weave.publish({"v": 0}, name="pub_resolve")
     weave.publish(
-        {"v": 1}, name="pub_resolve",
-        tags=["release-candidate"], aliases=["rc"],
+        {"v": 1},
+        name="pub_resolve",
+        tags=["release-candidate"],
+        aliases=["rc"],
     )
     weave.publish({"v": 2}, name="pub_resolve")
 
@@ -1530,20 +1632,26 @@ def test_cross_project_isolation(client: WeaveClient):
     # Tag only project A
     server.obj_add_tags(
         tsi.ObjAddTagsReq(
-            project_id=proj_a, object_id="shared_obj", digest=digest_a,
+            project_id=proj_a,
+            object_id="shared_obj",
+            digest=digest_a,
             tags=["proj-a-only"],
         )
     )
     res_a = server.obj_read(
         tsi.ObjReadReq(
-            project_id=proj_a, object_id="shared_obj", digest=digest_a,
+            project_id=proj_a,
+            object_id="shared_obj",
+            digest=digest_a,
             include_tags_and_aliases=True,
         )
     )
     assert "proj-a-only" in (res_a.obj.tags or [])
     res_b = server.obj_read(
         tsi.ObjReadReq(
-            project_id=proj_b, object_id="shared_obj", digest=digest_b,
+            project_id=proj_b,
+            object_id="shared_obj",
+            digest=digest_b,
             include_tags_and_aliases=True,
         )
     )
@@ -1552,20 +1660,26 @@ def test_cross_project_isolation(client: WeaveClient):
     # Alias only project A
     server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
-            project_id=proj_a, object_id="shared_obj", digest=digest_a,
+            project_id=proj_a,
+            object_id="shared_obj",
+            digest=digest_a,
             aliases=["production"],
         )
     )
     res_a = server.obj_read(
         tsi.ObjReadReq(
-            project_id=proj_a, object_id="shared_obj", digest=digest_a,
+            project_id=proj_a,
+            object_id="shared_obj",
+            digest=digest_a,
             include_tags_and_aliases=True,
         )
     )
     assert "production" in (res_a.obj.aliases or [])
     res_b = server.obj_read(
         tsi.ObjReadReq(
-            project_id=proj_b, object_id="shared_obj", digest=digest_b,
+            project_id=proj_b,
+            object_id="shared_obj",
+            digest=digest_b,
             include_tags_and_aliases=True,
         )
     )
@@ -1585,7 +1699,9 @@ def test_cross_project_isolation(client: WeaveClient):
     # Alias resolution scoped
     res = server.obj_read(
         tsi.ObjReadReq(
-            project_id=proj_a, object_id="shared_obj", digest="production",
+            project_id=proj_a,
+            object_id="shared_obj",
+            digest="production",
             include_tags_and_aliases=True,
         )
     )
@@ -1593,7 +1709,9 @@ def test_cross_project_isolation(client: WeaveClient):
     with pytest.raises(NotFoundError):
         server.obj_read(
             tsi.ObjReadReq(
-                project_id=proj_b, object_id="shared_obj", digest="production",
+                project_id=proj_b,
+                object_id="shared_obj",
+                digest="production",
             )
         )
 
@@ -1610,14 +1728,16 @@ def test_deletion_cascades(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid, digest=digest,
+            object_id=oid,
+            digest=digest,
             tags=["reviewed", "staging"],
         )
     )
     client.server.obj_delete(
         tsi.ObjDeleteReq(
             project_id=client.project_id,
-            object_id=oid, digests=[digest],
+            object_id=oid,
+            digests=[digest],
         )
     )
     tags_res = client.server.tags_list(tsi.TagsListReq(project_id=client.project_id))
@@ -1629,23 +1749,28 @@ def test_deletion_cascades(client: WeaveClient):
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid2, digest=digest2,
+            object_id=oid2,
+            digest=digest2,
             aliases=["production"],
         )
     )
     client.server.obj_delete(
         tsi.ObjDeleteReq(
             project_id=client.project_id,
-            object_id=oid2, digests=[digest2],
+            object_id=oid2,
+            digests=[digest2],
         )
     )
-    aliases_res = client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id))
+    aliases_res = client.server.aliases_list(
+        tsi.AliasesListReq(project_id=client.project_id)
+    )
     assert "production" not in aliases_res.aliases
     with pytest.raises(NotFoundError):
         client.server.obj_read(
             tsi.ObjReadReq(
                 project_id=client.project_id,
-                object_id=oid2, digest="production",
+                object_id=oid2,
+                digest="production",
             )
         )
 
@@ -1655,25 +1780,33 @@ def test_deletion_cascades(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid3, digest=d3_0, tags=["v0-tag"],
+            object_id=oid3,
+            digest=d3_0,
+            tags=["v0-tag"],
         )
     )
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid3, digest=d3_1, tags=["v1-tag"],
+            object_id=oid3,
+            digest=d3_1,
+            tags=["v1-tag"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid3, digest=d3_0, aliases=["v0-alias"],
+            object_id=oid3,
+            digest=d3_0,
+            aliases=["v0-alias"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid3, digest=d3_1, aliases=["v1-alias"],
+            object_id=oid3,
+            digest=d3_1,
+            aliases=["v1-alias"],
         )
     )
     client.server.obj_delete(
@@ -1685,7 +1818,9 @@ def test_deletion_cascades(client: WeaveClient):
     tags_res = client.server.tags_list(tsi.TagsListReq(project_id=client.project_id))
     assert "v0-tag" not in tags_res.tags
     assert "v1-tag" not in tags_res.tags
-    aliases_res = client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id))
+    aliases_res = client.server.aliases_list(
+        tsi.AliasesListReq(project_id=client.project_id)
+    )
     assert "v0-alias" not in aliases_res.aliases
     assert "v1-alias" not in aliases_res.aliases
 
@@ -1695,31 +1830,40 @@ def test_deletion_cascades(client: WeaveClient):
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid4, digest=d4_0, tags=["doomed"],
+            object_id=oid4,
+            digest=d4_0,
+            tags=["doomed"],
         )
     )
     client.server.obj_add_tags(
         tsi.ObjAddTagsReq(
             project_id=client.project_id,
-            object_id=oid4, digest=d4_1, tags=["survivor"],
+            object_id=oid4,
+            digest=d4_1,
+            tags=["survivor"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid4, digest=d4_0, aliases=["doomed-alias"],
+            object_id=oid4,
+            digest=d4_0,
+            aliases=["doomed-alias"],
         )
     )
     client.server.obj_set_aliases(
         tsi.ObjSetAliasesReq(
             project_id=client.project_id,
-            object_id=oid4, digest=d4_1, aliases=["survivor-alias"],
+            object_id=oid4,
+            digest=d4_1,
+            aliases=["survivor-alias"],
         )
     )
     client.server.obj_delete(
         tsi.ObjDeleteReq(
             project_id=client.project_id,
-            object_id=oid4, digests=[d4_0],
+            object_id=oid4,
+            digests=[d4_0],
         )
     )
 
@@ -1739,6 +1883,8 @@ def test_deletion_cascades(client: WeaveClient):
     tags_res = client.server.tags_list(tsi.TagsListReq(project_id=client.project_id))
     assert "doomed" not in tags_res.tags
     assert "survivor" in tags_res.tags
-    aliases_res = client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id))
+    aliases_res = client.server.aliases_list(
+        tsi.AliasesListReq(project_id=client.project_id)
+    )
     assert "doomed-alias" not in aliases_res.aliases
     assert "survivor-alias" in aliases_res.aliases
