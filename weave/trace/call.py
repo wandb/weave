@@ -362,6 +362,7 @@ def _make_calls_iterator(
     expand_columns: list[str] | None = None,
     return_expanded_column_values: bool = True,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
+    base_url: str | None = None,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
         # Add the global offset to the page offset
@@ -394,7 +395,7 @@ def _make_calls_iterator(
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
         entity, project = from_project_id(project_id)
-        return make_client_call(entity, project, call, server)
+        return make_client_call(entity, project, call, server, base_url=base_url)
 
     def size_func() -> int:
         response = server.calls_query_stats(
@@ -426,7 +427,11 @@ def _make_calls_iterator(
 
 
 def make_client_call(
-    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
+    entity: str,
+    project: str,
+    server_call: CallSchema,
+    server: TraceServerInterface,
+    base_url: str | None = None,
 ) -> WeaveObject:
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
@@ -455,6 +460,7 @@ def make_client_call(
         wb_run_step_end=server_call.wb_run_step_end,
         storage_size_bytes=server_call.storage_size_bytes,
         total_storage_size_bytes=server_call.total_storage_size_bytes,
+        _base_url=base_url,
     )
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()

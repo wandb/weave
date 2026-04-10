@@ -678,6 +678,7 @@ class WeaveClient:
             expand_columns=expand_columns,
             return_expanded_column_values=return_expanded_column_values,
             page_size=page_size,
+            base_url=self._base_url,
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -715,7 +716,13 @@ class WeaveClient:
         if not calls:
             raise ValueError(f"Call not found: {call_id}")
         response_call = calls[0]
-        return make_client_call(self.entity, self.project, response_call, self.server)
+        return make_client_call(
+            self.entity,
+            self.project,
+            response_call,
+            self.server,
+            base_url=self._base_url,
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(

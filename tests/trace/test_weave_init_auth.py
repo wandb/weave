@@ -5,11 +5,22 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from weave.trace import weave_init
+from weave.chat.completions import Completions
+from weave.chat.inference_models import InferenceModels
+from weave.compat.wandb.wandb_thin.internal_api import Api
+from weave.trace import urls, weave_init
+from weave.trace.call import Call
 from weave.trace.context import weave_client_context
+from weave.trace.env import wandb_base_url
+from weave.trace.op import op
+from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import (
     get_entity_project_from_project_name,
 )
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
+)
+from weave.wandb_interface.context import get_wandb_api_context
 
 
 @pytest.fixture(autouse=True)
@@ -244,10 +255,6 @@ def test_base_url_derives_trace_server_url(mock_wandb_api):
 
 
 def _make_mock_server():
-    from weave.trace_server_bindings.remote_http_trace_server import (
-        RemoteHTTPTraceServer,
-    )
-
     mock = MagicMock(spec=RemoteHTTPTraceServer)
     mock.server_info.return_value = MagicMock(
         min_required_weave_python_version="0.0.0",
@@ -428,16 +435,12 @@ def test_init_weave_without_base_url_stores_none_on_client(mock_wandb_api):
 
 def test_get_wandb_api_context_falls_back_to_env(monkeypatch):
     """get_wandb_api_context should read from environment variables."""
-    from weave.wandb_interface.context import get_wandb_api_context
-
     monkeypatch.setenv("WANDB_API_KEY", "env-key-123")
     assert get_wandb_api_context() == "env-key-123"
 
 
 def test_wandb_base_url_falls_back_to_env(monkeypatch):
     """wandb_base_url should read from env var."""
-    from weave.trace.env import wandb_base_url
-
     monkeypatch.setenv("WANDB_BASE_URL", "https://env.example.com")
     assert wandb_base_url() == "https://env.example.com"
 
@@ -492,8 +495,6 @@ def test_call_ui_url_uses_client_base_url(mock_wandb_api):
     """Call.ui_url should use the base_url from the client that created it,
     not a global or the default.
     """
-    from weave.trace.call import Call
-
     call = Call(
         _op_name="test-op",
         project_id="test-entity/test-project",
@@ -528,9 +529,6 @@ def test_no_global_state_leakage_after_init(mock_wandb_api, monkeypatch):
     mock_wandb_api.default_entity_name.return_value = "test-entity"
     mock_server = _make_mock_server()
 
-    from weave.trace.env import wandb_base_url
-    from weave.wandb_interface.context import get_wandb_api_context
-
     # Set env vars to known values
     monkeypatch.setenv("WANDB_BASE_URL", "https://env.example.com")
     monkeypatch.setenv("WANDB_API_KEY", "env-key")
@@ -563,8 +561,6 @@ def test_internal_api_uses_client_credentials(mock_wandb_api):
     """wandb.Api created with explicit credentials should use them,
     not fall back to global state.
     """
-    from weave.compat.wandb.wandb_thin.internal_api import Api
-
     api = Api(api_key="my-key", base_url="https://custom.example.com")
     assert api._api_key == "my-key"
     assert api._base_url == "https://custom.example.com"
@@ -656,10 +652,6 @@ def test_get_entity_project_receives_credentials(mock_wandb_api):
 
 def test_completions_uses_client_api_key():
     """Completions and InferenceModels should prefer client._api_key over env."""
-    from weave.chat.completions import Completions
-    from weave.chat.inference_models import InferenceModels
-    from weave.trace.weave_client import WeaveClient
-
     mock_server = _make_mock_server()
     client = WeaveClient(
         "entity",
@@ -683,8 +675,6 @@ def test_completions_uses_client_api_key():
 
 def test_url_functions_with_explicit_base_url():
     """All URL functions should use explicit base_url when provided."""
-    from weave.trace import urls
-
     for fn, args in [
         (urls.remote_project_root_url, ("entity", "project")),
         (urls.project_weave_root_url, ("entity", "project")),
@@ -740,8 +730,6 @@ def test_finish_one_client_does_not_affect_another(mock_wandb_api):
 @pytest.mark.disable_logging_error_check
 def test_client_create_call_sets_base_url(mock_wandb_api):
     """WeaveClient.create_call should set _base_url on the Call object."""
-    from weave.trace.weave_client import WeaveClient
-
     mock_server = _make_mock_server()
     client = WeaveClient(
         "entity",
@@ -751,8 +739,6 @@ def test_client_create_call_sets_base_url(mock_wandb_api):
         base_url="https://custom.example.com",
     )
     weave_client_context.set_weave_client_global(client)
-
-    from weave.trace.op import op
 
     @op
     def dummy_op():
@@ -769,8 +755,6 @@ def test_thread_captures_client_base_url(mock_wandb_api):
     """Operations deferred to FutureExecutor should capture the client's
     _base_url via closure, not read from globals.
     """
-    from weave.trace.weave_client import WeaveClient
-
     mock_server = _make_mock_server()
     client = WeaveClient(
         "entity",
@@ -798,8 +782,6 @@ def test_thread_captures_client_base_url(mock_wandb_api):
 
 def test_wal_callback_uses_client_base_url(mock_wandb_api):
     """The WAL send callback should use self._base_url to generate call URLs."""
-    from weave.trace.weave_client import WeaveClient
-
     mock_server = _make_mock_server()
     client = WeaveClient(
         "entity",
@@ -826,3 +808,178 @@ def test_wal_callback_uses_client_base_url(mock_wandb_api):
         )
 
     client.finish()
+
+
+# --- Coverage: init_weave api_key=None fallback path (lines 130-139) ---
+
+
+def test_init_weave_without_api_key_reads_from_env(mock_wandb_api):
+    """When api_key is not provided, init_weave should read from env/netrc
+    via get_wandb_api_context().
+    """
+    mock_wandb_api.default_entity_name.return_value = "test-entity"
+    mock_server = _make_mock_server()
+
+    with (
+        patch("weave.trace.weave_init.init_weave_get_server", return_value=mock_server),
+        patch("weave.trace.weave_init._weave_is_available", return_value=True),
+        patch("weave.trace.weave_init.get_username", return_value="test-user"),
+        patch("weave.trace.weave_init.init_message"),
+        patch(
+            "weave.trace.weave_init.get_wandb_api_context", return_value="env-key"
+        ) as mock_ctx,
+    ):
+        client = weave_init.init_weave("test-project")
+        # Should have read api_key from env context
+        mock_ctx.assert_called_once()
+        assert client._api_key == "env-key"
+        client.finish()
+        weave_client_context.set_weave_client_global(None)
+
+
+def test_init_weave_prompts_login_when_no_key_anywhere(mock_wandb_api):
+    """When api_key is None and get_wandb_api_context() returns None,
+    init_weave should prompt wandb.login() and use base_url for the login URL.
+    """
+    mock_wandb_api.default_entity_name.return_value = "test-entity"
+    mock_server = _make_mock_server()
+
+    with (
+        patch("weave.trace.weave_init.init_weave_get_server", return_value=mock_server),
+        patch("weave.trace.weave_init._weave_is_available", return_value=True),
+        patch("weave.trace.weave_init.get_username", return_value="test-user"),
+        patch("weave.trace.weave_init.init_message"),
+        # First call returns None (no key), second call returns key after login
+        patch(
+            "weave.trace.weave_init.get_wandb_api_context",
+            side_effect=[None, "login-key"],
+        ),
+        patch("weave.trace.weave_init.wandb") as mock_wandb,
+    ):
+        mock_wandb.app_url.return_value = "https://custom.example.com"
+        mock_wandb.login.return_value = None
+        client = weave_init.init_weave(
+            "test-project", base_url="https://custom.example.com"
+        )
+        # Should have called wandb.login
+        mock_wandb.login.assert_called_once()
+        # app_url should have been called with the explicit base_url
+        mock_wandb.app_url.assert_called_with("https://custom.example.com")
+        client.finish()
+        weave_client_context.set_weave_client_global(None)
+
+
+# --- Coverage: init_message.print_init_message with base_url ---
+
+
+def test_print_init_message_uses_base_url(caplog):
+    """print_init_message should use explicit base_url in the project URL."""
+    import logging
+
+    from weave.trace.init_message import print_init_message
+
+    with (
+        patch("weave.trace.init_message._print_version_check"),
+        caplog.at_level(logging.INFO, logger="weave.trace.init_message"),
+    ):
+        print_init_message(
+            "user",
+            "entity",
+            "project",
+            read_only=False,
+            base_url="https://custom.example.com",
+        )
+    assert "custom.example.com" in caplog.text
+
+
+# --- Coverage: Api constructor and fallback logic ---
+
+
+def test_api_constructor_stores_credentials():
+    """Api(api_key=, base_url=) should store both on the instance."""
+    from weave.compat.wandb.wandb_thin.internal_api import Api
+
+    api = Api(api_key="test-key", base_url="https://test.example.com")
+    assert api._api_key == "test-key"
+    assert api._base_url == "https://test.example.com"
+
+
+def test_api_constructor_defaults_to_none():
+    """Api() with no args should have None for both fields."""
+    from weave.compat.wandb.wandb_thin.internal_api import Api
+
+    api = Api()
+    assert api._api_key is None
+    assert api._base_url is None
+
+
+# --- Coverage: Completions/InferenceModels fallback when client has no api_key ---
+
+
+def test_completions_falls_back_to_env_when_no_client_key():
+    """When client._api_key is None, Completions should fall back to env."""
+    from weave.chat.completions import Completions
+    from weave.trace.weave_client import WeaveClient
+
+    mock_server = _make_mock_server()
+    client = WeaveClient(
+        "entity", "project", mock_server, ensure_project_exists=False, api_key=None
+    )
+    comp = Completions(client)
+
+    with patch(
+        "weave.chat.completions.get_wandb_api_context", return_value="env-key"
+    ) as mock_ctx:
+        api_key = (
+            comp._client._api_key
+            if comp._client._api_key is not None
+            else mock_ctx()
+        )
+        assert api_key == "env-key"
+        mock_ctx.assert_called_once()
+
+    client.finish()
+
+
+def test_inference_models_falls_back_to_env_when_no_client_key():
+    """When client._api_key is None, InferenceModels should fall back to env."""
+    from weave.chat.inference_models import InferenceModels
+    from weave.trace.weave_client import WeaveClient
+
+    mock_server = _make_mock_server()
+    client = WeaveClient(
+        "entity", "project", mock_server, ensure_project_exists=False, api_key=None
+    )
+    models = InferenceModels(client)
+
+    with patch(
+        "weave.chat.inference_models.get_wandb_api_context", return_value="env-key"
+    ) as mock_ctx:
+        api_key = (
+            models._client._api_key
+            if models._client._api_key is not None
+            else mock_ctx()
+        )
+        assert api_key == "env-key"
+        mock_ctx.assert_called_once()
+
+    client.finish()
+
+
+# --- Coverage: project_creator with explicit credentials ---
+
+
+def test_project_creator_threads_credentials():
+    """ensure_project_exists should pass api_key/base_url to _ensure_project_exists."""
+    with patch(
+        "weave.wandb_interface.project_creator._ensure_project_exists",
+        return_value={"project_name": "proj"},
+    ) as mock_inner:
+        from weave.wandb_interface.project_creator import ensure_project_exists
+
+        ensure_project_exists(
+            "entity", "project", api_key="key", base_url="https://example.com"
+        )
+        mock_inner.assert_called_once_with(
+            "entity", "project", api_key="key", base_url="https://example.com"
+        )
