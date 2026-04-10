@@ -89,9 +89,7 @@ class TableRoutingResolver:
         return residence
 
     @ddtrace.tracer.wrap(name="table_routing.resolve_read_table")
-    def resolve_read_table(
-        self, project_id: str, mint_client: MintClient
-    ) -> ReadTable:
+    def resolve_read_table(self, project_id: str, mint_client: MintClient) -> ReadTable:
         """Resolve which table to read from for a given project."""
         if self._mode == CallsStorageServerMode.OFF:
             return ReadTable.CALLS_MERGED
