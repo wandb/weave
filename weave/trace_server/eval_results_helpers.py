@@ -395,6 +395,7 @@ def finalize_rows(
     return apply_row_selection(rows, eval_root_ids, require_intersection, offset, limit)
 
 
+@_trace_wrap("eval_results_helpers.build_sorted_eval_rows")
 def build_sorted_eval_rows(
     page_calls: list[tsi.CallSchema],
     eval_root_ids: list[str],
