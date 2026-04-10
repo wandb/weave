@@ -168,12 +168,21 @@ class AgentSpanCHInsertable(BaseModel):
     server_port: int = 0
 
     # Raw dumps
+    raw_span_dump: str = ""
     attributes_dump: str = ""
     events_dump: str = ""
     resource_dump: str = ""
 
-    # Auth
+    # Auth / W&B integration
     wb_user_id: str = ""
+    wb_run_id: str = ""
+    wb_run_step: int = 0
+    wb_run_step_end: int = 0
+
+    # Retention
+    ttl_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime(2100, 1, 1)
+    )
 
 
 ALL_GENAI_SPAN_INSERT_COLUMNS: list[str] = sorted(

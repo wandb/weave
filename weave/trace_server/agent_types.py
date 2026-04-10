@@ -63,10 +63,14 @@ class AgentSpanSchema(BaseModel):
     artifact_refs: list[str] = Field(default_factory=list)
     object_refs: list[str] = Field(default_factory=list)
     custom_attrs: dict[str, str] = Field(default_factory=dict)
+    raw_span_dump: str = ""
     attributes_dump: str = ""
     events_dump: str = ""
     resource_dump: str = ""
     wb_user_id: str = ""
+    wb_run_id: str = ""
+    wb_run_step: int = 0
+    wb_run_step_end: int = 0
 
 
 class AgentSortBy(BaseModel):
@@ -278,6 +282,8 @@ class AgentConversationsQueryReq(BaseModel):
     sort_by: list[AgentSortBy] | None = None
     limit: int = 100
     offset: int = 0
+    start: str | None = None
+    end: str | None = None
 
 
 class AgentConversationsQueryRes(BaseModel):
@@ -619,4 +625,29 @@ class AgentVersionsQueryRes(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# OTel ingest types
 # ---------------------------------------------------------------------------
+
+
+class GenAIOTelExportReq(BaseModel):
+    """Request for the GenAI OTel ingest endpoint.
+
+    Carries the same ProcessedResourceSpans as the standard OTel endpoint
+    but routes through GenAI extraction and into genai_spans.
+    """
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    processed_spans: list = Field(
+        ..., description="List of ProcessedResourceSpans from OTel deserialization"
+    )
+    project_id: str
+    wb_user_id: str | None = None
+
+
+class GenAIOTelExportRes(BaseModel):
+    """Response for the GenAI OTel ingest endpoint."""
+
+    accepted_spans: int = 0
+    rejected_spans: int = 0
+    error_message: str = ""

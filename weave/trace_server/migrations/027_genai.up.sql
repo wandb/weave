@@ -6,9 +6,11 @@
 --   3. genai_agent_versions — AggregatingMergeTree MV, same pattern
 --   4. genai_message_search — app-level insert, full-text search (optional)
 --
--- No skinny table, no projections, no partitions, no ReplacingMergeTree.
+-- No skinny table, no projections.
+-- ReplacingMergeTree(created_at) for idempotent re-inserts / late updates.
+-- Monthly partitioning for time-range pruning and TTL-based retention.
 -- ClickHouse columnar storage means queries only read the columns they SELECT.
--- Bloom filters on IDs for point lookups, on dimensions for filtered scans.
+-- Bloom filters on IDs for point lookups, ngrambf on dimensions for substring search.
 -- All span-derived queries use time bounds from the UI (H/D/W/M presets).
 -- AMTs handle the only all-time queries: agent/version aggregate counters.
 --
@@ -32,16 +34,16 @@ CREATE TABLE genai_spans (
     status_code         Enum8('UNSET'=0,'OK'=1,'ERROR'=2) CODEC(ZSTD(1)),
     status_message      String DEFAULT '' CODEC(ZSTD(1)),
 
-    operation_name      LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
-    provider_name       LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
+    operation_name      String DEFAULT '' CODEC(ZSTD(1)),
+    provider_name       String DEFAULT '' CODEC(ZSTD(1)),
 
     agent_name          String DEFAULT '' CODEC(ZSTD(1)),
     agent_id            String DEFAULT '' CODEC(ZSTD(1)),
     agent_description   String DEFAULT '' CODEC(ZSTD(1)),
     agent_version       String DEFAULT '' CODEC(ZSTD(1)),
 
-    request_model       LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
-    response_model      LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
+    request_model       String DEFAULT '' CODEC(ZSTD(1)),
+    response_model      String DEFAULT '' CODEC(ZSTD(1)),
     response_id         String DEFAULT '' CODEC(ZSTD(1)),
     input_tokens        UInt64 DEFAULT 0 CODEC(ZSTD(1)),
     output_tokens       UInt64 DEFAULT 0 CODEC(ZSTD(1)),
@@ -62,7 +64,7 @@ CREATE TABLE genai_spans (
     tool_definitions    String DEFAULT '' CODEC(ZSTD(1)),
 
     finish_reasons      Array(String) CODEC(ZSTD(1)),
-    error_type          LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
+    error_type          String DEFAULT '' CODEC(ZSTD(1)),
 
     request_temperature     Float64 DEFAULT 0 CODEC(ZSTD(1)),
     request_max_tokens      UInt64 DEFAULT 0 CODEC(ZSTD(1)),
@@ -73,7 +75,7 @@ CREATE TABLE genai_spans (
     request_stop_sequences  Array(String) DEFAULT [] CODEC(ZSTD(1)),
     request_choice_count    UInt32 DEFAULT 0 CODEC(ZSTD(1)),
 
-    output_type         LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
+    output_type         String DEFAULT '' CODEC(ZSTD(1)),
 
     input_messages  Array(Tuple(
         role String, content String, parts String,
@@ -103,22 +105,36 @@ CREATE TABLE genai_spans (
     server_address      String DEFAULT '' CODEC(ZSTD(1)),
     server_port         UInt32 DEFAULT 0 CODEC(ZSTD(1)),
 
+    raw_span_dump       String DEFAULT '' CODEC(ZSTD(1)),
     attributes_dump     String DEFAULT '' CODEC(ZSTD(1)),
     events_dump         String DEFAULT '' CODEC(ZSTD(1)),
     resource_dump       String DEFAULT '' CODEC(ZSTD(1)),
 
     wb_user_id          String DEFAULT '' CODEC(ZSTD(1)),
+    wb_run_id           String DEFAULT '' CODEC(ZSTD(1)),
+    wb_run_step         UInt64 DEFAULT 0 CODEC(ZSTD(1)),
+    wb_run_step_end     UInt64 DEFAULT 0 CODEC(ZSTD(1)),
+
+    ttl_at              DateTime DEFAULT '2100-01-01 00:00:00' CODEC(ZSTD(1)),
 
     -- Point lookup bloom filters (high selectivity — ~1 row per ID)
     INDEX idx_span_id span_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_parent parent_span_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1,
-    -- Dimension bloom filters (used WITH time bounds for filtered scans)
-    INDEX idx_agent_name agent_name TYPE bloom_filter(0.01) GRANULARITY 1,
-    INDEX idx_agent_version agent_version TYPE bloom_filter(0.01) GRANULARITY 1
-) ENGINE = MergeTree()
+    INDEX idx_wb_run_id wb_run_id TYPE bloom_filter(0.01) GRANULARITY 1,
+    -- Dimension ngrambf indexes (substring search on filtered scans)
+    INDEX idx_operation_name operation_name TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
+    INDEX idx_provider_name provider_name TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
+    INDEX idx_request_model request_model TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
+    INDEX idx_response_model response_model TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
+    INDEX idx_agent_name agent_name TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
+    INDEX idx_agent_version agent_version TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
+    INDEX idx_error_type error_type TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1
+) ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(started_at)
 ORDER BY (project_id, started_at, span_id)
+TTL ttl_at DELETE
 SETTINGS min_bytes_for_wide_part=0;
 
 
@@ -199,16 +215,16 @@ CREATE TABLE genai_message_search (
     conversation_id String DEFAULT '' CODEC(ZSTD(1)),
     trace_id String CODEC(ZSTD(1)),
     span_id String CODEC(ZSTD(1)),
-    role LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
+    role String DEFAULT '' CODEC(ZSTD(1)),
     started_at DateTime64(6) CODEC(Delta(8), ZSTD(1)),
     content String CODEC(ZSTD(1)),
     agent_name String DEFAULT '' CODEC(ZSTD(1)),
     agent_version String DEFAULT '' CODEC(ZSTD(1)),
     conversation_name String DEFAULT '' CODEC(ZSTD(1)),
     wb_user_id String DEFAULT '' CODEC(ZSTD(1)),
-    provider_name LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
-    request_model LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
-    operation_name LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
+    provider_name String DEFAULT '' CODEC(ZSTD(1)),
+    request_model String DEFAULT '' CODEC(ZSTD(1)),
+    operation_name String DEFAULT '' CODEC(ZSTD(1)),
     created_at DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
 
     INDEX idx_content content TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1,

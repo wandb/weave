@@ -6472,6 +6472,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> AgentConversationChatRes:
         return AgentWriteHandler(self.ch_client).conversation_chat(req)
 
+    def genai_otel_export(self, req: Any) -> Any:
+        return AgentWriteHandler(self.ch_client).otel_export(req)
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
