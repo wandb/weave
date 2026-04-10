@@ -1,6 +1,7 @@
 """Tests for weave init authentication flow."""
 
 import logging
+from contextlib import contextmanager
 from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
@@ -60,7 +61,6 @@ def _make_mock_server():
 
 def _init_patches(mock_server):
     """Context manager bundle for the common init_weave mock set."""
-    from contextlib import contextmanager
 
     @contextmanager
     def _ctx():
@@ -213,7 +213,9 @@ def test_base_url_derives_trace_server_url(mock_wandb_api):
             patch("weave.trace.weave_init.init_message"),
         ):
             weave_init.init_weave(
-                "test-project", api_key="key", base_url=base_url,
+                "test-project",
+                api_key="key",
+                base_url=base_url,
                 trace_server_url=tsurl,
             )
             mock_get_server.assert_called_with("key", trace_server_url=expected)
@@ -276,7 +278,8 @@ def test_init_weave_reuse_and_reinit(mock_wandb_api):
         assert client_c is not client_b
 
         client_d = weave_init.init_weave(
-            "test-project", api_key="new-key",
+            "test-project",
+            api_key="new-key",
             trace_server_url="https://trace.new.example.com",
         )
         assert client_d is not client_c
@@ -531,8 +534,11 @@ def test_completions_prefers_explicit_client_key():
     """
     mock_server = _make_mock_server()
     client = WeaveClient(
-        "entity", "project", mock_server,
-        ensure_project_exists=False, api_key="client-key",
+        "entity",
+        "project",
+        mock_server,
+        ensure_project_exists=False,
+        api_key="client-key",
     )
 
     with patch("weave.wandb_interface.context.get_wandb_api_context") as mock_env_key:
@@ -596,8 +602,11 @@ def test_create_call_and_children_thread_base_url(mock_wandb_api):
     """
     mock_server = _make_mock_server()
     client = WeaveClient(
-        "entity", "project", mock_server,
-        ensure_project_exists=False, base_url="https://custom.example.com",
+        "entity",
+        "project",
+        mock_server,
+        ensure_project_exists=False,
+        base_url="https://custom.example.com",
     )
     weave_client_context.set_weave_client_global(client)
 
@@ -637,9 +646,12 @@ def test_thread_captures_client_credentials():
     """FutureExecutor closure reads correct client credentials."""
     mock_server = _make_mock_server()
     client = WeaveClient(
-        "entity", "project", mock_server,
+        "entity",
+        "project",
+        mock_server,
         ensure_project_exists=False,
-        api_key="thread-key", base_url="https://thread.example.com",
+        api_key="thread-key",
+        base_url="https://thread.example.com",
     )
 
     captured: dict = {}
@@ -649,7 +661,10 @@ def test_thread_captures_client_credentials():
         captured["base_url"] = client._base_url
 
     client.future_executor.defer(capture).result()
-    assert captured == {"api_key": "thread-key", "base_url": "https://thread.example.com"}
+    assert captured == {
+        "api_key": "thread-key",
+        "base_url": "https://thread.example.com",
+    }
     client.finish()
 
 
@@ -657,16 +672,20 @@ def test_wal_callback_uses_client_base_url():
     """WAL send callback uses self._base_url to generate call URLs."""
     mock_server = _make_mock_server()
     client = WeaveClient(
-        "entity", "project", mock_server,
-        ensure_project_exists=False, base_url="https://wal.example.com",
+        "entity",
+        "project",
+        mock_server,
+        ensure_project_exists=False,
+        base_url="https://wal.example.com",
     )
 
     with patch("weave.trace.weave_client.redirect_call") as mock_redirect:
         mock_redirect.return_value = "https://wal.example.com/r/call/test-id"
         client._wal_pending_call_ids.add("test-call-id")
-        client._on_wal_send("call_start", {
-            "req": {"start": {"id": "test-call-id", "project_id": "entity/project"}}
-        })
+        client._on_wal_send(
+            "call_start",
+            {"req": {"start": {"id": "test-call-id", "project_id": "entity/project"}}},
+        )
         mock_redirect.assert_called_once_with(
             "entity", "project", "test-call-id", base_url="https://wal.example.com"
         )
@@ -686,7 +705,10 @@ def test_print_init_message_uses_base_url(caplog):
         caplog.at_level(logging.INFO, logger="weave.trace.init_message"),
     ):
         print_init_message(
-            "user", "entity", "project",
-            read_only=False, base_url="https://custom.example.com",
+            "user",
+            "entity",
+            "project",
+            read_only=False,
+            base_url="https://custom.example.com",
         )
     assert "custom.example.com" in caplog.text
