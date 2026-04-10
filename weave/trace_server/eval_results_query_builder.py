@@ -7,7 +7,6 @@ CTE chain:
   predict_and_score_calls_resolved → LEFT JOIN table_rows to resolve dataset-backed inputs
 """
 
-
 # SQL CASE expression for extracting row_digest from predict-and-score call inputs.
 # Dataset-backed rows: extract digest from the ref URI.
 # Inline rows: SHA256 hash of the raw JSON example object.

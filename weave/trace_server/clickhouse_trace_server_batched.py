@@ -5178,7 +5178,38 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 req.include_predict_and_score_children,
             )
         )
+        if req.resolve_row_refs:
+            reader = lambda digests: self._table_rows_read_batch(
+                req.project_id, digests
+            )
+            eval_helpers.resolve_eval_inputs(all_calls, eval_root_ids, reader)
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
+
+    def _table_rows_read_batch(
+        self, project_id: str, digests: list[str]
+    ) -> dict[str, Any]:
+        """Batch read table_rows by digest. Returns {digest: parsed_val}."""
+        if not digests:
+            return {}
+        pb = ParamBuilder()
+        project_param = pb.add(project_id, None, "String")
+        digests_param = pb.add(digests, None, "Array(String)")
+        sql = f"""
+            SELECT digest, any(val_dump) AS val_dump
+            FROM table_rows
+            WHERE project_id = {project_param}
+              AND digest IN {digests_param}
+            GROUP BY project_id, digest
+        """
+        result = self.ch_client.query(sql, pb.get_params())
+        out: dict[str, Any] = {}
+        for row in result.result_rows:
+            d, val_dump = row[0], row[1]
+            try:
+                out[d] = json.loads(val_dump)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return out
 
     @staticmethod
     def _read_with_retry(
