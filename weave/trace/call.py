@@ -180,6 +180,7 @@ class Call:
             self.project_id,
             CallsFilter(parent_ids=[self.id]),
             page_size=page_size,
+            base_url=client._base_url,
         )
 
     def delete(self) -> bool:

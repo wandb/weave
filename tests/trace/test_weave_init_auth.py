@@ -983,3 +983,41 @@ def test_project_creator_passes_credentials_to_api():
             api_key="key", base_url="https://example.com"
         )
         assert result == {"project_name": "proj"}
+
+
+# --- Coverage: Call.children() passes base_url ---
+
+
+def test_call_children_passes_base_url():
+    """Call.children() should pass client._base_url to _make_calls_iterator."""
+    from weave.trace.call import Call
+    from weave.trace.weave_client import WeaveClient
+
+    mock_server = _make_mock_server()
+    client = WeaveClient(
+        "entity",
+        "project",
+        mock_server,
+        ensure_project_exists=False,
+        base_url="https://children.example.com",
+    )
+    weave_client_context.set_weave_client_global(client)
+
+    call = Call(
+        _op_name="test-op",
+        project_id="entity/project",
+        trace_id="trace-123",
+        parent_id=None,
+        inputs={},
+        id="call-123",
+    )
+
+    with patch("weave.trace.call._make_calls_iterator") as mock_iter:
+        mock_iter.return_value = iter([])
+        list(call.children())
+        mock_iter.assert_called_once()
+        _, kwargs = mock_iter.call_args
+        assert kwargs.get("base_url") == "https://children.example.com"
+
+    client.finish()
+    weave_client_context.set_weave_client_global(None)
