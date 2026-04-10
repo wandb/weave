@@ -308,7 +308,9 @@ def test_init_weave_reinits_when_credential_params_provided(mock_wandb_api):
         assert client_b is not client_a
 
         # Re-init with base_url should NOT reuse
-        client_c = weave_init.init_weave("test-project", base_url="https://new.example.com")
+        client_c = weave_init.init_weave(
+            "test-project", base_url="https://new.example.com"
+        )
         assert client_c is not client_b
 
         # Re-init with trace_server_url should NOT reuse
