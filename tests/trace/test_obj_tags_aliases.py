@@ -1484,10 +1484,15 @@ def test_weave_alias_functions(client: WeaveClient):
     ref_d = weave.publish({"v": 1}, name="tl_alias_latest")
     assert "latest" in weave.get_aliases(ref_d)
 
-    # list_aliases: across objects, deduplicated
+    # list_aliases: across objects, deduplicated (use fresh alias to avoid
+    # interaction with the partial removal of "prod" above)
+    ref_x = weave.publish({"obj": "x"}, name="tl_alias_dedup_x")
+    ref_y = weave.publish({"obj": "y"}, name="tl_alias_dedup_y")
+    weave.set_aliases(ref_x, "shared-alias")
+    weave.set_aliases(ref_y, "shared-alias")
     all_aliases = weave.list_aliases()
-    assert "prod" in all_aliases  # still on ref_b
-    assert all_aliases.count("prod") == 1
+    assert "shared-alias" in all_aliases
+    assert all_aliases.count("shared-alias") == 1
 
     # Remove alias then resolve raises
     ref_e = weave.publish({"data": "test"}, name="tl_alias_rm_resolve")
