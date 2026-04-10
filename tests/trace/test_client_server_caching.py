@@ -71,9 +71,7 @@ def test_caching_middleware_delegates_ensure_project_exists(tmp_path):
 
     assert result is expected
     assert result.project_name == "my-project"
-    mock_server.ensure_project_exists.assert_called_once_with(
-        "entity", "project"
-    )
+    mock_server.ensure_project_exists.assert_called_once_with("entity", "project")
 
 
 def test_weave_client_init_with_caching_middleware():
