@@ -1,5 +1,6 @@
 """Tests for weave init authentication flow."""
 
+import logging
 from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
@@ -12,6 +13,7 @@ from weave.trace import urls, weave_init
 from weave.trace.call import Call
 from weave.trace.context import weave_client_context
 from weave.trace.env import wandb_base_url
+from weave.trace.init_message import print_init_message
 from weave.trace.op import op
 from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import (
@@ -21,6 +23,9 @@ from weave.trace_server_bindings.remote_http_trace_server import (
     RemoteHTTPTraceServer,
 )
 from weave.wandb_interface.context import get_wandb_api_context
+from weave.wandb_interface.project_creator import (
+    _ensure_project_exists,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -874,10 +879,6 @@ def test_init_weave_prompts_login_when_no_key_anywhere(mock_wandb_api):
 
 def test_print_init_message_uses_base_url(caplog):
     """print_init_message should use explicit base_url in the project URL."""
-    import logging
-
-    from weave.trace.init_message import print_init_message
-
     with (
         patch("weave.trace.init_message._print_version_check"),
         caplog.at_level(logging.INFO, logger="weave.trace.init_message"),
@@ -897,8 +898,6 @@ def test_print_init_message_uses_base_url(caplog):
 
 def test_api_constructor_stores_credentials():
     """Api(api_key=, base_url=) should store both on the instance."""
-    from weave.compat.wandb.wandb_thin.internal_api import Api
-
     api = Api(api_key="test-key", base_url="https://test.example.com")
     assert api._api_key == "test-key"
     assert api._base_url == "https://test.example.com"
@@ -906,8 +905,6 @@ def test_api_constructor_stores_credentials():
 
 def test_api_constructor_defaults_to_none():
     """Api() with no args should have None for both fields."""
-    from weave.compat.wandb.wandb_thin.internal_api import Api
-
     api = Api()
     assert api._api_key is None
     assert api._base_url is None
@@ -918,9 +915,6 @@ def test_api_constructor_defaults_to_none():
 
 def test_completions_falls_back_to_env_when_no_client_key():
     """When client._api_key is None, Completions should fall back to env."""
-    from weave.chat.completions import Completions
-    from weave.trace.weave_client import WeaveClient
-
     mock_server = _make_mock_server()
     client = WeaveClient(
         "entity", "project", mock_server, ensure_project_exists=False, api_key=None
@@ -941,9 +935,6 @@ def test_completions_falls_back_to_env_when_no_client_key():
 
 def test_inference_models_falls_back_to_env_when_no_client_key():
     """When client._api_key is None, InferenceModels should fall back to env."""
-    from weave.chat.inference_models import InferenceModels
-    from weave.trace.weave_client import WeaveClient
-
     mock_server = _make_mock_server()
     client = WeaveClient(
         "entity", "project", mock_server, ensure_project_exists=False, api_key=None
@@ -969,8 +960,6 @@ def test_inference_models_falls_back_to_env_when_no_client_key():
 
 def test_project_creator_passes_credentials_to_api():
     """_ensure_project_exists should construct wandb.Api with api_key and base_url."""
-    from weave.wandb_interface.project_creator import _ensure_project_exists
-
     mock_api = MagicMock()
     mock_api.project.return_value = {"project": {"name": "proj"}}
 
@@ -990,9 +979,6 @@ def test_project_creator_passes_credentials_to_api():
 
 def test_call_children_passes_base_url():
     """Call.children() should pass client._base_url to _make_calls_iterator."""
-    from weave.trace.call import Call
-    from weave.trace.weave_client import WeaveClient
-
     mock_server = _make_mock_server()
     client = WeaveClient(
         "entity",
