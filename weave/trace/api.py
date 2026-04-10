@@ -221,18 +221,21 @@ def publish(
             client.add_tags(ref, tags)
         if aliases:
             client.set_aliases(ref, aliases)
+        client_base_url = client._base_url
         if isinstance(ref, weave_client.OpRef):
             url = urls.op_version_path(
                 ref.entity,
                 ref.project,
                 ref.name,
                 ref.digest,
+                base_url=client_base_url,
             )
         elif isinstance(obj, leaderboard.Leaderboard):
             url = urls.leaderboard_path(
                 ref.entity,
                 ref.project,
                 ref.name,
+                base_url=client_base_url,
             )
         # TODO(gst): once frontend has direct dataset/model links
         # elif isinstance(obj, weave_client.Dataset):
@@ -242,6 +245,7 @@ def publish(
                 ref.project,
                 ref.name,
                 ref.digest,
+                base_url=client_base_url,
             )
         # Ensure logger level is up to date before logging
         update_logger_level()
@@ -578,9 +582,6 @@ def finish() -> None:
     Following finish, calls of weave.op decorated functions will no longer be logged. You will need to run weave.init() again to resume logging.
 
     """
-    # Flush outstanding work *before* clearing explicit overrides (api_key,
-    # base_url) so that callbacks (e.g. 🍩 call URLs) still see the correct
-    # base URL during flush.
     wc = weave_client_context.get_weave_client()
     if wc is not None:
         wc.finish()

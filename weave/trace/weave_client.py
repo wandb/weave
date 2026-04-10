@@ -355,10 +355,14 @@ class WeaveClient:
         project: str,
         server: TraceServerClientInterface,
         ensure_project_exists: bool = True,
+        api_key: str | None = None,
+        base_url: str | None = None,
     ):
         self.entity = entity
         self.project = project
         self.server = server
+        self._api_key = api_key
+        self._base_url = base_url
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
         self.project_id_resolver = ProjectIdResolver(server)
@@ -368,9 +372,15 @@ class WeaveClient:
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
-            resp = self.server.ensure_project_exists(entity, project)
+            from weave.wandb_interface.project_creator import (
+                ensure_project_exists as _ensure_project,
+            )
+
+            result = _ensure_project(
+                entity, project, api_key=self._api_key, base_url=self._base_url
+            )
             # Set Client project name with updated project name
-            self.project = resp.project_name
+            self.project = result["project_name"]
 
         self._server_call_processor: AsyncBatchProcessor | CallBatchProcessor | None = (
             None
@@ -419,7 +429,7 @@ class WeaveClient:
             self._wal_pending_call_ids.discard(call_id)
             project_id = start.get("project_id", "")
             entity, project = from_project_id(project_id)
-            url = redirect_call(entity, project, call_id)
+            url = redirect_call(entity, project, call_id, base_url=self._base_url)
             logger.info("%s %s", TRACE_CALL_EMOJI, url)
         except Exception:
             pass
@@ -823,6 +833,7 @@ class WeaveClient:
             attributes=attributes_dict,
             thread_id=thread_id,
             turn_id=turn_id,
+            _base_url=self._base_url,
         )
         # Disallow further modification of attributes after the call is created
         attributes_dict.freeze()

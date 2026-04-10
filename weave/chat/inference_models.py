@@ -26,7 +26,11 @@ class InferenceModels:
         self._client = client
 
     def list(self) -> ModelsResponse:
-        api_key = get_wandb_api_context()
+        api_key = (
+            self._client._api_key
+            if self._client._api_key is not None
+            else get_wandb_api_context()
+        )
         if not api_key:
             raise ValueError("No API key found")
         headers = {

@@ -80,6 +80,7 @@ class Call:
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
+    _base_url: str | None = None
 
     # Size of metadata storage for this call
     storage_size_bytes: int | None = None
@@ -146,7 +147,7 @@ class Call:
             entity, project = from_project_id(self.project_id)
         except ValueError:
             raise ValueError(f"Invalid project_id: {self.project_id}") from None
-        return urls.redirect_call(entity, project, self.id)
+        return urls.redirect_call(entity, project, self.id, base_url=self._base_url)
 
     @property
     def ref(self) -> CallRef:

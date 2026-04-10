@@ -20,14 +20,28 @@ TCP_CONNECTION_POOL_LIMIT = 50
 
 
 class Api:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
+        self._api_key = api_key
+        self._base_url = base_url
+
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
         from gql.transport.httpx import HTTPXTransport
 
         auth = None
-        api_key = get_wandb_api_context()
+        api_key = (
+            self._api_key if self._api_key is not None else get_wandb_api_context()
+        )
         if api_key is not None:
             auth = httpx.BasicAuth("api", api_key)
-        url_base = env.wandb_base_url()
+        url_base = (
+            self._base_url.rstrip("/")
+            if self._base_url is not None
+            else env.wandb_base_url()
+        )
         transport = HTTPXTransport(
             url=url_base + "/graphql",
             auth=auth,
@@ -215,9 +229,15 @@ class Api:
 
 
 class ApiAsync:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
         import aiohttp
 
+        self._api_key = api_key
+        self._base_url = base_url
         self.connector = aiohttp.TCPConnector(
             limit=TCP_CONNECTION_POOL_LIMIT, ssl=env.ssl_verify()
         )
@@ -227,14 +247,20 @@ class ApiAsync:
         from gql.transport.aiohttp import AIOHTTPTransport
 
         auth = None
-        api_key = get_wandb_api_context()
+        api_key = (
+            self._api_key if self._api_key is not None else get_wandb_api_context()
+        )
         if api_key is not None:
             auth = aiohttp.BasicAuth("api", api_key)
         # TODO: This is currently used by our FastAPI auth helper, there's probably a better way.
         api_key_override = kwargs.pop("api_key", None)
         if api_key_override:
             auth = aiohttp.BasicAuth("api", api_key_override)
-        url_base = env.wandb_base_url()
+        url_base = (
+            self._base_url.rstrip("/")
+            if self._base_url is not None
+            else env.wandb_base_url()
+        )
         transport = AIOHTTPTransport(
             url=url_base + "/graphql",
             client_session_args={

@@ -30,15 +30,19 @@ logger = logging.getLogger(__name__)
 class WeaveWandbAuthenticationException(Exception): ...
 
 
-def get_username() -> str | None:
-    api = wandb.Api()
+def get_username(api_key: str | None = None, base_url: str | None = None) -> str | None:
+    api = wandb.Api(api_key=api_key, base_url=base_url)
     try:
         return api.username()
     except AttributeError:
         return None
 
 
-def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
+def get_entity_project_from_project_name(
+    project_name: str,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> tuple[str, str]:
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
@@ -48,7 +52,7 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
         entity_name = os.environ.get("WANDB_ENTITY")
         if entity_name is None:
             # Fall back to wandb default entity
-            api = wandb.Api()
+            api = wandb.Api(api_key=api_key, base_url=base_url)
             entity_name = api.default_entity_name()
             if entity_name is None:
                 raise WeaveWandbAuthenticationException(
@@ -122,29 +126,23 @@ def init_weave(
             current_client.finish()
             weave_client_context.set_weave_client_global(None)
 
-    # Set explicit base_url in context so downstream code (e.g. entity resolution
-    # via wandb.Api(), trace server URL derivation) uses it instead of env vars.
-    if base_url is not None:
-        env.set_wandb_base_url(base_url)
-
     if api_key is None:
         from weave.wandb_interface.context import get_wandb_api_context
 
         api_key = get_wandb_api_context()
         if api_key is None:
-            url = wandb.app_url(env.wandb_base_url())
+            effective_base_url = (
+                base_url if base_url is not None else env.wandb_base_url()
+            )
+            url = wandb.app_url(effective_base_url)
             logger.info("Please login to Weights & Biases (%s) to continue...", url)
             wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
             api_key = get_wandb_api_context()
-    else:
-        # Set explicit api_key in context so downstream code (e.g. entity resolution
-        # via wandb.Api()) uses it instead of reading from env vars.
-        from weave.wandb_interface.context import set_wandb_api_context
-
-        set_wandb_api_context(api_key)
 
     # Resolve entity name after authentication is ensured
-    entity_name, project_name = get_entity_project_from_project_name(project_name)
+    entity_name, project_name = get_entity_project_from_project_name(
+        project_name, api_key=api_key, base_url=base_url
+    )
     wb_run_context = get_global_wb_run_context()
     if wb_run_context:
         wandb_run_id = f"{entity_name}/{project_name}/{wb_run_context.run_id}"
@@ -160,7 +158,12 @@ def init_weave(
         server = CachingMiddlewareTraceServer.from_env(server)
 
     client = weave_client.WeaveClient(
-        entity_name, project_name, server, ensure_project_exists
+        entity_name,
+        project_name,
+        server,
+        ensure_project_exists,
+        api_key=api_key,
+        base_url=base_url,
     )
 
     # If the project name was formatted by init, update the project name
@@ -176,7 +179,7 @@ def init_weave(
     implicit_patch()
     register_import_hook()
 
-    username = get_username()
+    username = get_username(api_key=api_key, base_url=base_url)
 
     # This is a temporary event to track the number of users who have enabled PII redaction.
     if should_redact_pii():
@@ -211,7 +214,11 @@ def init_weave(
     ):
         return init_weave_disabled()
     init_message.print_init_message(
-        username, entity_name, project_name, read_only=not ensure_project_exists
+        username,
+        entity_name,
+        project_name,
+        read_only=not ensure_project_exists,
+        base_url=base_url,
     )
 
     user_context = {"username": username} if username else None
@@ -240,12 +247,6 @@ def init_weave_disabled() -> weave_client.WeaveClient:
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
         weave_client_context.set_weave_client_global(None)
-
-    # Clear explicit overrides to avoid stale state
-    env.set_wandb_base_url(None)
-    from weave.wandb_interface.context import set_wandb_api_context
-
-    set_wandb_api_context(None)
 
     client = weave_client.WeaveClient(
         "DISABLED",
@@ -290,13 +291,6 @@ def finish() -> None:
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
         weave_client_context.set_weave_client_global(None)
-
-    # Clear explicit overrides so a subsequent weave.init() without params
-    # falls back to env vars / netrc as expected.
-    env.set_wandb_base_url(None)
-    from weave.wandb_interface.context import set_wandb_api_context
-
-    set_wandb_api_context(None)
 
     # Unregister the import hook
     from weave.integrations.patch import unregister_import_hook

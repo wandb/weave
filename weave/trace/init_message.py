@@ -155,7 +155,11 @@ def check_min_trace_server_version(
 
 
 def print_init_message(
-    username: str | None, entity_name: str, project_name: str, read_only: bool
+    username: str | None,
+    entity_name: str,
+    project_name: str,
+    read_only: bool,
+    base_url: str | None = None,
 ) -> None:
     try:
         _print_version_check()
@@ -165,9 +169,7 @@ def print_init_message(
     message = ""
     if username is not None:
         message += f"Logged in as Weights & Biases user: {username}.\n"
-    message += (
-        f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
-    )
+    message += f"View Weave data at {urls.project_weave_root_url(entity_name, project_name, base_url=base_url)}"
     # Cosmetically, if we are in `read_only` mode, we are not logging data, so
     # we should not print the message about logging data.
     if not read_only:
