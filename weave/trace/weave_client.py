@@ -165,6 +165,9 @@ from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
 from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
+from weave.wandb_interface.project_creator import (
+    ensure_project_exists as _ensure_project,
+)
 
 if TYPE_CHECKING:
     from weave.evaluation.eval import Evaluation
@@ -372,10 +375,6 @@ class WeaveClient:
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
-            from weave.wandb_interface.project_creator import (
-                ensure_project_exists as _ensure_project,
-            )
-
             result = _ensure_project(
                 entity, project, api_key=self._api_key, base_url=self._base_url
             )

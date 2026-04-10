@@ -25,7 +25,7 @@ def reset_weave_client():
 def mock_project_creator():
     """Mock project_creator.ensure_project_exists for all tests that create clients."""
     with patch(
-        "weave.wandb_interface.project_creator.ensure_project_exists",
+        "weave.trace.weave_client._ensure_project",
         return_value={"project_name": "test-project"},
     ):
         yield
@@ -170,6 +170,78 @@ def test_init_weave_get_server_falls_back_to_env_without_trace_server_url():
     server = weave_init.init_weave_get_server(api_key="test-key")
     assert server.trace_server_url is not None
     assert server._auth == ("api", "test-key")
+
+
+def test_base_url_derives_trace_server_url(mock_wandb_api):
+    """When base_url is provided but trace_server_url is not, the trace server
+    URL should be derived from base_url (matching the documented contract).
+    """
+    mock_wandb_api.default_entity_name.return_value = "test-entity"
+    mock_server = MagicMock()
+    mock_server.server_info.return_value = MagicMock(
+        min_required_weave_python_version="0.0.0",
+        trace_server_version=None,
+    )
+    mock_server.get_call_processor.return_value = None
+    mock_server.get_feedback_processor.return_value = None
+
+    with (
+        patch(
+            "weave.trace.weave_init.init_weave_get_server", return_value=mock_server
+        ) as mock_get_server,
+        patch("weave.trace.weave_init._weave_is_available", return_value=True),
+        patch("weave.trace.weave_init.get_username", return_value="test-user"),
+        patch("weave.trace.weave_init.init_message"),
+    ):
+        # Non-default base_url → should derive trace_server_url as base_url + "/traces"
+        weave_init.init_weave(
+            "test-project",
+            api_key="key",
+            base_url="https://custom.example.com",
+        )
+        mock_get_server.assert_called_with(
+            "key", trace_server_url="https://custom.example.com/traces"
+        )
+        weave_client_context.set_weave_client_global(None)
+
+    with (
+        patch(
+            "weave.trace.weave_init.init_weave_get_server", return_value=mock_server
+        ) as mock_get_server,
+        patch("weave.trace.weave_init._weave_is_available", return_value=True),
+        patch("weave.trace.weave_init.get_username", return_value="test-user"),
+        patch("weave.trace.weave_init.init_message"),
+    ):
+        # Default base_url → should derive MTSAAS trace URL
+        weave_init.init_weave(
+            "test-project",
+            api_key="key",
+            base_url="https://api.wandb.ai",
+        )
+        mock_get_server.assert_called_with(
+            "key", trace_server_url="https://trace.wandb.ai"
+        )
+        weave_client_context.set_weave_client_global(None)
+
+    with (
+        patch(
+            "weave.trace.weave_init.init_weave_get_server", return_value=mock_server
+        ) as mock_get_server,
+        patch("weave.trace.weave_init._weave_is_available", return_value=True),
+        patch("weave.trace.weave_init.get_username", return_value="test-user"),
+        patch("weave.trace.weave_init.init_message"),
+    ):
+        # Explicit trace_server_url should NOT be overridden by base_url derivation
+        weave_init.init_weave(
+            "test-project",
+            api_key="key",
+            base_url="https://custom.example.com",
+            trace_server_url="https://explicit-trace.example.com",
+        )
+        mock_get_server.assert_called_with(
+            "key", trace_server_url="https://explicit-trace.example.com"
+        )
+        weave_client_context.set_weave_client_global(None)
 
 
 def _make_mock_server():
@@ -643,7 +715,7 @@ def test_project_creator_receives_client_credentials(mock_wandb_api):
         patch("weave.trace.weave_init.get_username", return_value="test-user"),
         patch("weave.trace.weave_init.init_message"),
         patch(
-            "weave.wandb_interface.project_creator.ensure_project_exists",
+            "weave.trace.weave_client._ensure_project",
             return_value={"project_name": "test-project"},
         ) as mock_ensure,
     ):

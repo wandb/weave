@@ -23,6 +23,7 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
+from weave.wandb_interface.context import get_wandb_api_context
 
 logger = logging.getLogger(__name__)
 
@@ -127,8 +128,6 @@ def init_weave(
             weave_client_context.set_weave_client_global(None)
 
     if api_key is None:
-        from weave.wandb_interface.context import get_wandb_api_context
-
         api_key = get_wandb_api_context()
         if api_key is None:
             effective_base_url = (
@@ -147,6 +146,16 @@ def init_weave(
     if wb_run_context:
         wandb_run_id = f"{entity_name}/{project_name}/{wb_run_context.run_id}"
         check_wandb_run_matches(wandb_run_id, entity_name, project_name)
+
+    # Derive trace_server_url from base_url when not explicitly provided,
+    # honoring the documented contract: "The trace server URL is derived from
+    # this if trace_server_url is not provided."
+    if trace_server_url is None and base_url is not None:
+        normalized = base_url.rstrip("/")
+        if normalized == "https://api.wandb.ai":
+            trace_server_url = env.MTSAAS_TRACE_URL
+        else:
+            trace_server_url = normalized + "/traces"
 
     remote_server = init_weave_get_server(api_key, trace_server_url=trace_server_url)
     if not _weave_is_available(remote_server):
