@@ -69,6 +69,12 @@ def pytest_addoption(parser):
             default="remote",
             help="Specify the remote HTTP trace server implementation: remote or stainless",
         )
+        parser.addoption(
+            "--clickhouse-replicated",
+            action="store_true",
+            default=False,
+            help="Run ClickHouse tests in replicated mode (requires Keeper-enabled CH)",
+        )
     except ValueError:
         pass
 
@@ -134,6 +140,10 @@ def _get_worker_db_suffix(request, default: str = "_test") -> str:
     return f"_w{worker_id.replace('gw', '')}"
 
 
+REPLICATED_CLUSTER = "weave_cluster"
+REPLICATED_PATH = "/clickhouse/tables/{db}"
+
+
 # Tables with migration-seeded data that should NOT be truncated between tests.
 SEED_DATA_TABLES = frozenset({"llm_token_prices"})
 
@@ -196,6 +206,8 @@ def _ch_session_server(
         yield None
         return
 
+    use_replicated = request.config.getoption("--clickhouse-replicated", default=False)
+
     host, port = next(ensure_clickhouse_db())
     db_suffix = _get_worker_db_suffix(request)
 
@@ -205,6 +217,17 @@ def _ch_session_server(
     management_db = f"db_management{db_suffix}"
 
     os.environ["WF_CLICKHOUSE_DATABASE"] = unique_db
+
+    # Set replicated env vars so the batched server picks them up at runtime
+    saved_env: dict[str, str | None] = {}
+    if use_replicated:
+        for key, val in [
+            ("WF_CLICKHOUSE_REPLICATED", "true"),
+            ("WF_CLICKHOUSE_REPLICATED_CLUSTER", REPLICATED_CLUSTER),
+            ("WF_CLICKHOUSE_REPLICATED_PATH", REPLICATED_PATH),
+        ]:
+            saved_env[key] = os.environ.get(key)
+            os.environ[key] = val
 
     id_converter = DummyIdConverter()
     ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
@@ -223,7 +246,11 @@ def _ch_session_server(
 
     def patched_run_migrations():
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            ch_server._mint_client(), management_db=management_db
+            ch_server._mint_client(),
+            management_db=management_db,
+            replicated=use_replicated,
+            replicated_cluster=REPLICATED_CLUSTER if use_replicated else None,
+            replicated_path=REPLICATED_PATH if use_replicated else None,
         )
         migrator.apply_migrations(ch_server._database)
 
@@ -244,6 +271,13 @@ def _ch_session_server(
         os.environ.pop("WF_CLICKHOUSE_DATABASE", None)
     else:
         os.environ["WF_CLICKHOUSE_DATABASE"] = original_db
+
+    # Restore replicated env vars
+    for key, original_val in saved_env.items():
+        if original_val is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = original_val
 
     # Session cleanup: drop databases
     try:
