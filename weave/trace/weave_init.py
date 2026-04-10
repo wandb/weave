@@ -263,20 +263,24 @@ def init_weave_get_server(
     should_batch: bool = True,
     trace_server_url: str | None = None,
 ) -> TraceServerClientInterface:
-    url = (
-        trace_server_url
-        if trace_server_url is not None
-        else env.weave_trace_server_url()
-    )
     res: TraceServerClientInterface
-    if should_use_stainless_server():
+    if trace_server_url is not None:
+        if should_use_stainless_server():
+            from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+                StainlessRemoteHTTPTraceServer,
+            )
+
+            res = StainlessRemoteHTTPTraceServer(trace_server_url, should_batch)  # type: ignore[abstract]  # pyright: ignore[reportAbstractUsage]
+        else:
+            res = RemoteHTTPTraceServer(trace_server_url, should_batch)  # type: ignore[abstract]  # pyright: ignore[reportAbstractUsage]
+    elif should_use_stainless_server():
         from weave.trace_server_bindings.stainless_remote_http_trace_server import (
             StainlessRemoteHTTPTraceServer,
         )
 
-        res = StainlessRemoteHTTPTraceServer(url, should_batch)
+        res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
     else:
-        res = RemoteHTTPTraceServer(url, should_batch)
+        res = RemoteHTTPTraceServer.from_env(should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res
