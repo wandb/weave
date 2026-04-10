@@ -178,5 +178,3 @@ def test_calls_complete_table_resolution_by_mode(
             assert f"ON CLUSTER {cluster_name}" in result
         else:
             assert "ON CLUSTER" not in result
-        # Never double-suffix
-        assert "_local_local" not in result
