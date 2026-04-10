@@ -153,6 +153,7 @@ def test_simple_op(client):
         ended_at=DatetimeMatcher(),
         deleted_at=None,
         wb_user_id=client.entity,
+        _base_url=client._base_url,
     )
 
 

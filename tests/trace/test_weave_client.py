@@ -397,6 +397,7 @@ def test_call_create(client):
         ended_at=DatetimeMatcher(),
         deleted_at=None,
         wb_user_id=client.entity,
+        _base_url=client._base_url,
     )
     assert result == expected
 
@@ -433,6 +434,7 @@ def test_calls_query(client):
         started_at=DatetimeMatcher(),
         ended_at=None,
         wb_user_id=client.entity,
+        _base_url=client._base_url,
     )
     assert result[1] == weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
@@ -460,6 +462,7 @@ def test_calls_query(client):
         started_at=DatetimeMatcher(),
         ended_at=None,
         wb_user_id=client.entity,
+        _base_url=client._base_url,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
