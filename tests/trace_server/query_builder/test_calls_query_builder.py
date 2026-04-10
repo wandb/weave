@@ -711,7 +711,7 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
 
 
 def test_query_with_simple_feedback_filter_calls_complete() -> None:
-    """Test feedback filter on calls_complete table - should NOT use GROUP BY or aggregation."""
+    """Test feedback filter on calls_complete uses DISTINCT to avoid row duplication."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
     cq.add_field("id")
     cq.add_condition(
@@ -731,7 +731,7 @@ def test_query_with_simple_feedback_filter_calls_complete() -> None:
     assert_sql(
         cq,
         """
-        SELECT
+        SELECT DISTINCT
             calls_complete.id AS id
         FROM
             calls_complete
@@ -3332,14 +3332,14 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
 
 
 def test_query_with_simple_feedback_sort_calls_complete() -> None:
-    """Ensure feedback sorting uses calls_complete."""
+    """Ensure feedback sorting uses calls_complete with DISTINCT for dedup."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
     cq.add_field("id")
     cq.add_order("feedback.[wandb.runnable.my_op].payload.output.expected", "desc")
     assert_sql(
         cq,
         """
-            SELECT
+            SELECT DISTINCT
                 calls_complete.id AS id
             FROM
                 calls_complete
@@ -3456,7 +3456,7 @@ def test_calls_complete_with_feedback_filter() -> None:
     assert_sql(
         cq,
         """
-        SELECT
+        SELECT DISTINCT
             calls_complete.id AS id
         FROM
             calls_complete
@@ -3891,6 +3891,58 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
             "pb_0": SENTINEL_DATETIME,
             "pb_1": "project",
             "pb_2": "",
+        },
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+
+def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -> None:
+    """Stats query on calls_complete with feedback filter uses COUNT(DISTINCT id).
+
+    Feedback LEFT JOIN can multiply rows on calls_complete. The data query uses
+    SELECT DISTINCT to deduplicate; the stats query must use COUNT(DISTINCT id)
+    so the count matches the actual number of rows returned.
+    """
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        query=tsi.Query.model_validate(
+            {
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$getField": "feedback.[wandb.annotation.rating].payload.value"
+                        },
+                        {"$literal": "good"},
+                    ]
+                }
+            }
+        ),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count(DISTINCT calls_complete.id) AS count
+        FROM calls_complete
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
+        ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_4:String},
+            '/call/',
+            calls_complete.id))
+        PREWHERE calls_complete.project_id = {pb_4:String}
+        WHERE 1
+          AND (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
+            THEN feedback.payload_dump END,
+            {pb_1:String}), 'null'), '') = {pb_2:String}))
+       AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)})))
+        """,
+        {
+            "pb_0": "wandb.annotation.rating",
+            "pb_1": '$."value"',
+            "pb_2": "good",
+            "pb_3": SENTINEL_DATETIME,
+            "pb_4": "project",
         },
         read_table=ReadTable.CALLS_COMPLETE,
     )

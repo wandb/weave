@@ -1058,6 +1058,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
             def process_operand(operand: tsi_query.Operand) -> str:
                 if isinstance(operand, tsi_query.LiteralOperation):
+                    # Use SQL string literals instead of json.dumps, which wraps strings in
+                    # double quotes that don't match json_extract() output.
+                    if isinstance(operand.literal_, str):
+                        escaped = operand.literal_.replace("'", "''")
+                        return f"'{escaped}'"
                     return json.dumps(operand.literal_)
                 elif isinstance(operand, tsi_query.GetFieldOperator):
                     if operand.get_field_.startswith("feedback."):

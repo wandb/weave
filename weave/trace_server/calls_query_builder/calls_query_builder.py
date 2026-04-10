@@ -116,6 +116,13 @@ class OrderLimitOffsetResult(NamedTuple):
     needs_feedback: bool
 
 
+class QueryBodyResult(NamedTuple):
+    """Result from building the query body (FROM through OFFSET)."""
+
+    sql: str
+    needs_feedback_join: bool
+
+
 def maybe_agg(expr: str, use_agg_fn: bool) -> str:
     """Wrap expression in any() aggregate function if needed."""
     return f"any({expr})" if use_agg_fn else expr
@@ -1668,7 +1675,7 @@ class CallsQuery(BaseModel):
         id_subquery_name: str | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
-    ) -> str:
+    ) -> QueryBodyResult:
         """Build the SQL query body: everything from FROM through OFFSET.
 
         This method builds filters, JOINs, WHERE/PREWHERE, GROUP BY, ORDER BY,
@@ -1707,6 +1714,9 @@ class CallsQuery(BaseModel):
             field_to_object_join_alias_map=field_to_object_join_alias_map,
             id_subquery_name=id_subquery_name,
         )
+        needs_feedback_join = (
+            filter_result.needs_feedback or order_result.needs_feedback
+        )
         group_by_sql = ""
         if self.read_table == ReadTable.CALLS_MERGED:
             group_by_sql = f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
@@ -1737,7 +1747,7 @@ class CallsQuery(BaseModel):
         if self.eval_root_ids and self.read_table == ReadTable.CALLS_MERGED:
             having_sql = self._build_eval_subtree_having(having_sql, pb, table_alias)
 
-        return f"""FROM {table_alias}
+        sql = f"""FROM {table_alias}
         {joins.to_sql()}
         PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
         {where_clause}
@@ -1746,6 +1756,7 @@ class CallsQuery(BaseModel):
         {order_result.order_by_sql}
         {order_result.limit_sql}
         {order_result.offset_sql}"""
+        return QueryBodyResult(sql=sql, needs_feedback_join=needs_feedback_join)
 
     def _as_sql_base_format(
         self,
@@ -1776,16 +1787,23 @@ class CallsQuery(BaseModel):
             )
             for field in self.select_fields
         )
-        body = self._build_query_body(
+        body_result = self._build_query_body(
             pb,
             table_alias,
             id_subquery_name,
             field_to_object_join_alias_map,
             expand_columns,
         )
+        # On calls_complete, feedback LEFT JOIN can multiply rows, so use DISTINCT to de-dup.
+        distinct = ""
+        if (
+            self.read_table == ReadTable.CALLS_COMPLETE
+            and body_result.needs_feedback_join
+        ):
+            distinct = "DISTINCT"
         raw_sql = f"""
-        SELECT {select_fields_sql}
-        {body}
+        SELECT {distinct} {select_fields_sql}
+        {body_result.sql}
         """
         return safely_format_sql(raw_sql, logger)
 
@@ -2852,9 +2870,11 @@ def _build_calls_complete_stats_query(
 
     # Build the query body (FROM, JOINs, WHERE, etc.) — reuses all existing
     # filter/condition/join abstractions without CTE optimization overhead
-    body = cq._build_query_body(param_builder, table_name)
+    body_result = cq._build_query_body(param_builder, table_name)
 
     # Build the aggregate SELECT clause
+    # When feedback JOIN is present, use COUNT(DISTINCT id) to avoid counting
+    # duplicate rows from the JOIN.
     stats_parts: list[str] = []
     for col_name, col_agg in aggregated_columns.items():
         if col_name == "total_storage_size_bytes":
@@ -2871,13 +2891,15 @@ def _build_calls_complete_stats_query(
                 f"ELSE NULL END"
             )
             stats_parts.append(f"sum(coalesce({total_storage_expr}, 0)) AS {col_name}")
+        elif body_result.needs_feedback_join and col_name == "count":
+            stats_parts.append(f"count(DISTINCT {table_name}.id) AS {col_name}")
         else:
             stats_parts.append(f"{col_agg} AS {col_name}")
     stats_select = ", ".join(stats_parts)
 
     raw_sql = f"""
     SELECT {stats_select}
-    {body}
+    {body_result.sql}
     """
     return safely_format_sql(raw_sql, logger)
 
