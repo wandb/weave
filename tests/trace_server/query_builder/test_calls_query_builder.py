@@ -2338,15 +2338,6 @@ def test_maybe_convert_datetime_operands() -> None:
     )
     assert ops[1].literal_ == 1709251200
 
-    # Test: string literal compared to started_at → should NOT convert (already a string)
-    ops = _maybe_convert_datetime_operands(
-        [
-            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
-            tsi_query.LiteralOperation(**{"$literal": "2024-03-01 00:00:00"}),
-        ]
-    )
-    assert ops[1].literal_ == "2024-03-01 00:00:00"
-
     # Test: None literal compared to deleted_at → should NOT convert
     ops = _maybe_convert_datetime_operands(
         [
@@ -2365,6 +2356,68 @@ def test_maybe_convert_datetime_operands() -> None:
         ]
     )
     assert original_lit.literal_ == 1709251200
+
+
+def test_maybe_convert_ch_format_literal_unchanged() -> None:
+    """Canonical CH datetime string (timestamp_to_datetime_str shape) is left as-is."""
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+            tsi_query.LiteralOperation(**{"$literal": "2024-03-01 00:00:00.000000"}),
+        ]
+    )
+    assert ops[1].literal_ == "2024-03-01 00:00:00.000000"
+
+
+def test_maybe_convert_iso8601_literal_to_ch_format() -> None:
+    """ISO 8601 datetime literals are rewritten to canonical CH format."""
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+            tsi_query.LiteralOperation(**{"$literal": "2024-03-01T00:00:00Z"}),
+        ]
+    )
+    assert ops[1].literal_ == "2024-03-01 00:00:00.000000"
+
+
+@pytest.mark.parametrize("field", ["started_at", "ended_at", "deleted_at"])
+def test_maybe_convert_string_date_for_datetime_columns(field: str) -> None:
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": field}),
+            tsi_query.LiteralOperation(**{"$literal": "2024-03-01"}),
+        ]
+    )
+    assert ops[1].literal_ == "2024-03-01 00:00:00.000000"
+
+
+def test_maybe_convert_literal_before_field() -> None:
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.LiteralOperation(**{"$literal": "2024-03-01T12:00:00Z"}),
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+        ]
+    )
+    assert ops[0].literal_ == "2024-03-01 12:00:00.000000"
+
+
+def test_maybe_convert_skips_non_datetime_string_field() -> None:
+    original = [
+        tsi_query.GetFieldOperator(**{"$getField": "display_name"}),
+        tsi_query.LiteralOperation(**{"$literal": "2024-03-01"}),
+    ]
+    ops = _maybe_convert_datetime_operands(original)
+    assert ops == original
+    assert ops[1].literal_ == "2024-03-01"
+
+
+def test_maybe_convert_skips_unparseable_string() -> None:
+    original = [
+        tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+        tsi_query.LiteralOperation(**{"$literal": "not-a-timestamp"}),
+    ]
+    ops = _maybe_convert_datetime_operands(original)
+    assert ops == original
 
 
 def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:

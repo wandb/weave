@@ -57,6 +57,7 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
 from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
+    parse_string_to_utc_timestamp,
     safe_alias,
     safely_format_sql,
     timestamp_to_datetime_str,
@@ -2015,12 +2016,15 @@ class FilterToConditions(BaseModel):
 def _maybe_convert_datetime_operands(
     operands: Sequence["tsi_query.Operand"],
 ) -> Sequence["tsi_query.Operand"]:
-    """Convert numeric literals to datetime strings when compared against DateTime columns.
+    """Convert numeric or parseable string literals when compared to DateTime columns.
 
-    When a numeric literal (int/float unix timestamp) is being compared against a
-    DateTime column field (started_at, ended_at, deleted_at), convert it to a datetime
-    string so ClickHouse can properly use primary key / ORDER BY indexes on DateTime64
-    columns.
+    When a literal (int/float unix timestamp, or ISO / ``YYYY-MM-DD`` string) is
+    compared against a DateTime column field (started_at, ended_at, deleted_at),
+    convert it to a datetime string so ClickHouse can properly use
+    primary key / ORDER BY indexes on DateTime64 columns.
+
+    String dates use midnight UTC for ``YYYY-MM-DD``. Other formats follow
+    :func:`parse_string_to_utc_timestamp`.
 
     Returns a new list of operands with conversions applied, or the original sequence if
     no conversion is needed.
@@ -2032,12 +2036,19 @@ def _maybe_convert_datetime_operands(
         ... ])
         >>> isinstance(ops[1].literal_, str)
         True
+        >>> ops2 = _maybe_convert_datetime_operands([
+        ...     tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+        ...     tsi_query.LiteralOperation(**{"$literal": "2024-03-01"}),
+        ... ])
+        >>> ops2[1].literal_
+        '2024-03-01 00:00:00.000000'
     """
     if len(operands) != 2:
         return operands
 
     field_idx = None
     literal_idx = None
+    timestamp: float | None = None
 
     for i, op in enumerate(operands):
         if (
@@ -2045,17 +2056,22 @@ def _maybe_convert_datetime_operands(
             and op.get_field_ in DATETIME_COLUMN_FIELDS
         ):
             field_idx = i
-        elif isinstance(op, tsi_query.LiteralOperation) and isinstance(
-            op.literal_, (int, float)
-        ):
-            literal_idx = i
+        elif isinstance(op, tsi_query.LiteralOperation):
+            lit = op.literal_
+            if isinstance(lit, (int, float)):
+                literal_idx = i
+                timestamp = float(lit)
+            elif isinstance(lit, str):
+                parsed = parse_string_to_utc_timestamp(lit)
+                if parsed is not None:
+                    literal_idx = i
+                    timestamp = parsed
 
-    if field_idx is None or literal_idx is None:
+    if field_idx is None or literal_idx is None or timestamp is None:
         return operands
 
     # Convert numeric timestamp to datetime string for proper DateTime64 comparison
-    timestamp = operands[literal_idx].literal_
-    assert isinstance(timestamp, (int, float))
+    assert isinstance(timestamp, float)
     datetime_str = timestamp_to_datetime_str(timestamp)
 
     new_operands = list(operands)
