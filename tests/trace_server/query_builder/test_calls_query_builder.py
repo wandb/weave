@@ -2270,6 +2270,75 @@ def test_maybe_convert_datetime_operands() -> None:
     assert original_lit.literal_ == 1709251200
 
 
+@pytest.mark.parametrize(
+    ("literal_in", "expected_literal"),
+    [
+        (
+            "2024-03-01 00:00:00.000000",
+            "2024-03-01 00:00:00.000000",
+        ),
+        (
+            "2024-03-01 00:00:00",
+            "2024-03-01 00:00:00.000000",
+        ),
+        (
+            "2024-03-01T00:00:00Z",
+            "2024-03-01 00:00:00.000000",
+        ),
+    ],
+)
+def test_maybe_convert_string_literal_to_ch_format(
+    literal_in: str, expected_literal: str
+) -> None:
+    """CH-shaped literals are unchanged; ISO 8601 literals map to canonical CH format."""
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+            tsi_query.LiteralOperation(**{"$literal": literal_in}),
+        ]
+    )
+    assert ops[1].literal_ == expected_literal
+
+
+@pytest.mark.parametrize("field", ["started_at", "ended_at", "deleted_at"])
+def test_maybe_convert_string_date_for_datetime_columns(field: str) -> None:
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": field}),
+            tsi_query.LiteralOperation(**{"$literal": "2024-03-01"}),
+        ]
+    )
+    assert ops[1].literal_ == "2024-03-01 00:00:00.000000"
+
+
+def test_maybe_convert_literal_before_field() -> None:
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.LiteralOperation(**{"$literal": "2024-03-01T12:00:00Z"}),
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+        ]
+    )
+    assert ops[0].literal_ == "2024-03-01 12:00:00.000000"
+
+
+def test_maybe_convert_skips_non_datetime_string_field() -> None:
+    original = [
+        tsi_query.GetFieldOperator(**{"$getField": "display_name"}),
+        tsi_query.LiteralOperation(**{"$literal": "2024-03-01"}),
+    ]
+    ops = _maybe_convert_datetime_operands(original)
+    assert ops == original
+
+
+def test_maybe_convert_skips_unparseable_string() -> None:
+    original = [
+        tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+        tsi_query.LiteralOperation(**{"$literal": "not-a-timestamp"}),
+    ]
+    ops = _maybe_convert_datetime_operands(original)
+    assert ops == original
+
+
 def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -3346,7 +3415,9 @@ def test_build_calls_complete_delete_query() -> None:
 def test_build_calls_complete_delete_query_with_cluster() -> None:
     """Ensure the delete helper builds the expected query with cluster name.
 
-    In distributed mode, mutations target the local table with ON CLUSTER clause.
+    _format_table_name_with_cluster only adds ON CLUSTER; the caller is
+    responsible for passing the correct table name (e.g. calls_complete_local
+    in distributed mode via _get_calls_complete_table_name).
     """
     query = build_calls_complete_delete_query(
         table_name="calls_complete",
@@ -3357,7 +3428,7 @@ def test_build_calls_complete_delete_query_with_cluster() -> None:
 
     expected = sqlparse.format(
         """
-        DELETE FROM calls_complete_local ON CLUSTER my_cluster
+        DELETE FROM calls_complete ON CLUSTER my_cluster
         WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
         """,
         reindent=True,
@@ -3390,7 +3461,9 @@ def test_build_calls_complete_update_query() -> None:
 def test_build_calls_complete_update_query_with_cluster() -> None:
     """Ensure the update helper builds the expected query with cluster name.
 
-    In distributed mode, mutations target the local table with ON CLUSTER clause.
+    _format_table_name_with_cluster only adds ON CLUSTER; the caller is
+    responsible for passing the correct table name (e.g. calls_complete_local
+    in distributed mode via _get_calls_complete_table_name).
     """
     query = build_calls_complete_update_query(
         table_name="calls_complete",
@@ -3402,7 +3475,7 @@ def test_build_calls_complete_update_query_with_cluster() -> None:
 
     expected = sqlparse.format(
         """
-        UPDATE calls_complete_local ON CLUSTER my_cluster
+        UPDATE calls_complete ON CLUSTER my_cluster
         SET display_name = {display_name:String}
         WHERE project_id = {project_id:String} AND id = {id:String}
         """,
