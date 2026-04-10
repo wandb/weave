@@ -1496,7 +1496,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> Iterator[tsi.CallSchema]:
         """Fetch direct children of eval root IDs and optionally their children."""
         read_table = self.table_routing_resolver.resolve_read_table(
-            project_id, self.ch_client
+            project_id, self._mint_client
         )
         columns = sorted(
             [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
