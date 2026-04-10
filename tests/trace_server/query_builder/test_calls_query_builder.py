@@ -711,7 +711,7 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
 
 
 def test_query_with_simple_feedback_filter_calls_complete() -> None:
-    """Test feedback filter on calls_complete uses DISTINCT to avoid row duplication."""
+    """Test feedback filter on calls_complete table - should NOT use GROUP BY or aggregation."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
     cq.add_field("id")
     cq.add_condition(
@@ -3332,7 +3332,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
 
 
 def test_query_with_simple_feedback_sort_calls_complete() -> None:
-    """Ensure feedback sorting uses calls_complete with DISTINCT for dedup."""
+    """Ensure feedback sorting uses calls_complete."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
     cq.add_field("id")
     cq.add_order("feedback.[wandb.runnable.my_op].payload.output.expected", "desc")
