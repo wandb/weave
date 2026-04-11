@@ -2242,7 +2242,6 @@ def process_query_to_conditions(
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
             cond = f"({lhs_part} IN ({rhs_part}))"
         elif isinstance(operation, tsi_query.ContainsOperation):
-            # Multi-value feedback fields need arrayExists instead of position
             mv_field = (
                 _get_multi_value_feedback_field(operation.contains_.input)
                 if use_agg_fn
