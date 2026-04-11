@@ -174,7 +174,7 @@ def resolve_eval_inputs(
             if was_ref:
                 digests_to_resolve.add(digest)
 
-    if not digests_to_resolve:
+    if len(digests_to_resolve) == 0:
         return
 
     resolved_map = table_rows_reader(list(digests_to_resolve))
