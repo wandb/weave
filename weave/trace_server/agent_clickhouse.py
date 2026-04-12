@@ -12,12 +12,10 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.agent_query_builder import (
-    SPAN_FILTERABLE_COLS,
     SPAN_SORTABLE_COLS,
     add_custom_attr_filters,
     add_span_filters,
     add_time_filters,
-    build_group_by_clause,
     build_order_by,
     safe_int,
     safe_str,
@@ -36,10 +34,6 @@ from weave.trace_server.agent_types import (
     AgentConversationChatRes,
     AgentConversationSchema,
     AgentConversationsQueryRes,
-    AgentConversationStatsBucket,
-    AgentConversationStatsRes,
-    AgentMetricsBucket,
-    AgentMetricsRes,
     AgentSchema,
     AgentSearchConversationResult,
     AgentSearchMatchedMessage,
@@ -49,10 +43,8 @@ from weave.trace_server.agent_types import (
     AgentSpansTraceReq,
     AgentSpansTraceRes,
     AgentsQueryRes,
-    AgentStatsBucket,
     AgentTraceSchema,
     AgentTracesQueryRes,
-    AgentTurnStatsRes,
     AgentVersionSchema,
     AgentVersionsQueryRes,
 )
@@ -362,12 +354,10 @@ class AgentQueryHandler:
             conditions.append("agent_version = {f_agent_version:String}")
             parameters["f_agent_version"] = req.agent_version
 
-        if req.start:
-            conditions.append("started_at >= parseDateTimeBestEffort({start:String})")
-            parameters["start"] = req.start
-        if req.end:
-            conditions.append("started_at < parseDateTimeBestEffort({end:String})")
-            parameters["end"] = req.end
+        add_time_filters(
+            conditions, parameters,
+            start=req.start, end=req.end, column="started_at",
+        )
 
         where = " AND ".join(conditions)
         order_by = build_order_by(
@@ -428,9 +418,9 @@ class AgentQueryHandler:
                     total_output_tokens=safe_int(row[3]),
                     error_count=safe_int(row[4]),
                     conversation_id=safe_str(row[5]),
-                    agent_names=[x for x in (list(row[6]) if row[6] else []) if x],
-                    agent_versions=[x for x in (list(row[7]) if row[7] else []) if x],
-                    request_models=[x for x in (list(row[8]) if row[8] else []) if x],
+                    agent_names=_unpack_string_array(row[6]),
+                    agent_versions=_unpack_string_array(row[7]),
+                    request_models=_unpack_string_array(row[8]),
                     first_seen=row[9],
                     last_seen=row[10],
                 )
@@ -698,230 +688,15 @@ class AgentQueryHandler:
                     total_output_tokens=int(row[5]),
                     total_duration_ms=int(row[6]),
                     error_count=int(row[7]),
-                    agent_names=[x for x in (list(row[8]) if row[8] else []) if x],
-                    agent_versions=[x for x in (list(row[9]) if row[9] else []) if x],
-                    provider_names=[x for x in (list(row[10]) if row[10] else []) if x],
-                    request_models=[x for x in (list(row[11]) if row[11] else []) if x],
+                    agent_names=_unpack_string_array(row[8]),
+                    agent_versions=_unpack_string_array(row[9]),
+                    provider_names=_unpack_string_array(row[10]),
+                    request_models=_unpack_string_array(row[11]),
                     first_seen=row[12],
                     last_seen=row[13],
                 )
             )
         return AgentConversationsQueryRes(conversations=convs, total_count=total)
-
-    # ------------------------------------------------------------------
-    # Turn stats (time-bucketed span analytics)
-    # ------------------------------------------------------------------
-
-    def turn_stats(self, req: Any) -> Any:
-        """Aggregate span metrics into time buckets with full filter support."""
-        granularity = max(req.granularity_seconds, 60)
-        conditions = ["s.project_id = {project_id:String}"]
-        parameters: dict[str, Any] = {
-            "project_id": req.project_id,
-            "granularity": granularity,
-        }
-
-        add_time_filters(conditions, parameters, start=req.start, end=req.end)
-
-        # List filters (IN arrays) — validated against whitelist
-        list_filters = {
-            "operation_names": "operation_name",
-            "agent_names": "agent_name",
-            "agent_versions": "agent_version",
-            "provider_names": "provider_name",
-            "request_models": "request_model",
-            "tool_names": "tool_name",
-            "conversation_ids": "conversation_id",
-            "status_codes": "status_code",
-        }
-        for field_name, col_name in list_filters.items():
-            if col_name not in SPAN_FILTERABLE_COLS:
-                continue
-            values = getattr(req, field_name, None) or []
-            if values:
-                pk = f"f_{col_name}"
-                conditions.append(f"s.{col_name} IN {{{pk}:Array(String)}}")
-                parameters[pk] = values
-
-        add_custom_attr_filters(
-            conditions, parameters, getattr(req, "custom_filters", None)
-        )
-
-        group_select, group_by_extra, group_by_col = build_group_by_clause(req.group_by)
-
-        where = " AND ".join(conditions)
-        query = f"""
-            SELECT
-                toStartOfInterval(s.started_at, INTERVAL {{granularity:UInt32}} SECOND) AS bucket{group_select},
-                count() AS cnt,
-                sum(s.input_tokens) AS input_tokens,
-                sum(s.output_tokens) AS output_tokens,
-                countIf(s.status_code = 'ERROR') AS error_count,
-                avg(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)) AS avg_duration_ms
-            FROM genai_spans s
-            WHERE {where}
-            GROUP BY bucket{group_by_extra}
-            ORDER BY bucket{group_by_extra}
-        """
-        result = self._ch.query(query, parameters=parameters)
-
-        buckets = []
-        for row in result.result_rows:
-            b: dict[str, Any] = {
-                "timestamp": str(row[0]),
-                "count": int(row[1 if not group_by_col else 2]),
-                "input_tokens": int(row[2 if not group_by_col else 3]),
-                "output_tokens": int(row[3 if not group_by_col else 4]),
-                "error_count": int(row[4 if not group_by_col else 5]),
-                "avg_duration_ms": float(row[5 if not group_by_col else 6] or 0),
-            }
-            if group_by_col:
-                b["group"] = str(row[1])
-            buckets.append(AgentStatsBucket(**b))
-        return AgentTurnStatsRes(buckets=buckets)
-
-    # ------------------------------------------------------------------
-    # Conversation stats (time-bucketed, from genai_spans)
-    # ------------------------------------------------------------------
-
-    def conversation_stats(self, req: Any) -> Any:
-        """Aggregate conversation metrics into time buckets from genai_spans."""
-        granularity = max(req.granularity_seconds, 60)
-        conditions = [
-            "s.project_id = {project_id:String}",
-            "s.conversation_id != ''",
-        ]
-        parameters: dict[str, Any] = {
-            "project_id": req.project_id,
-            "granularity": granularity,
-        }
-
-        add_time_filters(conditions, parameters, start=req.start, end=req.end)
-
-        conv_ids = getattr(req, "conversation_ids", None) or []
-        if conv_ids:
-            conditions.append("s.conversation_id IN {f_conversation_id:Array(String)}")
-            parameters["f_conversation_id"] = conv_ids
-
-        # Direct span column filters (no array columns in v4)
-        for field_name, col in [
-            ("agent_names", "agent_name"),
-            ("provider_names", "provider_name"),
-        ]:
-            values = getattr(req, field_name, None) or []
-            if values:
-                pk = f"f_{col}"
-                conditions.append(f"s.{col} IN {{{pk}:Array(String)}}")
-                parameters[pk] = values
-
-        group_by_col = ""
-        group_select = ""
-        group_by_extra = ""
-        allowed_group = {"agent_name", "provider_name", "conversation_id"}
-        if req.group_by and req.group_by in allowed_group:
-            group_by_col = req.group_by
-            group_select = f", s.{req.group_by} AS group_value"
-            group_by_extra = ", group_value"
-
-        where = " AND ".join(conditions)
-
-        # Two-level aggregation: first group by conversation, then bucket
-        query = f"""
-            SELECT
-                toStartOfInterval(last_seen, INTERVAL {{granularity:UInt32}} SECOND) AS bucket{group_select.replace("s.", "")},
-                count() AS conversation_count,
-                sum(turn_count) AS turn_count,
-                sum(total_input_tokens) AS input_tokens,
-                sum(total_output_tokens) AS output_tokens,
-                sum(error_count) AS error_count
-            FROM (
-                SELECT conversation_id,
-                       max(started_at) AS last_seen,
-                       {f"any(s.{req.group_by}) AS group_value," if group_by_col else ""}
-                       countIf(s.operation_name = 'invoke_agent') AS turn_count,
-                       sum(s.input_tokens) AS total_input_tokens,
-                       sum(s.output_tokens) AS total_output_tokens,
-                       countIf(s.status_code = 'ERROR') AS error_count
-                FROM genai_spans s
-                WHERE {where}
-                GROUP BY conversation_id
-            )
-            GROUP BY bucket{group_by_extra}
-            ORDER BY bucket{group_by_extra}
-        """
-        result = self._ch.query(query, parameters=parameters)
-
-        buckets = []
-        for row in result.result_rows:
-            b: dict[str, Any] = {
-                "timestamp": str(row[0]),
-                "conversation_count": int(row[1 if not group_by_col else 2]),
-                "turn_count": int(row[2 if not group_by_col else 3]),
-                "input_tokens": int(row[3 if not group_by_col else 4]),
-                "output_tokens": int(row[4 if not group_by_col else 5]),
-                "error_count": int(row[5 if not group_by_col else 6]),
-            }
-            if group_by_col:
-                b["group"] = str(row[1])
-            buckets.append(AgentConversationStatsBucket(**b))
-        return AgentConversationStatsRes(buckets=buckets)
-
-    # ------------------------------------------------------------------
-    # Agent metrics (time-bucketed, for a single agent)
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-    # Agent metrics (time-bucketed, for a single agent)
-    # ------------------------------------------------------------------
-
-    def agent_metrics(self, req: Any) -> Any:
-        """Time-bucketed metrics for a specific agent."""
-        granularity = max(req.granularity_seconds, 60)
-        conditions = [
-            "s.project_id = {project_id:String}",
-            "s.agent_name = {agent_name:String}",
-            "s.operation_name = 'invoke_agent'",
-        ]
-        parameters: dict[str, Any] = {
-            "project_id": req.project_id,
-            "agent_name": req.agent_name,
-            "granularity": granularity,
-        }
-        if req.start:
-            conditions.append("s.started_at >= parseDateTimeBestEffort({start:String})")
-            parameters["start"] = req.start
-        if req.end:
-            conditions.append("s.started_at < parseDateTimeBestEffort({end:String})")
-            parameters["end"] = req.end
-
-        where = " AND ".join(conditions)
-        query = f"""
-            SELECT
-                toStartOfInterval(s.started_at, INTERVAL {{granularity:UInt32}} SECOND) AS bucket,
-                count() AS invocation_count,
-                sum(s.input_tokens) AS input_tokens,
-                sum(s.output_tokens) AS output_tokens,
-                countIf(s.status_code = 'ERROR') AS error_count,
-                avg(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)) AS avg_duration_ms
-            FROM genai_spans s
-            WHERE {where}
-            GROUP BY bucket
-            ORDER BY bucket
-        """
-        result = self._ch.query(query, parameters=parameters)
-        buckets = []
-        for row in result.result_rows:
-            buckets.append(
-                AgentMetricsBucket(
-                    timestamp=str(row[0]),
-                    invocation_count=int(row[1]),
-                    input_tokens=int(row[2]),
-                    output_tokens=int(row[3]),
-                    error_count=int(row[4]),
-                    avg_duration_ms=float(row[5] or 0),
-                )
-            )
-        return AgentMetricsRes(agent_name=req.agent_name, buckets=buckets)
 
     # ------------------------------------------------------------------
     # Message search
@@ -1018,6 +793,13 @@ _CHAT_VIEW_COLS = """
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _unpack_string_array(val: Any) -> list[str]:
+    """Unpack a ClickHouse Array(String) value, filtering empty strings."""
+    if not val:
+        return []
+    return [x for x in list(val) if x]
 
 
 def _normalize_span_row(d: dict[str, Any]) -> dict[str, Any]:

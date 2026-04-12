@@ -63,10 +63,6 @@ from weave.trace_server.agent_types import (
     AgentConversationChatRes,
     AgentConversationsQueryReq,
     AgentConversationsQueryRes,
-    AgentConversationStatsReq,
-    AgentConversationStatsRes,
-    AgentMetricsReq,
-    AgentMetricsRes,
     AgentSearchReq,
     AgentSearchRes,
     AgentSpansQueryReq,
@@ -79,8 +75,6 @@ from weave.trace_server.agent_types import (
     AgentTraceChatRes,
     AgentTracesQueryReq,
     AgentTracesQueryRes,
-    AgentTurnStatsReq,
-    AgentTurnStatsRes,
     AgentVersionsQueryReq,
     AgentVersionsQueryRes,
 )
@@ -6449,17 +6443,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: AgentConversationsQueryReq
     ) -> AgentConversationsQueryRes:
         return AgentQueryHandler(self.ch_client).conversations_query(req)
-
-    def agent_turn_stats(self, req: AgentTurnStatsReq) -> AgentTurnStatsRes:
-        return AgentQueryHandler(self.ch_client).turn_stats(req)
-
-    def agent_conversation_stats(
-        self, req: AgentConversationStatsReq
-    ) -> AgentConversationStatsRes:
-        return AgentQueryHandler(self.ch_client).conversation_stats(req)
-
-    def agent_metrics(self, req: AgentMetricsReq) -> AgentMetricsRes:
-        return AgentQueryHandler(self.ch_client).agent_metrics(req)
 
     def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
         return AgentQueryHandler(self.ch_client).search(req)
