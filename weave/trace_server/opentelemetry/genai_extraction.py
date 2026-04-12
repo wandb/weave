@@ -11,6 +11,7 @@ The main entry point is ``extract_genai_span()`` which takes a parsed OTel
 import json
 from typing import Any
 
+from weave.trace_server.agent_query_builder import safe_float, safe_int
 from weave.trace_server.agent_schema import (
     KNOWN_SEMCONV_ATTR_KEYS,
     AgentSpanCHInsertable,
@@ -59,24 +60,6 @@ def _get(attrs: dict[str, Any], *keys: str) -> Any:
     return None
 
 
-def _safe_int(val: Any) -> int:
-    if val is None:
-        return 0
-    try:
-        return int(val)
-    except (TypeError, ValueError):
-        return 0
-
-
-def _safe_float(val: Any) -> float:
-    if val is None:
-        return 0.0
-    try:
-        return float(val)
-    except (TypeError, ValueError):
-        return 0.0
-
-
 def _json_str(val: Any) -> str:
     if val is None:
         return ""
@@ -123,8 +106,8 @@ def extract_provider(attrs: dict[str, Any], span_name: str) -> str:
     if val:
         return str(val).lower()
     if "." in span_name:
-        prefix = span_name.split(".")[0].lower()
-        if prefix in ("anthropic", "openai", "google", "gemini", "cohere"):
+        prefix = span_name.split(".", maxsplit=1)[0].lower()
+        if prefix in {"anthropic", "openai", "google", "gemini", "cohere"}:
             return prefix
     return ""
 
@@ -165,8 +148,8 @@ def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
         return "chat"
 
     if "." in span_name:
-        suffix = span_name.split(".")[-1].lower()
-        if suffix in ("chat", "completion", "generate"):
+        suffix = span_name.rsplit(".", maxsplit=1)[-1].lower()
+        if suffix in {"chat", "completion", "generate"}:
             return suffix
 
     return ""
@@ -212,7 +195,7 @@ def extract_conversation_name(attrs: dict[str, Any]) -> str:
 
 def extract_input_tokens(attrs: dict[str, Any]) -> int:
     """Fallback: gen_ai.usage.input_tokens, prompt_tokens, llm.token_count.prompt"""
-    return _safe_int(
+    return safe_int(
         _get(
             attrs,
             "gen_ai.usage.input_tokens",
@@ -224,7 +207,7 @@ def extract_input_tokens(attrs: dict[str, Any]) -> int:
 
 def extract_output_tokens(attrs: dict[str, Any]) -> int:
     """Fallback: gen_ai.usage.output_tokens, completion_tokens, llm.token_count.completion"""
-    return _safe_int(
+    return safe_int(
         _get(
             attrs,
             "gen_ai.usage.output_tokens",
@@ -235,14 +218,14 @@ def extract_output_tokens(attrs: dict[str, Any]) -> int:
 
 
 def extract_total_tokens(attrs: dict[str, Any], input_t: int, output_t: int) -> int:
-    val = _safe_int(_get(attrs, "llm.usage.total_tokens", "llm.token_count.total"))
+    val = safe_int(_get(attrs, "llm.usage.total_tokens", "llm.token_count.total"))
     if val > 0:
         return val
     return input_t + output_t
 
 
 def extract_reasoning_tokens(attrs: dict[str, Any]) -> int:
-    return _safe_int(
+    return safe_int(
         _get(
             attrs,
             "gen_ai.usage.reasoning_tokens",
@@ -652,8 +635,8 @@ def extract_genai_span(
     reasoning_content = extract_reasoning_content(raw_output)
 
     error_type = str(_get(attrs, "error.type") or "")
-    cache_creation = _safe_int(_get(attrs, "gen_ai.usage.cache_creation.input_tokens"))
-    cache_read = _safe_int(_get(attrs, "gen_ai.usage.cache_read.input_tokens"))
+    cache_creation = safe_int(_get(attrs, "gen_ai.usage.cache_creation.input_tokens"))
+    cache_read = safe_int(_get(attrs, "gen_ai.usage.cache_read.input_tokens"))
 
     custom_str, custom_int, custom_float = _extract_custom_attrs(attrs)
 
@@ -696,14 +679,14 @@ def extract_genai_span(
         tool_definitions=_json_str(_get(attrs, "gen_ai.tool.definitions")),
         finish_reasons=extract_finish_reasons(attrs),
         error_type=error_type,
-        request_temperature=_safe_float(_get(attrs, "gen_ai.request.temperature")),
-        request_max_tokens=_safe_int(_get(attrs, "gen_ai.request.max_tokens")),
-        request_top_p=_safe_float(_get(attrs, "gen_ai.request.top_p")),
-        request_frequency_penalty=_safe_float(_get(attrs, "gen_ai.request.frequency_penalty")),
-        request_presence_penalty=_safe_float(_get(attrs, "gen_ai.request.presence_penalty")),
-        request_seed=_safe_int(_get(attrs, "gen_ai.request.seed")),
+        request_temperature=safe_float(_get(attrs, "gen_ai.request.temperature")),
+        request_max_tokens=safe_int(_get(attrs, "gen_ai.request.max_tokens")),
+        request_top_p=safe_float(_get(attrs, "gen_ai.request.top_p")),
+        request_frequency_penalty=safe_float(_get(attrs, "gen_ai.request.frequency_penalty")),
+        request_presence_penalty=safe_float(_get(attrs, "gen_ai.request.presence_penalty")),
+        request_seed=safe_int(_get(attrs, "gen_ai.request.seed")),
         request_stop_sequences=_str_list(_get(attrs, "gen_ai.request.stop_sequences")),
-        request_choice_count=_safe_int(_get(attrs, "gen_ai.request.choice.count")),
+        request_choice_count=safe_int(_get(attrs, "gen_ai.request.choice.count")),
         output_type=str(_get(attrs, "gen_ai.output.type") or ""),
         input_messages=_normalize_raw_messages(_extract_raw_input(attrs, events_dicts)),
         output_messages=output_msgs,
@@ -713,8 +696,8 @@ def extract_genai_span(
         tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts) or tl_tool_args,
         tool_call_result=extract_tool_call_result(attrs, events_dicts),
         compaction_summary=str(_get(attrs, "weave.compaction.summary") or ""),
-        compaction_items_before=_safe_int(_get(attrs, "weave.compaction.items_before")),
-        compaction_items_after=_safe_int(_get(attrs, "weave.compaction.items_after")),
+        compaction_items_before=safe_int(_get(attrs, "weave.compaction.items_before")),
+        compaction_items_after=safe_int(_get(attrs, "weave.compaction.items_after")),
         content_refs=_str_list(_get(attrs, "weave.content_refs")),
         artifact_refs=_str_list(_get(attrs, "weave.artifact_refs")),
         object_refs=_str_list(_get(attrs, "weave.object_refs")),
@@ -722,7 +705,7 @@ def extract_genai_span(
         custom_attrs_int=custom_int,
         custom_attrs_float=custom_float,
         server_address=str(_get(attrs, "server.address") or ""),
-        server_port=_safe_int(_get(attrs, "server.port")),
+        server_port=safe_int(_get(attrs, "server.port")),
         raw_span_dump=raw_span_dump,
         attributes_dump=_json_str(attrs),
         events_dump=_json_str(events_dicts) if events_dicts else "",
