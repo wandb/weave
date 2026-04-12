@@ -189,6 +189,14 @@ class AgentChatMessage(BaseModel):
     Produced by the backend normalization of agent spans into a linear
     sequence of user messages, agent responses, tool calls, handoffs,
     and agent boundaries.
+
+    Message types derived from OTel GenAI semconv operations:
+    - ``user_message``, ``agent_message``, ``tool_call``
+
+    Weave-specific product extensions (no semconv equivalent):
+    - ``agent_start``: agent lifecycle boundary marker
+    - ``agent_handoff``: agent-to-agent delegation
+    - ``context_compacted``: context window compaction event
     """
 
     type: Literal[

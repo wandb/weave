@@ -4,7 +4,13 @@ Converts a flat list of ``AgentSpanSchema`` rows (from the ``genai_spans``
 table) into a linear sequence of ``AgentChatMessage`` objects suitable for
 rendering an agent conversation UI.
 
-The normalization handles provider-specific formats (OpenAI Agents SDK,
+This is a **Weave product feature**, not a semconv concern.  The message types
+include Weave-specific concepts that have no OTel GenAI semconv equivalent:
+
+- ``agent_start`` / ``agent_handoff``: agent lifecycle boundaries
+- ``context_compacted``: Weave context compaction events
+
+The normalization handles provider-specific span formats (OpenAI Agents SDK,
 Google ADK) and produces a unified output.
 """
 
