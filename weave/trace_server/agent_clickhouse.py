@@ -64,14 +64,7 @@ def genai_span_to_row(span: AgentSpanCHInsertable) -> list[Any]:
         msgs = params.get(key)
         if msgs and isinstance(msgs, list):
             params[key] = [
-                (
-                    m["role"],
-                    m["content"],
-                    m["parts"],
-                    m["tool_calls"],
-                    m["finish_reason"],
-                    m["name"],
-                )
+                (m["role"], m["content"], m["finish_reason"])
                 if isinstance(m, dict)
                 else m
                 for m in msgs
@@ -814,10 +807,7 @@ def _normalize_span_row(d: dict[str, Any]) -> dict[str, Any]:
                 {
                     "role": m[0],
                     "content": m[1],
-                    "parts": m[2],
-                    "tool_calls": m[3],
-                    "finish_reason": m[4],
-                    "name": m[5],
+                    "finish_reason": m[2],
                 }
                 if isinstance(m, tuple)
                 else m

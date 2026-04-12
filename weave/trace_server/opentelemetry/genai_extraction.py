@@ -1,8 +1,17 @@
-"""Extract normalized GenAI semantic convention fields from OTel spans.
+"""Extract normalized GenAI fields from OTel spans into the Weave GenAI schema.
 
-Handles the divergent attribute layouts produced by the OpenAI Agents SDK,
-Google ADK, and Anthropic (Traceloop) instrumentations by applying ordered
-fallback chains for each field.
+Convention strategy:
+
+- Standard OTel GenAI semconv attributes (``gen_ai.*``) are the preferred source.
+  The OTel GenAI semconv is "Development" status (unstable) as of April 2026.
+- Vendor-specific attributes (``agent.*``, ``llm.*``, ``gcp.*``) serve as
+  fallbacks for providers that haven't adopted the ``gen_ai.*`` namespace yet
+  (OpenAI Agents SDK, Traceloop/OpenLLMetry, Google ADK).
+- Weave-specific attributes (``weave.*``) provide product extensions not
+  covered by OTel semconv (compaction tracking, content refs, etc.).
+- All sources are normalized into the same schema with neutral column names.
+
+See ``agent_schema.py`` for the categorized list of known attribute keys.
 
 The main entry point is ``extract_genai_span()`` which takes a parsed OTel
 ``Span`` and returns an ``AgentSpanCHInsertable`` ready for ClickHouse insert.
@@ -21,20 +30,26 @@ from weave.trace_server.opentelemetry.helpers import get_attribute, to_json_seri
 from weave.trace_server.opentelemetry.python_spans import Span
 
 # ---------------------------------------------------------------------------
-# OpenAI Agents SDK span type -> GenAI operation name
+# OpenAI Agents SDK span type -> operation name
+#
+# Standard OTel GenAI ops: invoke_agent, execute_tool, chat
+# Vendor-specific ops: handoff, guardrail, custom, transcription, speech
 # ---------------------------------------------------------------------------
 _OPENAI_SPAN_TYPE_TO_OP = {
-    "agent": "invoke_agent",
-    "function": "execute_tool",
-    "response": "chat",
-    "generation": "chat",
-    "handoff": "handoff",
-    "guardrail": "guardrail",
-    "custom": "custom",
-    "transcription": "transcription",
-    "speech": "speech",
+    "agent": "invoke_agent",      # [OTel GenAI]
+    "function": "execute_tool",   # [OTel GenAI]
+    "response": "chat",           # [OTel GenAI]
+    "generation": "chat",         # [OTel GenAI]
+    "handoff": "handoff",         # [vendor: OpenAI]
+    "guardrail": "guardrail",     # [vendor: OpenAI]
+    "custom": "custom",           # [vendor: OpenAI]
+    "transcription": "transcription",  # [vendor: OpenAI]
+    "speech": "speech",           # [vendor: OpenAI]
 }
 
+# Known operation name prefixes for span-name inference.
+# OTel GenAI standard: chat, invoke_agent, execute_tool, generate_content,
+#   text_completion, embeddings, create_agent, retrieval
 _KNOWN_OP_PREFIXES = (
     "chat",
     "invoke_agent",
@@ -399,22 +414,10 @@ def _normalize_single_message(msg: dict[str, Any]) -> NormalizedMessage:
     elif isinstance(msg.get("content"), list):
         content = _text_from_parts(msg["content"])
 
-    parts_json = ""
-    if isinstance(raw_parts, list) and raw_parts:
-        parts_json = _json_str(raw_parts)
-
-    tool_calls_json = ""
-    tool_calls = msg.get("tool_calls")
-    if isinstance(tool_calls, list) and tool_calls:
-        tool_calls_json = _json_str(tool_calls)
-
     return NormalizedMessage(
         role=role,
         content=content,
-        parts=parts_json,
-        tool_calls=tool_calls_json,
         finish_reason=str(msg.get("finish_reason", "")),
-        name=str(msg.get("name", "") or ""),
     )
 
 

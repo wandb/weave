@@ -78,12 +78,10 @@ CREATE TABLE genai_spans (
     output_type         String DEFAULT '' CODEC(ZSTD(1)),
 
     input_messages  Array(Tuple(
-        role String, content String, parts String,
-        tool_calls String, finish_reason String, name String
+        role String, content String, finish_reason String
     )) CODEC(ZSTD(1)),
     output_messages Array(Tuple(
-        role String, content String, parts String,
-        tool_calls String, finish_reason String, name String
+        role String, content String, finish_reason String
     )) CODEC(ZSTD(1)),
     system_instructions Array(String) DEFAULT [] CODEC(ZSTD(1)),
 
