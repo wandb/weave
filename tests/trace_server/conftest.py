@@ -19,7 +19,6 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.project_version import project_version
-from weave.trace_server.project_version.types import CallsStorageServerMode
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -157,8 +156,9 @@ def _reset_server_state(server: ClickHouseTraceServer) -> None:
     server._op_ref_cache.clear()
     # Clear placeholder file projects set
     server._placeholder_file_projects.clear()
-    # Reset table routing mode (tests may set it to AUTO)
-    server.table_routing_resolver._mode = CallsStorageServerMode.from_env()
+    # Reset table routing resolver to None so it's lazily re-created
+    # (tests may have set _mode to AUTO or accessed the resolver)
+    server._table_routing_resolver = None
     # Reset file storage client so tests that mock env vars get a fresh client
     server._file_storage_client = None
     server._file_storage_client_initialized = False
