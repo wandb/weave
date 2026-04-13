@@ -340,6 +340,9 @@ class WeaveClient:
     # multiple times.
     send_file_cache: WeaveClientSendFileCache
 
+    # Raw caller-supplied init params, set by init_weave() for client reuse checks.
+    _raw_init_params: tuple[str, bool, str | None, str | None, str | None]
+
     """
     A client for interacting with the Weave trace server.
 
@@ -368,9 +371,7 @@ class WeaveClient:
         self._api_key: str | None = (
             api_key if api_key is not None else get_wandb_api_context()
         )
-        self._base_url: str = (
-            base_url if base_url is not None else env.wandb_base_url()
-        )
+        self._base_url: str = base_url if base_url is not None else env.wandb_base_url()
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
         self.project_id_resolver = ProjectIdResolver(server)
