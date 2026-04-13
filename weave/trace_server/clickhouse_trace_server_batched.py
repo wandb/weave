@@ -5189,7 +5189,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, project_id: str, digests: list[str]
     ) -> dict[str, Any]:
         """Batch read table_rows by digest. Returns {digest: parsed_val}."""
-        if not digests:
+        if len(digests) == 0:
             return {}
         pb = ParamBuilder()
         project_param = pb.add(project_id, None, "String")
