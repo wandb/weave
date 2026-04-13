@@ -204,7 +204,6 @@ def get_ch_trace_server(
                 # engine which auto-handles everything and masks bugs).
                 ch_server.ch_client.command(
                     f"CREATE DATABASE IF NOT EXISTS {unique_db}"
-                    f" ON CLUSTER {REPLICATED_CLUSTER}"
                     f" ENGINE = Atomic"
                 )
 
