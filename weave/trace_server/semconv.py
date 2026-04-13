@@ -28,7 +28,6 @@ class Attribute:
     type: str  # "string", "int", "float", "string[]", "json"
     description: str
     gen_ai_alias: str = ""  # OTel gen_ai.* equivalent, if any
-    group: str = ""  # logical grouping
 
 
 # ---------------------------------------------------------------------------
@@ -36,305 +35,58 @@ class Attribute:
 # ---------------------------------------------------------------------------
 
 _DEFS: list[Attribute] = [
-    # -- Classification --
-    Attribute(
-        "weave.operation.name",
-        "string",
-        "Operation type (chat, invoke_agent, execute_tool, ...)",
-        "gen_ai.operation.name",
-        "classification",
-    ),
-    Attribute(
-        "weave.provider.name",
-        "string",
-        "Provider: openai, anthropic, gcp.gemini, ...",
-        "gen_ai.provider.name",
-        "classification",
-    ),
-    Attribute(
-        "weave.system",
-        "string",
-        "Deprecated alias for provider.name",
-        "gen_ai.system",
-        "classification",
-    ),
-    # -- Agent --
-    Attribute(
-        "weave.agent.name", "string", "Agent display name", "gen_ai.agent.name", "agent"
-    ),
-    Attribute(
-        "weave.agent.id", "string", "Agent identifier", "gen_ai.agent.id", "agent"
-    ),
-    Attribute(
-        "weave.agent.description",
-        "string",
-        "Agent description",
-        "gen_ai.agent.description",
-        "agent",
-    ),
-    Attribute(
-        "weave.agent.version",
-        "string",
-        "Agent version",
-        "gen_ai.agent.version",
-        "agent",
-    ),
-    # -- Model --
-    Attribute(
-        "weave.request.model",
-        "string",
-        "Requested model name",
-        "gen_ai.request.model",
-        "model",
-    ),
-    Attribute(
-        "weave.response.model",
-        "string",
-        "Actual model used",
-        "gen_ai.response.model",
-        "model",
-    ),
-    Attribute(
-        "weave.response.id",
-        "string",
-        "Provider response identifier",
-        "gen_ai.response.id",
-        "model",
-    ),
-    # -- Token usage --
-    Attribute(
-        "weave.usage.input_tokens",
-        "int",
-        "Input tokens (includes cached)",
-        "gen_ai.usage.input_tokens",
-        "usage",
-    ),
-    Attribute(
-        "weave.usage.output_tokens",
-        "int",
-        "Output tokens",
-        "gen_ai.usage.output_tokens",
-        "usage",
-    ),
-    Attribute(
-        "weave.usage.reasoning_tokens",
-        "int",
-        "Reasoning/thinking tokens",
-        "gen_ai.usage.reasoning_tokens",
-        "usage",
-    ),
-    Attribute(
-        "weave.usage.cache_creation.input_tokens",
-        "int",
-        "Tokens written to cache",
-        "gen_ai.usage.cache_creation.input_tokens",
-        "usage",
-    ),
-    Attribute(
-        "weave.usage.cache_read.input_tokens",
-        "int",
-        "Tokens served from cache",
-        "gen_ai.usage.cache_read.input_tokens",
-        "usage",
-    ),
-    # -- Conversation --
-    Attribute(
-        "weave.conversation.id",
-        "string",
-        "Conversation or session ID",
-        "gen_ai.conversation.id",
-        "conversation",
-    ),
-    Attribute(
-        "weave.conversation.name",
-        "string",
-        "Human-readable conversation name",
-        "gen_ai.conversation.name",
-        "conversation",
-    ),
-    # -- Tool --
-    Attribute(
-        "weave.tool.name", "string", "Tool/function name", "gen_ai.tool.name", "tool"
-    ),
-    Attribute(
-        "weave.tool.type",
-        "string",
-        "Tool type: function, extension, datastore",
-        "gen_ai.tool.type",
-        "tool",
-    ),
-    Attribute(
-        "weave.tool.call.id",
-        "string",
-        "Tool call identifier",
-        "gen_ai.tool.call.id",
-        "tool",
-    ),
-    Attribute(
-        "weave.tool.description",
-        "string",
-        "Tool description",
-        "gen_ai.tool.description",
-        "tool",
-    ),
-    Attribute(
-        "weave.tool.definitions",
-        "json",
-        "Available tool definitions",
-        "gen_ai.tool.definitions",
-        "tool",
-    ),
-    Attribute(
-        "weave.tool.call.arguments",
-        "json",
-        "Arguments passed to the tool",
-        "gen_ai.tool.call.arguments",
-        "tool",
-    ),
-    Attribute(
-        "weave.tool.call.result",
-        "json",
-        "Result returned by the tool",
-        "gen_ai.tool.call.result",
-        "tool",
-    ),
-    # -- Request params --
-    Attribute(
-        "weave.request.temperature",
-        "float",
-        "Sampling temperature",
-        "gen_ai.request.temperature",
-        "request",
-    ),
-    Attribute(
-        "weave.request.max_tokens",
-        "int",
-        "Maximum output tokens",
-        "gen_ai.request.max_tokens",
-        "request",
-    ),
-    Attribute(
-        "weave.request.top_p",
-        "float",
-        "Nucleus sampling threshold",
-        "gen_ai.request.top_p",
-        "request",
-    ),
-    Attribute(
-        "weave.request.frequency_penalty",
-        "float",
-        "Frequency penalty",
-        "gen_ai.request.frequency_penalty",
-        "request",
-    ),
-    Attribute(
-        "weave.request.presence_penalty",
-        "float",
-        "Presence penalty",
-        "gen_ai.request.presence_penalty",
-        "request",
-    ),
-    Attribute(
-        "weave.request.seed", "int", "Random seed", "gen_ai.request.seed", "request"
-    ),
-    Attribute(
-        "weave.request.stop_sequences",
-        "string[]",
-        "Stop sequences",
-        "gen_ai.request.stop_sequences",
-        "request",
-    ),
-    Attribute(
-        "weave.request.choice.count",
-        "int",
-        "Number of choices requested",
-        "gen_ai.request.choice.count",
-        "request",
-    ),
-    # -- Response --
-    Attribute(
-        "weave.response.finish_reasons",
-        "string[]",
-        "Finish reasons",
-        "gen_ai.response.finish_reasons",
-        "response",
-    ),
-    Attribute(
-        "weave.output.type",
-        "string",
-        "Output modality: text, json, image, speech",
-        "gen_ai.output.type",
-        "response",
-    ),
-    # -- Messages --
-    Attribute(
-        "weave.input.messages",
-        "json",
-        "Input messages",
-        "gen_ai.input.messages",
-        "messages",
-    ),
-    Attribute(
-        "weave.output.messages",
-        "json",
-        "Output messages",
-        "gen_ai.output.messages",
-        "messages",
-    ),
-    Attribute(
-        "weave.system_instructions",
-        "json",
-        "System instructions",
-        "gen_ai.system_instructions",
-        "messages",
-    ),
-    Attribute(
-        "weave.prompt",
-        "json",
-        "Input messages (pre-v1.36 format)",
-        "gen_ai.prompt",
-        "messages",
-    ),
-    Attribute(
-        "weave.completion",
-        "json",
-        "Output messages (pre-v1.36 format)",
-        "gen_ai.completion",
-        "messages",
-    ),
-    # -- Error --
-    Attribute("weave.error.type", "string", "Error type", "error.type", "error"),
-    # -- Server --
-    Attribute(
-        "weave.server.address", "string", "Server hostname", "server.address", "server"
-    ),
-    Attribute("weave.server.port", "int", "Server port", "server.port", "server"),
-    # -- Weave extensions (no gen_ai.* alias) --
-    Attribute(
-        "weave.reasoning_content",
-        "string",
-        "Reasoning/thinking text from output messages",
-        group="weave",
-    ),
-    Attribute(
-        "weave.compaction.summary",
-        "string",
-        "Context compaction summary",
-        group="weave",
-    ),
-    Attribute(
-        "weave.compaction.items_before", "int", "Items before compaction", group="weave"
-    ),
-    Attribute(
-        "weave.compaction.items_after", "int", "Items after compaction", group="weave"
-    ),
-    Attribute(
-        "weave.content_refs", "string[]", "Uploaded content references", group="weave"
-    ),
-    Attribute(
-        "weave.artifact_refs", "string[]", "W&B artifact references", group="weave"
-    ),
-    Attribute("weave.object_refs", "string[]", "W&B object references", group="weave"),
+    # fmt: off
+    Attribute("weave.operation.name",                "string",   "Operation type (chat, invoke_agent, execute_tool, ...)", "gen_ai.operation.name"),
+    Attribute("weave.provider.name",                 "string",   "Provider: openai, anthropic, gcp.gemini, ...",           "gen_ai.provider.name"),
+    Attribute("weave.system",                        "string",   "Deprecated alias for provider.name",                     "gen_ai.system"),
+    Attribute("weave.agent.name",                    "string",   "Agent display name",                                     "gen_ai.agent.name"),
+    Attribute("weave.agent.id",                      "string",   "Agent identifier",                                       "gen_ai.agent.id"),
+    Attribute("weave.agent.description",             "string",   "Agent description",                                      "gen_ai.agent.description"),
+    Attribute("weave.agent.version",                 "string",   "Agent version",                                          "gen_ai.agent.version"),
+    Attribute("weave.request.model",                 "string",   "Requested model name",                                   "gen_ai.request.model"),
+    Attribute("weave.response.model",                "string",   "Actual model used",                                      "gen_ai.response.model"),
+    Attribute("weave.response.id",                   "string",   "Provider response identifier",                           "gen_ai.response.id"),
+    Attribute("weave.usage.input_tokens",            "int",      "Input tokens (includes cached)",                         "gen_ai.usage.input_tokens"),
+    Attribute("weave.usage.output_tokens",           "int",      "Output tokens",                                          "gen_ai.usage.output_tokens"),
+    Attribute("weave.usage.reasoning_tokens",        "int",      "Reasoning/thinking tokens",                              "gen_ai.usage.reasoning_tokens"),
+    Attribute("weave.usage.cache_creation.input_tokens", "int",  "Tokens written to cache",                                "gen_ai.usage.cache_creation.input_tokens"),
+    Attribute("weave.usage.cache_read.input_tokens", "int",      "Tokens served from cache",                               "gen_ai.usage.cache_read.input_tokens"),
+    Attribute("weave.conversation.id",               "string",   "Conversation or session ID",                             "gen_ai.conversation.id"),
+    Attribute("weave.conversation.name",             "string",   "Human-readable conversation name",                       "gen_ai.conversation.name"),
+    Attribute("weave.tool.name",                     "string",   "Tool/function name",                                     "gen_ai.tool.name"),
+    Attribute("weave.tool.type",                     "string",   "Tool type: function, extension, datastore",              "gen_ai.tool.type"),
+    Attribute("weave.tool.call.id",                  "string",   "Tool call identifier",                                   "gen_ai.tool.call.id"),
+    Attribute("weave.tool.description",              "string",   "Tool description",                                       "gen_ai.tool.description"),
+    Attribute("weave.tool.definitions",              "json",     "Available tool definitions",                             "gen_ai.tool.definitions"),
+    Attribute("weave.tool.call.arguments",           "json",     "Arguments passed to the tool",                           "gen_ai.tool.call.arguments"),
+    Attribute("weave.tool.call.result",              "json",     "Result returned by the tool",                            "gen_ai.tool.call.result"),
+    Attribute("weave.request.temperature",           "float",    "Sampling temperature",                                   "gen_ai.request.temperature"),
+    Attribute("weave.request.max_tokens",            "int",      "Maximum output tokens",                                  "gen_ai.request.max_tokens"),
+    Attribute("weave.request.top_p",                 "float",    "Nucleus sampling threshold",                             "gen_ai.request.top_p"),
+    Attribute("weave.request.frequency_penalty",     "float",    "Frequency penalty",                                      "gen_ai.request.frequency_penalty"),
+    Attribute("weave.request.presence_penalty",      "float",    "Presence penalty",                                       "gen_ai.request.presence_penalty"),
+    Attribute("weave.request.seed",                  "int",      "Random seed",                                            "gen_ai.request.seed"),
+    Attribute("weave.request.stop_sequences",        "string[]", "Stop sequences",                                         "gen_ai.request.stop_sequences"),
+    Attribute("weave.request.choice.count",          "int",      "Number of choices requested",                            "gen_ai.request.choice.count"),
+    Attribute("weave.response.finish_reasons",       "string[]", "Finish reasons",                                         "gen_ai.response.finish_reasons"),
+    Attribute("weave.output.type",                   "string",   "Output modality: text, json, image, speech",             "gen_ai.output.type"),
+    Attribute("weave.input.messages",                "json",     "Input messages",                                         "gen_ai.input.messages"),
+    Attribute("weave.output.messages",               "json",     "Output messages",                                        "gen_ai.output.messages"),
+    Attribute("weave.system_instructions",           "json",     "System instructions",                                    "gen_ai.system_instructions"),
+    Attribute("weave.prompt",                        "json",     "Input messages (pre-v1.36 format)",                      "gen_ai.prompt"),
+    Attribute("weave.completion",                    "json",     "Output messages (pre-v1.36 format)",                     "gen_ai.completion"),
+    Attribute("weave.error.type",                    "string",   "Error type",                                             "error.type"),
+    Attribute("weave.server.address",                "string",   "Server hostname",                                        "server.address"),
+    Attribute("weave.server.port",                   "int",      "Server port",                                            "server.port"),
+    # Weave-only extensions (no gen_ai.* alias)
+    Attribute("weave.reasoning_content",             "string",   "Reasoning/thinking text from output messages"),
+    Attribute("weave.compaction.summary",            "string",   "Context compaction summary"),
+    Attribute("weave.compaction.items_before",       "int",      "Items before compaction"),
+    Attribute("weave.compaction.items_after",        "int",      "Items after compaction"),
+    Attribute("weave.content_refs",                  "string[]", "Uploaded content references"),
+    Attribute("weave.artifact_refs",                 "string[]", "W&B artifact references"),
+    Attribute("weave.object_refs",                   "string[]", "W&B object references"),
+    # fmt: on
 ]
 
 

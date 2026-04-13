@@ -101,13 +101,13 @@ class TestSpansQuery:
         # Count query
         count_sql = ch.sql_at(0)
         assert count_sql == _normalize_sql(
-            "SELECT count() FROM genai_spans s WHERE s.project_id = {project_id:String}"
+            "SELECT count() FROM spans s WHERE s.project_id = {project_id:String}"
         )
         assert ch.params_at(0)["project_id"] == "p1"
 
         # Data query
         data_sql = ch.sql_at(1)
-        assert "FROM genai_spans s" in data_sql
+        assert "FROM spans s" in data_sql
         assert "WHERE s.project_id = {project_id:String}" in data_sql
         assert "ORDER BY started_at DESC" in data_sql
         assert "LIMIT {limit:UInt64} OFFSET {offset:UInt64}" in data_sql
@@ -242,7 +242,7 @@ class TestSpansTrace:
 
         assert len(ch.calls) == 1
         sql = ch.last_sql
-        assert "FROM genai_spans s" in sql
+        assert "FROM spans s" in sql
         assert "s.project_id = {project_id:String}" in sql
         assert "s.trace_id = {trace_id:String}" in sql
         assert "ORDER BY s.started_at ASC" in sql
@@ -280,7 +280,7 @@ class TestTracesQuery:
         count_sql = ch.sql_at(0)
         assert "SELECT count() FROM (" in count_sql
         assert (
-            "SELECT trace_id FROM genai_spans WHERE project_id = {project_id:String} GROUP BY trace_id"
+            "SELECT trace_id FROM spans WHERE project_id = {project_id:String} GROUP BY trace_id"
             in count_sql
         )
 
@@ -353,7 +353,7 @@ class TestAgentsQuery:
         assert len(ch.calls) == 2
 
         data_sql = ch.sql_at(0)
-        assert "FROM genai_agents" in data_sql
+        assert "FROM agents" in data_sql
         assert "sum(invocation_count) AS invocation_count" in data_sql
         assert "sum(span_count) AS span_count" in data_sql
         assert "sum(total_input_tokens) AS total_input_tokens" in data_sql
@@ -383,7 +383,7 @@ class TestAgentsQuery:
         handler.agents_query(AgentsQueryReq(project_id="p1"))
         count_sql = ch.sql_at(1)
         assert "SELECT count() FROM (" in count_sql
-        assert "SELECT agent_name FROM genai_agents" in count_sql
+        assert "SELECT agent_name FROM agents" in count_sql
         assert "GROUP BY agent_name" in count_sql
 
 
@@ -403,7 +403,7 @@ class TestAgentVersionsQuery:
         assert len(ch.calls) == 2
 
         data_sql = ch.sql_at(0)
-        assert "FROM genai_agent_versions" in data_sql
+        assert "FROM agent_versions" in data_sql
         assert "project_id = {project_id:String}" in data_sql
         assert "agent_name = {agent_name:String}" in data_sql
         assert "GROUP BY agent_version" in data_sql
@@ -419,7 +419,7 @@ class TestAgentVersionsQuery:
         )
         count_sql = ch.sql_at(1)
         assert "SELECT count() FROM (" in count_sql
-        assert "SELECT agent_version FROM genai_agent_versions" in count_sql
+        assert "SELECT agent_version FROM agent_versions" in count_sql
         assert "GROUP BY agent_version" in count_sql
 
 
@@ -437,7 +437,7 @@ class TestConversationsQuery:
         assert len(ch.calls) == 2
 
         data_sql = ch.sql_at(1)
-        assert "FROM genai_spans" in data_sql
+        assert "FROM spans" in data_sql
         assert "GROUP BY conversation_id" in data_sql
         assert "conversation_id != ''" in data_sql
         assert "max(conversation_name) AS conversation_name" in data_sql
@@ -542,7 +542,7 @@ class TestSearch:
 
         assert len(ch.calls) == 1
         sql = ch.last_sql
-        assert "FROM genai_message_search FINAL" in sql
+        assert "FROM message_search FINAL" in sql
         assert "project_id = {project_id:String}" in sql
         assert "content LIKE {query:String}" in sql
         assert "ORDER BY started_at DESC" in sql
@@ -593,7 +593,7 @@ class TestSearch:
     def test_uses_final_for_dedup(
         self, handler: AgentQueryHandler, ch: _QueryCapture
     ) -> None:
-        """genai_message_search is ReplacingMergeTree, so FINAL is needed."""
+        """message_search is ReplacingMergeTree, so FINAL is needed."""
         handler.search(AgentSearchReq(project_id="p1", query="test"))
         sql = ch.last_sql
         assert "FINAL" in sql
@@ -710,7 +710,7 @@ class TestSQLInjectionSafety:
                 project_id="p1",
                 sort_by=[
                     AgentSortBy(
-                        field="started_at; DROP TABLE genai_spans--", direction="desc"
+                        field="started_at; DROP TABLE spans--", direction="desc"
                     )
                 ],
             )

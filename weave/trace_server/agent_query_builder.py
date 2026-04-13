@@ -12,7 +12,7 @@ from typing import Any
 # Column whitelists — only these can appear in WHERE/ORDER BY/GROUP BY
 # ---------------------------------------------------------------------------
 
-#: Columns on genai_spans that can be filtered with equality/IN
+#: Columns on spans that can be filtered with equality/IN
 SPAN_FILTERABLE_COLS: frozenset[str] = frozenset(
     {
         "operation_name",
@@ -33,7 +33,7 @@ SPAN_FILTERABLE_COLS: frozenset[str] = frozenset(
     }
 )
 
-#: Columns on genai_spans that can be sorted
+#: Columns on spans that can be sorted
 SPAN_SORTABLE_COLS: frozenset[str] = SPAN_FILTERABLE_COLS | frozenset(
     {
         "started_at",

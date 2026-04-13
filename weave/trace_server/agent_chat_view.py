@@ -1,6 +1,6 @@
 """Normalize agent spans into a structured chat / agent trajectory view.
 
-Converts a flat list of ``AgentSpanSchema`` rows (from the ``genai_spans``
+Converts a flat list of ``AgentSpanSchema`` rows (from the ``spans``
 table) into a linear sequence of ``AgentChatMessage`` objects suitable for
 rendering an agent conversation UI.
 
