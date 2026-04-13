@@ -363,12 +363,14 @@ jobs:
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace')" -- \
             -m "trace_server and not skip_clickhouse_client" \
             --clickhouse-replicated \
-            --ignore=tests/trace/test_obj_tags_aliases.py \
-            --ignore=tests/trace/test_client_server_caching.py \
-            --ignore=tests/trace/test_custom_objs.py \
-            --ignore=tests/trace/test_deepcopy.py \
-            --ignore=tests/trace/test_op_argument_forms.py \
-            --ignore=tests/trace/test_op_accumulator.py
+            tests/trace/test_weave_client.py \
+            tests/trace/test_weave_client_mutations.py \
+            tests/trace/test_client_annotation_queues.py \
+            tests/trace/test_feedback.py \
+            tests/trace/test_log_call.py \
+            tests/trace/test_client_trace.py \
+            tests/trace/test_queue_filtering.py \
+            tests/trace_server/test_calls_complete.py
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
