@@ -198,6 +198,16 @@ def get_ch_trace_server(
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
             ch_server._database_ensured = False
 
+            if use_replicated:
+                # Pre-create data DB with Atomic engine so the migrator uses
+                # explicit ON CLUSTER + ReplicatedMergeTree (not Replicated DB
+                # engine which auto-handles everything and masks bugs).
+                ch_server.ch_client.command(
+                    f"CREATE DATABASE IF NOT EXISTS {unique_db}"
+                    f" ON CLUSTER {REPLICATED_CLUSTER}"
+                    f" ENGINE = Atomic"
+                )
+
             # Patch _run_migrations to use worker-specific management database
             def patched_run_migrations():
                 import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
