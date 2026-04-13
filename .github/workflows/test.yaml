@@ -322,21 +322,41 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Start ClickHouse with embedded Keeper
+      - name: Start 2-replica ClickHouse cluster with embedded Keeper
         run: |
+          docker network create ch-replicated
+
+          # Node 1: Keeper + ClickHouse (tests connect here)
           docker run -d --rm \
+            --network ch-replicated --name ch-node1 \
             -e CLICKHOUSE_DB=default \
             -e CLICKHOUSE_USER=default \
             -e "CLICKHOUSE_PASSWORD=" \
             -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
             -p 8123:8123 \
-            -v ${{ github.workspace }}/tests/trace_server/conftest_lib/clickhouse_keeper_config.xml:/etc/clickhouse-server/config.d/keeper.xml \
-            --name weave-test-keeper-replicated \
+            -v ${{ github.workspace }}/tests/trace_server/conftest_lib/clickhouse_keeper_node1.xml:/etc/clickhouse-server/config.d/keeper.xml \
             --ulimit nofile=262144:262144 \
             clickhouse/clickhouse-server:25.11.2.24
-          # Wait for server to be healthy
+
+          # Wait for node 1 (Keeper must be ready before node 2 starts)
           for i in $(seq 1 30); do
             wget -q -O- 'http://localhost:8123/ping' && break || sleep 1
+          done
+
+          # Node 2: ClickHouse only (connects to node 1's Keeper)
+          docker run -d --rm \
+            --network ch-replicated --name ch-node2 \
+            -e CLICKHOUSE_DB=default \
+            -e CLICKHOUSE_USER=default \
+            -e "CLICKHOUSE_PASSWORD=" \
+            -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
+            -v ${{ github.workspace }}/tests/trace_server/conftest_lib/clickhouse_keeper_node2.xml:/etc/clickhouse-server/config.d/keeper.xml \
+            --ulimit nofile=262144:262144 \
+            clickhouse/clickhouse-server:25.11.2.24
+
+          # Wait for node 2
+          for i in $(seq 1 30); do
+            docker exec ch-node2 wget -q -O- 'http://localhost:8123/ping' && break || sleep 1
           done
       - name: Install SQLite dev package
         run: sudo apt update && sudo apt install -y libsqlite3-dev

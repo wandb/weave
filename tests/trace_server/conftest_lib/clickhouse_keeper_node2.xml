@@ -1,0 +1,30 @@
+<clickhouse>
+    <!-- No embedded Keeper — connects to node 1's Keeper -->
+    <zookeeper>
+        <node>
+            <host>ch-node1</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+
+    <!-- Two-replica cluster definition (must match node 1) -->
+    <remote_servers>
+        <weave_cluster>
+            <shard>
+                <replica>
+                    <host>ch-node1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>ch-node2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </weave_cluster>
+    </remote_servers>
+
+    <macros>
+        <shard>shard1</shard>
+        <replica>replica2</replica>
+    </macros>
+</clickhouse>

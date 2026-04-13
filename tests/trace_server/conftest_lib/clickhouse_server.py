@@ -92,81 +92,147 @@ def ensure_clickhouse_db_container_running(host: str, port: int) -> Callable[[],
 def ensure_clickhouse_db_keeper_container_running(
     host: str, port: int
 ) -> Callable[[], None]:
-    """Start a ClickHouse container with embedded Keeper for replicated-mode tests.
+    """Start a 2-replica ClickHouse cluster with embedded Keeper for replicated-mode tests.
 
-    Uses the same clickhouse_keeper_config.xml as the migrator functional tests
-    to enable Keeper, cluster definitions, and macros needed for ReplicatedMergeTree.
+    Starts two containers on a shared Docker network:
+    - ch-node1: Keeper + ClickHouse (tests connect here via host:port)
+    - ch-node2: ClickHouse only (connects to node 1's Keeper)
+
+    Two replicas are needed so ON CLUSTER mutations against non-existent tables
+    actually fail (single-node setups silently succeed).
     """
     server_up = check_server_up(host, port, 1)
-    started_container = None
+    network_name = "weave-test-ch-replicated"
+    node1_name = "ch-node1"
+    node2_name = "ch-node2"
+    started_containers: list[str] = []
 
     if not server_up:
-        container_name = "weave-python-test-clickhouse-keeper"
+        config_dir = os.path.dirname(__file__)
+        node1_config = os.path.join(config_dir, "clickhouse_keeper_node1.xml")
+        node2_config = os.path.join(config_dir, "clickhouse_keeper_node2.xml")
 
+        # Clean up any existing containers/network
+        for name in [node2_name, node1_name]:
+            subprocess.run(["docker", "stop", name], capture_output=True, check=False)
+            subprocess.run(["docker", "rm", name], capture_output=True, check=False)
         subprocess.run(
-            ["docker", "stop", container_name], capture_output=True, check=False
+            ["docker", "network", "rm", network_name],
+            capture_output=True,
+            check=False,
         )
+
+        # Create shared network
         subprocess.run(
-            ["docker", "rm", container_name], capture_output=True, check=False
+            ["docker", "network", "create", network_name],
+            capture_output=True,
+            check=True,
         )
 
-        # Resolve the keeper config path relative to this file
-        config_path = os.path.join(
-            os.path.dirname(__file__), "clickhouse_keeper_config.xml"
-        )
+        ch_env = [
+            "-e",
+            "CLICKHOUSE_DB=default",
+            "-e",
+            "CLICKHOUSE_USER=default",
+            "-e",
+            "CLICKHOUSE_PASSWORD=",
+            "-e",
+            "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
+        ]
+        ch_image = "clickhouse/clickhouse-server:25.11.2.24"
 
-        process = subprocess.Popen(
+        # Start node 1 (Keeper + CH, exposed to host)
+        result = subprocess.run(
             [
                 "docker",
                 "run",
                 "-d",
                 "--rm",
-                "-e",
-                "CLICKHOUSE_DB=default",
-                "-e",
-                "CLICKHOUSE_USER=default",
-                "-e",
-                "CLICKHOUSE_PASSWORD=",
-                "-e",
-                "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
+                "--network",
+                network_name,
+                "--name",
+                node1_name,
+                *ch_env,
                 "-p",
                 f"{port}:8123",
                 "-v",
-                f"{config_path}:/etc/clickhouse-server/config.d/keeper.xml",
-                "--name",
-                container_name,
+                f"{node1_config}:/etc/clickhouse-server/config.d/keeper.xml",
                 "--ulimit",
                 "nofile=262144:262144",
-                "clickhouse/clickhouse-server:25.11.2.24",
+                ch_image,
             ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
+            check=False,
         )
+        if result.returncode != 0:
+            pytest.fail(f"Failed to start CH node 1: {result.stderr.decode()}")
+        started_containers.append(node1_name)
 
-        stdout, stderr = process.communicate()
-        if process.returncode != 0:
-            pytest.fail(
-                f"Failed to start ClickHouse Keeper container: {stderr.decode()}"
-            )
+        # Wait for node 1 (Keeper must be ready before node 2)
+        if not check_server_up(host, port):
+            _cleanup_containers(started_containers, network_name)
+            pytest.fail(f"CH node 1 failed to become healthy on {host}:{port}")
 
-        started_container = container_name
+        # Start node 2 (CH only, not exposed to host)
+        result = subprocess.run(
+            [
+                "docker",
+                "run",
+                "-d",
+                "--rm",
+                "--network",
+                network_name,
+                "--name",
+                node2_name,
+                *ch_env,
+                "-v",
+                f"{node2_config}:/etc/clickhouse-server/config.d/keeper.xml",
+                "--ulimit",
+                "nofile=262144:262144",
+                ch_image,
+            ],
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            _cleanup_containers(started_containers, network_name)
+            pytest.fail(f"Failed to start CH node 2: {result.stderr.decode()}")
+        started_containers.append(node2_name)
 
-        server_up = check_server_up(host, port)
-        if not server_up:
-            subprocess.run(
-                ["docker", "stop", container_name], capture_output=True, check=False
+        # Wait for node 2 via docker exec
+        for _ in range(30):
+            check = subprocess.run(
+                [
+                    "docker",
+                    "exec",
+                    node2_name,
+                    "wget",
+                    "-q",
+                    "-O-",
+                    "http://localhost:8123/ping",
+                ],
+                capture_output=True,
+                check=False,
             )
-            pytest.fail(
-                f"ClickHouse Keeper server failed to become healthy on {host}:{port}"
-            )
+            if check.returncode == 0:
+                break
+            time.sleep(1)
+        else:
+            _cleanup_containers(started_containers, network_name)
+            pytest.fail("CH node 2 failed to become healthy")
 
     def cleanup():
-        if started_container:
-            subprocess.run(
-                ["docker", "stop", started_container], capture_output=True, check=False
-            )
+        _cleanup_containers(started_containers, network_name)
 
     return cleanup
+
+
+def _cleanup_containers(containers: list[str], network: str) -> None:
+    for name in reversed(containers):
+        subprocess.run(["docker", "stop", name], capture_output=True, check=False)
+    subprocess.run(
+        ["docker", "network", "rm", network], capture_output=True, check=False
+    )
 
 
 def ensure_clickhouse_db_process_running(host: str, port: int) -> Callable[[], None]:
