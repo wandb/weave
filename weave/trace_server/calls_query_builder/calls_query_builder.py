@@ -1365,7 +1365,9 @@ class CallsQuery(BaseModel):
         # to avoid duplicate id IN filters in the generated SQL.
         id_mask = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
-            assert_parameter_length_less_than_max("call_ids", len(self.hardcoded_filter.filter.call_ids))
+            assert_parameter_length_less_than_max(
+                "call_ids", len(self.hardcoded_filter.filter.call_ids)
+            )
             id_mask = f"AND ({table_alias}.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
 
         return WhereFilters(
