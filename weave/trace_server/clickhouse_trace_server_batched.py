@@ -1689,7 +1689,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_id_param = pb.add_param(project_id)
         call_ids_param = pb.add_param(call_ids)
         delete_query = build_calls_complete_delete_query(
-            "calls_complete",
+            self._get_calls_complete_table_name(),
             project_id_param,
             call_ids_param,
             cluster_name=self.clickhouse_cluster_name,
@@ -1744,7 +1744,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ch_sentinel_values.to_ch_value("display_name", display_name)
         )
         update_query = build_calls_complete_update_query(
-            "calls_complete",
+            self._get_calls_complete_table_name(),
             project_id_param,
             call_id_param,
             display_name_param,

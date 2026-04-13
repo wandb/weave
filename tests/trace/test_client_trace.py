@@ -3583,6 +3583,49 @@ def test_calls_stream_feedback(client):
     } in call2_payloads
 
 
+def test_feedback_filter_finds_minority_reaction(client):
+    """Regression test-ish: filtering by emoji must check all reactions, not pick one arbitrarily.
+
+    previously `anyIf` (clickhouse) / `LIMIT 1` (sqlite) would pick one reaction per call, leading to unpredictable results when filtering by reaction.
+    this test has a 10% chance of passing on the original implementation, but will always pass on the groupArrayIf implementation.
+    """
+
+    @weave.op
+    def my_op(x):
+        return x
+
+    my_op(1)
+
+    calls = list(my_op.calls())
+    assert len(calls) == 1
+
+    # add 10 👎 and 1 👍 — anyIf will almost always pick a 👎
+    for _ in range(10):
+        calls[0].feedback.add_reaction("👎")
+    calls[0].feedback.add_reaction("👍")
+
+    project_id = get_client_project_id(client)
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            query=tsi.Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "feedback.[wandb.reaction.1].payload.emoji"},
+                            {"$literal": "👍"},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    results = list(res)
+
+    assert len(results) == 1
+    assert results[0].id == calls[0].id
+
+
 def test_inline_dataclass_generates_no_refs_in_function(client):
     @dataclasses.dataclass
     class A:

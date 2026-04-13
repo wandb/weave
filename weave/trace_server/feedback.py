@@ -18,6 +18,7 @@ from weave.trace_server.interface.builtin_object_classes.annotation_spec import 
 from weave.trace_server.interface.feedback_types import (
     ANNOTATION_FEEDBACK_TYPE_PREFIX,
     FEEDBACK_PAYLOAD_SCHEMAS,
+    REACTION_FEEDBACK_TYPE,
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     AnnotationPayloadSchema,
     RunnablePayloadSchema,
@@ -69,7 +70,7 @@ def process_feedback_payload(
     """
     processed_payload = feedback_req.payload.copy()
 
-    if feedback_req.feedback_type == "wandb.reaction.1":
+    if feedback_req.feedback_type == REACTION_FEEDBACK_TYPE:
         em = feedback_req.payload["emoji"]
         if emoji.emoji_count(em) != 1:
             raise InvalidRequest(
