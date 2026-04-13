@@ -362,20 +362,20 @@ def test_replicated_management_table_follows_database_engine(replicated_migrator
     def _normalize(sql: str) -> str:
         return " ".join(sql.split())
 
-    # Replicated DB: plain MergeTree, no ON CLUSTER (auto-replicated)
-    replicated_migrator._replicated_db_engine_cache[
-        replicated_migrator.management_db
-    ] = True
+    # Replicated DB: bare ReplicatedMergeTree, no ON CLUSTER
+    replicated_migrator._database_engine_cache[replicated_migrator.management_db] = (
+        "Replicated"
+    )
     assert _normalize(replicated_migrator._create_management_table_sql()) == _normalize(
         """CREATE TABLE IF NOT EXISTS db_management.migrations
            ( db_name String, curr_version UInt64, partially_applied_version UInt64 NULL, )
-           ENGINE = MergeTree() ORDER BY (db_name)"""
+           ENGINE = ReplicatedMergeTree() ORDER BY (db_name)"""
     )
 
-    # Atomic DB: explicit ReplicatedMergeTree + ON CLUSTER
-    replicated_migrator._replicated_db_engine_cache[
-        replicated_migrator.management_db
-    ] = False
+    # Atomic DB: bare ReplicatedMergeTree + ON CLUSTER
+    replicated_migrator._database_engine_cache[replicated_migrator.management_db] = (
+        "Atomic"
+    )
     assert _normalize(replicated_migrator._create_management_table_sql()) == _normalize(
         """CREATE TABLE IF NOT EXISTS db_management.migrations
            ON CLUSTER test_cluster
@@ -408,12 +408,11 @@ def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
         migration_dir=DEFAULT_MIGRATION_DIR,
     )
 
-    assert migrator._replicated_db_engine_cache[migrator.management_db] is True
+    assert migrator._database_engine_cache[migrator.management_db] == "Replicated"
     assert mock_sleep.call_count == 2
-    # Management table DDL should use plain MergeTree (Replicated DB auto-converts)
+    # Management table DDL should use bare ReplicatedMergeTree with no ON CLUSTER.
     create_table_sql = ch_client.command.call_args_list[1][0][0]
-    assert "ENGINE = MergeTree()" in create_table_sql
-    assert "ReplicatedMergeTree" not in create_table_sql
+    assert "ENGINE = ReplicatedMergeTree()" in create_table_sql
     assert "ON CLUSTER" not in create_table_sql
 
     # Times out: engine never becomes visible, error includes the SQL context
@@ -488,48 +487,6 @@ def test_format_replicated_sql(input_sql, expected_sql):
         migration_dir=DEFAULT_MIGRATION_DIR,
     )
     assert replicated_migrator._format_replicated_sql(input_sql) == expected_sql
-
-
-def test_format_replicated_sql_distributed():
-    """Test replicated SQL formatting in distributed mode with explicit paths."""
-    distributed_migrator = DistributedClickHouseTraceServerMigrator(
-        _make_ch_client(),
-        replicated_cluster="test_cluster",
-        migration_dir=DEFAULT_MIGRATION_DIR,
-    )
-    result = distributed_migrator._format_replicated_sql_distributed(
-        "CREATE TABLE test (id Int32) ENGINE = MergeTree", "test_db"
-    )
-    assert (
-        "ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
-        in result
-    )
-
-
-def test_format_replicated_sql_distributed_with_engine_args():
-    """Test that engine args like (created_at) are merged into the ZK path params."""
-    distributed_migrator = DistributedClickHouseTraceServerMigrator(
-        _make_ch_client(),
-        replicated_cluster="test_cluster",
-        migration_dir=DEFAULT_MIGRATION_DIR,
-    )
-    result = distributed_migrator._format_replicated_sql_distributed(
-        "CREATE TABLE test (id Int32) ENGINE = ReplacingMergeTree(created_at)",
-        "test_db",
-    )
-    assert (
-        "ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}', created_at)"
-        in result
-    )
-
-    # AggregatingMergeTree() should not get extra args
-    result = distributed_migrator._format_replicated_sql_distributed(
-        "CREATE TABLE test (id Int32) ENGINE = AggregatingMergeTree()", "test_db"
-    )
-    assert (
-        "ReplicatedAggregatingMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
-        in result
-    )
 
 
 @pytest.mark.parametrize(
@@ -645,6 +602,7 @@ def test_format_distributed_sql():
 
 
 def test_execute_migration_command_with_distributed(distributed_migrator):
+    """Distributed CREATE uses the same bare Replicated* rewrite as replicated mode."""
     distributed_migrator._execute_migration_command(
         "test_db", "CREATE TABLE test (id Int32) ENGINE = MergeTree"
     )
@@ -654,10 +612,7 @@ def test_execute_migration_command_with_distributed(distributed_migrator):
 
     first_call = distributed_migrator.ch_client.command.call_args_list[0][0][0]
     assert "CREATE TABLE test_local ON CLUSTER test_cluster" in first_call
-    assert (
-        "ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
-        in first_call
-    )
+    assert "ENGINE = ReplicatedMergeTree" in first_call
 
     second_call = distributed_migrator.ch_client.command.call_args_list[1][0][0]
     assert "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster" in second_call
@@ -1156,25 +1111,28 @@ def test_drop_table_replicated(replicated_migrator):
 
 
 def test_ddl_adapts_to_database_engine(replicated_migrator, distributed_migrator):
-    """DDL is passed through on Replicated engines, gets ON CLUSTER + ReplicatedMergeTree on Atomic."""
+    """DDL always uses Replicated*MergeTree; ON CLUSTER depends on the DB engine."""
     create_sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id"
 
-    # Replicated engine: SQL passed through as-is (DB auto-converts and auto-replicates)
-    replicated_migrator._replicated_db_engine_cache["test_db"] = True
+    # Replicated DB: bare ReplicatedMergeTree, no ON CLUSTER.
+    replicated_migrator._database_engine_cache["test_db"] = "Replicated"
     replicated_migrator._execute_migration_command("test_db", create_sql)
-    assert replicated_migrator.ch_client.command.call_args_list[0][0][0] == create_sql
+    assert (
+        replicated_migrator.ch_client.command.call_args_list[0][0][0]
+        == "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree() ORDER BY id"
+    )
     replicated_migrator.ch_client.command.reset_mock()
 
-    # Atomic engine: explicit ON CLUSTER + ReplicatedMergeTree
-    replicated_migrator._replicated_db_engine_cache["test_db"] = False
+    # Atomic DB: same rewrite, but add ON CLUSTER.
+    replicated_migrator._database_engine_cache["test_db"] = "Atomic"
     replicated_migrator._execute_migration_command("test_db", create_sql)
     assert (
         replicated_migrator.ch_client.command.call_args_list[0][0][0]
         == "CREATE TABLE test ON CLUSTER test_cluster (id Int32) ENGINE = ReplicatedMergeTree() ORDER BY id"
     )
 
-    # Distributed migrator also skips ON CLUSTER for Replicated engine
-    distributed_migrator._replicated_db_engine_cache["test_db"] = True
+    # Distributed migrator reuses the same engine/on-cluster decision.
+    distributed_migrator._database_engine_cache["test_db"] = "Replicated"
     distributed_migrator._execute_migration_command(
         "test_db", "DROP TABLE IF EXISTS my_table"
     )

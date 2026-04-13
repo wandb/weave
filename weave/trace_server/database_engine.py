@@ -2,7 +2,7 @@
 
 Queries ``system.databases`` to determine whether a database uses the
 Replicated engine (DDL auto-replicated, ON CLUSTER forbidden) or the
-default Atomic engine (explicit ON CLUSTER + ReplicatedMergeTree required).
+default Atomic engine (DDL still needs ON CLUSTER).
 
 Handles the metadata-visibility lag that can occur after ``CREATE DATABASE``
 by polling with exponential back-off.
