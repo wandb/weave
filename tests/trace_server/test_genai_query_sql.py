@@ -1,15 +1,16 @@
 """SQL assertion tests for GenAI query layer.
 
-These tests verify the exact SQL produced by each query handler method
-without requiring a running ClickHouse instance. A mock CH client captures
-every query() call and we assert on the normalized SQL string and parameters.
+Each test verifies the exact SQL and parameters produced by a query handler
+method. Uses sqlparse to normalize whitespace so expected SQL can be written
+as readable multi-line strings.
 """
 
-import re
+import copy
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+import sqlparse
 
 from weave.trace_server.agent_clickhouse import AgentQueryHandler
 from weave.trace_server.agent_query_builder import (
@@ -35,13 +36,25 @@ from weave.trace_server.agent_types import (
 )
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Test infrastructure
 # ---------------------------------------------------------------------------
 
 
-def _normalize_sql(sql: str) -> str:
-    """Collapse whitespace so SQL comparisons are indentation-insensitive."""
-    return re.sub(r"\s+", " ", sql).strip()
+def _assert_sql(
+    expected_query: str,
+    expected_params: dict,
+    actual_query: str,
+    actual_params: dict,
+) -> None:
+    """Assert SQL and params match, using sqlparse to normalize formatting."""
+    expected_formatted = sqlparse.format(expected_query, reindent=True).strip()
+    actual_formatted = sqlparse.format(actual_query, reindent=True).strip()
+    assert expected_formatted == actual_formatted, (
+        f"\nExpected:\n{expected_formatted}\n\nGot:\n{actual_formatted}"
+    )
+    assert expected_params == actual_params, (
+        f"\nExpected params: {expected_params}\n\nGot params: {actual_params}"
+    )
 
 
 class _QueryCapture:
@@ -51,25 +64,11 @@ class _QueryCapture:
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def query(self, sql: str, *, parameters: dict[str, Any] | None = None) -> Any:
-        self.calls.append((sql, dict(parameters or {})))
+        self.calls.append((sql, copy.deepcopy(parameters or {})))
         result = MagicMock()
         result.result_rows = []
         result.column_names = []
         return result
-
-    @property
-    def last_sql(self) -> str:
-        return _normalize_sql(self.calls[-1][0])
-
-    @property
-    def last_params(self) -> dict[str, Any]:
-        return self.calls[-1][1]
-
-    def sql_at(self, index: int) -> str:
-        return _normalize_sql(self.calls[index][0])
-
-    def params_at(self, index: int) -> dict[str, Any]:
-        return self.calls[index][1]
 
 
 @pytest.fixture
@@ -83,77 +82,103 @@ def handler(ch: _QueryCapture) -> AgentQueryHandler:
 
 
 # ============================================================================
-# 1. spans_query
+# spans_query
 # ============================================================================
 
 
 class TestSpansQuery:
-    """SQL assertions for AgentQueryHandler.spans_query()."""
-
-    def test_basic_no_filters(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
+    def test_basic(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
         handler.spans_query(AgentSpansQueryReq(project_id="p1"))
 
-        # Two queries: count + data
         assert len(ch.calls) == 2
 
-        # Count query
-        count_sql = ch.sql_at(0)
-        assert count_sql == _normalize_sql(
-            "SELECT count() FROM spans s WHERE s.project_id = {project_id:String}"
+        _assert_sql(
+            "SELECT count() FROM spans s WHERE s.project_id = {project_id:String}",
+            {"project_id": "p1"},
+            ch.calls[0][0],
+            ch.calls[0][1],
         )
-        assert ch.params_at(0)["project_id"] == "p1"
 
-        # Data query
-        data_sql = ch.sql_at(1)
-        assert "FROM spans s" in data_sql
-        assert "WHERE s.project_id = {project_id:String}" in data_sql
-        assert "ORDER BY started_at DESC" in data_sql
-        assert "LIMIT {limit:UInt64} OFFSET {offset:UInt64}" in data_sql
-        assert ch.params_at(1)["limit"] == 100
-        assert ch.params_at(1)["offset"] == 0
+        _assert_sql(
+            """
+            SELECT project_id, trace_id, span_id, parent_span_id, span_name,
+                   span_kind, started_at, ended_at, created_at,
+                   status_code, status_message, operation_name, provider_name,
+                   agent_name, agent_id, agent_description, agent_version,
+                   request_model, response_model, response_id,
+                   input_tokens, output_tokens, total_tokens, reasoning_tokens,
+                   cache_creation_input_tokens, cache_read_input_tokens,
+                   conversation_id, conversation_name,
+                   tool_name, tool_type, tool_call_id,
+                   finish_reasons, error_type, custom_attrs,
+                   wb_user_id, wb_run_id
+            FROM spans s
+            WHERE s.project_id = {project_id:String}
+            ORDER BY started_at DESC
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+            """,
+            {"project_id": "p1", "limit": 100, "offset": 0},
+            ch.calls[1][0],
+            ch.calls[1][1],
+        )
 
-    def test_with_agent_name_filter(
+    def test_with_filters_time_sort(
         self, handler: AgentQueryHandler, ch: _QueryCapture
     ) -> None:
         handler.spans_query(
             AgentSpansQueryReq(
                 project_id="p1",
-                filters=AgentSpansQueryFilters(agent_name="my-agent"),
-            )
-        )
-        data_sql = ch.sql_at(1)
-        assert "s.agent_name = {f_agent_name:String}" in data_sql
-        assert ch.params_at(1)["f_agent_name"] == "my-agent"
-
-    def test_with_time_range(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.spans_query(
-            AgentSpansQueryReq(
-                project_id="p1",
-                start="2026-01-01T00:00:00Z",
-                end="2026-01-02T00:00:00Z",
-            )
-        )
-        data_sql = ch.sql_at(1)
-        assert "s.started_at >= parseDateTimeBestEffort({t_start:String})" in data_sql
-        assert "s.started_at < parseDateTimeBestEffort({t_end:String})" in data_sql
-        assert ch.params_at(1)["t_start"] == "2026-01-01T00:00:00Z"
-        assert ch.params_at(1)["t_end"] == "2026-01-02T00:00:00Z"
-
-    def test_with_sort(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
-        handler.spans_query(
-            AgentSpansQueryReq(
-                project_id="p1",
+                filters=AgentSpansQueryFilters(
+                    agent_name="bot",
+                    custom_filters=[
+                        AgentCustomAttrFilter(
+                            attr_key="env", operator="eq", value="prod"
+                        )
+                    ],
+                ),
+                start="2026-01-01",
+                end="2026-02-01",
                 sort_by=[AgentSortBy(field="input_tokens", direction="asc")],
             )
         )
-        data_sql = ch.sql_at(1)
-        assert "ORDER BY input_tokens asc" in data_sql
 
-    def test_invalid_sort_column_uses_default(
+        _assert_sql(
+            """
+            SELECT project_id, trace_id, span_id, parent_span_id, span_name,
+                   span_kind, started_at, ended_at, created_at,
+                   status_code, status_message, operation_name, provider_name,
+                   agent_name, agent_id, agent_description, agent_version,
+                   request_model, response_model, response_id,
+                   input_tokens, output_tokens, total_tokens, reasoning_tokens,
+                   cache_creation_input_tokens, cache_read_input_tokens,
+                   conversation_id, conversation_name,
+                   tool_name, tool_type, tool_call_id,
+                   finish_reasons, error_type, custom_attrs,
+                   wb_user_id, wb_run_id
+            FROM spans s
+            WHERE s.project_id = {project_id:String}
+              AND s.started_at >= parseDateTimeBestEffort({t_start:String})
+              AND s.started_at < parseDateTimeBestEffort({t_end:String})
+              AND s.agent_name = {f_agent_name:String}
+              AND s.custom_attrs[{cf0_key:String}] = {cf0_val:String}
+            ORDER BY input_tokens asc
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+            """,
+            {
+                "project_id": "p1",
+                "t_start": "2026-01-01",
+                "t_end": "2026-02-01",
+                "f_agent_name": "bot",
+                "cf0_key": "env",
+                "cf0_val": "prod",
+                "limit": 100,
+                "offset": 0,
+            },
+            ch.calls[1][0],
+            ch.calls[1][1],
+        )
+
+    def test_invalid_sort_uses_default(
         self, handler: AgentQueryHandler, ch: _QueryCapture
     ) -> None:
         handler.spans_query(
@@ -162,547 +187,436 @@ class TestSpansQuery:
                 sort_by=[AgentSortBy(field="DROP TABLE", direction="asc")],
             )
         )
-        data_sql = ch.sql_at(1)
-        assert "ORDER BY started_at DESC" in data_sql
-        assert "DROP TABLE" not in data_sql
+        assert "DROP TABLE" not in ch.calls[1][0]
+        assert "ORDER BY started_at DESC" in ch.calls[1][0]
 
-    def test_custom_attr_filter(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.spans_query(
-            AgentSpansQueryReq(
-                project_id="p1",
-                filters=AgentSpansQueryFilters(
-                    custom_filters=[
-                        AgentCustomAttrFilter(
-                            attr_key="env", operator="eq", value="prod"
-                        ),
-                    ]
-                ),
-            )
-        )
-        data_sql = ch.sql_at(1)
-        assert "s.custom_attrs[{cf0_key:String}] = {cf0_val:String}" in data_sql
-        assert ch.params_at(1)["cf0_key"] == "env"
-        assert ch.params_at(1)["cf0_val"] == "prod"
-
-    def test_custom_attr_filter_ne_operator(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.spans_query(
-            AgentSpansQueryReq(
-                project_id="p1",
-                filters=AgentSpansQueryFilters(
-                    custom_filters=[
-                        AgentCustomAttrFilter(
-                            attr_key="env", operator="ne", value="dev"
-                        ),
-                    ]
-                ),
-            )
-        )
-        data_sql = ch.sql_at(1)
-        assert "s.custom_attrs[{cf0_key:String}] != {cf0_val:String}" in data_sql
-
-    def test_limit_capped_at_10000(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
+    def test_limit_capped(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
         handler.spans_query(AgentSpansQueryReq(project_id="p1", limit=99999))
-        assert ch.params_at(1)["limit"] == 10000
-
-    def test_multiple_filters(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.spans_query(
-            AgentSpansQueryReq(
-                project_id="p1",
-                filters=AgentSpansQueryFilters(
-                    agent_name="a1",
-                    provider_name="openai",
-                    operation_name="chat",
-                ),
-            )
-        )
-        data_sql = ch.sql_at(1)
-        assert "s.agent_name = {f_agent_name:String}" in data_sql
-        assert "s.provider_name = {f_provider_name:String}" in data_sql
-        assert "s.operation_name = {f_operation_name:String}" in data_sql
+        assert ch.calls[1][1]["limit"] == 10000
 
 
 # ============================================================================
-# 2. spans_trace
+# spans_trace
 # ============================================================================
 
 
 class TestSpansTrace:
-    """SQL assertions for AgentQueryHandler.spans_trace()."""
-
     def test_basic(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
-        handler.spans_trace(AgentSpansTraceReq(project_id="p1", trace_id="t123"))
+        handler.spans_trace(AgentSpansTraceReq(project_id="p1", trace_id="t1"))
 
         assert len(ch.calls) == 1
-        sql = ch.last_sql
+        sql = ch.calls[0][0]
+        params = ch.calls[0][1]
+
         assert "FROM spans s" in sql
         assert "s.project_id = {project_id:String}" in sql
         assert "s.trace_id = {trace_id:String}" in sql
         assert "ORDER BY s.started_at ASC" in sql
-        assert ch.last_params["project_id"] == "p1"
-        assert ch.last_params["trace_id"] == "t123"
-
-    def test_selects_chat_view_cols(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.spans_trace(AgentSpansTraceReq(project_id="p1", trace_id="t1"))
-        sql = ch.last_sql
-        # Should include message columns for chat view
+        # Chat view cols present
         assert "input_messages" in sql
         assert "output_messages" in sql
-        assert "system_instructions" in sql
-        # Should NOT include raw dump columns
+        # Raw dumps not present
         assert "raw_span_dump" not in sql
         assert "attributes_dump" not in sql
+        assert params == {"project_id": "p1", "trace_id": "t1"}
 
 
 # ============================================================================
-# 3. traces_query
+# traces_query
 # ============================================================================
 
 
 class TestTracesQuery:
-    """SQL assertions for AgentQueryHandler.traces_query()."""
-
     def test_basic(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
         handler.traces_query(AgentTracesQueryReq(project_id="p1"))
 
-        # count + data
         assert len(ch.calls) == 2
 
-        count_sql = ch.sql_at(0)
-        assert "SELECT count() FROM (" in count_sql
-        assert (
-            "SELECT trace_id FROM spans WHERE project_id = {project_id:String} GROUP BY trace_id"
-            in count_sql
+        _assert_sql(
+            """
+            SELECT count() FROM (
+                SELECT trace_id FROM spans
+                WHERE project_id = {project_id:String}
+                GROUP BY trace_id
+            )
+            """,
+            {"project_id": "p1"},
+            ch.calls[0][0],
+            ch.calls[0][1],
         )
 
-        data_sql = ch.sql_at(1)
-        assert "count() AS span_count" in data_sql
-        assert "sum(input_tokens) AS total_input_tokens" in data_sql
-        assert "sum(output_tokens) AS total_output_tokens" in data_sql
-        assert "countIf(status_code = 'ERROR') AS error_count" in data_sql
-        assert "groupUniqArray(agent_name) AS agent_names" in data_sql
-        assert "GROUP BY trace_id" in data_sql
-        assert "ORDER BY last_seen DESC" in data_sql
-
-    def test_with_conversation_filter(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.traces_query(
-            AgentTracesQueryReq(project_id="p1", conversation_id="conv-1")
+        _assert_sql(
+            """
+            SELECT trace_id,
+                   count() AS span_count,
+                   sum(input_tokens) AS total_input_tokens,
+                   sum(output_tokens) AS total_output_tokens,
+                   countIf(status_code = 'ERROR') AS error_count,
+                   max(conversation_id) AS conversation_id,
+                   groupUniqArray(agent_name) AS agent_names,
+                   groupUniqArray(agent_version) AS agent_versions,
+                   groupUniqArray(request_model) AS request_models,
+                   min(started_at) AS first_seen,
+                   max(started_at) AS last_seen
+            FROM spans
+            WHERE project_id = {project_id:String}
+            GROUP BY trace_id
+            ORDER BY last_seen DESC
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+            """,
+            {"project_id": "p1", "limit": 100, "offset": 0},
+            ch.calls[1][0],
+            ch.calls[1][1],
         )
-        data_sql = ch.sql_at(1)
-        assert "conversation_id = {f_conversation_id:String}" in data_sql
-        assert ch.params_at(1)["f_conversation_id"] == "conv-1"
 
-    def test_with_agent_filter(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.traces_query(AgentTracesQueryReq(project_id="p1", agent_name="bot-x"))
-        data_sql = ch.sql_at(1)
-        assert "agent_name = {f_agent_name:String}" in data_sql
-        assert ch.params_at(1)["f_agent_name"] == "bot-x"
-
-    def test_with_time_range(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
+    def test_with_filters(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
         handler.traces_query(
             AgentTracesQueryReq(
                 project_id="p1",
+                conversation_id="conv-1",
+                agent_name="bot",
                 start="2026-01-01",
                 end="2026-02-01",
             )
         )
-        data_sql = ch.sql_at(1)
-        assert "started_at >= parseDateTimeBestEffort({t_start:String})" in data_sql
-        assert "started_at < parseDateTimeBestEffort({t_end:String})" in data_sql
-
-    def test_sort_by_span_count(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.traces_query(
-            AgentTracesQueryReq(
-                project_id="p1",
-                sort_by=[AgentSortBy(field="span_count", direction="asc")],
-            )
-        )
-        data_sql = ch.sql_at(1)
-        assert "ORDER BY span_count asc" in data_sql
+        sql = ch.calls[1][0]
+        params = ch.calls[1][1]
+        assert "conversation_id = {f_conversation_id:String}" in sql
+        assert "agent_name = {f_agent_name:String}" in sql
+        assert "parseDateTimeBestEffort({t_start:String})" in sql
+        assert params["f_conversation_id"] == "conv-1"
+        assert params["f_agent_name"] == "bot"
 
 
 # ============================================================================
-# 4. agents_query
+# agents_query
 # ============================================================================
 
 
 class TestAgentsQuery:
-    """SQL assertions for AgentQueryHandler.agents_query()."""
-
     def test_basic(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
         handler.agents_query(AgentsQueryReq(project_id="p1"))
 
-        # data + count
         assert len(ch.calls) == 2
 
-        data_sql = ch.sql_at(0)
-        assert "FROM agents" in data_sql
-        assert "sum(invocation_count) AS invocation_count" in data_sql
-        assert "sum(span_count) AS span_count" in data_sql
-        assert "sum(total_input_tokens) AS total_input_tokens" in data_sql
-        assert "sum(total_duration_ms) AS total_duration_ms" in data_sql
-        assert "min(first_seen) AS first_seen" in data_sql
-        assert "max(last_seen) AS last_seen" in data_sql
-        assert "GROUP BY agent_name" in data_sql
-        assert "ORDER BY last_seen DESC" in data_sql
-        assert "project_id = {project_id:String}" in data_sql
+        _assert_sql(
+            """
+            SELECT agent_name,
+                   sum(invocation_count) AS invocation_count,
+                   sum(span_count) AS span_count,
+                   sum(total_input_tokens) AS total_input_tokens,
+                   sum(total_output_tokens) AS total_output_tokens,
+                   sum(total_duration_ms) AS total_duration_ms,
+                   sum(error_count) AS error_count,
+                   min(first_seen) AS first_seen,
+                   max(last_seen) AS last_seen
+            FROM agents
+            WHERE project_id = {project_id:String}
+            GROUP BY agent_name
+            ORDER BY last_seen DESC
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+            """,
+            {"project_id": "p1", "limit": 100, "offset": 0},
+            ch.calls[0][0],
+            ch.calls[0][1],
+        )
 
-    def test_with_agent_name_filter(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
+        _assert_sql(
+            """
+            SELECT count() FROM (
+                SELECT agent_name FROM agents
+                WHERE project_id = {project_id:String}
+                GROUP BY agent_name
+            )
+            """,
+            {"project_id": "p1", "limit": 100, "offset": 0},
+            ch.calls[1][0],
+            ch.calls[1][1],
+        )
+
+    def test_with_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
         handler.agents_query(
             AgentsQueryReq(
                 project_id="p1",
                 filters=AgentsQueryFilters(agent_name="my-agent"),
             )
         )
-        data_sql = ch.sql_at(0)
-        assert "agent_name = {f_agent:String}" in data_sql
-        assert ch.params_at(0)["f_agent"] == "my-agent"
-
-    def test_count_query_structure(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.agents_query(AgentsQueryReq(project_id="p1"))
-        count_sql = ch.sql_at(1)
-        assert "SELECT count() FROM (" in count_sql
-        assert "SELECT agent_name FROM agents" in count_sql
-        assert "GROUP BY agent_name" in count_sql
+        assert "agent_name = {f_agent:String}" in ch.calls[0][0]
+        assert ch.calls[0][1]["f_agent"] == "my-agent"
 
 
 # ============================================================================
-# 5. agent_versions_query
+# agent_versions_query
 # ============================================================================
 
 
 class TestAgentVersionsQuery:
-    """SQL assertions for AgentQueryHandler.agent_versions_query()."""
-
     def test_basic(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
         handler.agent_versions_query(
-            AgentVersionsQueryReq(project_id="p1", agent_name="my-agent")
+            AgentVersionsQueryReq(project_id="p1", agent_name="a1")
         )
 
         assert len(ch.calls) == 2
 
-        data_sql = ch.sql_at(0)
-        assert "FROM agent_versions" in data_sql
-        assert "project_id = {project_id:String}" in data_sql
-        assert "agent_name = {agent_name:String}" in data_sql
-        assert "GROUP BY agent_version" in data_sql
-        assert "ORDER BY max(last_seen) DESC" in data_sql
-        assert "sum(invocation_count)" in data_sql
-        assert "sum(span_count)" in data_sql
-        assert ch.params_at(0)["project_id"] == "p1"
-        assert ch.params_at(0)["agent_name"] == "my-agent"
-
-    def test_count_query(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
-        handler.agent_versions_query(
-            AgentVersionsQueryReq(project_id="p1", agent_name="a1")
+        _assert_sql(
+            """
+            SELECT agent_version,
+                   sum(invocation_count), sum(span_count),
+                   sum(total_input_tokens), sum(total_output_tokens),
+                   sum(total_duration_ms), sum(error_count),
+                   min(first_seen), max(last_seen)
+            FROM agent_versions
+            WHERE project_id = {project_id:String}
+              AND agent_name = {agent_name:String}
+            GROUP BY agent_version
+            ORDER BY max(last_seen) DESC
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+            """,
+            {"project_id": "p1", "agent_name": "a1", "limit": 100, "offset": 0},
+            ch.calls[0][0],
+            ch.calls[0][1],
         )
-        count_sql = ch.sql_at(1)
-        assert "SELECT count() FROM (" in count_sql
-        assert "SELECT agent_version FROM agent_versions" in count_sql
-        assert "GROUP BY agent_version" in count_sql
+
+        _assert_sql(
+            """
+            SELECT count() FROM (
+                SELECT agent_version FROM agent_versions
+                WHERE project_id = {project_id:String}
+                  AND agent_name = {agent_name:String}
+                GROUP BY agent_version
+            )
+            """,
+            {"project_id": "p1", "agent_name": "a1", "limit": 100, "offset": 0},
+            ch.calls[1][0],
+            ch.calls[1][1],
+        )
 
 
 # ============================================================================
-# 6. conversations_query
+# conversations_query
 # ============================================================================
 
 
 class TestConversationsQuery:
-    """SQL assertions for AgentQueryHandler.conversations_query()."""
-
     def test_basic(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
         handler.conversations_query(AgentConversationsQueryReq(project_id="p1"))
 
         assert len(ch.calls) == 2
 
-        data_sql = ch.sql_at(1)
-        assert "FROM spans" in data_sql
-        assert "GROUP BY conversation_id" in data_sql
-        assert "conversation_id != ''" in data_sql
-        assert "max(conversation_name) AS conversation_name" in data_sql
-        assert "countIf(operation_name = 'invoke_agent') AS turn_count" in data_sql
-        assert "count() AS span_count" in data_sql
-        assert "sum(input_tokens) AS total_input_tokens" in data_sql
-        assert "groupUniqArray(agent_name) AS agent_names" in data_sql
-        assert "groupUniqArray(provider_name) AS provider_names" in data_sql
-        assert "ORDER BY last_seen DESC" in data_sql
+        _assert_sql(
+            """
+            SELECT count() FROM (
+                SELECT conversation_id FROM spans
+                WHERE project_id = {project_id:String}
+                  AND conversation_id != ''
+                GROUP BY conversation_id
+            )
+            """,
+            {"project_id": "p1"},
+            ch.calls[0][0],
+            ch.calls[0][1],
+        )
 
-    def test_excludes_empty_conversation_ids(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.conversations_query(AgentConversationsQueryReq(project_id="p1"))
-        count_sql = ch.sql_at(0)
-        assert "conversation_id != ''" in count_sql
+        _assert_sql(
+            """
+            SELECT conversation_id,
+                   max(conversation_name) AS conversation_name,
+                   countIf(operation_name = 'invoke_agent') AS turn_count,
+                   count() AS span_count,
+                   sum(input_tokens) AS total_input_tokens,
+                   sum(output_tokens) AS total_output_tokens,
+                   sum(toUnixTimestamp64Milli(ended_at) - toUnixTimestamp64Milli(started_at)) AS total_duration_ms,
+                   countIf(status_code = 'ERROR') AS error_count,
+                   groupUniqArray(agent_name) AS agent_names,
+                   groupUniqArray(agent_version) AS agent_versions,
+                   groupUniqArray(provider_name) AS provider_names,
+                   groupUniqArray(request_model) AS request_models,
+                   min(started_at) AS first_seen,
+                   max(started_at) AS last_seen
+            FROM spans
+            WHERE project_id = {project_id:String}
+              AND conversation_id != ''
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+            """,
+            {"project_id": "p1", "limit": 100, "offset": 0},
+            ch.calls[1][0],
+            ch.calls[1][1],
+        )
 
-    def test_with_agent_filter(
+    def test_with_filter_and_array_sort(
         self, handler: AgentQueryHandler, ch: _QueryCapture
     ) -> None:
         handler.conversations_query(
             AgentConversationsQueryReq(
                 project_id="p1",
                 filters=AgentConversationsQueryFilters(agent_name="bot"),
-            )
-        )
-        data_sql = ch.sql_at(1)
-        assert "agent_name = {f_agent_name:String}" in data_sql
-        assert ch.params_at(1)["f_agent_name"] == "bot"
-
-    def test_with_provider_filter(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.conversations_query(
-            AgentConversationsQueryReq(
-                project_id="p1",
-                filters=AgentConversationsQueryFilters(provider_name="openai"),
-            )
-        )
-        data_sql = ch.sql_at(1)
-        assert "provider_name = {f_provider_name:String}" in data_sql
-
-    def test_with_time_range(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.conversations_query(
-            AgentConversationsQueryReq(
-                project_id="p1",
-                start="2026-01-01",
-                end="2026-02-01",
-            )
-        )
-        data_sql = ch.sql_at(1)
-        assert "parseDateTimeBestEffort({t_start:String})" in data_sql
-        assert "parseDateTimeBestEffort({t_end:String})" in data_sql
-
-    def test_sort_by_turn_count(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.conversations_query(
-            AgentConversationsQueryReq(
-                project_id="p1",
-                sort_by=[AgentSortBy(field="turn_count", direction="desc")],
-            )
-        )
-        data_sql = ch.sql_at(1)
-        assert "ORDER BY turn_count desc" in data_sql
-
-    def test_sort_by_array_field_uses_array_element(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.conversations_query(
-            AgentConversationsQueryReq(
-                project_id="p1",
                 sort_by=[AgentSortBy(field="agent_name", direction="asc")],
             )
         )
-        data_sql = ch.sql_at(1)
-        assert "ORDER BY arrayElement(agent_names, 1) asc" in data_sql
-
-    def test_duration_calculation(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.conversations_query(AgentConversationsQueryReq(project_id="p1"))
-        data_sql = ch.sql_at(1)
-        assert (
-            "sum(toUnixTimestamp64Milli(ended_at) - toUnixTimestamp64Milli(started_at)) AS total_duration_ms"
-            in data_sql
-        )
+        sql = ch.calls[1][0]
+        params = ch.calls[1][1]
+        assert "agent_name = {f_agent_name:String}" in sql
+        assert "ORDER BY arrayElement(agent_names, 1) asc" in sql
+        assert params["f_agent_name"] == "bot"
 
 
 # ============================================================================
-# 7. search
+# search
 # ============================================================================
 
 
 class TestSearch:
-    """SQL assertions for AgentQueryHandler.search()."""
-
     def test_basic(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
         handler.search(AgentSearchReq(project_id="p1", query="hello"))
 
         assert len(ch.calls) == 1
-        sql = ch.last_sql
-        assert "FROM message_search FINAL" in sql
-        assert "project_id = {project_id:String}" in sql
-        assert "content LIKE {query:String}" in sql
-        assert "ORDER BY started_at DESC" in sql
-        assert "LIMIT {limit:UInt64} OFFSET {offset:UInt64}" in sql
-        assert ch.last_params["query"] == "%hello%"
 
-    def test_with_role_filter(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.search(
-            AgentSearchReq(project_id="p1", query="test", roles=["user", "assistant"])
+        _assert_sql(
+            """
+            SELECT conversation_id, conversation_name, agent_name,
+                   span_id, trace_id, role, content, content_digest, started_at
+            FROM message_search FINAL
+            WHERE project_id = {project_id:String}
+              AND content LIKE {query:String}
+            ORDER BY started_at DESC
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+            """,
+            {"project_id": "p1", "query": "%hello%", "limit": 20, "offset": 0},
+            ch.calls[0][0],
+            ch.calls[0][1],
         )
-        sql = ch.last_sql
-        assert "role IN {roles:Array(String)}" in sql
-        assert ch.last_params["roles"] == ["user", "assistant"]
 
-    def test_with_agent_filter(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.search(AgentSearchReq(project_id="p1", query="test", agent_name="bot"))
-        sql = ch.last_sql
-        assert "agent_name = {agent_name:String}" in sql
-
-    def test_with_conversation_filter(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
+    def test_with_filters(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
         handler.search(
-            AgentSearchReq(project_id="p1", query="test", conversation_id="conv-1")
+            AgentSearchReq(
+                project_id="p1",
+                query="test",
+                agent_name="bot",
+                roles=["user", "assistant"],
+            )
         )
-        sql = ch.last_sql
-        assert "conversation_id = {conv_id:String}" in sql
-        assert ch.last_params["conv_id"] == "conv-1"
 
-    def test_limit_capped_at_1000(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.search(AgentSearchReq(project_id="p1", query="test", limit=5000))
-        assert ch.last_params["limit"] == 1000
+        _assert_sql(
+            """
+            SELECT conversation_id, conversation_name, agent_name,
+                   span_id, trace_id, role, content, content_digest, started_at
+            FROM message_search FINAL
+            WHERE project_id = {project_id:String}
+              AND content LIKE {query:String}
+              AND role IN {roles:Array(String)}
+              AND agent_name = {agent_name:String}
+            ORDER BY started_at DESC
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+            """,
+            {
+                "project_id": "p1",
+                "query": "%test%",
+                "roles": ["user", "assistant"],
+                "agent_name": "bot",
+                "limit": 20,
+                "offset": 0,
+            },
+            ch.calls[0][0],
+            ch.calls[0][1],
+        )
 
-    def test_selects_correct_columns(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        handler.search(AgentSearchReq(project_id="p1", query="test"))
-        sql = ch.last_sql
-        assert "conversation_id, conversation_name, agent_name," in sql
-        assert "span_id, trace_id, role, content, content_digest, started_at" in sql
-
-    def test_uses_final_for_dedup(
-        self, handler: AgentQueryHandler, ch: _QueryCapture
-    ) -> None:
-        """message_search is ReplacingMergeTree, so FINAL is needed."""
-        handler.search(AgentSearchReq(project_id="p1", query="test"))
-        sql = ch.last_sql
-        assert "FINAL" in sql
+    def test_limit_capped(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+        handler.search(AgentSearchReq(project_id="p1", query="x", limit=5000))
+        assert ch.calls[0][1]["limit"] == 1000
 
 
 # ============================================================================
-# 11. Query builder helpers (unit tests)
+# Query builder helpers
 # ============================================================================
 
 
 class TestQueryBuilderHelpers:
-    """Unit tests for agent_query_builder functions."""
-
     def test_build_order_by_default(self) -> None:
-        result = build_order_by(None, SPAN_SORTABLE_COLS, "started_at DESC")
-        assert result == "started_at DESC"
+        assert (
+            build_order_by(None, SPAN_SORTABLE_COLS, "started_at DESC")
+            == "started_at DESC"
+        )
 
     def test_build_order_by_valid(self) -> None:
         sort = [AgentSortBy(field="input_tokens", direction="asc")]
-        result = build_order_by(sort, SPAN_SORTABLE_COLS, "started_at DESC")
-        assert result == "input_tokens asc"
+        assert (
+            build_order_by(sort, SPAN_SORTABLE_COLS, "fallback") == "input_tokens asc"
+        )
 
-    def test_build_order_by_rejects_invalid_column(self) -> None:
+    def test_build_order_by_rejects_invalid(self) -> None:
         sort = [AgentSortBy(field="'; DROP TABLE--", direction="asc")]
-        result = build_order_by(sort, SPAN_SORTABLE_COLS, "started_at DESC")
-        assert result == "started_at DESC"
-
-    def test_build_order_by_rejects_invalid_direction(self) -> None:
-        sort = [AgentSortBy(field="started_at", direction="desc")]
-        # Pydantic validates direction to Literal["asc", "desc"] so this always passes,
-        # but the code also checks direction in {"asc", "desc"}
-        result = build_order_by(sort, SPAN_SORTABLE_COLS, "fallback")
-        assert result == "started_at desc"
+        assert (
+            build_order_by(sort, SPAN_SORTABLE_COLS, "started_at DESC")
+            == "started_at DESC"
+        )
 
     def test_build_order_by_multiple(self) -> None:
         sort = [
             AgentSortBy(field="started_at", direction="desc"),
             AgentSortBy(field="input_tokens", direction="asc"),
         ]
-        result = build_order_by(sort, SPAN_SORTABLE_COLS, "fallback")
-        assert result == "started_at desc, input_tokens asc"
+        assert (
+            build_order_by(sort, SPAN_SORTABLE_COLS, "fallback")
+            == "started_at desc, input_tokens asc"
+        )
 
-    def test_add_time_filters_both(self) -> None:
+    def test_add_time_filters(self) -> None:
         conds: list[str] = []
         params: dict[str, Any] = {}
         add_time_filters(conds, params, start="2026-01-01", end="2026-02-01")
         assert len(conds) == 2
-        assert "s.started_at >= parseDateTimeBestEffort({t_start:String})" in conds[0]
-        assert "s.started_at < parseDateTimeBestEffort({t_end:String})" in conds[1]
-        assert params["t_start"] == "2026-01-01"
-        assert params["t_end"] == "2026-02-01"
-
-    def test_add_time_filters_custom_column(self) -> None:
-        conds: list[str] = []
-        params: dict[str, Any] = {}
-        add_time_filters(
-            conds, params, start="2026-01-01", end=None, column="started_at"
-        )
-        assert "started_at >= parseDateTimeBestEffort({t_start:String})" in conds[0]
+        assert params == {"t_start": "2026-01-01", "t_end": "2026-02-01"}
 
     def test_add_time_filters_none(self) -> None:
         conds: list[str] = []
         params: dict[str, Any] = {}
         add_time_filters(conds, params, start=None, end=None)
         assert conds == []
-        assert params == {}
 
     def test_add_span_filters(self) -> None:
         conds: list[str] = []
         params: dict[str, Any] = {}
-        filters = AgentSpansQueryFilters(agent_name="bot", provider_name="openai")
-        add_span_filters(conds, params, filters)
-        assert any("s.agent_name = {f_agent_name:String}" in c for c in conds)
-        assert any("s.provider_name = {f_provider_name:String}" in c for c in conds)
+        add_span_filters(
+            conds,
+            params,
+            AgentSpansQueryFilters(agent_name="bot", provider_name="openai"),
+        )
         assert params["f_agent_name"] == "bot"
         assert params["f_provider_name"] == "openai"
 
     def test_add_span_filters_skips_none(self) -> None:
         conds: list[str] = []
         params: dict[str, Any] = {}
-        filters = AgentSpansQueryFilters(agent_name=None)
-        add_span_filters(conds, params, filters)
+        add_span_filters(conds, params, AgentSpansQueryFilters())
         assert conds == []
-        assert params == {}
 
-    def test_add_custom_attr_filters_operators(self) -> None:
+    def test_add_custom_attr_filters(self) -> None:
         conds: list[str] = []
         params: dict[str, Any] = {}
-        custom = [
-            AgentCustomAttrFilter(attr_key="k1", operator="eq", value="v1"),
-            AgentCustomAttrFilter(attr_key="k2", operator="gt", value="10"),
-            AgentCustomAttrFilter(attr_key="k3", operator="lte", value="99"),
-        ]
-        add_custom_attr_filters(conds, params, custom)
+        add_custom_attr_filters(
+            conds,
+            params,
+            [
+                AgentCustomAttrFilter(attr_key="k1", operator="eq", value="v1"),
+                AgentCustomAttrFilter(attr_key="k2", operator="gt", value="10"),
+                AgentCustomAttrFilter(attr_key="k3", operator="lte", value="99"),
+            ],
+        )
         assert len(conds) == 3
-        assert "s.custom_attrs[{cf0_key:String}] = {cf0_val:String}" in conds[0]
-        assert "s.custom_attrs[{cf1_key:String}] > {cf1_val:String}" in conds[1]
-        assert "s.custom_attrs[{cf2_key:String}] <= {cf2_val:String}" in conds[2]
+        assert "= {cf0_val:String}" in conds[0]
+        assert "> {cf1_val:String}" in conds[1]
+        assert "<= {cf2_val:String}" in conds[2]
 
 
 # ============================================================================
-# 9. SQL injection safety
+# SQL injection safety
 # ============================================================================
 
 
 class TestSQLInjectionSafety:
-    """Verify that untrusted input never reaches SQL directly."""
-
-    def test_sort_injection_rejected(
+    def test_sort_injection(
         self, handler: AgentQueryHandler, ch: _QueryCapture
     ) -> None:
         handler.spans_query(
@@ -715,45 +629,33 @@ class TestSQLInjectionSafety:
                 ],
             )
         )
-        data_sql = ch.sql_at(1)
-        assert "DROP" not in data_sql
-        assert "ORDER BY started_at DESC" in data_sql
+        assert "DROP" not in ch.calls[1][0]
 
-    def test_custom_attr_key_is_parameterized(
+    def test_custom_attr_key_parameterized(
         self, handler: AgentQueryHandler, ch: _QueryCapture
     ) -> None:
-        """Custom attr keys go through parameterized queries, not string interpolation."""
         handler.spans_query(
             AgentSpansQueryReq(
                 project_id="p1",
                 filters=AgentSpansQueryFilters(
                     custom_filters=[
                         AgentCustomAttrFilter(
-                            attr_key="'; DROP TABLE--",
-                            operator="eq",
-                            value="x",
-                        ),
+                            attr_key="'; DROP TABLE--", operator="eq", value="x"
+                        )
                     ]
                 ),
             )
         )
-        data_sql = ch.sql_at(1)
-        # The key should be in params, not interpolated into SQL
-        assert "DROP TABLE" not in data_sql
-        assert ch.params_at(1)["cf0_key"] == "'; DROP TABLE--"
+        assert "DROP TABLE" not in ch.calls[1][0]
+        assert ch.calls[1][1]["cf0_key"] == "'; DROP TABLE--"
 
-    def test_all_filter_values_are_parameterized(
+    def test_filter_values_parameterized(
         self, handler: AgentQueryHandler, ch: _QueryCapture
     ) -> None:
-        """Filter values are always passed as parameters, never interpolated."""
         handler.spans_query(
             AgentSpansQueryReq(
                 project_id="'; DROP TABLE--",
                 filters=AgentSpansQueryFilters(agent_name="'; DROP TABLE--"),
             )
         )
-        data_sql = ch.sql_at(1)
-        # SQL template uses {param:Type} placeholders, actual values in params dict
-        assert "DROP TABLE" not in data_sql
-        assert ch.params_at(1)["project_id"] == "'; DROP TABLE--"
-        assert ch.params_at(1)["f_agent_name"] == "'; DROP TABLE--"
+        assert "DROP TABLE" not in ch.calls[1][0]

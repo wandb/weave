@@ -1,24 +1,6 @@
--- GenAI Observability Schema v4
---
--- 3 core tables, 2 MVs + optional message search:
---   1. spans          — MergeTree, bloom filters, codecs, typed Maps
---   2. agents         — AggregatingMergeTree MV, lean counters + first/last seen
---   3. agent_versions — AggregatingMergeTree MV, same pattern
---   4. message_search — app-level insert, full-text search (optional)
---
--- No skinny table, no projections.
--- ReplacingMergeTree(created_at) for idempotent re-inserts / late updates.
--- Monthly partitioning for time-range pruning and TTL-based retention.
--- ClickHouse columnar storage means queries only read the columns they SELECT.
--- Bloom filters on IDs for point lookups, ngrambf on dimensions for substring search.
--- All span-derived queries use time bounds from the UI (H/D/W/M presets).
--- AMTs handle the only all-time queries: agent/version aggregate counters.
---
--- See: benchmarks/genai_clickhouse/REPORT.md for design rationale.
+-- Agent observability tables.
 
--- ---------------------------------------------------------------------------
--- 1. spans — primary storage
--- ---------------------------------------------------------------------------
+-- spans
 CREATE TABLE spans (
     project_id          String CODEC(ZSTD(1)),
     trace_id            String CODEC(ZSTD(1)),
@@ -115,13 +97,11 @@ CREATE TABLE spans (
 
     ttl_at              DateTime DEFAULT '2100-01-01 00:00:00' CODEC(ZSTD(1)),
 
-    -- Point lookup bloom filters (high selectivity — ~1 row per ID)
     INDEX idx_span_id span_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_parent parent_span_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_wb_run_id wb_run_id TYPE bloom_filter(0.01) GRANULARITY 1,
-    -- Dimension ngrambf indexes (substring search on filtered scans)
     INDEX idx_operation_name operation_name TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
     INDEX idx_provider_name provider_name TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
     INDEX idx_request_model request_model TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
@@ -136,9 +116,7 @@ TTL ttl_at DELETE
 SETTINGS min_bytes_for_wide_part=0;
 
 
--- ---------------------------------------------------------------------------
--- 2. agents — all-time counters + first/last seen
--- ---------------------------------------------------------------------------
+-- agents (materialized from spans)
 CREATE TABLE agents (
     project_id String CODEC(ZSTD(1)),
     agent_name String CODEC(ZSTD(1)),
@@ -169,9 +147,7 @@ FROM spans
 WHERE agent_name != '';
 
 
--- ---------------------------------------------------------------------------
--- 3. agent_versions — all-time counters + first/last seen
--- ---------------------------------------------------------------------------
+-- agent_versions (materialized from spans)
 CREATE TABLE agent_versions (
     project_id String CODEC(ZSTD(1)),
     agent_name String CODEC(ZSTD(1)),
@@ -204,9 +180,7 @@ FROM spans
 WHERE agent_name != '';
 
 
--- ---------------------------------------------------------------------------
--- 4. message_search — per-message full-text search (app-level insert)
--- ---------------------------------------------------------------------------
+-- message_search
 CREATE TABLE message_search (
     project_id String CODEC(ZSTD(1)),
     content_digest String CODEC(ZSTD(1)),
