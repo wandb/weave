@@ -24,22 +24,46 @@ def test_skip_clickhouse_client(
     assert get_trace_server_flag(request) != "clickhouse"
 
 
-# The exact count of instance attributes on ClickHouseTraceServer.__init__.
-# If this changes, someone added or removed state. The test below will fail
-# and force them to check whether _reset_server_state needs updating.
-EXPECTED_ATTR_COUNT = 19
+# All instance attributes set in ClickHouseTraceServer.__init__.
+# Instrumentation (ddtrace, coverage) may add extras — those are ignored.
+# If you add a new attribute to __init__, add it here AND decide whether
+# _reset_server_state in conftest.py needs to reset it between tests.
+KNOWN_SERVER_ATTRS = frozenset(
+    {
+        "_database",
+        "_database_ensured",
+        "_evaluate_model_dispatcher",
+        "_file_storage_client",
+        "_file_storage_client_initialized",
+        "_host",
+        "_init_lock",
+        "_kafka_producer",
+        "_model_to_provider_info_map",
+        "_op_ref_cache",
+        "_op_ref_cache_lock",
+        "_password",
+        "_placeholder_file_projects",
+        "_port",
+        "_run_migrations",
+        "_table_routing_resolver",
+        "_thread_local",
+        "_use_async_insert",
+        "_user",
+        "ch_client",
+    }
+)
 
 
 def test_reset_server_state_covers_all_attrs(ch_server):
-    """Canary: fails when ClickHouseTraceServer gains/loses instance attributes.
+    """Fails when ClickHouseTraceServer gains new instance attributes.
 
-    This doesn't know *which* attributes need resetting — it just notices when
-    the set changes so the author is forced to check _reset_server_state.
+    Instrumentation attrs (ddtrace, coverage) are ignored — only attrs
+    missing from KNOWN_SERVER_ATTRS trigger failure.
     """
-    attr_count = len([a for a in ch_server.__dict__ if not a.startswith("__")])
-    assert attr_count == EXPECTED_ATTR_COUNT, (
-        f"ClickHouseTraceServer has {attr_count} instance attributes "
-        f"(expected {EXPECTED_ATTR_COUNT}). If you added/removed state, "
-        f"check whether _reset_server_state in conftest.py needs updating, "
-        f"then update EXPECTED_ATTR_COUNT."
+    actual = {a for a in ch_server.__dict__ if not a.startswith("__")}
+    unknown = actual - KNOWN_SERVER_ATTRS
+    assert not unknown, (
+        f"ClickHouseTraceServer has new attributes: {unknown}. "
+        f"Add them to KNOWN_SERVER_ATTRS in this file, and check whether "
+        f"_reset_server_state in conftest.py needs to reset them."
     )
