@@ -111,21 +111,27 @@ def init_weave(
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
+    # Snapshot the raw caller-supplied values before any resolution/mutation
+    # so the reuse check compares what the caller actually passed.
+    raw_init_params = (
+        project_name,
+        ensure_project_exists,
+        api_key,
+        base_url,
+        trace_server_url,
+    )
+
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
-        # TODO: Prob should move into settings
-        if (
-            current_client.project == project_name
-            and current_client.ensure_project_exists == ensure_project_exists
-            and api_key is None
-            and base_url is None
-            and trace_server_url is None
-        ):
+        # Reuse the existing client when every caller-supplied parameter
+        # matches.  When api_key is None the value comes from the
+        # environment which may have changed, so we only reuse when an
+        # explicit api_key was provided and all params match.
+        if api_key is not None and current_client.raw_init_params == raw_init_params:
             return current_client
-        else:
-            # Flush any pending calls before switching to a new project
-            current_client.finish()
-            weave_client_context.set_weave_client_global(None)
+        # Flush any pending calls before switching to a new client
+        current_client.finish()
+        weave_client_context.set_weave_client_global(None)
 
     if api_key is None:
         api_key = get_wandb_api_context()
@@ -174,6 +180,7 @@ def init_weave(
         api_key=api_key,
         base_url=base_url,
     )
+    client.raw_init_params = raw_init_params
 
     # If the project name was formatted by init, update the project name
     project_name = client.project

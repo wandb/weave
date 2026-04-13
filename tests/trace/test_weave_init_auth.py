@@ -259,31 +259,52 @@ def test_init_weave_credential_storage_and_env_skipping(mock_wandb_api):
 
 
 def test_init_weave_reuse_and_reinit(mock_wandb_api):
-    """Same project without credential params reuses client; passing any
-    credential param forces re-init.
+    """Reuse client when identical explicit credentials are passed;
+    recreate when credentials differ or are env-derived (None).
     """
     mock_wandb_api.default_entity_name.return_value = "test-entity"
     mock_server = _make_mock_server()
 
-    with _init_patches(mock_server):
+    with (
+        _init_patches(mock_server),
+        patch(
+            "weave.trace.weave_init.get_wandb_api_context",
+            return_value="env-key",
+        ),
+    ):
         client_a = weave_init.init_weave("test-project", api_key="key")
-        assert weave_init.init_weave("test-project") is client_a  # reuse
+        # Same explicit credentials → reuse
+        assert weave_init.init_weave("test-project", api_key="key") is client_a
 
-        client_b = weave_init.init_weave("test-project", api_key="new-key")
+        # No explicit api_key (env-derived) → recreate to pick up env changes
+        client_b = weave_init.init_weave("test-project")
         assert client_b is not client_a
 
-        client_c = weave_init.init_weave(
-            "test-project", api_key="new-key", base_url="https://new.example.com"
-        )
+        # Different explicit key → recreate
+        client_c = weave_init.init_weave("test-project", api_key="new-key")
         assert client_c is not client_b
 
+        # Same key but added base_url → recreate
         client_d = weave_init.init_weave(
+            "test-project", api_key="new-key", base_url="https://new.example.com"
+        )
+        assert client_d is not client_c
+        # Same key + same base_url → reuse
+        assert (
+            weave_init.init_weave(
+                "test-project", api_key="new-key", base_url="https://new.example.com"
+            )
+            is client_d
+        )
+
+        # Added trace_server_url → recreate
+        client_e = weave_init.init_weave(
             "test-project",
             api_key="new-key",
             trace_server_url="https://trace.new.example.com",
         )
-        assert client_d is not client_c
-        client_d.finish()
+        assert client_e is not client_d
+        client_e.finish()
 
 
 def test_init_weave_env_fallback_paths(mock_wandb_api, monkeypatch):
