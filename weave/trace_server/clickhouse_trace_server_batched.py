@@ -5197,8 +5197,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         sql = f"""
             SELECT digest, any(val_dump) AS val_dump
             FROM table_rows
-            WHERE project_id = {project_param}
-              AND digest IN {digests_param}
+            PREWHERE project_id = {project_param}
+            WHERE digest IN {digests_param}
             GROUP BY project_id, digest
         """
         result = self.ch_client.query(sql, pb.get_params())
