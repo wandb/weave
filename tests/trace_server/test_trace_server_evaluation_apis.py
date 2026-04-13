@@ -1128,7 +1128,9 @@ def test_eval_results_sort_by_output(client):
         )
     )
     assert res.total_rows == 3
-    sorted_labels = [row.evaluations[0].trials[0].model_output["label"] for row in res.rows]
+    sorted_labels = [
+        row.evaluations[0].trials[0].model_output["label"] for row in res.rows
+    ]
     assert sorted_labels == ["apple", "banana", "cherry"]
 
 
