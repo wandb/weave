@@ -368,7 +368,7 @@ class WeaveClient:
         self._api_key: str | None = (
             api_key if api_key is not None else get_wandb_api_context()
         )
-        self._base_url: str | None = (
+        self._base_url: str = (
             base_url if base_url is not None else env.wandb_base_url()
         )
         self._anonymous_ops: dict[str, Op] = {}
