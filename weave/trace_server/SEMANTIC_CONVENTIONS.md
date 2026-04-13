@@ -1,193 +1,176 @@
 # Weave GenAI Semantic Conventions
 
-Weave defines its own GenAI semantic conventions that **overlap with and recognize**
-the [OTel GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/),
-while adding product-specific extensions for features not covered by the standard.
+Weave provides a GenAI observability store that accepts arbitrary OTel spans and
+provides special indexing and storage for spans that follow the
+[OTel GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/).
 
-The OTel GenAI semconv is "Development" status (unstable) as of April 2026.
-Having our own convention layer gives us control over the schema while staying
-compatible as the standard evolves.
-
-## Convention Layers
-
-The extraction pipeline (`opentelemetry/genai_extraction.py`) reads attributes
-from OTel spans and normalizes them into the `genai_spans` ClickHouse table.
-Attributes are resolved through a priority chain:
-
-1. **OTel GenAI Semconv** (`gen_ai.*`) -- preferred source
-2. **Vendor-specific fallbacks** (`agent.*`, `llm.*`, `gcp.*`) -- for providers
-   that haven't adopted `gen_ai.*` yet
-3. **Weave extensions** (`weave.*`) -- product features not in the standard
-
-All sources are normalized into columns with **neutral names** (e.g. `input_tokens`,
-not `gen_ai_usage_input_tokens`).  The original span data is preserved losslessly
-in `raw_span_dump`.
+Any OTel span can be stored and its raw contents retrieved. Spans that carry
+`gen_ai.*` attributes get additional structured fields extracted for efficient
+sorting, filtering, and aggregation. All other attributes are preserved in typed
+custom attribute maps and in the lossless raw span dump.
 
 ## Operation Names
 
-The `operation_name` column captures what kind of work a span represents.
-
-### Standard (OTel GenAI Semconv)
+**Field:** `operation_name` (string)
 
 | Operation | Description |
 |---|---|
-| `chat` | LLM chat completion (OpenAI, Anthropic, etc.) |
+| `chat` | LLM chat completion |
 | `invoke_agent` | Agent invocation (root of an agent turn) |
 | `execute_tool` | Tool/function execution |
-| `generate_content` | Multimodal content generation (Google Gemini) |
+| `generate_content` | Multimodal content generation |
 | `text_completion` | Legacy text completion |
 | `embeddings` | Embedding generation |
 | `create_agent` | Agent creation |
 | `retrieval` | Vector store / RAG retrieval |
-
-### Vendor-Specific (recognized, not standard)
-
-| Operation | Source | Description |
-|---|---|---|
-| `handoff` | OpenAI Agents SDK | Agent-to-agent delegation |
-| `guardrail` | OpenAI Agents SDK | Safety guardrail check |
-| `custom` | OpenAI Agents SDK | Custom span type |
-| `transcription` | OpenAI Agents SDK | Audio transcription |
-| `speech` | OpenAI Agents SDK | Text-to-speech |
-
-Operation names are extracted from `gen_ai.operation.name` (standard), then
-`agent.span.type` (OpenAI), then inferred from the span name.
+| `handoff` | Agent-to-agent delegation |
+| `guardrail` | Safety guardrail check |
 
 ## Span Attributes
 
-### OTel GenAI Semconv Attributes (mapped to columns)
+### Classification
 
-| Column | OTel Attribute | Description |
+| Field | Type | Description |
 |---|---|---|
-| `operation_name` | `gen_ai.operation.name` | Operation type (see above) |
-| `provider_name` | `gen_ai.provider.name` | Provider (openai, anthropic, etc.) |
-| `agent_name` | `gen_ai.agent.name` | Agent name |
-| `agent_id` | `gen_ai.agent.id` | Agent identifier |
-| `agent_description` | `gen_ai.agent.description` | Agent description |
-| `agent_version` | `gen_ai.agent.version` | Agent version string |
-| `request_model` | `gen_ai.request.model` | Requested model name |
-| `response_model` | `gen_ai.response.model` | Actual model used |
-| `response_id` | `gen_ai.response.id` | Provider response ID |
-| `input_tokens` | `gen_ai.usage.input_tokens` | Input token count |
-| `output_tokens` | `gen_ai.usage.output_tokens` | Output token count |
-| `reasoning_tokens` | `gen_ai.usage.reasoning_tokens` | Reasoning token count (proposed) |
-| `cache_creation_input_tokens` | `gen_ai.usage.cache_creation.input_tokens` | Tokens written to cache |
-| `cache_read_input_tokens` | `gen_ai.usage.cache_read.input_tokens` | Tokens served from cache |
-| `conversation_id` | `gen_ai.conversation.id` | Conversation/session ID |
-| `tool_name` | `gen_ai.tool.name` | Tool name |
-| `tool_type` | `gen_ai.tool.type` | Tool type (function, extension, datastore) |
-| `tool_call_id` | `gen_ai.tool.call.id` | Tool call ID |
-| `tool_description` | `gen_ai.tool.description` | Tool description |
-| `tool_definitions` | `gen_ai.tool.definitions` | JSON tool definitions |
-| `tool_call_arguments` | `gen_ai.tool.call.arguments` | Tool call arguments (JSON) |
-| `tool_call_result` | `gen_ai.tool.call.result` | Tool call result (JSON) |
-| `finish_reasons` | `gen_ai.response.finish_reasons` | Finish reasons array |
-| `error_type` | `error.type` | Error type string |
-| `request_temperature` | `gen_ai.request.temperature` | Temperature |
-| `request_max_tokens` | `gen_ai.request.max_tokens` | Max tokens |
-| `request_top_p` | `gen_ai.request.top_p` | Top-p |
-| `request_frequency_penalty` | `gen_ai.request.frequency_penalty` | Frequency penalty |
-| `request_presence_penalty` | `gen_ai.request.presence_penalty` | Presence penalty |
-| `request_seed` | `gen_ai.request.seed` | Seed |
-| `request_stop_sequences` | `gen_ai.request.stop_sequences` | Stop sequences |
-| `request_choice_count` | `gen_ai.request.choice.count` | Number of choices |
-| `output_type` | `gen_ai.output.type` | Output modality (text, json, image, speech) |
-| `server_address` | `server.address` | Server hostname |
-| `server_port` | `server.port` | Server port |
+| `operation_name` | string | Operation type (see above) |
+| `provider_name` | string | Provider: `openai`, `anthropic`, `gcp.gemini`, etc. |
 
-### Weave Extension Attributes
+### Agent Identity
 
-| Column | Weave Attribute | Description |
+| Field | Type | Description |
 |---|---|---|
-| `conversation_name` | `weave.conversation.name` | Human-readable conversation name |
-| `reasoning_content` | *(extracted from message parts)* | Reasoning/thinking text from ReasoningPart |
-| `compaction_summary` | `weave.compaction.summary` | Context compaction summary |
-| `compaction_items_before` | `weave.compaction.items_before` | Items before compaction |
-| `compaction_items_after` | `weave.compaction.items_after` | Items after compaction |
-| `content_refs` | `weave.content_refs` | Uploaded content references |
-| `artifact_refs` | `weave.artifact_refs` | W&B artifact references |
-| `object_refs` | `weave.object_refs` | W&B object references |
+| `agent_name` | string | Agent display name |
+| `agent_id` | string | Agent identifier |
+| `agent_description` | string | Agent description |
+| `agent_version` | string | Agent version (free-form string) |
 
-### Custom Attributes
+### Model
 
-Any attribute not in the known set is routed into typed Map columns:
-
-| Column | Type | Use |
+| Field | Type | Description |
 |---|---|---|
-| `custom_attrs` | `Map(String, String)` | String-valued custom attributes |
-| `custom_attrs_int` | `Map(String, Int64)` | Integer-valued custom attributes |
-| `custom_attrs_float` | `Map(String, Float64)` | Float-valued custom attributes |
+| `request_model` | string | Model name requested |
+| `response_model` | string | Actual model used (may differ) |
+| `response_id` | string | Provider response identifier |
 
-These support native ClickHouse Map operations for filtering and aggregation.
+### Token Usage
 
-## Message Format
+| Field | Type | Description |
+|---|---|---|
+| `input_tokens` | int | Input tokens (includes cached) |
+| `output_tokens` | int | Output tokens |
+| `total_tokens` | int | Total tokens (input + output) |
+| `reasoning_tokens` | int | Reasoning/thinking tokens |
+| `cache_creation_input_tokens` | int | Tokens written to cache |
+| `cache_read_input_tokens` | int | Tokens served from cache |
 
-Messages are stored as `Array(Tuple(role String, content String, finish_reason String))`.
+### Conversation
 
-| Field | Description |
-|---|---|
-| `role` | Message role: `user`, `assistant`, `tool`, `system` |
-| `content` | Concatenated text content for display and search |
-| `finish_reason` | Per-message finish reason (`stop`, `length`, `tool_call`, etc.) |
+| Field | Type | Description |
+|---|---|---|
+| `conversation_id` | string | Conversation or session ID |
+| `conversation_name` | string | Human-readable conversation name **[Weave]** |
 
-The original message data (including structured parts, tool calls, and
-participant names) is preserved losslessly in `raw_span_dump`.
+### Tool
 
-Messages are extracted from `gen_ai.input.messages` and `gen_ai.output.messages`
-(standard), with fallbacks to `gen_ai.prompt`/`gen_ai.completion` (pre-v1.36),
-Google ADK format, and Traceloop indexed format.
+| Field | Type | Description |
+|---|---|---|
+| `tool_name` | string | Tool/function name |
+| `tool_type` | string | Type: `function`, `extension`, `datastore` |
+| `tool_call_id` | string | Tool call identifier |
+| `tool_description` | string | Tool description |
+| `tool_definitions` | string (JSON) | Available tool definitions |
+| `tool_call_arguments` | string (JSON) | Arguments passed to the tool |
+| `tool_call_result` | string (JSON) | Result returned by the tool |
 
-## Vendor Fallback Chains
+### Request Parameters
 
-Each field has an extraction function with documented fallback chains.
-Examples:
+| Field | Type | Description |
+|---|---|---|
+| `request_temperature` | float | Sampling temperature |
+| `request_max_tokens` | int | Maximum output tokens |
+| `request_top_p` | float | Nucleus sampling threshold |
+| `request_frequency_penalty` | float | Frequency penalty |
+| `request_presence_penalty` | float | Presence penalty |
+| `request_seed` | int | Random seed |
+| `request_stop_sequences` | string[] | Stop sequences |
+| `request_choice_count` | int | Number of choices requested |
 
-**Provider name:**
-`gen_ai.provider.name` -> `gen_ai.system` -> infer from span name
+### Response
 
-**Input tokens:**
-`gen_ai.usage.input_tokens` -> `gen_ai.usage.prompt_tokens` -> `llm.token_count.prompt`
+| Field | Type | Description |
+|---|---|---|
+| `finish_reasons` | string[] | Finish reasons: `stop`, `length`, `tool_call`, `content_filter`, `error` |
+| `output_type` | string | Output modality: `text`, `json`, `image`, `speech` |
+| `error_type` | string | Error type string |
 
-**Conversation ID:**
-`gen_ai.conversation.id` -> `gcp.vertex.agent.session_id`
+### Server
 
-**Tool call arguments:**
-`gen_ai.tool.call.arguments` -> `gen_ai.tool.input` event -> `gcp.vertex.agent.tool_call_args` -> `gen_ai.completion.0.tool_calls.0.arguments`
+| Field | Type | Description |
+|---|---|---|
+| `server_address` | string | Server hostname |
+| `server_port` | int | Server port |
 
-See `opentelemetry/genai_extraction.py` for the complete fallback chain
-documentation on each `extract_*` function.
+## Messages
+
+Messages represent the conversation turns within a span.
+
+**Fields:** `input_messages`, `output_messages` — each an array of:
+
+| Field | Type | Description |
+|---|---|---|
+| `role` | string | Message role: `user`, `assistant`, `tool`, `system` |
+| `content` | string | Text content |
+| `finish_reason` | string | Per-message finish reason (output messages only) |
+
+System instructions are stored separately in `system_instructions` (string[]).
+
+## Weave Extensions
+
+These fields are defined by Weave and have no OTel semconv equivalent.
+
+### Context Compaction
+
+| Field | Type | Description |
+|---|---|---|
+| `compaction_summary` | string | Summary of compacted content |
+| `compaction_items_before` | int | Items in context before compaction |
+| `compaction_items_after` | int | Items in context after compaction |
+
+### Content References
+
+| Field | Type | Description |
+|---|---|---|
+| `content_refs` | string[] | Uploaded content references |
+| `artifact_refs` | string[] | W&B artifact references |
+| `object_refs` | string[] | W&B object references |
+
+### Reasoning Content
+
+| Field | Type | Description |
+|---|---|---|
+| `reasoning_content` | string | Reasoning/thinking text extracted from output messages |
+
+## Custom Attributes
+
+Any span attribute not in the known set is preserved in typed custom attribute fields:
+
+| Field | Value Type | Description |
+|---|---|---|
+| `custom_attrs` | string | String-valued custom attributes |
+| `custom_attrs_int` | int | Integer-valued custom attributes |
+| `custom_attrs_float` | float | Float-valued custom attributes |
+
+These support sorting, filtering, and aggregation on arbitrary user or vendor attributes.
 
 ## Chat View Message Types
 
-The chat view (`agent_chat_view.py`) normalizes spans into a linear message
-sequence for UI rendering.  Message types:
+The chat view normalizes spans into a linear message sequence for UI rendering.
 
-**Semconv-derived:**
-- `user_message` -- user input text
-- `agent_message` -- agent/assistant response
-- `tool_call` -- tool invocation with arguments and result
-
-**Weave product extensions:**
-- `agent_start` -- agent lifecycle boundary marker
-- `agent_handoff` -- agent-to-agent delegation
-- `context_compacted` -- context window compaction event
-
-## Schema Architecture
-
-```
-genai_spans (ReplacingMergeTree)
-  Primary key: (project_id, started_at, span_id)
-  Bloom filters: span_id, trace_id, conversation_id, wb_run_id
-  Ngram indexes: operation_name, provider_name, request_model, agent_name, agent_version
-
-genai_agents (AggregatingMergeTree, materialized from genai_spans)
-  Counters: invocation_count, span_count, tokens, duration, errors
-  Min/max: first_seen, last_seen
-
-genai_agent_versions (AggregatingMergeTree, materialized from genai_spans)
-  Same as genai_agents, keyed by (project_id, agent_name, agent_version)
-
-genai_message_search (ReplacingMergeTree, app-level insert)
-  Full-text search via tokenbf_v1 index on content
-  Deduplicated by content_digest
-```
+| Type | Description |
+|---|---|
+| `user_message` | User input text |
+| `agent_message` | Agent/assistant response |
+| `tool_call` | Tool invocation with arguments and result |
+| `agent_start` | Agent lifecycle boundary marker **[Weave]** |
+| `agent_handoff` | Agent-to-agent delegation **[Weave]** |
+| `context_compacted` | Context window compaction event **[Weave]** |
