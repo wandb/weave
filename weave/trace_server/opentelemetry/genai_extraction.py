@@ -14,12 +14,12 @@ from typing import Any
 
 from weave.trace_server.agent_query_builder import safe_float, safe_int
 from weave.trace_server.agent_schema import (
-    KNOWN_SEMCONV_ATTR_KEYS,
     AgentSpanCHInsertable,
     NormalizedMessage,
 )
 from weave.trace_server.opentelemetry.helpers import get_attribute, to_json_serializable
 from weave.trace_server.opentelemetry.python_spans import Span
+from weave.trace_server.semconv import KNOWN_KEYS
 
 # Known operation name prefixes for span-name inference.
 _KNOWN_OP_PREFIXES = (
@@ -84,14 +84,12 @@ def _str_list(val: Any) -> list[str]:
 
 
 def extract_provider(attrs: dict[str, Any]) -> str:
-    """Extract gen_ai.provider.name (or deprecated gen_ai.system)."""
-    val = _get(attrs, "gen_ai.provider.name", "gen_ai.system")
+    val = _get(attrs, "weave.provider.name", "gen_ai.provider.name", "gen_ai.system")
     return str(val).lower() if val else ""
 
 
 def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
-    """Extract gen_ai.operation.name, falling back to span name inference."""
-    val = _get(attrs, "gen_ai.operation.name")
+    val = _get(attrs, "weave.operation.name", "gen_ai.operation.name")
     if val:
         return str(val)
 
@@ -105,8 +103,7 @@ def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
 
 
 def extract_agent_name(attrs: dict[str, Any], span_name: str) -> str:
-    """Extract gen_ai.agent.name, falling back to span name parsing."""
-    val = _get(attrs, "gen_ai.agent.name")
+    val = _get(attrs, "weave.agent.name", "gen_ai.agent.name")
     if val:
         return str(val)
     if span_name.lower().startswith("invoke_agent "):
@@ -115,21 +112,25 @@ def extract_agent_name(attrs: dict[str, Any], span_name: str) -> str:
 
 
 def extract_conversation_id(attrs: dict[str, Any]) -> str:
-    val = _get(attrs, "gen_ai.conversation.id")
+    val = _get(attrs, "weave.conversation.id", "gen_ai.conversation.id")
     return str(val) if val else ""
 
 
 def extract_conversation_name(attrs: dict[str, Any]) -> str:
-    val = _get(attrs, "gen_ai.conversation.name", "weave.conversation.name")
+    val = _get(attrs, "weave.conversation.name", "gen_ai.conversation.name")
     return str(val) if val else ""
 
 
 def extract_input_tokens(attrs: dict[str, Any]) -> int:
-    return safe_int(_get(attrs, "gen_ai.usage.input_tokens"))
+    return safe_int(
+        _get(attrs, "weave.usage.input_tokens", "gen_ai.usage.input_tokens")
+    )
 
 
 def extract_output_tokens(attrs: dict[str, Any]) -> int:
-    return safe_int(_get(attrs, "gen_ai.usage.output_tokens"))
+    return safe_int(
+        _get(attrs, "weave.usage.output_tokens", "gen_ai.usage.output_tokens")
+    )
 
 
 def extract_total_tokens(attrs: dict[str, Any], input_t: int, output_t: int) -> int:
@@ -137,7 +138,9 @@ def extract_total_tokens(attrs: dict[str, Any], input_t: int, output_t: int) -> 
 
 
 def extract_reasoning_tokens(attrs: dict[str, Any]) -> int:
-    return safe_int(_get(attrs, "gen_ai.usage.reasoning_tokens"))
+    return safe_int(
+        _get(attrs, "weave.usage.reasoning_tokens", "gen_ai.usage.reasoning_tokens")
+    )
 
 
 def extract_reasoning_content(raw_output: Any) -> str:
@@ -168,7 +171,7 @@ def extract_reasoning_content(raw_output: Any) -> str:
 
 
 def extract_finish_reasons(attrs: dict[str, Any]) -> list[str]:
-    val = _get(attrs, "gen_ai.response.finish_reasons")
+    val = _get(attrs, "weave.response.finish_reasons", "gen_ai.response.finish_reasons")
     if isinstance(val, list):
         return [str(v) for v in val]
     if isinstance(val, str):
@@ -179,8 +182,7 @@ def extract_finish_reasons(attrs: dict[str, Any]) -> list[str]:
 def extract_tool_call_arguments(
     attrs: dict[str, Any], events: list[dict[str, Any]]
 ) -> str:
-    """Extract gen_ai.tool.call.arguments from attributes or gen_ai.tool.input event."""
-    val = _get(attrs, "gen_ai.tool.call.arguments")
+    val = _get(attrs, "weave.tool.call.arguments", "gen_ai.tool.call.arguments")
     if val:
         return _json_str(val)
 
@@ -197,8 +199,7 @@ def extract_tool_call_arguments(
 def extract_tool_call_result(
     attrs: dict[str, Any], events: list[dict[str, Any]]
 ) -> str:
-    """Extract gen_ai.tool.call.result from attributes or gen_ai.tool.output event."""
-    val = _get(attrs, "gen_ai.tool.call.result")
+    val = _get(attrs, "weave.tool.call.result", "gen_ai.tool.call.result")
     if val:
         return _json_str(val)
 
@@ -308,12 +309,11 @@ def _normalize_system_instructions(raw: Any) -> list[str]:
 
 
 def _extract_raw_input(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
-    """Extract raw input messages from gen_ai.input.messages or gen_ai.prompt."""
-    val = _get(attrs, "gen_ai.input.messages")
+    val = _get(attrs, "weave.input.messages", "gen_ai.input.messages")
     if val is not None:
         return val
 
-    val = _get(attrs, "gen_ai.prompt")
+    val = _get(attrs, "weave.prompt", "gen_ai.prompt")
     if val is not None:
         return val
 
@@ -328,12 +328,11 @@ def _extract_raw_input(attrs: dict[str, Any], events: list[dict[str, Any]]) -> A
 
 
 def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
-    """Extract raw output messages from gen_ai.output.messages or gen_ai.completion."""
-    val = _get(attrs, "gen_ai.output.messages")
+    val = _get(attrs, "weave.output.messages", "gen_ai.output.messages")
     if val is not None:
         return val
 
-    val = _get(attrs, "gen_ai.completion")
+    val = _get(attrs, "weave.completion", "gen_ai.completion")
     if val is not None:
         return val
 
@@ -361,7 +360,7 @@ def _extract_custom_attrs(
     float_map: dict[str, float] = {}
 
     for key, val in _flatten_attrs(attrs):
-        if key in KNOWN_SEMCONV_ATTR_KEYS:
+        if key in KNOWN_KEYS:
             continue
         if val is None:
             continue
@@ -440,49 +439,89 @@ def extract_genai_span(
         operation_name=extract_operation_name(attrs, span.name),
         provider_name=extract_provider(attrs),
         agent_name=extract_agent_name(attrs, span.name),
-        agent_id=str(_get(attrs, "gen_ai.agent.id") or ""),
-        agent_description=str(_get(attrs, "gen_ai.agent.description") or ""),
-        agent_version=str(_get(attrs, "gen_ai.agent.version") or ""),
-        request_model=str(_get(attrs, "gen_ai.request.model") or ""),
-        response_model=str(_get(attrs, "gen_ai.response.model") or ""),
-        response_id=str(_get(attrs, "gen_ai.response.id") or ""),
+        agent_id=str(_get(attrs, "weave.agent.id", "gen_ai.agent.id") or ""),
+        agent_description=str(
+            _get(attrs, "weave.agent.description", "gen_ai.agent.description") or ""
+        ),
+        agent_version=str(
+            _get(attrs, "weave.agent.version", "gen_ai.agent.version") or ""
+        ),
+        request_model=str(
+            _get(attrs, "weave.request.model", "gen_ai.request.model") or ""
+        ),
+        response_model=str(
+            _get(attrs, "weave.response.model", "gen_ai.response.model") or ""
+        ),
+        response_id=str(_get(attrs, "weave.response.id", "gen_ai.response.id") or ""),
         input_tokens=input_t,
         output_tokens=output_t,
         total_tokens=total_t,
         reasoning_tokens=reasoning_t,
         cache_creation_input_tokens=safe_int(
-            _get(attrs, "gen_ai.usage.cache_creation.input_tokens")
+            _get(
+                attrs,
+                "weave.usage.cache_creation.input_tokens",
+                "gen_ai.usage.cache_creation.input_tokens",
+            )
         ),
         cache_read_input_tokens=safe_int(
-            _get(attrs, "gen_ai.usage.cache_read.input_tokens")
+            _get(
+                attrs,
+                "weave.usage.cache_read.input_tokens",
+                "gen_ai.usage.cache_read.input_tokens",
+            )
         ),
         reasoning_content=reasoning_content,
         conversation_id=extract_conversation_id(attrs),
         conversation_name=extract_conversation_name(attrs),
-        tool_name=str(_get(attrs, "gen_ai.tool.name") or ""),
-        tool_type=str(_get(attrs, "gen_ai.tool.type") or ""),
-        tool_call_id=str(_get(attrs, "gen_ai.tool.call.id") or ""),
-        tool_description=str(_get(attrs, "gen_ai.tool.description") or ""),
-        tool_definitions=_json_str(_get(attrs, "gen_ai.tool.definitions")),
+        tool_name=str(_get(attrs, "weave.tool.name", "gen_ai.tool.name") or ""),
+        tool_type=str(_get(attrs, "weave.tool.type", "gen_ai.tool.type") or ""),
+        tool_call_id=str(
+            _get(attrs, "weave.tool.call.id", "gen_ai.tool.call.id") or ""
+        ),
+        tool_description=str(
+            _get(attrs, "weave.tool.description", "gen_ai.tool.description") or ""
+        ),
+        tool_definitions=_json_str(
+            _get(attrs, "weave.tool.definitions", "gen_ai.tool.definitions")
+        ),
         finish_reasons=extract_finish_reasons(attrs),
-        error_type=str(_get(attrs, "error.type") or ""),
-        request_temperature=safe_float(_get(attrs, "gen_ai.request.temperature")),
-        request_max_tokens=safe_int(_get(attrs, "gen_ai.request.max_tokens")),
-        request_top_p=safe_float(_get(attrs, "gen_ai.request.top_p")),
+        error_type=str(_get(attrs, "weave.error.type", "error.type") or ""),
+        request_temperature=safe_float(
+            _get(attrs, "weave.request.temperature", "gen_ai.request.temperature")
+        ),
+        request_max_tokens=safe_int(
+            _get(attrs, "weave.request.max_tokens", "gen_ai.request.max_tokens")
+        ),
+        request_top_p=safe_float(
+            _get(attrs, "weave.request.top_p", "gen_ai.request.top_p")
+        ),
         request_frequency_penalty=safe_float(
-            _get(attrs, "gen_ai.request.frequency_penalty")
+            _get(
+                attrs,
+                "weave.request.frequency_penalty",
+                "gen_ai.request.frequency_penalty",
+            )
         ),
         request_presence_penalty=safe_float(
-            _get(attrs, "gen_ai.request.presence_penalty")
+            _get(
+                attrs,
+                "weave.request.presence_penalty",
+                "gen_ai.request.presence_penalty",
+            )
         ),
-        request_seed=safe_int(_get(attrs, "gen_ai.request.seed")),
-        request_stop_sequences=_str_list(_get(attrs, "gen_ai.request.stop_sequences")),
-        request_choice_count=safe_int(_get(attrs, "gen_ai.request.choice.count")),
-        output_type=str(_get(attrs, "gen_ai.output.type") or ""),
+        request_seed=safe_int(_get(attrs, "weave.request.seed", "gen_ai.request.seed")),
+        request_stop_sequences=_str_list(
+            _get(attrs, "weave.request.stop_sequences", "gen_ai.request.stop_sequences")
+        ),
+        request_choice_count=safe_int(
+            _get(attrs, "weave.request.choice.count", "gen_ai.request.choice.count")
+        ),
+        output_type=str(_get(attrs, "weave.output.type", "gen_ai.output.type") or ""),
         input_messages=_normalize_raw_messages(_extract_raw_input(attrs, events_dicts)),
         output_messages=output_msgs,
         system_instructions=_normalize_system_instructions(
-            _get(attrs, "gen_ai.system_instructions")
+            _get(attrs, "weave.system_instructions", "gen_ai.system_instructions")
         ),
         tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts),
         tool_call_result=extract_tool_call_result(attrs, events_dicts),
@@ -495,8 +534,8 @@ def extract_genai_span(
         custom_attrs=custom_str,
         custom_attrs_int=custom_int,
         custom_attrs_float=custom_float,
-        server_address=str(_get(attrs, "server.address") or ""),
-        server_port=safe_int(_get(attrs, "server.port")),
+        server_address=str(_get(attrs, "weave.server.address", "server.address") or ""),
+        server_port=safe_int(_get(attrs, "weave.server.port", "server.port")),
         raw_span_dump=_json_str(span.as_dict()),
         attributes_dump=_json_str(attrs),
         events_dump=_json_str(events_dicts) if events_dicts else "",
