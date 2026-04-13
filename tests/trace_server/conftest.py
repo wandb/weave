@@ -130,6 +130,10 @@ def _get_worker_db_suffix(request) -> str:
     return f"_w{worker_id.replace('gw', '')}"
 
 
+# Tables with migration-seeded data that should NOT be truncated between tests.
+SEED_DATA_TABLES = frozenset({"llm_token_prices"})
+
+
 def _discover_truncatable_tables(ch_client, database: str) -> list[str]:
     """Query system.tables to find non-view tables that can be truncated."""
     result = ch_client.query(
@@ -138,7 +142,7 @@ def _discover_truncatable_tables(ch_client, database: str) -> list[str]:
         "AND engine NOT IN ('View', 'MaterializedView') "
         "ORDER BY name"
     )
-    return [row[0] for row in result.result_rows]
+    return [row[0] for row in result.result_rows if row[0] not in SEED_DATA_TABLES]
 
 
 def _truncate_all_tables(ch_client, database: str, tables: list[str]) -> None:
@@ -155,6 +159,9 @@ def _reset_server_state(server: ClickHouseTraceServer) -> None:
     server._placeholder_file_projects.clear()
     # Reset table routing mode (tests may set it to AUTO)
     server.table_routing_resolver._mode = CallsStorageServerMode.from_env()
+    # Reset file storage client so tests that mock env vars get a fresh client
+    server._file_storage_client = None
+    server._file_storage_client_initialized = False
     # Clear batch queues (thread-local, clear for current thread)
     tl = server._thread_local
     if hasattr(tl, "call_batch"):
