@@ -22,8 +22,6 @@ from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
-pytestmark = pytest.mark.skip_clickhouse_client
-
 
 @pytest.mark.parametrize(
     ("read_table", "expected_table"),
