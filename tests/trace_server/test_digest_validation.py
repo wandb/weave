@@ -35,94 +35,91 @@ def test_validate_expected_digest_mismatch_raises() -> None:
         validate_expected_digest(expected="wrong", actual="abc123", label="test")
 
 
-@pytest.mark.trace_server
-class TestFileCreateExpectedDigest:
-    def test_no_expected_digest(self, client) -> None:
-        """file_create without expected_digest succeeds (fallback path)."""
-        req = FileCreateReq(
+def test_expected_digest_on_create_endpoints(client) -> None:
+    """Test expected_digest validation on file_create, obj_create, and table_create."""
+    from weave.trace_server.sqlite_trace_server import compute_file_digest
+
+    # --- FileCreateReq ---
+    # No expected_digest (fallback path)
+    res = client.server.file_create(
+        FileCreateReq(
             project_id=client.project_id,
             name="test.txt",
             content=b"hello world",
         )
-        res = client.server.file_create(req)
-        assert res.digest is not None
+    )
+    assert res.digest is not None
 
-    def test_correct_expected_digest(self, client) -> None:
-        """file_create with correct expected_digest succeeds."""
-        from weave.trace_server.sqlite_trace_server import compute_file_digest
-
-        content = b"hello world"
-        digest = compute_file_digest(content)
-        req = FileCreateReq(
+    # Correct expected_digest
+    content = b"hello world"
+    digest = compute_file_digest(content)
+    res = client.server.file_create(
+        FileCreateReq(
             project_id=client.project_id,
             name="test.txt",
             content=content,
             expected_digest=digest,
         )
-        res = client.server.file_create(req)
-        assert res.digest == digest
+    )
+    assert res.digest == digest
 
-    def test_wrong_expected_digest(self, client) -> None:
-        """file_create with wrong expected_digest raises DigestMismatchError."""
-        req = FileCreateReq(
-            project_id=client.project_id,
-            name="test.txt",
-            content=b"hello world",
-            expected_digest="wrong_digest",
+    # Wrong expected_digest
+    with pytest.raises(DigestMismatchError):
+        client.server.file_create(
+            FileCreateReq(
+                project_id=client.project_id,
+                name="test.txt",
+                content=b"hello world",
+                expected_digest="wrong_digest",
+            )
         )
-        with pytest.raises(DigestMismatchError):
-            client.server.file_create(req)
 
-
-@pytest.mark.trace_server
-class TestObjCreateExpectedDigest:
-    def test_no_expected_digest(self, client) -> None:
-        """obj_create without expected_digest succeeds (fallback path)."""
-        req = ObjCreateReq(
+    # --- ObjCreateReq ---
+    # No expected_digest
+    res = client.server.obj_create(
+        ObjCreateReq(
             obj=ObjSchemaForInsert(
                 project_id=client.project_id,
                 object_id="test_obj",
                 val={"key": "value"},
             )
         )
-        res = client.server.obj_create(req)
-        assert res.digest is not None
+    )
+    assert res.digest is not None
 
-    def test_wrong_expected_digest(self, client) -> None:
-        """obj_create with wrong expected_digest raises DigestMismatchError."""
-        req = ObjCreateReq(
-            obj=ObjSchemaForInsert(
-                project_id=client.project_id,
-                object_id="test_obj",
-                val={"key": "value"},
-                expected_digest="wrong_digest",
+    # Wrong expected_digest
+    with pytest.raises(DigestMismatchError):
+        client.server.obj_create(
+            ObjCreateReq(
+                obj=ObjSchemaForInsert(
+                    project_id=client.project_id,
+                    object_id="test_obj",
+                    val={"key": "value"},
+                    expected_digest="wrong_digest",
+                )
             )
         )
-        with pytest.raises(DigestMismatchError):
-            client.server.obj_create(req)
 
-
-@pytest.mark.trace_server
-class TestTableCreateExpectedDigest:
-    def test_no_expected_digest(self, client) -> None:
-        """table_create without expected_digest succeeds (fallback path)."""
-        req = TableCreateReq(
+    # --- TableCreateReq ---
+    # No expected_digest
+    res = client.server.table_create(
+        TableCreateReq(
             table=TableSchemaForInsert(
                 project_id=client.project_id,
                 rows=[{"val": {"a": 1}}, {"val": {"a": 2}}],
             )
         )
-        res = client.server.table_create(req)
-        assert res.digest is not None
+    )
+    assert res.digest is not None
 
-    def test_wrong_expected_digest(self, client) -> None:
-        """table_create with wrong expected_digest raises DigestMismatchError."""
-        req = TableCreateReq(
-            table=TableSchemaForInsert(
-                project_id=client.project_id,
-                rows=[{"val": {"a": 1}}, {"val": {"a": 2}}],
-                expected_digest="wrong_digest",
+    # Wrong expected_digest
+    with pytest.raises(DigestMismatchError):
+        client.server.table_create(
+            TableCreateReq(
+                table=TableSchemaForInsert(
+                    project_id=client.project_id,
+                    rows=[{"val": {"a": 1}}, {"val": {"a": 2}}],
+                    expected_digest="wrong_digest",
+                )
             )
         )
-        with pytest.raises(DigestMismatchError):
-            client.server.table_create(req)
