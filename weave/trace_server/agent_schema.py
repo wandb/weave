@@ -201,7 +201,6 @@ class AgentSpanCHInsertable(BaseModel):
 
 ALL_SPAN_INSERT_COLUMNS: list[str] = sorted(AgentSpanCHInsertable.model_fields.keys())
 
-ALL_SPAN_SELECT_COLUMNS: list[str] = sorted(AgentSpanCHInsertable.model_fields.keys())
 
 
 class AgentMessageSearchRow(BaseModel):

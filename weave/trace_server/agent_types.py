@@ -324,15 +324,6 @@ class AgentConversationChatRes(BaseModel):
     turns: list[AgentTraceChatRes] = Field(default_factory=list)
 
 
-class AgentModelUsage(BaseModel):
-    """Token usage for a specific model within an agent's runs."""
-
-    model: str
-    input_tokens: int = 0
-    output_tokens: int = 0
-    total_tokens: int = 0
-
-
 class AgentSchema(BaseModel):
     """Aggregated per-agent stats from the agents table."""
 
@@ -344,12 +335,6 @@ class AgentSchema(BaseModel):
     total_output_tokens: int = 0
     total_duration_ms: int = 0
     error_count: int = 0
-    model_usage: list[AgentModelUsage] = Field(default_factory=list)
-    agent_description: str = ""
-    agent_id: str = ""
-    provider_names: list[str] = Field(default_factory=list)
-    request_models: list[str] = Field(default_factory=list)
-    system_instructions: str = ""
     first_seen: datetime.datetime | None = None
     last_seen: datetime.datetime | None = None
     llm_summary: str = ""

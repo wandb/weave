@@ -45,7 +45,6 @@ class Attribute:
 # ---------------------------------------------------------------------------
 
 _DEFS: list[Attribute] = [
-    # fmt: off
     Attribute(
         "weave.operation.name",
         "string",
@@ -284,11 +283,3 @@ def resolve(key: str) -> str | None:
 #: into dedicated columns.  Used by the extraction layer to exclude these
 #: from the custom_attrs overflow map.
 KNOWN_KEYS: frozenset[str] = frozenset(_ALIAS_TO_CANONICAL.keys())
-
-#: Just the canonical weave.* keys.
-WEAVE_KEYS: frozenset[str] = frozenset(a.key for a in _DEFS)
-
-#: Just the gen_ai.* alias keys (non-empty aliases only).
-GENAI_ALIAS_KEYS: frozenset[str] = frozenset(
-    a.gen_ai_alias for a in _DEFS if a.gen_ai_alias
-)
