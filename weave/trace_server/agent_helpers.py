@@ -107,34 +107,6 @@ def extract_search_rows(
 
 
 # ---------------------------------------------------------------------------
-# Conversation name generation
-# ---------------------------------------------------------------------------
-
-_ADJECTIVES = [
-    "amber", "bold", "calm", "deft", "eager", "fair", "glad", "hale",
-    "keen", "lush", "neat", "pale", "quick", "rare", "sage", "tame",
-    "vast", "warm", "zest", "airy", "brave", "crisp", "dusk", "epic",
-    "fern", "glow", "haze", "iron", "jade", "knit", "lime", "moss",
-]  # fmt: skip
-
-_ANIMALS = [
-    "ant", "bat", "cat", "doe", "elk", "fox", "gnu", "hen",
-    "ibis", "jay", "koi", "lynx", "mole", "newt", "owl", "pug",
-    "quail", "ram", "seal", "toad", "urchin", "vole", "wren", "yak",
-    "asp", "bee", "cod", "dab", "eel", "fly", "gar", "hawk",
-]  # fmt: skip
-
-
-def auto_conversation_name(conversation_id: str) -> str:
-    """Generate a deterministic human-readable name from a conversation_id."""
-    h = hashlib.md5(conversation_id.encode()).digest()
-    adj = _ADJECTIVES[h[0] % len(_ADJECTIVES)]
-    animal = _ANIMALS[h[1] % len(_ANIMALS)]
-    suffix = f"{h[2]:02x}{h[3]:02x}"
-    return f"{adj}-{animal}-{suffix}"
-
-
-# ---------------------------------------------------------------------------
 # Result coercion
 # ---------------------------------------------------------------------------
 
