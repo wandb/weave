@@ -135,6 +135,13 @@ VIEW_SUFFIX = "_view"
 # individual migrations (SQUASH_MIGRATION_VERSION+1 … latest).
 SQUASH_MIGRATION_VERSION = 28
 
+# Migration files that seed data and must also be applied after the squash
+# migration creates the schema.  Migration 006 seeds default LLM token prices
+# with effective_date = now().  The post-migration hook later adds any NEWER
+# entries from cost_checkpoint.json but deduplicates against what's already
+# present, so the 006 rows remain authoritative (their now()-based date wins).
+SQUASH_SEED_MIGRATIONS = ("006_seed_costs.up.sql",)
+
 # Schema for the migration tracking table (shared across all migrator variants)
 _MIGRATIONS_TABLE_COLUMNS = """
     db_name String,
@@ -243,7 +250,12 @@ class BaseClickHouseTraceServerMigrator(ABC):
         return None
 
     def _apply_squash_migration(self, target_db: str, squash_path: str) -> int:
-        """Apply the squash migration and return the version it represents."""
+        """Apply the squash migration and return the version it represents.
+
+        After creating the schema, any data-seeding migrations listed in
+        ``SQUASH_SEED_MIGRATIONS`` are replayed so that the database state
+        matches the sequential migration path exactly.
+        """
         logger.info(
             "Applying squash migration (version %s) to `%s`",
             SQUASH_MIGRATION_VERSION,
@@ -258,6 +270,18 @@ class BaseClickHouseTraceServerMigrator(ABC):
         migration_sub_commands = migration_sql.split(";")
         for command in migration_sub_commands:
             self._execute_migration_command(target_db, command)
+
+        # Replay data-seeding migrations that the squash DDL intentionally
+        # omits (e.g. cost seed data from migration 006).
+        for seed_file in SQUASH_SEED_MIGRATIONS:
+            seed_path = os.path.join(self.migration_dir, seed_file)
+            if os.path.isfile(seed_path):
+                logger.info("Seeding data from %s", seed_file)
+                with open(seed_path, encoding="utf-8") as f:
+                    seed_sql = f.read()
+                for command in seed_sql.split(";"):
+                    self._execute_migration_command(target_db, command)
+
         self._update_migration_status(
             target_db, SQUASH_MIGRATION_VERSION, is_start=False
         )
