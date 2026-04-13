@@ -1,74 +1,22 @@
 # Clickhouse Trace Server Manager
 
-"""Differences between cloud, replicated, and distributed modes:
+"""ClickHouse trace-server migrator.
 
-## Cloud Mode (replicated=False, use_distributed=False)
-- Single-node ClickHouse deployment managed by cloud provider (e.g., ClickHouse Cloud)
-- All SQL commands executed as-is without transformation
+We keep one simple data-table rule across replicated and distributed deployments:
 
-## Replicated Mode (replicated=True, use_distributed=False)
-- Multi-node ClickHouse cluster with automatic replication
-- Tables have 'Replicated' prepended to MergeTree engine with ZooKeeper coordination
-- DDL statements include `ON CLUSTER {cluster_name}` UNLESS the target database uses the
-  ClickHouse Replicated database engine (ENGINE = Replicated(...)), which auto-replicates
-  DDL and rejects ON CLUSTER with error 80 (INCORRECT_QUERY)
+- Rewrite MergeTree-family engines to bare ``Replicated*MergeTree``.
+- Let the target database engine decide whether the DDL also needs
+  ``ON CLUSTER``.
 
-## Distributed Mode (replicated=True, use_distributed=True)
-- Extends replicated mode with sharding and distributed query capabilities
-- Requires replicated mode as foundation (distributed tables reference local replicated tables)
-- Two-tier table structure:
-  - Local tables (`table_name_local`): ReplicatedMergeTree, store actual data on each shard
-  - Distributed tables (`table_name`): Distributed engine, query router across all shards
-- All DDL statements include `ON CLUSTER {cluster_name}`
+That gives us two normal data layouts:
 
-### Distributed Mode Special Handling:
+- Replicated DB: bare ``Replicated*MergeTree``, no ``ON CLUSTER``.
+- Atomic DB: bare ``Replicated*MergeTree`` plus ``ON CLUSTER``.
 
-**CREATE TABLE:**
-  - Creates `table_name_local` (ReplicatedMergeTree on each node)
-  - Creates `table_name` (Distributed table pointing to `table_name_local`)
-
-**ALTER TABLE (regular columns):**
-  - Alters both `table_name_local` AND `table_name` (both need schema updates)
-
-**ALTER TABLE ADD/DROP INDEX:**
-  - Only alters `table_name_local` (distributed tables don't support indexes)
-  - Skips altering the distributed table
-
-**ALTER TABLE DELETE/UPDATE (mutations):**
-  - Only alters `table_name_local` (distributed tables don't support mutations)
-  - Skips altering the distributed table
-
-**ALTER TABLE ... MODIFY QUERY (materialized views):**
-  - Uses DROP/CREATE pattern instead of ALTER
-  - Drops `view_name_local` ON CLUSTER
-  - Creates `view_name_local` ON CLUSTER with `TO target_table_local`
-  - All `FROM` clauses and qualified column references renamed to `_local` suffix
-
-**CREATE VIEW and CREATE MATERIALIZED VIEW:**
-  - Only adds `ON CLUSTER` clause (views are metadata-only, no local/distributed split)
-  - Note: In distributed mode, materialized views from initial CREATE statements should reference
-    base tables (not _local), as the migrator doesn't transform initial CREATE statements
-
-**DROP TABLE:**
-  - Drops both `table_name_local` AND `table_name`
-  - Ensures complete cleanup of both local and distributed tables
-
-**DROP VIEW:**
-  - Only adds `ON CLUSTER` clause (views are metadata-only, no local/distributed split)
-  - Works identically to replicated mode
-  - Note: For materialized views that were modified via ALTER TABLE MODIFY QUERY,
-    you must drop the `_local` version explicitly (e.g., `DROP VIEW view_name_local`)
-
-**INSERT INTO:**
-  - Skipped entirely (backfill not supported for distributed tables; handle per-shard)
-
-**RENAME TABLE:**
-  - Renames `table_name_local` to `new_name_local` ON CLUSTER
-  - Drops old distributed table `table_name` ON CLUSTER
-  - Creates new distributed table `new_name` ON CLUSTER pointing to `new_name_local`
-
-**MATERIALIZE commands:**
-  - Skipped entirely (not supported by distributed tables)
+Distributed mode adds only the `_local` / `Distributed(...)` table split on top
+of that. The only remaining explicit ZooKeeper-path handling is the shared
+``db_management.migrations`` table in distributed mode when the management DB is
+Atomic; that table must be shared across shards instead of per-shard.
 """
 
 import logging
@@ -94,6 +42,7 @@ from weave.trace_server.costs.insert_costs import insert_costs, should_insert_co
 from weave.trace_server.database_engine import (
     ENGINE_DISCOVERY_MAX_WAIT_SECONDS,
     EngineDiscoveryError,
+    get_database_engine,
     wait_for_database_engine,
 )
 from weave.trace_server.environment import wf_clickhouse_calls_shard_key
@@ -189,25 +138,8 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self.post_migration_hook = post_migration_hook
         self._initialize_migration_db()
 
-    def _uses_replicated_db_engine(self, db_name: str) -> bool:
-        """Check if a database uses ClickHouse's Replicated database engine.
-
-        When a database uses ENGINE = Replicated(...), DDL is automatically
-        replicated via ZooKeeper. Including ON CLUSTER in DDL statements inside
-        such a database causes ClickHouse error 80 (INCORRECT_QUERY):
-        "ON CLUSTER is not allowed for Replicated database."
-
-        The base class always returns False. The replicated subclass overrides
-        this to read from ``_replicated_db_engine_cache``.
-        """
-        return False
-
     def _ensure_database(self, db_name: str) -> None:
-        """Create a database if it does not exist.
-
-        Subclasses that need engine introspection override this to also
-        populate ``_replicated_db_engine_cache``.
-        """
+        """Create a database if it does not exist."""
         db_sql = self._create_db_sql(db_name)
         self._run_ddl_with_retry(db_sql)
 
@@ -503,8 +435,9 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
     """Migrator for replicated ClickHouse deployments.
 
     In replicated mode:
-    - Tables use ReplicatedMergeTree engines with ZooKeeper coordination
-    - All DDL statements include `ON CLUSTER {cluster_name}`
+    - Fresh databases use ENGINE = Replicated(...)
+    - MergeTree-family tables are rewritten to bare Replicated*MergeTree
+    - Existing Atomic databases remain supported by adding ON CLUSTER
     """
 
     replicated_path: str
@@ -544,7 +477,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             management_db,
         )
 
-        self._replicated_db_engine_cache: dict[str, bool] = {}
+        self._database_engine_cache: dict[str, str] = {}
         super().__init__(
             ch_client,
             management_db,
@@ -552,17 +485,8 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             post_migration_hook=post_migration_hook,
         )
 
-    def _uses_replicated_db_engine(self, db_name: str) -> bool:
-        return self._replicated_db_engine_cache.get(db_name, False)
-
     def _ensure_database(self, db_name: str) -> None:
-        """Create the database and discover its engine for the DDL cache.
-
-        After ``CREATE DATABASE IF NOT EXISTS``, the engine may not be
-        immediately visible in ``system.databases`` (metadata propagation lag
-        on replicated clusters).  We poll with back-off so that all later DDL
-        knows whether to emit ``ON CLUSTER`` / ``ReplicatedMergeTree``.
-        """
+        """Create the database and cache the resulting engine."""
         db_sql = self._create_db_sql(db_name)
         self._run_ddl_with_retry(db_sql)
         try:
@@ -574,21 +498,30 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             )
         except EngineDiscoveryError as exc:
             raise MigrationError(str(exc)) from exc
-        self._replicated_db_engine_cache[db_name] = engine == "Replicated"
+        self._database_engine_cache[db_name] = engine
+
+    def _get_database_engine(self, db_name: str) -> str:
+        if engine := self._database_engine_cache.get(db_name):
+            return engine
+
+        try:
+            engine = get_database_engine(self.ch_client, db_name)
+        except EngineDiscoveryError as exc:
+            raise MigrationError(str(exc)) from exc
+        if engine is None:
+            raise MigrationError(f"Could not determine database engine for `{db_name}`")
+        self._database_engine_cache[db_name] = engine
+        return engine
+
+    def _should_add_on_cluster(self, db_name: str) -> bool:
+        return self._get_database_engine(db_name) != "Replicated"
 
     def _create_db_sql(self, db_name: str) -> str:
         """Generate SQL to create a database in replicated mode.
 
-        Uses ENGINE = Replicated(...) so that DDL within the database is
-        automatically replicated via ZooKeeper, without needing ON CLUSTER
-        on every subsequent CREATE TABLE / ALTER TABLE statement.
-
-        If the database already exists (IF NOT EXISTS), this is a no-op
-        regardless of the existing engine. Databases created by older weave
-        versions already use Replicated; databases created by the intermediate
-        code (19052e896c..HEAD~) may be Atomic. Both are handled: the
-        auto-detection in _add_on_cluster_clause skips ON CLUSTER for
-        Replicated databases and keeps it for Atomic ones.
+        Fresh databases use ENGINE = Replicated(...). Existing Atomic
+        databases remain supported because later DDL checks the actual engine
+        once and only adds ON CLUSTER when needed.
         """
         if not self._is_safe_identifier(db_name):
             raise MigrationError(f"Invalid database name: {db_name}")
@@ -607,28 +540,12 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             f" ENGINE = Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
         )
 
-    def _prepare_ddl_for_database(self, sql_query: str, target_db: str) -> str:
-        """Adapt DDL for the target database's engine type.
-
-        * **Replicated engine** — the database auto-converts ``MergeTree`` to
-          ``ReplicatedMergeTree`` and auto-replicates DDL, so we pass the SQL
-          through unchanged.  Emitting ``ON CLUSTER`` would cause ClickHouse
-          error 80 (INCORRECT_QUERY).
-        * **Atomic engine** — the database does not auto-replicate, so we must
-          explicitly rewrite ``MergeTree`` → ``ReplicatedMergeTree`` and add
-          ``ON CLUSTER`` to every DDL statement.
-
-        In the distributed migrator, ``db_management`` is intentionally Atomic
-        so the migrations table can use an explicit ``ReplicatedMergeTree``
-        with a shared ZooKeeper path across all shards.  A Replicated-engine
-        database would auto-assign per-shard ZK paths, causing each shard to
-        track migration state independently instead of sharing it.
-        """
-        if self._uses_replicated_db_engine(target_db):
-            return sql_query
-
+    def _prepare_replicated_ddl(self, sql_query: str, target_db: str) -> str:
+        """Rewrite tables to Replicated*MergeTree and add ON CLUSTER if needed."""
         sql_query = self._format_replicated_sql(sql_query)
-        return self._add_on_cluster_clause(sql_query, target_db=target_db)
+        if self._should_add_on_cluster(target_db):
+            return self._add_on_cluster_clause(sql_query)
+        return sql_query
 
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in replicated mode."""
@@ -638,7 +555,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             ENGINE = MergeTree()
             ORDER BY (db_name)
         """
-        return self._prepare_ddl_for_database(create_table_sql, self.management_db)
+        return self._prepare_replicated_ddl(create_table_sql, self.management_db)
 
     def _execute_migration_command(self, target_db: str, command: str) -> None:
         """Execute command in replicated mode."""
@@ -649,7 +566,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         curr_db = self.ch_client.database
         self.ch_client.database = target_db
 
-        formatted_command = self._prepare_ddl_for_database(command, target_db)
+        formatted_command = self._prepare_replicated_ddl(command, target_db)
         self._run_ddl_with_retry(formatted_command)
 
         self.ch_client.database = curr_db
@@ -668,27 +585,13 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         return SQLPatterns.MERGETREE_ENGINE.sub(replace_engine, sql_query)
 
     def _get_on_cluster_clause(self, db_name: str) -> str:
-        """Returns ' ON CLUSTER {cluster}' or '' depending on database engine.
+        """Returns ' ON CLUSTER {cluster}' when the DB engine needs it."""
+        if self._should_add_on_cluster(db_name):
+            return f" ON CLUSTER {self.replicated_cluster}"
+        return ""
 
-        When the database uses the Replicated engine, DDL is auto-replicated
-        and ON CLUSTER must be omitted (ClickHouse error 80).
-        """
-        if self._uses_replicated_db_engine(db_name):
-            return ""
-        return f" ON CLUSTER {self.replicated_cluster}"
-
-    def _add_on_cluster_clause(
-        self, sql_query: str, target_db: str | None = None
-    ) -> str:
-        """Add ON CLUSTER clause to DDL statements if not present.
-
-        When target_db is specified and uses the Replicated database engine,
-        ON CLUSTER is skipped entirely — DDL is auto-replicated by the engine,
-        and including ON CLUSTER causes ClickHouse error 80 (INCORRECT_QUERY).
-        """
-        # Guard: Replicated database engine handles DDL replication internally.
-        if target_db and self._uses_replicated_db_engine(target_db):
-            return sql_query
+    def _add_on_cluster_clause(self, sql_query: str) -> str:
+        """Add ON CLUSTER clause to DDL statements if not already present."""
         if SQLPatterns.ON_CLUSTER.search(sql_query):
             return sql_query
 
@@ -756,14 +659,11 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
     """Migrator for distributed ClickHouse deployments with sharding.
 
     In distributed mode (extends replicated mode):
-    - Two-tier table structure:
-      * Local tables (`table_name_local`): ReplicatedMergeTree, store actual data on each shard
-      * Distributed tables (`table_name`): Distributed engine, query router across shards
-    - Special handling for:
-      * CREATE TABLE: creates both local and distributed tables
-      * ALTER TABLE: differentiates between columns (both tables) and indexes/mutations (local only)
-      * Materialized views: DROP/CREATE pattern with `_local` suffix renaming
-      * DROP operations: drops both versions
+    - Data DBs still use the same bare Replicated*MergeTree rewrite as replicated mode
+    - Local tables (`table_name_local`) store data
+    - Distributed tables (`table_name`) route queries across shards
+    - The only explicit ZK-path special case is the shared migrations table when
+      the management DB is Atomic
     """
 
     def __init__(
@@ -793,7 +693,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         """Generate SQL to create a database in distributed mode.
 
         The management database uses ENGINE = Atomic (not Replicated) so that the
-        migrations table can use explicit ReplicatedMergeTree with a shared ZK path
+        migrations table can use an explicit shared ReplicatedMergeTree path
         across all shards. Data databases still use ENGINE = Replicated.
         """
         if db_name == self.management_db:
@@ -809,21 +709,27 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in distributed mode.
 
-        If the management DB uses Replicated engine, use MergeTree() (auto-converted
-        by the DB engine) and skip ON CLUSTER. Otherwise, use explicit
-        ReplicatedMergeTree with a shared ZK path so all shards share migration state.
+        Preferred layout:
+        - Replicated-only DB: Replicated*MergeTree() with no ON CLUSTER
+        - Distributed + Atomic DB: explicit ZK args plus ON CLUSTER
+        - Distributed + Replicated DB: Replicated*MergeTree() with no explicit
+          ZK args and no ON CLUSTER
+
+        In distributed mode, the shared migrations table is the only case that
+        still needs explicit ZK arguments: when the management DB is Atomic we
+        must share one migrations table across all shards instead of giving
+        each shard its own replicated table.
         """
-        if self._uses_replicated_db_engine(self.management_db):
-            # Legacy path: existing deployments where db_management was created with
-            # ENGINE = Replicated. Migration state is tracked per-shard, not shared.
-            # This is safe only because the migrator runs from a single node. Do not
-            # change this assumption without migrating db_management to Atomic first.
-            return f"""
-                CREATE TABLE IF NOT EXISTS {self.management_db}.migrations
-                ({_MIGRATIONS_TABLE_COLUMNS})
-                ENGINE = MergeTree()
-                ORDER BY (db_name)
-            """
+        if self._get_database_engine(self.management_db) == "Replicated":
+            return self._prepare_replicated_ddl(
+                f"""
+                    CREATE TABLE IF NOT EXISTS {self.management_db}.migrations
+                    ({_MIGRATIONS_TABLE_COLUMNS})
+                    ENGINE = MergeTree()
+                    ORDER BY (db_name)
+                """,
+                self.management_db,
+            )
         return f"""
             CREATE TABLE IF NOT EXISTS {self.management_db}.migrations
             ON CLUSTER {self.replicated_cluster}
@@ -870,27 +776,14 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         if SQLPatterns.CREATE_VIEW_STMT.search(
             command_for_match
         ) or SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
-            # When the DB uses ENGINE = Replicated, it auto-converts MergeTree
-            # and handles DDL replication — skip explicit engine conversion and ON CLUSTER.
-            if self._uses_replicated_db_engine(target_db):
-                formatted_command = command
-            else:
-                formatted_command = self._format_replicated_sql(command)
-                formatted_command = self._add_on_cluster_clause(
-                    formatted_command, target_db=target_db
-                )
+            formatted_command = command
+            if self._should_add_on_cluster(target_db):
+                formatted_command = self._add_on_cluster_clause(formatted_command)
             self._run_ddl_with_retry(formatted_command)
             self.ch_client.database = curr_db
             return
 
-        # When the DB uses ENGINE = Replicated, skip explicit ReplicatedMergeTree
-        # conversion — the DB engine auto-converts MergeTree tables.
-        if self._uses_replicated_db_engine(target_db):
-            formatted_command = command
-        else:
-            formatted_command = self._format_replicated_sql_distributed(
-                command, target_db
-            )
+        formatted_command = self._prepare_replicated_ddl(command, target_db)
 
         # Handle ALTER TABLE
         if SQLPatterns.ALTER_TABLE_STMT.search(command_for_match):
@@ -900,50 +793,6 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             self._execute_distributed_ddl(formatted_command)
 
         self.ch_client.database = curr_db
-
-    def _format_replicated_sql_distributed(self, sql_query: str, target_db: str) -> str:
-        """Format SQL query to use replicated engines with explicit paths for distributed mode."""
-
-        def replace_engine(match: re.Match[str]) -> str:
-            engine_prefix = match.group(1) or ""
-            engine_args = match.group(2) or ""
-            if engine_prefix.lower().startswith("replicated"):
-                return match.group(0)
-
-            # Extract original engine args (e.g. "created_at" from ReplacingMergeTree(created_at))
-            engine_args = match.group(2)
-            extra_args = ""
-            if engine_args:
-                inner = engine_args.strip("()")
-                if inner:
-                    extra_args = f", {inner}"
-
-            # Extract table name for path
-            table_match = SQLPatterns.CREATE_TABLE.search(sql_query)
-            if table_match:
-                table_name = table_match.group(1)
-                if "." in table_name:
-                    table_name = table_name.split(".")[-1]
-                local_table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
-
-                # Merge original engine args (e.g. created_at from
-                # ReplacingMergeTree(created_at)) with the ZK path params.
-                extra_args = ""
-                if engine_args and engine_args != "()":
-                    inner = engine_args[1:-1].strip()
-                    if inner:
-                        extra_args = f", {inner}"
-
-                return (
-                    f"ENGINE = Replicated{engine_prefix}MergeTree("
-                    f"'/clickhouse/tables/{{shard}}/{target_db}/{local_table_name}', "
-                    f"'{{replica}}'{extra_args})"
-                )
-
-            engine_args_str = engine_args or ""
-            return f"ENGINE = Replicated{engine_prefix}MergeTree{engine_args_str}"
-
-        return SQLPatterns.MERGETREE_ENGINE.sub(replace_engine, sql_query)
 
     def _execute_distributed_alter(self, command: str) -> None:
         """Execute ALTER TABLE in distributed mode."""
@@ -958,13 +807,10 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             return
 
         # Regular ALTER: apply to both local and distributed tables
-        db = self.ch_client.database
         local_command = self._rename_alter_table_to_local(command)
-        local_command = self._add_on_cluster_clause(local_command, target_db=db)
         self._run_ddl_with_retry(local_command)
 
-        distributed_command = self._add_on_cluster_clause(command, target_db=db)
-        self._run_ddl_with_retry(distributed_command)
+        self._run_ddl_with_retry(command)
 
     def _execute_materialized_view_alter(self, command: str) -> None:
         """Handle ALTER TABLE MODIFY QUERY for materialized views in distributed mode."""
@@ -1006,9 +852,6 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
     def _execute_local_table_operation(self, command: str) -> None:
         """Execute operations that only apply to local tables (indexes, mutations)."""
         local_command = self._rename_alter_table_to_local(command)
-        local_command = self._add_on_cluster_clause(
-            local_command, target_db=self.ch_client.database
-        )
         self._run_ddl_with_retry(local_command)
 
     def _execute_distributed_rename(self, command: str) -> None:
@@ -1038,10 +881,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
 
     def _execute_distributed_ddl(self, command: str) -> None:
         """Execute DDL in distributed mode (CREATE TABLE, CREATE/DROP VIEW)."""
-        formatted_command = self._add_on_cluster_clause(
-            command, target_db=self.ch_client.database
-        )
-        result = self._format_distributed_sql(formatted_command)
+        result = self._format_distributed_sql(command)
 
         self._run_ddl_with_retry(result.local_command)
         if result.distributed_command:

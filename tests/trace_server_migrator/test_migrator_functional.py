@@ -110,8 +110,12 @@ def test_replicated_creates_replicated_db_and_tables(ch_client):
 
     assert _get_db_engine(ch_client, mgmt_db) == "Replicated"
     assert _get_db_engine(ch_client, target_db) == "Replicated"
-    assert _table_exists(ch_client, mgmt_db, "migrations")
-    assert _table_exists(ch_client, target_db, "test_tbl")
+    assert _get_table_engine_full(ch_client, mgmt_db, "migrations").startswith(
+        "ReplicatedMergeTree"
+    )
+    assert _get_table_engine_full(ch_client, target_db, "test_tbl").startswith(
+        "ReplicatedMergeTree"
+    )
 
 
 def test_distributed_fresh_creates_atomic_management_db(ch_client):
@@ -141,6 +145,9 @@ def test_distributed_fresh_creates_atomic_management_db(ch_client):
 
     assert _get_db_engine(ch_client, target_db) == "Replicated"
     assert _table_exists(ch_client, target_db, "test_tbl_local")
+    assert _get_table_engine_full(ch_client, target_db, "test_tbl_local").startswith(
+        "ReplicatedMergeTree"
+    )
     assert _get_table_engine_full(ch_client, target_db, "test_tbl").startswith(
         "Distributed"
     )
@@ -179,9 +186,50 @@ def test_distributed_legacy_replicated_management_db(ch_client):
 
     assert _get_db_engine(ch_client, target_db) == "Replicated"
     assert _table_exists(ch_client, target_db, "test_tbl_local")
+    assert _get_table_engine_full(ch_client, target_db, "test_tbl_local").startswith(
+        "ReplicatedMergeTree"
+    )
     assert _get_table_engine_full(ch_client, target_db, "test_tbl").startswith(
         "Distributed"
     )
+
+
+def test_legacy_atomic_data_dbs_still_use_replicated_tables(ch_client):
+    """Legacy Atomic data DBs still work; only ON CLUSTER behavior changes."""
+    for use_distributed in (False, True):
+        mgmt_db = _unique_name(
+            f"db_mgmt_legacy_atomic_{'dist' if use_distributed else 'repl'}"
+        )
+        target_db = _unique_name(
+            f"legacy_atomic_{'dist' if use_distributed else 'repl'}"
+        )
+        ch_client.track_db(mgmt_db)
+        ch_client.track_db(target_db)
+        ch_client.command(
+            f"CREATE DATABASE {target_db} ON CLUSTER {_CLUSTER} ENGINE = Atomic"
+        )
+
+        migrator = get_clickhouse_trace_server_migrator(
+            ch_client,
+            replicated=True,
+            use_distributed=use_distributed,
+            replicated_cluster=_CLUSTER,
+            replicated_path=_REPLICATED_PATH,
+            management_db=mgmt_db,
+            migration_dir=_TEST_MIGRATION_DIR,
+            post_migration_hook=None,
+        )
+        migrator.apply_migrations(target_db)
+
+        assert _get_db_engine(ch_client, target_db) == "Atomic"
+        local_table = "test_tbl_local" if use_distributed else "test_tbl"
+        assert _get_table_engine_full(ch_client, target_db, local_table).startswith(
+            "ReplicatedMergeTree"
+        )
+        if use_distributed:
+            assert _get_table_engine_full(ch_client, target_db, "test_tbl").startswith(
+                "Distributed"
+            )
 
 
 def test_all_production_migrations_replicated(ch_client):
