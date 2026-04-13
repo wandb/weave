@@ -135,7 +135,7 @@ class AgentSpansTraceRes(BaseModel):
 class AgentSearchReq(BaseModel):
     """Full-text search across message content and span metadata.
 
-    Searches the genai_message_search index for messages matching the query
+    Searches the message_search index for messages matching the query
     string, returning results grouped by conversation.
     """
 
@@ -269,7 +269,7 @@ class AgentConversationSchema(BaseModel):
 
 
 class AgentConversationsQueryFilters(BaseModel):
-    """Filters for querying conversations (GROUP BY on genai_spans)."""
+    """Filters for querying conversations (GROUP BY on spans)."""
 
     conversation_id: str | None = None
     agent_name: str | None = None
@@ -334,7 +334,7 @@ class AgentModelUsage(BaseModel):
 
 
 class AgentSchema(BaseModel):
-    """Aggregated per-agent stats from the genai_agents table."""
+    """Aggregated per-agent stats from the agents table."""
 
     project_id: str
     agent_name: str
@@ -393,12 +393,12 @@ class AgentCustomAttrFilter(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Agent traces (GROUP BY trace_id on genai_spans)
+# Agent traces (GROUP BY trace_id on spans)
 # ---------------------------------------------------------------------------
 
 
 class AgentTraceSchema(BaseModel):
-    """Aggregated per-trace stats from GROUP BY trace_id on genai_spans."""
+    """Aggregated per-trace stats from GROUP BY trace_id on spans."""
 
     project_id: str = ""
     trace_id: str = ""
@@ -436,12 +436,12 @@ class AgentTracesQueryRes(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Agent versions (from genai_agent_versions MV)
+# Agent versions (from agent_versions MV)
 # ---------------------------------------------------------------------------
 
 
 class AgentVersionSchema(BaseModel):
-    """Aggregated per-version stats from the genai_agent_versions AMT."""
+    """Aggregated per-version stats from the agent_versions AMT."""
 
     project_id: str = ""
     agent_name: str = ""
@@ -486,7 +486,7 @@ class GenAIOTelExportReq(BaseModel):
     """Request for the GenAI OTel ingest endpoint.
 
     Carries the same ProcessedResourceSpans as the standard OTel endpoint
-    but routes through GenAI extraction and into genai_spans.
+    but routes through GenAI extraction and into spans.
     """
 
     model_config = {"arbitrary_types_allowed": True}

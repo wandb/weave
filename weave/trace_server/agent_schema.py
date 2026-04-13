@@ -1,4 +1,4 @@
-"""ClickHouse schema and column definitions for the genai_spans table.
+"""ClickHouse schema and column definitions for the spans table.
 
 Convention strategy — Weave GenAI semantic conventions:
 
@@ -63,7 +63,7 @@ class NormalizedMessage(BaseModel):
 
 
 class AgentSpanCHInsertable(BaseModel):
-    """Schema for inserting a normalized GenAI span into the genai_spans table.
+    """Schema for inserting a normalized GenAI span into the spans table.
 
     Field names match ClickHouse column names exactly.  Default values match
     the ClickHouse DEFAULT expressions so that omitted fields produce the
@@ -199,17 +199,17 @@ class AgentSpanCHInsertable(BaseModel):
     )
 
 
-ALL_GENAI_SPAN_INSERT_COLUMNS: list[str] = sorted(
+ALL_SPAN_INSERT_COLUMNS: list[str] = sorted(
     AgentSpanCHInsertable.model_fields.keys()
 )
 
-ALL_GENAI_SPAN_SELECT_COLUMNS: list[str] = sorted(
+ALL_SPAN_SELECT_COLUMNS: list[str] = sorted(
     AgentSpanCHInsertable.model_fields.keys()
 )
 
 
 class AgentMessageSearchRow(BaseModel):
-    """A row for the genai_message_search table.
+    """A row for the message_search table.
 
     One row per unique (project_id, content_digest) — identical message content
     deduplicates across spans via ReplacingMergeTree.
@@ -232,6 +232,6 @@ class AgentMessageSearchRow(BaseModel):
     operation_name: str = ""
 
 
-ALL_GENAI_SEARCH_INSERT_COLUMNS: list[str] = sorted(
+ALL_SEARCH_INSERT_COLUMNS: list[str] = sorted(
     AgentMessageSearchRow.model_fields.keys()
 )

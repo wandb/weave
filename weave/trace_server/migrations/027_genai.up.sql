@@ -1,10 +1,10 @@
 -- GenAI Observability Schema v4
 --
 -- 3 core tables, 2 MVs + optional message search:
---   1. genai_spans          — MergeTree, bloom filters, codecs, typed Maps
---   2. genai_agents         — AggregatingMergeTree MV, lean counters + first/last seen
---   3. genai_agent_versions — AggregatingMergeTree MV, same pattern
---   4. genai_message_search — app-level insert, full-text search (optional)
+--   1. spans          — MergeTree, bloom filters, codecs, typed Maps
+--   2. agents         — AggregatingMergeTree MV, lean counters + first/last seen
+--   3. agent_versions — AggregatingMergeTree MV, same pattern
+--   4. message_search — app-level insert, full-text search (optional)
 --
 -- No skinny table, no projections.
 -- ReplacingMergeTree(created_at) for idempotent re-inserts / late updates.
@@ -17,9 +17,9 @@
 -- See: benchmarks/genai_clickhouse/REPORT.md for design rationale.
 
 -- ---------------------------------------------------------------------------
--- 1. genai_spans — primary storage
+-- 1. spans — primary storage
 -- ---------------------------------------------------------------------------
-CREATE TABLE genai_spans (
+CREATE TABLE spans (
     project_id          String CODEC(ZSTD(1)),
     trace_id            String CODEC(ZSTD(1)),
     span_id             String CODEC(ZSTD(1)),
@@ -137,9 +137,9 @@ SETTINGS min_bytes_for_wide_part=0;
 
 
 -- ---------------------------------------------------------------------------
--- 2. genai_agents — all-time counters + first/last seen
+-- 2. agents — all-time counters + first/last seen
 -- ---------------------------------------------------------------------------
-CREATE TABLE genai_agents (
+CREATE TABLE agents (
     project_id String CODEC(ZSTD(1)),
     agent_name String CODEC(ZSTD(1)),
     invocation_count SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
@@ -153,7 +153,7 @@ CREATE TABLE genai_agents (
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, agent_name);
 
-CREATE MATERIALIZED VIEW genai_agents_mv TO genai_agents AS
+CREATE MATERIALIZED VIEW agents_mv TO agents AS
 SELECT
     project_id,
     agent_name,
@@ -165,14 +165,14 @@ SELECT
     toUInt64(status_code = 'ERROR') AS error_count,
     started_at AS first_seen,
     started_at AS last_seen
-FROM genai_spans
+FROM spans
 WHERE agent_name != '';
 
 
 -- ---------------------------------------------------------------------------
--- 3. genai_agent_versions — all-time counters + first/last seen
+-- 3. agent_versions — all-time counters + first/last seen
 -- ---------------------------------------------------------------------------
-CREATE TABLE genai_agent_versions (
+CREATE TABLE agent_versions (
     project_id String CODEC(ZSTD(1)),
     agent_name String CODEC(ZSTD(1)),
     agent_version String CODEC(ZSTD(1)),
@@ -187,7 +187,7 @@ CREATE TABLE genai_agent_versions (
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, agent_name, agent_version);
 
-CREATE MATERIALIZED VIEW genai_agent_versions_mv TO genai_agent_versions AS
+CREATE MATERIALIZED VIEW agent_versions_mv TO agent_versions AS
 SELECT
     project_id,
     agent_name,
@@ -200,14 +200,14 @@ SELECT
     toUInt64(status_code = 'ERROR') AS error_count,
     started_at AS first_seen,
     started_at AS last_seen
-FROM genai_spans
+FROM spans
 WHERE agent_name != '';
 
 
 -- ---------------------------------------------------------------------------
--- 4. genai_message_search — per-message full-text search (app-level insert)
+-- 4. message_search — per-message full-text search (app-level insert)
 -- ---------------------------------------------------------------------------
-CREATE TABLE genai_message_search (
+CREATE TABLE message_search (
     project_id String CODEC(ZSTD(1)),
     content_digest String CODEC(ZSTD(1)),
     conversation_id String DEFAULT '' CODEC(ZSTD(1)),

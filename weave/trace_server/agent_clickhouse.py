@@ -1,6 +1,6 @@
 """ClickHouse operations for the Weave Agents observability system.
 
-Provides ingest (insert), query, and stats functions for genai_spans
+Provides ingest (insert), query, and stats functions for spans
 and related tables. Uses shared query-building helpers from
 agent_query_builder for validated, consistent query construction.
 """
@@ -25,8 +25,8 @@ if TYPE_CHECKING:
     from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server.agent_schema import (
-    ALL_GENAI_SEARCH_INSERT_COLUMNS,
-    ALL_GENAI_SPAN_INSERT_COLUMNS,
+    ALL_SEARCH_INSERT_COLUMNS,
+    ALL_SPAN_INSERT_COLUMNS,
     AgentMessageSearchRow,
     AgentSpanCHInsertable,
 )
@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 def genai_span_to_row(span: AgentSpanCHInsertable) -> list[Any]:
-    """Convert a AgentSpanCHInsertable to a row list matching ALL_GENAI_SPAN_INSERT_COLUMNS order."""
+    """Convert a AgentSpanCHInsertable to a row list matching ALL_SPAN_INSERT_COLUMNS order."""
     params = span.model_dump()
     # Convert NormalizedMessage lists to ClickHouse Array(Tuple) format
     for key in ("input_messages", "output_messages"):
@@ -69,13 +69,13 @@ def genai_span_to_row(span: AgentSpanCHInsertable) -> list[Any]:
                 else m
                 for m in msgs
             ]
-    return [params.get(col) for col in ALL_GENAI_SPAN_INSERT_COLUMNS]
+    return [params.get(col) for col in ALL_SPAN_INSERT_COLUMNS]
 
 
 def genai_search_row_to_row(row: AgentMessageSearchRow) -> list[Any]:
     """Convert a AgentMessageSearchRow to a row list matching column order."""
     params = row.model_dump()
-    return [params.get(col) for col in ALL_GENAI_SEARCH_INSERT_COLUMNS]
+    return [params.get(col) for col in ALL_SEARCH_INSERT_COLUMNS]
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ class AgentQueryHandler:
     # ------------------------------------------------------------------
 
     def spans_query(self, req: Any) -> Any:
-        """Query genai_spans with filters, sort, and pagination."""
+        """Query spans with filters, sort, and pagination."""
         conditions = ["s.project_id = {project_id:String}"]
         parameters: dict[str, Any] = {"project_id": req.project_id}
 
@@ -271,7 +271,7 @@ class AgentQueryHandler:
         offset = req.offset or 0
 
         # Count query — plain MergeTree, no FINAL needed
-        count_q = f"SELECT count() FROM genai_spans s WHERE {where}"
+        count_q = f"SELECT count() FROM spans s WHERE {where}"
         count_result = self._ch.query(count_q, parameters=parameters)
         total = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
 
@@ -288,7 +288,7 @@ class AgentQueryHandler:
                    tool_name, tool_type, tool_call_id,
                    finish_reasons, error_type, custom_attrs,
                    wb_user_id, wb_run_id
-            FROM genai_spans s
+            FROM spans s
             WHERE {where}
             ORDER BY {order_by}
             LIMIT {{limit:UInt64}} OFFSET {{offset:UInt64}}
@@ -311,7 +311,7 @@ class AgentQueryHandler:
 
         # bloom_filter(0.01) on trace_id gives constant ~80ms lookups at any scale
         query = f"""
-            SELECT {_CHAT_VIEW_COLS} FROM genai_spans s
+            SELECT {_CHAT_VIEW_COLS} FROM spans s
             WHERE s.project_id = {{project_id:String}}
               AND s.trace_id = {{trace_id:String}}
             ORDER BY s.started_at ASC
@@ -327,11 +327,11 @@ class AgentQueryHandler:
         return AgentSpansTraceRes(spans=spans)
 
     # ------------------------------------------------------------------
-    # Traces queries (GROUP BY trace_id on genai_spans)
+    # Traces queries (GROUP BY trace_id on spans)
     # ------------------------------------------------------------------
 
     def traces_query(self, req: Any) -> Any:
-        """Query traces by aggregating genai_spans with time bounds."""
+        """Query traces by aggregating spans with time bounds."""
         conditions = ["project_id = {project_id:String}"]
         parameters: dict[str, Any] = {"project_id": req.project_id}
 
@@ -374,7 +374,7 @@ class AgentQueryHandler:
 
         # Count query
         count_q = f"""SELECT count() FROM (
-            SELECT trace_id FROM genai_spans WHERE {where} GROUP BY trace_id
+            SELECT trace_id FROM spans WHERE {where} GROUP BY trace_id
         )"""
         count_result = self._ch.query(count_q, parameters=parameters)
         total = (
@@ -393,7 +393,7 @@ class AgentQueryHandler:
                    groupUniqArray(request_model) AS request_models,
                    min(started_at) AS first_seen,
                    max(started_at) AS last_seen
-            FROM genai_spans
+            FROM spans
             WHERE {where}
             GROUP BY trace_id
             ORDER BY {order_by}
@@ -428,7 +428,7 @@ class AgentQueryHandler:
     # ------------------------------------------------------------------
 
     def agents_query(self, req: Any) -> Any:
-        """Query genai_agents AMT for agent list page."""
+        """Query agents AMT for agent list page."""
         conditions = ["project_id = {project_id:String}"]
         parameters: dict[str, Any] = {"project_id": req.project_id}
 
@@ -463,7 +463,7 @@ class AgentQueryHandler:
                    sum(error_count) AS error_count,
                    min(first_seen) AS first_seen,
                    max(last_seen) AS last_seen
-            FROM genai_agents
+            FROM agents
             WHERE {where}
             GROUP BY agent_name
             ORDER BY {order_by}
@@ -490,7 +490,7 @@ class AgentQueryHandler:
                 )
             )
         count_q = f"""SELECT count() FROM (
-            SELECT agent_name FROM genai_agents WHERE {where} GROUP BY agent_name
+            SELECT agent_name FROM agents WHERE {where} GROUP BY agent_name
         )"""
         count_result = self._ch.query(count_q, parameters=parameters)
         total = (
@@ -503,7 +503,7 @@ class AgentQueryHandler:
     # ------------------------------------------------------------------
 
     def agent_versions_query(self, req: Any) -> Any:
-        """Query genai_agent_versions AMT for version drill-down."""
+        """Query agent_versions AMT for version drill-down."""
         conditions = [
             "project_id = {project_id:String}",
             "agent_name = {agent_name:String}",
@@ -520,7 +520,7 @@ class AgentQueryHandler:
                    sum(total_input_tokens), sum(total_output_tokens),
                    sum(total_duration_ms), sum(error_count),
                    min(first_seen), max(last_seen)
-            FROM genai_agent_versions
+            FROM agent_versions
             WHERE {where}
             GROUP BY agent_version
             ORDER BY max(last_seen) DESC
@@ -547,7 +547,7 @@ class AgentQueryHandler:
                     last_seen=row[8],
                 )
             )
-        count_q = f"SELECT count() FROM (SELECT agent_version FROM genai_agent_versions WHERE {where} GROUP BY agent_version)"
+        count_q = f"SELECT count() FROM (SELECT agent_version FROM agent_versions WHERE {where} GROUP BY agent_version)"
         count_result = self._ch.query(count_q, parameters=parameters)
         total = (
             safe_int(count_result.result_rows[0][0]) if count_result.result_rows else 0
@@ -555,11 +555,11 @@ class AgentQueryHandler:
         return AgentVersionsQueryRes(versions=versions, total_count=total)
 
     # ------------------------------------------------------------------
-    # Conversations queries (GROUP BY conversation_id on genai_spans)
+    # Conversations queries (GROUP BY conversation_id on spans)
     # ------------------------------------------------------------------
 
     def conversations_query(self, req: Any) -> Any:
-        """Query conversations by aggregating genai_spans with time bounds."""
+        """Query conversations by aggregating spans with time bounds."""
         conditions = [
             "project_id = {project_id:String}",
             "conversation_id != ''",
@@ -641,7 +641,7 @@ class AgentQueryHandler:
 
         # Count query
         count_q = f"""SELECT count() FROM (
-            SELECT conversation_id FROM genai_spans WHERE {where} GROUP BY conversation_id
+            SELECT conversation_id FROM spans WHERE {where} GROUP BY conversation_id
         )"""
         count_result = self._ch.query(count_q, parameters=parameters)
         total = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
@@ -661,7 +661,7 @@ class AgentQueryHandler:
                    groupUniqArray(request_model) AS request_models,
                    min(started_at) AS first_seen,
                    max(started_at) AS last_seen
-            FROM genai_spans
+            FROM spans
             WHERE {where}
             GROUP BY conversation_id
             ORDER BY {order_by}
@@ -728,7 +728,7 @@ class AgentQueryHandler:
         query = f"""
             SELECT conversation_id, conversation_name, agent_name,
                    span_id, trace_id, role, content, content_digest, started_at
-            FROM genai_message_search FINAL
+            FROM message_search FINAL
             WHERE {where}
             ORDER BY started_at DESC
             LIMIT {{limit:UInt64}} OFFSET {{offset:UInt64}}
@@ -839,7 +839,7 @@ class AgentWriteHandler:
     # ------------------------------------------------------------------
 
     def otel_export(self, req: Any) -> Any:
-        """Ingest OTel spans into genai_spans (and message search index).
+        """Ingest OTel spans into spans (and message search index).
 
         Receives ProcessedResourceSpans, extracts GenAI semconv fields via
         genai_extraction, and batch-inserts into ClickHouse.
@@ -898,16 +898,16 @@ class AgentWriteHandler:
 
         if span_rows:
             self._ch.insert(
-                "genai_spans",
+                "spans",
                 data=span_rows,
-                column_names=ALL_GENAI_SPAN_INSERT_COLUMNS,
+                column_names=ALL_SPAN_INSERT_COLUMNS,
             )
 
         if search_rows:
             self._ch.insert(
-                "genai_message_search",
+                "message_search",
                 data=search_rows,
-                column_names=ALL_GENAI_SEARCH_INSERT_COLUMNS,
+                column_names=ALL_SEARCH_INSERT_COLUMNS,
             )
 
         from weave.trace_server.agent_types import GenAIOTelExportRes
@@ -957,7 +957,7 @@ class AgentWriteHandler:
         # then we group by trace_id in Python. At ~5 spans/conversation
         # this is typically <50 rows.
         spans_q = f"""
-            SELECT {_CHAT_VIEW_COLS} FROM genai_spans s
+            SELECT {_CHAT_VIEW_COLS} FROM spans s
             WHERE s.project_id = {{project_id:String}}
               AND s.conversation_id = {{conversation_id:String}}
             ORDER BY s.started_at ASC

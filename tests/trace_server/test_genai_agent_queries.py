@@ -14,8 +14,8 @@ from weave.trace_server.agent_clickhouse import (
     genai_span_to_row,
 )
 from weave.trace_server.agent_schema import (
-    ALL_GENAI_SEARCH_INSERT_COLUMNS,
-    ALL_GENAI_SPAN_INSERT_COLUMNS,
+    ALL_SEARCH_INSERT_COLUMNS,
+    ALL_SPAN_INSERT_COLUMNS,
     AgentSpanCHInsertable,
     NormalizedMessage,
 )
@@ -56,12 +56,12 @@ def _make_span(project_id: str, **overrides: object) -> AgentSpanCHInsertable:
 
 
 def _insert_spans(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
-    """Insert spans directly into genai_spans."""
+    """Insert spans directly into spans."""
     rows = [genai_span_to_row(s) for s in spans]
     ch_client.insert(
-        "genai_spans",
+        "spans",
         data=rows,
-        column_names=ALL_GENAI_SPAN_INSERT_COLUMNS,
+        column_names=ALL_SPAN_INSERT_COLUMNS,
     )
 
 
@@ -72,9 +72,9 @@ def _insert_search_rows(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
         all_rows.extend(genai_search_row_to_row(sr) for sr in extract_search_rows(s))
     if all_rows:
         ch_client.insert(
-            "genai_message_search",
+            "message_search",
             data=all_rows,
-            column_names=ALL_GENAI_SEARCH_INSERT_COLUMNS,
+            column_names=ALL_SEARCH_INSERT_COLUMNS,
         )
 
 
@@ -88,12 +88,12 @@ def test_genai_tables_created(ch_server):
     result = ch_server.ch_client.query("SHOW TABLES")
     table_names = {row[0] for row in result.result_rows}
 
-    assert "genai_spans" in table_names
-    assert "genai_agents" in table_names
-    assert "genai_agent_versions" in table_names
-    assert "genai_agents_mv" in table_names
-    assert "genai_agent_versions_mv" in table_names
-    assert "genai_message_search" in table_names
+    assert "spans" in table_names
+    assert "agents" in table_names
+    assert "agent_versions" in table_names
+    assert "agents_mv" in table_names
+    assert "agent_versions_mv" in table_names
+    assert "message_search" in table_names
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ def test_traces_group_by(ch_server):
 
 
 def test_agents_mv_aggregation(ch_server):
-    """AggregatingMergeTree MV populates genai_agents on insert."""
+    """AggregatingMergeTree MV populates agents on insert."""
     project_id = _make_project_id("agents")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
@@ -249,7 +249,7 @@ def test_agents_mv_aggregation(ch_server):
 
 
 def test_conversations_query(ch_server):
-    """Conversations are grouped from genai_spans by conversation_id."""
+    """Conversations are grouped from spans by conversation_id."""
     project_id = _make_project_id("convs")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     conv_a = f"conv-{uuid.uuid4().hex[:8]}"
@@ -306,7 +306,7 @@ def test_conversations_query(ch_server):
 
 
 def test_message_search(ch_server):
-    """Full-text search on genai_message_search via tokenbf_v1 index."""
+    """Full-text search on message_search via tokenbf_v1 index."""
     project_id = _make_project_id("search")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
