@@ -46,7 +46,7 @@ def retry_not_found(
     """
     return Retrying(
         stop=stop_after_attempt(max_attempts),
-        wait=wait_exponential(multiplier=1, min=initial_delay, max=1.0),
+        wait=wait_exponential(multiplier=initial_delay, min=initial_delay, max=1.0),
         retry=retry_if_exception_type(NotFoundError),
         reraise=True,
     )
