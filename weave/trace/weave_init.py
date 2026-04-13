@@ -111,15 +111,10 @@ def init_weave(
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
-    # Snapshot the raw caller-supplied values before any resolution/mutation
-    # so the reuse check compares what the caller actually passed.
-    raw_init_params = (
-        project_name,
-        ensure_project_exists,
-        api_key,
-        base_url,
-        trace_server_url,
-    )
+    # Capture caller-supplied values before any resolution/mutation.
+    caller_api_key = api_key
+    caller_base_url = base_url
+    caller_trace_server_url = trace_server_url
 
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
@@ -127,7 +122,14 @@ def init_weave(
         # matches.  When api_key is None the value comes from the
         # environment which may have changed, so we only reuse when an
         # explicit api_key was provided and all params match.
-        if api_key is not None and current_client.raw_init_params == raw_init_params:
+        params_match = (
+            current_client.project == project_name
+            and current_client.ensure_project_exists == ensure_project_exists
+            and current_client.init_api_key == caller_api_key
+            and current_client.init_base_url == caller_base_url
+            and current_client.init_trace_server_url == caller_trace_server_url
+        )
+        if caller_api_key is not None and params_match:
             return current_client
         # Flush any pending calls before switching to a new client
         current_client.finish()
@@ -180,7 +182,10 @@ def init_weave(
         api_key=api_key,
         base_url=base_url,
     )
-    client.raw_init_params = raw_init_params
+    # Store the original caller-supplied values for reuse comparison.
+    client.init_api_key = caller_api_key
+    client.init_base_url = caller_base_url
+    client.init_trace_server_url = caller_trace_server_url
 
     # If the project name was formatted by init, update the project name
     project_name = client.project
