@@ -177,12 +177,21 @@ def wf_clickhouse_replicated_cluster() -> str | None:
     return os.environ.get("WF_CLICKHOUSE_REPLICATED_CLUSTER")
 
 
-def wf_clickhouse_use_distributed_tables() -> bool:
-    """Whether to use distributed tables on top of replicated tables."""
-    return (
-        os.environ.get("WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES", "false").lower()
-        == "true"
-    )
+def wf_clickhouse_use_distributed_tables() -> bool | None:
+    """Whether to use distributed tables on top of replicated tables.
+
+    Returns:
+        True/False: explicit override from the env var.
+        None: env var is not set — caller should auto-detect by querying
+              system.clusters for the shard count.
+    """
+    # When the env var is not set at all, return None to signal
+    # "auto-detect from the cluster configuration."
+    # When explicitly set to "true"/"false"/"1"/"0", honour that as an override.
+    raw = os.environ.get("WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES")
+    if raw is None:
+        return None
+    return raw.lower() in {"true", "1"}
 
 
 VALID_CALLS_SHARD_KEYS = frozenset({"trace_id", "id", "project_id"})

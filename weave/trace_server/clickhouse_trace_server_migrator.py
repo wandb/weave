@@ -94,6 +94,7 @@ from weave.trace_server.costs.insert_costs import insert_costs, should_insert_co
 from weave.trace_server.database_engine import (
     ENGINE_DISCOVERY_MAX_WAIT_SECONDS,
     EngineDiscoveryError,
+    detect_cluster_shard_count,
     wait_for_database_engine,
 )
 from weave.trace_server.environment import wf_clickhouse_calls_shard_key
@@ -1226,7 +1227,11 @@ def get_clickhouse_trace_server_migrator(
         replicated: Whether to use replicated tables
         replicated_path: ZooKeeper path for replication
         replicated_cluster: Cluster name for replication
-        use_distributed: Whether to use distributed tables (requires replicated=True)
+        use_distributed: Whether to use distributed tables on top of replicated
+            tables. Pass ``None`` (the default) to auto-detect from the cluster's
+            shard count in ``system.clusters``. Pass ``True``/``False`` to
+            override auto-detection (e.g. via the
+            ``WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES`` env var).
         management_db: Database name for migration management
         migration_dir: Absolute path to a directory containing `*.up.sql` / `*.down.sql`
         post_migration_hook: Optional callable run after migrations; defaults to the Weave costs backfill hook (pass None to disable)
@@ -1238,7 +1243,40 @@ def get_clickhouse_trace_server_migrator(
         MigrationError: If configuration is invalid (e.g., use_distributed without replicated)
     """
     replicated = False if replicated is None else replicated
-    use_distributed = False if use_distributed is None else use_distributed
+
+    # --- Auto-detect distributed mode from cluster shard count ---
+    # When use_distributed is None (no explicit env var / CLI flag), we query
+    # system.clusters to count the shards. >1 shard means data is partitioned
+    # across nodes and we need Distributed engine tables.
+    # An explicit True/False always wins — auto-detect only fires for None.
+    if use_distributed is None and replicated:
+        cluster = replicated_cluster or DEFAULT_REPLICATED_CLUSTER
+        try:
+            shard_count = detect_cluster_shard_count(ch_client, cluster)
+            # >1 shard → distributed tables needed to fan queries across shards.
+            # 0 means the cluster wasn't found (misconfigured or single-node);
+            # 1 means single-shard replicated — no distributed tables needed.
+            use_distributed = shard_count > 1
+            logger.info(
+                "Auto-detected %d shard(s) for cluster '%s' → use_distributed=%s",
+                shard_count,
+                cluster,
+                use_distributed,
+            )
+        except EngineDiscoveryError:
+            # If we can't query system.clusters (e.g. permissions), fall back
+            # to non-distributed mode and let the operator know.
+            logger.warning(
+                "Could not auto-detect shard count for cluster '%s' from "
+                "system.clusters — defaulting to use_distributed=False. "
+                "Set WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES explicitly to "
+                "override.",
+                cluster,
+            )
+            use_distributed = False
+    elif use_distributed is None:
+        # Not replicated → distributed tables don't apply.
+        use_distributed = False
 
     logger.info(
         "ClickHouseTraceServerMigrator initialized with: "

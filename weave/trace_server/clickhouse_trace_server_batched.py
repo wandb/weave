@@ -132,10 +132,17 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHObjSchema,
     TagCHInsertable,
 )
+from weave.trace_server.clickhouse_trace_server_migrator import (
+    DEFAULT_REPLICATED_CLUSTER,
+)
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter
 from weave.trace_server.constants import (
     COMPLETIONS_CREATE_OP_NAME,
     IMAGE_GENERATION_CREATE_OP_NAME,
+)
+from weave.trace_server.database_engine import (
+    EngineDiscoveryError,
+    detect_cluster_shard_count,
 )
 from weave.trace_server.datadog import (
     generator_trace,
@@ -340,6 +347,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._op_ref_cache_lock = threading.Lock()
         self._placeholder_file_projects: set[str] = set()
         self._database_ensured = False
+        # Cached result of distributed-mode auto-detection (None = not yet resolved).
+        # Once resolved by querying system.clusters, the bool is stored here so
+        # we don't re-query on every call to use_distributed_mode.
+        self._use_distributed_cached: bool | None = None
 
         if wf_env.wf_clickhouse_disable_lightweight_update():
             logger.warning(
@@ -458,12 +469,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def use_distributed_mode(self) -> bool:
         """Check if ClickHouse is configured to use distributed tables.
 
-        Returns the value from WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES environment variable.
-
-        Returns:
-            bool: True if using distributed tables, False otherwise.
+        Resolution order:
+        1. If WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES is explicitly set → use that.
+        2. Otherwise, auto-detect by querying system.clusters for the shard
+           count of the configured cluster (>1 shard → distributed).
+        3. Cache the result so we only query system.clusters once.
         """
-        return wf_env.wf_clickhouse_use_distributed_tables()
+        # Fast path: already resolved and cached.
+        if self._use_distributed_cached is not None:
+            return self._use_distributed_cached
+
+        # Check the env var — returns None when unset (= auto-detect).
+        env_value = wf_env.wf_clickhouse_use_distributed_tables()
+        if env_value is not None:
+            # Explicit override from env var — cache and return.
+            self._use_distributed_cached = env_value
+            return env_value
+
+        # Auto-detect: query system.clusters for the shard count.
+        cluster = (
+            wf_env.wf_clickhouse_replicated_cluster() or DEFAULT_REPLICATED_CLUSTER
+        )
+        try:
+            shard_count = detect_cluster_shard_count(self.ch_client, cluster)
+            result = shard_count > 1
+            logger.info(
+                "Auto-detected %d shard(s) for cluster '%s' → use_distributed=%s",
+                shard_count,
+                cluster,
+                result,
+            )
+        except EngineDiscoveryError:
+            logger.warning(
+                "Could not auto-detect shard count for cluster '%s' — "
+                "defaulting to use_distributed=False. Set "
+                "WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES explicitly to override.",
+                cluster,
+            )
+            result = False
+
+        self._use_distributed_cached = result
+        return result
 
     @property
     def clickhouse_cluster_name(self) -> str | None:
