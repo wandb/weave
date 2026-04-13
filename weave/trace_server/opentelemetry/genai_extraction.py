@@ -38,6 +38,7 @@ _KNOWN_OP_PREFIXES = (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _get(attrs: dict[str, Any], *keys: str) -> Any:
     """Return the first non-None value found for the given attribute keys."""
     for key in keys:
@@ -80,6 +81,7 @@ def _str_list(val: Any) -> list[str]:
 # ---------------------------------------------------------------------------
 # Field extraction
 # ---------------------------------------------------------------------------
+
 
 def extract_provider(attrs: dict[str, Any]) -> str:
     """Extract gen_ai.provider.name (or deprecated gen_ai.system)."""
@@ -213,6 +215,7 @@ def extract_tool_call_result(
 # ---------------------------------------------------------------------------
 # Message normalization
 # ---------------------------------------------------------------------------
+
 
 def _text_from_parts(parts: list[Any]) -> str:
     """Concatenate text from a list of message parts."""
@@ -348,6 +351,7 @@ def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> 
 # Custom attributes -> typed Maps
 # ---------------------------------------------------------------------------
 
+
 def _extract_custom_attrs(
     attrs: dict[str, Any],
 ) -> tuple[dict[str, str], dict[str, int], dict[str, float]]:
@@ -375,9 +379,7 @@ def _extract_custom_attrs(
     return string_map, int_map, float_map
 
 
-def _flatten_attrs(
-    attrs: dict[str, Any], prefix: str = ""
-) -> list[tuple[str, Any]]:
+def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, Any]]:
     """Flatten a nested attribute dict into dot-separated key-value pairs."""
     result: list[tuple[str, Any]] = []
     for key, val in attrs.items():
@@ -392,6 +394,7 @@ def _flatten_attrs(
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
+
 
 def extract_genai_span(
     span: Span,
@@ -447,8 +450,12 @@ def extract_genai_span(
         output_tokens=output_t,
         total_tokens=total_t,
         reasoning_tokens=reasoning_t,
-        cache_creation_input_tokens=safe_int(_get(attrs, "gen_ai.usage.cache_creation.input_tokens")),
-        cache_read_input_tokens=safe_int(_get(attrs, "gen_ai.usage.cache_read.input_tokens")),
+        cache_creation_input_tokens=safe_int(
+            _get(attrs, "gen_ai.usage.cache_creation.input_tokens")
+        ),
+        cache_read_input_tokens=safe_int(
+            _get(attrs, "gen_ai.usage.cache_read.input_tokens")
+        ),
         reasoning_content=reasoning_content,
         conversation_id=extract_conversation_id(attrs),
         conversation_name=extract_conversation_name(attrs),
@@ -462,8 +469,12 @@ def extract_genai_span(
         request_temperature=safe_float(_get(attrs, "gen_ai.request.temperature")),
         request_max_tokens=safe_int(_get(attrs, "gen_ai.request.max_tokens")),
         request_top_p=safe_float(_get(attrs, "gen_ai.request.top_p")),
-        request_frequency_penalty=safe_float(_get(attrs, "gen_ai.request.frequency_penalty")),
-        request_presence_penalty=safe_float(_get(attrs, "gen_ai.request.presence_penalty")),
+        request_frequency_penalty=safe_float(
+            _get(attrs, "gen_ai.request.frequency_penalty")
+        ),
+        request_presence_penalty=safe_float(
+            _get(attrs, "gen_ai.request.presence_penalty")
+        ),
         request_seed=safe_int(_get(attrs, "gen_ai.request.seed")),
         request_stop_sequences=_str_list(_get(attrs, "gen_ai.request.stop_sequences")),
         request_choice_count=safe_int(_get(attrs, "gen_ai.request.choice.count")),
