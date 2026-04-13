@@ -177,4 +177,7 @@ def detect_cluster_shard_count(
         return 0
 
     count = first_row[0]
+    # Guard against None (e.g. from a mock or unexpected query result).
+    if count is None:
+        return 0
     return int(count)
