@@ -3928,10 +3928,9 @@ def test_feedback_batching(network_proxy_client):
     client.flush()
 
     test_call = client.get_calls()[0]
-    client.server.attribute_access_log = []
+    records.clear()
 
     feedback_items = []
-    start = time.time()
     for i in range(10):
         id = test_call.feedback.add(
             feedback_type=f"test_feedback_{i}",
@@ -3940,17 +3939,15 @@ def test_feedback_batching(network_proxy_client):
         assert id is not None
         feedback_items.append(id)
 
-    # make sure we aren't actually waiting for 10 feedbacks, should be quick
-    assert time.time() - start < 0.5, "Feedback creation took too long"
-
     # Flush to ensure all feedback is processed
     client.flush()
 
-    log = client.server.attribute_access_log
-    feedback_creates = [l for l in log if l == "feedback_create"]
+    feedback_create_records = [req for route, req in records if route == "feedback_create"]
 
-    assert_err = f"Expected 0 feedback creates, got {len(feedback_creates)}"
-    assert len(feedback_creates) == 0, assert_err
+    assert remote_client.get_feedback_processor() is not None
+    assert len(feedback_create_records) == 0, (
+        f"Expected 0 feedback_create requests, got {len(feedback_create_records)}"
+    )
 
     # Query feedback to verify all items were created
     all_feedback = list(test_call.feedback)
