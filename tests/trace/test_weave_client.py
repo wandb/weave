@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 import json
 import platform
@@ -711,7 +710,8 @@ def test_calls_delete(client):
     assert len(result) == 1
 
 
-def test_calls_delete_cascade(client):
+@pytest.mark.asyncio
+async def test_calls_delete_cascade(client):
     # run an evaluation, then delete the evaluation and its children
     @weave.op
     async def model_predict(input) -> str:
@@ -728,7 +728,7 @@ def test_calls_delete_cascade(client):
         dataset=dataset_rows,
         scorers=[score],
     )
-    asyncio.run(evaluation.evaluate(model_predict))
+    await evaluation.evaluate(model_predict)
 
     evaluate_calls = list(weave.as_op(evaluation.evaluate).calls())
     assert len(evaluate_calls) == 1
@@ -1059,7 +1059,8 @@ def test_save_model(client):
 
 @pytest.mark.skip(reason="TODO: Skip flake")
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-def test_saved_nested_modellike(client):
+@pytest.mark.asyncio
+async def test_saved_nested_modellike(client):
     class A(weave.Object):
         x: int
 
@@ -1092,7 +1093,7 @@ def test_saved_nested_modellike(client):
         return await c.call(input)
 
     c = C(b=model2, z=1)
-    assert asyncio.run(call_model(c, 5)) == 4
+    assert await call_model(c, 5) == 4
 
 
 def test_dataset_rows_ref(client):
@@ -1104,7 +1105,8 @@ def test_dataset_rows_ref(client):
 
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
-def test_evaluate(client):
+@pytest.mark.asyncio
+async def test_evaluate(client):
     @weave.op
     async def model_predict(input) -> str:
         return eval(input)
@@ -1120,7 +1122,7 @@ def test_evaluate(client):
         dataset=dataset_rows,
         scorers=[score],
     )
-    result = asyncio.run(evaluation.evaluate(model_predict))
+    result = await evaluation.evaluate(model_predict)
     expected_eval_result = {
         "output": {"mean": 9.5},
         "score": {"true_count": 1, "true_fraction": 0.5},
