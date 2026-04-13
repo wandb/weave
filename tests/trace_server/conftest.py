@@ -19,6 +19,7 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.project_version import project_version
+from weave.trace_server.project_version.types import CallsStorageServerMode
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -26,12 +27,14 @@ pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
 
 
 @dataclass(frozen=True)
-class ClickHouseServerCleanup:
-    """Tracks ClickHouse server resources that need cleanup after tests."""
+class ClickHouseSessionState:
+    """Holds the session-scoped ClickHouse server and its database names."""
 
     server: clickhouse_trace_server_batched.ClickHouseTraceServer
     management_db: str
     unique_db: str
+    # Tables that should be truncated between tests (excludes views)
+    truncatable_tables: list[str]
 
 
 def pytest_addoption(parser):
@@ -127,102 +130,161 @@ def _get_worker_db_suffix(request) -> str:
     return f"_w{worker_id.replace('gw', '')}"
 
 
-@pytest.fixture
-def get_ch_trace_server(
+def _discover_truncatable_tables(ch_client, database: str) -> list[str]:
+    """Query system.tables to find non-view tables that can be truncated."""
+    result = ch_client.query(
+        "SELECT name FROM system.tables "
+        f"WHERE database = '{database}' "
+        "AND engine NOT IN ('View', 'MaterializedView') "
+        "ORDER BY name"
+    )
+    return [row[0] for row in result.result_rows]
+
+
+def _truncate_all_tables(ch_client, database: str, tables: list[str]) -> None:
+    """Truncate all data tables in the database for test isolation."""
+    for table in tables:
+        ch_client.command(f"TRUNCATE TABLE {database}.{table}")
+
+
+def _reset_server_state(server: ClickHouseTraceServer) -> None:
+    """Reset cached/accumulated state on a ClickHouseTraceServer instance."""
+    # Clear op ref cache
+    server._op_ref_cache.clear()
+    # Clear placeholder file projects set
+    server._placeholder_file_projects.clear()
+    # Reset table routing mode (tests may set it to AUTO)
+    server.table_routing_resolver._mode = CallsStorageServerMode.from_env()
+    # Clear batch queues (thread-local, clear for current thread)
+    tl = server._thread_local
+    if hasattr(tl, "call_batch"):
+        tl.call_batch.clear()
+    if hasattr(tl, "file_batch"):
+        tl.file_batch.clear()
+    if hasattr(tl, "calls_complete_batch"):
+        tl.calls_complete_batch.clear()
+    if hasattr(tl, "flush_immediately"):
+        tl.flush_immediately = False
+
+
+@pytest.fixture(scope="session")
+def _ch_session_server(
     ensure_clickhouse_db,
     request,
+) -> ClickHouseSessionState | None:
+    """Session-scoped ClickHouse server: created once, migrated once.
+
+    Returns None if ClickHouse is not the selected backend, so that
+    function-scoped fixtures can fall through to the old path if needed.
+    """
+    # Only set up if we'll actually use clickhouse
+    trace_server_flag = request.config.getoption("--trace-server", default="clickhouse")
+    use_sqlite = request.config.getoption("--sqlite", default=False)
+    if use_sqlite or trace_server_flag == "sqlite":
+        yield None
+        return
+
+    host, port = next(ensure_clickhouse_db())
+    db_suffix = _get_worker_db_suffix(request)
+    if not db_suffix:
+        db_suffix = "_test"
+
+    original_db = os.environ.get("WF_CLICKHOUSE_DATABASE")
+    base_db = original_db or "default"
+    unique_db = f"{base_db}{db_suffix}"
+    management_db = f"db_management{db_suffix}"
+
+    os.environ["WF_CLICKHOUSE_DATABASE"] = unique_db
+
+    id_converter = DummyIdConverter()
+    ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
+        host=host,
+        port=port,
+        database=unique_db,
+        evaluate_model_dispatcher=EvaluateModelTestDispatcher(
+            id_converter=id_converter
+        ),
+    )
+
+    # Drop and recreate from scratch once
+    ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
+    ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
+    ch_server._database_ensured = False
+
+    import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
+
+    def patched_run_migrations():
+        migrator = wf_migrator.get_clickhouse_trace_server_migrator(
+            ch_server._mint_client(), management_db=management_db
+        )
+        migrator.apply_migrations(ch_server._database)
+
+    ch_server._run_migrations = patched_run_migrations  # type: ignore[assignment]
+    ch_server._run_migrations()
+
+    truncatable = _discover_truncatable_tables(ch_server.ch_client, unique_db)
+
+    yield ClickHouseSessionState(
+        server=ch_server,
+        management_db=management_db,
+        unique_db=unique_db,
+        truncatable_tables=truncatable,
+    )
+
+    # Restore env
+    if original_db is None:
+        os.environ.pop("WF_CLICKHOUSE_DATABASE", None)
+    else:
+        os.environ["WF_CLICKHOUSE_DATABASE"] = original_db
+
+    # Session cleanup: drop databases
+    try:
+        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
+    except Exception:
+        pass
+    try:
+        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
+    except Exception:
+        pass
+    try:
+        ch_server.ch_client.close()
+    except Exception:
+        pass
+
+
+@pytest.fixture
+def get_ch_trace_server(
+    _ch_session_server: ClickHouseSessionState | None,
+    request,
 ) -> Callable[[], UserInjectingExternalTraceServer]:
-    servers_to_cleanup: list[ClickHouseServerCleanup] = []
+    """Function-scoped CH fixture factory. Reuses session-scoped DB, truncates between tests."""
 
     def ch_trace_server_inner() -> UserInjectingExternalTraceServer:
-        host, port = next(ensure_clickhouse_db())
-        db_suffix = _get_worker_db_suffix(request)
+        if _ch_session_server is None:
+            pytest.skip("ClickHouse session not available")
 
-        # Always add a test-specific suffix to prevent collision with other databases
-        if not db_suffix:
-            db_suffix = "_test"
+        state = _ch_session_server
+        server = state.server
 
-        # Store original environment variable
-        original_db = os.environ.get("WF_CLICKHOUSE_DATABASE")
-        base_db = original_db or "default"
-        unique_db = f"{base_db}{db_suffix}"
-        management_db = f"db_management{db_suffix}"
+        # Truncate all tables for a clean slate
+        _truncate_all_tables(
+            server.ch_client, state.unique_db, state.truncatable_tables
+        )
 
-        # Set worker-specific database name
-        os.environ["WF_CLICKHOUSE_DATABASE"] = unique_db
+        # Reset any accumulated in-memory state
+        _reset_server_state(server)
 
-        try:
-            id_converter = DummyIdConverter()
-            ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
-                host=host,
-                port=port,
-                database=unique_db,
-                evaluate_model_dispatcher=EvaluateModelTestDispatcher(
-                    id_converter=id_converter
-                ),
-            )
+        # Force synchronous writes so tests see data immediately
+        server._flush_immediately = True
 
-            # Track server for cleanup
-            servers_to_cleanup.append(
-                ClickHouseServerCleanup(
-                    server=ch_server,
-                    management_db=management_db,
-                    unique_db=unique_db,
-                )
-            )
+        # Wrap in the external adapter (fresh id_converter per test)
+        id_converter = DummyIdConverter()
+        server._evaluate_model_dispatcher = EvaluateModelTestDispatcher(
+            id_converter=id_converter
+        )
+        return externalize_trace_server(server, TEST_ENTITY, id_converter=id_converter)
 
-            # Clean up any existing worker-specific databases
-            ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
-            ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
-            ch_server._database_ensured = False
-
-            # Patch _run_migrations to use worker-specific management database
-            def patched_run_migrations():
-                import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
-
-                migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-                    ch_server._mint_client(), management_db=management_db
-                )
-                migrator.apply_migrations(ch_server._database)
-
-            ch_server._run_migrations = patched_run_migrations  # type: ignore[assignment]
-            ch_server._run_migrations()
-
-            result = externalize_trace_server(
-                ch_server, TEST_ENTITY, id_converter=id_converter
-            )
-            return result
-        finally:
-            # Restore original database name
-            if original_db is None:
-                os.environ.pop("WF_CLICKHOUSE_DATABASE", None)
-            else:
-                os.environ["WF_CLICKHOUSE_DATABASE"] = original_db
-
-    yield ch_trace_server_inner
-
-    # Cleanup after all tests using this fixture complete
-    for server_config in servers_to_cleanup:
-        ch_client = getattr(server_config.server, "ch_client", None)
-        if not ch_client:
-            continue
-
-        # Drop test databases (best effort)
-        try:
-            ch_client.command(f"DROP DATABASE IF EXISTS {server_config.management_db}")
-        except Exception:
-            pass
-
-        try:
-            ch_client.command(f"DROP DATABASE IF EXISTS {server_config.unique_db}")
-        except Exception:
-            pass
-
-        # Close client connection (best effort)
-        try:
-            ch_client.close()
-        except Exception:
-            pass
+    return ch_trace_server_inner
 
 
 @pytest.fixture
