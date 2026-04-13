@@ -151,7 +151,12 @@ def _truncate_all_tables(ch_client, database: str, tables: list[str]) -> None:
 
 
 def _reset_server_state(server: ClickHouseTraceServer) -> None:
-    """Reset cached/accumulated state on a ClickHouseTraceServer instance."""
+    """Reset cached/accumulated state on a ClickHouseTraceServer instance.
+
+    IMPORTANT: If you add new cached/mutable state to ClickHouseTraceServer,
+    you must reset it here too — otherwise it will leak between tests and cause
+    hard-to-debug order-dependent failures.
+    """
     # Clear op ref cache
     server._op_ref_cache.clear()
     # Clear placeholder file projects set
