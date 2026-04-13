@@ -348,9 +348,11 @@ class WeaveClient:
         project: The project name.
         server: The server to use for communication.
         ensure_project_exists: Whether to ensure the project exists on the server.
-        api_key: Caller-supplied API key (None means env-derived).
-        base_url: Caller-supplied base URL (None means env-derived).
-        trace_server_url: Caller-supplied trace server URL (None means derived).
+        api_key: Resolved API key for downstream use.
+        base_url: Resolved base URL for downstream use.
+        init_api_key: Raw caller-supplied API key (for client reuse checks).
+        init_base_url: Raw caller-supplied base URL (for client reuse checks).
+        init_trace_server_url: Raw caller-supplied trace server URL (for client reuse checks).
     """
 
     def __init__(
@@ -361,16 +363,18 @@ class WeaveClient:
         ensure_project_exists: bool = True,
         api_key: str | None = None,
         base_url: str | None = None,
+        init_api_key: str | None = None,
+        init_base_url: str | None = None,
+        init_trace_server_url: str | None = None,
     ):
         self.entity = entity
         self.project = project
         self.server = server
-        # Caller-supplied values (before env resolution), set by init_weave()
-        # for client reuse decisions.  Defaults to None when constructed
-        # directly (not via init_weave).
-        self.init_api_key: str | None = None
-        self.init_base_url: str | None = None
-        self.init_trace_server_url: str | None = None
+        # Raw caller-supplied values (before env resolution) for client reuse
+        # decisions in init_weave.
+        self.init_api_key = init_api_key
+        self.init_base_url = init_base_url
+        self.init_trace_server_url = init_trace_server_url
         # Eagerly resolve credentials so downstream consumers never need
         # fallback logic.  When the caller provides an explicit value we
         # use it; otherwise we snapshot the current env / netrc value once.

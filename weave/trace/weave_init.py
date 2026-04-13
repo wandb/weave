@@ -111,11 +111,6 @@ def init_weave(
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
-    # Capture caller-supplied values before any resolution/mutation.
-    caller_api_key = api_key
-    caller_base_url = base_url
-    caller_trace_server_url = trace_server_url
-
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
         # Reuse the existing client when every caller-supplied parameter
@@ -125,30 +120,33 @@ def init_weave(
         params_match = (
             current_client.project == project_name
             and current_client.ensure_project_exists == ensure_project_exists
-            and current_client.init_api_key == caller_api_key
-            and current_client.init_base_url == caller_base_url
-            and current_client.init_trace_server_url == caller_trace_server_url
+            and current_client.init_api_key == api_key
+            and current_client.init_base_url == base_url
+            and current_client.init_trace_server_url == trace_server_url
         )
-        if caller_api_key is not None and params_match:
+        if api_key is not None and params_match:
             return current_client
         # Flush any pending calls before switching to a new client
         current_client.finish()
         weave_client_context.set_weave_client_global(None)
 
-    if api_key is None:
-        api_key = get_wandb_api_context()
-        if api_key is None:
+    # Resolve credentials — use separate locals so the raw api_key/base_url/
+    # trace_server_url params stay available for storing on the client.
+    resolved_api_key = api_key
+    if resolved_api_key is None:
+        resolved_api_key = get_wandb_api_context()
+        if resolved_api_key is None:
             effective_base_url = (
                 base_url if base_url is not None else env.wandb_base_url()
             )
             url = wandb.app_url(effective_base_url)
             logger.info("Please login to Weights & Biases (%s) to continue...", url)
             wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
-            api_key = get_wandb_api_context()
+            resolved_api_key = get_wandb_api_context()
 
     # Resolve entity name after authentication is ensured
     entity_name, project_name = get_entity_project_from_project_name(
-        project_name, api_key=api_key, base_url=base_url
+        project_name, api_key=resolved_api_key, base_url=base_url
     )
     wb_run_context = get_global_wb_run_context()
     if wb_run_context:
@@ -158,14 +156,17 @@ def init_weave(
     # Derive trace_server_url from base_url when not explicitly provided,
     # honoring the documented contract: "The trace server URL is derived from
     # this if trace_server_url is not provided."
-    if trace_server_url is None and base_url is not None:
+    resolved_trace_server_url = trace_server_url
+    if resolved_trace_server_url is None and base_url is not None:
         normalized = base_url.rstrip("/")
         if normalized == "https://api.wandb.ai":
-            trace_server_url = env.MTSAAS_TRACE_URL
+            resolved_trace_server_url = env.MTSAAS_TRACE_URL
         else:
-            trace_server_url = normalized + "/traces"
+            resolved_trace_server_url = normalized + "/traces"
 
-    remote_server = init_weave_get_server(api_key, trace_server_url=trace_server_url)
+    remote_server = init_weave_get_server(
+        resolved_api_key, trace_server_url=resolved_trace_server_url
+    )
     if not _weave_is_available(remote_server):
         raise RuntimeError(
             "Weave is not available on the server.  Please contact support."
@@ -179,13 +180,12 @@ def init_weave(
         project_name,
         server,
         ensure_project_exists,
-        api_key=api_key,
+        api_key=resolved_api_key,
         base_url=base_url,
+        init_api_key=api_key,
+        init_base_url=base_url,
+        init_trace_server_url=trace_server_url,
     )
-    # Store the original caller-supplied values for reuse comparison.
-    client.init_api_key = caller_api_key
-    client.init_base_url = caller_base_url
-    client.init_trace_server_url = caller_trace_server_url
 
     # If the project name was formatted by init, update the project name
     project_name = client.project
@@ -200,7 +200,7 @@ def init_weave(
     implicit_patch()
     register_import_hook()
 
-    username = get_username(api_key=api_key, base_url=base_url)
+    username = get_username(api_key=resolved_api_key, base_url=base_url)
 
     # This is a temporary event to track the number of users who have enabled PII redaction.
     if should_redact_pii():
