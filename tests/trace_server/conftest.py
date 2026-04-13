@@ -17,6 +17,7 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
 from weave.trace_server import clickhouse_trace_server_batched
+from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
@@ -120,11 +121,15 @@ def reset_project_version_cache():
     project_version.reset_project_residence_cache()
 
 
-def _get_worker_db_suffix(request) -> str:
-    """Get database suffix for pytest-xdist worker isolation."""
+def _get_worker_db_suffix(request, default: str = "_test") -> str:
+    """Get database suffix for pytest-xdist worker isolation.
+
+    Returns worker-specific suffix like '_w0' for xdist, or `default` for
+    single-process runs.
+    """
     worker_input = getattr(request.config, "workerinput", None)
     if worker_input is None:
-        return ""
+        return default
     worker_id = worker_input.get("workerid", "master")
     return f"_w{worker_id.replace('gw', '')}"
 
@@ -167,16 +172,11 @@ def _reset_server_state(server: ClickHouseTraceServer) -> None:
     # Reset file storage client so tests that mock env vars get a fresh client
     server._file_storage_client = None
     server._file_storage_client_initialized = False
-    # Clear batch queues (thread-local, clear for current thread)
-    tl = server._thread_local
-    if hasattr(tl, "call_batch"):
-        tl.call_batch.clear()
-    if hasattr(tl, "file_batch"):
-        tl.file_batch.clear()
-    if hasattr(tl, "calls_complete_batch"):
-        tl.calls_complete_batch.clear()
-    if hasattr(tl, "flush_immediately"):
-        tl.flush_immediately = False
+    # Reset batch queues (thread-local, for current thread)
+    server._call_batch = []
+    server._file_batch = []
+    server._calls_complete_batch = []
+    server._flush_immediately = False
 
 
 @pytest.fixture(scope="session")
@@ -198,8 +198,6 @@ def _ch_session_server(
 
     host, port = next(ensure_clickhouse_db())
     db_suffix = _get_worker_db_suffix(request)
-    if not db_suffix:
-        db_suffix = "_test"
 
     original_db = os.environ.get("WF_CLICKHOUSE_DATABASE")
     base_db = original_db or "default"
@@ -222,8 +220,6 @@ def _ch_session_server(
     ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
     ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
     ch_server._database_ensured = False
-
-    import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
 
     def patched_run_migrations():
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
