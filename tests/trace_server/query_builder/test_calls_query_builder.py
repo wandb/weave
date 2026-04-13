@@ -2416,6 +2416,7 @@ def test_maybe_convert_skips_non_datetime_string_field() -> None:
     ]
     ops = _maybe_convert_datetime_operands(original)
     assert ops == original
+    assert ops[1].literal_ == "2024-03-01"
 
 
 def test_maybe_convert_skips_unparseable_string() -> None:
@@ -3576,9 +3577,7 @@ def test_build_calls_complete_delete_query() -> None:
 def test_build_calls_complete_delete_query_with_cluster() -> None:
     """Ensure the delete helper builds the expected query with cluster name.
 
-    _format_table_name_with_cluster only adds ON CLUSTER; the caller is
-    responsible for passing the correct table name (e.g. calls_complete_local
-    in distributed mode via _get_calls_complete_table_name).
+    In distributed mode, mutations target the local table with ON CLUSTER clause.
     """
     query = build_calls_complete_delete_query(
         table_name="calls_complete",
@@ -3589,7 +3588,7 @@ def test_build_calls_complete_delete_query_with_cluster() -> None:
 
     expected = sqlparse.format(
         """
-        DELETE FROM calls_complete ON CLUSTER my_cluster
+        DELETE FROM calls_complete_local ON CLUSTER my_cluster
         WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
         """,
         reindent=True,
@@ -3622,9 +3621,7 @@ def test_build_calls_complete_update_query() -> None:
 def test_build_calls_complete_update_query_with_cluster() -> None:
     """Ensure the update helper builds the expected query with cluster name.
 
-    _format_table_name_with_cluster only adds ON CLUSTER; the caller is
-    responsible for passing the correct table name (e.g. calls_complete_local
-    in distributed mode via _get_calls_complete_table_name).
+    In distributed mode, mutations target the local table with ON CLUSTER clause.
     """
     query = build_calls_complete_update_query(
         table_name="calls_complete",
@@ -3636,7 +3633,7 @@ def test_build_calls_complete_update_query_with_cluster() -> None:
 
     expected = sqlparse.format(
         """
-        UPDATE calls_complete ON CLUSTER my_cluster
+        UPDATE calls_complete_local ON CLUSTER my_cluster
         SET display_name = {display_name:String}
         WHERE project_id = {project_id:String} AND id = {id:String}
         """,
