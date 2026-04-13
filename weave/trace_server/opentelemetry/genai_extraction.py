@@ -1,17 +1,9 @@
-"""Extract normalized GenAI fields from OTel spans into the Weave GenAI schema.
+"""Extract GenAI semantic convention fields from OTel spans.
 
-Convention strategy:
-
-- Standard OTel GenAI semconv attributes (``gen_ai.*``) are the preferred source.
-  The OTel GenAI semconv is "Development" status (unstable) as of April 2026.
-- Vendor-specific attributes (``agent.*``, ``llm.*``, ``gcp.*``) serve as
-  fallbacks for providers that haven't adopted the ``gen_ai.*`` namespace yet
-  (OpenAI Agents SDK, Traceloop/OpenLLMetry, Google ADK).
-- Weave-specific attributes (``weave.*``) provide product extensions not
-  covered by OTel semconv (compaction tracking, content refs, etc.).
-- All sources are normalized into the same schema with neutral column names.
-
-See ``agent_schema.py`` for the categorized list of known attribute keys.
+Extracts standard ``gen_ai.*`` attributes into dedicated columns for efficient
+querying.  Weave-specific ``weave.*`` attributes are also extracted.  All other
+attributes are preserved in typed custom attribute maps and in the lossless
+raw span dump.
 
 The main entry point is ``extract_genai_span()`` which takes a parsed OTel
 ``Span`` and returns an ``AgentSpanCHInsertable`` ready for ClickHouse insert.
@@ -29,27 +21,7 @@ from weave.trace_server.agent_schema import (
 from weave.trace_server.opentelemetry.helpers import get_attribute, to_json_serializable
 from weave.trace_server.opentelemetry.python_spans import Span
 
-# ---------------------------------------------------------------------------
-# OpenAI Agents SDK span type -> operation name
-#
-# Standard OTel GenAI ops: invoke_agent, execute_tool, chat
-# Vendor-specific ops: handoff, guardrail, custom, transcription, speech
-# ---------------------------------------------------------------------------
-_OPENAI_SPAN_TYPE_TO_OP = {
-    "agent": "invoke_agent",      # [OTel GenAI]
-    "function": "execute_tool",   # [OTel GenAI]
-    "response": "chat",           # [OTel GenAI]
-    "generation": "chat",         # [OTel GenAI]
-    "handoff": "handoff",         # [vendor: OpenAI]
-    "guardrail": "guardrail",     # [vendor: OpenAI]
-    "custom": "custom",           # [vendor: OpenAI]
-    "transcription": "transcription",  # [vendor: OpenAI]
-    "speech": "speech",           # [vendor: OpenAI]
-}
-
 # Known operation name prefixes for span-name inference.
-# OTel GenAI standard: chat, invoke_agent, execute_tool, generate_content,
-#   text_completion, embeddings, create_agent, retrieval
 _KNOWN_OP_PREFIXES = (
     "chat",
     "invoke_agent",
@@ -63,7 +35,7 @@ _KNOWN_OP_PREFIXES = (
 
 
 # ---------------------------------------------------------------------------
-# Primitive coercion helpers
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _get(attrs: dict[str, Any], *keys: str) -> Any:
@@ -106,147 +78,64 @@ def _str_list(val: Any) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Field extraction — each function documents its fallback chain
+# Field extraction
 # ---------------------------------------------------------------------------
 
-def extract_provider(attrs: dict[str, Any], span_name: str) -> str:
-    """Extract the GenAI provider name.
-
-    Fallback chain:
-    1. gen_ai.provider.name (standard)
-    2. gen_ai.system (deprecated but widely used)
-    3. Infer from span name prefix (e.g. "anthropic.chat" -> "anthropic")
-    """
+def extract_provider(attrs: dict[str, Any]) -> str:
+    """Extract gen_ai.provider.name (or deprecated gen_ai.system)."""
     val = _get(attrs, "gen_ai.provider.name", "gen_ai.system")
-    if val:
-        return str(val).lower()
-    if "." in span_name:
-        prefix = span_name.split(".", maxsplit=1)[0].lower()
-        if prefix in {"anthropic", "openai", "google", "gemini", "cohere"}:
-            return prefix
-    return ""
+    return str(val).lower() if val else ""
 
 
 def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
-    """Extract the GenAI operation name.
-
-    Fallback chain:
-    1. gen_ai.operation.name (standard)
-    2. agent.span.type mapped via _OPENAI_SPAN_TYPE_TO_OP
-    3. Infer from span name pattern
-    4. llm.request.type (Traceloop)
-    5. Infer from span name with dot prefix
-    """
+    """Extract gen_ai.operation.name, falling back to span name inference."""
     val = _get(attrs, "gen_ai.operation.name")
     if val:
         return str(val)
 
-    openai_type = _get(attrs, "agent.span.type")
-    if openai_type:
-        return _OPENAI_SPAN_TYPE_TO_OP.get(str(openai_type), str(openai_type))
-
+    # Infer from span name prefix
     name_lower = span_name.lower()
     for prefix in _KNOWN_OP_PREFIXES:
         if name_lower.startswith(prefix):
             return prefix
-    if name_lower == "call_llm":
-        return "chat"
-    if name_lower.startswith("agent_run") or name_lower == "invocation":
-        return "invoke_agent"
-    if name_lower.startswith("agent:"):
-        return "invoke_agent"
-    if name_lower.startswith("workflow:"):
-        return "workflow"
-
-    req_type = _get(attrs, "llm.request.type")
-    if req_type == "completion":
-        return "chat"
-
-    if "." in span_name:
-        suffix = span_name.rsplit(".", maxsplit=1)[-1].lower()
-        if suffix in {"chat", "completion", "generate"}:
-            return suffix
 
     return ""
 
 
 def extract_agent_name(attrs: dict[str, Any], span_name: str) -> str:
-    """Extract agent name.
-
-    Fallback chain:
-    1. gen_ai.agent.name (standard, Google ADK)
-    2. agent.name (OpenAI Agents bridge)
-    3. Parse from span name patterns
-    """
-    val = _get(attrs, "gen_ai.agent.name", "agent.name")
+    """Extract gen_ai.agent.name, falling back to span name parsing."""
+    val = _get(attrs, "gen_ai.agent.name")
     if val:
         return str(val)
-    if span_name.lower().startswith("agent: "):
-        return span_name[7:].strip()
     if span_name.lower().startswith("invoke_agent "):
         return span_name[13:].strip()
-    if span_name.startswith("agent_run [") and span_name.endswith("]"):
-        return span_name[len("agent_run ["):-1]
     return ""
 
 
 def extract_conversation_id(attrs: dict[str, Any]) -> str:
-    """Extract conversation/session ID.
-
-    Fallback: gen_ai.conversation.id, gcp.vertex.agent.session_id
-    """
-    val = _get(attrs, "gen_ai.conversation.id", "gcp.vertex.agent.session_id")
+    val = _get(attrs, "gen_ai.conversation.id")
     return str(val) if val else ""
 
 
 def extract_conversation_name(attrs: dict[str, Any]) -> str:
-    """Extract conversation display name.
-
-    Fallback: gen_ai.conversation.name, weave.conversation.name
-    """
     val = _get(attrs, "gen_ai.conversation.name", "weave.conversation.name")
     return str(val) if val else ""
 
 
 def extract_input_tokens(attrs: dict[str, Any]) -> int:
-    """Fallback: gen_ai.usage.input_tokens, prompt_tokens, llm.token_count.prompt"""
-    return safe_int(
-        _get(
-            attrs,
-            "gen_ai.usage.input_tokens",
-            "gen_ai.usage.prompt_tokens",
-            "llm.token_count.prompt",
-        )
-    )
+    return safe_int(_get(attrs, "gen_ai.usage.input_tokens"))
 
 
 def extract_output_tokens(attrs: dict[str, Any]) -> int:
-    """Fallback: gen_ai.usage.output_tokens, completion_tokens, llm.token_count.completion"""
-    return safe_int(
-        _get(
-            attrs,
-            "gen_ai.usage.output_tokens",
-            "gen_ai.usage.completion_tokens",
-            "llm.token_count.completion",
-        )
-    )
+    return safe_int(_get(attrs, "gen_ai.usage.output_tokens"))
 
 
 def extract_total_tokens(attrs: dict[str, Any], input_t: int, output_t: int) -> int:
-    val = safe_int(_get(attrs, "llm.usage.total_tokens", "llm.token_count.total"))
-    if val > 0:
-        return val
     return input_t + output_t
 
 
 def extract_reasoning_tokens(attrs: dict[str, Any]) -> int:
-    return safe_int(
-        _get(
-            attrs,
-            "gen_ai.usage.reasoning_tokens",
-            "gen_ai.usage.output_tokens_details.reasoning_tokens",
-        )
-    )
+    return safe_int(_get(attrs, "gen_ai.usage.reasoning_tokens"))
 
 
 def extract_reasoning_content(raw_output: Any) -> str:
@@ -277,66 +166,18 @@ def extract_reasoning_content(raw_output: Any) -> str:
 
 
 def extract_finish_reasons(attrs: dict[str, Any]) -> list[str]:
-    """Fallback: gen_ai.response.finish_reasons, gen_ai.completion.0.finish_reason"""
     val = _get(attrs, "gen_ai.response.finish_reasons")
     if isinstance(val, list):
         return [str(v) for v in val]
     if isinstance(val, str):
         return [val]
-    reason = _get(attrs, "gen_ai.completion.0.finish_reason")
-    if reason:
-        return [str(reason)]
     return []
-
-
-# ---------------------------------------------------------------------------
-# Tool call extraction
-# ---------------------------------------------------------------------------
-
-def _extract_traceloop_tool_info(attrs: dict[str, Any]) -> tuple[str, str, str]:
-    """Extract tool call info from Traceloop's indexed completion format.
-
-    Returns (tool_name, tool_call_arguments, tool_call_id).
-    """
-    completion = _get(attrs, "gen_ai.completion")
-    if not isinstance(completion, (dict, list)):
-        return "", "", ""
-
-    first_completion = None
-    if isinstance(completion, list) and len(completion) > 0:
-        first_completion = completion[0]
-    elif isinstance(completion, dict):
-        first_completion = completion.get("0") or completion
-
-    if not isinstance(first_completion, dict):
-        return "", "", ""
-
-    tool_calls = first_completion.get("tool_calls")
-    if not tool_calls:
-        return "", "", ""
-
-    first_tool = None
-    if isinstance(tool_calls, list) and len(tool_calls) > 0:
-        first_tool = tool_calls[0]
-    elif isinstance(tool_calls, dict):
-        first_tool = tool_calls.get("0") or tool_calls
-
-    if not isinstance(first_tool, dict):
-        return "", "", ""
-
-    return (
-        str(first_tool.get("name", "")),
-        _json_str(first_tool.get("arguments", "")),
-        str(first_tool.get("id", "")),
-    )
 
 
 def extract_tool_call_arguments(
     attrs: dict[str, Any], events: list[dict[str, Any]]
 ) -> str:
-    """Fallback: gen_ai.tool.call.arguments, gen_ai.tool.input event,
-    gcp.vertex.agent.tool_call_args, Traceloop completion.
-    """
+    """Extract gen_ai.tool.call.arguments from attributes or gen_ai.tool.input event."""
     val = _get(attrs, "gen_ai.tool.call.arguments")
     if val:
         return _json_str(val)
@@ -348,23 +189,13 @@ def extract_tool_call_arguments(
             if val:
                 return _json_str(val)
 
-    val = _get(attrs, "gcp.vertex.agent.tool_call_args")
-    if val:
-        return _json_str(val)
-
-    val = _get(attrs, "gen_ai.completion.0.tool_calls.0.arguments")
-    if val:
-        return _json_str(val)
-
     return ""
 
 
 def extract_tool_call_result(
     attrs: dict[str, Any], events: list[dict[str, Any]]
 ) -> str:
-    """Fallback: gen_ai.tool.call.result, gen_ai.tool.output event,
-    gcp.vertex.agent.tool_response.
-    """
+    """Extract gen_ai.tool.call.result from attributes or gen_ai.tool.output event."""
     val = _get(attrs, "gen_ai.tool.call.result")
     if val:
         return _json_str(val)
@@ -375,10 +206,6 @@ def extract_tool_call_result(
             val = get_attribute(event_attrs, "gen_ai.tool.call.result")
             if val:
                 return _json_str(val)
-
-    val = _get(attrs, "gcp.vertex.agent.tool_response")
-    if val:
-        return _json_str(val)
 
     return ""
 
@@ -422,9 +249,9 @@ def _normalize_single_message(msg: dict[str, Any]) -> NormalizedMessage:
 
 
 def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
-    """Normalize provider-specific message data into NormalizedMessage list.
+    """Normalize message data into NormalizedMessage list.
 
-    Handles OpenAI, Google ADK, Traceloop indexed, and plain string formats.
+    Handles structured message arrays, plain strings, and JSON-encoded strings.
     """
     if raw is None:
         return []
@@ -437,23 +264,6 @@ def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
             return [NormalizedMessage(role="user", content=raw)]
 
     if isinstance(raw, dict):
-        if "contents" in raw and isinstance(raw["contents"], list):
-            return _normalize_raw_messages(raw["contents"])
-        if "content" in raw:
-            content = raw["content"]
-            if isinstance(content, dict) and isinstance(content.get("parts"), list):
-                return [
-                    NormalizedMessage(
-                        role=raw.get("role", "assistant"),
-                        content=_text_from_parts(content["parts"]),
-                    )
-                ]
-            if isinstance(content, str):
-                return [NormalizedMessage(role=raw.get("role", "assistant"), content=content)]
-        # Traceloop indexed: {"0": {role, content}, "1": ...}
-        if all(k.isdigit() for k in raw.keys()):
-            items = sorted(raw.items(), key=lambda kv: int(kv[0]))
-            return _normalize_raw_messages([v for _, v in items])
         if "role" in raw:
             return [_normalize_single_message(raw)]
         return []
@@ -495,11 +305,7 @@ def _normalize_system_instructions(raw: Any) -> list[str]:
 
 
 def _extract_raw_input(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
-    """Extract raw input message data.
-
-    Fallback: gen_ai.input.messages, gen_ai.prompt, gen_ai.content.prompt event,
-    gcp.vertex.agent.llm_request.
-    """
+    """Extract raw input messages from gen_ai.input.messages or gen_ai.prompt."""
     val = _get(attrs, "gen_ai.input.messages")
     if val is not None:
         return val
@@ -515,19 +321,11 @@ def _extract_raw_input(attrs: dict[str, Any], events: list[dict[str, Any]]) -> A
             if val is not None:
                 return val
 
-    val = _get(attrs, "gcp.vertex.agent.llm_request")
-    if val is not None:
-        return val
-
     return None
 
 
 def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
-    """Extract raw output message data.
-
-    Fallback: gen_ai.output.messages, gen_ai.completion, gen_ai.content.completion event,
-    gcp.vertex.agent.llm_response.
-    """
+    """Extract raw output messages from gen_ai.output.messages or gen_ai.completion."""
     val = _get(attrs, "gen_ai.output.messages")
     if val is not None:
         return val
@@ -543,10 +341,6 @@ def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> 
             if val is not None:
                 return val
 
-    val = _get(attrs, "gcp.vertex.agent.llm_response")
-    if val is not None:
-        return val
-
     return None
 
 
@@ -557,10 +351,7 @@ def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> 
 def _extract_custom_attrs(
     attrs: dict[str, Any],
 ) -> tuple[dict[str, str], dict[str, int], dict[str, float]]:
-    """Route non-semconv attributes into the three typed Maps.
-
-    Returns (custom_attrs, custom_attrs_int, custom_attrs_float).
-    """
+    """Route non-semconv attributes into the three typed Maps."""
     string_map: dict[str, str] = {}
     int_map: dict[str, int] = {}
     float_map: dict[str, float] = {}
@@ -610,10 +401,7 @@ def extract_genai_span(
     wb_run_step: int = 0,
     wb_run_step_end: int = 0,
 ) -> AgentSpanCHInsertable:
-    """Extract all GenAI semantic convention fields from a parsed OTel span.
-
-    Handles divergent attribute layouts from OpenAI Agents SDK, Google ADK,
-    and Anthropic (Traceloop) by applying ordered fallback chains.
+    """Extract GenAI semantic convention fields from a parsed OTel span.
 
     Returns an ``AgentSpanCHInsertable`` ready for ClickHouse insert.
     """
@@ -629,22 +417,11 @@ def extract_genai_span(
     if status_code == "UNSET" and not span.status.message:
         status_code = "OK"
 
-    tl_tool_name, tl_tool_args, tl_tool_id = _extract_traceloop_tool_info(attrs)
-    tool_name = str(_get(attrs, "gen_ai.tool.name") or "") or tl_tool_name
-    tool_call_id = str(_get(attrs, "gen_ai.tool.call.id") or "") or tl_tool_id
-
     raw_output = _extract_raw_output(attrs, events_dicts)
     output_msgs = _normalize_raw_messages(raw_output)
     reasoning_content = extract_reasoning_content(raw_output)
 
-    error_type = str(_get(attrs, "error.type") or "")
-    cache_creation = safe_int(_get(attrs, "gen_ai.usage.cache_creation.input_tokens"))
-    cache_read = safe_int(_get(attrs, "gen_ai.usage.cache_read.input_tokens"))
-
     custom_str, custom_int, custom_float = _extract_custom_attrs(attrs)
-
-    # Build full raw span dump for lossless archival
-    raw_span_dump = _json_str(span.as_dict())
 
     return AgentSpanCHInsertable(
         project_id=project_id,
@@ -658,7 +435,7 @@ def extract_genai_span(
         status_code=status_code,
         status_message=span.status.message or "",
         operation_name=extract_operation_name(attrs, span.name),
-        provider_name=extract_provider(attrs, span.name),
+        provider_name=extract_provider(attrs),
         agent_name=extract_agent_name(attrs, span.name),
         agent_id=str(_get(attrs, "gen_ai.agent.id") or ""),
         agent_description=str(_get(attrs, "gen_ai.agent.description") or ""),
@@ -670,18 +447,18 @@ def extract_genai_span(
         output_tokens=output_t,
         total_tokens=total_t,
         reasoning_tokens=reasoning_t,
-        cache_creation_input_tokens=cache_creation,
-        cache_read_input_tokens=cache_read,
+        cache_creation_input_tokens=safe_int(_get(attrs, "gen_ai.usage.cache_creation.input_tokens")),
+        cache_read_input_tokens=safe_int(_get(attrs, "gen_ai.usage.cache_read.input_tokens")),
         reasoning_content=reasoning_content,
         conversation_id=extract_conversation_id(attrs),
         conversation_name=extract_conversation_name(attrs),
-        tool_name=tool_name,
+        tool_name=str(_get(attrs, "gen_ai.tool.name") or ""),
         tool_type=str(_get(attrs, "gen_ai.tool.type") or ""),
-        tool_call_id=tool_call_id,
+        tool_call_id=str(_get(attrs, "gen_ai.tool.call.id") or ""),
         tool_description=str(_get(attrs, "gen_ai.tool.description") or ""),
         tool_definitions=_json_str(_get(attrs, "gen_ai.tool.definitions")),
         finish_reasons=extract_finish_reasons(attrs),
-        error_type=error_type,
+        error_type=str(_get(attrs, "error.type") or ""),
         request_temperature=safe_float(_get(attrs, "gen_ai.request.temperature")),
         request_max_tokens=safe_int(_get(attrs, "gen_ai.request.max_tokens")),
         request_top_p=safe_float(_get(attrs, "gen_ai.request.top_p")),
@@ -696,7 +473,7 @@ def extract_genai_span(
         system_instructions=_normalize_system_instructions(
             _get(attrs, "gen_ai.system_instructions")
         ),
-        tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts) or tl_tool_args,
+        tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts),
         tool_call_result=extract_tool_call_result(attrs, events_dicts),
         compaction_summary=str(_get(attrs, "weave.compaction.summary") or ""),
         compaction_items_before=safe_int(_get(attrs, "weave.compaction.items_before")),
@@ -709,7 +486,7 @@ def extract_genai_span(
         custom_attrs_float=custom_float,
         server_address=str(_get(attrs, "server.address") or ""),
         server_port=safe_int(_get(attrs, "server.port")),
-        raw_span_dump=raw_span_dump,
+        raw_span_dump=_json_str(span.as_dict()),
         attributes_dump=_json_str(attrs),
         events_dump=_json_str(events_dicts) if events_dicts else "",
         resource_dump=_json_str(span.resource.as_dict() if span.resource else None),

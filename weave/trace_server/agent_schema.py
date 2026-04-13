@@ -264,10 +264,7 @@ _OTEL_GENAI_SEMCONV_KEYS: frozenset[str] = frozenset(
         # Token usage
         "gen_ai.usage.input_tokens",
         "gen_ai.usage.output_tokens",
-        "gen_ai.usage.prompt_tokens",  # deprecated alias for input_tokens
-        "gen_ai.usage.completion_tokens",  # deprecated alias for output_tokens
-        "gen_ai.usage.reasoning_tokens",  # proposed (OTel PR #3383)
-        "gen_ai.usage.output_tokens_details.reasoning_tokens",  # OpenAI-specific
+        "gen_ai.usage.reasoning_tokens",
         "gen_ai.usage.cache_creation.input_tokens",
         "gen_ai.usage.cache_read.input_tokens",
         # Conversation
@@ -312,29 +309,6 @@ _OTEL_CORE_SEMCONV_KEYS: frozenset[str] = frozenset(
     }
 )
 
-# Vendor-specific keys extracted via fallback chains.
-# These are NOT part of the OTel GenAI semconv but are emitted by popular
-# instrumentations (OpenAI Agents SDK, Traceloop/OpenLLMetry, Google ADK).
-_VENDOR_FALLBACK_KEYS: frozenset[str] = frozenset(
-    {
-        # OpenAI Agents SDK
-        "agent.name",
-        "agent.span.type",
-        # Traceloop / OpenLLMetry (pre-semconv)
-        "llm.usage.total_tokens",
-        "llm.token_count.prompt",
-        "llm.token_count.completion",
-        "llm.token_count.total",
-        "llm.request.type",
-        # Google ADK / Vertex AI
-        "gcp.vertex.agent.session_id",
-        "gcp.vertex.agent.tool_call_args",
-        "gcp.vertex.agent.tool_response",
-        "gcp.vertex.agent.llm_request",
-        "gcp.vertex.agent.llm_response",
-    }
-)
-
 # Weave extensions (weave.* namespace) — product-specific features not
 # covered by the OTel GenAI semantic conventions.
 _WEAVE_EXTENSION_KEYS: frozenset[str] = frozenset(
@@ -354,6 +328,5 @@ _WEAVE_EXTENSION_KEYS: frozenset[str] = frozenset(
 KNOWN_SEMCONV_ATTR_KEYS: frozenset[str] = (
     _OTEL_GENAI_SEMCONV_KEYS
     | _OTEL_CORE_SEMCONV_KEYS
-    | _VENDOR_FALLBACK_KEYS
     | _WEAVE_EXTENSION_KEYS
 )
