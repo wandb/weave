@@ -3942,7 +3942,9 @@ def test_feedback_batching(network_proxy_client):
     # Flush to ensure all feedback is processed
     client.flush()
 
-    feedback_create_records = [req for route, req in records if route == "feedback_create"]
+    feedback_create_records = [
+        req for route, req in records if route == "feedback_create"
+    ]
 
     assert remote_client.get_feedback_processor() is not None
     assert len(feedback_create_records) == 0, (
