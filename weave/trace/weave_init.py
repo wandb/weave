@@ -220,8 +220,8 @@ def init_weave(
         min_required_version = "0.0.0"
         trace_server_version = None
     effective_trace_server_url = (
-        trace_server_url
-        if trace_server_url is not None
+        resolved_trace_server_url
+        if resolved_trace_server_url is not None
         else env.weave_trace_server_url()
     )
     if not init_message.check_min_weave_version(
