@@ -4745,6 +4745,98 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         res = self.calls_delete(calls_delete_req)
         return tsi.PredictionDeleteRes(num_deleted=res.num_deleted)
 
+    def _rebuild_predict_and_score_output(
+        self,
+        project_id: str,
+        predict_and_score_id: str,
+        prediction_call: tsi.CallSchema,
+    ) -> None:
+        """Re-collect all scorer children and re-end the predict_and_score call.
+
+        Reads the existing output.scores (which may contain scores from the
+        original eval run that don't have weave.score="true"), then layers on
+        scores from child calls that DO have weave.score="true" (created by
+        score_create). This preserves original scores while adding new ones.
+        Called by both prediction_finish (initial) and score_create (post-hoc).
+        """
+        # Start with existing scores from the predict_and_score call's output,
+        # since original eval scorers don't set weave.score="true" and won't
+        # be found by the child call query below.
+        pas_read = self.call_read(
+            tsi.CallReadReq(project_id=project_id, id=predict_and_score_id)
+        )
+        existing_output = (
+            pas_read.call.output
+            if pas_read.call and isinstance(pas_read.call.output, dict)
+            else {}
+        )
+        scores_dict: dict[str, Any] = (
+            dict(existing_output.get("scores", {}))
+            if isinstance(existing_output.get("scores"), dict)
+            else {}
+        )
+
+        score_query = tsi.Query(
+            expr_=tsi_query.EqOperation(
+                eq_=[
+                    tsi_query.GetFieldOperator(
+                        get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.SCORE_ATTR_KEY}"
+                    ),
+                    tsi_query.LiteralOperation(literal_="true"),
+                ]
+            )
+        )
+
+        calls_query_req = tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(
+                parent_ids=[predict_and_score_id],
+            ),
+            query=score_query,
+            columns=["output", "attributes"],
+        )
+
+        for score_call in self.calls_query_stream(calls_query_req):
+            if score_call.output is None:
+                continue
+
+            weave_attrs = score_call.attributes.get(
+                constants.WEAVE_ATTRIBUTES_NAMESPACE, {}
+            )
+            scorer_ref = weave_attrs.get(constants.SCORE_SCORER_ATTR_KEY)
+
+            scorer_name = "unknown"
+            if scorer_ref and isinstance(scorer_ref, str):
+                parts = scorer_ref.split("/")
+                if parts:
+                    name_and_digest = parts[-1]
+                    if ":" in name_and_digest:
+                        scorer_name = name_and_digest.split(":")[0]
+
+            scores_dict[scorer_name] = score_call.output
+
+        model_latency = None
+        if prediction_call.started_at and prediction_call.ended_at:
+            latency_seconds = (
+                prediction_call.ended_at - prediction_call.started_at
+            ).total_seconds()
+            model_latency = {"mean": latency_seconds}
+
+        parent_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=predict_and_score_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output={
+                    "output": prediction_call.output,
+                    "scores": scores_dict,
+                    "model_latency": model_latency,
+                },
+                summary={},
+            )
+        )
+        self.call_end(parent_end_req)
+
     def prediction_finish(
         self, req: tsi.PredictionFinishReq
     ) -> tsi.PredictionFinishRes:
@@ -4802,76 +4894,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # == After here, we assume the parent is a predict_and_score call ==
 
-        # Build the scores dict by querying all score children of predict_and_score
-        scores_dict = {}
-
-        # Build query to filter for score calls at database level
-        score_query = tsi.Query(
-            expr_=tsi_query.EqOperation(
-                eq_=[
-                    tsi_query.GetFieldOperator(
-                        get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.SCORE_ATTR_KEY}"
-                    ),
-                    tsi_query.LiteralOperation(literal_="true"),
-                ]
-            )
+        self._rebuild_predict_and_score_output(
+            req.project_id, parent_id, prediction_call
         )
-
-        calls_query_req = tsi.CallsQueryReq(
-            project_id=req.project_id,
-            filter=tsi.CallsFilter(
-                parent_ids=[parent_id],
-            ),
-            query=score_query,
-            columns=["output", "attributes"],
-        )
-
-        for score_call in self.calls_query_stream(calls_query_req):
-            if score_call.output is None:
-                continue
-
-            # Get scorer name from the scorer ref in attributes
-            weave_attrs = score_call.attributes.get(
-                constants.WEAVE_ATTRIBUTES_NAMESPACE, {}
-            )
-            scorer_ref = weave_attrs.get(constants.SCORE_SCORER_ATTR_KEY)
-
-            # Extract scorer name from ref (e.g., "weave:///entity/project/Scorer:digest" -> "Scorer")
-            scorer_name = "unknown"
-            if scorer_ref and isinstance(scorer_ref, str):
-                # Parse the weave:// URI to get the object name
-                parts = scorer_ref.split("/")
-                if parts:
-                    # Get the last part which should be like "Scorer:digest"
-                    name_and_digest = parts[-1]
-                    if ":" in name_and_digest:
-                        scorer_name = name_and_digest.split(":")[0]
-
-            scores_dict[scorer_name] = score_call.output
-
-        # Calculate model latency from the prediction call's timestamps
-        model_latency = None
-        if prediction_call.started_at and prediction_call.ended_at:
-            latency_seconds = (
-                prediction_call.ended_at - prediction_call.started_at
-            ).total_seconds()
-            model_latency = {"mean": latency_seconds}
-
-        # Finish the predict_and_score parent call with proper output
-        parent_end_req = tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=req.project_id,
-                id=parent_id,
-                ended_at=datetime.datetime.now(datetime.timezone.utc),
-                output={
-                    "output": prediction_call.output,
-                    "scores": scores_dict,
-                    "model_latency": model_latency,
-                },
-                summary={},
-            )
-        )
-        self.call_end(parent_end_req)
 
         return tsi.PredictionFinishRes(success=True)
 
@@ -5013,6 +5038,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=wb_user_id,
         )
         self.feedback_create(feedback_req)
+
+        # If this score is part of an evaluation, rebuild the predict_and_score
+        # call's output so that output.scores includes this new score. This
+        # keeps the eval topology consistent for eval_results_query.
+        if req.evaluation_run_id and prediction_call and prediction_call.parent_id:
+            self._rebuild_predict_and_score_output(
+                req.project_id, prediction_call.parent_id, prediction_call
+            )
 
         return tsi.ScoreCreateRes(score_id=score_id)
 

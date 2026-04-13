@@ -232,30 +232,6 @@ def best_effort_scorer_call_ids(
     return result
 
 
-def extract_scores_from_scorer_children(
-    child_calls: list[tsi.CallSchema],
-) -> dict[str, Any]:
-    """Extract score values from child calls created by score_create().
-
-    Identifies scorer calls by the presence of the weave.scorer attribute
-    (set exclusively by score_create), parses the scorer name from the ref URI,
-    and returns a dict of scorer_name -> output value.
-    """
-    scores: dict[str, Any] = {}
-    for call in child_calls:
-        weave_attrs = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
-        scorer_ref_uri = weave_attrs.get(constants.SCORE_SCORER_ATTR_KEY)
-        if not scorer_ref_uri or not isinstance(scorer_ref_uri, str):
-            continue
-        try:
-            scorer_ref = ri.parse_internal_uri(scorer_ref_uri)
-        except Exception:
-            continue
-        if isinstance(scorer_ref, ri.InternalObjectRef):
-            scores[scorer_ref.name] = call.output
-    return scores
-
-
 @_trace_wrap("eval_results_helpers.build_eval_rows_from_calls")
 def build_eval_rows_from_calls(
     predict_and_score_calls: list[tsi.CallSchema],
@@ -303,13 +279,6 @@ def build_eval_rows_from_calls(
         scores = output.get("scores") if isinstance(output.get("scores"), dict) else {}
         trial_children = child_by_parent.get(pas_call.id, [])
 
-        # Merge scores from child calls created via score_create().
-        # These are identified by the weave.scorer attribute and won't
-        # collide with scores already in output.scores.
-        child_scores = extract_scores_from_scorer_children(trial_children)
-        for key, val in child_scores.items():
-            if key not in scores:
-                scores[key] = val
         model_ref = (
             pas_call.inputs.get("model") if isinstance(pas_call.inputs, dict) else None
         )
