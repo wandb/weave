@@ -28,6 +28,7 @@ from tests.trace.util import (
     MaybeStringMatcher,
     client_is_sqlite,
     get_info_loglines,
+    retry_not_found,
 )
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
@@ -1781,8 +1782,9 @@ def test_bound_op_retrieval(client):
     obj = CustomType(a=1)
     obj_ref = weave.publish(obj)
     # Allow ClickHouse file writes to settle before loading the bound op source.
-    time.sleep(0.2)
-    obj2 = obj_ref.get()
+    for attempt in retry_not_found():
+        with attempt:
+            obj2 = obj_ref.get()
     assert obj2.op_with_custom_type(1) == 2
 
     my_op_ref = weave_client.get_ref(CustomType.op_with_custom_type)
@@ -3246,8 +3248,9 @@ def test_model_save(client):
     model_ref = weave.publish(model)
     assert model.predict(1) == {"answer": "42"}
     # Allow ClickHouse file writes to settle before loading the model source.
-    time.sleep(0.2)
-    model2 = model_ref.get()
+    for attempt in retry_not_found():
+        with attempt:
+            model2 = model_ref.get()
     assert model2.predict(1) == {"answer": "42"}
 
     inner_res = get_client_trace_server(client).objs_query(
@@ -4749,8 +4752,9 @@ def test_get_object_from_uri_non_registered_object(client):
     uri = ref.uri
 
     # Allow ClickHouse file writes to settle before loading the model source.
-    time.sleep(0.2)
-    res = weave.get(uri)
+    for attempt in retry_not_found():
+        with attempt:
+            res = weave.get(uri)
     assert res.name == "example"
     assert res.description == "fancy"
     assert res.a == 1

@@ -8,7 +8,15 @@ import time
 from collections.abc import Callable
 from contextlib import contextmanager
 
+from tenacity import (
+    Retrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
+
 from tests.trace.server_utils import find_server_layer
+from weave.trace_server.errors import NotFoundError
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
@@ -18,6 +26,30 @@ def client_is_sqlite(client):
     except TypeError:
         return False
     return True
+
+
+def retry_not_found(
+    max_attempts: int = 5,
+    initial_delay: float = 0.05,
+) -> Retrying:
+    """Retry iterator for ClickHouse eventual consistency.
+
+    Use instead of time.sleep() before reads that follow writes in tests.
+    Backoff: 50ms, 100ms, 200ms, 400ms — total ~750ms worst case.
+    On SQLite the first attempt always succeeds (no EC).
+
+    Usage::
+
+        for attempt in retry_not_found():
+            with attempt:
+                obj = ref.get()
+    """
+    return Retrying(
+        stop=stop_after_attempt(max_attempts),
+        wait=wait_exponential(multiplier=1, min=initial_delay, max=1.0),
+        retry=retry_if_exception_type(NotFoundError),
+        reraise=True,
+    )
 
 
 class AnyStrMatcher:  # noqa: PLW1641
