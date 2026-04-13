@@ -194,7 +194,7 @@ class AgentSpanCHInsertable(BaseModel):
     wb_run_step_end: int = 0
 
     # [Infra] retention
-    ttl_at: datetime.datetime = Field(
+    expire_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime(2100, 1, 1)
     )
 

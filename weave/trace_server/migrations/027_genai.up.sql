@@ -2,100 +2,100 @@
 
 -- spans
 CREATE TABLE spans (
-    project_id          String CODEC(ZSTD(1)),
-    trace_id            String CODEC(ZSTD(1)),
-    span_id             String CODEC(ZSTD(1)),
-    parent_span_id      String DEFAULT '' CODEC(ZSTD(1)),
-    span_name           String CODEC(ZSTD(1)),
-    span_kind           Enum8('UNSPECIFIED'=0,'INTERNAL'=1,'SERVER'=2,'CLIENT'=3,'PRODUCER'=4,'CONSUMER'=5) CODEC(ZSTD(1)),
+    project_id          String,
+    trace_id            String,
+    span_id             String,
+    parent_span_id      String DEFAULT '',
+    span_name           String,
+    span_kind           Enum8('UNSPECIFIED'=0,'INTERNAL'=1,'SERVER'=2,'CLIENT'=3,'PRODUCER'=4,'CONSUMER'=5),
 
-    started_at          DateTime64(6) CODEC(Delta(8), ZSTD(1)),
-    ended_at            DateTime64(6) DEFAULT toDateTime64(0, 6) CODEC(Delta(8), ZSTD(1)),
-    created_at          DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
+    started_at          DateTime64(6),
+    ended_at            DateTime64(6) DEFAULT toDateTime64(0, 6),
+    created_at          DateTime64(3) DEFAULT now64(3),
 
-    status_code         Enum8('UNSET'=0,'OK'=1,'ERROR'=2) CODEC(ZSTD(1)),
-    status_message      String DEFAULT '' CODEC(ZSTD(1)),
+    status_code         Enum8('UNSET'=0,'OK'=1,'ERROR'=2),
+    status_message      String DEFAULT '',
 
-    operation_name      String DEFAULT '' CODEC(ZSTD(1)),
-    provider_name       String DEFAULT '' CODEC(ZSTD(1)),
+    operation_name      String DEFAULT '',
+    provider_name       String DEFAULT '',
 
-    agent_name          String DEFAULT '' CODEC(ZSTD(1)),
-    agent_id            String DEFAULT '' CODEC(ZSTD(1)),
-    agent_description   String DEFAULT '' CODEC(ZSTD(1)),
-    agent_version       String DEFAULT '' CODEC(ZSTD(1)),
+    agent_name          String DEFAULT '',
+    agent_id            String DEFAULT '',
+    agent_description   String DEFAULT '',
+    agent_version       String DEFAULT '',
 
-    request_model       String DEFAULT '' CODEC(ZSTD(1)),
-    response_model      String DEFAULT '' CODEC(ZSTD(1)),
-    response_id         String DEFAULT '' CODEC(ZSTD(1)),
-    input_tokens        UInt64 DEFAULT 0 CODEC(ZSTD(1)),
-    output_tokens       UInt64 DEFAULT 0 CODEC(ZSTD(1)),
-    total_tokens        UInt64 DEFAULT 0 CODEC(ZSTD(1)),
-    reasoning_tokens    UInt64 DEFAULT 0 CODEC(ZSTD(1)),
-    cache_creation_input_tokens UInt64 DEFAULT 0 CODEC(ZSTD(1)),
-    cache_read_input_tokens     UInt64 DEFAULT 0 CODEC(ZSTD(1)),
+    request_model       String DEFAULT '',
+    response_model      String DEFAULT '',
+    response_id         String DEFAULT '',
+    input_tokens        UInt64 DEFAULT 0,
+    output_tokens       UInt64 DEFAULT 0,
+    total_tokens        UInt64 DEFAULT 0,
+    reasoning_tokens    UInt64 DEFAULT 0,
+    cache_creation_input_tokens UInt64 DEFAULT 0,
+    cache_read_input_tokens     UInt64 DEFAULT 0,
 
-    reasoning_content   String DEFAULT '' CODEC(ZSTD(1)),
+    reasoning_content   String DEFAULT '',
 
-    conversation_id     String DEFAULT '' CODEC(ZSTD(1)),
-    conversation_name   String DEFAULT '' CODEC(ZSTD(1)),
+    conversation_id     String DEFAULT '',
+    conversation_name   String DEFAULT '',
 
-    tool_name           String DEFAULT '' CODEC(ZSTD(1)),
-    tool_type           String DEFAULT '' CODEC(ZSTD(1)),
-    tool_call_id        String DEFAULT '' CODEC(ZSTD(1)),
-    tool_description    String DEFAULT '' CODEC(ZSTD(1)),
-    tool_definitions    String DEFAULT '' CODEC(ZSTD(1)),
+    tool_name           String DEFAULT '',
+    tool_type           String DEFAULT '',
+    tool_call_id        String DEFAULT '',
+    tool_description    String DEFAULT '',
+    tool_definitions    String DEFAULT '',
 
-    finish_reasons      Array(String) CODEC(ZSTD(1)),
-    error_type          String DEFAULT '' CODEC(ZSTD(1)),
+    finish_reasons      Array(String),
+    error_type          String DEFAULT '',
 
-    request_temperature     Float64 DEFAULT 0 CODEC(ZSTD(1)),
-    request_max_tokens      UInt64 DEFAULT 0 CODEC(ZSTD(1)),
-    request_top_p           Float64 DEFAULT 0 CODEC(ZSTD(1)),
-    request_frequency_penalty Float64 DEFAULT 0 CODEC(ZSTD(1)),
-    request_presence_penalty  Float64 DEFAULT 0 CODEC(ZSTD(1)),
-    request_seed            Int64 DEFAULT 0 CODEC(ZSTD(1)),
-    request_stop_sequences  Array(String) DEFAULT [] CODEC(ZSTD(1)),
-    request_choice_count    UInt32 DEFAULT 0 CODEC(ZSTD(1)),
+    request_temperature     Float64 DEFAULT 0,
+    request_max_tokens      UInt64 DEFAULT 0,
+    request_top_p           Float64 DEFAULT 0,
+    request_frequency_penalty Float64 DEFAULT 0,
+    request_presence_penalty  Float64 DEFAULT 0,
+    request_seed            Int64 DEFAULT 0,
+    request_stop_sequences  Array(String) DEFAULT [],
+    request_choice_count    UInt32 DEFAULT 0,
 
-    output_type         String DEFAULT '' CODEC(ZSTD(1)),
+    output_type         String DEFAULT '',
 
     input_messages  Array(Tuple(
         role String, content String, finish_reason String
-    )) CODEC(ZSTD(1)),
+    )),
     output_messages Array(Tuple(
         role String, content String, finish_reason String
-    )) CODEC(ZSTD(1)),
-    system_instructions Array(String) DEFAULT [] CODEC(ZSTD(1)),
+    )),
+    system_instructions Array(String) DEFAULT [],
 
-    tool_call_arguments String DEFAULT '' CODEC(ZSTD(1)),
-    tool_call_result    String DEFAULT '' CODEC(ZSTD(1)),
+    tool_call_arguments String DEFAULT '',
+    tool_call_result    String DEFAULT '',
 
-    compaction_summary       String DEFAULT '' CODEC(ZSTD(1)),
-    compaction_items_before  UInt32 DEFAULT 0 CODEC(ZSTD(1)),
-    compaction_items_after   UInt32 DEFAULT 0 CODEC(ZSTD(1)),
+    compaction_summary       String DEFAULT '',
+    compaction_items_before  UInt32 DEFAULT 0,
+    compaction_items_after   UInt32 DEFAULT 0,
 
-    content_refs        Array(String) CODEC(ZSTD(1)),
-    artifact_refs       Array(String) CODEC(ZSTD(1)),
-    object_refs         Array(String) CODEC(ZSTD(1)),
+    content_refs        Array(String),
+    artifact_refs       Array(String),
+    object_refs         Array(String),
 
-    custom_attrs        Map(String, String) CODEC(ZSTD(1)),
-    custom_attrs_int    Map(String, Int64) CODEC(ZSTD(1)),
-    custom_attrs_float  Map(String, Float64) CODEC(ZSTD(1)),
+    custom_attrs        Map(String, String),
+    custom_attrs_int    Map(String, Int64),
+    custom_attrs_float  Map(String, Float64),
 
-    server_address      String DEFAULT '' CODEC(ZSTD(1)),
-    server_port         UInt32 DEFAULT 0 CODEC(ZSTD(1)),
+    server_address      String DEFAULT '',
+    server_port         UInt32 DEFAULT 0,
 
-    raw_span_dump       String DEFAULT '' CODEC(ZSTD(1)),
-    attributes_dump     String DEFAULT '' CODEC(ZSTD(1)),
-    events_dump         String DEFAULT '' CODEC(ZSTD(1)),
-    resource_dump       String DEFAULT '' CODEC(ZSTD(1)),
+    raw_span_dump       String DEFAULT '',
+    attributes_dump     String DEFAULT '',
+    events_dump         String DEFAULT '',
+    resource_dump       String DEFAULT '',
 
-    wb_user_id          String DEFAULT '' CODEC(ZSTD(1)),
-    wb_run_id           String DEFAULT '' CODEC(ZSTD(1)),
-    wb_run_step         UInt64 DEFAULT 0 CODEC(ZSTD(1)),
-    wb_run_step_end     UInt64 DEFAULT 0 CODEC(ZSTD(1)),
+    wb_user_id          String DEFAULT '',
+    wb_run_id           String DEFAULT '',
+    wb_run_step         UInt64 DEFAULT 0,
+    wb_run_step_end     UInt64 DEFAULT 0,
 
-    ttl_at              DateTime DEFAULT '2100-01-01 00:00:00' CODEC(ZSTD(1)),
+    expire_at              DateTime DEFAULT '2100-01-01 00:00:00',
 
     INDEX idx_span_id span_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
@@ -112,22 +112,22 @@ CREATE TABLE spans (
 ) ENGINE = ReplacingMergeTree(created_at)
 PARTITION BY toYYYYMM(started_at)
 ORDER BY (project_id, started_at, span_id)
-TTL ttl_at DELETE
+TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part=0;
 
 
 -- agents (materialized from spans)
 CREATE TABLE agents (
-    project_id String CODEC(ZSTD(1)),
-    agent_name String CODEC(ZSTD(1)),
-    invocation_count SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    span_count SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    total_input_tokens SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    total_output_tokens SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    total_duration_ms SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    error_count SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    first_seen SimpleAggregateFunction(min, DateTime64(6)) CODEC(Delta(8), ZSTD(1)),
-    last_seen SimpleAggregateFunction(max, DateTime64(6)) CODEC(Delta(8), ZSTD(1))
+    project_id String,
+    agent_name String,
+    invocation_count SimpleAggregateFunction(sum, UInt64),
+    span_count SimpleAggregateFunction(sum, UInt64),
+    total_input_tokens SimpleAggregateFunction(sum, UInt64),
+    total_output_tokens SimpleAggregateFunction(sum, UInt64),
+    total_duration_ms SimpleAggregateFunction(sum, UInt64),
+    error_count SimpleAggregateFunction(sum, UInt64),
+    first_seen SimpleAggregateFunction(min, DateTime64(6)),
+    last_seen SimpleAggregateFunction(max, DateTime64(6))
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, agent_name);
 
@@ -149,17 +149,17 @@ WHERE agent_name != '';
 
 -- agent_versions (materialized from spans)
 CREATE TABLE agent_versions (
-    project_id String CODEC(ZSTD(1)),
-    agent_name String CODEC(ZSTD(1)),
-    agent_version String CODEC(ZSTD(1)),
-    invocation_count SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    span_count SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    total_input_tokens SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    total_output_tokens SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    total_duration_ms SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    error_count SimpleAggregateFunction(sum, UInt64) CODEC(ZSTD(1)),
-    first_seen SimpleAggregateFunction(min, DateTime64(6)) CODEC(Delta(8), ZSTD(1)),
-    last_seen SimpleAggregateFunction(max, DateTime64(6)) CODEC(Delta(8), ZSTD(1))
+    project_id String,
+    agent_name String,
+    agent_version String,
+    invocation_count SimpleAggregateFunction(sum, UInt64),
+    span_count SimpleAggregateFunction(sum, UInt64),
+    total_input_tokens SimpleAggregateFunction(sum, UInt64),
+    total_output_tokens SimpleAggregateFunction(sum, UInt64),
+    total_duration_ms SimpleAggregateFunction(sum, UInt64),
+    error_count SimpleAggregateFunction(sum, UInt64),
+    first_seen SimpleAggregateFunction(min, DateTime64(6)),
+    last_seen SimpleAggregateFunction(max, DateTime64(6))
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, agent_name, agent_version);
 
@@ -182,22 +182,22 @@ WHERE agent_name != '';
 
 -- message_search
 CREATE TABLE message_search (
-    project_id String CODEC(ZSTD(1)),
-    content_digest String CODEC(ZSTD(1)),
-    conversation_id String DEFAULT '' CODEC(ZSTD(1)),
-    trace_id String CODEC(ZSTD(1)),
-    span_id String CODEC(ZSTD(1)),
-    role String DEFAULT '' CODEC(ZSTD(1)),
-    started_at DateTime64(6) CODEC(Delta(8), ZSTD(1)),
-    content String CODEC(ZSTD(1)),
-    agent_name String DEFAULT '' CODEC(ZSTD(1)),
-    agent_version String DEFAULT '' CODEC(ZSTD(1)),
-    conversation_name String DEFAULT '' CODEC(ZSTD(1)),
-    wb_user_id String DEFAULT '' CODEC(ZSTD(1)),
-    provider_name String DEFAULT '' CODEC(ZSTD(1)),
-    request_model String DEFAULT '' CODEC(ZSTD(1)),
-    operation_name String DEFAULT '' CODEC(ZSTD(1)),
-    created_at DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
+    project_id String,
+    content_digest String,
+    conversation_id String DEFAULT '',
+    trace_id String,
+    span_id String,
+    role String DEFAULT '',
+    started_at DateTime64(6),
+    content String,
+    agent_name String DEFAULT '',
+    agent_version String DEFAULT '',
+    conversation_name String DEFAULT '',
+    wb_user_id String DEFAULT '',
+    provider_name String DEFAULT '',
+    request_model String DEFAULT '',
+    operation_name String DEFAULT '',
+    created_at DateTime64(3) DEFAULT now64(3),
 
     INDEX idx_content content TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1,
     INDEX idx_conv_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1,

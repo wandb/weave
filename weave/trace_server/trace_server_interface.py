@@ -15,6 +15,7 @@ else:
         ResourceSpans = Any
 
 from weave.trace_server import http_service_interface as his
+from weave.trace_server.agent_types import *  # noqa: F403
 from weave.trace_server.common_interface import (
     WB_USER_ID_DESCRIPTION,
     AnnotationState,
@@ -3286,9 +3287,3 @@ class CallsUsageRes(BaseModel):
     call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
     # Unique IDs of calls considered for rollup that have not ended yet.
     unfinished_call_ids: list[str] = Field(default_factory=list)
-
-
-# ---------------------------------------------------------------------------
-# Agent observability types — re-exported from agent_types module
-# ---------------------------------------------------------------------------
-from weave.trace_server.agent_types import *  # noqa: F403

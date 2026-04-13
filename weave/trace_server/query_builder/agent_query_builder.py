@@ -1,12 +1,13 @@
 """Shared query-building helpers for GenAI ClickHouse queries.
 
-Provides validated, parameterized query construction to prevent SQL injection
-and ensure consistency across all GenAI query endpoints.
+Uses the ParamBuilder abstraction for parameterized query construction.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
+from weave.trace_server.orm import ParamBuilder
 
 # ---------------------------------------------------------------------------
 # Column whitelists — only these can appear in WHERE/ORDER BY/GROUP BY
@@ -56,11 +57,6 @@ _ATTR_OPS: dict[str, str] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Safe ORDER BY builder
-# ---------------------------------------------------------------------------
-
-
 def build_order_by(
     sort_by: list[Any] | None,
     allowed: frozenset[str],
@@ -80,94 +76,64 @@ def build_order_by(
     return ", ".join(parts) if parts else default
 
 
-# ---------------------------------------------------------------------------
-# Time range filter builder
-# ---------------------------------------------------------------------------
-
-
 def add_time_filters(
     conditions: list[str],
-    parameters: dict[str, Any],
+    pb: ParamBuilder,
     *,
     start: str | None,
     end: str | None,
     column: str = "s.started_at",
-    param_prefix: str = "t",
 ) -> None:
-    """Add start/end time range conditions using parseDateTimeBestEffort.
-
-    Uses parameterized String values — safe against injection.
-    """
+    """Add start/end time range conditions using parseDateTimeBestEffort."""
     if start:
-        p = f"{param_prefix}_start"
-        conditions.append(f"{column} >= parseDateTimeBestEffort({{{p}:String}})")
-        parameters[p] = str(start)
+        conditions.append(
+            f"{column} >= parseDateTimeBestEffort({pb.add(str(start), param_type='String')})"
+        )
     if end:
-        p = f"{param_prefix}_end"
-        conditions.append(f"{column} < parseDateTimeBestEffort({{{p}:String}})")
-        parameters[p] = str(end)
-
-
-# ---------------------------------------------------------------------------
-# Simple equality filter builder (for span columns)
-# ---------------------------------------------------------------------------
+        conditions.append(
+            f"{column} < parseDateTimeBestEffort({pb.add(str(end), param_type='String')})"
+        )
 
 
 def add_span_filters(
     conditions: list[str],
-    parameters: dict[str, Any],
+    pb: ParamBuilder,
     filters: Any,
     *,
     table_alias: str = "s",
 ) -> None:
-    """Add validated equality filters from an AgentSpansQueryFilters-like object.
-
-    Only columns in SPAN_FILTERABLE_COLS are allowed.
-    """
+    """Add validated equality filters. Only columns in SPAN_FILTERABLE_COLS are allowed."""
     for attr in SPAN_FILTERABLE_COLS:
         val = getattr(filters, attr, None)
         if val:
-            param = f"f_{attr}"
-            conditions.append(f"{table_alias}.{attr} = {{{param}:String}}")
-            parameters[param] = val
-
-
-# ---------------------------------------------------------------------------
-# Custom attrs (Map) filter builder
-# ---------------------------------------------------------------------------
+            conditions.append(
+                f"{table_alias}.{attr} = {pb.add(val, param_type='String')}"
+            )
 
 
 def add_custom_attr_filters(
     conditions: list[str],
-    parameters: dict[str, Any],
+    pb: ParamBuilder,
     custom_filters: list[Any] | None,
     *,
     table_alias: str = "s",
 ) -> None:
-    """Add custom_attrs Map(String, String) filters with parameterized values.
-
-    All values are compared as strings. The attr_key and value are parameterized
-    to prevent SQL injection.
-    """
+    """Add custom_attrs Map(String, String) filters with parameterized values."""
     if not custom_filters:
         return
-    for i, cf in enumerate(custom_filters):
-        key_param = f"cf{i}_key"
-        val_param = f"cf{i}_val"
+    for cf in custom_filters:
         attr_key = cf.attr_key if hasattr(cf, "attr_key") else cf.get("attr_key", "")
         value = cf.value if hasattr(cf, "value") else cf.get("value", "")
         operator = cf.operator if hasattr(cf, "operator") else cf.get("operator", "eq")
 
         op = _ATTR_OPS.get(operator, "=")
-        parameters[key_param] = str(attr_key)
-        parameters[val_param] = str(value)
-        conditions.append(
-            f"{table_alias}.custom_attrs[{{{key_param}:String}}] {op} {{{val_param}:String}}"
-        )
+        key_slot = pb.add(str(attr_key), param_type="String")
+        val_slot = pb.add(str(value), param_type="String")
+        conditions.append(f"{table_alias}.custom_attrs[{key_slot}] {op} {val_slot}")
 
 
 # ---------------------------------------------------------------------------
-# Safe int/str extraction from query rows
+# Safe type coercion from query rows
 # ---------------------------------------------------------------------------
 
 
