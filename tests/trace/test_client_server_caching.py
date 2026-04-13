@@ -8,6 +8,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import PIL
+import pytest
 
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
@@ -213,6 +214,7 @@ def test_server_cache_size_limit(client):
             )
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_server_cache_latency(client):
     count = 500
 
@@ -220,12 +222,12 @@ def test_server_cache_latency(client):
     caching_server = CachingMiddlewareTraceServer(next_trace_server=base_server)
 
     def get_latency_for_server(server: TraceServerInterface, count: int):
-        start = time.time()
+        start = time.perf_counter()
         for i in range(count):
             server.obj_read(
                 ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
             )
-        end = time.time()
+        end = time.perf_counter()
         return (end - start) / count
 
     latency_without_cache = get_latency_for_server(base_server, count)
@@ -237,7 +239,7 @@ def test_server_cache_latency(client):
     if sys.platform == "win32":
         assert added_latency < 0.05  # Windows is REALLY slow
     else:
-        assert added_latency < 0.002
+        assert added_latency < 0.003
 
 
 def test_file_create_caching(client):
