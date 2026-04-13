@@ -278,13 +278,13 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
 
             ranked_digests AS (
                 SELECT row_digest,
-                    ROW_NUMBER() OVER(ORDER BY avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_4:String} THEN nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') ELSE NULL END)) DESC, row_digest ASC) AS row_order
+                    ROW_NUMBER() OVER(ORDER BY avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_4:String} THEN multiIf(nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'true', '1', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'false', '0', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null')) ELSE NULL END)) DESC, row_digest ASC) AS row_order
                 FROM predict_and_score_calls_resolved
                 GROUP BY row_digest
                 HAVING 1=1
                     AND countDistinct(eval_call_id) >= {pb_5:UInt64}
-                    AND (avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_4:String} THEN nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') ELSE NULL END)) >= {pb_6:Float64})
-                    AND (avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_7:String} THEN nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') ELSE NULL END)) <= {pb_8:Float64})
+                    AND (avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_4:String} THEN multiIf(nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'true', '1', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'false', '0', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null')) ELSE NULL END)) >= {pb_6:Float64})
+                    AND (avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_7:String} THEN multiIf(nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'true', '1', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'false', '0', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null')) ELSE NULL END)) <= {pb_8:Float64})
             ),
 
             ranked_digest_count AS (

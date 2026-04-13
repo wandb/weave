@@ -172,9 +172,11 @@ def resolve_eval_field_to_sql(
         remaining = field_path[len("scores.") :]
         parts = ["scores"] + split_escaped_field_path(remaining)
         path = _string_param(pb, quote_json_path_parts(parts))
-        inner = f"nullIf(JSON_VALUE(output_dump, {path}), 'null')"
-        inner = _wrap_with_eval_scope(inner, evaluation_call_id, pb)
-        return f"avg(toFloat64OrNull({inner}))", {"output_dump"}
+        raw = f"nullIf(JSON_VALUE(output_dump, {path}), 'null')"
+        # coerce json booleans ('true'/'false') to numeric before avg
+        coerced = f"multiIf({raw} = 'true', '1', {raw} = 'false', '0', {raw})"
+        coerced = _wrap_with_eval_scope(coerced, evaluation_call_id, pb)
+        return f"avg(toFloat64OrNull({coerced}))", {"output_dump"}
 
     raise InvalidRequest(
         f"Unsupported eval results field: '{field_path}'. "
