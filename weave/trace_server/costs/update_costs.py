@@ -79,8 +79,12 @@ def fetch_new_costs() -> dict[str, CostDetails]:
             provider=raw_costs[k].get("litellm_provider", "default"),
             input=float(Decimal(raw_costs[k].get("input_cost_per_token", 0))),
             output=float(Decimal(raw_costs[k].get("output_cost_per_token", 0))),
-            cache_read_input=float(Decimal(raw_costs[k].get("cache_read_input_token_cost", 0))),
-            cache_creation_input=float(Decimal(raw_costs[k].get("cache_creation_input_token_cost", 0))),
+            cache_read_input=float(
+                Decimal(raw_costs[k].get("cache_read_input_token_cost", 0))
+            ),
+            cache_creation_input=float(
+                Decimal(raw_costs[k].get("cache_creation_input_token_cost", 0))
+            ),
             created_at=current_time,
         )
 
@@ -218,7 +222,8 @@ def main(file_name: str = COST_FILE) -> None:
             costs[k][-1]["input"] != v["input"]
             or costs[k][-1]["output"] != v["output"]
             or costs[k][-1].get("cache_read_input", 0) != v.get("cache_read_input", 0)
-            or costs[k][-1].get("cache_creation_input", 0) != v.get("cache_creation_input", 0)
+            or costs[k][-1].get("cache_creation_input", 0)
+            != v.get("cache_creation_input", 0)
         ):
             new_costs_count += 1
             # We store up to 3 historical costs for each model
