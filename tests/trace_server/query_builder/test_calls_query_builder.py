@@ -4096,13 +4096,12 @@ def test_call_ids_filter_not_duplicated(
     read_table: ReadTable, expected_table: str
 ) -> None:
     """call_ids should appear exactly once in the query, not duplicated across
-    WHERE optimization and filter conditions."""
+    WHERE optimization and filter conditions.
+    """
     cq = CallsQuery(project_id="project", read_table=read_table)
     cq.add_field("id")
     cq.set_hardcoded_filter(
-        HardCodedFilter(
-            filter=tsi.CallsFilter(call_ids=["test-call-id-123"])
-        )
+        HardCodedFilter(filter=tsi.CallsFilter(call_ids=["test-call-id-123"]))
     )
 
     pb = ParamBuilder("pb")
