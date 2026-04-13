@@ -50,7 +50,10 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.interface.feedback_types import (
+    MULTI_VALUE_FEEDBACK_TYPES,
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+)
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.methods.sqlite_feedback_stats import (
     sqlite_feedback_payload_schema,
@@ -1016,11 +1019,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     cond = f"(NOT ({operand_part}))"
                 elif isinstance(operation, tsi_query.EqOperation):
                     lhs_part = process_operand(operation.eq_[0])
+                    is_multi_value_feedback = _is_multi_value_feedback_operand(
+                        operation.eq_[0]
+                    )
                     if (
                         isinstance(operation.eq_[1], tsi_query.LiteralOperation)
                         and operation.eq_[1].literal_ is None
                     ):
                         cond = f"({lhs_part} IS NULL)"
+                    elif is_multi_value_feedback:
+                        # Multi-value: GROUP_CONCAT result, use INSTR to find value
+                        rhs_part = process_operand(operation.eq_[1])
+                        cond = f"instr({lhs_part}, {rhs_part})"
                     else:
                         rhs_part = process_operand(operation.eq_[1])
                         cond = f"({lhs_part} = {rhs_part})"
@@ -5045,8 +5055,8 @@ def _build_feedback_subquery(field: str) -> str:
         escaped = feedback_type.replace("'", "''")
         type_filter = f" AND feedback_type = '{escaped}'"
 
-    if feedback_type == "*":
-        # For wildcard, concatenate values from all feedback rows so filters
+    if feedback_type == "*" or feedback_type in MULTI_VALUE_FEEDBACK_TYPES:
+        # Concatenate values from all matching feedback rows so filters
         # can search across every entry.
         return (
             f"(SELECT GROUP_CONCAT({value_expr}, ',') FROM feedback"
@@ -5059,3 +5069,12 @@ def _build_feedback_subquery(field: str) -> str:
             f" WHERE feedback.weave_ref = 'weave-trace-internal:///' || calls.project_id || '/call/' || calls.id"
             f"{type_filter} LIMIT 1)"
         )
+
+
+def _is_multi_value_feedback_operand(operand: tsi_query.Operand) -> bool:
+    """Check if an operand references a multi-value feedback field."""
+    if not isinstance(operand, tsi_query.GetFieldOperator):
+        return False
+    return any(
+        f"feedback.[{ft}]" in operand.get_field_ for ft in MULTI_VALUE_FEEDBACK_TYPES
+    )

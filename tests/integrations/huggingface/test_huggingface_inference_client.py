@@ -1,4 +1,3 @@
-import asyncio
 import os
 
 import pytest
@@ -89,19 +88,18 @@ def test_huggingface_chat_completion_stream(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_huggingface_chat_completion_async(client):
+@pytest.mark.asyncio
+async def test_huggingface_chat_completion_async(client):
     from huggingface_hub import AsyncInferenceClient
 
     huggingface_client = AsyncInferenceClient(
         api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     )
-    asyncio.run(
-        huggingface_client.chat_completion(
-            model="meta-llama/Meta-Llama-3-8B-Instruct",
-            messages=[{"role": "user", "content": "What is the capital of France?"}],
-            max_tokens=500,
-            seed=42,
-        )
+    await huggingface_client.chat_completion(
+        model="meta-llama/Meta-Llama-3-8B-Instruct",
+        messages=[{"role": "user", "content": "What is the capital of France?"}],
+        max_tokens=500,
+        seed=42,
     )
 
     calls = list(client.get_calls())
@@ -159,18 +157,17 @@ def test_huggingface_document_question_answering(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_huggingface_document_question_answering_async(client):
+@pytest.mark.asyncio
+async def test_huggingface_document_question_answering_async(client):
     from huggingface_hub import AsyncInferenceClient
 
     image_url = "https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png"
-    asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).document_question_answering(
-            image=image_url,
-            model="impira/layoutlm-document-qa",
-            question="What is the invoice number?",
-        )
+    await AsyncInferenceClient(
+        api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).document_question_answering(
+        image=image_url,
+        model="impira/layoutlm-document-qa",
+        question="What is the invoice number?",
     )
 
     calls = list(client.get_calls())
@@ -216,14 +213,13 @@ def test_huggingface_fill_mask(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_huggingface_fill_mask_async(client):
+@pytest.mark.asyncio
+async def test_huggingface_fill_mask_async(client):
     from huggingface_hub import AsyncInferenceClient
 
-    asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).fill_mask("The goal of life is <mask>.")
-    )
+    await AsyncInferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).fill_mask("The goal of life is <mask>.")
 
     calls = list(client.get_calls())
     assert len(calls) == 1
@@ -273,16 +269,15 @@ def test_huggingface_question_answering(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_huggingface_question_answering_async(client):
+@pytest.mark.asyncio
+async def test_huggingface_question_answering_async(client):
     from huggingface_hub import AsyncInferenceClient
 
-    asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).question_answering(
-            question="What's my name?",
-            context="My name is Clara and I live in Berkeley.",
-        )
+    await AsyncInferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).question_answering(
+        question="What's my name?",
+        context="My name is Clara and I live in Berkeley.",
     )
 
     calls = list(client.get_calls())
@@ -335,7 +330,8 @@ def test_huggingface_table_question_answering(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_huggingface_table_question_answering_async(client):
+@pytest.mark.asyncio
+async def test_huggingface_table_question_answering_async(client):
     from huggingface_hub import AsyncInferenceClient
 
     query = "How many stars does the transformers repository have?"
@@ -343,13 +339,9 @@ def test_huggingface_table_question_answering_async(client):
         "Repository": ["Transformers", "Datasets", "Tokenizers"],
         "Stars": ["36542", "4512", "3934"],
     }
-    asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).table_question_answering(
-            table, query, model="google/tapas-base-finetuned-wtq"
-        )
-    )
+    await AsyncInferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).table_question_answering(table, query, model="google/tapas-base-finetuned-wtq")
 
     calls = list(client.get_calls())
     assert len(calls) == 1
@@ -397,14 +389,13 @@ def test_huggingface_text_classification(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_huggingface_text_classification_async(client):
+@pytest.mark.asyncio
+async def test_huggingface_text_classification_async(client):
     from huggingface_hub import AsyncInferenceClient
 
-    asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).text_classification("I like you")
-    )
+    await AsyncInferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).text_classification("I like you")
 
     calls = list(client.get_calls())
     assert len(calls) == 1
@@ -455,15 +446,14 @@ def test_huggingface_token_classification(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_huggingface_token_classification_async(client):
+@pytest.mark.asyncio
+async def test_huggingface_token_classification_async(client):
     from huggingface_hub import AsyncInferenceClient
 
-    asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).token_classification(
-            "My name is Sarah Jessica Parker but you can call me Jessica"
-        )
+    await AsyncInferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).token_classification(
+        "My name is Sarah Jessica Parker but you can call me Jessica"
     )
 
     calls = list(client.get_calls())
@@ -513,16 +503,15 @@ def test_huggingface_translation(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_huggingface_translation_async(client):
+@pytest.mark.asyncio
+async def test_huggingface_translation_async(client):
     from huggingface_hub import AsyncInferenceClient
 
-    asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).translation(
-            "My name is Wolfgang and I live in Berlin",
-            model="Helsinki-NLP/opus-mt-en-fr",
-        )
+    await AsyncInferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).translation(
+        "My name is Wolfgang and I live in Berlin",
+        model="Helsinki-NLP/opus-mt-en-fr",
     )
 
     calls = list(client.get_calls())
@@ -574,17 +563,16 @@ def test_huggingface_text_to_image(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_huggingface_text_to_image_async(client):
+@pytest.mark.asyncio
+async def test_huggingface_text_to_image_async(client):
     from huggingface_hub import AsyncInferenceClient
 
-    asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).text_to_image(
-            prompt="A cute puppy",
-            model="black-forest-labs/FLUX.1-schnell",
-            num_inference_steps=4,
-        )
+    await AsyncInferenceClient(
+        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
+    ).text_to_image(
+        prompt="A cute puppy",
+        model="black-forest-labs/FLUX.1-schnell",
+        num_inference_steps=4,
     )
 
     calls = list(client.get_calls())

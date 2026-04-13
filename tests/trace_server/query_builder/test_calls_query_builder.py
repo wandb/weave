@@ -4232,3 +4232,156 @@ def test_status_sort_calls_complete_uses_sentinels() -> None:
             "pb_8": "project",
         },
     )
+
+
+def test_query_with_reaction_eq_filter_calls_merged() -> None:
+    """Test that reaction emoji filter uses groupArrayIf + has() instead of anyIf."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "feedback.[wandb.reaction.1].payload.emoji"},
+                    {"$literal": "👎"},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {pb_3:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            ((has(groupArrayIf(coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_1:String}), 'null'), ''),
+            feedback.feedback_type = {pb_0:String}
+            AND coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_1:String}), 'null'), '') != ''), {pb_2:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.reaction.1",
+            "pb_1": '$."emoji"',
+            "pb_2": "👎",
+            "pb_3": "project",
+        },
+    )
+
+
+def test_query_with_note_contains_filter_calls_merged() -> None:
+    """Test that note text filter uses arrayExists instead of position on anyIf."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.ContainsOperation.model_validate(
+            {
+                "$contains": {
+                    "input": {"$getField": "feedback.[wandb.note.1].payload.note"},
+                    "substr": {"$literal": "bad output"},
+                    "case_insensitive": False,
+                }
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {pb_3:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            ((arrayExists(x -> position(x, {pb_2:String}) > 0,
+            groupArrayIf(coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_1:String}), 'null'), ''),
+            feedback.feedback_type = {pb_0:String}
+            AND coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {pb_1:String}), 'null'), '') != '')))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.note.1",
+            "pb_1": '$."note"',
+            "pb_2": "bad output",
+            "pb_3": "project",
+        },
+    )
+
+
+def test_query_with_annotation_filter_still_uses_anyif() -> None:
+    """Regression test: annotation feedback (single-value) still uses anyIf, not groupArrayIf."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "feedback.[wandb.annotation.rating].payload.value"},
+                    {"$literal": "good"},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {pb_3:String}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            (((coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_1:String}), 'null'), '') = {pb_2:String}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.annotation.rating",
+            "pb_1": '$."value"',
+            "pb_2": "good",
+            "pb_3": "project",
+        },
+    )

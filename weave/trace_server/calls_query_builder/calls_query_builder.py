@@ -65,6 +65,7 @@ from weave.trace_server.calls_query_builder.utils import (
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.interface.feedback_types import MULTI_VALUE_FEEDBACK_TYPES
 from weave.trace_server.orm import (
     ParamBuilder,
     clickhouse_cast,
@@ -301,6 +302,11 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     def is_feedback_field(self) -> bool:
         return True
 
+    @property
+    def is_multi_value(self) -> bool:
+        """Whether this feedback type can have multiple entries per call."""
+        return self.feedback_type in MULTI_VALUE_FEEDBACK_TYPES
+
     @classmethod
     def from_path(cls, path: str) -> Self:
         """Expected format: `[feedback.type].dot.path`.
@@ -374,6 +380,25 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         if not self.extra_path:
             return res
         return json_dump_field_as_sql(pb, "feedback", res, self.extra_path, cast)
+
+    def as_array_sql(self, pb: ParamBuilder) -> str:
+        """Build a groupArrayIf expression collecting all values for this feedback field.
+
+        Used for multi-value feedback types (reactions, notes) where a call can
+        have multiple entries. Extracts and collects all non-empty values from
+        the feedback rows into an array for has()/arrayExists().
+        """
+        inner = f"feedback.{self.field}"
+        type_param = pb.add_param(self.feedback_type)
+        type_cond = f"feedback.feedback_type = {param_slot(type_param, 'String')}"
+
+        if self.extra_path:
+            extracted = json_dump_field_as_sql(
+                pb, "feedback", inner, self.extra_path, None
+            )
+            return f"groupArrayIf({extracted}, {type_cond} AND {extracted} != '')"
+        else:
+            return f"groupArrayIf({inner}, {type_cond})"
 
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
@@ -2103,6 +2128,22 @@ def _extract_field_name(operand: "tsi_query.Operand") -> str | None:
     return None
 
 
+def _get_multi_value_feedback_field(
+    operand: tsi_query.Operand,
+) -> CallsMergedFeedbackPayloadField | None:
+    """If the operand is a GetField referencing a multi-value feedback field, return it."""
+    field_name = _extract_field_name(operand)
+    if not field_name or not field_name.startswith("feedback."):
+        return None
+    structured_field = get_field_by_name(field_name)
+    if (
+        isinstance(structured_field, CallsMergedFeedbackPayloadField)
+        and structured_field.is_multi_value
+    ):
+        return structured_field
+    return None
+
+
 def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
@@ -2138,31 +2179,44 @@ def process_query_to_conditions(
             cond = f"(NOT ({operand_part}))"
         elif isinstance(operation, tsi_query.EqOperation):
             ops = _maybe_convert_datetime_operands(operation.eq_)
-            lhs_part = process_operand(ops[0])
-            if (
-                isinstance(ops[1], tsi_query.LiteralOperation)
-                and ops[1].literal_ is None
-            ):
-                # For calls_complete, sentinel fields use equality checks
-                # against the sentinel value instead of IS NULL.
-                field_name = _extract_field_name(ops[0])
-                sentinel = (
-                    ch_sentinel_values.get_sentinel_value(field_name)
-                    if use_sentinels and field_name
-                    else None
-                )
-                if sentinel is not None:
-                    assert field_name is not None
-                    sentinel_type = ch_sentinel_values.sentinel_ch_type(field_name)
-                    sentinel_slot = param_builder.add(
-                        sentinel, param_type=sentinel_type
-                    )
-                    cond = f"({lhs_part} = {sentinel_slot})"
+            mv_field = _get_multi_value_feedback_field(ops[0]) if use_agg_fn else None
+            if mv_field is not None:
+                array_expr = mv_field.as_array_sql(param_builder)
+                raw_fields_used[mv_field.feedback_type] = mv_field
+                if (
+                    isinstance(ops[1], tsi_query.LiteralOperation)
+                    and ops[1].literal_ is None
+                ):
+                    cond = f"(length({array_expr}) = 0)"
                 else:
-                    cond = f"({lhs_part} IS NULL)"
+                    rhs_part = process_operand(ops[1])
+                    cond = f"has({array_expr}, {rhs_part})"
             else:
-                rhs_part = process_operand(ops[1])
-                cond = f"({lhs_part} = {rhs_part})"
+                lhs_part = process_operand(ops[0])
+                if (
+                    isinstance(ops[1], tsi_query.LiteralOperation)
+                    and ops[1].literal_ is None
+                ):
+                    # For calls_complete, sentinel fields use equality checks
+                    # against the sentinel value instead of IS NULL.
+                    field_name = _extract_field_name(ops[0])
+                    sentinel = (
+                        ch_sentinel_values.get_sentinel_value(field_name)
+                        if use_sentinels and field_name
+                        else None
+                    )
+                    if sentinel is not None:
+                        assert field_name is not None
+                        sentinel_type = ch_sentinel_values.sentinel_ch_type(field_name)
+                        sentinel_slot = param_builder.add(
+                            sentinel, param_type=sentinel_type
+                        )
+                        cond = f"({lhs_part} = {sentinel_slot})"
+                    else:
+                        cond = f"({lhs_part} IS NULL)"
+                else:
+                    rhs_part = process_operand(ops[1])
+                    cond = f"({lhs_part} = {rhs_part})"
         elif isinstance(operation, tsi_query.GtOperation):
             ops = _maybe_convert_datetime_operands(operation.gt_)
             lhs_part = process_operand(ops[0])
@@ -2188,12 +2242,26 @@ def process_query_to_conditions(
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
             cond = f"({lhs_part} IN ({rhs_part}))"
         elif isinstance(operation, tsi_query.ContainsOperation):
-            lhs_part = process_operand(operation.contains_.input)
-            rhs_part = process_operand(operation.contains_.substr)
-            position_operation = "position"
-            if operation.contains_.case_insensitive:
-                position_operation = "positionCaseInsensitive"
-            cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
+            mv_field = (
+                _get_multi_value_feedback_field(operation.contains_.input)
+                if use_agg_fn
+                else None
+            )
+            if mv_field is not None:
+                array_expr = mv_field.as_array_sql(param_builder)
+                rhs_part = process_operand(operation.contains_.substr)
+                raw_fields_used[mv_field.feedback_type] = mv_field
+                position_operation = "position"
+                if operation.contains_.case_insensitive:
+                    position_operation = "positionCaseInsensitive"
+                cond = f"arrayExists(x -> {position_operation}(x, {rhs_part}) > 0, {array_expr})"
+            else:
+                lhs_part = process_operand(operation.contains_.input)
+                rhs_part = process_operand(operation.contains_.substr)
+                position_operation = "position"
+                if operation.contains_.case_insensitive:
+                    position_operation = "positionCaseInsensitive"
+                cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
         else:
             raise TypeError(f"Unknown operation type: {operation}")
 
