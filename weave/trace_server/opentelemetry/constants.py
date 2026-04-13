@@ -106,6 +106,13 @@ USAGE_KEYS = {
         ("llm.usage.total_tokens", try_parse_int),
         ("llm.token_count.total", try_parse_int),
     ],
+    # Cache token usage from OpenTelemetry GenAI semantic conventions
+    "cache_creation_input_tokens": [
+        ("gen_ai.usage.cache_creation.input_tokens", try_parse_int),
+    ],
+    "cache_read_input_tokens": [
+        ("gen_ai.usage.cache_read.input_tokens", try_parse_int),
+    ],
 }
 
 # ATTRIBUTE_KEYS: Maps common LLM call metadata attributes to the types of attributes expected in weave traces
@@ -114,9 +121,9 @@ USAGE_KEYS = {
 ATTRIBUTE_KEYS = {
     # System prompt/instructions
     "system": [
-        "gen_ai.system",  # OpenTelemetry AI
+        "gen_ai.system_instructions",  # OpenTelemetry GenAI semconv
+        "gen_ai.system",  # OpenTelemetry AI (legacy, pre-v1.36)
         "llm.system",  # OpenInference
-        "gen_ai.system_instructions",
     ],
     # Span kind - identifies the type of operation
     "kind": [
@@ -126,30 +133,50 @@ ATTRIBUTE_KEYS = {
         # See: https://arize-ai.github.io/openinference/spec/semantic_conventions.html
         "openinference.span.kind",  # OpenInference - LLM, EMBEDDING, CHAIN, RETRIEVER, RERANKER, TOOL, AGENT, GUARDRAIL, EVALUATOR, PROMPT
     ],
-    # Model name/identifier
-    "model": ["gen_ai.response.model", "llm.model_name", "ai.model.id"],
+    # Model name/identifier - response model preferred over request model
+    "model": [
+        "gen_ai.response.model",  # OpenTelemetry GenAI semconv (actual model used)
+        "gen_ai.request.model",  # OpenTelemetry GenAI semconv (requested model)
+        "llm.model_name",  # OpenInference
+        "ai.model.id",  # Vercel
+    ],
     # Provider/vendor of the model
     "provider": [
+        "gen_ai.provider.name",  # OpenTelemetry GenAI semconv
         "llm.provider",  # Common across standards
         "ai.model.provider",  # Vercel
     ],
     # Model generation parameters (temperature, max_tokens, etc.)
     "model_parameters": ["gen_ai.request", "llm.invocation_parameters"],
+    # Operation name - identifies the type of GenAI operation (chat, embeddings, etc.)
+    "operation_name": ["gen_ai.operation.name"],
+    # Response identifier
+    "response_id": ["gen_ai.response.id"],
+    # Finish reasons for each generation
+    "finish_reasons": ["gen_ai.response.finish_reasons"],
+    # Agent attributes from OpenTelemetry GenAI agent semantic conventions
+    "agent_name": ["gen_ai.agent.name"],
+    "agent_id": ["gen_ai.agent.id"],
 }
 
 # WB_KEYS: Wandb/Weave specific attributes for enhanced visualization and reporting
 WB_KEYS = {
     # Custom display name for the call in the UI
     "display_name": ["wandb.display_name"],
-    "thread_id": ["gcp.vertex.agent.session_id", "wandb.thread_id"],
+    "thread_id": [
+        "gen_ai.conversation.id",  # OpenTelemetry GenAI semconv
+        "gcp.vertex.agent.session_id",
+        "wandb.thread_id",
+    ],
     "attributes": ["wandb.attributes"],
     "wb_run_id": ["wandb.wb_run_id"],
     "wb_run_step": ["wandb.wb_run_step"],
     "wb_run_step_end": ["wandb.wb_run_step_end"],
     "is_turn": [
+        "gen_ai.conversation.id",  # OpenTelemetry GenAI semconv - presence implies a turn
         "gcp.vertex.agent.session_id",
         "wandb.is_turn",
-    ],  # We just check if this is truthy so we can reuse session_id
+    ],  # We just check if this is truthy so we can reuse the id
 }
 
 # These represent fields that are set by a provider which override top level span information

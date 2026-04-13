@@ -6,7 +6,8 @@ from dataclasses import dataclass
 
 import pytest
 
-from tests.trace.server_utils import TEST_ENTITY
+from tests.trace.server_utils import TEST_ENTITY, find_server_layer
+from tests.trace.util import client_is_sqlite
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
     UserInjectingExternalTraceServer,
@@ -305,3 +306,11 @@ def ch_server(trace_server):
     if not isinstance(server, ClickHouseTraceServer):
         pytest.skip("ClickHouse-only test")
     return server
+
+
+@pytest.fixture
+def internal_server(client):
+    """Return the underlying SQLite or ClickHouse server from the middleware chain."""
+    if client_is_sqlite(client):
+        return find_server_layer(client.server, SqliteTraceServer)
+    return find_server_layer(client.server, ClickHouseTraceServer)

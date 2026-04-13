@@ -1,5 +1,6 @@
-import asyncio
 import json
+
+import pytest
 
 from weave.integrations.openai_realtime.connection import (
     WeaveAsyncWebsocketConnection,
@@ -133,23 +134,21 @@ class DummyAsyncConn:
         raise self.ConnectionClosed()
 
 
-def test_async_wrapper_basic(monkeypatch):
+@pytest.mark.asyncio
+async def test_async_wrapper_basic(monkeypatch):
     import weave.integrations.openai_realtime.state_exporter as se
 
     monkeypatch.setattr(se, "require_weave_client", DummyWeaveClient)
 
-    async def _drive_async_wrapper():
-        conn = WeaveAsyncWebsocketConnection(DummyAsyncConn())
-        await conn.send(json.dumps({"type": "response.create"}))
-        # Try to receive once
-        try:
-            await conn.recv()
-        except Exception:
-            pass
-        # Session should be set from received message
-        assert conn.conversation_manager.state.session_span is not None
+    conn = WeaveAsyncWebsocketConnection(DummyAsyncConn())
+    await conn.send(json.dumps({"type": "response.create"}))
+    # Try to receive once
+    try:
+        await conn.recv()
+    except Exception:
+        pass
+    # Session should be set from received message
+    assert conn.conversation_manager.state.session_span is not None
 
-        # Prevent atexit handler from firing after monkeypatch restores require_weave_client
-        conn._exit_ran = True
-
-    asyncio.run(_drive_async_wrapper())
+    # Prevent atexit handler from firing after monkeypatch restores require_weave_client
+    conn._exit_ran = True

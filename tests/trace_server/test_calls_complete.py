@@ -1814,3 +1814,75 @@ def test_call_start_v2_converts_wb_run_id(trace_server, clickhouse_trace_server)
     started_call = _find_call_by_id(calls, call_id)
     assert started_call is not None
     assert started_call.wb_run_id == ext_run_id
+
+
+def test_feedback_filter_does_not_duplicate_calls_complete(
+    trace_server, clickhouse_trace_server
+):
+    """Regression test: feedback filter on calls_complete must not return duplicate calls.
+
+    On calls_complete there is no GROUP BY, so a feedback LEFT JOIN multiplies
+    rows when a call has multiple feedback entries. Without SELECT DISTINCT,
+    the same call appears once per matching feedback row.
+    """
+    project_id = f"{TEST_ENTITY}/calls_complete_feedback_dedup"
+    internal_project_id = b64(project_id)
+
+    call_id = _insert_complete_call(
+        clickhouse_trace_server.ch_client, internal_project_id
+    )
+    reset_project_residence_cache()
+
+    # verify we are reading from calls_complete
+    resolver = clickhouse_trace_server.table_routing_resolver
+    read_table = resolver.resolve_read_table(
+        internal_project_id, clickhouse_trace_server.ch_client
+    )
+    assert read_table == ReadTable.CALLS_COMPLETE
+
+    # add 2 feedback entries to the same call
+    call_ref = f"weave-trace-internal:///{internal_project_id}/call/{call_id}"
+    trace_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=call_ref,
+            feedback_type="wandb.reaction.1",
+            payload={"emoji": "👍"},
+            wb_user_id="user_alice",
+        )
+    )
+    trace_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=call_ref,
+            feedback_type="wandb.reaction.1",
+            payload={"emoji": "👍"},
+            wb_user_id="user_bob",
+        )
+    )
+
+    # this should return 1 item in result set
+    results = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query=tsi.Query.model_validate(
+                    {
+                        "$expr": {
+                            "$eq": [
+                                {
+                                    "$getField": "feedback.[wandb.reaction.1].payload.emoji"
+                                },
+                                {"$literal": "👍"},
+                            ]
+                        }
+                    }
+                ),
+            )
+        )
+    )
+
+    assert len(results) == 1, (
+        f"Expected 1 call but got {len(results)} — feedback LEFT JOIN is duplicating rows"
+    )
+    assert results[0].id == call_id

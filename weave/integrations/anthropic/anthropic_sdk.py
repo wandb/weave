@@ -38,6 +38,7 @@ def anthropic_accumulator(
 ) -> Message:
     if acc is None:
         if hasattr(value, "message"):
+            msg_usage = value.message.usage
             acc = Message(
                 id=value.message.id,
                 role=value.message.role,
@@ -46,7 +47,13 @@ def anthropic_accumulator(
                 stop_reason=value.message.stop_reason,
                 stop_sequence=value.message.stop_sequence,
                 type=value.message.type,  # Include the type field
-                usage=Usage(input_tokens=0, output_tokens=0),
+                usage=Usage(
+                    input_tokens=0,
+                    output_tokens=0,
+                    cache_read_input_tokens=msg_usage.cache_read_input_tokens or 0,
+                    cache_creation_input_tokens=msg_usage.cache_creation_input_tokens
+                    or 0,
+                ),
             )
         else:
             raise ValueError("Initial event must contain a message")

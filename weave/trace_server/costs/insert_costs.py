@@ -21,13 +21,15 @@ logger.setLevel(logging.INFO)
 
 def get_current_costs(
     client: Client,
-) -> list[tuple[str, float, float, datetime]]:
+) -> list[tuple[str, float, float, float, float, datetime]]:
     current_costs = client.query(
         f"""
         SELECT
             llm_id,
             prompt_token_cost,
             completion_token_cost,
+            cache_read_input_token_cost,
+            cache_creation_input_token_cost,
             effective_date
         FROM llm_token_prices
         WHERE
@@ -42,6 +44,8 @@ def get_current_costs(
 class CostDetails(TypedDict):
     input: float
     output: float
+    cache_read_input: float
+    cache_creation_input: float
     provider: str
     created_at: str
 
@@ -69,6 +73,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
             provider_id = cost.get("provider", "default")
             input_token_cost = cost.get("input", 0)
             output_token_cost = cost.get("output", 0)
+            cache_read_input_token_cost = cost.get("cache_read_input", 0)
+            cache_creation_input_token_cost = cost.get("cache_creation_input", 0)
             date_str = cost.get(
                 "created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )
@@ -87,6 +93,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
                     "USD",
                     output_token_cost,
                     "USD",
+                    cache_read_input_token_cost,
+                    cache_creation_input_token_cost,
                     "system",
                     created_at,
                 ),
@@ -106,6 +114,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
             "prompt_token_cost_unit",
             "completion_token_cost",
             "completion_token_cost_unit",
+            "cache_read_input_token_cost",
+            "cache_creation_input_token_cost",
             "created_by",
             "created_at",
         ],
@@ -120,6 +130,8 @@ def filter_out_current_costs(
         llm_id,
         prompt_token_cost,
         completion_token_cost,
+        cache_read_input_token_cost,
+        cache_creation_input_token_cost,
         effective_date,
     ) in current_costs:
         if llm_id not in new_costs:
@@ -128,10 +140,22 @@ def filter_out_current_costs(
         filtered_costs = []
         for cost in new_costs[llm_id]:
             # Filter out costs that already exist in the database by comparing
-            # the prompt and completion token costs with a relative tolerance
+            # the prompt, completion, and cache token costs with a relative tolerance
             if not (
                 math.isclose(prompt_token_cost, cost["input"], rel_tol=1e-7)
                 and math.isclose(completion_token_cost, cost["output"], rel_tol=1e-7)
+                and math.isclose(
+                    cache_read_input_token_cost,
+                    cost.get("cache_read_input", 0),
+                    rel_tol=1e-7,
+                    abs_tol=1e-12,
+                )
+                and math.isclose(
+                    cache_creation_input_token_cost,
+                    cost.get("cache_creation_input", 0),
+                    rel_tol=1e-7,
+                    abs_tol=1e-12,
+                )
                 and effective_date_str == cost["created_at"]
             ):
                 filtered_costs.append(cost)

@@ -1,8 +1,6 @@
-import asyncio
 import json
 import os
 from collections.abc import Generator, Iterable
-from typing import Any
 
 import pytest
 from pydantic import BaseModel
@@ -133,7 +131,8 @@ def test_instructor_openai_with_completion(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_instructor_openai_async(
+@pytest.mark.asyncio
+async def test_instructor_openai_async(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     import instructor
@@ -142,16 +141,13 @@ def test_instructor_openai_async(
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     lm_client = instructor.from_openai(AsyncOpenAI(api_key=api_key))
 
-    async def extract_person(text: str) -> Person:
-        return await lm_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "user", "content": text},
-            ],
-            response_model=Person,
-        )
-
-    asyncio.run(extract_person("My name is John and I am 20 years old"))
+    await lm_client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "user", "content": "My name is John and I am 20 years old"},
+        ],
+        response_model=Person,
+    )
 
     calls = list(client.get_calls())
     assert len(calls) == 2
@@ -288,7 +284,8 @@ def test_instructor_iterable_sync_stream(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_instructor_iterable_async_stream(
+@pytest.mark.asyncio
+async def test_instructor_iterable_async_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     import instructor
@@ -299,26 +296,23 @@ def test_instructor_iterable_async_stream(
         AsyncOpenAI(api_key=api_key), mode=instructor.Mode.TOOLS
     )
 
-    async def print_iterable_results() -> list[Person]:
-        model = await lm_client.chat.completions.create(
-            model="gpt-4",
-            response_model=Iterable[Person],
-            max_retries=2,
-            stream=True,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a perfect entity extraction system",
-                },
-                {
-                    "role": "user",
-                    "content": "Extract `Jason is 10 and John is 30`",
-                },
-            ],
-        )
-        return [m async for m in model]
-
-    asyncio.run(print_iterable_results())
+    model = await lm_client.chat.completions.create(
+        model="gpt-4",
+        response_model=Iterable[Person],
+        max_retries=2,
+        stream=True,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a perfect entity extraction system",
+            },
+            {
+                "role": "user",
+                "content": "Extract `Jason is 10 and John is 30`",
+            },
+        ],
+    )
+    _ = [m async for m in model]
 
     calls = list(client.get_calls())
     assert len(calls) == 2
@@ -416,7 +410,8 @@ list of speakers.
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_instructor_partial_stream_async(
+@pytest.mark.asyncio
+async def test_instructor_partial_stream_async(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     import instructor
@@ -443,21 +438,18 @@ A follow-up meeting is scheduled for January 25th at 3 PM GMT to finalize the ag
 list of speakers.
     """
 
-    async def fetch_results(text_block: str) -> list[Any]:
-        extraction_stream = lm_client.chat.completions.create_partial(
-            model="gpt-4",
-            response_model=MeetingInfo,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"Get the information about the meeting and the users {text_block}",
-                },
-            ],
-            stream=True,
-        )
-        return [extraction async for extraction in extraction_stream]
-
-    _ = asyncio.run(fetch_results(text_block))
+    extraction_stream = lm_client.chat.completions.create_partial(
+        model="gpt-4",
+        response_model=MeetingInfo,
+        messages=[
+            {
+                "role": "user",
+                "content": f"Get the information about the meeting and the users {text_block}",
+            },
+        ],
+        stream=True,
+    )
+    _ = [extraction async for extraction in extraction_stream]
 
     calls = list(client.get_calls())
     assert len(calls) == 2

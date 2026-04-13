@@ -58,6 +58,8 @@ def test_concurrent_save_op_reuses_single_inflight_save(
         if val is test_op:
             with save_call_count_lock:
                 save_call_count += 1
+            # Keep the creator thread parked so the other callers must join the
+            # inflight future instead of racing through a completed save.
             creator_entered_save.set()
             allow_creator_to_finish.wait()
         return original_save_object_basic(val, name=name, branch=branch)
@@ -108,6 +110,8 @@ def test_concurrent_save_op_rejects_conflicting_names(
     with ThreadPoolExecutor(max_workers=1) as executor:
         first_save = executor.submit(client._save_op, test_op, "first_name")
         assert creator_entered_save.wait(timeout=1)
+        # A different concurrent name should fail fast rather than silently
+        # reusing the inflight save under mismatched naming.
         with pytest.raises(ValueError, match="conflicting names"):
             client._save_op(test_op, name="second_name")
         allow_creator_to_finish.set()

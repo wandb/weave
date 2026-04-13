@@ -57,14 +57,15 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
 from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
+    parse_string_to_utc_timestamp,
     safe_alias,
     safely_format_sql,
     timestamp_to_datetime_str,
 )
-from weave.trace_server.clickhouse_trace_server_settings import LOCAL_TABLE_SUFFIX
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.interface.feedback_types import MULTI_VALUE_FEEDBACK_TYPES
 from weave.trace_server.orm import (
     ParamBuilder,
     clickhouse_cast,
@@ -80,6 +81,7 @@ logger = logging.getLogger(__name__)
 
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
+CTE_EVAL_SUBCALLS = "eval_subcalls"
 
 
 class FilterConditionsResult(NamedTuple):
@@ -112,6 +114,13 @@ class OrderLimitOffsetResult(NamedTuple):
     limit_sql: str
     offset_sql: str
     needs_feedback: bool
+
+
+class QueryBodyResult(NamedTuple):
+    """Result from building the query body (FROM through OFFSET)."""
+
+    sql: str
+    needs_feedback_join: bool
 
 
 def maybe_agg(expr: str, use_agg_fn: bool) -> str:
@@ -293,6 +302,11 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     def is_feedback_field(self) -> bool:
         return True
 
+    @property
+    def is_multi_value(self) -> bool:
+        """Whether this feedback type can have multiple entries per call."""
+        return self.feedback_type in MULTI_VALUE_FEEDBACK_TYPES
+
     @classmethod
     def from_path(cls, path: str) -> Self:
         """Expected format: `[feedback.type].dot.path`.
@@ -366,6 +380,25 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         if not self.extra_path:
             return res
         return json_dump_field_as_sql(pb, "feedback", res, self.extra_path, cast)
+
+    def as_array_sql(self, pb: ParamBuilder) -> str:
+        """Build a groupArrayIf expression collecting all values for this feedback field.
+
+        Used for multi-value feedback types (reactions, notes) where a call can
+        have multiple entries. Extracts and collects all non-empty values from
+        the feedback rows into an array for has()/arrayExists().
+        """
+        inner = f"feedback.{self.field}"
+        type_param = pb.add_param(self.feedback_type)
+        type_cond = f"feedback.feedback_type = {param_slot(type_param, 'String')}"
+
+        if self.extra_path:
+            extracted = json_dump_field_as_sql(
+                pb, "feedback", inner, self.extra_path, None
+            )
+            return f"groupArrayIf({extracted}, {type_cond} AND {extracted} != '')"
+        else:
+            return f"groupArrayIf({inner}, {type_cond})"
 
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
@@ -835,6 +868,7 @@ class CallsQuery(BaseModel):
     include_total_storage_size: bool = False
     read_table: ReadTable = ReadTable.CALLS_MERGED
     eval_root_ids: list[str] | None = None
+    include_predict_and_score_children: bool = True
 
     @property
     def use_agg_fn(self) -> bool:
@@ -1132,7 +1166,19 @@ class CallsQuery(BaseModel):
         )
 
         # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs and not object_ref_conditions:
+        # when querying the eval_root_ids on calls_merged, we need the CTE path
+        # to avoid duplicate subqueries, so skip the early return.
+        needs_eval_cte = (
+            self.eval_root_ids
+            and self.read_table == ReadTable.CALLS_MERGED
+            and self.include_predict_and_score_children
+        )
+        if (
+            not should_optimize
+            and not self.include_costs
+            and not object_ref_conditions
+            and not needs_eval_cte
+        ):
             return self._as_sql_base_format(pb, table_alias_resolved)
 
         # Use the filtered_calls CTE (two-pass) pattern only for calls_merged
@@ -1146,6 +1192,19 @@ class CallsQuery(BaseModel):
         ctes, field_to_object_join_alias_map = build_object_ref_ctes(
             pb, self.project_id, object_ref_conditions
         )
+
+        # Build a CTE for eval subcalls (direct children of eval roots) so both
+        # the WHERE clause and the HAVING clause can reference it without
+        # duplicating the subquery.
+        if needs_eval_cte:
+            subcall_cq = CallsQuery(
+                project_id=self.project_id, read_table=self.read_table
+            )
+            subcall_cq.add_field("id")
+            subcall_cq.set_hardcoded_filter(
+                HardCodedFilter(filter=tsi.CallsFilter(parent_ids=self.eval_root_ids))
+            )
+            ctes.add_cte(CTE_EVAL_SUBCALLS, subcall_cq.as_sql(pb))
 
         if use_filter_cte:
             # Build two queries: a filter CTE that narrows rows by light
@@ -1275,8 +1334,19 @@ class CallsQuery(BaseModel):
         trace_id = process_trace_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias
         )
+        needs_eval_cte = (
+            self.eval_root_ids
+            and self.read_table == ReadTable.CALLS_MERGED
+            and self.include_predict_and_score_children
+        )
         children_of_eval_ids = process_children_of_eval_ids_to_sql(
-            self.eval_root_ids, pb, table_alias, self.project_id, self.read_table
+            self.eval_root_ids,
+            pb,
+            table_alias,
+            self.project_id,
+            self.read_table,
+            eval_subcall_cte_name=CTE_EVAL_SUBCALLS if needs_eval_cte else None,
+            include_predict_and_score_children=self.include_predict_and_score_children,
         )
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
@@ -1597,6 +1667,31 @@ class CallsQuery(BaseModel):
             needs_feedback=needs_feedback,
         )
 
+    def _build_eval_subtree_having(
+        self,
+        existing_having: str,
+        pb: ParamBuilder,
+        table_alias: str,
+    ) -> str:
+        """Build a HAVING clause that filters out rows leaked via parent_id IS NULL.
+        On calls_merged, end rows have parent_id=NULL which causes the WHERE clause
+        to match all top-level calls in the project.
+        """
+        parent_id_field = get_field_by_name("parent_id")
+        if not isinstance(parent_id_field, CallsMergedAggField):
+            raise TypeError("parent_id is not an aggregate field")
+        parent_id_agg = parent_id_field.as_sql(pb, table_alias, use_agg_fn=True)
+        eval_ids_param = param_slot(pb.add_param(self.eval_root_ids), "Array(String)")
+        eval_subtree_having = f"{parent_id_agg} IN {eval_ids_param}"
+        if self.include_predict_and_score_children:
+            eval_subtree_having = (
+                f"({eval_subtree_having}"
+                f" OR {parent_id_agg} IN (SELECT id FROM {CTE_EVAL_SUBCALLS}))"
+            )
+        if existing_having:
+            return f"{existing_having}\n        AND {eval_subtree_having}"
+        return f"HAVING {eval_subtree_having}"
+
     def _build_query_body(
         self,
         pb: ParamBuilder,
@@ -1604,7 +1699,7 @@ class CallsQuery(BaseModel):
         id_subquery_name: str | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
-    ) -> str:
+    ) -> QueryBodyResult:
         """Build the SQL query body: everything from FROM through OFFSET.
 
         This method builds filters, JOINs, WHERE/PREWHERE, GROUP BY, ORDER BY,
@@ -1643,6 +1738,9 @@ class CallsQuery(BaseModel):
             field_to_object_join_alias_map=field_to_object_join_alias_map,
             id_subquery_name=id_subquery_name,
         )
+        needs_feedback_join = (
+            filter_result.needs_feedback or order_result.needs_feedback
+        )
         group_by_sql = ""
         if self.read_table == ReadTable.CALLS_MERGED:
             group_by_sql = f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
@@ -1667,15 +1765,22 @@ class CallsQuery(BaseModel):
         ):
             where_clause = "WHERE 1"
 
-        return f"""FROM {table_alias}
+        # After GROUP BY, filter out rows that leaked in via parent_id IS NULL
+        # but don't actually belong to the eval subtree (e.g. top-level calls).
+        having_sql = filter_result.filter_sql
+        if self.eval_root_ids and self.read_table == ReadTable.CALLS_MERGED:
+            having_sql = self._build_eval_subtree_having(having_sql, pb, table_alias)
+
+        sql = f"""FROM {table_alias}
         {joins.to_sql()}
         PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
         {where_clause}
         {group_by_sql}
-        {filter_result.filter_sql}
+        {having_sql}
         {order_result.order_by_sql}
         {order_result.limit_sql}
         {order_result.offset_sql}"""
+        return QueryBodyResult(sql=sql, needs_feedback_join=needs_feedback_join)
 
     def _as_sql_base_format(
         self,
@@ -1706,16 +1811,23 @@ class CallsQuery(BaseModel):
             )
             for field in self.select_fields
         )
-        body = self._build_query_body(
+        body_result = self._build_query_body(
             pb,
             table_alias,
             id_subquery_name,
             field_to_object_join_alias_map,
             expand_columns,
         )
+        # On calls_complete, feedback LEFT JOIN can multiply rows, so use DISTINCT to de-dup.
+        distinct = ""
+        if (
+            self.read_table == ReadTable.CALLS_COMPLETE
+            and body_result.needs_feedback_join
+        ):
+            distinct = "DISTINCT"
         raw_sql = f"""
-        SELECT {select_fields_sql}
-        {body}
+        SELECT {distinct} {select_fields_sql}
+        {body_result.sql}
         """
         return safely_format_sql(raw_sql, logger)
 
@@ -1946,12 +2058,15 @@ class FilterToConditions(BaseModel):
 def _maybe_convert_datetime_operands(
     operands: Sequence["tsi_query.Operand"],
 ) -> Sequence["tsi_query.Operand"]:
-    """Convert numeric literals to datetime strings when compared against DateTime columns.
+    """Convert numeric or parseable string literals when compared to DateTime columns.
 
-    When a numeric literal (int/float unix timestamp) is being compared against a
-    DateTime column field (started_at, ended_at, deleted_at), convert it to a datetime
-    string so ClickHouse can properly use primary key / ORDER BY indexes on DateTime64
-    columns.
+    When a literal (int/float unix timestamp, or ISO / ``YYYY-MM-DD`` string) is
+    compared against a DateTime column field (started_at, ended_at, deleted_at),
+    convert it to a datetime string so ClickHouse can properly use
+    primary key / ORDER BY indexes on DateTime64 columns.
+
+    String dates use midnight UTC for ``YYYY-MM-DD``. Other formats follow
+    :func:`parse_string_to_utc_timestamp`.
 
     Returns a new list of operands with conversions applied, or the original sequence if
     no conversion is needed.
@@ -1963,12 +2078,19 @@ def _maybe_convert_datetime_operands(
         ... ])
         >>> isinstance(ops[1].literal_, str)
         True
+        >>> ops2 = _maybe_convert_datetime_operands([
+        ...     tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+        ...     tsi_query.LiteralOperation(**{"$literal": "2024-03-01"}),
+        ... ])
+        >>> ops2[1].literal_
+        '2024-03-01 00:00:00.000000'
     """
     if len(operands) != 2:
         return operands
 
     field_idx = None
     literal_idx = None
+    timestamp: float | None = None
 
     for i, op in enumerate(operands):
         if (
@@ -1976,17 +2098,22 @@ def _maybe_convert_datetime_operands(
             and op.get_field_ in DATETIME_COLUMN_FIELDS
         ):
             field_idx = i
-        elif isinstance(op, tsi_query.LiteralOperation) and isinstance(
-            op.literal_, (int, float)
-        ):
-            literal_idx = i
+        elif isinstance(op, tsi_query.LiteralOperation):
+            lit = op.literal_
+            if isinstance(lit, (int, float)):
+                literal_idx = i
+                timestamp = float(lit)
+            elif isinstance(lit, str):
+                parsed = parse_string_to_utc_timestamp(lit)
+                if parsed is not None:
+                    literal_idx = i
+                    timestamp = parsed
 
-    if field_idx is None or literal_idx is None:
+    if field_idx is None or literal_idx is None or timestamp is None:
         return operands
 
     # Convert numeric timestamp to datetime string for proper DateTime64 comparison
-    timestamp = operands[literal_idx].literal_
-    assert isinstance(timestamp, (int, float))
+    assert isinstance(timestamp, float)
     datetime_str = timestamp_to_datetime_str(timestamp)
 
     new_operands = list(operands)
@@ -1998,6 +2125,22 @@ def _extract_field_name(operand: "tsi_query.Operand") -> str | None:
     """Extract the top-level field name from a GetFieldOperator, if present."""
     if isinstance(operand, tsi_query.GetFieldOperator):
         return operand.get_field_
+    return None
+
+
+def _get_multi_value_feedback_field(
+    operand: tsi_query.Operand,
+) -> CallsMergedFeedbackPayloadField | None:
+    """If the operand is a GetField referencing a multi-value feedback field, return it."""
+    field_name = _extract_field_name(operand)
+    if not field_name or not field_name.startswith("feedback."):
+        return None
+    structured_field = get_field_by_name(field_name)
+    if (
+        isinstance(structured_field, CallsMergedFeedbackPayloadField)
+        and structured_field.is_multi_value
+    ):
+        return structured_field
     return None
 
 
@@ -2036,31 +2179,44 @@ def process_query_to_conditions(
             cond = f"(NOT ({operand_part}))"
         elif isinstance(operation, tsi_query.EqOperation):
             ops = _maybe_convert_datetime_operands(operation.eq_)
-            lhs_part = process_operand(ops[0])
-            if (
-                isinstance(ops[1], tsi_query.LiteralOperation)
-                and ops[1].literal_ is None
-            ):
-                # For calls_complete, sentinel fields use equality checks
-                # against the sentinel value instead of IS NULL.
-                field_name = _extract_field_name(ops[0])
-                sentinel = (
-                    ch_sentinel_values.get_sentinel_value(field_name)
-                    if use_sentinels and field_name
-                    else None
-                )
-                if sentinel is not None:
-                    assert field_name is not None
-                    sentinel_type = ch_sentinel_values.sentinel_ch_type(field_name)
-                    sentinel_slot = param_builder.add(
-                        sentinel, param_type=sentinel_type
-                    )
-                    cond = f"({lhs_part} = {sentinel_slot})"
+            mv_field = _get_multi_value_feedback_field(ops[0]) if use_agg_fn else None
+            if mv_field is not None:
+                array_expr = mv_field.as_array_sql(param_builder)
+                raw_fields_used[mv_field.feedback_type] = mv_field
+                if (
+                    isinstance(ops[1], tsi_query.LiteralOperation)
+                    and ops[1].literal_ is None
+                ):
+                    cond = f"(length({array_expr}) = 0)"
                 else:
-                    cond = f"({lhs_part} IS NULL)"
+                    rhs_part = process_operand(ops[1])
+                    cond = f"has({array_expr}, {rhs_part})"
             else:
-                rhs_part = process_operand(ops[1])
-                cond = f"({lhs_part} = {rhs_part})"
+                lhs_part = process_operand(ops[0])
+                if (
+                    isinstance(ops[1], tsi_query.LiteralOperation)
+                    and ops[1].literal_ is None
+                ):
+                    # For calls_complete, sentinel fields use equality checks
+                    # against the sentinel value instead of IS NULL.
+                    field_name = _extract_field_name(ops[0])
+                    sentinel = (
+                        ch_sentinel_values.get_sentinel_value(field_name)
+                        if use_sentinels and field_name
+                        else None
+                    )
+                    if sentinel is not None:
+                        assert field_name is not None
+                        sentinel_type = ch_sentinel_values.sentinel_ch_type(field_name)
+                        sentinel_slot = param_builder.add(
+                            sentinel, param_type=sentinel_type
+                        )
+                        cond = f"({lhs_part} = {sentinel_slot})"
+                    else:
+                        cond = f"({lhs_part} IS NULL)"
+                else:
+                    rhs_part = process_operand(ops[1])
+                    cond = f"({lhs_part} = {rhs_part})"
         elif isinstance(operation, tsi_query.GtOperation):
             ops = _maybe_convert_datetime_operands(operation.gt_)
             lhs_part = process_operand(ops[0])
@@ -2086,12 +2242,26 @@ def process_query_to_conditions(
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
             cond = f"({lhs_part} IN ({rhs_part}))"
         elif isinstance(operation, tsi_query.ContainsOperation):
-            lhs_part = process_operand(operation.contains_.input)
-            rhs_part = process_operand(operation.contains_.substr)
-            position_operation = "position"
-            if operation.contains_.case_insensitive:
-                position_operation = "positionCaseInsensitive"
-            cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
+            mv_field = (
+                _get_multi_value_feedback_field(operation.contains_.input)
+                if use_agg_fn
+                else None
+            )
+            if mv_field is not None:
+                array_expr = mv_field.as_array_sql(param_builder)
+                rhs_part = process_operand(operation.contains_.substr)
+                raw_fields_used[mv_field.feedback_type] = mv_field
+                position_operation = "position"
+                if operation.contains_.case_insensitive:
+                    position_operation = "positionCaseInsensitive"
+                cond = f"arrayExists(x -> {position_operation}(x, {rhs_part}) > 0, {array_expr})"
+            else:
+                lhs_part = process_operand(operation.contains_.input)
+                rhs_part = process_operand(operation.contains_.substr)
+                position_operation = "position"
+                if operation.contains_.case_insensitive:
+                    position_operation = "positionCaseInsensitive"
+                cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
         else:
             raise TypeError(f"Unknown operation type: {operation}")
 
@@ -2251,8 +2421,15 @@ def process_children_of_eval_ids_to_sql(
     table_alias: str,
     project_id: str = "",
     read_table: ReadTable = ReadTable.CALLS_MERGED,
+    eval_subcall_cte_name: str | None = None,
+    include_predict_and_score_children: bool = True,
 ) -> str:
-    """Fetch direct children of eval root IDs and their children for the eval results dataset."""
+    """Fetch direct children of eval root IDs and optionally their children.
+
+    When include_predict_and_score_children is False, only fetch
+    predict-and-score calls (direct children of eval roots), skipping
+    the nested subquery for their children (predict/scorer calls).
+    """
     if not eval_root_ids:
         return ""
     assert_parameter_length_less_than_max("eval_root_ids", len(eval_root_ids))
@@ -2268,22 +2445,28 @@ def process_children_of_eval_ids_to_sql(
         param_builder.add_param(eval_root_ids), "Array(String)"
     )
 
-    # we generate a nested CallsQuery to find all instances of the PredictandScore calls
-    # that are children of the eval root IDs. this is then used as a WHERE clause
-    # in the outer query to return both the PredictandScore calls and their children (scorers/predict calls).
-    eval_root_children_cq = CallsQuery(project_id=project_id, read_table=read_table)
-    eval_root_children_cq.add_field("id")
-    eval_root_children_cq.set_hardcoded_filter(
-        HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
-    )
-    eval_root_children_subquery = eval_root_children_cq.as_sql(param_builder)
+    # Level 1: direct children of the eval root ids (predict_and_score, summarize, etc).
+    parent_id_conditions = f"{parent_id_field_sql} IN {eval_root_ids_param}"
+
+    if include_predict_and_score_children:
+        # Level 2: children of the direct children (predict/score calls).
+        if eval_subcall_cte_name:
+            eval_root_children_subquery = f"SELECT id FROM {eval_subcall_cte_name}"
+        else:
+            eval_root_children_cq = CallsQuery(
+                project_id=project_id, read_table=read_table
+            )
+            eval_root_children_cq.add_field("id")
+            eval_root_children_cq.set_hardcoded_filter(
+                HardCodedFilter(filter=tsi.CallsFilter(parent_ids=eval_root_ids))
+            )
+            eval_root_children_subquery = eval_root_children_cq.as_sql(param_builder)
+        parent_id_conditions += (
+            f" OR {parent_id_field_sql} IN ({eval_root_children_subquery})"
+        )
 
     # for the calls-merged table, each call is stored as split start/end rows.
     # end-rows have parent_id as NULL, so we need to do this.
-    parent_id_conditions = (
-        f"{parent_id_field_sql} IN {eval_root_ids_param}"
-        f" OR {parent_id_field_sql} IN ({eval_root_children_subquery})"
-    )
     if read_table == ReadTable.CALLS_MERGED:
         parent_null = parent_id_field.null_check_sql(
             param_builder, table_alias, read_table, use_agg_fn=False
@@ -2754,9 +2937,11 @@ def _build_calls_complete_stats_query(
 
     # Build the query body (FROM, JOINs, WHERE, etc.) — reuses all existing
     # filter/condition/join abstractions without CTE optimization overhead
-    body = cq._build_query_body(param_builder, table_name)
+    body_result = cq._build_query_body(param_builder, table_name)
 
     # Build the aggregate SELECT clause
+    # When feedback JOIN is present, use COUNT(DISTINCT id) to avoid counting
+    # duplicate rows from the JOIN.
     stats_parts: list[str] = []
     for col_name, col_agg in aggregated_columns.items():
         if col_name == "total_storage_size_bytes":
@@ -2773,13 +2958,15 @@ def _build_calls_complete_stats_query(
                 f"ELSE NULL END"
             )
             stats_parts.append(f"sum(coalesce({total_storage_expr}, 0)) AS {col_name}")
+        elif body_result.needs_feedback_join and col_name == "count":
+            stats_parts.append(f"count(DISTINCT {table_name}.id) AS {col_name}")
         else:
             stats_parts.append(f"{col_agg} AS {col_name}")
     stats_select = ", ".join(stats_parts)
 
     raw_sql = f"""
     SELECT {stats_select}
-    {body}
+    {body_result.sql}
     """
     return safely_format_sql(raw_sql, logger)
 
@@ -2892,14 +3079,18 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
     )
 
 
-def _format_table_name_with_cluster(table_name: str, cluster_name: str | None) -> str:
+def _format_table_name_with_cluster(
+    table_name: str,
+    cluster_name: str | None,
+) -> str:
     """Format a table name with ON CLUSTER clause if cluster_name is provided.
 
-    In distributed mode, mutations (UPDATE, DELETE, etc.) must target the local
-    table with the ON CLUSTER clause to execute across all cluster nodes.
+    Callers are responsible for passing the correct table name (e.g.
+    calls_complete_local in distributed mode). This function only appends the
+    ON CLUSTER clause.
     """
     if cluster_name:
-        return f"{table_name}{LOCAL_TABLE_SUFFIX} ON CLUSTER {cluster_name}"
+        return f"{table_name} ON CLUSTER {cluster_name}"
     return table_name
 
 

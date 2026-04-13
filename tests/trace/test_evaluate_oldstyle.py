@@ -1,4 +1,3 @@
-import asyncio
 import threading
 
 import pytest
@@ -75,6 +74,7 @@ def _install_concurrent_first_save_tracker(
                     if gate_state["waiting"] == 2:
                         gate_state["release"].set()
                 gate_state["release"].wait(timeout=0.5)
+            # Count how many real saves reach `_save_object_basic` for each scorer op.
             with save_counts_lock:
                 save_counts[tracked_op.name] += 1
         return original_save_object_basic(val, name=name, branch=branch)
@@ -83,7 +83,8 @@ def _install_concurrent_first_save_tracker(
     return save_counts
 
 
-def test_evaluate_callable_as_model(client, dataset_rows):
+@pytest.mark.asyncio
+async def test_evaluate_callable_as_model(client, dataset_rows):
     @weave.op
     async def model_predict(input) -> str:
         return eval(input)
@@ -92,11 +93,12 @@ def test_evaluate_callable_as_model(client, dataset_rows):
         dataset=dataset_rows,
         scorers=[score_oldstyle],
     )
-    result = asyncio.run(evaluation.evaluate(model_predict))
+    result = await evaluation.evaluate(model_predict)
     assert result == expected_eval_result
 
 
-def test_predict_can_receive_other_params(client, dataset_rows):
+@pytest.mark.asyncio
+async def test_predict_can_receive_other_params(client, dataset_rows):
     @weave.op
     async def model_predict(input, target) -> str:
         return eval(input) + target
@@ -105,7 +107,7 @@ def test_predict_can_receive_other_params(client, dataset_rows):
         dataset=dataset_rows,
         scorers=[score_oldstyle],
     )
-    result = asyncio.run(evaluation.evaluate(model_predict))
+    result = await evaluation.evaluate(model_predict)
     assert result == {
         "model_output": {"mean": 18.5},
         "score_oldstyle": {"true_count": 0, "true_fraction": 0.0},
@@ -115,7 +117,8 @@ def test_predict_can_receive_other_params(client, dataset_rows):
     }
 
 
-def test_can_preprocess_model_input(client, dataset_rows):
+@pytest.mark.asyncio
+async def test_can_preprocess_model_input(client, dataset_rows):
     @weave.op
     async def model_predict(x) -> str:
         return eval(x)
@@ -129,17 +132,18 @@ def test_can_preprocess_model_input(client, dataset_rows):
         scorers=[score_oldstyle],
         preprocess_model_input=preprocess,
     )
-    result = asyncio.run(evaluation.evaluate(model_predict))
+    result = await evaluation.evaluate(model_predict)
     assert result == expected_eval_result
 
 
-def test_evaluate_rows_only(client, dataset_rows):
+@pytest.mark.asyncio
+async def test_evaluate_rows_only(client, dataset_rows):
     evaluation = Evaluation(
         dataset=dataset_rows,
         scorers=[score_oldstyle],
     )
     model = EvalModel()
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result == expected_eval_result
 
 
@@ -184,6 +188,7 @@ async def test_evaluate_both_styles_saves_each_function_scorer_once(
     save_counts = _install_concurrent_first_save_tracker(
         client, monkeypatch, score_oldstyle, score_newstyle
     )
+    # Raise parallelism to make overlapping scorer saves much more likely.
     monkeypatch.setenv("WEAVE_PARALLELISM", "20")
 
     client.set_autoflush(False)
@@ -205,7 +210,8 @@ async def test_evaluate_both_styles_saves_each_function_scorer_once(
     }
 
 
-def test_evaluate_other_model_method_names(dataset_rows):
+@pytest.mark.asyncio
+async def test_evaluate_other_model_method_names(dataset_rows):
     class EvalModel(Model):
         @weave.op
         async def infer(self, input) -> str:
@@ -216,11 +222,12 @@ def test_evaluate_other_model_method_names(dataset_rows):
         scorers=[score_oldstyle],
     )
     model = EvalModel()
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result == expected_eval_result
 
 
-def test_score_as_class(client, dataset_rows):
+@pytest.mark.asyncio
+async def test_score_as_class(client, dataset_rows):
     class MyScorerOldstyle(weave.Scorer):
         @weave.op
         def score(self, model_output, target):
@@ -231,7 +238,7 @@ def test_score_as_class(client, dataset_rows):
         scorers=[MyScorerOldstyle()],
     )
     model = EvalModel()
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result == {
         "model_output": {"mean": 9.5},
         "MyScorerOldstyle": {"true_count": 1, "true_fraction": 0.5},
@@ -241,7 +248,8 @@ def test_score_as_class(client, dataset_rows):
     }
 
 
-def test_score_with_custom_summarize(client, dataset_rows):
+@pytest.mark.asyncio
+async def test_score_with_custom_summarize(client, dataset_rows):
     class MyScorerOldstyle(weave.Scorer):
         @weave.op
         def summarize(self, score_rows):
@@ -257,7 +265,7 @@ def test_score_with_custom_summarize(client, dataset_rows):
         scorers=[MyScorerOldstyle()],
     )
     model = EvalModel()
-    result = asyncio.run(evaluation.evaluate(model))
+    result = await evaluation.evaluate(model)
     assert result == {
         "model_output": {"mean": 9.5},
         "MyScorerOldstyle": {"awesome": 3},
@@ -267,7 +275,8 @@ def test_score_with_custom_summarize(client, dataset_rows):
     }
 
 
-def test_multiclass_f1_score(client):
+@pytest.mark.asyncio
+async def test_multiclass_f1_score(client):
     evaluation = Evaluation(
         dataset=[{"target": {"a": False, "b": True}, "pred": {"a": True, "b": False}}],
         scorers=[MultiTaskBinaryClassificationF1(class_names=["a", "b"])],
@@ -277,7 +286,7 @@ def test_multiclass_f1_score(client):
     def return_pred(pred):
         return pred
 
-    result = asyncio.run(evaluation.evaluate(return_pred))
+    result = await evaluation.evaluate(return_pred)
     assert result == {
         "model_output": {
             "a": {"true_count": 1, "true_fraction": 1.0},

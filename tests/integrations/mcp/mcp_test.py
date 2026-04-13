@@ -172,14 +172,13 @@ def test_mcp_client(client: WeaveClient) -> None:
     sys.platform == "win32",
     reason="Currently not working on Windows",
 )
-def test_mcp_server(client: WeaveClient) -> None:
+@pytest.mark.asyncio
+async def test_mcp_server(client: WeaveClient) -> None:
     fastmcp = mcp_server()
 
-    result = asyncio.run(fastmcp.call_tool("add", {"a": 1, "b": 2}))
-    resource = asyncio.run(fastmcp.read_resource("greeting://cw"))
-    prompt = asyncio.run(
-        fastmcp.get_prompt("review_code", {"code": "print('Hello, world!')"})
-    )
+    result = await fastmcp.call_tool("add", {"a": 1, "b": 2})
+    resource = await fastmcp.read_resource("greeting://cw")
+    prompt = await fastmcp.get_prompt("review_code", {"code": "print('Hello, world!')"})
 
     assert result[0].text == str(3)
     assert resource[0].content == "Hello, cw!"
