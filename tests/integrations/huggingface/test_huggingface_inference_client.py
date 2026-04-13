@@ -341,9 +341,7 @@ async def test_huggingface_table_question_answering_async(client):
     }
     await AsyncInferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).table_question_answering(
-        table, query, model="google/tapas-base-finetuned-wtq"
-    )
+    ).table_question_answering(table, query, model="google/tapas-base-finetuned-wtq")
 
     calls = list(client.get_calls())
     assert len(calls) == 1
