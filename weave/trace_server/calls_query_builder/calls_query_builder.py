@@ -1361,9 +1361,11 @@ class CallsQuery(BaseModel):
         if id_subquery_name is not None:
             id_subquery = f"AND ({table_alias}.id IN {id_subquery_name})"
 
-        # special optimization for call_ids filter
+        # call_ids is handled exclusively here (not in process_calls_filter_to_conditions)
+        # to avoid duplicate id IN filters in the generated SQL.
         id_mask = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
+            assert_parameter_length_less_than_max("call_ids", len(self.hardcoded_filter.filter.call_ids))
             id_mask = f"AND ({table_alias}.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
 
         return WhereFilters(
@@ -2680,11 +2682,9 @@ def process_calls_filter_to_conditions(
             f"{get_field_sql('parent_id')} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
-    if filter.call_ids:
-        assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
-        conditions.append(
-            f"{get_field_sql('id')} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
-        )
+    # Note: call_ids is intentionally NOT handled here — it is pushed into
+    # the WHERE clause as an id_mask optimization by
+    # _build_where_clause_optimizations to avoid duplicate id IN filters.
 
     if filter.thread_ids is not None:
         assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
