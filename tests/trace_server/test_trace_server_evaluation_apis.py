@@ -1073,25 +1073,63 @@ def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
 
 
 def test_eval_results_sort_by_output(client):
-    """Sort by output.output orders rows by model output value."""
+    """Sort by output.label orders rows by nested model output field."""
     if client_is_sqlite(client):
         pytest.skip("sort/filter only implemented for ClickHouse")
-    eval_id = _create_eval_with_scores(
-        client,
-        [{"accuracy": 0.1}, {"accuracy": 0.5}, {"accuracy": 0.9}],
-        eval_name="output-sort",
+    project_id = client.project_id
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://output-sort",
+            model="model://output-sort",
+        )
     )
+    labels = ["cherry", "apple", "banana"]
+    for i, label in enumerate(labels):
+        call_id = generate_id()
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=run.evaluation_run_id,
+                    op_name="Evaluation.predict_and_score",
+                    started_at=now,
+                    attributes={},
+                    inputs={
+                        "example": {"idx": i},
+                        "model": "model://output-sort",
+                    },
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=now + datetime.timedelta(seconds=1),
+                    output={
+                        "output": {"label": label},
+                        "scores": {"accuracy": float(i)},
+                    },
+                    summary={},
+                )
+            )
+        )
     res = client.server.eval_results_query(
         EvalResultsQueryReq(
-            project_id=client.project_id,
-            evaluation_call_ids=[eval_id],
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
             include_raw_data_rows=True,
-            sort_by=[EvalResultsSortBy(field="output.output", direction="asc")],
+            sort_by=[EvalResultsSortBy(field="output.label", direction="asc")],
         )
     )
     assert res.total_rows == 3
-    outputs = [row.evaluations[0].trials[0].model_output for row in res.rows]
-    assert outputs == ["answer_0", "answer_1", "answer_2"]
+    sorted_labels = [row.evaluations[0].trials[0].model_output["label"] for row in res.rows]
+    assert sorted_labels == ["apple", "banana", "cherry"]
 
 
 def test_eval_results_summary_with_filter(client):
