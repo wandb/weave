@@ -8,7 +8,7 @@ import base64
 import datetime
 import uuid
 
-from weave.trace_server.agent_clickhouse import (
+from weave.trace_server.agent_helpers import (
     extract_search_rows,
     genai_search_row_to_row,
     genai_span_to_row,

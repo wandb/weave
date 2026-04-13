@@ -29,6 +29,16 @@ class Attribute:
     description: str
     gen_ai_alias: str = ""  # OTel gen_ai.* equivalent, if any
 
+    @property
+    def lookup_keys(self) -> tuple[str, ...]:
+        """Return (weave_key, gen_ai_alias) for use in attribute extraction.
+
+        The canonical weave.* key is always first so it takes priority.
+        """
+        if self.gen_ai_alias:
+            return (self.key, self.gen_ai_alias)
+        return (self.key,)
+
 
 # ---------------------------------------------------------------------------
 # Attribute definitions
@@ -249,6 +259,10 @@ _DEFS: list[Attribute] = [
 
 #: All attributes keyed by canonical weave.* key.
 ATTRIBUTES: dict[str, Attribute] = {a.key: a for a in _DEFS}
+
+#: Shortcut: maps canonical key -> lookup_keys tuple for extraction.
+#: Usage: ``_get(attrs, *K["weave.agent.name"])``
+K: dict[str, tuple[str, ...]] = {a.key: a.lookup_keys for a in _DEFS}
 
 #: Map from any recognized key (weave.* or gen_ai.*) to canonical weave.* key.
 _ALIAS_TO_CANONICAL: dict[str, str] = {}

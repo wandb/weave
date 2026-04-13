@@ -16,12 +16,10 @@ Google ADK) and produces a unified output.
 
 from __future__ import annotations
 
-import json
 import logging
-import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 from weave.trace_server.agent_types import (
     AgentChatMessage,
@@ -29,65 +27,25 @@ from weave.trace_server.agent_types import (
     AgentTraceChatRes,
 )
 
+
+class UserPrompt(NamedTuple):
+    text: str
+    started_at: str
+    content_refs: list[str]
+
+
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# JSON helpers
-# ---------------------------------------------------------------------------
-
-
-def _safe_parse_json(s: str) -> Any:
-    if not s:
-        return None
-    try:
-        return json.loads(s)
-    except (json.JSONDecodeError, TypeError):
-        return None
-
-
-def _normalize_content_refs(raw: Any) -> list[str]:
-    """Normalize content_refs into a list of strings.
-
-    Handles both native list[str] (from Array(String) columns) and legacy
-    JSON-encoded strings for backward compatibility.
-    """
-    if not raw:
-        return []
-    if isinstance(raw, list):
-        return [str(r) for r in raw if r]
-    if isinstance(raw, str):
-        parsed = _safe_parse_json(raw)
-        if isinstance(parsed, list):
-            return [str(r) for r in parsed if r]
-        try:
-            fixed = (
-                raw.replace("'", '"')
-                .replace("True", "true")
-                .replace("False", "false")
-                .replace("None", "null")
-            )
-            parsed = json.loads(fixed)
-            if isinstance(parsed, list):
-                return [str(r) for r in parsed if r]
-        except (json.JSONDecodeError, TypeError):
-            pass
-    return []
-
 
 # ---------------------------------------------------------------------------
-# Text extraction from message formats
+# Text helpers
 # ---------------------------------------------------------------------------
 
 
 def _extract_user_text(
     messages: list[dict[str, Any]], *, last_only: bool = False
 ) -> str:
-    """Extract user text from normalized input_messages.
-
-    Args:
-        messages: Normalized message list (each has role, content, etc.).
-        last_only: If True, return only the last user message (multi-turn).
-    """
+    """Extract user text from normalized input_messages."""
     if not messages:
         return ""
     texts = [
@@ -114,46 +72,7 @@ def _extract_assistant_text(messages: list[dict[str, Any]]) -> str:
     return "\n".join(texts)
 
 
-def _extract_system_prompt(instructions: list[str] | str) -> str:
-    """Extract readable system prompt from normalized system_instructions."""
-    if not instructions:
-        return ""
-    if isinstance(instructions, str):
-        parsed = _safe_parse_json(instructions)
-        if isinstance(parsed, list):
-            return "\n".join(str(i) for i in parsed if i)
-        return instructions
-    return "\n".join(instructions)
-
-
-def _looks_like_tool_call(text: str) -> bool:
-    """Detect text that is SDK metadata rather than human-readable content.
-
-    Filters out OpenAI Agents SDK Python repr strings
-    (ResponseReasoningItem, ResponseFunctionToolCall, etc.) and
-    serialized tool-call JSON that shouldn't appear as assistant text.
-    """
-    t = text.strip()
-    if not t:
-        return False
-    if (
-        t.startswith("ResponseFunctionToolCall(")
-        or t.startswith("transfer_to_")
-        or t.startswith('{"tool_calls"')
-        or t.startswith('[{"tool_calls"')
-    ):
-        return True
-    lines = t.split("\n")
-    return all(
-        line.strip() == "" or _RESPONSE_REPR_RE.match(line.strip()) for line in lines
-    )
-
-
-_RESPONSE_REPR_RE = re.compile(r"^Response[A-Z][A-Za-z]*\(.+\)$", re.DOTALL)
-
-
 def _dt_to_iso(dt: Any) -> str:
-    """Convert a datetime (or None / str) to an ISO 8601 string."""
     if dt is None:
         return ""
     if isinstance(dt, str):
@@ -164,11 +83,7 @@ def _dt_to_iso(dt: Any) -> str:
         return str(dt)
 
 
-def _compute_duration_ms(
-    started_at: Any,
-    ended_at: Any,
-) -> int:
-    """Compute span duration in milliseconds."""
+def _compute_duration_ms(started_at: Any, ended_at: Any) -> int:
     if not started_at or not ended_at:
         return 0
     try:
@@ -182,33 +97,18 @@ def _compute_duration_ms(
         return 0
 
 
+def _content_refs(span: AgentSpanSchema) -> list[str]:
+    raw = span.content_refs
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return [str(r) for r in raw if r]
+    return []
+
+
 # ---------------------------------------------------------------------------
 # Span tree
 # ---------------------------------------------------------------------------
-
-_NOISE_TOOL_NAMES = {"(merged tools)", "(merged)", "transfer_to_agent"}
-
-
-def _sum_descendant_tokens(
-    node: SpanNode,
-) -> tuple[int, int, int, str]:
-    """Recursively sum input, output, and reasoning tokens across a subtree.
-
-    Returns:
-        (input_tokens, output_tokens, reasoning_tokens, reasoning_content)
-    """
-    input_t = node.span.input_tokens or 0
-    output_t = node.span.output_tokens or 0
-    reasoning_t = node.span.reasoning_tokens or 0
-    reasoning_text = node.span.reasoning_content or ""
-    for child in node.children:
-        ci, co, cr, ct = _sum_descendant_tokens(child)
-        input_t += ci
-        output_t += co
-        reasoning_t += cr
-        if ct and not reasoning_text:
-            reasoning_text = ct
-    return input_t, output_t, reasoning_t, reasoning_text
 
 
 @dataclass
@@ -247,58 +147,94 @@ def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
     return roots
 
 
+def _sum_descendant_tokens(node: SpanNode) -> tuple[int, int, int, str]:
+    """Sum input, output, and reasoning tokens across a subtree."""
+    input_t = node.span.input_tokens or 0
+    output_t = node.span.output_tokens or 0
+    reasoning_t = node.span.reasoning_tokens or 0
+    reasoning_text = node.span.reasoning_content or ""
+    for child in node.children:
+        ci, co, cr, ct = _sum_descendant_tokens(child)
+        input_t += ci
+        output_t += co
+        reasoning_t += cr
+        if ct and not reasoning_text:
+            reasoning_text = ct
+    return input_t, output_t, reasoning_t, reasoning_text
+
+
 # ---------------------------------------------------------------------------
 # User prompt extraction
 # ---------------------------------------------------------------------------
 
 
-def find_user_prompt(
-    spans: list[AgentSpanSchema],
-) -> tuple[str, str, list[str]]:
-    """Pre-scan spans to find the user prompt for this trace.
+def _find_user_prompt(spans: list[AgentSpanSchema]) -> UserPrompt:
+    """Find the user prompt for this trace.
 
-    Uses last_only=True because multi-turn conversations send the full
-    history as input_messages, and we only want the current turn's prompt.
-
-    Returns:
-        (prompt_text, started_at, content_refs) — started_at is the ISO
-        timestamp of the span that carried the user prompt; content_refs is
-        the list of uploaded attachment refs from the same span.
+    Prefers invoke_agent spans, falls back to any span with input_messages.
     """
     sorted_spans = sorted(spans, key=lambda s: s.started_at or "")
 
-    msgs_field = "input_messages"
-    for s in sorted_spans:
-        msgs = getattr(s, msgs_field, None) or []
-        if s.operation_name == "invoke_agent" and msgs:
+    for prefer_invoke_agent in (True, False):
+        for s in sorted_spans:
+            if prefer_invoke_agent and s.operation_name != "invoke_agent":
+                continue
+            msgs = s.input_messages or []
+            if not msgs:
+                continue
             text = _extract_user_text(msgs, last_only=True)
-            if text and not _looks_like_tool_call(text):
-                return (
-                    text,
-                    _dt_to_iso(s.started_at),
-                    _normalize_content_refs(s.content_refs),
-                )
+            if text:
+                return UserPrompt(text, _dt_to_iso(s.started_at), _content_refs(s))
 
-    for s in sorted_spans:
-        msgs = getattr(s, msgs_field, None) or []
-        if msgs:
-            text = _extract_user_text(msgs, last_only=True)
-            if text and not _looks_like_tool_call(text):
-                return (
-                    text,
-                    _dt_to_iso(s.started_at),
-                    _normalize_content_refs(s.content_refs),
-                )
+    return UserPrompt("", "", [])
 
-    for s in sorted_spans:
-        if s.attributes_dump:
-            attrs = _safe_parse_json(s.attributes_dump)
-            if isinstance(attrs, dict):
-                prompt = attrs.get("gen_ai.prompt")
-                if prompt and isinstance(prompt, str):
-                    return prompt, _dt_to_iso(s.started_at), []
 
-    return "", "", []
+# ---------------------------------------------------------------------------
+# Message emission helpers
+# ---------------------------------------------------------------------------
+
+_NOISE_TOOL_NAMES = frozenset({"(merged tools)", "(merged)", "transfer_to_agent"})
+_MAX_WALK_DEPTH = 200
+
+
+def _emit_agent_message(
+    span: AgentSpanSchema,
+    agent_name: str,
+    *,
+    aggregate_node: SpanNode | None = None,
+) -> AgentChatMessage | None:
+    """Build an agent_message from a span's output_messages, or None if empty."""
+    if not span.output_messages:
+        return None
+    text = _extract_assistant_text(span.output_messages)
+    if not text:
+        return None
+
+    if aggregate_node:
+        agg_in, agg_out, agg_reasoning, agg_reasoning_text = _sum_descendant_tokens(
+            aggregate_node
+        )
+    else:
+        agg_in = span.input_tokens
+        agg_out = span.output_tokens
+        agg_reasoning = span.reasoning_tokens
+        agg_reasoning_text = span.reasoning_content or ""
+
+    return AgentChatMessage(
+        type="agent_message",
+        span_id=span.span_id,
+        agent_name=agent_name,
+        model=span.response_model or span.request_model,
+        text=text,
+        reasoning_content=agg_reasoning_text,
+        reasoning_tokens=agg_reasoning,
+        input_tokens=agg_in or span.input_tokens,
+        output_tokens=agg_out or span.output_tokens,
+        duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
+        started_at=_dt_to_iso(span.started_at),
+        status=span.status_code,
+        content_refs=_content_refs(span),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -306,27 +242,16 @@ def find_user_prompt(
 # ---------------------------------------------------------------------------
 
 
-def build_chat_messages(
-    spans: list[AgentSpanSchema],
-) -> list[AgentChatMessage]:
-    """Convert a list of agent spans into a structured chat trajectory.
-
-    Args:
-        spans: All spans for a single trace, typically ordered by started_at.
-
-    Returns:
-        Ordered list of chat messages representing the agent trajectory.
-    """
+def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
+    """Convert a list of agent spans into a structured chat trajectory."""
     if not spans:
         return []
 
     tree = build_span_tree(spans)
     messages: list[AgentChatMessage] = []
-    agent_response_emitted: set[str] = set()
-    # Dedup by first 200 chars to avoid hashing megabyte-scale messages
-    emitted_agent_texts: set[str] = set()
+    emitted_span_ids: set[str] = set()
 
-    user_prompt, user_started_at, user_content_refs = find_user_prompt(spans)
+    user_prompt, user_started_at, user_refs = _find_user_prompt(spans)
     if user_prompt:
         messages.append(
             AgentChatMessage(
@@ -334,26 +259,20 @@ def build_chat_messages(
                 text=user_prompt,
                 agent_name="User",
                 started_at=_dt_to_iso(user_started_at),
-                content_refs=user_content_refs,
+                content_refs=user_refs,
             )
         )
 
     def _walk(node: SpanNode, nearest_agent: str = "", _depth: int = 0) -> None:
-        if _depth > 200:
-            return  # guard against pathological nesting
+        if _depth > _MAX_WALK_DEPTH:
+            return
         span = node.span
         op = span.operation_name
-        agent_name = (
-            span.agent_name
-            or nearest_agent
-            or span.span_name.replace("invoke_agent ", "").replace(
-                "generate_content ", ""
-            )
-        )
+        agent_name = span.agent_name or nearest_agent
 
         # ---- invoke_agent ----
         if op == "invoke_agent":
-            name = span.agent_name or span.span_name.replace("invoke_agent ", "")
+            name = span.agent_name or span.span_name.removeprefix("invoke_agent ")
 
             if span.agent_name:
                 messages.append(
@@ -363,9 +282,9 @@ def build_chat_messages(
                         agent_name=span.agent_name,
                         model=span.request_model,
                         status=span.status_code,
-                        system_instructions=_extract_system_prompt(
-                            span.system_instructions
-                        ),
+                        system_instructions="\n".join(span.system_instructions)
+                        if span.system_instructions
+                        else "",
                         tool_definitions=span.tool_definitions or "",
                         started_at=_dt_to_iso(span.started_at),
                     )
@@ -374,39 +293,12 @@ def build_chat_messages(
             for child in node.children:
                 _walk(child, name, _depth + 1)
 
-            if span.output_messages and span.span_id not in agent_response_emitted:
-                text = _extract_assistant_text(span.output_messages)
-                if (
-                    text
-                    and not _looks_like_tool_call(text)
-                    and text[:200] not in emitted_agent_texts
-                ):
-                    agent_response_emitted.add(span.span_id)
-                    emitted_agent_texts.add(text[:200])
-                    agg_in, agg_out, agg_reasoning, agg_reasoning_text = (
-                        _sum_descendant_tokens(node)
-                    )
-                    messages.append(
-                        AgentChatMessage(
-                            type="agent_message",
-                            span_id=span.span_id,
-                            agent_name=name,
-                            model=span.response_model or span.request_model,
-                            text=text,
-                            reasoning_content=agg_reasoning_text,
-                            reasoning_tokens=agg_reasoning,
-                            input_tokens=agg_in or span.input_tokens,
-                            output_tokens=agg_out or span.output_tokens,
-                            duration_ms=_compute_duration_ms(
-                                span.started_at, span.ended_at
-                            ),
-                            started_at=_dt_to_iso(span.started_at),
-                            status=span.status_code,
-                            content_refs=_normalize_content_refs(span.content_refs),
-                        )
-                    )
+            if span.span_id not in emitted_span_ids:
+                msg = _emit_agent_message(span, name, aggregate_node=node)
+                if msg:
+                    emitted_span_ids.add(span.span_id)
+                    messages.append(msg)
 
-            # Emit compaction event if this span triggered context compaction
             if span.compaction_summary or span.compaction_items_before > 0:
                 messages.append(
                     AgentChatMessage(
@@ -423,14 +315,14 @@ def build_chat_messages(
 
         # ---- execute_tool ----
         if op == "execute_tool":
-            tool_name = span.tool_name or span.span_name.replace("execute_tool ", "")
+            tool_name = span.tool_name or span.span_name.removeprefix("execute_tool ")
 
             if tool_name.startswith("transfer_to_"):
                 messages.append(
                     AgentChatMessage(
                         type="agent_handoff",
                         span_id=span.span_id,
-                        text=tool_name.replace("transfer_to_", "→ "),
+                        text=tool_name.removeprefix("transfer_to_"),
                         status=span.status_code,
                         started_at=_dt_to_iso(span.started_at),
                     )
@@ -449,7 +341,7 @@ def build_chat_messages(
                         ),
                         started_at=_dt_to_iso(span.started_at),
                         status=span.status_code,
-                        content_refs=_normalize_content_refs(span.content_refs),
+                        content_refs=_content_refs(span),
                     )
                 )
 
@@ -457,14 +349,14 @@ def build_chat_messages(
                 _walk(child, nearest_agent, _depth + 1)
             return
 
-        # ---- handoff / agent_handoff ----
+        # ---- handoff ----
         if op in {"handoff", "agent_handoff"}:
             messages.append(
                 AgentChatMessage(
                     type="agent_handoff",
                     span_id=span.span_id,
                     agent_name=span.agent_name,
-                    text=span.span_name.replace("agent_handoff ", "→ "),
+                    text=span.span_name.removeprefix("agent_handoff "),
                     status=span.status_code,
                     started_at=_dt_to_iso(span.started_at),
                 )
@@ -473,73 +365,15 @@ def build_chat_messages(
                 _walk(child, nearest_agent, _depth + 1)
             return
 
-        # ---- chat: either walk children or emit leaf message ----
-        if op == "chat":
-            if node.children:
-                for child in node.children:
-                    _walk(child, nearest_agent, _depth + 1)
-            elif span.output_messages:
-                text = _extract_assistant_text(span.output_messages)
-                if (
-                    text
-                    and not _looks_like_tool_call(text)
-                    and text not in emitted_agent_texts
-                ):
-                    emitted_agent_texts.add(text)
-                    messages.append(
-                        AgentChatMessage(
-                            type="agent_message",
-                            span_id=span.span_id,
-                            agent_name=nearest_agent or agent_name,
-                            model=span.response_model or span.request_model,
-                            text=text,
-                            input_tokens=span.input_tokens,
-                            output_tokens=span.output_tokens,
-                            duration_ms=_compute_duration_ms(
-                                span.started_at, span.ended_at
-                            ),
-                            started_at=_dt_to_iso(span.started_at),
-                            status=span.status_code,
-                        )
-                    )
-            return
-
-        # ---- generate_content (Google): walk children ----
-        if op == "generate_content":
-            for child in node.children:
-                _walk(child, agent_name, _depth + 1)
-            return
-
-        # ---- unknown/empty op (call_llm, invocation, etc.) ----
+        # ---- chat / generate_content / unknown: walk children, maybe emit ----
         for child in node.children:
-            _walk(child, nearest_agent, _depth + 1)
+            _walk(child, agent_name, _depth + 1)
 
-        if span.output_messages:
-            text = _extract_assistant_text(span.output_messages)
-            if (
-                text
-                and not _looks_like_tool_call(text)
-                and text not in emitted_agent_texts
-            ):
-                emitted_agent_texts.add(text)
-                messages.append(
-                    AgentChatMessage(
-                        type="agent_message",
-                        span_id=span.span_id,
-                        agent_name=nearest_agent or agent_name,
-                        model=span.response_model or span.request_model,
-                        text=text,
-                        reasoning_content=span.reasoning_content or "",
-                        reasoning_tokens=span.reasoning_tokens,
-                        input_tokens=span.input_tokens,
-                        output_tokens=span.output_tokens,
-                        duration_ms=_compute_duration_ms(
-                            span.started_at, span.ended_at
-                        ),
-                        started_at=_dt_to_iso(span.started_at),
-                        status=span.status_code,
-                    )
-                )
+        if span.span_id not in emitted_span_ids:
+            msg = _emit_agent_message(span, agent_name)
+            if msg:
+                emitted_span_ids.add(span.span_id)
+                messages.append(msg)
 
     for root in tree:
         _walk(root)
@@ -551,15 +385,7 @@ def build_trace_chat(
     spans: list[AgentSpanSchema],
     trace_id: str,
 ) -> AgentTraceChatRes:
-    """Build the full chat response for a trace.
-
-    Args:
-        spans: All spans for the trace.
-        trace_id: The trace identifier.
-
-    Returns:
-        Complete chat view response with metadata and messages.
-    """
+    """Build the full chat response for a trace."""
     messages = build_chat_messages(spans)
 
     root_span_name = ""
@@ -567,11 +393,7 @@ def build_trace_chat(
     total_duration_ms = 0
 
     if spans:
-        # Spans are already sorted by started_at from the query
-        root = next(
-            (s for s in spans if not s.parent_span_id),
-            spans[0],
-        )
+        root = next((s for s in spans if not s.parent_span_id), spans[0])
         root_span_name = root.agent_name or root.span_name
         provider = root.provider_name
         total_duration_ms = _compute_duration_ms(root.started_at, root.ended_at)
