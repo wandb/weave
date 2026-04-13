@@ -20,9 +20,12 @@ from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 pytest_plugins = ["tests.trace_server.conftest"]
@@ -434,7 +437,7 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
 
 
 @pytest.fixture
-def network_proxy_client(client):
+def network_proxy_client(client, monkeypatch):
     """This fixture is used to test the `RemoteHTTPTraceServer` class. There is
     almost no logic in this class, other than a little batching, so we typically
     skip it for simplicity. However, we can use this fixture to test such logic.
@@ -551,6 +554,25 @@ def network_proxy_client(client):
 
         orig_post = weave.utils.http_requests.post
         weave.utils.http_requests.post = post
+
+        def make_fast_async_batch_processor(*args, **kwargs):
+            kwargs.setdefault("min_batch_interval", 0)
+            return AsyncBatchProcessor(*args, **kwargs)
+
+        def make_fast_call_batch_processor(*args, **kwargs):
+            kwargs.setdefault("min_batch_interval", 0)
+            return CallBatchProcessor(*args, **kwargs)
+
+        monkeypatch.setattr(
+            remote_http_trace_server,
+            "AsyncBatchProcessor",
+            make_fast_async_batch_processor,
+        )
+        monkeypatch.setattr(
+            remote_http_trace_server,
+            "CallBatchProcessor",
+            make_fast_call_batch_processor,
+        )
 
         remote_client = RemoteHTTPTraceServer(
             trace_server_url="",
