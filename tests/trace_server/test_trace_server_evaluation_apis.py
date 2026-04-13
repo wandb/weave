@@ -1073,7 +1073,7 @@ def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
 
 
 def test_eval_results_sort_by_output(client):
-    """Sort by outputs.output orders rows by model output value."""
+    """Sort by output.output orders rows by model output value."""
     if client_is_sqlite(client):
         pytest.skip("sort/filter only implemented for ClickHouse")
     eval_id = _create_eval_with_scores(
@@ -1086,7 +1086,7 @@ def test_eval_results_sort_by_output(client):
             project_id=client.project_id,
             evaluation_call_ids=[eval_id],
             include_raw_data_rows=True,
-            sort_by=[EvalResultsSortBy(field="outputs.output", direction="asc")],
+            sort_by=[EvalResultsSortBy(field="output.output", direction="asc")],
         )
     )
     assert res.total_rows == 3

@@ -160,8 +160,8 @@ def resolve_eval_field_to_sql(
         inner = _wrap_with_eval_scope(inner, evaluation_call_id, pb)
         return f"any({inner})", {"inputs_dump"}
 
-    if field_path.startswith("outputs."):
-        remaining = field_path[len("outputs.") :]
+    if field_path.startswith("output."):
+        remaining = field_path[len("output.") :]
         parts = ["output"] + split_escaped_field_path(remaining)
         path = _string_param(pb, quote_json_path_parts(parts))
         inner = f"nullIf(JSON_VALUE(output_dump, {path}), 'null')"
@@ -180,7 +180,7 @@ def resolve_eval_field_to_sql(
 
     raise InvalidRequest(
         f"Unsupported eval results field: '{field_path}'. "
-        f"Supported prefixes: scores.*, inputs.*, outputs.*, row_digest."
+        f"Supported prefixes: scores.*, inputs.*, output.*, row_digest."
     )
 
 

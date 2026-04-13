@@ -2402,7 +2402,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 sort_fields.append(field)
 
-        rows = self._table_query_stream(
+        yield from self._table_query_stream(
             req.project_id,
             req.digest,
             pb,
@@ -2412,7 +2412,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             limit=req.limit,
             offset=req.offset,
         )
-        yield from rows
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._table_query_stream")
     def _table_query_stream(

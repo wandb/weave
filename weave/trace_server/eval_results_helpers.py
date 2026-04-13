@@ -30,8 +30,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 _SUPPORTED_SORT_PREFIXES = (
     "scores.",
     "inputs.",
-    "outputs.",
-    "row_digest",
+    "output.",
 )
 _NUMERIC_SORT_PREFIXES = ("scores.",)
 
@@ -579,7 +578,7 @@ def validate_eval_results_request(req: tsi.EvalResultsQueryReq) -> None:
             ):
                 raise InvalidRequest(
                     f"Unsupported sort field: '{s.field}'. "
-                    f"Supported: scores.*, inputs.*, outputs.*, row_digest."
+                    f"Supported: scores.*, inputs.*, output.*."
                 )
             if s.mode == "difference" and not any(
                 s.field.startswith(p) or s.field == p for p in _NUMERIC_SORT_PREFIXES
