@@ -101,10 +101,16 @@ def init_weave(
 
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
-        # Always finish the old client and create a new one so that
-        # credentials and settings are re-evaluated from the environment.
-        current_client.finish()
-        weave_client_context.set_weave_client_global(None)
+        # TODO: Prob should move into settings
+        if (
+            current_client.project == project_name
+            and current_client.ensure_project_exists == ensure_project_exists
+        ):
+            return current_client
+        else:
+            # Flush any pending calls before switching to a new project
+            current_client.finish()
+            weave_client_context.set_weave_client_global(None)
 
     from weave.wandb_interface import (
         context as wandb_context_module,  # type: ignore
