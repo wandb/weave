@@ -49,7 +49,6 @@ KNOWN_SERVER_ATTRS = frozenset(
         "_thread_local",
         "_use_async_insert",
         "_user",
-        "ch_client",
     }
 )
 
@@ -60,7 +59,12 @@ def test_reset_server_state_covers_all_attrs(ch_server):
     Instrumentation attrs (ddtrace, coverage) are ignored — only attrs
     missing from KNOWN_SERVER_ATTRS trigger failure.
     """
-    actual = {a for a in ch_server.__dict__ if not a.startswith("__")}
+    # Only check underscore-prefixed attrs (real app state).
+    # Instrumentation (ddtrace) injects public-name wrappers like
+    # 'objs_query', 'file_create' etc. — ignore those.
+    actual = {
+        a for a in ch_server.__dict__ if a.startswith("_") and not a.startswith("__")
+    }
     unknown = actual - KNOWN_SERVER_ATTRS
     assert not unknown, (
         f"ClickHouseTraceServer has new attributes: {unknown}. "
