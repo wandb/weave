@@ -1925,9 +1925,8 @@ def test_namedtuple_support(client):
     assert res.calls[0].output == [{"x": 1, "y": 2}, 3]
 
 
-def test_named_reuse(client):
-    import asyncio
-
+@pytest.mark.asyncio
+async def test_named_reuse(client):
     d = weave.Dataset(rows=[{"x": 1}, {"x": 2}])
     d_ref = weave.publish(d, "test_dataset")
     dataset = weave.ref(d_ref.uri).get()
@@ -1950,7 +1949,7 @@ def test_named_reuse(client):
     evaluation_dataset = evaluation.dataset
     eval_dataset_ref = evaluation_dataset.ref
     assert dataset_ref == eval_dataset_ref
-    asyncio.run(evaluation.evaluate(model))
+    await evaluation.evaluate(model)
 
     res = get_client_trace_server(client).objs_query(
         tsi.ObjQueryReq(
@@ -3946,7 +3945,8 @@ def test_op_sampling(client):
     assert num_traces == 38
 
 
-def test_op_sampling_async(client):
+@pytest.mark.asyncio
+async def test_op_sampling_async(client):
     never_traced_calls = 0
     always_traced_calls = 0
     sometimes_traced_calls = 0
@@ -3971,18 +3971,16 @@ def test_op_sampling_async(client):
         sometimes_traced_calls += 1
         return x + 1
 
-    import asyncio
-
     weave.publish(never_traced)
     # Never traced should execute but not be traced
     for i in range(10):
-        asyncio.run(never_traced(i))
+        await never_traced(i)
     assert never_traced_calls == 10  # Function was called
     assert len(list(never_traced.calls())) == 0  # Not traced
 
     # Always traced should execute and be traced
     for i in range(10):
-        asyncio.run(always_traced(i))
+        await always_traced(i)
     assert always_traced_calls == 10  # Function was called
     assert len(list(always_traced.calls())) == 10  # And traced
     assert "call_start" in client.server.attribute_access_log
@@ -3990,7 +3988,7 @@ def test_op_sampling_async(client):
     # Sometimes traced should execute always but only be traced sometimes
     num_runs = 100
     for i in range(num_runs):
-        asyncio.run(sometimes_traced(i))
+        await sometimes_traced(i)
     assert sometimes_traced_calls == num_runs  # Function was called every time
     num_traces = len(list(sometimes_traced.calls()))
     assert num_traces == 38
@@ -4033,7 +4031,8 @@ def test_op_sampling_inheritance(client):
     assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
 
 
-def test_op_sampling_inheritance_async(client):
+@pytest.mark.asyncio
+async def test_op_sampling_inheritance_async(client):
     parent_calls = 0
     child_calls = 0
 
@@ -4049,12 +4048,10 @@ def test_op_sampling_inheritance_async(client):
         parent_calls += 1
         return await child_op(x)
 
-    import asyncio
-
     weave.publish(parent_op)
     # When parent is sampled out, child should still execute but not be traced
     for i in range(10):
-        asyncio.run(parent_op(i))
+        await parent_op(i)
 
     assert parent_calls == 10  # Parent function executed
     assert child_calls == 10  # Child function executed
@@ -4065,7 +4062,7 @@ def test_op_sampling_inheritance_async(client):
 
     # Direct calls to child should execute and be traced
     for i in range(10):
-        asyncio.run(child_op(i))
+        await child_op(i)
 
     assert child_calls == 10  # Child function executed
     assert len(list(child_op.calls())) == 10  # And was traced

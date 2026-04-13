@@ -1,4 +1,3 @@
-import asyncio
 import os
 from collections.abc import Generator
 from unittest.mock import Mock
@@ -347,14 +346,13 @@ def test_image_generation_sync(client):
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
-def test_image_generation_async(client):
+@pytest.mark.asyncio
+async def test_image_generation_async(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
-    response = asyncio.run(
-        google_client.aio.models.generate_images(
-            model="imagen-3.0-generate-002",
-            prompt="Fuzzy bunnies in my kitchen",
-            config=GenerateImagesConfig(number_of_images=1),
-        )
+    response = await google_client.aio.models.generate_images(
+        model="imagen-3.0-generate-002",
+        prompt="Fuzzy bunnies in my kitchen",
+        config=GenerateImagesConfig(number_of_images=1),
     )
 
     assert len(response.generated_images) == 1

@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 import weave
@@ -123,7 +121,8 @@ def test_score_with_logic(trust_scorer):
 
 
 # we need to test parallelism and how it plays with weave.Evaluations
-def test_trust_scorer_parallelism(trust_scorer):
+@pytest.mark.asyncio
+async def test_trust_scorer_parallelism(trust_scorer):
     trust_scorer.run_in_parallel = True
     n_samples = 100
     ds = [
@@ -139,7 +138,7 @@ def test_trust_scorer_parallelism(trust_scorer):
         return output
 
     evaluation = weave.Evaluation(dataset=ds, scorers=[trust_scorer])
-    eval_result = asyncio.run(evaluation.evaluate(model))
+    eval_result = await evaluation.evaluate(model)
 
     # Check that the trust scorer result structure is correct
     assert "passed" in eval_result["WeaveTrustScorerV1"]
