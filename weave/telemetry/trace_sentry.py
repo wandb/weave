@@ -21,11 +21,13 @@ from typing import TYPE_CHECKING, Any, Literal
 try:
     import sentry_sdk  # type: ignore
     import sentry_sdk.utils  # type: ignore
+    from sentry_sdk.session import Session  # type: ignore
 
     SENTRY_AVAILABLE = True
 except ImportError:
     SENTRY_AVAILABLE = False
     sentry_sdk = None  # type: ignore
+    Session = None  # type: ignore
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Event, ExcInfo
@@ -120,13 +122,14 @@ class Sentry:
         else:
             exc_info = sys.exc_info()
 
+        client = self.scope.client  # type: ignore
         event, hint = sentry_sdk.utils.event_from_exception(
             exc_info,
-            client_options=self.scope.client.options,  # type: ignore
+            client_options=client.options,
             mechanism={"type": "generic", "handled": handled},
         )
         try:
-            self.scope.capture_event(event, hint=hint)  # type: ignore
+            client.capture_event(event, hint=hint, scope=self.scope)
         except Exception:
             pass
 
@@ -135,7 +138,6 @@ class Sentry:
         status = status or ("crashed" if not handled else "errored")  # type: ignore
         self.mark_session(status=status)
 
-        client = self.scope.client  # type: ignore
         if client is not None:
             client.flush()
 
@@ -145,9 +147,15 @@ class Sentry:
         if not SENTRY_AVAILABLE or self.scope is None:
             return
 
-        # if there's no session, start one
+        # if there's no session, start one using the instance's client directly
+        # (Scope.start_session uses get_client() classmethod which ignores self.client)
         if self.scope._session is None:
-            self.scope.start_session()
+            client = self.scope.client
+            if client is not None:
+                self.scope._session = Session(
+                    release=client.options.get("release"),
+                    environment=client.options.get("environment"),
+                )
 
     @_safe_noop
     def end_session(self) -> None:
@@ -155,9 +163,12 @@ class Sentry:
         if not SENTRY_AVAILABLE or self.scope is None:
             return
 
+        session = self.scope._session
         client = self.scope.client
-        if self.scope._session is not None and client is not None:
-            self.scope.end_session()
+        if session is not None and client is not None:
+            self.scope._session = None
+            session.close()
+            client.capture_session(session)
             client.flush()
 
     @_safe_noop
@@ -232,7 +243,9 @@ class Sentry:
             },
         }
 
-        self.scope.capture_event(event_data)
+        client = self.scope.client
+        if client is not None:
+            client.capture_event(event_data, scope=self.scope)
 
 
 def _is_local_dev_install(module: Any) -> bool:
