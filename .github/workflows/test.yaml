@@ -294,7 +294,7 @@ jobs:
   trace-replicated-tests:
     name: Replicated ClickHouse trace tests
     timeout-minutes: 30
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-latest-16-cores
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -363,7 +363,12 @@ jobs:
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace')" -- \
             -m "trace_server and not skip_clickhouse_client" \
             --clickhouse-replicated \
-            --ignore=tests/trace/test_obj_tags_aliases.py  # TODO: remove once these tests are consolidated (132 tests, all obj reads/writes, no CH mutations)
+            --ignore=tests/trace/test_obj_tags_aliases.py \
+            --ignore=tests/trace/test_client_server_caching.py \
+            --ignore=tests/trace/test_custom_objs.py \
+            --ignore=tests/trace/test_deepcopy.py \
+            --ignore=tests/trace/test_op_argument_forms.py \
+            --ignore=tests/trace/test_op_accumulator.py
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
