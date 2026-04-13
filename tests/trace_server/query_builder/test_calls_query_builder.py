@@ -4085,6 +4085,36 @@ def test_hardcoded_filters_calls_complete() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("read_table", "expected_table"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_call_ids_filter_not_duplicated(
+    read_table: ReadTable, expected_table: str
+) -> None:
+    """call_ids should appear exactly once in the query, not duplicated across
+    WHERE optimization and filter conditions."""
+    cq = CallsQuery(project_id="project", read_table=read_table)
+    cq.add_field("id")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi.CallsFilter(call_ids=["test-call-id-123"])
+        )
+    )
+
+    pb = ParamBuilder("pb")
+    query = cq.as_sql(pb)
+
+    id_in_count = query.count("id IN")
+    assert id_in_count == 1, (
+        f"Expected 'id IN' exactly once but found {id_in_count} times "
+        f"in {read_table} query.\nQuery:\n{query}"
+    )
+
+
 def test_status_sort_calls_complete_uses_sentinels() -> None:
     """Verify status computation sort uses sentinel checks on calls_complete."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
