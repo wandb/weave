@@ -387,7 +387,7 @@ jobs:
       - trace-tests
       - trace_no_server
       - trace-server-migrator-tests
-      # trace-replicated-tests is intentionally non-blocking — informational only
+      - trace-replicated-tests
 
     runs-on: ubuntu-latest
 
