@@ -338,7 +338,9 @@ def build_chat_messages(
             )
         )
 
-    def _walk(node: SpanNode, nearest_agent: str = "") -> None:
+    def _walk(node: SpanNode, nearest_agent: str = "", _depth: int = 0) -> None:
+        if _depth > 200:
+            return  # guard against pathological nesting
         span = node.span
         op = span.operation_name
         agent_name = (
@@ -370,7 +372,7 @@ def build_chat_messages(
                 )
 
             for child in node.children:
-                _walk(child, name)
+                _walk(child, name, _depth + 1)
 
             if span.output_messages and span.span_id not in agent_response_emitted:
                 text = _extract_assistant_text(span.output_messages)
@@ -452,7 +454,7 @@ def build_chat_messages(
                 )
 
             for child in node.children:
-                _walk(child, nearest_agent)
+                _walk(child, nearest_agent, _depth + 1)
             return
 
         # ---- handoff / agent_handoff ----
@@ -468,14 +470,14 @@ def build_chat_messages(
                 )
             )
             for child in node.children:
-                _walk(child, nearest_agent)
+                _walk(child, nearest_agent, _depth + 1)
             return
 
         # ---- chat: either walk children or emit leaf message ----
         if op == "chat":
             if node.children:
                 for child in node.children:
-                    _walk(child, nearest_agent)
+                    _walk(child, nearest_agent, _depth + 1)
             elif span.output_messages:
                 text = _extract_assistant_text(span.output_messages)
                 if (
@@ -505,12 +507,12 @@ def build_chat_messages(
         # ---- generate_content (Google): walk children ----
         if op == "generate_content":
             for child in node.children:
-                _walk(child, agent_name)
+                _walk(child, agent_name, _depth + 1)
             return
 
         # ---- unknown/empty op (call_llm, invocation, etc.) ----
         for child in node.children:
-            _walk(child, nearest_agent)
+            _walk(child, nearest_agent, _depth + 1)
 
         if span.output_messages:
             text = _extract_assistant_text(span.output_messages)
