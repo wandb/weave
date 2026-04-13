@@ -1563,6 +1563,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         server=remote_client,
         ensure_project_exists=False,
     )
+    client.set_autoflush(False)
 
     # Create a Table object and save it to trigger chunking logic
     table_obj = weave_client.Table(rows)
@@ -1572,6 +1573,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     _ENDPOINT_CACHE.discard("table_create_from_digests")
 
     saved_table = client.save(table_obj, "table")
+    client.flush()
 
     assert saved_table.table_ref._digest == exp_digest
 
