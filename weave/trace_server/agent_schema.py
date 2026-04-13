@@ -326,7 +326,5 @@ _WEAVE_EXTENSION_KEYS: frozenset[str] = frozenset(
 # Combined set: all attribute keys extracted into dedicated columns.
 # Excluded from the custom_attrs Map to avoid duplication.
 KNOWN_SEMCONV_ATTR_KEYS: frozenset[str] = (
-    _OTEL_GENAI_SEMCONV_KEYS
-    | _OTEL_CORE_SEMCONV_KEYS
-    | _WEAVE_EXTENSION_KEYS
+    _OTEL_GENAI_SEMCONV_KEYS | _OTEL_CORE_SEMCONV_KEYS | _WEAVE_EXTENSION_KEYS
 )

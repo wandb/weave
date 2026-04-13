@@ -348,8 +348,11 @@ class AgentQueryHandler:
             parameters["f_agent_version"] = req.agent_version
 
         add_time_filters(
-            conditions, parameters,
-            start=req.start, end=req.end, column="started_at",
+            conditions,
+            parameters,
+            start=req.start,
+            end=req.end,
+            column="started_at",
         )
 
         where = " AND ".join(conditions)

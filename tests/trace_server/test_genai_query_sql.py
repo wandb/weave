@@ -90,7 +90,9 @@ def handler(ch: _QueryCapture) -> AgentQueryHandler:
 class TestSpansQuery:
     """SQL assertions for AgentQueryHandler.spans_query()."""
 
-    def test_basic_no_filters(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_basic_no_filters(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.spans_query(AgentSpansQueryReq(project_id="p1"))
 
         # Two queries: count + data
@@ -112,7 +114,9 @@ class TestSpansQuery:
         assert ch.params_at(1)["limit"] == 100
         assert ch.params_at(1)["offset"] == 0
 
-    def test_with_agent_name_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_with_agent_name_filter(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.spans_query(
             AgentSpansQueryReq(
                 project_id="p1",
@@ -123,7 +127,9 @@ class TestSpansQuery:
         assert "s.agent_name = {f_agent_name:String}" in data_sql
         assert ch.params_at(1)["f_agent_name"] == "my-agent"
 
-    def test_with_time_range(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_with_time_range(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.spans_query(
             AgentSpansQueryReq(
                 project_id="p1",
@@ -147,7 +153,9 @@ class TestSpansQuery:
         data_sql = ch.sql_at(1)
         assert "ORDER BY input_tokens asc" in data_sql
 
-    def test_invalid_sort_column_uses_default(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_invalid_sort_column_uses_default(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.spans_query(
             AgentSpansQueryReq(
                 project_id="p1",
@@ -158,13 +166,17 @@ class TestSpansQuery:
         assert "ORDER BY started_at DESC" in data_sql
         assert "DROP TABLE" not in data_sql
 
-    def test_custom_attr_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_custom_attr_filter(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.spans_query(
             AgentSpansQueryReq(
                 project_id="p1",
                 filters=AgentSpansQueryFilters(
                     custom_filters=[
-                        AgentCustomAttrFilter(attr_key="env", operator="eq", value="prod"),
+                        AgentCustomAttrFilter(
+                            attr_key="env", operator="eq", value="prod"
+                        ),
                     ]
                 ),
             )
@@ -174,13 +186,17 @@ class TestSpansQuery:
         assert ch.params_at(1)["cf0_key"] == "env"
         assert ch.params_at(1)["cf0_val"] == "prod"
 
-    def test_custom_attr_filter_ne_operator(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_custom_attr_filter_ne_operator(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.spans_query(
             AgentSpansQueryReq(
                 project_id="p1",
                 filters=AgentSpansQueryFilters(
                     custom_filters=[
-                        AgentCustomAttrFilter(attr_key="env", operator="ne", value="dev"),
+                        AgentCustomAttrFilter(
+                            attr_key="env", operator="ne", value="dev"
+                        ),
                     ]
                 ),
             )
@@ -188,11 +204,15 @@ class TestSpansQuery:
         data_sql = ch.sql_at(1)
         assert "s.custom_attrs[{cf0_key:String}] != {cf0_val:String}" in data_sql
 
-    def test_limit_capped_at_10000(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_limit_capped_at_10000(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.spans_query(AgentSpansQueryReq(project_id="p1", limit=99999))
         assert ch.params_at(1)["limit"] == 10000
 
-    def test_multiple_filters(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_multiple_filters(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.spans_query(
             AgentSpansQueryReq(
                 project_id="p1",
@@ -229,7 +249,9 @@ class TestSpansTrace:
         assert ch.last_params["project_id"] == "p1"
         assert ch.last_params["trace_id"] == "t123"
 
-    def test_selects_chat_view_cols(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_selects_chat_view_cols(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.spans_trace(AgentSpansTraceReq(project_id="p1", trace_id="t1"))
         sql = ch.last_sql
         # Should include message columns for chat view
@@ -257,7 +279,10 @@ class TestTracesQuery:
 
         count_sql = ch.sql_at(0)
         assert "SELECT count() FROM (" in count_sql
-        assert "SELECT trace_id FROM genai_spans WHERE project_id = {project_id:String} GROUP BY trace_id" in count_sql
+        assert (
+            "SELECT trace_id FROM genai_spans WHERE project_id = {project_id:String} GROUP BY trace_id"
+            in count_sql
+        )
 
         data_sql = ch.sql_at(1)
         assert "count() AS span_count" in data_sql
@@ -268,7 +293,9 @@ class TestTracesQuery:
         assert "GROUP BY trace_id" in data_sql
         assert "ORDER BY last_seen DESC" in data_sql
 
-    def test_with_conversation_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_with_conversation_filter(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.traces_query(
             AgentTracesQueryReq(project_id="p1", conversation_id="conv-1")
         )
@@ -276,15 +303,17 @@ class TestTracesQuery:
         assert "conversation_id = {f_conversation_id:String}" in data_sql
         assert ch.params_at(1)["f_conversation_id"] == "conv-1"
 
-    def test_with_agent_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
-        handler.traces_query(
-            AgentTracesQueryReq(project_id="p1", agent_name="bot-x")
-        )
+    def test_with_agent_filter(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
+        handler.traces_query(AgentTracesQueryReq(project_id="p1", agent_name="bot-x"))
         data_sql = ch.sql_at(1)
         assert "agent_name = {f_agent_name:String}" in data_sql
         assert ch.params_at(1)["f_agent_name"] == "bot-x"
 
-    def test_with_time_range(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_with_time_range(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.traces_query(
             AgentTracesQueryReq(
                 project_id="p1",
@@ -296,7 +325,9 @@ class TestTracesQuery:
         assert "started_at >= parseDateTimeBestEffort({t_start:String})" in data_sql
         assert "started_at < parseDateTimeBestEffort({t_end:String})" in data_sql
 
-    def test_sort_by_span_count(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_sort_by_span_count(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.traces_query(
             AgentTracesQueryReq(
                 project_id="p1",
@@ -333,7 +364,9 @@ class TestAgentsQuery:
         assert "ORDER BY last_seen DESC" in data_sql
         assert "project_id = {project_id:String}" in data_sql
 
-    def test_with_agent_name_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_with_agent_name_filter(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.agents_query(
             AgentsQueryReq(
                 project_id="p1",
@@ -344,7 +377,9 @@ class TestAgentsQuery:
         assert "agent_name = {f_agent:String}" in data_sql
         assert ch.params_at(0)["f_agent"] == "my-agent"
 
-    def test_count_query_structure(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_count_query_structure(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.agents_query(AgentsQueryReq(project_id="p1"))
         count_sql = ch.sql_at(1)
         assert "SELECT count() FROM (" in count_sql
@@ -413,12 +448,16 @@ class TestConversationsQuery:
         assert "groupUniqArray(provider_name) AS provider_names" in data_sql
         assert "ORDER BY last_seen DESC" in data_sql
 
-    def test_excludes_empty_conversation_ids(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_excludes_empty_conversation_ids(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.conversations_query(AgentConversationsQueryReq(project_id="p1"))
         count_sql = ch.sql_at(0)
         assert "conversation_id != ''" in count_sql
 
-    def test_with_agent_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_with_agent_filter(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.conversations_query(
             AgentConversationsQueryReq(
                 project_id="p1",
@@ -429,7 +468,9 @@ class TestConversationsQuery:
         assert "agent_name = {f_agent_name:String}" in data_sql
         assert ch.params_at(1)["f_agent_name"] == "bot"
 
-    def test_with_provider_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_with_provider_filter(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.conversations_query(
             AgentConversationsQueryReq(
                 project_id="p1",
@@ -439,7 +480,9 @@ class TestConversationsQuery:
         data_sql = ch.sql_at(1)
         assert "provider_name = {f_provider_name:String}" in data_sql
 
-    def test_with_time_range(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_with_time_range(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.conversations_query(
             AgentConversationsQueryReq(
                 project_id="p1",
@@ -451,7 +494,9 @@ class TestConversationsQuery:
         assert "parseDateTimeBestEffort({t_start:String})" in data_sql
         assert "parseDateTimeBestEffort({t_end:String})" in data_sql
 
-    def test_sort_by_turn_count(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_sort_by_turn_count(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.conversations_query(
             AgentConversationsQueryReq(
                 project_id="p1",
@@ -461,7 +506,9 @@ class TestConversationsQuery:
         data_sql = ch.sql_at(1)
         assert "ORDER BY turn_count desc" in data_sql
 
-    def test_sort_by_array_field_uses_array_element(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_sort_by_array_field_uses_array_element(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.conversations_query(
             AgentConversationsQueryReq(
                 project_id="p1",
@@ -471,10 +518,15 @@ class TestConversationsQuery:
         data_sql = ch.sql_at(1)
         assert "ORDER BY arrayElement(agent_names, 1) asc" in data_sql
 
-    def test_duration_calculation(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_duration_calculation(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.conversations_query(AgentConversationsQueryReq(project_id="p1"))
         data_sql = ch.sql_at(1)
-        assert "sum(toUnixTimestamp64Milli(ended_at) - toUnixTimestamp64Milli(started_at)) AS total_duration_ms" in data_sql
+        assert (
+            "sum(toUnixTimestamp64Milli(ended_at) - toUnixTimestamp64Milli(started_at)) AS total_duration_ms"
+            in data_sql
+        )
 
 
 # ============================================================================
@@ -497,7 +549,9 @@ class TestSearch:
         assert "LIMIT {limit:UInt64} OFFSET {offset:UInt64}" in sql
         assert ch.last_params["query"] == "%hello%"
 
-    def test_with_role_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_with_role_filter(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.search(
             AgentSearchReq(project_id="p1", query="test", roles=["user", "assistant"])
         )
@@ -505,36 +559,40 @@ class TestSearch:
         assert "role IN {roles:Array(String)}" in sql
         assert ch.last_params["roles"] == ["user", "assistant"]
 
-    def test_with_agent_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
-        handler.search(
-            AgentSearchReq(project_id="p1", query="test", agent_name="bot")
-        )
+    def test_with_agent_filter(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
+        handler.search(AgentSearchReq(project_id="p1", query="test", agent_name="bot"))
         sql = ch.last_sql
         assert "agent_name = {agent_name:String}" in sql
 
-    def test_with_conversation_filter(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_with_conversation_filter(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.search(
-            AgentSearchReq(
-                project_id="p1", query="test", conversation_id="conv-1"
-            )
+            AgentSearchReq(project_id="p1", query="test", conversation_id="conv-1")
         )
         sql = ch.last_sql
         assert "conversation_id = {conv_id:String}" in sql
         assert ch.last_params["conv_id"] == "conv-1"
 
-    def test_limit_capped_at_1000(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
-        handler.search(
-            AgentSearchReq(project_id="p1", query="test", limit=5000)
-        )
+    def test_limit_capped_at_1000(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
+        handler.search(AgentSearchReq(project_id="p1", query="test", limit=5000))
         assert ch.last_params["limit"] == 1000
 
-    def test_selects_correct_columns(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_selects_correct_columns(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.search(AgentSearchReq(project_id="p1", query="test"))
         sql = ch.last_sql
         assert "conversation_id, conversation_name, agent_name," in sql
         assert "span_id, trace_id, role, content, content_digest, started_at" in sql
 
-    def test_uses_final_for_dedup(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_uses_final_for_dedup(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         """genai_message_search is ReplacingMergeTree, so FINAL is needed."""
         handler.search(AgentSearchReq(project_id="p1", query="test"))
         sql = ch.last_sql
@@ -591,7 +649,9 @@ class TestQueryBuilderHelpers:
     def test_add_time_filters_custom_column(self) -> None:
         conds: list[str] = []
         params: dict[str, Any] = {}
-        add_time_filters(conds, params, start="2026-01-01", end=None, column="started_at")
+        add_time_filters(
+            conds, params, start="2026-01-01", end=None, column="started_at"
+        )
         assert "started_at >= parseDateTimeBestEffort({t_start:String})" in conds[0]
 
     def test_add_time_filters_none(self) -> None:
@@ -634,7 +694,6 @@ class TestQueryBuilderHelpers:
         assert "s.custom_attrs[{cf2_key:String}] <= {cf2_val:String}" in conds[2]
 
 
-
 # ============================================================================
 # 9. SQL injection safety
 # ============================================================================
@@ -643,18 +702,26 @@ class TestQueryBuilderHelpers:
 class TestSQLInjectionSafety:
     """Verify that untrusted input never reaches SQL directly."""
 
-    def test_sort_injection_rejected(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_sort_injection_rejected(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         handler.spans_query(
             AgentSpansQueryReq(
                 project_id="p1",
-                sort_by=[AgentSortBy(field="started_at; DROP TABLE genai_spans--", direction="desc")],
+                sort_by=[
+                    AgentSortBy(
+                        field="started_at; DROP TABLE genai_spans--", direction="desc"
+                    )
+                ],
             )
         )
         data_sql = ch.sql_at(1)
         assert "DROP" not in data_sql
         assert "ORDER BY started_at DESC" in data_sql
 
-    def test_custom_attr_key_is_parameterized(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_custom_attr_key_is_parameterized(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         """Custom attr keys go through parameterized queries, not string interpolation."""
         handler.spans_query(
             AgentSpansQueryReq(
@@ -675,7 +742,9 @@ class TestSQLInjectionSafety:
         assert "DROP TABLE" not in data_sql
         assert ch.params_at(1)["cf0_key"] == "'; DROP TABLE--"
 
-    def test_all_filter_values_are_parameterized(self, handler: AgentQueryHandler, ch: _QueryCapture) -> None:
+    def test_all_filter_values_are_parameterized(
+        self, handler: AgentQueryHandler, ch: _QueryCapture
+    ) -> None:
         """Filter values are always passed as parameters, never interpolated."""
         handler.spans_query(
             AgentSpansQueryReq(
