@@ -149,7 +149,7 @@ class Sentry:
 
         # if there's no session, start one using the instance's client directly
         # (Scope.start_session uses get_client() classmethod which ignores self.client)
-        if self.scope._session is None:
+        if self.scope._session is None and Session is not None:
             client = self.scope.client
             if client is not None:
                 self.scope._session = Session(
