@@ -1127,3 +1127,9 @@ def test_eval_results_summary_with_filter(client):
     )
     assert res.summary is not None
     assert res.summary.row_count == 2
+    # mean should be (0.6 + 0.9) / 2 = 0.75, not (0.2 + 0.6 + 0.9) / 3
+    eval_summary = res.summary.evaluations[0]
+    accuracy_stat = next(
+        s for s in eval_summary.scorer_stats if s.scorer_key == "accuracy"
+    )
+    assert accuracy_stat.numeric_mean == pytest.approx(0.75, abs=0.01)
