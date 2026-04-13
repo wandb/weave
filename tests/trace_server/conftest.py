@@ -198,15 +198,6 @@ def get_ch_trace_server(
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
             ch_server._database_ensured = False
 
-            if use_replicated:
-                # Pre-create data DB with Atomic engine so the migrator uses
-                # explicit ON CLUSTER + ReplicatedMergeTree (not Replicated DB
-                # engine which auto-handles everything and masks bugs).
-                ch_server.ch_client.command(
-                    f"CREATE DATABASE IF NOT EXISTS {unique_db}"
-                    f" ENGINE = Atomic"
-                )
-
             # Patch _run_migrations to use worker-specific management database
             def patched_run_migrations():
                 import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
@@ -218,6 +209,23 @@ def get_ch_trace_server(
                     replicated_cluster=REPLICATED_CLUSTER if use_replicated else None,
                     replicated_path=REPLICATED_PATH if use_replicated else None,
                 )
+
+                if use_replicated:
+                    # Override DB creation to use Atomic engine instead of
+                    # Replicated. Replicated DB engine auto-handles ON CLUSTER
+                    # and masks bugs like the _local suffix issue. Atomic engine
+                    # forces the migrator to use explicit ON CLUSTER +
+                    # ReplicatedMergeTree, matching production setups that hit
+                    # the original error.
+                    original_create_db_sql = migrator._create_db_sql
+
+                    def _atomic_create_db_sql(db_name: str) -> str:
+                        if db_name == management_db:
+                            return original_create_db_sql(db_name)
+                        return f"CREATE DATABASE IF NOT EXISTS {db_name} ENGINE = Atomic"
+
+                    migrator._create_db_sql = _atomic_create_db_sql  # type: ignore[assignment]
+
                 migrator.apply_migrations(ch_server._database)
 
             ch_server._run_migrations = patched_run_migrations  # type: ignore[assignment]
