@@ -429,17 +429,73 @@ def _extract_search_rows(
 
 
 _ADJECTIVES = [
-    "amber", "bold", "calm", "deft", "eager", "fair", "glad", "hale",
-    "keen", "lush", "neat", "pale", "quick", "rare", "sage", "tame",
-    "vast", "warm", "zest", "airy", "brave", "crisp", "dusk", "epic",
-    "fern", "glow", "haze", "iron", "jade", "knit", "lime", "moss",
+    "amber",
+    "bold",
+    "calm",
+    "deft",
+    "eager",
+    "fair",
+    "glad",
+    "hale",
+    "keen",
+    "lush",
+    "neat",
+    "pale",
+    "quick",
+    "rare",
+    "sage",
+    "tame",
+    "vast",
+    "warm",
+    "zest",
+    "airy",
+    "brave",
+    "crisp",
+    "dusk",
+    "epic",
+    "fern",
+    "glow",
+    "haze",
+    "iron",
+    "jade",
+    "knit",
+    "lime",
+    "moss",
 ]
 
 _ANIMALS = [
-    "ant", "bat", "cat", "doe", "elk", "fox", "gnu", "hen",
-    "ibis", "jay", "koi", "lynx", "mole", "newt", "owl", "pug",
-    "quail", "ram", "seal", "toad", "urchin", "vole", "wren", "yak",
-    "asp", "bee", "cod", "dab", "eel", "fly", "gar", "hawk",
+    "ant",
+    "bat",
+    "cat",
+    "doe",
+    "elk",
+    "fox",
+    "gnu",
+    "hen",
+    "ibis",
+    "jay",
+    "koi",
+    "lynx",
+    "mole",
+    "newt",
+    "owl",
+    "pug",
+    "quail",
+    "ram",
+    "seal",
+    "toad",
+    "urchin",
+    "vole",
+    "wren",
+    "yak",
+    "asp",
+    "bee",
+    "cod",
+    "dab",
+    "eel",
+    "fly",
+    "gar",
+    "hawk",
 ]
 
 
@@ -973,9 +1029,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return
         producer = self.kafka_producer
         if producer is None:
-            logger.info("Kafka producer is None, skipping genai_span_ended events for structured ingest")
+            logger.info(
+                "Kafka producer is None, skipping genai_span_ended events for structured ingest"
+            )
             return
-        logger.info("Publishing %d genai_span_ended events for project %s", len(spans), project_id)
+        logger.info(
+            "Publishing %d genai_span_ended events for project %s",
+            len(spans),
+            project_id,
+        )
 
         for span in spans:
             event = tsi.GenAISpanEndedEvent(
@@ -1104,9 +1166,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return ", ".join(clauses) if clauses else default_order
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_spans_query")
-    def genai_spans_query(
-        self, req: tsi.GenAISpansQueryReq
-    ) -> tsi.GenAISpansQueryRes:
+    def genai_spans_query(self, req: tsi.GenAISpansQueryReq) -> tsi.GenAISpansQueryRes:
         """Query genai_spans with optional filters."""
         conditions = ["project_id = {project_id:String}"]
         parameters: dict[str, Any] = {"project_id": req.project_id}
@@ -1142,20 +1202,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         parameters["offset"] = req.offset
 
         _SPANS_SORT_COLS = {
-            "started_at", "span_name", "operation_name", "provider_name",
-            "agent_name", "request_model", "input_tokens", "output_tokens",
+            "started_at",
+            "span_name",
+            "operation_name",
+            "provider_name",
+            "agent_name",
+            "request_model",
+            "input_tokens",
+            "output_tokens",
             "status_code",
         }
         order_by = self._build_genai_order_by(
             req.sort_by, _SPANS_SORT_COLS, "started_at DESC"
         )
 
-        count_params = {k: v for k, v in parameters.items() if k not in ("limit", "offset")}
+        count_params = {
+            k: v for k, v in parameters.items() if k not in ("limit", "offset")
+        }
         count_query = f"""
             SELECT count() FROM genai_spans WHERE {where_clause}
         """
         count_result = self.ch_client.query(count_query, parameters=count_params)
-        total_count = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
+        total_count = (
+            int(count_result.result_rows[0][0]) if count_result.result_rows else 0
+        )
 
         query = f"""
             SELECT {_GENAI_SPAN_COLS}
@@ -1170,9 +1240,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.GenAISpansQueryRes(spans=spans, total_count=total_count)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_spans_trace")
-    def genai_spans_trace(
-        self, req: tsi.GenAISpansTraceReq
-    ) -> tsi.GenAISpansTraceRes:
+    def genai_spans_trace(self, req: tsi.GenAISpansTraceReq) -> tsi.GenAISpansTraceRes:
         """Get all genai_spans for a specific trace, ordered by start time."""
         query = f"""
             SELECT {_GENAI_SPAN_COLS}
@@ -1190,9 +1258,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.GenAISpansTraceRes(spans=spans)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_traces_chat")
-    def genai_traces_chat(
-        self, req: tsi.GenAITraceChatReq
-    ) -> tsi.GenAITraceChatRes:
+    def genai_traces_chat(self, req: tsi.GenAITraceChatReq) -> tsi.GenAITraceChatRes:
         """Build a structured chat view for a GenAI trace."""
         trace_res = self.genai_spans_trace(
             tsi.GenAISpansTraceReq(
@@ -1249,7 +1315,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "openai": "gpt%",
                     "google": "gemini%",
                 }.get(req.filters.provider_name.lower(), "")
-                parameters["filter_provider_model"] = model_prefix or f"{req.filters.provider_name}%"
+                parameters["filter_provider_model"] = (
+                    model_prefix or f"{req.filters.provider_name}%"
+                )
             if req.filters.started_after is not None:
                 having.append("max(last_seen) >= {filter_after:DateTime64(6)}")
                 parameters["filter_after"] = req.filters.started_after
@@ -1271,9 +1339,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         having_clause = (" HAVING " + " AND ".join(having)) if having else ""
 
         _CONV_SORT_COLS = {
-            "last_seen", "first_seen", "turn_count", "span_count",
-            "total_input_tokens", "total_output_tokens", "total_duration_ms",
-            "error_count", "conversation_id", "agent_name", "provider_name",
+            "last_seen",
+            "first_seen",
+            "turn_count",
+            "span_count",
+            "total_input_tokens",
+            "total_output_tokens",
+            "total_duration_ms",
+            "error_count",
+            "conversation_id",
+            "agent_name",
+            "provider_name",
         }
         order_by = self._build_genai_order_by(
             req.sort_by, _CONV_SORT_COLS, "last_seen DESC"
@@ -1295,7 +1371,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 max(last_seen)              AS last_seen
         """
 
-        count_params = {k: v for k, v in parameters.items() if k not in ("limit", "offset")}
+        count_params = {
+            k: v for k, v in parameters.items() if k not in ("limit", "offset")
+        }
         count_query = f"""
             SELECT count() FROM (
                 SELECT conversation_id
@@ -1306,7 +1384,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         """
         count_result = self.ch_client.query(count_query, parameters=count_params)
-        total_count = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
+        total_count = (
+            int(count_result.result_rows[0][0]) if count_result.result_rows else 0
+        )
 
         query = f"""
             SELECT {select_cols}
@@ -1419,9 +1499,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "offset": req.offset,
         }
 
-        conditions.append(
-            "positionCaseInsensitive(content, {search_term:String}) > 0"
-        )
+        conditions.append("positionCaseInsensitive(content, {search_term:String}) > 0")
 
         if req.roles:
             conditions.append("role IN {filter_roles:Array(String)}")
@@ -1533,7 +1611,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for cid in conv_ids:
             msgs = conv_messages.get(cid, [])
             agent, conv_name = conv_meta.get(cid, ("", ""))
-            last_activity = msgs[0].started_at if msgs else conv_result.result_rows[0][1]
+            last_activity = (
+                msgs[0].started_at if msgs else conv_result.result_rows[0][1]
+            )
             results.append(
                 tsi.GenAISearchConversationResult(
                     conversation_id=cid,
@@ -1560,7 +1640,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.GenAIConversationIngestReq
     ) -> tsi.GenAIConversationIngestRes:
         """Ingest a structured conversation by converting to genai_spans rows."""
-        conversation_id, trace_ids, spans = structured_turns_to_spans(req)
+        conversation_id, trace_ids, root_span_ids, spans = structured_turns_to_spans(
+            req
+        )
 
         rows = [_genai_span_to_row(s) for s in spans]
         if rows:
@@ -1576,14 +1658,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         self._maybe_enqueue_genai_span_ends_from_insertables(spans, req.project_id)
 
-        return build_conversation_ingest_response(conversation_id, trace_ids, spans)
+        return build_conversation_ingest_response(
+            conversation_id, trace_ids, root_span_ids, spans
+        )
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.genai_ingest_atif"
-    )
-    def genai_ingest_atif(
-        self, req: tsi.GenAIATIFIngestReq
-    ) -> tsi.GenAIATIFIngestRes:
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_ingest_atif")
+    def genai_ingest_atif(self, req: tsi.GenAIATIFIngestReq) -> tsi.GenAIATIFIngestRes:
         """Ingest an ATIF trajectory by converting to native format then to spans."""
         native_req = atif_to_conversation_req(req)
         res = self.genai_conversation_ingest(native_req)
@@ -1593,9 +1673,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             span_count=res.span_count,
         )
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.genai_ingest_openhands"
-    )
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_ingest_openhands")
     def genai_ingest_openhands(
         self, req: tsi.GenAIOpenHandsIngestReq
     ) -> tsi.GenAIOpenHandsIngestRes:
@@ -1608,9 +1686,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             span_count=res.span_count,
         )
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.genai_conversation_chat"
-    )
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_conversation_chat")
     def genai_conversation_chat(
         self, req: tsi.GenAIConversationChatReq
     ) -> tsi.GenAIConversationChatRes:
@@ -1618,9 +1694,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         spans_res = self.genai_spans_query(
             tsi.GenAISpansQueryReq(
                 project_id=req.project_id,
-                filters=tsi.GenAISpansQueryFilters(
-                    conversation_id=req.conversation_id
-                ),
+                filters=tsi.GenAISpansQueryFilters(conversation_id=req.conversation_id),
                 limit=5000,
             )
         )
@@ -1693,9 +1767,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return o
         return "unknown"
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.genai_scores_insert"
-    )
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_scores_insert")
     def genai_scores_insert(
         self, req: tsi.GenAIScoresInsertReq
     ) -> tsi.GenAIScoresInsertRes:
@@ -1763,9 +1835,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.GenAIScoresInsertRes(inserted=len(rows))
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.genai_scores_query"
-    )
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_scores_query")
     def genai_scores_query(
         self, req: tsi.GenAIScoresQueryReq
     ) -> tsi.GenAIScoresQueryRes:
@@ -1823,12 +1893,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ]
         return tsi.GenAIScoresQueryRes(scores=scores)
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.genai_score_stats"
-    )
-    def genai_score_stats(
-        self, req: tsi.GenAIScoreStatsReq
-    ) -> tsi.GenAIScoreStatsRes:
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_score_stats")
+    def genai_score_stats(self, req: tsi.GenAIScoreStatsReq) -> tsi.GenAIScoreStatsRes:
         """Aggregate score counts into time buckets."""
         conditions = ["project_id = {project_id:String}"]
         parameters: dict[str, Any] = {"project_id": req.project_id}
@@ -1839,14 +1905,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             conditions.append("entity_type = {entity_type:String}")
             parameters["entity_type"] = req.entity_type
         if req.start:
-            conditions.append(
-                "scored_at >= parseDateTime64BestEffort({start:String})"
-            )
+            conditions.append("scored_at >= parseDateTime64BestEffort({start:String})")
             parameters["start"] = req.start
         if req.end:
-            conditions.append(
-                "scored_at <= parseDateTime64BestEffort({end:String})"
-            )
+            conditions.append("scored_at <= parseDateTime64BestEffort({end:String})")
             parameters["end"] = req.end
 
         gran = max(1, min(req.granularity_seconds, 7 * 86400))
@@ -1906,16 +1968,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.GenAIScoreStatsRes(buckets=buckets, totals=totals)
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.genai_turn_stats"
-    )
-    def genai_turn_stats(
-        self, req: tsi.GenAITurnStatsReq
-    ) -> tsi.GenAITurnStatsRes:
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_turn_stats")
+    def genai_turn_stats(self, req: tsi.GenAITurnStatsReq) -> tsi.GenAITurnStatsRes:
         """Aggregate turn (span) metrics into time buckets."""
         _ALLOWED_GROUP_BY = {
-            "operation_name", "provider_name", "agent_name", "request_model",
-            "response_model", "tool_name", "conversation_id", "status_code",
+            "operation_name",
+            "provider_name",
+            "agent_name",
+            "request_model",
+            "response_model",
+            "tool_name",
+            "conversation_id",
+            "status_code",
         }
 
         granularity = max(req.granularity_seconds, 60)
@@ -1926,10 +1990,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         }
 
         if req.start:
-            conditions.append("s.started_at >= parseDateTimeBestEffort({start_time:String})")
+            conditions.append(
+                "s.started_at >= parseDateTimeBestEffort({start_time:String})"
+            )
             parameters["start_time"] = req.start
         if req.end:
-            conditions.append("s.started_at < parseDateTimeBestEffort({end_time:String})")
+            conditions.append(
+                "s.started_at < parseDateTimeBestEffort({end_time:String})"
+            )
             parameters["end_time"] = req.end
 
         _LIST_FILTERS: dict[str, str] = {
@@ -1945,14 +2013,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             values = getattr(req, field_name, None) or []
             if values:
                 param_key = f"f_{col_name}"
-                conditions.append(
-                    f"s.{col_name} IN {{{param_key}:Array(String)}}"
-                )
+                conditions.append(f"s.{col_name} IN {{{param_key}:Array(String)}}")
                 parameters[param_key] = values
 
         _ATTR_FILTER_OPS = {
-            "eq": "=", "ne": "!=", "gt": ">", "lt": "<",
-            "gte": ">=", "lte": "<=",
+            "eq": "=",
+            "ne": "!=",
+            "gt": ">",
+            "lt": "<",
+            "gte": ">=",
+            "lte": "<=",
         }
         join_clauses: list[str] = []
         for i, cf in enumerate(getattr(req, "custom_filters", None) or []):
@@ -1981,9 +2051,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f" AND {alias}.attr_key = {{{key_param}:String}}"
             )
             conditions.append(f"{alias}.span_id IS NOT NULL")
-            conditions.append(
-                f"{alias}.{val_col} {op} {{{val_param}:{val_type}}}"
-            )
+            conditions.append(f"{alias}.{val_col} {op} {{{val_param}:{val_type}}}")
 
         group_by_col = ""
         group_select = ""
@@ -2043,15 +2111,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         }
 
         if req.start:
-            conditions.append("s.started_at >= parseDateTimeBestEffort({start_time:String})")
+            conditions.append(
+                "s.started_at >= parseDateTimeBestEffort({start_time:String})"
+            )
             parameters["start_time"] = req.start
         if req.end:
-            conditions.append("s.started_at < parseDateTimeBestEffort({end_time:String})")
+            conditions.append(
+                "s.started_at < parseDateTimeBestEffort({end_time:String})"
+            )
             parameters["end_time"] = req.end
 
         group_select = ""
         group_by_extra = ""
-        if req.group_by and req.group_by in {"agent_name", "provider_name", "request_model"}:
+        if req.group_by and req.group_by in {
+            "agent_name",
+            "provider_name",
+            "request_model",
+        }:
             group_select = f",\n                any(s.{req.group_by}) AS group_value"
             group_by_extra = ", group_value"
 
@@ -2123,20 +2199,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         agent_where = " AND ".join(agent_conditions)
 
         _AGENTS_SORT_COLS = {
-            "invocation_count", "last_seen", "first_seen", "agent_name",
-            "total_input_tokens", "total_output_tokens", "total_duration_ms",
-            "error_count", "span_count",
+            "invocation_count",
+            "last_seen",
+            "first_seen",
+            "agent_name",
+            "total_input_tokens",
+            "total_output_tokens",
+            "total_duration_ms",
+            "error_count",
+            "span_count",
         }
         order_by = self._build_genai_order_by(
             req.sort_by, _AGENTS_SORT_COLS, "invocation_count DESC"
         )
 
-        count_params = {k: v for k, v in parameters.items() if k not in ("limit", "offset")}
+        count_params = {
+            k: v for k, v in parameters.items() if k not in ("limit", "offset")
+        }
         count_query = f"""
             SELECT count() FROM genai_agents FINAL WHERE {agent_where}
         """
         count_result = self.ch_client.query(count_query, parameters=count_params)
-        total_count = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
+        total_count = (
+            int(count_result.result_rows[0][0]) if count_result.result_rows else 0
+        )
 
         meta_query = f"""
             SELECT
@@ -2203,12 +2289,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             out = int(row[3])
             if agent_name in agents_by_name:
                 agent = agents_by_name[agent_name]
-                agent.model_usage.append(tsi.GenAIModelUsage(
-                    model=model,
-                    input_tokens=inp,
-                    output_tokens=out,
-                    total_tokens=inp + out,
-                ))
+                agent.model_usage.append(
+                    tsi.GenAIModelUsage(
+                        model=model,
+                        input_tokens=inp,
+                        output_tokens=out,
+                        total_tokens=inp + out,
+                    )
+                )
 
         return tsi.GenAIAgentsQueryRes(
             agents=[agents_by_name[n] for n in agent_order],
@@ -2270,15 +2358,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query_result = self.ch_client.query(query, parameters=parameters)
         buckets = []
         for row in query_result.result_rows:
-            buckets.append(tsi.GenAIAgentMetricsBucket(
-                timestamp=str(row[0]),
-                invocation_count=int(row[1]),
-                span_count=int(row[2]),
-                input_tokens=int(row[3]),
-                output_tokens=int(row[4]),
-                error_count=int(row[5]),
-                avg_duration_ms=float(row[6]) if row[6] else 0.0,
-            ))
+            buckets.append(
+                tsi.GenAIAgentMetricsBucket(
+                    timestamp=str(row[0]),
+                    invocation_count=int(row[1]),
+                    span_count=int(row[2]),
+                    input_tokens=int(row[3]),
+                    output_tokens=int(row[4]),
+                    error_count=int(row[5]),
+                    avg_duration_ms=float(row[6]) if row[6] else 0.0,
+                )
+            )
         return tsi.GenAIAgentMetricsRes(
             agent_name=req.agent_name,
             buckets=buckets,
@@ -2296,28 +2386,39 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         rows = []
         for ann in req.annotations:
-            rows.append([
-                req.project_id,
-                ann.entity_type,
-                ann.entity_id,
-                ann.namespace,
-                ann.key,
-                ann.string_value,
-                ann.float_value,
-                ann.int_value,
-                ann.json_value,
-                ann.value_type,
-                ann.source,
-                ann.source_id,
-            ])
+            rows.append(
+                [
+                    req.project_id,
+                    ann.entity_type,
+                    ann.entity_id,
+                    ann.namespace,
+                    ann.key,
+                    ann.string_value,
+                    ann.float_value,
+                    ann.int_value,
+                    ann.json_value,
+                    ann.value_type,
+                    ann.source,
+                    ann.source_id,
+                ]
+            )
 
         self.ch_client.insert(
             "entity_annotations",
             rows,
             column_names=[
-                "project_id", "entity_type", "entity_id", "namespace", "key",
-                "string_value", "float_value", "int_value", "json_value",
-                "value_type", "source", "source_id",
+                "project_id",
+                "entity_type",
+                "entity_id",
+                "namespace",
+                "key",
+                "string_value",
+                "float_value",
+                "int_value",
+                "json_value",
+                "value_type",
+                "source",
+                "source_id",
             ],
         )
         return tsi.GenAIAnnotationsUpsertRes(inserted=len(rows))
@@ -2363,26 +2464,46 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         now = datetime.datetime.now()
         delete_rows = []
         for row in result.result_rows:
-            delete_rows.append([
-                row[0], row[1], row[2], row[3], row[4],
-                row[5], row[6], row[7], row[8], row[9],
-                row[10], row[11], now,
-            ])
+            delete_rows.append(
+                [
+                    row[0],
+                    row[1],
+                    row[2],
+                    row[3],
+                    row[4],
+                    row[5],
+                    row[6],
+                    row[7],
+                    row[8],
+                    row[9],
+                    row[10],
+                    row[11],
+                    now,
+                ]
+            )
 
         self.ch_client.insert(
             "entity_annotations",
             delete_rows,
             column_names=[
-                "project_id", "entity_type", "entity_id", "namespace", "key",
-                "string_value", "float_value", "int_value", "json_value",
-                "value_type", "source", "source_id", "deleted_at",
+                "project_id",
+                "entity_type",
+                "entity_id",
+                "namespace",
+                "key",
+                "string_value",
+                "float_value",
+                "int_value",
+                "json_value",
+                "value_type",
+                "source",
+                "source_id",
+                "deleted_at",
             ],
         )
         return tsi.GenAIAnnotationsDeleteRes(deleted=len(delete_rows))
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.genai_annotations_query"
-    )
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.genai_annotations_query")
     def genai_annotations_query(
         self, req: tsi.GenAIAnnotationsQueryReq
     ) -> tsi.GenAIAnnotationsQueryRes:
@@ -2427,22 +2548,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         annotations = []
         for row in result.result_rows:
-            annotations.append(tsi.GenAIAnnotationRow(
-                project_id=row[0],
-                entity_type=row[1],
-                entity_id=row[2],
-                namespace=row[3],
-                key=row[4],
-                string_value=row[5],
-                float_value=row[6],
-                int_value=row[7],
-                json_value=row[8],
-                value_type=row[9],
-                source=row[10],
-                source_id=row[11],
-                updated_at=row[12],
-                deleted_at=row[13],
-            ))
+            annotations.append(
+                tsi.GenAIAnnotationRow(
+                    project_id=row[0],
+                    entity_type=row[1],
+                    entity_id=row[2],
+                    namespace=row[3],
+                    key=row[4],
+                    string_value=row[5],
+                    float_value=row[6],
+                    int_value=row[7],
+                    json_value=row[8],
+                    value_type=row[9],
+                    source=row[10],
+                    source_id=row[11],
+                    updated_at=row[12],
+                    deleted_at=row[13],
+                )
+            )
         return tsi.GenAIAnnotationsQueryRes(annotations=annotations)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")

@@ -1103,14 +1103,44 @@ class GenAIStructuredToolCall(BaseModel):
     duration_ms: int = 0
 
 
+class GenAIStructuredStep(BaseModel):
+    """One LLM invocation within a turn.
+
+    When provided on a turn, each step becomes a ``chat`` child span under
+    the turn's root ``invoke_agent`` span.  Tool calls within a step become
+    ``execute_tool`` children of that step's chat span.
+    """
+
+    model: str = ""
+    provider_name: str = ""
+    input_messages: list[GenAIStructuredMessage] = Field(default_factory=list)
+    output_messages: list[GenAIStructuredMessage] = Field(default_factory=list)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    reasoning_content: str = ""
+    started_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    finish_reasons: list[str] = Field(default_factory=list)
+    tool_calls: list[GenAIStructuredToolCall] = Field(default_factory=list)
+    system_instructions: list[str] = Field(default_factory=list)
+
+
 class GenAIStructuredTurn(BaseModel):
     """One user-agent interaction within a conversation.
 
     Each turn maps to a unique ``trace_id`` in the underlying span storage.
+
+    When ``steps`` is non-empty, each step produces a ``chat`` child span
+    with its own tool call children.  The turn-level ``model``, ``input_tokens``,
+    ``output_tokens``, and ``tool_calls`` fields are ignored in favour of
+    the per-step data.  When ``steps`` is empty, existing flat behaviour
+    is preserved.
     """
 
     messages: list[GenAIStructuredMessage]
     tool_calls: list[GenAIStructuredToolCall] = Field(default_factory=list)
+    steps: list[GenAIStructuredStep] = Field(default_factory=list)
     agent_name: str = ""
     model: str = ""
     input_tokens: int = 0
@@ -1120,6 +1150,7 @@ class GenAIStructuredTurn(BaseModel):
     ended_at: datetime.datetime | None = None
     system_instructions: list[str] = Field(default_factory=list)
     trace_id: str = ""
+    parent_span_id: str = ""
 
 
 class GenAIConversationIngestReq(BaseModel):
@@ -1144,6 +1175,7 @@ class GenAIConversationIngestRes(BaseModel):
 
     conversation_id: str
     trace_ids: list[str]
+    root_span_ids: list[str] = Field(default_factory=list)
     span_count: int
 
 
@@ -1233,7 +1265,11 @@ class GenAIATIFIngestReq(BaseModel):
     @classmethod
     def _auto_wrap_raw_trajectory(cls, data: Any) -> Any:
         """Allow posting a raw ATIF document without the wrapper."""
-        if isinstance(data, dict) and "schema_version" in data and "trajectory" not in data:
+        if (
+            isinstance(data, dict)
+            and "schema_version" in data
+            and "trajectory" not in data
+        ):
             pid = data.pop("project_id", "")
             cname = data.pop("conversation_name", "")
             pname = data.pop("provider_name", "")
@@ -3783,16 +3819,16 @@ class TraceServerInterface(Protocol):
     def genai_spans_query(self, req: GenAISpansQueryReq) -> GenAISpansQueryRes: ...
     def genai_spans_trace(self, req: GenAISpansTraceReq) -> GenAISpansTraceRes: ...
     def genai_agents_query(self, req: GenAIAgentsQueryReq) -> GenAIAgentsQueryRes: ...
-    def genai_agent_metrics(self, req: GenAIAgentMetricsReq) -> GenAIAgentMetricsRes: ...
+    def genai_agent_metrics(
+        self, req: GenAIAgentMetricsReq
+    ) -> GenAIAgentMetricsRes: ...
     def genai_conversations_query(
         self, req: GenAIConversationsQueryReq
     ) -> GenAIConversationsQueryRes: ...
     def genai_conversation_chat(
         self, req: GenAIConversationChatReq
     ) -> GenAIConversationChatRes: ...
-    def genai_traces_chat(
-        self, req: GenAITraceChatReq
-    ) -> GenAITraceChatRes: ...
+    def genai_traces_chat(self, req: GenAITraceChatReq) -> GenAITraceChatRes: ...
     def genai_annotations_upsert(
         self, req: GenAIAnnotationsUpsertReq
     ) -> GenAIAnnotationsUpsertRes: ...
@@ -3802,7 +3838,9 @@ class TraceServerInterface(Protocol):
     def genai_annotations_query(
         self, req: GenAIAnnotationsQueryReq
     ) -> GenAIAnnotationsQueryRes: ...
-    def genai_scores_insert(self, req: GenAIScoresInsertReq) -> GenAIScoresInsertRes: ...
+    def genai_scores_insert(
+        self, req: GenAIScoresInsertReq
+    ) -> GenAIScoresInsertRes: ...
     def genai_scores_query(self, req: GenAIScoresQueryReq) -> GenAIScoresQueryRes: ...
     def genai_score_stats(self, req: GenAIScoreStatsReq) -> GenAIScoreStatsRes: ...
     def genai_turn_stats(self, req: GenAITurnStatsReq) -> GenAITurnStatsRes: ...
@@ -3815,9 +3853,7 @@ class TraceServerInterface(Protocol):
     def genai_conversation_ingest(
         self, req: GenAIConversationIngestReq
     ) -> GenAIConversationIngestRes: ...
-    def genai_ingest_atif(
-        self, req: GenAIATIFIngestReq
-    ) -> GenAIATIFIngestRes: ...
+    def genai_ingest_atif(self, req: GenAIATIFIngestReq) -> GenAIATIFIngestRes: ...
     def genai_ingest_openhands(
         self, req: GenAIOpenHandsIngestReq
     ) -> GenAIOpenHandsIngestRes: ...

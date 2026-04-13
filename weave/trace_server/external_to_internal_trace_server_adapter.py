@@ -51,15 +51,18 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
     _internal_trace_server: tsi.FullTraceServerInterface
     _idc: IdConverter
+    _username_resolver: Callable[[str], str | None] | None
 
     def __init__(
         self,
         internal_trace_server: tsi.FullTraceServerInterface,
         id_converter: IdConverter,
+        username_resolver: Callable[[str], str | None] | None = None,
     ):
         super().__init__()
         self._internal_trace_server = internal_trace_server
         self._idc = id_converter
+        self._username_resolver = username_resolver
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._internal_trace_server, name)
@@ -169,17 +172,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.genai_otel_export, req, req.project_id
         )
 
-    def genai_spans_query(
-        self, req: tsi.GenAISpansQueryReq
-    ) -> tsi.GenAISpansQueryRes:
+    def genai_spans_query(self, req: tsi.GenAISpansQueryReq) -> tsi.GenAISpansQueryRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(
             self._internal_trace_server.genai_spans_query, req, req.project_id
         )
 
-    def genai_spans_trace(
-        self, req: tsi.GenAISpansTraceReq
-    ) -> tsi.GenAISpansTraceRes:
+    def genai_spans_trace(self, req: tsi.GenAISpansTraceReq) -> tsi.GenAISpansTraceRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(
             self._internal_trace_server.genai_spans_trace, req, req.project_id
@@ -195,9 +194,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.genai_conversation_ingest(req)
 
-    def genai_ingest_atif(
-        self, req: tsi.GenAIATIFIngestReq
-    ) -> tsi.GenAIATIFIngestRes:
+    def genai_ingest_atif(self, req: tsi.GenAIATIFIngestReq) -> tsi.GenAIATIFIngestRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.genai_ingest_atif(req)
 
@@ -207,9 +204,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.genai_ingest_openhands(req)
 
-    def genai_traces_chat(
-        self, req: tsi.GenAITraceChatReq
-    ) -> tsi.GenAITraceChatRes:
+    def genai_traces_chat(self, req: tsi.GenAITraceChatReq) -> tsi.GenAITraceChatRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.genai_traces_chat(req)
 
@@ -255,9 +250,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.genai_scores_query(req)
 
-    def genai_score_stats(
-        self, req: tsi.GenAIScoreStatsReq
-    ) -> tsi.GenAIScoreStatsRes:
+    def genai_score_stats(self, req: tsi.GenAIScoreStatsReq) -> tsi.GenAIScoreStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.genai_score_stats(req)
 
