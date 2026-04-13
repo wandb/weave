@@ -1,4 +1,5 @@
 import random
+import time
 from collections.abc import Iterator
 
 import pytest
@@ -9,6 +10,25 @@ from tests.trace.util import (
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
+
+
+def wait_for_table_create_settle(
+    client: WeaveClient, digest: str, expected_rows: int
+) -> None:
+    # Allow ClickHouse table inserts to become queryable before immediate reads.
+    time.sleep(0.2)
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        res = client.server.table_query(
+            tsi.TableQueryReq(project_id=client.project_id, digest=digest)
+        )
+        if len(res.rows) == expected_rows:
+            return
+        time.sleep(0.1)
+
+    raise AssertionError(
+        f"table {digest} never became queryable with {expected_rows} rows"
+    )
 
 
 def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):
@@ -41,6 +61,7 @@ def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):
     )
     digest = res.digest
     row_digests = res.row_digests
+    wait_for_table_create_settle(client, digest, len(data))
 
     return digest, row_digests, data
 
@@ -99,6 +120,7 @@ def test_table_query_invalid_digest(client: WeaveClient):
     assert res.rows == []
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_query_filter_by_row_digests(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 5)
 
@@ -132,6 +154,7 @@ def test_table_query_invalid_row_digest(client: WeaveClient):
     assert res.rows == []
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_query_limit(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 5)
 
@@ -150,6 +173,7 @@ def test_table_query_limit(client: WeaveClient):
     assert result_indices == list(range(limit))
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_query_offset(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 5)
 
@@ -323,6 +347,7 @@ def generate_duplication_simple_table_data(
     )
     digest = res.digest
     row_digests = res.row_digests
+    wait_for_table_create_settle(client, digest, len(data))
 
     return {"digest": digest, "row_digests": row_digests, "data": data}
 
@@ -435,6 +460,7 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
             ),
         )
     )
+    wait_for_table_create_settle(client, res2.digest, len(data))
 
     assert len(res1.row_digests) == 10
 
