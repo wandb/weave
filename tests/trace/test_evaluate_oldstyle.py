@@ -5,13 +5,20 @@ import pytest
 
 import weave
 from tests.conftest import LATENCY_TOL
-from weave import Dataset, Evaluation, Model
+from weave import Evaluation, Model
 from weave.scorers import MultiTaskBinaryClassificationF1
 from weave.trace.ref_util import get_ref, remove_ref
 from weave.trace.weave_client import WeaveClient
 
-dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
-dataset = Dataset(rows=dataset_rows)
+
+@pytest.fixture
+def dataset_rows():
+    return [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
+
+
+@pytest.fixture
+def expanded_dataset_rows(dataset_rows):
+    return [dict(row) for _ in range(5) for row in dataset_rows]
 
 
 expected_eval_result = {
@@ -42,7 +49,41 @@ def example_to_model_input(example):
     return {"input": example["input"]}
 
 
-def test_evaluate_callable_as_model(client):
+def _install_concurrent_first_save_tracker(
+    client: WeaveClient, monkeypatch: pytest.MonkeyPatch, *tracked_ops
+) -> dict[str, int]:
+    """Force first-time saves of shared ops to overlap and count real save attempts."""
+    save_counts = {op.name: 0 for op in tracked_ops}
+    save_counts_lock = threading.Lock()
+    first_save_gates = {
+        id(op): {"waiting": 0, "release": threading.Event()} for op in tracked_ops
+    }
+    tracked_ops_by_id = {id(op): op for op in tracked_ops}
+    gate_lock = threading.Lock()
+    original_save_object_basic = WeaveClient._save_object_basic.__get__(
+        client, type(client)
+    )
+
+    def tracking_save_object_basic(val, name=None, branch="latest"):
+        tracked_op = tracked_ops_by_id.get(id(val))
+        if tracked_op is not None:
+            # Hold the first unsaved call for each scorer until a second caller arrives.
+            if get_ref(val) is None:
+                gate_state = first_save_gates[id(val)]
+                with gate_lock:
+                    gate_state["waiting"] += 1
+                    if gate_state["waiting"] == 2:
+                        gate_state["release"].set()
+                gate_state["release"].wait(timeout=0.5)
+            with save_counts_lock:
+                save_counts[tracked_op.name] += 1
+        return original_save_object_basic(val, name=name, branch=branch)
+
+    monkeypatch.setattr(client, "_save_object_basic", tracking_save_object_basic)
+    return save_counts
+
+
+def test_evaluate_callable_as_model(client, dataset_rows):
     @weave.op
     async def model_predict(input) -> str:
         return eval(input)
@@ -55,7 +96,7 @@ def test_evaluate_callable_as_model(client):
     assert result == expected_eval_result
 
 
-def test_predict_can_receive_other_params(client):
+def test_predict_can_receive_other_params(client, dataset_rows):
     @weave.op
     async def model_predict(input, target) -> str:
         return eval(input) + target
@@ -74,7 +115,7 @@ def test_predict_can_receive_other_params(client):
     }
 
 
-def test_can_preprocess_model_input(client):
+def test_can_preprocess_model_input(client, dataset_rows):
     @weave.op
     async def model_predict(x) -> str:
         return eval(x)
@@ -92,7 +133,7 @@ def test_can_preprocess_model_input(client):
     assert result == expected_eval_result
 
 
-def test_evaluate_rows_only(client):
+def test_evaluate_rows_only(client, dataset_rows):
     evaluation = Evaluation(
         dataset=dataset_rows,
         scorers=[score_oldstyle],
@@ -102,7 +143,8 @@ def test_evaluate_rows_only(client):
     assert result == expected_eval_result
 
 
-def test_evaluate_both_styles(client):
+@pytest.mark.asyncio
+async def test_evaluate_both_styles(client, dataset_rows):
     client.set_autoflush(False)
     evaluation = Evaluation(
         dataset=dataset_rows,
@@ -110,7 +152,7 @@ def test_evaluate_both_styles(client):
     )
     model = EvalModel()
     try:
-        result = asyncio.run(evaluation.evaluate(model))
+        result = await evaluation.evaluate(model)
         # Flush once after the evaluation to avoid per-op autoflush contention
         # in the calls_complete ClickHouse path.
         client.flush()
@@ -125,10 +167,12 @@ def test_evaluate_both_styles(client):
 
 
 @pytest.mark.disable_logging_error_check
-def test_evaluate_both_styles_saves_each_function_scorer_once(client, monkeypatch):
-    expanded_rows = [dict(row) for _ in range(5) for row in dataset_rows]
+@pytest.mark.asyncio
+async def test_evaluate_both_styles_saves_each_function_scorer_once(
+    client, monkeypatch, expanded_dataset_rows
+):
     evaluation = Evaluation(
-        dataset=expanded_rows,
+        dataset=expanded_dataset_rows,
         scorers=[score_oldstyle, score_newstyle],
     )
     model = EvalModel()
@@ -137,39 +181,14 @@ def test_evaluate_both_styles_saves_each_function_scorer_once(client, monkeypatc
     remove_ref(score_oldstyle)
     remove_ref(score_newstyle)
 
-    save_counts = {
-        score_oldstyle.name: 0,
-        score_newstyle.name: 0,
-    }
-    save_counts_lock = threading.Lock()
-    concurrent_first_save_gates = {
-        id(score_oldstyle): {"waiting": 0, "release": threading.Event()},
-        id(score_newstyle): {"waiting": 0, "release": threading.Event()},
-    }
-    gate_lock = threading.Lock()
-    original_save_object_basic = WeaveClient._save_object_basic.__get__(
-        client, type(client)
+    save_counts = _install_concurrent_first_save_tracker(
+        client, monkeypatch, score_oldstyle, score_newstyle
     )
-
-    def tracking_save_object_basic(val, name=None, branch="latest"):
-        if val is score_oldstyle or val is score_newstyle:
-            if get_ref(val) is None:
-                gate_state = concurrent_first_save_gates[id(val)]
-                with gate_lock:
-                    gate_state["waiting"] += 1
-                    if gate_state["waiting"] == 2:
-                        gate_state["release"].set()
-                gate_state["release"].wait(timeout=0.5)
-            with save_counts_lock:
-                save_counts[val.name] += 1
-        return original_save_object_basic(val, name=name, branch=branch)
-
-    monkeypatch.setattr(client, "_save_object_basic", tracking_save_object_basic)
     monkeypatch.setenv("WEAVE_PARALLELISM", "20")
 
     client.set_autoflush(False)
     try:
-        result = asyncio.run(evaluation.evaluate(model))
+        result = await evaluation.evaluate(model)
         client.flush()
     finally:
         client.set_autoflush(True)
@@ -186,7 +205,7 @@ def test_evaluate_both_styles_saves_each_function_scorer_once(client, monkeypatc
     }
 
 
-def test_evaluate_other_model_method_names():
+def test_evaluate_other_model_method_names(dataset_rows):
     class EvalModel(Model):
         @weave.op
         async def infer(self, input) -> str:
@@ -201,7 +220,7 @@ def test_evaluate_other_model_method_names():
     assert result == expected_eval_result
 
 
-def test_score_as_class(client):
+def test_score_as_class(client, dataset_rows):
     class MyScorerOldstyle(weave.Scorer):
         @weave.op
         def score(self, model_output, target):
@@ -222,7 +241,7 @@ def test_score_as_class(client):
     }
 
 
-def test_score_with_custom_summarize(client):
+def test_score_with_custom_summarize(client, dataset_rows):
     class MyScorerOldstyle(weave.Scorer):
         @weave.op
         def summarize(self, score_rows):

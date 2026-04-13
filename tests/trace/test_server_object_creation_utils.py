@@ -8,6 +8,8 @@ the client serialization requires a client object to serialize.
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
+
 import weave
 from weave.evaluation.eval import Evaluation
 from weave.flow.scorer import Scorer
@@ -44,32 +46,72 @@ def test_concurrent_save_op_reuses_single_inflight_save(
 
     save_call_count = 0
     save_call_count_lock = threading.Lock()
-    release = threading.Event()
-    waiting = 0
-    waiting_lock = threading.Lock()
+    creator_entered_save = threading.Event()
+    allow_creator_to_finish = threading.Event()
+    start_barrier = threading.Barrier(5)
     original_save_object_basic = WeaveClient._save_object_basic.__get__(
         client, type(client)
     )
 
     def tracked_save_object_basic(val, name=None, branch="latest"):
-        nonlocal save_call_count, waiting
+        nonlocal save_call_count
         if val is test_op:
             with save_call_count_lock:
                 save_call_count += 1
-            with waiting_lock:
-                waiting += 1
-                if waiting == 2:
-                    release.set()
-            release.wait(timeout=0.5)
+            creator_entered_save.set()
+            allow_creator_to_finish.wait()
         return original_save_object_basic(val, name=name, branch=branch)
 
     monkeypatch.setattr(client, "_save_object_basic", tracked_save_object_basic)
 
+    def save_once():
+        # Release all callers into `_save_op` at once while the creator thread
+        # is blocked in `_save_object_basic`, forcing the inflight join path.
+        start_barrier.wait()
+        return client._save_op(test_op)
+
     with ThreadPoolExecutor(max_workers=4) as executor:
-        refs = list(executor.map(lambda _: client._save_op(test_op), range(4)))
+        futures = [executor.submit(save_once) for _ in range(4)]
+        start_barrier.wait()
+        assert creator_entered_save.wait(timeout=1)
+        assert all(not future.done() for future in futures)
+        allow_creator_to_finish.set()
+        refs = [future.result(timeout=1) for future in futures]
 
     assert save_call_count == 1
     assert [ref.uri for ref in refs] == [refs[0].uri] * 4
+
+
+def test_concurrent_save_op_rejects_conflicting_names(
+    client: WeaveClient, monkeypatch
+) -> None:
+    @weave.op
+    def test_op(x: int) -> int:
+        return x + 1
+
+    remove_ref(test_op)
+
+    creator_entered_save = threading.Event()
+    allow_creator_to_finish = threading.Event()
+    original_save_object_basic = WeaveClient._save_object_basic.__get__(
+        client, type(client)
+    )
+
+    def tracked_save_object_basic(val, name=None, branch="latest"):
+        if val is test_op:
+            creator_entered_save.set()
+            allow_creator_to_finish.wait()
+        return original_save_object_basic(val, name=name, branch=branch)
+
+    monkeypatch.setattr(client, "_save_object_basic", tracked_save_object_basic)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        first_save = executor.submit(client._save_op, test_op, "first_name")
+        assert creator_entered_save.wait(timeout=1)
+        with pytest.raises(ValueError, match="conflicting names"):
+            client._save_op(test_op, name="second_name")
+        allow_creator_to_finish.set()
+        assert first_save.result(timeout=1).name == "first_name"
 
 
 def test_helper_serializes_dataset_same_way_as_sdk(client: WeaveClient) -> None:
