@@ -244,7 +244,7 @@ class IsolatedClientExecutor:
         self._request_queue = ctx.Queue()
         self._response_queue = ctx.Queue()
 
-        self._process = ctx.Process(
+        self._process = ctx.Process(  # type: ignore[attr-defined]
             target=_worker_loop,
             args=(
                 self.client_factory,
