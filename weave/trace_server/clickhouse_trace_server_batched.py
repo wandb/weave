@@ -5178,7 +5178,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         cq.add_order("id", "asc")
         query_sql = cq.as_sql(pb)
         query_params = pb.get_params()
-        result = self.ch_client.query(query_sql, query_params)
+        result = self._query(query_sql, query_params)
 
         digest_by_call: dict[str, str] = {}
         order_by_call: dict[str, int] = {}
