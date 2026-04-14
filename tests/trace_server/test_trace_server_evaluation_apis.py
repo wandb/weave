@@ -894,6 +894,30 @@ def _create_eval_with_scores(client, scores_per_row, eval_name="eval"):
     return run.evaluation_run_id
 
 
+def test_eval_results_row_order_is_stable(client):
+    """Row order should be stable across repeated requests (default sort by row_digest)."""
+    if client_is_sqlite(client):
+        pytest.skip("sort/filter only implemented for ClickHouse")
+    eval_id = _create_eval_with_scores(
+        client,
+        [{"accuracy": 0.1}, {"accuracy": 0.5}, {"accuracy": 0.9}, {"accuracy": 0.3}],
+        eval_name="order-stable",
+    )
+    digests_first = None
+    for _ in range(3):
+        res = client.server.eval_results_query(
+            EvalResultsQueryReq(
+                project_id=client.project_id,
+                evaluation_call_ids=[eval_id],
+            )
+        )
+        digests = [row.row_digest for row in res.rows]
+        if digests_first is None:
+            digests_first = digests
+        else:
+            assert digests == digests_first, "Row order changed between requests"
+
+
 def test_eval_results_sort_by_score_desc(client):
     """Sort by scores.accuracy DESC should return highest-scoring row first."""
     if client_is_sqlite(client):

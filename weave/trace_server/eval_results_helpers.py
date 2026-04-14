@@ -394,19 +394,18 @@ def finalize_rows(
     return apply_row_selection(rows, eval_root_ids, require_intersection, offset, limit)
 
 
-@_trace_wrap("eval_results_helpers.build_sorted_eval_rows")
-def build_sorted_eval_rows(
+@_trace_wrap("eval_results_helpers.build_eval_rows")
+def build_eval_rows(
     page_calls: list[tsi.CallSchema],
     eval_root_ids: list[str],
     digest_by_call: dict[str, str],
-    order_by_call: dict[str, int],
     include_raw_data_rows: bool,
     include_predict_and_score_children: bool,
 ) -> list[tsi.EvalResultsRow]:
     """Build eval result rows from CTE-paginated calls with precomputed metadata.
 
-    Uses digest_by_call instead of recomputing row_digest from call inputs,
-    and sorts by order_by_call (the ClickHouse-determined sort order).
+    Uses digest_by_call instead of recomputing row_digest from call inputs.
+    Rows are returned in the order they appear in page_calls (SQL ORDER BY row_order).
     """
     predict_and_score_calls = filter_predict_and_score_calls(page_calls, eval_root_ids)
     if not predict_and_score_calls:
@@ -452,16 +451,7 @@ def build_sorted_eval_rows(
         if row_digest in row_map:
             row_map[row_digest].evaluations = list(eval_entries.values())
 
-    digest_order: dict[str, int] = {}
-    for call_id, order in order_by_call.items():
-        d = digest_by_call.get(call_id)
-        if d and d not in digest_order:
-            digest_order[d] = order
-
-    return sorted(
-        row_map.values(),
-        key=lambda r: digest_order.get(r.row_digest, float("inf")),
-    )
+    return list(row_map.values())
 
 
 def apply_row_selection(

@@ -414,7 +414,8 @@ SELECT
     page_rows.resolved_inputs AS __resolved_inputs,
     (SELECT total_rows FROM ranked_digest_count) AS __total_rows
 FROM page_rows
-LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id"""
+LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id
+ORDER BY page_rows.row_order ASC"""
 
 
 def build_eval_results_cte_chain(

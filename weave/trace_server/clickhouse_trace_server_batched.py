@@ -1660,7 +1660,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_id_param = pb.add_param(project_id)
         call_ids_param = pb.add_param(call_ids)
         delete_query = build_calls_complete_delete_query(
-            "calls_complete",
+            self._get_calls_complete_table_name(),
             project_id_param,
             call_ids_param,
             cluster_name=self.clickhouse_cluster_name,
@@ -1714,7 +1714,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ch_sentinel_values.to_ch_value("display_name", display_name)
         )
         update_query = build_calls_complete_update_query(
-            "calls_complete",
+            self._get_calls_complete_table_name(),
             project_id_param,
             call_id_param,
             display_name_param,
@@ -5147,7 +5147,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self._query(page_query, pb.get_params())
 
         digest_by_call: dict[str, str] = {}
-        order_by_call: dict[str, int] = {}
         resolved_by_call_id: dict[str, Any] = {}
         total_rows = 0
         page_calls: list[tsi.CallSchema] = []
@@ -5156,13 +5155,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             row_data = dict(zip(result.column_names, row, strict=True))
             total_rows = int(row_data.get("__total_rows", 0))
             row_digest = row_data.get("__row_digest")
-            row_order = row_data.get("__row_order")
             resolved_raw = row_data.get("__resolved_inputs")
 
             call_id = row_data.get("id")
             if row_digest and call_id:
                 digest_by_call[call_id] = row_digest
-                order_by_call[call_id] = int(row_order) if row_order else 0
             if resolved_raw and call_id and req.resolve_row_refs:
                 parsed = try_parse_json(resolved_raw)
                 if parsed is not None:
@@ -5196,11 +5193,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 page_calls.extend(self.calls_query_stream(child_req))
 
-        rows = eval_helpers.build_sorted_eval_rows(
+        rows = eval_helpers.build_eval_rows(
             page_calls,
             eval_root_ids,
             digest_by_call,
-            order_by_call,
             req.include_raw_data_rows,
             req.include_predict_and_score_children,
         )

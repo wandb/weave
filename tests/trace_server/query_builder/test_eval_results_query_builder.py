@@ -436,6 +436,127 @@ def test_full_query_calls_merged() -> None:
             (SELECT total_rows FROM ranked_digest_count) AS __total_rows
         FROM page_rows
         LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id
+        ORDER BY page_rows.row_order ASC
+        """,
+        pb.get_params(),
+        {
+            "pb_0": "proj-1",
+            "pb_1": ["eval-1"],
+            "pb_2": PREDICT_AND_SCORE_OP_PREFIX,
+            "pb_3": "proj-1",
+        },
+    )
+
+
+def test_full_query_calls_complete() -> None:
+    """Full SQL: lean CTEs + page_calls hydration on calls_complete (no GROUP BY)."""
+    pb = ParamBuilder("pb")
+    sql = build_eval_results_query(
+        project_id="proj-1",
+        eval_root_ids=["eval-1"],
+        sort_by=None,
+        filters=None,
+        require_intersection=False,
+        limit=10,
+        offset=0,
+        pb=pb,
+        read_table="calls_complete",
+    )
+    assert_raw_sql(
+        sql,
+        """
+        WITH predict_and_score_calls AS (
+                SELECT calls_complete.id AS call_id,
+                    calls_complete.parent_id AS eval_call_id,
+                    calls_complete.inputs_dump,
+                    calls_complete.output_dump,
+                    CASE
+                        WHEN position(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/') > 0
+                            THEN regexpExtract(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/([^/]+)$', 1)
+                        ELSE hex(SHA256(JSONExtractRaw(calls_complete.inputs_dump, 'example')))
+                    END AS row_digest
+                FROM calls_complete
+                WHERE calls_complete.project_id = {pb_0:String}
+                    AND calls_complete.parent_id IN {pb_1:Array(String)}
+                    AND calls_complete.id NOT IN {pb_1:Array(String)}
+                    AND position(calls_complete.op_name, {pb_2:String}) > 0
+            ),
+
+            predict_and_score_calls_resolved AS (
+                SELECT predict_and_score_calls.*,
+                    COALESCE(tr.val_dump, JSONExtractRaw(predict_and_score_calls.inputs_dump, 'example')) AS resolved_inputs
+                FROM predict_and_score_calls
+                LEFT JOIN (
+                    SELECT project_id, digest, any(val_dump) AS val_dump
+                    FROM table_rows
+                    WHERE project_id = {pb_0:String}
+                        AND digest IN (SELECT row_digest FROM predict_and_score_calls)
+                    GROUP BY project_id, digest
+                ) AS tr ON tr.digest = predict_and_score_calls.row_digest
+            ),
+
+            ranked_digests AS (
+                SELECT row_digest,
+                    ROW_NUMBER() OVER(ORDER BY row_digest ASC) AS row_order
+                FROM predict_and_score_calls_resolved
+                GROUP BY row_digest
+                HAVING 1=1
+            ),
+
+            ranked_digest_count AS (
+                SELECT count(*) AS total_rows FROM ranked_digests
+            ),
+
+            page_digests AS (
+                SELECT row_digest, row_order
+                FROM ranked_digests
+                ORDER BY row_order
+                LIMIT 10
+                OFFSET 0
+            ),
+
+            page_rows AS (
+                SELECT predict_and_score_calls_resolved.call_id,
+                    predict_and_score_calls_resolved.eval_call_id,
+                    predict_and_score_calls_resolved.row_digest,
+                    page_digests.row_order,
+                    predict_and_score_calls_resolved.resolved_inputs
+                FROM predict_and_score_calls_resolved
+                INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
+            ),
+
+            page_calls AS (
+                SELECT calls_complete.id AS call_id,
+                    calls_complete.project_id,
+                    calls_complete.trace_id,
+                    calls_complete.op_name,
+                    calls_complete.started_at,
+                    calls_complete.ended_at,
+                    calls_complete.inputs_dump,
+                    calls_complete.output_dump,
+                    calls_complete.summary_dump
+                FROM calls_complete
+                WHERE calls_complete.project_id = {pb_3:String}
+                    AND calls_complete.id IN (SELECT call_id FROM page_rows)
+            )
+        SELECT
+            page_rows.call_id AS id,
+            page_rows.eval_call_id AS parent_id,
+            page_calls.project_id,
+            page_calls.trace_id,
+            page_calls.op_name,
+            page_calls.started_at,
+            page_calls.ended_at,
+            page_calls.inputs_dump,
+            page_calls.output_dump,
+            page_calls.summary_dump,
+            page_rows.row_digest AS __row_digest,
+            page_rows.row_order AS __row_order,
+            page_rows.resolved_inputs AS __resolved_inputs,
+            (SELECT total_rows FROM ranked_digest_count) AS __total_rows
+        FROM page_rows
+        LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id
+        ORDER BY page_rows.row_order ASC
         """,
         pb.get_params(),
         {
