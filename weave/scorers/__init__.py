@@ -44,7 +44,6 @@ __all__ = [
     "LLMAsAJudgeScorer",
     "LLMScorer",
     "LevenshteinScorer",
-    "LevenshteinScorer",
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
     "PresidioScorer",

@@ -41,6 +41,15 @@ def litellm_accumulator(
             acc.usage.completion_tokens = value.usage.completion_tokens
         else:
             acc.usage.completion_tokens += value.usage.completion_tokens
+        # Pass through cache token fields if present
+        if value.usage.cache_read_input_tokens is not None:
+            acc.usage.cache_read_input_tokens = (
+                acc.usage.cache_read_input_tokens or 0
+            ) + value.usage.cache_read_input_tokens
+        if value.usage.cache_creation_input_tokens is not None:
+            acc.usage.cache_creation_input_tokens = (
+                acc.usage.cache_creation_input_tokens or 0
+            ) + value.usage.cache_creation_input_tokens
 
     # Loop through the choices and add their deltas
     for delta_choice in value.choices:

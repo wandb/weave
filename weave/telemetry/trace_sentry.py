@@ -21,15 +21,17 @@ from typing import TYPE_CHECKING, Any, Literal
 try:
     import sentry_sdk  # type: ignore
     import sentry_sdk.utils  # type: ignore
+    from sentry_sdk.session import Session  # type: ignore
 
     SENTRY_AVAILABLE = True
 except ImportError:
     SENTRY_AVAILABLE = False
     sentry_sdk = None  # type: ignore
+    Session = None  # type: ignore
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Event, ExcInfo
-    from sentry_sdk.hub import Hub
+    from sentry_sdk.scope import Scope
 
 
 SENTRY_DEFAULT_DSN = "https://99697cf8ca5158250d3dd6cb23cca9b0@o151352.ingest.us.sentry.io/4507019311251456"
@@ -65,7 +67,7 @@ class Sentry:
 
         self.dsn = SENTRY_DEFAULT_DSN
 
-        self.hub: Hub | None = None
+        self.scope: Scope | None = None
 
         # Disable if sentry is not available
         self._disabled = not SENTRY_AVAILABLE
@@ -104,7 +106,7 @@ class Sentry:
             environment=self.environment,
             release=version.VERSION,
         )
-        self.hub = sentry_sdk.Hub(client)
+        self.scope = sentry_sdk.Scope(client=client)
 
     @_safe_noop
     def exception(
@@ -115,19 +117,19 @@ class Sentry:
     ) -> None:
         """Log an exception to Sentry."""
         error = Exception(exc) if isinstance(exc, str) else exc
-        # based on self.hub.capture_exception(_exc)
         if error is not None:
             exc_info = sentry_sdk.utils.exc_info_from_error(error)
         else:
             exc_info = sys.exc_info()
 
+        client = self.scope.client  # type: ignore
         event, hint = sentry_sdk.utils.event_from_exception(
             exc_info,
-            client_options=self.hub.client.options,  # type: ignore
+            client_options=client.options,
             mechanism={"type": "generic", "handled": handled},
         )
         try:
-            self.hub.capture_event(event, hint=hint)  # type: ignore
+            client.capture_event(event, hint=hint, scope=self.scope)
         except Exception:
             pass
 
@@ -136,47 +138,46 @@ class Sentry:
         status = status or ("crashed" if not handled else "errored")  # type: ignore
         self.mark_session(status=status)
 
-        client, _ = self.hub._stack[-1]  # type: ignore
         if client is not None:
             client.flush()
 
     @_safe_noop
     def start_session(self) -> None:
         """Start a new session."""
-        # get the current client and scope
-        if not SENTRY_AVAILABLE or self.hub is None:
+        if not SENTRY_AVAILABLE or self.scope is None:
             return
 
-        _, scope = self.hub._stack[-1]
-        session = scope._session
-
-        # if there's no session, start one
-        if session is None:
-            self.hub.start_session()
+        # if there's no session, start one using the instance's client directly
+        # (Scope.start_session uses get_client() classmethod which ignores self.client)
+        if self.scope._session is None and Session is not None:
+            client = self.scope.client
+            if client is not None:
+                self.scope._session = Session(
+                    release=client.options.get("release"),
+                    environment=client.options.get("environment"),
+                )
 
     @_safe_noop
     def end_session(self) -> None:
         """End the current session."""
-        # get the current client and scope
-        if not SENTRY_AVAILABLE or self.hub is None:
+        if not SENTRY_AVAILABLE or self.scope is None:
             return
 
-        client, scope = self.hub._stack[-1]
-        session = scope._session
-
+        session = self.scope._session
+        client = self.scope.client
         if session is not None and client is not None:
-            self.hub.end_session()
+            self.scope._session = None
+            session.close()
+            client.capture_session(session)
             client.flush()
 
     @_safe_noop
     def mark_session(self, status: SessionStatus | None = None) -> None:
         """Mark the current session with a status."""
-        if not SENTRY_AVAILABLE or self.hub is None:
+        if not SENTRY_AVAILABLE or self.scope is None:
             return
 
-        _, scope = self.hub._stack[-1]
-        session = scope._session
-
+        session = self.scope._session
         if session is not None:
             session.update(status=status)
 
@@ -192,17 +193,16 @@ class Sentry:
         all events sent from this thread. It also tries to start a session
         if one doesn't already exist for this thread.
         """
-        if not SENTRY_AVAILABLE or self.hub is None:
+        if not SENTRY_AVAILABLE or self.scope is None:
             return
 
-        with self.hub.configure_scope() as scope:
-            if tags is not None:
-                for tag in tags:
-                    val = tags.get(tag, None)
-                    if val not in {None, ""}:
-                        scope.set_tag(tag, val)
-                    if tag == "user":
-                        scope.user = val
+        if tags is not None:
+            for tag in tags:
+                val = tags.get(tag, None)
+                if val not in {None, ""}:
+                    self.scope.set_tag(tag, val)
+                if tag == "user":
+                    self.scope.set_user(val)
 
         self.start_session()
 
@@ -231,7 +231,7 @@ class Sentry:
         username: str | None = None,
     ) -> None:
         """Track an event to Sentry."""
-        if not SENTRY_AVAILABLE or self.hub is None:
+        if not SENTRY_AVAILABLE or self.scope is None:
             return
 
         event_data: Event = {
@@ -243,7 +243,9 @@ class Sentry:
             },
         }
 
-        self.hub.capture_event(event_data)
+        client = self.scope.client
+        if client is not None:
+            client.capture_event(event_data, scope=self.scope)
 
 
 def _is_local_dev_install(module: Any) -> bool:

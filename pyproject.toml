@@ -256,19 +256,7 @@ select = [
   "PLE",     # https://docs.astral.sh/ruff/rules/#pylint-ple
   "PLR",     # https://docs.astral.sh/ruff/rules/#pylint-plr
   "PLW",     # https://docs.astral.sh/ruff/rules/#pylint-pl
-  "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
-  "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
-  "RUF013",  # https://docs.astral.sh/ruff/rules/implicit-optional/
-  "RUF015",  # https://docs.astral.sh/ruff/rules/unnecessary-iterable-allocation-for-first-element/
-  "RUF018",  # https://docs.astral.sh/ruff/rules/assignment-in-assert/
-  "RUF022",  # https://docs.astral.sh/ruff/rules/unsorted-dunder-all/
-  "RUF031",  # https://docs.astral.sh/ruff/rules/incorrectly-parenthesized-tuple-in-subscript/
-  "RUF039",  # https://docs.astral.sh/ruff/rules/unraw-re-pattern/
-  "RUF046",  # https://docs.astral.sh/ruff/rules/unnecessary-cast-to-int/
-  "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
-  "RUF052",  # https://docs.astral.sh/ruff/rules/used-dummy-variable/
-  "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
-  "RUF100",  # https://docs.astral.sh/ruff/rules/unused-noqa/
+  "RUF",     # https://docs.astral.sh/ruff/rules/#ruff-specific-rules-ruf
   "E711",    # https://docs.astral.sh/ruff/rules/none-comparison/
   "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
   "PYI",     # https://docs.astral.sh/ruff/rules/#flake8-pyi-pyi
@@ -308,6 +296,13 @@ ignore = [
   "PLR1702", # https://docs.astral.sh/ruff/rules/too-many-nested-blocks/
   "PLR2004", # https://docs.astral.sh/ruff/rules/magic-value-comparison/
   "PLR6301", # https://docs.astral.sh/ruff/rules/no-self-use/
+  # Ambiguous unicode in prompt injection test strings and example data is intentional.
+  "RUF001", # https://docs.astral.sh/ruff/rules/ambiguous-unicode-character-string/
+  "RUF003", # https://docs.astral.sh/ruff/rules/ambiguous-unicode-character-comment/
+  # Collection literal concatenation — stylistic preference, defer for dedicated cleanup.
+  "RUF005", # https://docs.astral.sh/ruff/rules/collection-literal-concatenation/
+  # __init__ modules contain re-exports by design in this codebase.
+  "RUF067", # https://docs.astral.sh/ruff/rules/non-empty-init-module/
 ]
 
 [tool.ruff.lint.isort]
@@ -328,6 +323,9 @@ exclude = ["rules"]
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
 "!/tests/**/*.py" = ["RUF059"]
+# Tests intentionally use async functions without await, compare known float values,
+# and use pytest.raises match strings with regex-like characters.
+"tests/**/*.py" = ["RUF029", "RUF043", "RUF069"]
 "weave/trace/serialization/op_type.py" = ["RUF100", "N802"]
 "weave/trace_server/costs/update_costs.py" = ["PLW1514"]
 "weave/type_handlers/Video/video.py" = ["PLW0603"]

@@ -12,12 +12,17 @@ from agents.tracing import (
     AgentSpanData,
     CustomSpanData,
     FunctionSpanData,
+    GenerationSpanData,
     GuardrailSpanData,
     HandoffSpanData,
+    MCPListToolsSpanData,
     ResponseSpanData,
     Span,
+    SpeechGroupSpanData,
+    SpeechSpanData,
     Trace,
     TracingProcessor,
+    TranscriptionSpanData,
 )
 
 from weave.integrations.patcher import NoOpPatcher, Patcher
@@ -42,6 +47,16 @@ def _call_name(span: Span) -> str:
         return "Response"
     elif isinstance(span.span_data, HandoffSpanData):
         return "Handoff"
+    elif isinstance(span.span_data, GenerationSpanData):
+        return getattr(span.span_data, "model", None) or "Generation"
+    elif isinstance(span.span_data, TranscriptionSpanData):
+        return getattr(span.span_data, "model", None) or "Transcription"
+    elif isinstance(span.span_data, SpeechSpanData):
+        return getattr(span.span_data, "model", None) or "Speech"
+    elif isinstance(span.span_data, SpeechGroupSpanData):
+        return "Speech Group"
+    elif isinstance(span.span_data, MCPListToolsSpanData):
+        return getattr(span.span_data, "server", None) or "MCP List Tools"
     else:
         return "Unknown"
 
@@ -208,6 +223,120 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             error=None,
         )
 
+    def _generation_log_data(self, span: Span[GenerationSpanData]) -> WeaveDataDict:
+        """Extract log data from a generation span."""
+        inputs: dict[str, Any] = {}
+        outputs: dict[str, Any] = {}
+        metadata: dict[str, Any] = {}
+        metrics: dict[str, Any] = {}
+
+        if span.span_data.input is not None:
+            inputs["input"] = span.span_data.input
+        if span.span_data.output is not None:
+            outputs["output"] = span.span_data.output
+        if span.span_data.model is not None:
+            metadata["model"] = span.span_data.model
+        if span.span_data.model_config is not None:
+            metadata["model_config"] = span.span_data.model_config
+        if span.span_data.usage is not None:
+            usage = span.span_data.usage
+            metrics = {
+                "tokens": usage.get("total_tokens")
+                or (
+                    (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
+                ),
+                "prompt_tokens": usage.get("input_tokens"),
+                "completion_tokens": usage.get("output_tokens"),
+            }
+
+        return WeaveDataDict(
+            inputs=inputs,
+            outputs=outputs,
+            metadata=metadata,
+            metrics=metrics,
+            error=None,
+        )
+
+    def _transcription_log_data(
+        self, span: Span[TranscriptionSpanData]
+    ) -> WeaveDataDict:
+        """Extract log data from a transcription span."""
+        inputs: dict[str, Any] = {}
+        outputs: dict[str, Any] = {}
+        metadata: dict[str, Any] = {}
+
+        if span.span_data.input is not None:
+            inputs["input"] = span.span_data.input
+        if getattr(span.span_data, "input_format", None) is not None:
+            inputs["input_format"] = span.span_data.input_format
+        if span.span_data.output is not None:
+            outputs["output"] = span.span_data.output
+        if span.span_data.model is not None:
+            metadata["model"] = span.span_data.model
+        if span.span_data.model_config is not None:
+            metadata["model_config"] = span.span_data.model_config
+
+        return WeaveDataDict(
+            inputs=inputs,
+            outputs=outputs,
+            metadata=metadata,
+            metrics={},
+            error=None,
+        )
+
+    def _speech_log_data(self, span: Span[SpeechSpanData]) -> WeaveDataDict:
+        """Extract log data from a speech span."""
+        inputs: dict[str, Any] = {}
+        outputs: dict[str, Any] = {}
+        metadata: dict[str, Any] = {}
+
+        if span.span_data.input is not None:
+            inputs["input"] = span.span_data.input
+        if span.span_data.output is not None:
+            outputs["output"] = span.span_data.output
+        if getattr(span.span_data, "output_format", None) is not None:
+            metadata["output_format"] = span.span_data.output_format
+        if span.span_data.model is not None:
+            metadata["model"] = span.span_data.model
+        if span.span_data.model_config is not None:
+            metadata["model_config"] = span.span_data.model_config
+        if getattr(span.span_data, "first_content_at", None) is not None:
+            metadata["first_content_at"] = span.span_data.first_content_at
+
+        return WeaveDataDict(
+            inputs=inputs,
+            outputs=outputs,
+            metadata=metadata,
+            metrics={},
+            error=None,
+        )
+
+    def _speech_group_log_data(self, span: Span[SpeechGroupSpanData]) -> WeaveDataDict:
+        """Extract log data from a speech group span."""
+        inputs: dict[str, Any] = {}
+        if span.span_data.input is not None:
+            inputs["input"] = span.span_data.input
+
+        return WeaveDataDict(
+            inputs=inputs,
+            outputs={},
+            metadata={},
+            metrics={},
+            error=None,
+        )
+
+    def _mcp_list_tools_log_data(
+        self, span: Span[MCPListToolsSpanData]
+    ) -> WeaveDataDict:
+        """Extract log data from an MCP list tools span."""
+        return WeaveDataDict(
+            inputs={"server": span.span_data.server},
+            outputs={"output": span.span_data.result},
+            metadata={},
+            metrics={},
+            error=None,
+        )
+
     def _custom_log_data(self, span: Span[CustomSpanData]) -> WeaveDataDict:
         """Extract log data from a custom span."""
         # Prepare fields
@@ -257,6 +386,16 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             return self._handoff_log_data(span)
         elif isinstance(span.span_data, GuardrailSpanData):
             return self._guardrail_log_data(span)
+        elif isinstance(span.span_data, GenerationSpanData):
+            return self._generation_log_data(span)
+        elif isinstance(span.span_data, TranscriptionSpanData):
+            return self._transcription_log_data(span)
+        elif isinstance(span.span_data, SpeechSpanData):
+            return self._speech_log_data(span)
+        elif isinstance(span.span_data, SpeechGroupSpanData):
+            return self._speech_group_log_data(span)
+        elif isinstance(span.span_data, MCPListToolsSpanData):
+            return self._mcp_list_tools_log_data(span)
         elif isinstance(span.span_data, CustomSpanData):
             return self._custom_log_data(span)
         else:
