@@ -5176,15 +5176,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 call.inputs["example"] = resolved_by_call_id[call.id]
 
         if req.include_predict_and_score_children and len(page_calls) > 0:
-            pas_ids = [c.id for c in page_calls]
+            predict_and_score_ids = [c.id for c in page_calls]
             child_columns = [
                 *REQUIRED_CALL_COLUMNS,
                 *ALL_CALL_JSON_COLUMNS,
                 "parent_id",
                 "ended_at",
             ]
-            for i in range(0, len(pas_ids), MAX_FILTER_LENGTH):
-                batch = pas_ids[i : i + MAX_FILTER_LENGTH]
+            for i in range(0, len(predict_and_score_ids), MAX_FILTER_LENGTH):
+                batch = predict_and_score_ids[i : i + MAX_FILTER_LENGTH]
                 child_req = tsi.CallsQueryReq(
                     project_id=req.project_id,
                     filter=tsi.CallsFilter(parent_ids=batch),

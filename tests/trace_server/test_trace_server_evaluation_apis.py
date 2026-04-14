@@ -14,6 +14,7 @@ from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
+    CallsDeleteReq,
     CallsQueryReq,
     CallStartReq,
     EndedCallSchemaForInsert,
@@ -846,7 +847,7 @@ def _create_eval_with_scores(client, scores_per_row, eval_name="eval"):
     """Helper: create an eval run with predict-and-score calls having given scores.
 
     scores_per_row: list of dicts, e.g. [{"accuracy": 0.9}, {"accuracy": 0.3}]
-    Returns the evaluation_run_id.
+    Returns (evaluation_run_id, [pas_call_ids]).
     """
     project_id = client.project_id
     run = client.server.evaluation_run_create(
@@ -856,8 +857,10 @@ def _create_eval_with_scores(client, scores_per_row, eval_name="eval"):
             model=f"model://{eval_name}",
         )
     )
+    predict_and_score_ids = []
     for i, scores in enumerate(scores_per_row):
         predict_and_score_id = generate_id()
+        predict_and_score_ids.append(predict_and_score_id)
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         client.server.call_start(
             CallStartReq(
@@ -891,14 +894,14 @@ def _create_eval_with_scores(client, scores_per_row, eval_name="eval"):
                 )
             )
         )
-    return run.evaluation_run_id
+    return run.evaluation_run_id, predict_and_score_ids
 
 
 def test_eval_results_row_order_is_stable(client):
     """Row order should be stable across repeated requests (default sort by row_digest)."""
     if client_is_sqlite(client):
         pytest.skip("sort/filter only implemented for ClickHouse")
-    eval_id = _create_eval_with_scores(
+    eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.1}, {"accuracy": 0.5}, {"accuracy": 0.9}, {"accuracy": 0.3}],
         eval_name="order-stable",
@@ -918,11 +921,43 @@ def test_eval_results_row_order_is_stable(client):
             assert digests == digests_first, "Row order changed between requests"
 
 
+def test_eval_results_excludes_deleted_calls(client):
+    """Deleted PAS calls should not appear in eval results."""
+    eval_id, predict_and_score_ids = _create_eval_with_scores(
+        client,
+        [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
+        eval_name="delete-test",
+    )
+    # Verify all 3 rows are present before deletion
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+        )
+    )
+    assert res.total_rows == 3
+
+    # verify we no longer see deleted calls
+    client.server.calls_delete(
+        CallsDeleteReq(
+            project_id=client.project_id, call_ids=[predict_and_score_ids[0]]
+        )
+    )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+        )
+    )
+    assert res.total_rows == 2
+
+
 def test_eval_results_sort_by_score_desc(client):
     """Sort by scores.accuracy DESC should return highest-scoring row first."""
     if client_is_sqlite(client):
         pytest.skip("sort/filter only implemented for ClickHouse")
-    eval_id = _create_eval_with_scores(
+    eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
         eval_name="sort-desc",
@@ -944,7 +979,7 @@ def test_eval_results_sort_by_score_asc(client):
     """Sort by scores.accuracy ASC should return lowest-scoring row first."""
     if client_is_sqlite(client):
         pytest.skip("sort/filter only implemented for ClickHouse")
-    eval_id = _create_eval_with_scores(
+    eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
         eval_name="sort-asc",
@@ -965,7 +1000,7 @@ def test_eval_results_filter_score_gte(client):
     """Filter scores.accuracy >= 0.5 should exclude rows below threshold."""
     if client_is_sqlite(client):
         pytest.skip("sort/filter only implemented for ClickHouse")
-    eval_id = _create_eval_with_scores(
+    eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
         eval_name="filter-gte",
@@ -1002,7 +1037,7 @@ def test_eval_results_sort_and_filter_combined(client):
     """Sort + filter together: filter first, then sort the remaining rows."""
     if client_is_sqlite(client):
         pytest.skip("sort/filter only implemented for ClickHouse")
-    eval_id = _create_eval_with_scores(
+    eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.1}, {"accuracy": 0.5}, {"accuracy": 0.9}, {"accuracy": 0.7}],
         eval_name="sort-filter",
@@ -1038,7 +1073,7 @@ def test_eval_results_filter_with_evaluation_call_id_scope(client):
     """Filter scoped to evaluation_call_id only tests that eval's scores."""
     if client_is_sqlite(client):
         pytest.skip("sort/filter only implemented for ClickHouse")
-    eval_id = _create_eval_with_scores(
+    eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.9}, {"accuracy": 0.3}, {"accuracy": 0.7}],
         eval_name="scope-single",
@@ -1083,7 +1118,7 @@ def test_eval_results_filter_with_evaluation_call_id_scope(client):
 
 def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
     """Sorting on an unsupported field prefix returns InvalidRequest."""
-    eval_id = _create_eval_with_scores(
+    eval_id, _ = _create_eval_with_scores(
         client, [{"accuracy": 0.5}], eval_name="bad-field"
     )
     with pytest.raises(InvalidRequest, match="Unsupported sort field"):
@@ -1162,7 +1197,7 @@ def test_eval_results_summary_with_filter(client):
     """Summary reflects filtered rows, not all rows."""
     if client_is_sqlite(client):
         pytest.skip("sort/filter only implemented for ClickHouse")
-    eval_id = _create_eval_with_scores(
+    eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.2}, {"accuracy": 0.6}, {"accuracy": 0.9}],
         eval_name="summary-filter",
