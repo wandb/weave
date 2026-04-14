@@ -65,6 +65,12 @@ def build_predict_and_score_calls_cte(
     SELECT
         calls_merged.id AS call_id,
         any(calls_merged.parent_id) AS eval_call_id,
+        calls_merged.project_id AS project_id,
+        any(calls_merged.trace_id) AS trace_id,
+        any(calls_merged.op_name) AS op_name,
+        any(calls_merged.started_at) AS started_at,
+        any(calls_merged.ended_at) AS ended_at,
+        any(calls_merged.attributes_dump) AS attributes_dump,
         any(calls_merged.inputs_dump) AS inputs_dump,
         any(calls_merged.output_dump) AS output_dump,
         any(calls_merged.summary_dump) AS summary_dump,
@@ -92,6 +98,12 @@ def build_predict_and_score_calls_cte(
     SELECT
         calls_complete.id AS call_id,
         calls_complete.parent_id AS eval_call_id,
+        calls_complete.project_id,
+        calls_complete.trace_id,
+        calls_complete.op_name,
+        calls_complete.started_at,
+        calls_complete.ended_at,
+        calls_complete.attributes_dump,
         calls_complete.inputs_dump,
         calls_complete.output_dump,
         calls_complete.summary_dump,
@@ -316,16 +328,73 @@ page_digests AS (
 
 
 def build_page_rows_cte() -> str:
-    """Build page_rows CTE: call IDs + resolved_inputs for the page."""
+    """Build page_rows CTE: grabs full call data for the page."""
     return """page_rows AS (
     SELECT
         predict_and_score_calls_resolved.call_id,
+        predict_and_score_calls_resolved.eval_call_id,
+        predict_and_score_calls_resolved.project_id,
+        predict_and_score_calls_resolved.trace_id,
+        predict_and_score_calls_resolved.op_name,
+        predict_and_score_calls_resolved.started_at,
+        predict_and_score_calls_resolved.ended_at,
+        predict_and_score_calls_resolved.attributes_dump,
+        predict_and_score_calls_resolved.inputs_dump,
+        predict_and_score_calls_resolved.output_dump,
+        predict_and_score_calls_resolved.summary_dump,
         predict_and_score_calls_resolved.row_digest,
         page_digests.row_order,
         predict_and_score_calls_resolved.resolved_inputs
     FROM predict_and_score_calls_resolved
     INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
 )"""
+
+
+def build_eval_results_query(
+    project_id: str,
+    eval_root_ids: list[str],
+    sort_by: list[tsi.EvalResultsSortBy] | None,
+    filters: list[tsi.EvalResultsFilter] | None,
+    require_intersection: bool,
+    limit: int | None,
+    offset: int,
+    pb: ParamBuilder,
+    read_table: str,
+) -> str:
+    """Build the complete eval_results SQL query.
+
+    Returns a full WITH ... SELECT statement that reads PAS call data
+    directly from the CTE chain — no second table scan required.
+    """
+    cte_chain = build_eval_results_cte_chain(
+        project_id,
+        eval_root_ids,
+        sort_by,
+        filters,
+        require_intersection,
+        limit,
+        offset,
+        pb,
+        read_table,
+    )
+    return f"""WITH {cte_chain.strip()}
+SELECT
+    page_rows.call_id AS id,
+    page_rows.eval_call_id AS parent_id,
+    page_rows.project_id,
+    page_rows.trace_id,
+    page_rows.op_name,
+    page_rows.started_at,
+    page_rows.ended_at,
+    page_rows.attributes_dump,
+    page_rows.inputs_dump,
+    page_rows.output_dump,
+    page_rows.summary_dump,
+    page_rows.row_digest AS __row_digest,
+    page_rows.row_order AS __row_order,
+    page_rows.resolved_inputs AS __resolved_inputs,
+    (SELECT total_rows FROM ranked_digest_count) AS __total_rows
+FROM page_rows"""
 
 
 def build_eval_results_cte_chain(
@@ -339,10 +408,7 @@ def build_eval_results_cte_chain(
     pb: ParamBuilder,
     read_table: str,
 ) -> str:
-    """Build the full CTE chain for eval_results pagination.
-
-    Returns CTE body without the WITH keyword — the caller (CallsQuery.as_sql)
-    prepends WITH when merging with its own CTEs.
+    """Build the CTE chain body (without WITH keyword).
 
     Composes: predict_and_score_calls → predict_and_score_calls_resolved →
               ranked_digests → ranked_digest_count → page_digests → page_rows

@@ -1,17 +1,12 @@
 from tests.trace_server.query_builder.utils import assert_raw_sql
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder.calls_query_builder import CallsQuery
-from weave.trace_server.clickhouse_trace_server_batched import (
-    ALL_CALL_JSON_COLUMNS,
-    REQUIRED_CALL_COLUMNS,
-)
 from weave.trace_server.eval_results_query_builder import (
     PREDICT_AND_SCORE_OP_PREFIX,
     build_eval_results_cte_chain,
+    build_eval_results_query,
 )
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_version.types import ReadTable
 
 
 def test_cte_chain_calls_merged() -> None:
@@ -34,6 +29,12 @@ def test_cte_chain_calls_merged() -> None:
             predict_and_score_calls AS (
                 SELECT calls_merged.id AS call_id,
                     any(calls_merged.parent_id) AS eval_call_id,
+                    calls_merged.project_id AS project_id,
+                    any(calls_merged.trace_id) AS trace_id,
+                    any(calls_merged.op_name) AS op_name,
+                    any(calls_merged.started_at) AS started_at,
+                    any(calls_merged.ended_at) AS ended_at,
+                    any(calls_merged.attributes_dump) AS attributes_dump,
                     any(calls_merged.inputs_dump) AS inputs_dump,
                     any(calls_merged.output_dump) AS output_dump,
                     any(calls_merged.summary_dump) AS summary_dump,
@@ -52,6 +53,8 @@ def test_cte_chain_calls_merged() -> None:
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
                     AND position(any(calls_merged.op_name), {pb_2:String}) > 0
+                    AND any(calls_merged.deleted_at) IS NULL
+                    AND any(calls_merged.started_at) IS NOT NULL
             ),
 
             predict_and_score_calls_resolved AS (
@@ -90,6 +93,16 @@ def test_cte_chain_calls_merged() -> None:
 
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id,
+                    predict_and_score_calls_resolved.eval_call_id,
+                    predict_and_score_calls_resolved.project_id,
+                    predict_and_score_calls_resolved.trace_id,
+                    predict_and_score_calls_resolved.op_name,
+                    predict_and_score_calls_resolved.started_at,
+                    predict_and_score_calls_resolved.ended_at,
+                    predict_and_score_calls_resolved.attributes_dump,
+                    predict_and_score_calls_resolved.inputs_dump,
+                    predict_and_score_calls_resolved.output_dump,
+                    predict_and_score_calls_resolved.summary_dump,
                     predict_and_score_calls_resolved.row_digest,
                     page_digests.row_order,
                     predict_and_score_calls_resolved.resolved_inputs
@@ -127,6 +140,12 @@ def test_cte_chain_calls_complete() -> None:
             predict_and_score_calls AS (
                 SELECT calls_complete.id AS call_id,
                     calls_complete.parent_id AS eval_call_id,
+                    calls_complete.project_id,
+                    calls_complete.trace_id,
+                    calls_complete.op_name,
+                    calls_complete.started_at,
+                    calls_complete.ended_at,
+                    calls_complete.attributes_dump,
                     calls_complete.inputs_dump,
                     calls_complete.output_dump,
                     calls_complete.summary_dump,
@@ -177,6 +196,16 @@ def test_cte_chain_calls_complete() -> None:
 
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id,
+                    predict_and_score_calls_resolved.eval_call_id,
+                    predict_and_score_calls_resolved.project_id,
+                    predict_and_score_calls_resolved.trace_id,
+                    predict_and_score_calls_resolved.op_name,
+                    predict_and_score_calls_resolved.started_at,
+                    predict_and_score_calls_resolved.ended_at,
+                    predict_and_score_calls_resolved.attributes_dump,
+                    predict_and_score_calls_resolved.inputs_dump,
+                    predict_and_score_calls_resolved.output_dump,
+                    predict_and_score_calls_resolved.summary_dump,
                     predict_and_score_calls_resolved.row_digest,
                     page_digests.row_order,
                     predict_and_score_calls_resolved.resolved_inputs
@@ -248,6 +277,12 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
             predict_and_score_calls AS (
                 SELECT calls_complete.id AS call_id,
                     calls_complete.parent_id AS eval_call_id,
+                    calls_complete.project_id,
+                    calls_complete.trace_id,
+                    calls_complete.op_name,
+                    calls_complete.started_at,
+                    calls_complete.ended_at,
+                    calls_complete.attributes_dump,
                     calls_complete.inputs_dump,
                     calls_complete.output_dump,
                     calls_complete.summary_dump,
@@ -301,6 +336,16 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
 
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id,
+                    predict_and_score_calls_resolved.eval_call_id,
+                    predict_and_score_calls_resolved.project_id,
+                    predict_and_score_calls_resolved.trace_id,
+                    predict_and_score_calls_resolved.op_name,
+                    predict_and_score_calls_resolved.started_at,
+                    predict_and_score_calls_resolved.ended_at,
+                    predict_and_score_calls_resolved.attributes_dump,
+                    predict_and_score_calls_resolved.inputs_dump,
+                    predict_and_score_calls_resolved.output_dump,
+                    predict_and_score_calls_resolved.summary_dump,
                     predict_and_score_calls_resolved.row_digest,
                     page_digests.row_order,
                     predict_and_score_calls_resolved.resolved_inputs
@@ -323,10 +368,10 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
     )
 
 
-def test_composed_outer_query_calls_merged() -> None:
-    """Full composed SQL: CTE chain + CallsQuery with extra_joins/extra_select on calls_merged."""
+def test_full_query_calls_merged() -> None:
+    """Full SQL query: WITH CTE chain SELECT FROM page_rows on calls_merged."""
     pb = ParamBuilder("pb")
-    cte_chain = build_eval_results_cte_chain(
+    sql = build_eval_results_query(
         project_id="proj-1",
         eval_root_ids=["eval-1"],
         sort_by=None,
@@ -337,125 +382,113 @@ def test_composed_outer_query_calls_merged() -> None:
         pb=pb,
         read_table="calls_merged",
     )
-    columns = sorted(
-        [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
-    )
-    cq = CallsQuery(project_id="proj-1", read_table=ReadTable.CALLS_MERGED)
-    for col in columns:
-        cq.add_field(col)
-    cq.cte_prefix = cte_chain.strip()
-    cq.call_id_subquery = "page_rows"
-    cq.include_predict_and_score_children = False
-    cq.extra_joins = [
-        "LEFT JOIN page_rows ON calls_merged.id = page_rows.call_id",
-    ]
-    cq.extra_select_sql = [
-        "any(page_rows.row_digest) AS __row_digest",
-        "any(page_rows.row_order) AS __row_order",
-        "any(page_rows.resolved_inputs) AS __resolved_inputs",
-        "(SELECT total_rows FROM ranked_digest_count) AS __total_rows",
-    ]
-    cq.add_order("id", "asc")
-    sql = cq.as_sql(pb)
     assert_raw_sql(
         sql,
         """
-        WITH predict_and_score_calls AS
-          (SELECT calls_merged.id AS call_id,
-                  any(calls_merged.parent_id) AS eval_call_id,
-                  any(calls_merged.inputs_dump) AS inputs_dump,
-                  any(calls_merged.output_dump) AS output_dump,
-                  any(calls_merged.summary_dump) AS summary_dump,
-                  CASE
-                      WHEN position(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/') > 0 THEN regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/([^/]+)$', 1)
-                      ELSE hex(SHA256(JSONExtractRaw(any(calls_merged.inputs_dump), 'example')))
-                  END AS row_digest
-           FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
-           WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
-                  OR calls_merged.parent_id IS NULL)
-             AND calls_merged.id NOT IN {pb_1:Array(String)}
-             AND (position(calls_merged.op_name, {pb_2:String}) > 0
-                  OR calls_merged.op_name IS NULL)
-           GROUP BY (calls_merged.project_id,
-                     calls_merged.id)
-           HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
-           AND position(any(calls_merged.op_name), {pb_2:String}) > 0),
-             predict_and_score_calls_resolved AS
-          (SELECT predict_and_score_calls.*,
-                  COALESCE(tr.val_dump, JSONExtractRaw(predict_and_score_calls.inputs_dump, 'example')) AS resolved_inputs
-           FROM predict_and_score_calls
-           LEFT JOIN
-             (SELECT project_id,
-                     digest,
-                     any(val_dump) AS val_dump
-              FROM table_rows
-              WHERE project_id = {pb_0:String}
-                AND digest IN
-                  (SELECT row_digest
-                   FROM predict_and_score_calls)
-              GROUP BY project_id,
-                       digest) AS tr ON tr.digest = predict_and_score_calls.row_digest),
-             ranked_digests AS
-          (SELECT row_digest,
-                  ROW_NUMBER() OVER(
-                                    ORDER BY row_digest ASC) AS row_order
-           FROM predict_and_score_calls_resolved
-           GROUP BY row_digest
-           HAVING 1=1),
-             ranked_digest_count AS
-          (SELECT count(*) AS total_rows
-           FROM ranked_digests),
-             page_digests AS
-          (SELECT row_digest,
-                  row_order
-           FROM ranked_digests
-           ORDER BY row_order
-           LIMIT 10
-           OFFSET 0),
-             page_rows AS
-          (SELECT predict_and_score_calls_resolved.call_id,
-                  predict_and_score_calls_resolved.row_digest,
-                  page_digests.row_order,
-                  predict_and_score_calls_resolved.resolved_inputs
-           FROM predict_and_score_calls_resolved
-           INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest)
-        SELECT any(calls_merged.attributes_dump) AS attributes_dump,
-               any(calls_merged.ended_at) AS ended_at,
-               calls_merged.id AS id,
-               any(calls_merged.inputs_dump) AS inputs_dump,
-               any(calls_merged.op_name) AS op_name,
-               any(calls_merged.output_dump) AS output_dump,
-               any(calls_merged.parent_id) AS parent_id,
-               calls_merged.project_id AS project_id,
-               any(calls_merged.started_at) AS started_at,
-               any(calls_merged.summary_dump) AS summary_dump,
-               any(calls_merged.trace_id) AS trace_id,
-               any(page_rows.row_digest) AS __row_digest,
-               any(page_rows.row_order) AS __row_order,
-               any(page_rows.resolved_inputs) AS __resolved_inputs,
+        WITH predict_and_score_calls AS (
+                SELECT calls_merged.id AS call_id,
+                    any(calls_merged.parent_id) AS eval_call_id,
+                    calls_merged.project_id AS project_id,
+                    any(calls_merged.trace_id) AS trace_id,
+                    any(calls_merged.op_name) AS op_name,
+                    any(calls_merged.started_at) AS started_at,
+                    any(calls_merged.ended_at) AS ended_at,
+                    any(calls_merged.attributes_dump) AS attributes_dump,
+                    any(calls_merged.inputs_dump) AS inputs_dump,
+                    any(calls_merged.output_dump) AS output_dump,
+                    any(calls_merged.summary_dump) AS summary_dump,
+                    CASE
+                        WHEN position(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/') > 0
+                            THEN regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/([^/]+)$', 1)
+                        ELSE hex(SHA256(JSONExtractRaw(any(calls_merged.inputs_dump), 'example')))
+                    END AS row_digest
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_0:String}
+                WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
+                    OR calls_merged.parent_id IS NULL)
+                    AND calls_merged.id NOT IN {pb_1:Array(String)}
+                    AND (position(calls_merged.op_name, {pb_2:String}) > 0
+                        OR calls_merged.op_name IS NULL)
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
+                    AND position(any(calls_merged.op_name), {pb_2:String}) > 0
+                    AND any(calls_merged.deleted_at) IS NULL
+                    AND any(calls_merged.started_at) IS NOT NULL
+            ),
 
-          (SELECT total_rows
-           FROM ranked_digest_count) AS __total_rows
-        FROM calls_merged
-        LEFT JOIN page_rows ON calls_merged.id = page_rows.call_id PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE (calls_merged.id IN
-                 (SELECT call_id
-                  FROM page_rows)
-               OR calls_merged.parent_id IS NULL)
-        GROUP BY (calls_merged.project_id,
-                  calls_merged.id)
-        HAVING (((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
-        AND any(calls_merged.id) IN
-          (SELECT call_id
-           FROM page_rows)
-        ORDER BY calls_merged.id ASC
+            predict_and_score_calls_resolved AS (
+                SELECT predict_and_score_calls.*,
+                    COALESCE(tr.val_dump, JSONExtractRaw(predict_and_score_calls.inputs_dump, 'example')) AS resolved_inputs
+                FROM predict_and_score_calls
+                LEFT JOIN (
+                    SELECT project_id, digest, any(val_dump) AS val_dump
+                    FROM table_rows
+                    WHERE project_id = {pb_0:String}
+                        AND digest IN (SELECT row_digest FROM predict_and_score_calls)
+                    GROUP BY project_id, digest
+                ) AS tr ON tr.digest = predict_and_score_calls.row_digest
+            ),
+
+            ranked_digests AS (
+                SELECT row_digest,
+                    ROW_NUMBER() OVER(ORDER BY row_digest ASC) AS row_order
+                FROM predict_and_score_calls_resolved
+                GROUP BY row_digest
+                HAVING 1=1
+            ),
+
+            ranked_digest_count AS (
+                SELECT count(*) AS total_rows FROM ranked_digests
+            ),
+
+            page_digests AS (
+                SELECT row_digest, row_order
+                FROM ranked_digests
+                ORDER BY row_order
+                LIMIT 10
+                OFFSET 0
+            ),
+
+            page_rows AS (
+                SELECT predict_and_score_calls_resolved.call_id,
+                    predict_and_score_calls_resolved.eval_call_id,
+                    predict_and_score_calls_resolved.project_id,
+                    predict_and_score_calls_resolved.trace_id,
+                    predict_and_score_calls_resolved.op_name,
+                    predict_and_score_calls_resolved.started_at,
+                    predict_and_score_calls_resolved.ended_at,
+                    predict_and_score_calls_resolved.attributes_dump,
+                    predict_and_score_calls_resolved.inputs_dump,
+                    predict_and_score_calls_resolved.output_dump,
+                    predict_and_score_calls_resolved.summary_dump,
+                    predict_and_score_calls_resolved.row_digest,
+                    page_digests.row_order,
+                    predict_and_score_calls_resolved.resolved_inputs
+                FROM predict_and_score_calls_resolved
+                INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
+            )
+        SELECT
+            page_rows.call_id AS id,
+            page_rows.eval_call_id AS parent_id,
+            page_rows.project_id,
+            page_rows.trace_id,
+            page_rows.op_name,
+            page_rows.started_at,
+            page_rows.ended_at,
+            page_rows.attributes_dump,
+            page_rows.inputs_dump,
+            page_rows.output_dump,
+            page_rows.summary_dump,
+            page_rows.row_digest AS __row_digest,
+            page_rows.row_order AS __row_order,
+            page_rows.resolved_inputs AS __resolved_inputs,
+            (SELECT total_rows FROM ranked_digest_count) AS __total_rows
+        FROM page_rows
         """,
         pb.get_params(),
         {
             "pb_0": "proj-1",
             "pb_1": ["eval-1"],
             "pb_2": PREDICT_AND_SCORE_OP_PREFIX,
-            "pb_3": "proj-1",
         },
     )

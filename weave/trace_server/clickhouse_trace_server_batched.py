@@ -5131,7 +5131,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         pb = ParamBuilder()
 
-        cte_chain = eval_results_query_builder.build_eval_results_cte_chain(
+        page_query = eval_results_query_builder.build_eval_results_query(
             req.project_id,
             eval_root_ids,
             req.sort_by,
@@ -5143,42 +5143,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             read_table,
         )
 
-        columns = sorted(
-            [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
-        )
-        cq = CallsQuery(project_id=req.project_id, read_table=read_table)
-        for col in columns:
-            cq.add_field(col)
-
-        cq.cte_prefix = cte_chain.strip()
-        cq.call_id_subquery = "page_rows"
-        cq.include_predict_and_score_children = req.include_predict_and_score_children
-
-        table_alias = (
-            "calls_merged" if read_table == "calls_merged" else "calls_complete"
-        )
-        cq.extra_joins = [
-            f"LEFT JOIN page_rows ON {table_alias}.id = page_rows.call_id",
-        ]
-        if read_table == "calls_merged":
-            cq.extra_select_sql = [
-                "any(page_rows.row_digest) AS __row_digest",
-                "any(page_rows.row_order) AS __row_order",
-                "any(page_rows.resolved_inputs) AS __resolved_inputs",
-                "(SELECT total_rows FROM ranked_digest_count) AS __total_rows",
-            ]
-        else:
-            cq.extra_select_sql = [
-                "page_rows.row_digest AS __row_digest",
-                "page_rows.row_order AS __row_order",
-                "page_rows.resolved_inputs AS __resolved_inputs",
-                "(SELECT total_rows FROM ranked_digest_count) AS __total_rows",
-            ]
-
-        cq.add_order("id", "asc")
-        query_sql = cq.as_sql(pb)
-        query_params = pb.get_params()
-        result = self._query(query_sql, query_params)
+        result = self._query(page_query, pb.get_params())
 
         digest_by_call: dict[str, str] = {}
         order_by_call: dict[str, int] = {}
@@ -5211,6 +5176,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for call in page_calls:
             if call.id in resolved_by_call_id and isinstance(call.inputs, dict):
                 call.inputs["example"] = resolved_by_call_id[call.id]
+
+        if req.include_predict_and_score_children and len(page_calls) > 0:
+            pas_ids = [c.id for c in page_calls]
+            child_req = tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(parent_ids=pas_ids),
+                sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+            )
+            page_calls.extend(self.calls_query_stream(child_req))
 
         rows = eval_helpers.build_sorted_eval_rows(
             page_calls,

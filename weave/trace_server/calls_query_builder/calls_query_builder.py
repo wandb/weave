@@ -544,7 +544,6 @@ class WhereFilters(BaseModel):
     parent_ids: str = ""
     op_name: str = ""
     trace_id: str = ""
-    children_of_eval_ids: str = ""
     thread_id: str = ""
     turn_id: str = ""
     heavy_filter: str = ""
@@ -565,7 +564,6 @@ class WhereFilters(BaseModel):
             self.parent_ids,
             self.op_name,
             self.trace_id,
-            self.children_of_eval_ids,
             self.thread_id,
             self.turn_id,
             self.heavy_filter,
@@ -576,21 +574,13 @@ class WhereFilters(BaseModel):
 
 
 class QueryJoins(BaseModel):
-    """Container for all JOIN clauses in the query.
-
-    The named fields (feedback, storage_size, etc.) are managed internally by
-    CallsQuery based on requested columns. ``extra`` is an escape hatch for
-    callers that need to inject arbitrary JOINs — currently used by eval_results
-    to attach CTE metadata (row_digest, row_order, resolved_inputs) via LEFT
-    JOINs against the eval CTE chain. Raw SQL strings, no validation.
-    """
+    """Container for all JOIN clauses in the query."""
 
     feedback: str = ""
     queue_items: str = ""
     storage_size: str = ""
     total_storage_size: str = ""
     object_ref: str = ""
-    extra: list[str] = Field(default_factory=list)
 
     def to_sql(self) -> str:
         """Convert all joins to SQL clauses.
@@ -603,7 +593,6 @@ class QueryJoins(BaseModel):
             self.storage_size,
             self.total_storage_size,
             self.object_ref,
-            *self.extra,
         ]
         return "\n        ".join(j for j in joins if j)
 
@@ -875,11 +864,6 @@ class CallsQuery(BaseModel):
     include_storage_size: bool = False
     include_total_storage_size: bool = False
     read_table: ReadTable = ReadTable.CALLS_MERGED
-    include_predict_and_score_children: bool = True
-    cte_prefix: str | None = None
-    extra_select_sql: list[str] = Field(default_factory=list)
-    extra_joins: list[str] = Field(default_factory=list)
-    call_id_subquery: str | None = None
 
     @property
     def use_agg_fn(self) -> bool:
@@ -951,11 +935,6 @@ class CallsQuery(BaseModel):
             limit=self.limit,
             offset=self.offset,
             read_table=self.read_table,
-            include_predict_and_score_children=self.include_predict_and_score_children,
-            cte_prefix=self.cte_prefix,
-            extra_select_sql=list(self.extra_select_sql),
-            extra_joins=list(self.extra_joins),
-            call_id_subquery=self.call_id_subquery,
         )
 
     def _ensure_order_fields_selected(
@@ -1065,9 +1044,6 @@ class CallsQuery(BaseModel):
     def as_sql(self, pb: ParamBuilder, table_alias: str | None = None) -> str:
         """This is the main entry point for building the query.
 
-        If cte_prefix is set, merges it with any CTEs this query generates
-        under a single WITH clause.
-
         This method will determine the optimal query to build based on the
         fields and conditions that have been set.
 
@@ -1137,15 +1113,6 @@ class CallsQuery(BaseModel):
         ```
 
         """
-        sql = self._as_sql_core(pb, table_alias)
-        if not self.cte_prefix:
-            return sql
-        stripped = sql.strip()
-        if stripped.startswith("WITH "):
-            return f"WITH {self.cte_prefix},\n\n{stripped[5:]}"
-        return f"WITH {self.cte_prefix}\n\n{stripped}"
-
-    def _as_sql_core(self, pb: ParamBuilder, table_alias: str | None = None) -> str:
         if not self.select_fields:
             raise ValueError("Missing select columns")
 
@@ -1234,18 +1201,8 @@ class CallsQuery(BaseModel):
             filter_query.order_fields = self.order_fields
             filter_query.limit = self.limit
             filter_query.offset = self.offset
-            filter_query.call_id_subquery = self.call_id_subquery
-            filter_query.include_predict_and_score_children = (
-                self.include_predict_and_score_children
-            )
             # SUPER IMPORTANT: still need to re-sort the final query
             select_query.order_fields = self.order_fields
-            select_query.extra_select_sql = list(self.extra_select_sql)
-            select_query.extra_joins = list(self.extra_joins)
-            select_query.call_id_subquery = self.call_id_subquery
-            select_query.include_predict_and_score_children = (
-                self.include_predict_and_score_children
-            )
 
             # When using the CTE pattern with costs, ensure all fields used in
             # ordering are selected in select_query so they're available in the
@@ -1347,15 +1304,6 @@ class CallsQuery(BaseModel):
         trace_id = process_trace_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias
         )
-        if self.call_id_subquery:
-            children_of_eval_ids = _build_call_id_subquery_filter(
-                self.call_id_subquery,
-                self.include_predict_and_score_children,
-                table_alias,
-                self.read_table,
-            )
-        else:
-            children_of_eval_ids = ""
         thread_id = process_thread_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
         )
@@ -1415,7 +1363,6 @@ class CallsQuery(BaseModel):
             id_subquery=id_subquery,
             op_name=op_name,
             trace_id=trace_id,
-            children_of_eval_ids=children_of_eval_ids,
             thread_id=thread_id,
             turn_id=turn_id,
             wb_run_id=wb_run_id,
@@ -1558,7 +1505,6 @@ class CallsQuery(BaseModel):
             storage_size=storage_size_join,
             total_storage_size=total_storage_size_join,
             object_ref="".join(object_ref_joins_parts),
-            extra=list(self.extra_joins),
         )
 
     def _build_filter_conditions(
@@ -1753,16 +1699,7 @@ class CallsQuery(BaseModel):
         ):
             where_clause = "WHERE 1"
 
-        # After GROUP BY, filter out rows that leaked in via parent_id IS NULL
-        # but don't actually belong to the eval subtree (e.g. top-level calls).
         having_sql = filter_result.filter_sql
-        if self.call_id_subquery and self.read_table == ReadTable.CALLS_MERGED:
-            having_sql = _build_call_id_subquery_having(
-                having_sql,
-                self.call_id_subquery,
-                self.include_predict_and_score_children,
-                table_alias,
-            )
 
         sql = f"""FROM {table_alias}
         {joins.to_sql()}
@@ -1804,9 +1741,6 @@ class CallsQuery(BaseModel):
             )
             for field in self.select_fields
         )
-        if self.extra_select_sql:
-            select_fields_sql += ", " + ", ".join(self.extra_select_sql)
-
         body_result = self._build_query_body(
             pb,
             table_alias,
@@ -2409,54 +2343,6 @@ def process_trace_id_filter_to_sql(
         return ""
 
     return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
-
-
-def _build_call_id_subquery_filter(
-    subquery_name: str,
-    include_children: bool,
-    table_alias: str,
-    read_table: ReadTable,
-) -> str:
-    """Build WHERE clause to constrain calls to IDs from a CTE subquery.
-
-    When include_children is True, also includes calls whose parent_id
-    matches the subquery (predict/scorer children of PAS calls).
-    """
-    id_condition = f"{table_alias}.id IN (SELECT call_id FROM {subquery_name})"
-
-    if include_children:
-        parent_condition = (
-            f"{table_alias}.parent_id IN (SELECT call_id FROM {subquery_name})"
-        )
-        conditions = f"{id_condition} OR {parent_condition}"
-    else:
-        conditions = id_condition
-
-    if read_table == ReadTable.CALLS_MERGED:
-        conditions += f" OR {table_alias}.parent_id IS NULL"
-
-    return f" AND ({conditions})"
-
-
-def _build_call_id_subquery_having(
-    existing_having: str,
-    subquery_name: str,
-    include_children: bool,
-    table_alias: str,
-) -> str:
-    """Build HAVING clause for calls_merged to filter post-GROUP BY."""
-    id_cond = f"any({table_alias}.id) IN (SELECT call_id FROM {subquery_name})"
-    if include_children:
-        parent_cond = (
-            f"any({table_alias}.parent_id) IN (SELECT call_id FROM {subquery_name})"
-        )
-        eval_having = f"({id_cond} OR {parent_cond})"
-    else:
-        eval_having = id_cond
-
-    if existing_having:
-        return f"{existing_having}\n        AND {eval_having}"
-    return f"HAVING {eval_having}"
 
 
 def process_thread_id_filter_to_sql(
