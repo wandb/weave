@@ -128,6 +128,7 @@ async def runner_with_cleanup(
     Yields:
         IsolatedClientExecutor: Configured runner instance
     """
+    runner_kwargs.setdefault("mp_start_method", "fork")
     factory_config, cleanup = create_test_client_factory_and_cleanup(
         trace_server, entity=entity, project=project
     )
@@ -164,7 +165,9 @@ async def test_hello_world(client):
         client.server, entity=client.entity, project=inner_project
     )
     runner = IsolatedClientExecutor(
-        client_factory=weave_client_factory, client_factory_config=factory_config
+        client_factory=weave_client_factory,
+        client_factory_config=factory_config,
+        mp_start_method="fork",
     )
 
     assert get_ref(get_keys) is None
