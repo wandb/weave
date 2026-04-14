@@ -66,6 +66,9 @@ from weave.trace_server.agent_types import (
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_AGENT_QUERY_LIMIT = 100
+_MAX_AGENT_QUERY_LIMIT = 10_000
+
 # Column projections derived from AgentSpanCHInsertable to stay in sync.
 _ALL_SPAN_FIELDS = list(AgentSpanCHInsertable.model_fields.keys())
 
@@ -174,7 +177,7 @@ class AgentQueryHandler:
 
         order_by = build_order_by(req.sort_by, SPAN_SORTABLE_COLS, "started_at DESC")
         where = " AND ".join(conditions)
-        limit = min(req.limit or 100, 10000)
+        limit = min(req.limit or _DEFAULT_AGENT_QUERY_LIMIT, _MAX_AGENT_QUERY_LIMIT)
         offset = req.offset or 0
 
         count_q = f"SELECT count() FROM spans s WHERE {where}"
@@ -262,7 +265,7 @@ class AgentQueryHandler:
             ),
             "last_seen DESC, trace_id",
         )
-        limit = min(req.limit or 100, 10000)
+        limit = min(req.limit or _DEFAULT_AGENT_QUERY_LIMIT, _MAX_AGENT_QUERY_LIMIT)
         offset = req.offset or 0
 
         count_q = f"""SELECT count() FROM (
@@ -347,7 +350,10 @@ class AgentQueryHandler:
             "last_seen DESC, agent_name",
         )
 
-        limit_slot = pb.add(min(req.limit or 100, 10000), param_type="UInt64")
+        limit_slot = pb.add(
+            min(req.limit or _DEFAULT_AGENT_QUERY_LIMIT, _MAX_AGENT_QUERY_LIMIT),
+            param_type="UInt64",
+        )
         offset_slot = pb.add(req.offset or 0, param_type="UInt64")
         query = f"""
             SELECT agent_name,
@@ -407,7 +413,10 @@ class AgentQueryHandler:
         conditions = [f"project_id = {pid}", f"agent_name = {aname}"]
         where = " AND ".join(conditions)
 
-        limit_slot = pb.add(min(req.limit or 100, 10000), param_type="UInt64")
+        limit_slot = pb.add(
+            min(req.limit or _DEFAULT_AGENT_QUERY_LIMIT, _MAX_AGENT_QUERY_LIMIT),
+            param_type="UInt64",
+        )
         offset_slot = pb.add(req.offset or 0, param_type="UInt64")
         query = f"""
             SELECT agent_version,
@@ -541,7 +550,10 @@ class AgentQueryHandler:
         count_result = self._ch.query(count_q, parameters=pb.get_params())
         total = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
 
-        limit_slot = pb.add(min(req.limit or 100, 10000), param_type="UInt64")
+        limit_slot = pb.add(
+            min(req.limit or _DEFAULT_AGENT_QUERY_LIMIT, _MAX_AGENT_QUERY_LIMIT),
+            param_type="UInt64",
+        )
         offset_slot = pb.add(req.offset or 0, param_type="UInt64")
         query = f"""
             SELECT conversation_id,
