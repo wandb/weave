@@ -554,14 +554,7 @@ export class WeaveClient {
       );
     }
 
-    const resolvedRef = await savedRef;
-    if (!(resolvedRef instanceof ObjectRef)) {
-      throw new Error(
-        'linkPromptToRegistry requires a prompt ref. Publish a prompt or pass an ObjectRef / weave:/// URI.'
-      );
-    }
-
-    return resolvedRef;
+    return await savedRef;
   }
 
   private parseRegistryTargetPath(targetPath: string): {
@@ -586,16 +579,16 @@ export class WeaveClient {
     prompt: RegistryLinkable,
     options: LinkPromptToRegistryOptions
   ): Promise<CreateAndLinkWeaveAssetRes> {
-    const promptRef = await this.resolveRegistryPromptRef(prompt);
-    const {registryProject, portfolioName} = this.parseRegistryTargetPath(
-      options.targetPath
-    );
     if (!this.projectId.includes('/')) {
       throw new Error(
         "linkPromptToRegistry requires client.projectId in '<entity>/<project>' format"
       );
     }
     const [entityName] = this.projectId.split('/', 1);
+    const promptRef = await this.resolveRegistryPromptRef(prompt);
+    const {registryProject, portfolioName} = this.parseRegistryTargetPath(
+      options.targetPath
+    );
 
     const req: CreateAndLinkWeaveAssetReq = {
       ref: promptRef.uri(),
