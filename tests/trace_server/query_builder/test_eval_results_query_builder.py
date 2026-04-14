@@ -29,14 +29,8 @@ def test_cte_chain_calls_merged() -> None:
             predict_and_score_calls AS (
                 SELECT calls_merged.id AS call_id,
                     any(calls_merged.parent_id) AS eval_call_id,
-                    calls_merged.project_id AS project_id,
-                    any(calls_merged.trace_id) AS trace_id,
-                    any(calls_merged.op_name) AS op_name,
-                    any(calls_merged.started_at) AS started_at,
-                    any(calls_merged.ended_at) AS ended_at,
                     any(calls_merged.inputs_dump) AS inputs_dump,
                     any(calls_merged.output_dump) AS output_dump,
-                    any(calls_merged.summary_dump) AS summary_dump,
                     CASE
                         WHEN position(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/') > 0
                             THEN regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/([^/]+)$', 1)
@@ -93,14 +87,6 @@ def test_cte_chain_calls_merged() -> None:
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id,
                     predict_and_score_calls_resolved.eval_call_id,
-                    predict_and_score_calls_resolved.project_id,
-                    predict_and_score_calls_resolved.trace_id,
-                    predict_and_score_calls_resolved.op_name,
-                    predict_and_score_calls_resolved.started_at,
-                    predict_and_score_calls_resolved.ended_at,
-                    predict_and_score_calls_resolved.inputs_dump,
-                    predict_and_score_calls_resolved.output_dump,
-                    predict_and_score_calls_resolved.summary_dump,
                     predict_and_score_calls_resolved.row_digest,
                     page_digests.row_order,
                     predict_and_score_calls_resolved.resolved_inputs
@@ -138,14 +124,8 @@ def test_cte_chain_calls_complete() -> None:
             predict_and_score_calls AS (
                 SELECT calls_complete.id AS call_id,
                     calls_complete.parent_id AS eval_call_id,
-                    calls_complete.project_id,
-                    calls_complete.trace_id,
-                    calls_complete.op_name,
-                    calls_complete.started_at,
-                    calls_complete.ended_at,
                     calls_complete.inputs_dump,
                     calls_complete.output_dump,
-                    calls_complete.summary_dump,
                     CASE
                         WHEN position(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/') > 0
                             THEN regexpExtract(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/([^/]+)$', 1)
@@ -194,14 +174,6 @@ def test_cte_chain_calls_complete() -> None:
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id,
                     predict_and_score_calls_resolved.eval_call_id,
-                    predict_and_score_calls_resolved.project_id,
-                    predict_and_score_calls_resolved.trace_id,
-                    predict_and_score_calls_resolved.op_name,
-                    predict_and_score_calls_resolved.started_at,
-                    predict_and_score_calls_resolved.ended_at,
-                    predict_and_score_calls_resolved.inputs_dump,
-                    predict_and_score_calls_resolved.output_dump,
-                    predict_and_score_calls_resolved.summary_dump,
                     predict_and_score_calls_resolved.row_digest,
                     page_digests.row_order,
                     predict_and_score_calls_resolved.resolved_inputs
@@ -273,14 +245,8 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
             predict_and_score_calls AS (
                 SELECT calls_complete.id AS call_id,
                     calls_complete.parent_id AS eval_call_id,
-                    calls_complete.project_id,
-                    calls_complete.trace_id,
-                    calls_complete.op_name,
-                    calls_complete.started_at,
-                    calls_complete.ended_at,
                     calls_complete.inputs_dump,
                     calls_complete.output_dump,
-                    calls_complete.summary_dump,
                     CASE
                         WHEN position(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/') > 0
                             THEN regexpExtract(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/([^/]+)$', 1)
@@ -332,14 +298,6 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id,
                     predict_and_score_calls_resolved.eval_call_id,
-                    predict_and_score_calls_resolved.project_id,
-                    predict_and_score_calls_resolved.trace_id,
-                    predict_and_score_calls_resolved.op_name,
-                    predict_and_score_calls_resolved.started_at,
-                    predict_and_score_calls_resolved.ended_at,
-                    predict_and_score_calls_resolved.inputs_dump,
-                    predict_and_score_calls_resolved.output_dump,
-                    predict_and_score_calls_resolved.summary_dump,
                     predict_and_score_calls_resolved.row_digest,
                     page_digests.row_order,
                     predict_and_score_calls_resolved.resolved_inputs
@@ -363,7 +321,7 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
 
 
 def test_full_query_calls_merged() -> None:
-    """Full SQL query: WITH CTE chain SELECT FROM page_rows on calls_merged."""
+    """Full SQL: lean CTEs + outer SELECT hydrates from calls_merged."""
     pb = ParamBuilder("pb")
     sql = build_eval_results_query(
         project_id="proj-1",
@@ -382,14 +340,8 @@ def test_full_query_calls_merged() -> None:
         WITH predict_and_score_calls AS (
                 SELECT calls_merged.id AS call_id,
                     any(calls_merged.parent_id) AS eval_call_id,
-                    calls_merged.project_id AS project_id,
-                    any(calls_merged.trace_id) AS trace_id,
-                    any(calls_merged.op_name) AS op_name,
-                    any(calls_merged.started_at) AS started_at,
-                    any(calls_merged.ended_at) AS ended_at,
                     any(calls_merged.inputs_dump) AS inputs_dump,
                     any(calls_merged.output_dump) AS output_dump,
-                    any(calls_merged.summary_dump) AS summary_dump,
                     CASE
                         WHEN position(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/') > 0
                             THEN regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/([^/]+)$', 1)
@@ -445,14 +397,6 @@ def test_full_query_calls_merged() -> None:
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id,
                     predict_and_score_calls_resolved.eval_call_id,
-                    predict_and_score_calls_resolved.project_id,
-                    predict_and_score_calls_resolved.trace_id,
-                    predict_and_score_calls_resolved.op_name,
-                    predict_and_score_calls_resolved.started_at,
-                    predict_and_score_calls_resolved.ended_at,
-                    predict_and_score_calls_resolved.inputs_dump,
-                    predict_and_score_calls_resolved.output_dump,
-                    predict_and_score_calls_resolved.summary_dump,
                     predict_and_score_calls_resolved.row_digest,
                     page_digests.row_order,
                     predict_and_score_calls_resolved.resolved_inputs
@@ -462,24 +406,35 @@ def test_full_query_calls_merged() -> None:
         SELECT
             page_rows.call_id AS id,
             page_rows.eval_call_id AS parent_id,
-            page_rows.project_id,
-            page_rows.trace_id,
-            page_rows.op_name,
-            page_rows.started_at,
-            page_rows.ended_at,
-            page_rows.inputs_dump,
-            page_rows.output_dump,
-            page_rows.summary_dump,
+            any(calls_merged.project_id) AS project_id,
+            any(calls_merged.trace_id) AS trace_id,
+            any(calls_merged.op_name) AS op_name,
+            any(calls_merged.started_at) AS started_at,
+            any(calls_merged.ended_at) AS ended_at,
+            any(calls_merged.inputs_dump) AS inputs_dump,
+            any(calls_merged.output_dump) AS output_dump,
+            any(calls_merged.summary_dump) AS summary_dump,
             page_rows.row_digest AS __row_digest,
             page_rows.row_order AS __row_order,
             page_rows.resolved_inputs AS __resolved_inputs,
             (SELECT total_rows FROM ranked_digest_count) AS __total_rows
         FROM page_rows
+        LEFT JOIN calls_merged
+            ON calls_merged.id = page_rows.call_id
+            AND calls_merged.project_id = {pb_3:String}
+        GROUP BY (
+            page_rows.call_id,
+            page_rows.eval_call_id,
+            page_rows.row_digest,
+            page_rows.row_order,
+            page_rows.resolved_inputs
+        )
         """,
         pb.get_params(),
         {
             "pb_0": "proj-1",
             "pb_1": ["eval-1"],
             "pb_2": PREDICT_AND_SCORE_OP_PREFIX,
+            "pb_3": "proj-1",
         },
     )
