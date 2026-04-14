@@ -913,7 +913,7 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
         cq,
         """
         WITH all_calls AS
-          (SELECT calls_complete.id AS id,
+          (SELECT DISTINCT calls_complete.id AS id,
                   calls_complete.started_at AS started_at
            FROM calls_complete
            LEFT JOIN

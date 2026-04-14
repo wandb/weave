@@ -9,8 +9,6 @@ from pydantic import BaseModel
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
 from weave.trace.weave_client import WeaveClient
 
-# TODO: Responses should be updated once we have patching for the new Responses API
-
 
 @pytest.fixture
 def setup_tests():
@@ -36,17 +34,21 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     assert len(calls) == 2
 
     trace_root = calls[0]
-    trace_root.inputs["name"] = "Agent workflow"
-    trace_root.output["status"] = "completed"
-    trace_root.output["metrics"] = {}
-    trace_root.output["metadata"] = {}
+    assert trace_root.inputs["name"] == "Agent workflow"
+    assert trace_root.output["status"] == "completed"
+    assert trace_root.output["metrics"] == {}
+    assert trace_root.output["metadata"] == {}
 
     agent_call = calls[1]
-    agent_call.inputs["name"] = "Assistant"
-    agent_call.output["output"] = None
-    agent_call.output["metrics"] = {}
-    agent_call.output["metadata"] = {"tools": [], "handoffs": [], "output_type": "str"}
-    agent_call.output["error"] = None
+    assert agent_call.inputs["name"] == "Assistant"
+    assert agent_call.output["output"] is None
+    assert agent_call.output["metrics"] == {}
+    assert agent_call.output["metadata"] == {
+        "tools": [],
+        "handoffs": [],
+        "output_type": "str",
+    }
+    assert agent_call.output["error"] is None
 
 
 @pytest.mark.skip(

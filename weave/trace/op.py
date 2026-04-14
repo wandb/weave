@@ -920,7 +920,7 @@ def _call_sync_gen(
         return empty_sync_gen(), call
 
 
-async def _call_async_gen(
+def _call_async_gen(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
@@ -1135,7 +1135,7 @@ async def _call_async_gen(
         if __should_raise:
             raise
 
-        async def empty_async_gen() -> AsyncIterator[Any]:
+        async def empty_async_gen() -> AsyncIterator[Any]:  # noqa: RUF029 — must be async to produce AsyncIterator
             # Re-raise the original exception if __should_raise is False
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
@@ -1284,7 +1284,7 @@ def op(
                 async def wrapper(  # pyright: ignore[reportRedeclaration]
                     *args: P.args, **kwargs: P.kwargs
                 ) -> AsyncGenerator[R]:
-                    res, _ = await _call_async_gen(
+                    res, _ = _call_async_gen(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
                     async for item in res:

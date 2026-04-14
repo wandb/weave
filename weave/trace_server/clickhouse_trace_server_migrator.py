@@ -610,10 +610,16 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
     def _prepare_ddl_for_database(self, sql_query: str, target_db: str) -> str:
         """Adapt DDL for the target database's engine type.
 
-        * **Replicated engine** — the database auto-converts ``MergeTree`` to
-          ``ReplicatedMergeTree`` and auto-replicates DDL, so we pass the SQL
-          through unchanged.  Emitting ``ON CLUSTER`` would cause ClickHouse
-          error 80 (INCORRECT_QUERY).
+        Engine handling matrix:
+        - replicated-only DB: Replicated*MergeTree() with no ON CLUSTER
+        - distributed + Atomic DB: explicit ZK args plus ON CLUSTER
+        - distributed + Replicated DB: Replicated*MergeTree() with no explicit
+          ZK args and no ON CLUSTER
+
+        * **Replicated engine** — DDL is auto-replicated by the database, so
+          ``ON CLUSTER`` must be omitted to avoid ClickHouse error 80
+          (INCORRECT_QUERY). We still rewrite MergeTree-family engines to
+          ``Replicated*MergeTree`` so table data replicates across replicas.
         * **Atomic engine** — the database does not auto-replicate, so we must
           explicitly rewrite ``MergeTree`` → ``ReplicatedMergeTree`` and add
           ``ON CLUSTER`` to every DDL statement.
@@ -624,10 +630,9 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         database would auto-assign per-shard ZK paths, causing each shard to
         track migration state independently instead of sharing it.
         """
+        sql_query = self._format_replicated_sql(sql_query)
         if self._uses_replicated_db_engine(target_db):
             return sql_query
-
-        sql_query = self._format_replicated_sql(sql_query)
         return self._add_on_cluster_clause(sql_query, target_db=target_db)
 
     def _create_management_table_sql(self) -> str:
@@ -883,10 +888,12 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             self.ch_client.database = curr_db
             return
 
-        # When the DB uses ENGINE = Replicated, skip explicit ReplicatedMergeTree
-        # conversion — the DB engine auto-converts MergeTree tables.
+        # Engine handling matrix for distributed local tables:
+        # - distributed + Atomic DB: explicit ZK args plus ON CLUSTER
+        # - distributed + Replicated DB: Replicated*MergeTree() with no
+        #   explicit ZK args and no ON CLUSTER
         if self._uses_replicated_db_engine(target_db):
-            formatted_command = command
+            formatted_command = self._format_replicated_sql(command)
         else:
             formatted_command = self._format_replicated_sql_distributed(
                 command, target_db

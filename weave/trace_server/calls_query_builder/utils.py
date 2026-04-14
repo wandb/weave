@@ -38,6 +38,66 @@ def timestamp_to_datetime_str(timestamp: float) -> str:
     ).strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
+def parse_string_to_utc_timestamp(value: str) -> float | None:
+    """Parse a string date or datetime into a UTC unix timestamp (seconds).
+
+    Rules:
+
+    * ``YYYY-MM-DD`` (exactly 10 characters after strip) is interpreted as
+      midnight UTC on that calendar day.
+    * ISO-8601 datetimes are parsed via :func:`datetime.datetime.fromisoformat`.
+      ``Z`` / ``z`` suffix is accepted as UTC. Naive datetimes are treated as UTC
+      wall time.
+    * Unparsable strings return ``None`` (no conversion).
+
+    Args:
+        value: User-provided string literal.
+
+    Returns:
+        Unix timestamp in seconds in UTC, or ``None`` if not parseable.
+
+    Examples:
+        >>> parse_string_to_utc_timestamp("2024-03-01")
+        1709251200.0
+        >>> parse_string_to_utc_timestamp("2024-03-01T12:00:00Z") == parse_string_to_utc_timestamp(
+        ...     "2024-03-01T12:00:00+00:00"
+        ... )
+        True
+        >>> parse_string_to_utc_timestamp("not a date") is None
+        True
+    """
+    s = value.strip()
+    if not s:
+        return None
+
+    # Check for a date without a time
+    # string: 'YYYY-MM-DD'
+    # index:   0123456789
+    # length: 10
+    if len(s) == 10 and s[4] == "-" and s[7] == "-":
+        try:
+            d = datetime.date.fromisoformat(s)
+        except ValueError:
+            return None
+        dt = datetime.datetime.combine(
+            d, datetime.time.min, tzinfo=datetime.timezone.utc
+        )
+        return dt.timestamp()
+
+    iso = s
+    if iso.endswith(("Z", "z")):
+        iso = iso[:-1] + "+00:00"
+    try:
+        dt = datetime.datetime.fromisoformat(iso)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    else:
+        dt = dt.astimezone(datetime.timezone.utc)
+    return dt.timestamp()
+
+
 def safely_format_sql(
     sql: str,
     logger: logging.Logger,

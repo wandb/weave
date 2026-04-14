@@ -1,4 +1,3 @@
-import asyncio
 import os
 from collections.abc import Generator
 
@@ -76,35 +75,33 @@ def test_groq_quickstart(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_groq_async_chat_completion(
+@pytest.mark.asyncio
+async def test_groq_async_chat_completion(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     from groq import AsyncGroq
 
     groq_client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"))
 
-    async def complete_chat() -> None:
-        chat_completion = await groq_client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a psychiatrist helping young minds",
-                },
-                {
-                    "role": "user",
-                    "content": "I panicked during the test, even though I knew everything on the test paper.",
-                },
-            ],
-            model="llama3-8b-8192",
-            temperature=0.3,
-            max_tokens=360,
-            top_p=1,
-            stop=None,
-            stream=False,
-            seed=42,
-        )
-
-    asyncio.run(complete_chat())
+    await groq_client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a psychiatrist helping young minds",
+            },
+            {
+                "role": "user",
+                "content": "I panicked during the test, even though I knew everything on the test paper.",
+            },
+        ],
+        model="llama3-8b-8192",
+        temperature=0.3,
+        max_tokens=360,
+        top_p=1,
+        stop=None,
+        stream=False,
+        seed=42,
+    )
 
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
@@ -219,42 +216,38 @@ In summary, fast language models have revolutionized the field of NLP, enabling 
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_groq_async_streaming_chat_completion(
+@pytest.mark.asyncio
+async def test_groq_async_streaming_chat_completion(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     from groq import AsyncGroq
 
     groq_client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"))
 
-    async def generate_reponse() -> str:
-        chat_streaming = await groq_client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a psychiatrist helping young minds",
-                },
-                {
-                    "role": "user",
-                    "content": "I panicked during the test, even though I knew everything on the test paper.",
-                },
-            ],
-            model="llama3-8b-8192",
-            temperature=0.3,
-            max_tokens=360,
-            top_p=1,
-            stop=None,
-            stream=True,
-            seed=42,
-        )
+    chat_streaming = await groq_client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a psychiatrist helping young minds",
+            },
+            {
+                "role": "user",
+                "content": "I panicked during the test, even though I knew everything on the test paper.",
+            },
+        ],
+        model="llama3-8b-8192",
+        temperature=0.3,
+        max_tokens=360,
+        top_p=1,
+        stop=None,
+        stream=True,
+        seed=42,
+    )
 
-        all_content = ""
-        async for chunk in chat_streaming:
-            if chunk.choices[0].delta.content is not None:
-                all_content += chunk.choices[0].delta.content
-
-        return all_content
-
-    asyncio.run(generate_reponse())
+    all_content = ""
+    async for chunk in chat_streaming:
+        if chunk.choices[0].delta.content is not None:
+            all_content += chunk.choices[0].delta.content
 
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
