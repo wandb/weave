@@ -1,5 +1,3 @@
-from contextlib import contextmanager
-
 import pytest
 
 import weave
@@ -8,26 +6,12 @@ from weave import Evaluation
 from weave.trace_server.common_interface import SortBy
 
 
-@contextmanager
-def no_autoflush(client):
-    """Disable per-method autoflush during bulk call creation, flush once on exit."""
-    client.set_autoflush(False)
-    try:
-        yield
-    finally:
-        for _ in range(10):
-            client.flush()
-            if not client._has_pending_jobs():
-                break
-        client.set_autoflush(True)
-
-
 def test_filter_calls_by_ref_properties(client):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
 
-    with no_autoflush(client):
+    with client.no_autoflush():
         nested1 = {"nested key with spaces": {"one": "1"}}
         nested_ref = weave.publish(nested1, "nested")
         nested2 = {"nested key with spaces": {"one": "2"}}
@@ -372,7 +356,7 @@ async def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
     async def model_predict(input) -> str:
         return eval(input)
 
-    with no_autoflush(client):
+    with client.no_autoflush():
         object_ref1 = weave.publish({"a": 1, "b": 2}, "object")
         object_ref2 = weave.publish({"a": 3, "b": 4}, "object")
         object_ref3 = weave.publish({"a": 5, "b": 6}, "object")

@@ -1,3 +1,4 @@
+import contextlib
 import dataclasses
 import datetime
 import json
@@ -92,24 +93,6 @@ def get_client_trace_server(
 
 def get_client_project_id(client: weave_client.WeaveClient) -> str:
     return client.project_id
-
-
-@contextmanager
-def no_autoflush(client):
-    """Disable per-method autoflush during bulk call creation, flush once on exit.
-
-    Chained futures (from FutureExecutor.then) create work that isn't captured
-    by a single flush snapshot, so we loop until everything drains.
-    """
-    client.set_autoflush(False)
-    try:
-        yield
-    finally:
-        for _ in range(10):
-            client.flush()
-            if not client._has_pending_jobs():
-                break
-        client.set_autoflush(True)
 
 
 ## End hacky interface compatibility helpers
@@ -324,7 +307,13 @@ class OpCallSpec(BaseModel):
     part_sequence: list[tuple[str, str]]
 
 
-def simple_line_call_bootstrap() -> OpCallSpec:
+def simple_line_call_bootstrap(client=None) -> OpCallSpec:
+    """Bootstrap a set of ops and calls for testing query/filter behavior.
+
+    Args:
+        client: When provided, disables autoflush during bulk call creation
+                for significantly faster execution.
+    """
     part_sequence = []
 
     def track_sequence(name: str):
@@ -381,40 +370,42 @@ def simple_line_call_bootstrap() -> OpCallSpec:
     result["liner"] = OpCallSummary(op=liner)
     root_calls = 0
 
-    # Call each op a distinct number of time (allows for easier assertions later)
-    num_calls = 1
-    for i in range(num_calls):
-        adder_v0(Number(value=i))
-    result["adder_v0"].num_calls += num_calls
-    root_calls += num_calls
+    cm = client.no_autoflush() if client else contextlib.nullcontext()
+    with cm:
+        # Call each op a distinct number of times (allows for easier assertions later)
+        num_calls = 1
+        for i in range(num_calls):
+            adder_v0(Number(value=i))
+        result["adder_v0"].num_calls += num_calls
+        root_calls += num_calls
 
-    num_calls = 2
-    for i in range(num_calls):
-        adder(Number(value=i), i)
-    result["adder"].num_calls += num_calls
-    root_calls += num_calls
+        num_calls = 2
+        for i in range(num_calls):
+            adder(Number(value=i), i)
+        result["adder"].num_calls += num_calls
+        root_calls += num_calls
 
-    num_calls = 3
-    for i in range(num_calls):
-        subtractor(Number(value=i), i)
-    result["subtractor"].num_calls += num_calls
-    root_calls += num_calls
+        num_calls = 3
+        for i in range(num_calls):
+            subtractor(Number(value=i), i)
+        result["subtractor"].num_calls += num_calls
+        root_calls += num_calls
 
-    num_calls = 4
-    for i in range(num_calls):
-        multiplier(Number(value=i), i)
-    result["multiplier"].num_calls += num_calls
-    root_calls += num_calls
+        num_calls = 4
+        for i in range(num_calls):
+            multiplier(Number(value=i), i)
+        result["multiplier"].num_calls += num_calls
+        root_calls += num_calls
 
-    num_calls = 5
-    run_calls = 0
-    for i in range(num_calls):
-        liner(Number(value=i), i, i)
-    result["liner"].num_calls += num_calls
-    result["adder"].num_calls += num_calls
-    result["multiplier"].num_calls += num_calls
-    run_calls += num_calls * 3
-    root_calls += num_calls
+        num_calls = 5
+        run_calls = 0
+        for i in range(num_calls):
+            liner(Number(value=i), i, i)
+        result["liner"].num_calls += num_calls
+        result["adder"].num_calls += num_calls
+        result["multiplier"].num_calls += num_calls
+        run_calls += num_calls * 3
+        root_calls += num_calls
 
     total_calls = sum(op_call.num_calls for op_call in result.values())
 
@@ -432,8 +423,7 @@ def ref_str(op):
 
 
 def test_trace_call_query_filter_op_version_refs(client):
-    with no_autoflush(client):
-        call_spec = simple_line_call_bootstrap()
+    call_spec = simple_line_call_bootstrap(client)
     call_summaries = call_spec.call_summaries
 
     # This is just a string representation of the ref
@@ -898,8 +888,7 @@ def test_trace_call_query_filter_call_ids(client):
 
 
 def test_trace_call_query_filter_trace_roots_only(client):
-    with no_autoflush(client):
-        call_spec = simple_line_call_bootstrap()
+    call_spec = simple_line_call_bootstrap(client)
 
     for trace_roots_only, exp_count in [
         # Test the None case
@@ -925,7 +914,7 @@ def test_trace_call_query_filter_wb_run_ids(client):
     from weave.trace import weave_client
     from weave.trace.wandb_run_context import WandbRunContext
 
-    with no_autoflush(client):
+    with client.no_autoflush():
         with mock.patch.object(
             weave_client,
             "get_global_wb_run_context",
@@ -965,14 +954,11 @@ def test_trace_call_query_filter_wb_run_ids(client):
 
 
 def test_trace_call_query_filter_wb_user_ids(client, trace_server):
-    with no_autoflush(client):
-        call_spec_1 = simple_line_call_bootstrap()
+    call_spec_1 = simple_line_call_bootstrap(client)
     trace_server.set_user_id("second_user")
-    with no_autoflush(client):
-        call_spec_2 = simple_line_call_bootstrap()
+    call_spec_2 = simple_line_call_bootstrap(client)
     trace_server.set_user_id("third_user")
-    with no_autoflush(client):
-        call_spec_3 = simple_line_call_bootstrap()
+    call_spec_3 = simple_line_call_bootstrap(client)
 
     for wb_user_ids, exp_count in [
         (
@@ -1001,8 +987,7 @@ def test_trace_call_query_filter_wb_user_ids(client, trace_server):
 
 
 def test_trace_call_query_limit(client):
-    with no_autoflush(client):
-        call_spec = simple_line_call_bootstrap()
+    call_spec = simple_line_call_bootstrap(client)
 
     for limit, exp_count in [
         # Test the None case
@@ -1023,8 +1008,7 @@ def test_trace_call_query_limit(client):
 
 
 def test_trace_call_query_offset(client):
-    with no_autoflush(client):
-        call_spec = simple_line_call_bootstrap()
+    call_spec = simple_line_call_bootstrap(client)
 
     for offset, exp_count in [
         # Test the None case
@@ -1066,7 +1050,7 @@ def test_trace_call_query_timings(client):
             return even_later
 
     with (
-        no_autoflush(client),
+        client.no_autoflush(),
         mock.patch("weave.trace.weave_client.datetime.datetime") as mock_datetime_class,
     ):
         # Mock only the .now() method, keep everything else as-is
@@ -6585,7 +6569,7 @@ def test_calls_query_ordering_with_costs_comprehensive(client):
     def my_op(x: int) -> int:
         return x
 
-    with no_autoflush(client):
+    with client.no_autoflush():
         # Calls with multiple sortable attributes
         call1 = client.create_call(
             my_op, {"x": 1}, attributes={"category": "A", "priority": 2}

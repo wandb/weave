@@ -283,6 +283,19 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
     def set_autoflush(self, value: bool):
         self._autoflush = value
 
+    @contextlib.contextmanager
+    def no_autoflush(self):
+        """Disable per-method autoflush during bulk operations, drain on exit."""
+        self.set_autoflush(False)
+        try:
+            yield
+        finally:
+            for _ in range(10):
+                self.flush()
+                if not self._has_pending_jobs():
+                    break
+            self.set_autoflush(True)
+
     def __getattribute__(self, name):
         self_super = super()
         attr = self_super.__getattribute__(name)
