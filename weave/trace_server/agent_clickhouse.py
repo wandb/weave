@@ -458,7 +458,9 @@ class AgentQueryHandler:
     # Conversations queries (GROUP BY conversation_id on spans)
     # ------------------------------------------------------------------
 
-    def conversations_query(self, req: AgentConversationsQueryReq) -> AgentConversationsQueryRes:
+    def conversations_query(
+        self, req: AgentConversationsQueryReq
+    ) -> AgentConversationsQueryRes:
         """Query conversations by aggregating spans with time bounds."""
         pb = ParamBuilder("genai")
         conditions = [
@@ -712,7 +714,9 @@ class AgentWriteHandler:
                         )
                     except Exception as e:
                         rejected += 1
-                        errors.append(f"Extraction failed for span {span.span_id}: {e!s}")
+                        errors.append(
+                            f"Extraction failed for span {span.span_id}: {e!s}"
+                        )
                         continue
 
                     span_rows.append(genai_span_to_row(genai_row))
@@ -721,9 +725,15 @@ class AgentWriteHandler:
                     accepted += 1
 
         if span_rows:
-            self._ch.insert("spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS)
+            self._ch.insert(
+                "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
+            )
         if search_rows:
-            self._ch.insert("message_search", data=search_rows, column_names=ALL_SEARCH_INSERT_COLUMNS)
+            self._ch.insert(
+                "message_search",
+                data=search_rows,
+                column_names=ALL_SEARCH_INSERT_COLUMNS,
+            )
 
         error_msg = "; ".join(errors[:20])
         if len(errors) > 20:
@@ -749,7 +759,9 @@ class AgentWriteHandler:
         )
         return build_trace_chat(spans_res.spans, req.trace_id)
 
-    def conversation_chat(self, req: AgentConversationChatReq) -> AgentConversationChatRes:
+    def conversation_chat(
+        self, req: AgentConversationChatReq
+    ) -> AgentConversationChatRes:
         """Build multi-turn chat view for a conversation."""
         pb = ParamBuilder("genai")
         pid = pb.add(req.project_id, param_type="String")
