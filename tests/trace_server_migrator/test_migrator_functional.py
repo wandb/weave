@@ -110,8 +110,12 @@ def test_replicated_creates_replicated_db_and_tables(ch_client):
 
     assert _get_db_engine(ch_client, mgmt_db) == "Replicated"
     assert _get_db_engine(ch_client, target_db) == "Replicated"
-    assert _table_exists(ch_client, mgmt_db, "migrations")
-    assert _table_exists(ch_client, target_db, "test_tbl")
+    assert _get_table_engine_full(ch_client, mgmt_db, "migrations").startswith(
+        "ReplicatedMergeTree"
+    )
+    assert _get_table_engine_full(ch_client, target_db, "test_tbl").startswith(
+        "ReplicatedMergeTree"
+    )
 
 
 def test_distributed_fresh_creates_atomic_management_db(ch_client):
@@ -141,6 +145,9 @@ def test_distributed_fresh_creates_atomic_management_db(ch_client):
 
     assert _get_db_engine(ch_client, target_db) == "Replicated"
     assert _table_exists(ch_client, target_db, "test_tbl_local")
+    assert _get_table_engine_full(ch_client, target_db, "test_tbl_local").startswith(
+        "ReplicatedMergeTree"
+    )
     assert _get_table_engine_full(ch_client, target_db, "test_tbl").startswith(
         "Distributed"
     )
@@ -179,6 +186,9 @@ def test_distributed_legacy_replicated_management_db(ch_client):
 
     assert _get_db_engine(ch_client, target_db) == "Replicated"
     assert _table_exists(ch_client, target_db, "test_tbl_local")
+    assert _get_table_engine_full(ch_client, target_db, "test_tbl_local").startswith(
+        "ReplicatedMergeTree"
+    )
     assert _get_table_engine_full(ch_client, target_db, "test_tbl").startswith(
         "Distributed"
     )
