@@ -248,7 +248,6 @@ _DEFS: list[Attribute] = [
     Attribute("weave.content_refs", "string[]", "Uploaded content references"),
     Attribute("weave.artifact_refs", "string[]", "W&B artifact references"),
     Attribute("weave.object_refs", "string[]", "W&B object references"),
-    # fmt: on
 ]
 
 
