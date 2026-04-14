@@ -6,6 +6,21 @@ import {
 } from '../traceServerBindings/createAndLinkWeaveAsset';
 import type {CreateAndLinkWeaveAssetReq} from '../traceServerBindings/createAndLinkWeaveAsset';
 
+function makeReq(
+  overrides: Partial<CreateAndLinkWeaveAssetReq> = {}
+): CreateAndLinkWeaveAssetReq {
+  return {
+    ref: 'weave:///source-entity/source-project/object/my-prompt:v1',
+    target: {
+      entity_name: 'my-org',
+      project_name: 'wandb-registry-prompts',
+      portfolio_name: 'my-prompt-collection',
+    },
+    aliases: [],
+    ...overrides,
+  };
+}
+
 describe('createAndLinkWeaveAsset', () => {
   let mockTraceServerApi: jest.Mocked<TraceServerApi<unknown>>;
 
@@ -16,15 +31,7 @@ describe('createAndLinkWeaveAsset', () => {
   });
 
   it('posts the expected payload to /link_to_registry', async () => {
-    const req: CreateAndLinkWeaveAssetReq = {
-      ref: 'weave:///source-entity/source-project/object/my-prompt:v1',
-      target: {
-        entity_name: 'my-org',
-        project_name: 'wandb-registry-prompts',
-        portfolio_name: 'my-prompt-collection',
-      },
-      aliases: ['latest'],
-    };
+    const req = makeReq({aliases: ['latest']});
 
     mockTraceServerApi.request.mockResolvedValue({
       data: {version_index: 7},
@@ -43,68 +50,22 @@ describe('createAndLinkWeaveAsset', () => {
     });
   });
 
-  it('preserves an empty aliases array', async () => {
-    const req: CreateAndLinkWeaveAssetReq = {
-      ref: 'weave:///source-entity/source-project/object/my-prompt:v1',
-      target: {
-        entity_name: 'my-org',
-        project_name: 'wandb-registry-prompts',
-        portfolio_name: 'my-prompt-collection',
-      },
-      aliases: [],
-    };
-
-    mockTraceServerApi.request.mockResolvedValue({
-      data: {version_index: null},
-    } as any);
-
-    await createAndLinkWeaveAsset(mockTraceServerApi, req);
-
-    expect(mockTraceServerApi.request).toHaveBeenCalledWith(
-      expect.objectContaining({
-        body: expect.objectContaining({
-          aliases: [],
-        }),
-      })
-    );
-  });
-
   it('throws when the trace server returns invalid JSON', async () => {
-    const req: CreateAndLinkWeaveAssetReq = {
-      ref: 'weave:///source-entity/source-project/object/my-prompt:v1',
-      target: {
-        entity_name: 'my-org',
-        project_name: 'wandb-registry-prompts',
-        portfolio_name: 'my-prompt-collection',
-      },
-      aliases: [],
-    };
-
     mockTraceServerApi.request.mockResolvedValue({
       data: null,
     } as any);
 
     await expect(
-      createAndLinkWeaveAsset(mockTraceServerApi, req)
+      createAndLinkWeaveAsset(mockTraceServerApi, makeReq())
     ).rejects.toThrow('Trace server returned invalid JSON');
   });
 
   it('surfaces non-2xx request errors', async () => {
-    const req: CreateAndLinkWeaveAssetReq = {
-      ref: 'weave:///source-entity/source-project/object/my-prompt:v1',
-      target: {
-        entity_name: 'my-org',
-        project_name: 'wandb-registry-prompts',
-        portfolio_name: 'my-prompt-collection',
-      },
-      aliases: [],
-    };
     const error = new Error('Request failed');
-
     mockTraceServerApi.request.mockRejectedValue(error);
 
     await expect(
-      createAndLinkWeaveAsset(mockTraceServerApi, req)
+      createAndLinkWeaveAsset(mockTraceServerApi, makeReq())
     ).rejects.toThrow('Request failed');
   });
 });

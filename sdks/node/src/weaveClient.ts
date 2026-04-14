@@ -35,7 +35,6 @@ import {Table, TableRef, TableRowRef} from './table';
 import {
   CreateAndLinkWeaveAssetReq,
   CreateAndLinkWeaveAssetRes,
-  CreateAndLinkWeaveAssetTarget,
   createAndLinkWeaveAsset,
 } from './traceServerBindings/createAndLinkWeaveAsset';
 import {packageVersion} from './utils/userAgent';
@@ -122,7 +121,12 @@ function generateCallId(): string {
   return uuidv7();
 }
 
-type RegistryLinkable = Prompt | ObjectRef | string;
+export type RegistryLinkable = Prompt | ObjectRef | string;
+
+export interface LinkPromptToRegistryOptions {
+  targetPath: string;
+  aliases?: string[];
+}
 
 export class CallStack {
   constructor(private stack: CallStackEntry[] = []) {}
@@ -577,34 +581,21 @@ export class WeaveClient {
     };
   }
 
-  /**
-   * Link a published prompt version into a registry portfolio.
-   *
-   * @param prompt - A published prompt, an ObjectRef, or a fully-qualified
-   * weave URI string.
-   * @param options - Registry destination and alias options.
-   * @returns Parsed response from the registry-link endpoint.
-   * @throws Error if the prompt is unpublished, the client project scope is invalid,
-   * or the target path is malformed.
-   */
+  /** Link a published prompt version into a registry portfolio. */
   public async linkPromptToRegistry(
     prompt: RegistryLinkable,
-    options: {
-      targetPath: string;
-      aliases?: string[];
-    }
+    options: LinkPromptToRegistryOptions
   ): Promise<CreateAndLinkWeaveAssetRes> {
     const promptRef = await this.resolveRegistryPromptRef(prompt);
     const {registryProject, portfolioName} = this.parseRegistryTargetPath(
       options.targetPath
     );
-    const [entityName] = this.projectId.split('/', 1);
-
-    if (!this.projectId.includes('/') || !entityName) {
+    if (!this.projectId.includes('/')) {
       throw new Error(
         "linkPromptToRegistry requires client.projectId in '<entity>/<project>' format"
       );
     }
+    const [entityName] = this.projectId.split('/', 1);
 
     const req: CreateAndLinkWeaveAssetReq = {
       ref: promptRef.uri(),
@@ -612,7 +603,7 @@ export class WeaveClient {
         entity_name: entityName,
         project_name: registryProject,
         portfolio_name: portfolioName,
-      } satisfies CreateAndLinkWeaveAssetTarget,
+      },
       aliases: [...(options.aliases ?? [])],
     };
 
