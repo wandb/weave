@@ -38,7 +38,7 @@ import multiprocessing
 import time
 from collections.abc import Awaitable, Callable, Coroutine, Generator
 from contextlib import contextmanager
-from multiprocessing.process import BaseProcess
+from multiprocessing.context import SpawnProcess
 from multiprocessing.queues import Queue
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 
@@ -132,7 +132,6 @@ class IsolatedClientExecutor:
         client_factory: Callable[[FC], WeaveClient],
         client_factory_config: FC,
         timeout_seconds: float = DEFAULT_EXECUTION_TIMEOUT_SECONDS,
-        mp_start_method: str = "spawn",
     ) -> None:
         """Initialize the IsolatedClientExecutor with a client factory.
 
@@ -140,15 +139,13 @@ class IsolatedClientExecutor:
             client_factory: A callable that returns a configured WeaveClient.
             client_factory_config: Configuration object to pass to the client factory.
             timeout_seconds: Maximum time to wait for function execution.
-            mp_start_method: Multiprocessing start method ("spawn", "fork", "forkserver").
         """
         self.client_factory = client_factory
         self.client_factory_config = client_factory_config
         self.timeout_seconds = timeout_seconds
-        self._mp_start_method = mp_start_method
 
         # Process management
-        self._process: BaseProcess | None = None
+        self._process: SpawnProcess | None = None
         self._request_queue: RequestQueue | None = None
         self._response_queue: ResponseQueue | None = None
 
@@ -240,11 +237,11 @@ class IsolatedClientExecutor:
             return
 
         # Start the worker process
-        ctx = multiprocessing.get_context(self._mp_start_method)
+        ctx = multiprocessing.get_context("spawn")
         self._request_queue = ctx.Queue()
         self._response_queue = ctx.Queue()
 
-        self._process = ctx.Process(  # type: ignore[attr-defined]
+        self._process = ctx.Process(
             target=_worker_loop,
             args=(
                 self.client_factory,
@@ -360,8 +357,6 @@ def _worker_loop(
 
     Handles both synchronous and asynchronous function execution.
     """
-    # Clear any inherited client state (e.g. from fork start method)
-    set_weave_client_global(None)
     with _client_context(client_factory(client_factory_config)):
         while True:
             try:
