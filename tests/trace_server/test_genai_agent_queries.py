@@ -84,7 +84,7 @@ def _insert_search_rows(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
 
 
 def test_genai_tables_created(ch_server):
-    """Verify migration 027 created all genai tables and MVs."""
+    """Verify the genai migration created all tables and MVs."""
     result = ch_server.ch_client.query("SHOW TABLES")
     table_names = {row[0] for row in result.result_rows}
 
