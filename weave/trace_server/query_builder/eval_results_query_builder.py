@@ -327,6 +327,43 @@ def build_page_rows_cte() -> str:
 )"""
 
 
+def _build_page_calls_cte(project_id_param: str, read_table: str) -> str:
+    """Build page_calls CTE: pre-filter and pre-aggregate source table for page rows only."""
+    if read_table == "calls_merged":
+        return f"""page_calls AS (
+    SELECT
+        calls_merged.id AS call_id,
+        any(calls_merged.project_id) AS project_id,
+        any(calls_merged.trace_id) AS trace_id,
+        any(calls_merged.op_name) AS op_name,
+        any(calls_merged.started_at) AS started_at,
+        any(calls_merged.ended_at) AS ended_at,
+        any(calls_merged.inputs_dump) AS inputs_dump,
+        any(calls_merged.output_dump) AS output_dump,
+        any(calls_merged.summary_dump) AS summary_dump
+    FROM calls_merged
+    PREWHERE calls_merged.project_id = {project_id_param}
+    WHERE calls_merged.id IN (SELECT call_id FROM page_rows)
+    GROUP BY (calls_merged.project_id, calls_merged.id)
+)"""
+    else:
+        return f"""page_calls AS (
+    SELECT
+        calls_complete.id AS call_id,
+        calls_complete.project_id,
+        calls_complete.trace_id,
+        calls_complete.op_name,
+        calls_complete.started_at,
+        calls_complete.ended_at,
+        calls_complete.inputs_dump,
+        calls_complete.output_dump,
+        calls_complete.summary_dump
+    FROM calls_complete
+    WHERE calls_complete.project_id = {project_id_param}
+      AND calls_complete.id IN (SELECT call_id FROM page_rows)
+)"""
+
+
 def build_eval_results_query(
     project_id: str,
     eval_root_ids: list[str],
@@ -341,7 +378,8 @@ def build_eval_results_query(
     """Build the complete eval_results SQL query.
 
     The CTE chain carries only lightweight columns for sort/filter/pagination.
-    The outer SELECT joins back to the source table to hydrate heavy columns.
+    A page_calls CTE pre-filters the source table to just the page's call IDs,
+    then the outer SELECT joins two small tables (page_rows + page_calls).
     """
     cte_chain = build_eval_results_cte_chain(
         project_id,
@@ -355,56 +393,28 @@ def build_eval_results_query(
         read_table,
     )
     project_id_param = param_slot(pb.add_param(project_id), "String")
+    page_calls_cte = _build_page_calls_cte(project_id_param, read_table)
 
-    if read_table == "calls_merged":
-        return f"""WITH {cte_chain.strip()}
+    return f"""WITH {cte_chain.strip()},
+
+{page_calls_cte}
 SELECT
     page_rows.call_id AS id,
     page_rows.eval_call_id AS parent_id,
-    any(calls_merged.project_id) AS project_id,
-    any(calls_merged.trace_id) AS trace_id,
-    any(calls_merged.op_name) AS op_name,
-    any(calls_merged.started_at) AS started_at,
-    any(calls_merged.ended_at) AS ended_at,
-    any(calls_merged.inputs_dump) AS inputs_dump,
-    any(calls_merged.output_dump) AS output_dump,
-    any(calls_merged.summary_dump) AS summary_dump,
+    page_calls.project_id,
+    page_calls.trace_id,
+    page_calls.op_name,
+    page_calls.started_at,
+    page_calls.ended_at,
+    page_calls.inputs_dump,
+    page_calls.output_dump,
+    page_calls.summary_dump,
     page_rows.row_digest AS __row_digest,
     page_rows.row_order AS __row_order,
     page_rows.resolved_inputs AS __resolved_inputs,
     (SELECT total_rows FROM ranked_digest_count) AS __total_rows
 FROM page_rows
-LEFT JOIN calls_merged
-    ON calls_merged.id = page_rows.call_id
-    AND calls_merged.project_id = {project_id_param}
-GROUP BY (
-    page_rows.call_id,
-    page_rows.eval_call_id,
-    page_rows.row_digest,
-    page_rows.row_order,
-    page_rows.resolved_inputs
-)"""
-    else:
-        return f"""WITH {cte_chain.strip()}
-SELECT
-    page_rows.call_id AS id,
-    page_rows.eval_call_id AS parent_id,
-    calls_complete.project_id,
-    calls_complete.trace_id,
-    calls_complete.op_name,
-    calls_complete.started_at,
-    calls_complete.ended_at,
-    calls_complete.inputs_dump,
-    calls_complete.output_dump,
-    calls_complete.summary_dump,
-    page_rows.row_digest AS __row_digest,
-    page_rows.row_order AS __row_order,
-    page_rows.resolved_inputs AS __resolved_inputs,
-    (SELECT total_rows FROM ranked_digest_count) AS __total_rows
-FROM page_rows
-LEFT JOIN calls_complete
-    ON calls_complete.id = page_rows.call_id
-    AND calls_complete.project_id = {project_id_param}"""
+LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id"""
 
 
 def build_eval_results_cte_chain(

@@ -402,33 +402,40 @@ def test_full_query_calls_merged() -> None:
                     predict_and_score_calls_resolved.resolved_inputs
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
+            ),
+
+            page_calls AS (
+                SELECT calls_merged.id AS call_id,
+                    any(calls_merged.project_id) AS project_id,
+                    any(calls_merged.trace_id) AS trace_id,
+                    any(calls_merged.op_name) AS op_name,
+                    any(calls_merged.started_at) AS started_at,
+                    any(calls_merged.ended_at) AS ended_at,
+                    any(calls_merged.inputs_dump) AS inputs_dump,
+                    any(calls_merged.output_dump) AS output_dump,
+                    any(calls_merged.summary_dump) AS summary_dump
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_3:String}
+                WHERE calls_merged.id IN (SELECT call_id FROM page_rows)
+                GROUP BY (calls_merged.project_id, calls_merged.id)
             )
         SELECT
             page_rows.call_id AS id,
             page_rows.eval_call_id AS parent_id,
-            any(calls_merged.project_id) AS project_id,
-            any(calls_merged.trace_id) AS trace_id,
-            any(calls_merged.op_name) AS op_name,
-            any(calls_merged.started_at) AS started_at,
-            any(calls_merged.ended_at) AS ended_at,
-            any(calls_merged.inputs_dump) AS inputs_dump,
-            any(calls_merged.output_dump) AS output_dump,
-            any(calls_merged.summary_dump) AS summary_dump,
+            page_calls.project_id,
+            page_calls.trace_id,
+            page_calls.op_name,
+            page_calls.started_at,
+            page_calls.ended_at,
+            page_calls.inputs_dump,
+            page_calls.output_dump,
+            page_calls.summary_dump,
             page_rows.row_digest AS __row_digest,
             page_rows.row_order AS __row_order,
             page_rows.resolved_inputs AS __resolved_inputs,
             (SELECT total_rows FROM ranked_digest_count) AS __total_rows
         FROM page_rows
-        LEFT JOIN calls_merged
-            ON calls_merged.id = page_rows.call_id
-            AND calls_merged.project_id = {pb_3:String}
-        GROUP BY (
-            page_rows.call_id,
-            page_rows.eval_call_id,
-            page_rows.row_digest,
-            page_rows.row_order,
-            page_rows.resolved_inputs
-        )
+        LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id
         """,
         pb.get_params(),
         {
