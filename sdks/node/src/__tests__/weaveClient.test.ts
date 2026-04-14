@@ -454,9 +454,7 @@ describe('WeaveClient', () => {
         client.linkPromptToRegistry(prompt, {
           targetPath: 'wandb-registry-prompts/my-prompt-collection',
         })
-      ).rejects.toThrow(
-        'linkPromptToRegistry requires a published prompt'
-      );
+      ).rejects.toThrow('linkPromptToRegistry requires a published prompt');
     });
 
     it('rejects invalid target paths', async () => {
