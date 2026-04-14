@@ -258,6 +258,7 @@ from weave.trace_server.token_costs import (
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
+    MAX_FILTER_LENGTH,
     DynamicBatchProcessor,
     LRUCache,
     determine_call_status,
@@ -5179,12 +5180,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if req.include_predict_and_score_children and len(page_calls) > 0:
             pas_ids = [c.id for c in page_calls]
-            child_req = tsi.CallsQueryReq(
-                project_id=req.project_id,
-                filter=tsi.CallsFilter(parent_ids=pas_ids),
-                sort_by=[tsi.SortBy(field="started_at", direction="asc")],
-            )
-            page_calls.extend(self.calls_query_stream(child_req))
+            child_columns = [
+                *REQUIRED_CALL_COLUMNS,
+                *ALL_CALL_JSON_COLUMNS,
+                "parent_id",
+                "ended_at",
+            ]
+            for i in range(0, len(pas_ids), MAX_FILTER_LENGTH):
+                batch = pas_ids[i : i + MAX_FILTER_LENGTH]
+                child_req = tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=tsi.CallsFilter(parent_ids=batch),
+                    columns=child_columns,
+                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                )
+                page_calls.extend(self.calls_query_stream(child_req))
 
         rows = eval_helpers.build_sorted_eval_rows(
             page_calls,
