@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any, cast
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
@@ -27,6 +27,9 @@ from weave.trace.table import Table
 from weave.trace.view_utils import set_call_view
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
+from weave.trace_server_bindings.create_and_link_weave_asset import (
+    CreateAndLinkWeaveAssetRes,
+)
 from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
@@ -380,6 +383,51 @@ def ref(location: str) -> ObjectRef:
     return ref
 
 
+def link_prompt_to_registry(
+    prompt: Any | ObjectRef | str,
+    *,
+    target_path: str,
+    aliases: Sequence[str] | None = None,
+) -> CreateAndLinkWeaveAssetRes:
+    """Link a published prompt or object version into the registry.
+
+    Args:
+        prompt: A published prompt or object, an `ObjectRef`, or a fully qualified
+            `weave:///...` URI string.
+        target_path: Registry destination path in the format
+            `<registry_project>/<portfolio_name>`, for example
+            `wandb-registry-prompts/my-prompt-collection`.
+        aliases: Optional aliases to attach to the created registry version.
+
+    Returns:
+        CreateAndLinkWeaveAssetRes: Parsed response from the internal registry-link
+        endpoint.
+
+    Raises:
+        ValueError: If weave has not been initialized, the prompt is unpublished,
+            or the request cannot be authenticated.
+
+    Examples:
+        >>> import weave
+        >>> from weave.trace import api
+        >>> client = weave.init("my-entity/my-project")
+        >>> prompt_ref = weave.publish(weave.StringPrompt("Hello {name}"), name="hello")
+        >>> result = api.link_prompt_to_registry(
+        ...     prompt_ref,
+        ...     target_path="wandb-registry-prompts/my-prompt-collection",
+        ...     aliases=["latest"],
+        ... )
+        >>> result.version_index
+        0
+    """
+    client = weave_client_context.require_weave_client()
+    return client.link_prompt_to_registry(
+        prompt,
+        target_path=target_path,
+        aliases=aliases,
+    )
+
+
 def get(uri: str | ObjectRef) -> Any:
     """A convenience function for getting an object from a URI.
 
@@ -586,6 +634,7 @@ __all__ = [
     "get_tags",
     "get_tags_and_aliases",
     "init",
+    "link_prompt_to_registry",
     "list_aliases",
     "list_tags",
     "op",

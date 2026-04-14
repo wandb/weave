@@ -154,6 +154,12 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.create_and_link_weave_asset import (
+    CreateAndLinkWeaveAssetReq,
+    CreateAndLinkWeaveAssetRes,
+    CreateAndLinkWeaveAssetTarget,
+    create_and_link_weave_asset,
+)
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     ROW_COUNT_CHUNKING_THRESHOLD,
@@ -1270,6 +1276,103 @@ class WeaveClient:
         if isinstance(obj_ref, str):
             return ObjectRef.parse_uri(obj_ref)
         return obj_ref
+
+    @staticmethod
+    def _resolve_registry_prompt_ref(prompt: Any | ObjectRef | str) -> ObjectRef:
+        """Resolve a published prompt or object to an `ObjectRef`."""
+        if isinstance(prompt, str):
+            return ObjectRef.parse_uri(prompt)
+        if isinstance(prompt, ObjectRef):
+            return prompt
+
+        prompt_ref = get_ref(prompt)
+        if prompt_ref is None:
+            raise ValueError(
+                "link_prompt_to_registry requires a published prompt or object. "
+                "Call weave.publish() first or pass an ObjectRef / weave:/// URI."
+            )
+        return prompt_ref
+
+    @staticmethod
+    def _parse_registry_target_path(target_path: str) -> tuple[str, str]:
+        """Parse a registry target path.
+
+        Args:
+            target_path: Registry destination path in the format
+                `<registry_project>/<portfolio_name>`, for example
+                `wandb-registry-prompts/my-prompt-collection`.
+
+        Returns:
+            tuple[str, str]: The parsed `(registry_project, portfolio_name)`.
+
+        Raises:
+            ValueError: If `target_path` does not match the expected format.
+
+        Examples:
+            >>> WeaveClient._parse_registry_target_path(
+            ...     "wandb-registry-prompts/my-prompt-collection"
+            ... )
+            ('wandb-registry-prompts', 'my-prompt-collection')
+        """
+        match = re.fullmatch(r"(wandb-registry-[^/]+)/([^/]+)", target_path)
+        if match is None:
+            raise ValueError(
+                "target_path must match '<registry_project>/<portfolio_name>' "
+                "where registry_project starts with 'wandb-registry-'"
+            )
+        return cast(tuple[str, str], match.groups())
+
+    @trace_sentry.global_trace_sentry.watch()
+    def link_prompt_to_registry(
+        self,
+        prompt: Any | ObjectRef | str,
+        *,
+        target_path: str,
+        aliases: Sequence[str] | None = None,
+    ) -> CreateAndLinkWeaveAssetRes:
+        """Link a published prompt or object version into the registry.
+
+        Args:
+            prompt: A published prompt or object, an `ObjectRef`, or a fully qualified
+                `weave:///...` URI string.
+            target_path: Registry destination path in the format
+                `<registry_project>/<portfolio_name>`, for example
+                `wandb-registry-prompts/my-prompt-collection`.
+            aliases: Optional aliases to attach to the created registry version.
+
+        Returns:
+            CreateAndLinkWeaveAssetRes: Parsed response from the registry-link endpoint.
+
+        Raises:
+            ValueError: If `prompt` has not been published yet, `target_path` is
+                invalid, or no API key is available for the trace server request.
+
+        Examples:
+            >>> import weave
+            >>> client = weave.init("my-entity/my-project")
+            >>> prompt_ref = weave.publish(weave.StringPrompt("Hello {name}"), name="hello")
+            >>> result = client.link_prompt_to_registry(
+            ...     prompt_ref,
+            ...     target_path="wandb-registry-prompts/my-prompt-collection",
+            ...     aliases=["latest"],
+            ... )
+            >>> result.version_index
+            0
+        """
+        prompt_ref = self._resolve_registry_prompt_ref(prompt)
+        registry_project, portfolio_name = self._parse_registry_target_path(target_path)
+
+        return create_and_link_weave_asset(
+            CreateAndLinkWeaveAssetReq(
+                ref=prompt_ref.uri,
+                target=CreateAndLinkWeaveAssetTarget(
+                    portfolio_name=portfolio_name,
+                    entity_name=self.entity,
+                    project_name=registry_project,
+                ),
+                aliases=list(aliases or []),
+            )
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def add_tags(self, obj_ref: ObjectRef | str, tags: list[str]) -> None:
