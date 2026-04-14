@@ -362,14 +362,14 @@ def test_replicated_management_table_follows_database_engine(replicated_migrator
     def _normalize(sql: str) -> str:
         return " ".join(sql.split())
 
-    # Replicated DB: plain MergeTree, no ON CLUSTER (auto-replicated)
+    # Replicated DB: explicit ReplicatedMergeTree, no ON CLUSTER
     replicated_migrator._replicated_db_engine_cache[
         replicated_migrator.management_db
     ] = True
     assert _normalize(replicated_migrator._create_management_table_sql()) == _normalize(
         """CREATE TABLE IF NOT EXISTS db_management.migrations
            ( db_name String, curr_version UInt64, partially_applied_version UInt64 NULL, )
-           ENGINE = MergeTree() ORDER BY (db_name)"""
+           ENGINE = ReplicatedMergeTree() ORDER BY (db_name)"""
     )
 
     # Atomic DB: explicit ReplicatedMergeTree + ON CLUSTER
@@ -410,10 +410,9 @@ def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
 
     assert migrator._replicated_db_engine_cache[migrator.management_db] is True
     assert mock_sleep.call_count == 2
-    # Management table DDL should use plain MergeTree (Replicated DB auto-converts)
+    # Management table DDL should use ReplicatedMergeTree without ON CLUSTER.
     create_table_sql = ch_client.command.call_args_list[1][0][0]
-    assert "ENGINE = MergeTree()" in create_table_sql
-    assert "ReplicatedMergeTree" not in create_table_sql
+    assert "ENGINE = ReplicatedMergeTree()" in create_table_sql
     assert "ON CLUSTER" not in create_table_sql
 
     # Times out: engine never becomes visible, error includes the SQL context
@@ -1156,13 +1155,16 @@ def test_drop_table_replicated(replicated_migrator):
 
 
 def test_ddl_adapts_to_database_engine(replicated_migrator, distributed_migrator):
-    """DDL is passed through on Replicated engines, gets ON CLUSTER + ReplicatedMergeTree on Atomic."""
+    """Replicated DBs still get replicated engines, but never ON CLUSTER."""
     create_sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree() ORDER BY id"
 
-    # Replicated engine: SQL passed through as-is (DB auto-converts and auto-replicates)
+    # Replicated engine: rewrite to ReplicatedMergeTree, but omit ON CLUSTER.
     replicated_migrator._replicated_db_engine_cache["test_db"] = True
     replicated_migrator._execute_migration_command("test_db", create_sql)
-    assert replicated_migrator.ch_client.command.call_args_list[0][0][0] == create_sql
+    assert (
+        replicated_migrator.ch_client.command.call_args_list[0][0][0]
+        == "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree() ORDER BY id"
+    )
     replicated_migrator.ch_client.command.reset_mock()
 
     # Atomic engine: explicit ON CLUSTER + ReplicatedMergeTree
@@ -1172,14 +1174,25 @@ def test_ddl_adapts_to_database_engine(replicated_migrator, distributed_migrator
         replicated_migrator.ch_client.command.call_args_list[0][0][0]
         == "CREATE TABLE test ON CLUSTER test_cluster (id Int32) ENGINE = ReplicatedMergeTree() ORDER BY id"
     )
+    replicated_migrator.ch_client.command.reset_mock()
 
-    # Distributed migrator also skips ON CLUSTER for Replicated engine
+    # Distributed migrator also skips ON CLUSTER for Replicated DBs, while
+    # still creating ReplicatedMergeTree local tables plus a distributed table.
     distributed_migrator._replicated_db_engine_cache["test_db"] = True
-    distributed_migrator._execute_migration_command(
-        "test_db", "DROP TABLE IF EXISTS my_table"
+    distributed_migrator._execute_migration_command("test_db", create_sql)
+    local_sql, dist_sql = [
+        call.args[0] for call in distributed_migrator.ch_client.command.call_args_list
+    ]
+    assert "ON CLUSTER" not in local_sql
+    assert (
+        local_sql
+        == "CREATE TABLE test_local (id Int32) ENGINE = ReplicatedMergeTree() ORDER BY id"
     )
-    for c in distributed_migrator.ch_client.command.call_args_list:
-        assert "ON CLUSTER" not in c[0][0]
+    assert "ON CLUSTER" not in dist_sql
+    assert (
+        "ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
+        in dist_sql
+    )
 
 
 def test_index_operations_only_on_local_tables_distributed(distributed_migrator):
