@@ -371,10 +371,16 @@ async def populate_feedback(client: WeaveClient) -> None:
         ][x]
 
     ids = []
+    client.set_autoflush(False)
     for x in range(4):
         _, c = my_model.call(x)
         ids.append(c.id)
         await c.apply_scorer(my_scorer)
+    for _ in range(10):
+        client.flush()
+        if not client._has_pending_jobs():
+            break
+    client.set_autoflush(True)
 
     assert len(list(my_scorer.calls())) == 4
     assert len(list(my_model.calls())) == 4
