@@ -147,17 +147,13 @@ def test_dataset_list_and_pagination(trace_server):
 
     # Limit
     datasets = list(
-        trace_server.dataset_list(
-            tsi.DatasetListReq(project_id=project_id, limit=3)
-        )
+        trace_server.dataset_list(tsi.DatasetListReq(project_id=project_id, limit=3))
     )
     assert len(datasets) == 3
 
     # Offset
     datasets = list(
-        trace_server.dataset_list(
-            tsi.DatasetListReq(project_id=project_id, offset=7)
-        )
+        trace_server.dataset_list(tsi.DatasetListReq(project_id=project_id, offset=7))
     )
     assert len(datasets) == 3
 
@@ -316,9 +312,7 @@ def test_dataset_list_after_deletion(trace_server):
         )
 
     trace_server.dataset_delete(
-        tsi.DatasetDeleteReq(
-            project_id=project_id, object_id="delete_me", digests=None
-        )
+        tsi.DatasetDeleteReq(project_id=project_id, object_id="delete_me", digests=None)
     )
 
     datasets = list(

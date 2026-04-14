@@ -79,9 +79,7 @@ def test_scorer_list_and_pagination(trace_server):
     project_id = f"{TEST_ENTITY}/test_scorer_list_pagination"
 
     # Empty project
-    scorers = list(
-        trace_server.scorer_list(tsi.ScorerListReq(project_id=project_id))
-    )
+    scorers = list(trace_server.scorer_list(tsi.ScorerListReq(project_id=project_id)))
     assert len(scorers) == 0
 
     # Create 10 scorers
@@ -96,9 +94,7 @@ def test_scorer_list_and_pagination(trace_server):
         )
 
     # List all
-    scorers = list(
-        trace_server.scorer_list(tsi.ScorerListReq(project_id=project_id))
-    )
+    scorers = list(trace_server.scorer_list(tsi.ScorerListReq(project_id=project_id)))
     assert len(scorers) == 10
     for scorer in scorers:
         assert scorer.score_op
@@ -106,17 +102,13 @@ def test_scorer_list_and_pagination(trace_server):
 
     # Limit
     scorers = list(
-        trace_server.scorer_list(
-            tsi.ScorerListReq(project_id=project_id, limit=3)
-        )
+        trace_server.scorer_list(tsi.ScorerListReq(project_id=project_id, limit=3))
     )
     assert len(scorers) == 3
 
     # Offset
     scorers = list(
-        trace_server.scorer_list(
-            tsi.ScorerListReq(project_id=project_id, offset=7)
-        )
+        trace_server.scorer_list(tsi.ScorerListReq(project_id=project_id, offset=7))
     )
     assert len(scorers) == 3
 
@@ -203,9 +195,7 @@ def test_scorer_delete(trace_server):
         )
         digests.append(res.digest)
     delete_res = trace_server.scorer_delete(
-        tsi.ScorerDeleteReq(
-            project_id=project_id, object_id="delete_all", digests=None
-        )
+        tsi.ScorerDeleteReq(project_id=project_id, object_id="delete_all", digests=None)
     )
     assert delete_res.num_deleted == 3
 
@@ -275,14 +265,10 @@ def test_scorer_list_after_deletion(trace_server):
         )
 
     trace_server.scorer_delete(
-        tsi.ScorerDeleteReq(
-            project_id=project_id, object_id="delete_me", digests=None
-        )
+        tsi.ScorerDeleteReq(project_id=project_id, object_id="delete_me", digests=None)
     )
 
-    scorers = list(
-        trace_server.scorer_list(tsi.ScorerListReq(project_id=project_id))
-    )
+    scorers = list(trace_server.scorer_list(tsi.ScorerListReq(project_id=project_id)))
     scorer_names_returned = {s.name for s in scorers}
     assert scorer_names_returned == {"keep_1", "keep_2"}
 
@@ -415,9 +401,7 @@ def test_scorer_list_with_missing_name_in_val(trace_server):
         )
     )
 
-    scorers = list(
-        trace_server.scorer_list(tsi.ScorerListReq(project_id=project_id))
-    )
+    scorers = list(trace_server.scorer_list(tsi.ScorerListReq(project_id=project_id)))
     assert len(scorers) == 1
     assert scorers[0].name == "nameless_scorer"
     assert scorers[0].object_id == "nameless_scorer"

@@ -349,9 +349,7 @@ def test_custom_provider_completions_create(client):
                 model_id="test-model",
                 model_name="test-model",
             )
-            slash_mock_read = create_mock_obj_read(
-                slash_provider_obj, slash_model_obj
-            )
+            slash_mock_read = create_mock_obj_read(slash_provider_obj, slash_model_obj)
 
             slash_inputs = {
                 "model": slash_model_name,
@@ -432,9 +430,7 @@ def test_custom_provider_error_handling(client):
                         "project_id": client.project_id,
                         "inputs": {
                             "model": "invalid-model-format",
-                            "messages": [
-                                {"role": "user", "content": "Hello, world!"}
-                            ],
+                            "messages": [{"role": "user", "content": "Hello, world!"}],
                         },
                     }
                 )

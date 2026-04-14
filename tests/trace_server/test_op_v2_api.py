@@ -103,14 +103,10 @@ def test_op_list_and_pagination(trace_server):
 
     # Limit + offset pagination
     page1 = list(
-        trace_server.op_list(
-            tsi.OpListReq(project_id=project_id, limit=3, offset=0)
-        )
+        trace_server.op_list(tsi.OpListReq(project_id=project_id, limit=3, offset=0))
     )
     page2 = list(
-        trace_server.op_list(
-            tsi.OpListReq(project_id=project_id, limit=3, offset=3)
-        )
+        trace_server.op_list(tsi.OpListReq(project_id=project_id, limit=3, offset=3))
     )
     assert len(page1) == 3
     assert len(page2) == 3
@@ -184,9 +180,7 @@ def test_op_delete(trace_server):
         )
         digests.append(res.digest)
     delete_res = trace_server.op_delete(
-        tsi.OpDeleteReq(
-            project_id=project_id, object_id="delete_all", digests=None
-        )
+        tsi.OpDeleteReq(project_id=project_id, object_id="delete_all", digests=None)
     )
     assert delete_res.num_deleted == 3
 
@@ -256,9 +250,7 @@ def test_op_list_after_deletion(trace_server):
         )
 
     trace_server.op_delete(
-        tsi.OpDeleteReq(
-            project_id=project_id, object_id="op_delete", digests=None
-        )
+        tsi.OpDeleteReq(project_id=project_id, object_id="op_delete", digests=None)
     )
 
     ops = list(trace_server.op_list(tsi.OpListReq(project_id=project_id)))

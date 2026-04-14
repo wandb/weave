@@ -843,11 +843,7 @@ class StateExporter(BaseModel):
                     pass
 
             def _cb() -> None:
-                try:
-                    self._advance_fifo()
-                finally:
-                    # If more remain and head not ready, a new timer will be scheduled
-                    pass
+                self._advance_fifo()
 
             self.fifo_timer = threading.Timer(FIFO_TIMER_INTERVAL_SECONDS, _cb)
             self.fifo_timer.start()

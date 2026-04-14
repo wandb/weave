@@ -317,7 +317,7 @@ def get_code_deps_safe(
         fn: The Python function to analyze.
 
     Returns:
-        tupe: A tuple containing
+        tuple: A tuple containing
             import_code: str, the code that should be included in the generated code to ensure all
                 dependencies are available for the function body.
             code: str, the function body code.
@@ -405,26 +405,20 @@ def _get_code_deps(
                     code.append(get_source_notebook_safe(var_value))
 
                     warnings += fn_warnings
+            # For now, if the function is in another module.
+            # we just import it. This is ok for libraries, but not
+            # if the user has functions declared within their
+            # package but outside of the op module.
+            elif is_op(var_value):
+                warnings.append(
+                    f"Cross-module op dependencies are not yet serializable {var_value}"
+                )
             else:
-                # For now, if the function is in another module.
-                # we just import it. This is ok for libraries, but not
-                # if the user has functions declared within their
-                # package but outside of the op module.
-                if var_value.__module__.split(".")[0] == fn.__module__.split(".")[0]:
-                    pass
+                import_line = f"from {var_value.__module__} import {var_value.__name__}"
+                if var_value.__name__ != var_name:
+                    import_line += f" as {var_name}"
 
-                if is_op(var_value):
-                    warnings.append(
-                        f"Cross-module op dependencies are not yet serializable {var_value}"
-                    )
-                else:
-                    import_line = (
-                        f"from {var_value.__module__} import {var_value.__name__}"
-                    )
-                    if var_value.__name__ != var_name:
-                        import_line += f" as {var_name}"
-
-                    import_code.append(import_line)
+                import_code.append(import_line)
 
         else:
             # Code saving for Ops using TypedDict and NotRequired was failing on Python 3.9
