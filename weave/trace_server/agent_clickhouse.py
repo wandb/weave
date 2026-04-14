@@ -17,6 +17,9 @@ from weave.trace_server.agent_schema import (
     ALL_SPAN_INSERT_COLUMNS,
     AgentSpanCHInsertable,
 )
+from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
+from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
+from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     SPAN_SORTABLE_COLS,
@@ -30,23 +33,35 @@ from weave.trace_server.query_builder.agent_query_builder import (
 
 if TYPE_CHECKING:
     from clickhouse_connect.driver.client import Client as CHClient
+from weave.trace_server.agent_chat_view import build_trace_chat
 from weave.trace_server.agent_types import (
+    AgentConversationChatReq,
     AgentConversationChatRes,
     AgentConversationSchema,
+    AgentConversationsQueryReq,
     AgentConversationsQueryRes,
     AgentSchema,
     AgentSearchConversationResult,
     AgentSearchMatchedMessage,
+    AgentSearchReq,
     AgentSearchRes,
     AgentSpanSchema,
+    AgentSpansQueryReq,
     AgentSpansQueryRes,
     AgentSpansTraceReq,
     AgentSpansTraceRes,
+    AgentsQueryReq,
     AgentsQueryRes,
+    AgentTraceChatReq,
+    AgentTraceChatRes,
     AgentTraceSchema,
+    AgentTracesQueryReq,
     AgentTracesQueryRes,
     AgentVersionSchema,
+    AgentVersionsQueryReq,
     AgentVersionsQueryRes,
+    GenAIOTelExportReq,
+    GenAIOTelExportRes,
 )
 
 logger = logging.getLogger(__name__)
@@ -144,7 +159,7 @@ class AgentQueryHandler:
     # Spans queries
     # ------------------------------------------------------------------
 
-    def spans_query(self, req: Any) -> Any:
+    def spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
         """Query spans with filters, sort, and pagination."""
         pb = ParamBuilder("genai")
         conditions = [f"s.project_id = {pb.add(req.project_id, param_type='String')}"]
@@ -185,7 +200,7 @@ class AgentQueryHandler:
 
         return AgentSpansQueryRes(spans=spans, total_count=total)
 
-    def spans_trace(self, req: Any) -> Any:
+    def spans_trace(self, req: AgentSpansTraceReq) -> AgentSpansTraceRes:
         """Get all spans for a trace."""
         pb = ParamBuilder("genai")
         pid = pb.add(req.project_id, param_type="String")
@@ -211,7 +226,7 @@ class AgentQueryHandler:
     # Traces queries (GROUP BY trace_id on spans)
     # ------------------------------------------------------------------
 
-    def traces_query(self, req: Any) -> Any:
+    def traces_query(self, req: AgentTracesQueryReq) -> AgentTracesQueryRes:
         """Query traces by aggregating spans with time bounds."""
         pb = ParamBuilder("genai")
         conditions = [f"project_id = {pb.add(req.project_id, param_type='String')}"]
@@ -306,7 +321,7 @@ class AgentQueryHandler:
     # Agents AMT queries (lean: counters + first/last seen)
     # ------------------------------------------------------------------
 
-    def agents_query(self, req: Any) -> Any:
+    def agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         """Query agents AMT for agent list page."""
         pb = ParamBuilder("genai")
         conditions = [f"project_id = {pb.add(req.project_id, param_type='String')}"]
@@ -384,7 +399,7 @@ class AgentQueryHandler:
     # Agent versions AMT queries (lean: counters + first/last seen)
     # ------------------------------------------------------------------
 
-    def agent_versions_query(self, req: Any) -> Any:
+    def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
         """Query agent_versions AMT for version drill-down."""
         pb = ParamBuilder("genai")
         pid = pb.add(req.project_id, param_type="String")
@@ -443,7 +458,7 @@ class AgentQueryHandler:
     # Conversations queries (GROUP BY conversation_id on spans)
     # ------------------------------------------------------------------
 
-    def conversations_query(self, req: Any) -> Any:
+    def conversations_query(self, req: AgentConversationsQueryReq) -> AgentConversationsQueryRes:
         """Query conversations by aggregating spans with time bounds."""
         pb = ParamBuilder("genai")
         conditions = [
@@ -578,7 +593,7 @@ class AgentQueryHandler:
     # Message search
     # ------------------------------------------------------------------
 
-    def search(self, req: Any) -> Any:
+    def search(self, req: AgentSearchReq) -> AgentSearchRes:
         """Full-text search across message content."""
         pb = ParamBuilder("genai")
         conditions = [
@@ -668,23 +683,8 @@ class AgentWriteHandler:
     # OTel ingest
     # ------------------------------------------------------------------
 
-    def otel_export(self, req: Any) -> Any:
-        """Ingest OTel spans into spans (and message search index).
-
-        Receives ProcessedResourceSpans, extracts GenAI semconv fields via
-        genai_extraction, and batch-inserts into ClickHouse.
-        """
-        from weave.trace_server.opentelemetry.genai_extraction import (
-            extract_genai_span,
-        )
-        from weave.trace_server.opentelemetry.helpers import (
-            AttributePathConflictError,
-        )
-        from weave.trace_server.opentelemetry.python_spans import (
-            Resource,
-            Span,
-        )
-
+    def otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
+        """Ingest OTel spans into spans and message search index."""
         span_rows: list[list[Any]] = []
         search_rows: list[list[Any]] = []
         accepted = 0
@@ -692,11 +692,9 @@ class AgentWriteHandler:
         errors: list[str] = []
 
         for processed_span in req.processed_spans:
-            wb_run_id = getattr(processed_span, "run_id", None) or ""
-            proto_resource_spans = processed_span.resource_spans
-            resource = Resource.from_proto(proto_resource_spans.resource)
+            resource = Resource.from_proto(processed_span.resource_spans.resource)
 
-            for proto_scope_spans in proto_resource_spans.scope_spans:
+            for proto_scope_spans in processed_span.resource_spans.scope_spans:
                 for proto_span in proto_scope_spans.spans:
                     try:
                         span = Span.from_proto(proto_span, resource)
@@ -710,42 +708,26 @@ class AgentWriteHandler:
                             span,
                             project_id=req.project_id,
                             wb_user_id=req.wb_user_id or "",
-                            wb_run_id=wb_run_id,
+                            wb_run_id=processed_span.run_id or "",
                         )
                     except Exception as e:
                         rejected += 1
-                        errors.append(
-                            f"Extraction failed for span {span.span_id}: {e!s}"
-                        )
+                        errors.append(f"Extraction failed for span {span.span_id}: {e!s}")
                         continue
 
                     span_rows.append(genai_span_to_row(genai_row))
-
                     for sr in extract_search_rows(genai_row):
                         search_rows.append(genai_search_row_to_row(sr))
-
                     accepted += 1
 
         if span_rows:
-            self._ch.insert(
-                "spans",
-                data=span_rows,
-                column_names=ALL_SPAN_INSERT_COLUMNS,
-            )
-
+            self._ch.insert("spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS)
         if search_rows:
-            self._ch.insert(
-                "message_search",
-                data=search_rows,
-                column_names=ALL_SEARCH_INSERT_COLUMNS,
-            )
-
-        from weave.trace_server.agent_types import GenAIOTelExportRes
+            self._ch.insert("message_search", data=search_rows, column_names=ALL_SEARCH_INSERT_COLUMNS)
 
         error_msg = "; ".join(errors[:20])
         if len(errors) > 20:
             error_msg += "; ..."
-
         return GenAIOTelExportRes(
             accepted_spans=accepted,
             rejected_spans=rejected,
@@ -756,11 +738,8 @@ class AgentWriteHandler:
     # Chat projection
     # ------------------------------------------------------------------
 
-    def traces_chat(self, req: Any) -> Any:
+    def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
-        from weave.trace_server.agent_chat_view import build_trace_chat
-
-        # Load spans via time-bound oracle
         reader = AgentQueryHandler(self._ch)
         spans_res = reader.spans_trace(
             AgentSpansTraceReq(
@@ -770,14 +749,8 @@ class AgentWriteHandler:
         )
         return build_trace_chat(spans_res.spans, req.trace_id)
 
-    def conversation_chat(self, req: Any) -> Any:
-        """Build multi-turn chat view for a conversation.
-
-        Uses bloom_filter on conversation_id for constant-time lookup,
-        then groups spans by trace_id to build per-turn chat views.
-        """
-        from weave.trace_server.agent_chat_view import build_trace_chat
-
+    def conversation_chat(self, req: AgentConversationChatReq) -> AgentConversationChatRes:
+        """Build multi-turn chat view for a conversation."""
         pb = ParamBuilder("genai")
         pid = pb.add(req.project_id, param_type="String")
         cid = pb.add(req.conversation_id, param_type="String")
