@@ -13,6 +13,7 @@ from functools import partial
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import (
     ParamBuilder,
@@ -46,6 +47,7 @@ def build_predict_and_score_calls_cte(
     op_prefix_params: list[str],
     inputs_field: str,
     read_table: str,
+    deleted_at_sentinel_param: str | None = None,
 ) -> str:
     """Build the predict_and_score_calls CTE SQL.
 
@@ -438,6 +440,13 @@ def build_eval_results_cte_chain(
     eval_root_ids_param = pb.add(eval_root_ids, None, "Array(String)")
     op_prefix_param = pb.add(PREDICT_AND_SCORE_OP_PREFIX, None, "String")
 
+    # for calls_complete, deleted_at uses epoch zero instead of NULL.
+    deleted_at_sentinel_param = None
+    if read_table != "calls_merged":
+        deleted_at_sentinel_param = param_slot(
+            pb.add_param(SENTINEL_DATETIME), "DateTime64(3)"
+        )
+
     inputs_field = (
         "any(calls_merged.inputs_dump)"
         if read_table == "calls_merged"
@@ -450,6 +459,7 @@ def build_eval_results_cte_chain(
         op_prefix_param,
         inputs_field,
         read_table,
+        deleted_at_sentinel_param,
     )
     resolved_cte = build_predict_and_score_calls_resolved_cte(project_id_param)
     ranked_cte = build_ranked_digests_cte(

@@ -1,5 +1,8 @@
+import datetime
+
 from tests.trace_server.query_builder.utils import assert_raw_sql
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.eval_results_query_builder import (
     PREDICT_AND_SCORE_OP_PREFIX,
     build_eval_results_cte_chain,
@@ -136,6 +139,7 @@ def test_cte_chain_calls_complete() -> None:
                     AND calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
                     AND position(calls_complete.op_name, {pb_2:String}) > 0
+                    AND calls_complete.deleted_at = {pb_3:DateTime64(3)}
             ),
 
             predict_and_score_calls_resolved AS (
@@ -186,6 +190,7 @@ def test_cte_chain_calls_complete() -> None:
             "pb_0": "proj-1",
             "pb_1": ["eval-1"],
             "pb_2": PREDICT_AND_SCORE_OP_PREFIX,
+            "pb_3": SENTINEL_DATETIME,
         },
     )
 
@@ -257,6 +262,7 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                     AND calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
                     AND position(calls_complete.op_name, {pb_2:String}) > 0
+                    AND calls_complete.deleted_at = {pb_3:DateTime64(3)}
             ),
 
             predict_and_score_calls_resolved AS (
@@ -274,13 +280,13 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
 
             ranked_digests AS (
                 SELECT row_digest,
-                    ROW_NUMBER() OVER(ORDER BY avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_4:String} THEN multiIf(nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'true', '1', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'false', '0', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null')) ELSE NULL END)) DESC, row_digest ASC) AS row_order
+                    ROW_NUMBER() OVER(ORDER BY avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_5:String} THEN multiIf(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null') = 'true', '1', nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null') = 'false', '0', nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null')) ELSE NULL END)) DESC, row_digest ASC) AS row_order
                 FROM predict_and_score_calls_resolved
                 GROUP BY row_digest
                 HAVING 1=1
-                    AND countDistinct(eval_call_id) >= {pb_5:UInt64}
-                    AND (avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_4:String} THEN multiIf(nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'true', '1', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'false', '0', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null')) ELSE NULL END)) >= {pb_6:Float64})
-                    AND (avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_7:String} THEN multiIf(nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'true', '1', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null') = 'false', '0', nullIf(JSON_VALUE(output_dump, {pb_3:String}), 'null')) ELSE NULL END)) <= {pb_8:Float64})
+                    AND countDistinct(eval_call_id) >= {pb_6:UInt64}
+                    AND (avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_5:String} THEN multiIf(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null') = 'true', '1', nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null') = 'false', '0', nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null')) ELSE NULL END)) >= {pb_7:Float64})
+                    AND (avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_8:String} THEN multiIf(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null') = 'true', '1', nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null') = 'false', '0', nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null')) ELSE NULL END)) <= {pb_9:Float64})
             ),
 
             ranked_digest_count AS (
@@ -310,12 +316,13 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
             "pb_0": "proj-1",
             "pb_1": ["eval-1", "eval-2"],
             "pb_2": PREDICT_AND_SCORE_OP_PREFIX,
-            "pb_3": '$."scores"."accuracy"',
-            "pb_4": "eval-1",
-            "pb_5": 2,
-            "pb_6": 0.5,
-            "pb_7": "eval-2",
-            "pb_8": 0.9,
+            "pb_3": SENTINEL_DATETIME,
+            "pb_4": '$."scores"."accuracy"',
+            "pb_5": "eval-1",
+            "pb_6": 2,
+            "pb_7": 0.5,
+            "pb_8": "eval-2",
+            "pb_9": 0.9,
         },
     )
 
@@ -480,6 +487,7 @@ def test_full_query_calls_complete() -> None:
                     AND calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
                     AND position(calls_complete.op_name, {pb_2:String}) > 0
+                    AND calls_complete.deleted_at = {pb_3:DateTime64(3)}
             ),
 
             predict_and_score_calls_resolved AS (
@@ -536,7 +544,7 @@ def test_full_query_calls_complete() -> None:
                     calls_complete.output_dump,
                     calls_complete.summary_dump
                 FROM calls_complete
-                WHERE calls_complete.project_id = {pb_3:String}
+                WHERE calls_complete.project_id = {pb_4:String}
                     AND calls_complete.id IN (SELECT call_id FROM page_rows)
             )
         SELECT
@@ -563,6 +571,7 @@ def test_full_query_calls_complete() -> None:
             "pb_0": "proj-1",
             "pb_1": ["eval-1"],
             "pb_2": PREDICT_AND_SCORE_OP_PREFIX,
-            "pb_3": "proj-1",
+            "pb_3": SENTINEL_DATETIME,
+            "pb_4": "proj-1",
         },
     )
