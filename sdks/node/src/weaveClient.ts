@@ -32,11 +32,18 @@ import {
 } from './opType';
 import {Settings} from './settings';
 import {Table, TableRef, TableRowRef} from './table';
+import {
+  CreateAndLinkWeaveAssetReq,
+  CreateAndLinkWeaveAssetRes,
+  CreateAndLinkWeaveAssetTarget,
+  createAndLinkWeaveAsset,
+} from './traceServerBindings/createAndLinkWeaveAsset';
 import {packageVersion} from './utils/userAgent';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
 import {Call, CallState, InternalCall} from './call';
 import {CallRef} from './refs';
+import type {Prompt} from './prompt';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 const DEFAULT_GET_CALLS_LIMIT = 1000;
@@ -114,6 +121,8 @@ function generateTraceId(): string {
 function generateCallId(): string {
   return uuidv7();
 }
+
+type RegistryLinkable = Prompt | ObjectRef | string;
 
 export class CallStack {
   constructor(private stack: CallStackEntry[] = []) {}
@@ -522,6 +531,92 @@ export class WeaveClient {
       }
     }
     return val;
+  }
+
+  private async resolveRegistryPromptRef(
+    prompt: RegistryLinkable
+  ): Promise<ObjectRef> {
+    if (typeof prompt === 'string') {
+      return ObjectRef.fromUri(prompt);
+    }
+    if (prompt instanceof ObjectRef) {
+      return prompt;
+    }
+
+    const savedRef = prompt.__savedRef;
+    if (savedRef == null) {
+      throw new Error(
+        'linkPromptToRegistry requires a published prompt. Call publish() first or pass an ObjectRef / weave:/// URI.'
+      );
+    }
+
+    const resolvedRef = await savedRef;
+    if (!(resolvedRef instanceof ObjectRef)) {
+      throw new Error(
+        'linkPromptToRegistry requires a prompt ref. Publish a prompt or pass an ObjectRef / weave:/// URI.'
+      );
+    }
+
+    return resolvedRef;
+  }
+
+  private parseRegistryTargetPath(targetPath: string): {
+    registryProject: string;
+    portfolioName: string;
+  } {
+    const match = targetPath.match(/^(wandb-registry-[^/]+)\/([^/]+)$/);
+    if (match == null) {
+      throw new Error(
+        "targetPath must match '<registry_project>/<portfolio_name>' where registry_project starts with 'wandb-registry-'"
+      );
+    }
+
+    return {
+      registryProject: match[1],
+      portfolioName: match[2],
+    };
+  }
+
+  /**
+   * Link a published prompt version into a registry portfolio.
+   *
+   * @param prompt - A published prompt, an ObjectRef, or a fully-qualified
+   * weave URI string.
+   * @param options - Registry destination and alias options.
+   * @returns Parsed response from the registry-link endpoint.
+   * @throws Error if the prompt is unpublished, the client project scope is invalid,
+   * or the target path is malformed.
+   */
+  public async linkPromptToRegistry(
+    prompt: RegistryLinkable,
+    options: {
+      targetPath: string;
+      aliases?: string[];
+    }
+  ): Promise<CreateAndLinkWeaveAssetRes> {
+    const promptRef = await this.resolveRegistryPromptRef(prompt);
+    const {registryProject, portfolioName} = this.parseRegistryTargetPath(
+      options.targetPath
+    );
+    const [entityName] = this.projectId.split('/', 1);
+
+    if (!this.projectId.includes('/') || !entityName) {
+      throw new Error(
+        "linkPromptToRegistry requires client.projectId in '<entity>/<project>' format"
+      );
+    }
+
+    const req: CreateAndLinkWeaveAssetReq = {
+      ref: promptRef.uri(),
+      target: {
+        entity_name: entityName,
+        project_name: registryProject,
+        portfolio_name: portfolioName,
+      } satisfies CreateAndLinkWeaveAssetTarget,
+      aliases: [...(options.aliases ?? [])],
+    };
+
+    return createAndLinkWeaveAsset(this.traceServerApi, req);
   }
 
   // save* methods attached __savedRef promises to their values. These must

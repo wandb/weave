@@ -45,6 +45,7 @@ export async function login(apiKey: string, host?: string) {
   try {
     await testTraceServerApi.health.readRootHealthGet({});
   } catch (error) {
+    console.error(error);
     throw new Error(
       'Unable to verify connection to the weave trace server with given API Key'
     );
