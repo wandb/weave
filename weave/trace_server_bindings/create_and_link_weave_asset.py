@@ -30,11 +30,7 @@ class CreateAndLinkWeaveAssetRes(BaseModel):
 def create_and_link_weave_asset(
     req: CreateAndLinkWeaveAssetReq,
 ) -> CreateAndLinkWeaveAssetRes:
-    """Link a published Weave object version into a registry portfolio.
-
-    This helper posts the internal `/link_to_registry` request to the trace server,
-    validates the HTTP response, and parses the JSON payload into a typed response
-    model.
+    """Post a `/link_to_registry` request to the trace server.
 
     Args:
         req: Typed request payload containing the source object ref, destination
@@ -42,24 +38,6 @@ def create_and_link_weave_asset(
 
     Returns:
         CreateAndLinkWeaveAssetRes: Parsed response from the registry-link endpoint.
-
-    Raises:
-        ValueError: If no W&B API key is available or the trace server returns
-            invalid JSON.
-        httpx.HTTPStatusError: If the trace server responds with a non-2xx status.
-
-    Examples:
-        >>> req = CreateAndLinkWeaveAssetReq(
-        ...     ref="weave:///source-entity/source-project/object/my-prompt:v1",
-        ...     target=CreateAndLinkWeaveAssetTarget(
-        ...         entity_name="my-org",
-        ...         project_name="wandb-registry-prompts",
-        ...         portfolio_name="my-prompt-collection",
-        ...     ),
-        ...     aliases=["latest"],
-        ... )
-        >>> isinstance(req, CreateAndLinkWeaveAssetReq)
-        True
     """
     api_key = get_wandb_api_context()
     if api_key is None:

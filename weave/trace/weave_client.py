@@ -1280,10 +1280,8 @@ class WeaveClient:
     @staticmethod
     def _resolve_registry_prompt_ref(prompt: Any | ObjectRef | str) -> ObjectRef:
         """Resolve a published prompt or object to an `ObjectRef`."""
-        if isinstance(prompt, str):
-            return ObjectRef.parse_uri(prompt)
-        if isinstance(prompt, ObjectRef):
-            return prompt
+        if isinstance(prompt, (str, ObjectRef)):
+            return WeaveClient._resolve_obj_ref(prompt)
 
         prompt_ref = get_ref(prompt)
         if prompt_ref is None:
@@ -1295,25 +1293,7 @@ class WeaveClient:
 
     @staticmethod
     def _parse_registry_target_path(target_path: str) -> tuple[str, str]:
-        """Parse a registry target path.
-
-        Args:
-            target_path: Registry destination path in the format
-                `<registry_project>/<portfolio_name>`, for example
-                `wandb-registry-prompts/my-prompt-collection`.
-
-        Returns:
-            tuple[str, str]: The parsed `(registry_project, portfolio_name)`.
-
-        Raises:
-            ValueError: If `target_path` does not match the expected format.
-
-        Examples:
-            >>> WeaveClient._parse_registry_target_path(
-            ...     "wandb-registry-prompts/my-prompt-collection"
-            ... )
-            ('wandb-registry-prompts', 'my-prompt-collection')
-        """
+        """Parse `<registry_project>/<portfolio_name>` into its two parts."""
         match = re.fullmatch(r"(wandb-registry-[^/]+)/([^/]+)", target_path)
         if match is None:
             raise ValueError(
@@ -1342,22 +1322,6 @@ class WeaveClient:
 
         Returns:
             CreateAndLinkWeaveAssetRes: Parsed response from the registry-link endpoint.
-
-        Raises:
-            ValueError: If `prompt` has not been published yet, `target_path` is
-                invalid, or no API key is available for the trace server request.
-
-        Examples:
-            >>> import weave
-            >>> client = weave.init("my-entity/my-project")
-            >>> prompt_ref = weave.publish(weave.StringPrompt("Hello {name}"), name="hello")
-            >>> result = client.link_prompt_to_registry(
-            ...     prompt_ref,
-            ...     target_path="wandb-registry-prompts/my-prompt-collection",
-            ...     aliases=["latest"],
-            ... )
-            >>> result.version_index
-            0
         """
         prompt_ref = self._resolve_registry_prompt_ref(prompt)
         registry_project, portfolio_name = self._parse_registry_target_path(target_path)

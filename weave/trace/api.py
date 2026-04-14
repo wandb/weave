@@ -400,25 +400,7 @@ def link_prompt_to_registry(
         aliases: Optional aliases to attach to the created registry version.
 
     Returns:
-        CreateAndLinkWeaveAssetRes: Parsed response from the internal registry-link
-        endpoint.
-
-    Raises:
-        ValueError: If weave has not been initialized, the prompt is unpublished,
-            or the request cannot be authenticated.
-
-    Examples:
-        >>> import weave
-        >>> from weave.trace import api
-        >>> client = weave.init("my-entity/my-project")
-        >>> prompt_ref = weave.publish(weave.StringPrompt("Hello {name}"), name="hello")
-        >>> result = api.link_prompt_to_registry(
-        ...     prompt_ref,
-        ...     target_path="wandb-registry-prompts/my-prompt-collection",
-        ...     aliases=["latest"],
-        ... )
-        >>> result.version_index
-        0
+        CreateAndLinkWeaveAssetRes: Parsed response from the registry-link endpoint.
     """
     client = weave_client_context.require_weave_client()
     return client.link_prompt_to_registry(
@@ -634,7 +616,6 @@ __all__ = [
     "get_tags",
     "get_tags_and_aliases",
     "init",
-    "link_prompt_to_registry",
     "list_aliases",
     "list_tags",
     "op",
