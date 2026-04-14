@@ -104,6 +104,30 @@ def test_weave_client_link_prompt_to_registry_normalizes_ref_string_and_aliases(
     assert req.aliases == ["prod", "latest"]
 
 
+def test_weave_client_link_prompt_to_registry_accepts_object_ref_input(client):
+    """Accept an ObjectRef directly and normalize aliases."""
+    prompt_ref = make_prompt_ref()
+
+    with patch(
+        "weave.trace.weave_client.create_and_link_weave_asset",
+        return_value=make_response(),
+    ) as mock_transport:
+        result = client.link_prompt_to_registry(
+            prompt_ref,
+            target_path="wandb-registry-prompts/my-prompt-collection",
+            aliases=["prod"],
+        )
+
+    assert result.version_index == 2
+
+    req = mock_transport.call_args.args[0]
+    assert req.ref == prompt_ref.uri
+    assert req.target.entity_name == "current-entity"
+    assert req.target.project_name == "wandb-registry-prompts"
+    assert req.target.portfolio_name == "my-prompt-collection"
+    assert req.aliases == ["prod"]
+
+
 def test_weave_client_link_prompt_to_registry_rejects_unpublished_prompt(client):
     """Raise a clear error before making the transport call."""
     prompt = StringPrompt("Hello {name}")

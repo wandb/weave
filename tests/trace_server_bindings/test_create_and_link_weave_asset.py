@@ -126,3 +126,24 @@ def test_create_and_link_weave_asset_surfaces_http_errors(
 
     with pytest.raises(httpx.HTTPStatusError, match="invalid request"):
         create_and_link_weave_asset(req)
+
+
+@patch(
+    "weave.trace_server_bindings.create_and_link_weave_asset.get_wandb_api_context",
+    return_value=None,
+)
+def test_create_and_link_weave_asset_raises_when_no_api_key(
+    *_unused_mocks,
+) -> None:
+    """Raise ValueError when no API key is available."""
+    req = CreateAndLinkWeaveAssetReq(
+        ref="weave:///source-entity/source-project/object/my-prompt:v1",
+        target=CreateAndLinkWeaveAssetTarget(
+            portfolio_name="prompt-registry",
+            entity_name="target-entity",
+            project_name="target-project",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="No API key found"):
+        create_and_link_weave_asset(req)

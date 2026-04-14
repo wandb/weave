@@ -51,9 +51,4 @@ def create_and_link_weave_asset(
     )
     handle_response_error(response, url)
 
-    try:
-        data = response.json()
-    except ValueError as exc:
-        raise ValueError("Trace server returned invalid JSON") from exc
-
-    return CreateAndLinkWeaveAssetRes.model_validate(data)
+    return CreateAndLinkWeaveAssetRes.model_validate(response.json())
