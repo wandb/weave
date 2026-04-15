@@ -29,7 +29,11 @@ def _safe_join(base: str, untrusted_path: str) -> str:
 
     # Normalize to collapse '..' and '.' but don't resolve symlinks yet
     normed = os.path.normpath(untrusted_path)
-    if normed.startswith("..") or normed.startswith(os.sep):
+    if normed.startswith(os.sep):
+        raise ValueError(
+            f"Path must be relative, got absolute path: {untrusted_path!r}"
+        )
+    if normed.startswith(".."):
         raise ValueError(f"Path escapes base directory: {untrusted_path!r}")
 
     joined = os.path.join(base, normed)
