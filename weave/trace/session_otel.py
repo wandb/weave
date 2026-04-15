@@ -90,8 +90,19 @@ def chat_attributes(
         attrs["gen_ai.response.model"] = response_model
     if input_messages:
         attrs["gen_ai.input.messages"] = _encode_messages(input_messages)
+    # Build the output messages list, prepending a reasoning entry if needed.
+    output_encoded: list[dict[str, Any]] = []
+    if reasoning and reasoning.content:
+        output_encoded.append(
+            {
+                "role": "assistant",
+                "parts": [{"type": "reasoning", "content": reasoning.content}],
+            }
+        )
     if output_messages:
-        attrs["gen_ai.output.messages"] = _encode_messages(output_messages)
+        output_encoded.extend(json.loads(_encode_messages(output_messages)))
+    if output_encoded:
+        attrs["gen_ai.output.messages"] = json.dumps(output_encoded)
     if system_instructions:
         attrs["gen_ai.system_instructions"] = json.dumps(system_instructions)
     if usage:
@@ -101,15 +112,6 @@ def chat_attributes(
             attrs["gen_ai.usage.output_tokens"] = usage.output_tokens
         if usage.reasoning_tokens:
             attrs["gen_ai.usage.reasoning_tokens"] = usage.reasoning_tokens
-    if reasoning and reasoning.content:
-        # Reasoning content is extracted from raw output messages that have
-        # ``{"type": "reasoning", "content": "..."}`` parts.  We encode it
-        # in the output messages with that structure so the server extractor
-        # ``extract_reasoning_content`` can find it.
-        # However, the primary reasoning_content field is populated from
-        # the raw output, not from a standalone attribute. We still include
-        # the reasoning content in the output messages for extraction.
-        pass
     if finish_reasons:
         attrs["gen_ai.response.finish_reasons"] = list(finish_reasons)
     return attrs

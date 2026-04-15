@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 
-from weave.trace.session import Message, Usage
+from weave.trace.session import Message, Reasoning, Usage
 from weave.trace.session_otel import (
     _encode_messages,
     chat_attributes,
@@ -184,6 +184,40 @@ class TestChatAttributes:
         attrs = chat_attributes(model="gpt-4o", provider_name="openai")
         assert attrs["gen_ai.system"] == "openai"
 
+    def test_reasoning_content_prepended_to_output_messages(self) -> None:
+        reasoning = Reasoning(content="Let me think step by step...")
+        attrs = chat_attributes(
+            model="o3",
+            output_messages=[Message(role="assistant", content="The answer is 42.")],
+            reasoning=reasoning,
+        )
+        out_msgs = json.loads(attrs["gen_ai.output.messages"])
+        assert len(out_msgs) == 2
+        # First entry is the reasoning part
+        assert out_msgs[0]["role"] == "assistant"
+        assert out_msgs[0]["parts"] == [
+            {"type": "reasoning", "content": "Let me think step by step..."}
+        ]
+        # Second entry is the normal output message
+        assert out_msgs[1] == {"role": "assistant", "content": "The answer is 42."}
+
+    def test_reasoning_without_output_messages(self) -> None:
+        reasoning = Reasoning(content="Thinking...")
+        attrs = chat_attributes(model="o3", reasoning=reasoning)
+        out_msgs = json.loads(attrs["gen_ai.output.messages"])
+        assert len(out_msgs) == 1
+        assert out_msgs[0]["parts"][0]["type"] == "reasoning"
+
+    def test_empty_reasoning_content_omitted(self) -> None:
+        reasoning = Reasoning(content="")
+        attrs = chat_attributes(model="o3", reasoning=reasoning)
+        assert "gen_ai.output.messages" not in attrs
+
+    def test_none_reasoning_content_omitted(self) -> None:
+        reasoning = Reasoning()
+        attrs = chat_attributes(model="o3", reasoning=reasoning)
+        assert "gen_ai.output.messages" not in attrs
+
 
 # ---------------------------------------------------------------------------
 # execute_tool_attributes
@@ -304,6 +338,21 @@ class TestRoundTripWithExtractor:
         raw = get_attribute(attrs, "gen_ai.system_instructions")
         result = _normalize_system_instructions(raw)
         assert result == ["Be helpful", "Be concise"]
+
+    def test_chat_reasoning_content_round_trip(self) -> None:
+        from weave.trace_server.opentelemetry.genai_extraction import (
+            extract_reasoning_content,
+        )
+
+        reasoning = Reasoning(content="Step 1: analyze. Step 2: conclude.")
+        attrs = chat_attributes(
+            model="o3",
+            output_messages=[Message(role="assistant", content="Done.")],
+            reasoning=reasoning,
+        )
+        raw_output = attrs["gen_ai.output.messages"]
+        result = extract_reasoning_content(raw_output)
+        assert result == "Step 1: analyze. Step 2: conclude."
 
     def test_execute_tool_round_trip(self) -> None:
         from weave.trace_server.opentelemetry.genai_extraction import (
