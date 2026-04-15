@@ -273,8 +273,8 @@ class UserSettings(BaseModel):
 
     When True, deserializing Op objects and certain CustomWeaveType objects
     will import and execute user-uploaded Python code. Set to False to prevent
-    remote code execution during deserialization (e.g. in server-side workers).
-    Can be overridden with the environment variable `WEAVE_DANGEROUSLY_IMPORT_REMOTE_OPS`
+    remote code execution during deserialization. Can be overridden with the
+    environment variable `WEAVE_DANGEROUSLY_IMPORT_REMOTE_OPS`.
 
     In the future this will default to False to require explicit opt-in.
     """
