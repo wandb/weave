@@ -39,10 +39,13 @@ import logging
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from opentelemetry.context import Context
 from opentelemetry.trace import SpanKind, TracerProvider, set_span_in_context
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Span, Tracer
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from weave.trace_server import trace_server_interface as tsi
@@ -182,7 +185,7 @@ class Tool(BaseModel):
     _ended: bool = PrivateAttr(default=False)
 
     # OTel fields
-    _otel_span: Any = PrivateAttr(default=None)
+    _otel_span: Span | None = PrivateAttr(default=None)
     _conversation_id: str = PrivateAttr(default="")
     _conversation_name: str = PrivateAttr(default="")
 
@@ -267,9 +270,11 @@ class Step(BaseModel):
     _ended: bool = PrivateAttr(default=False)
 
     # OTel fields
-    _otel_span: Any = PrivateAttr(default=None)
-    _otel_context: Any = PrivateAttr(default=None)  # Context with this span active
-    _tracer: Any = PrivateAttr(default=None)
+    _otel_span: Span | None = PrivateAttr(default=None)
+    _otel_context: Context | None = PrivateAttr(
+        default=None
+    )  # Context with this span active
+    _tracer: Tracer | None = PrivateAttr(default=None)
 
     def start_tool(self, *, name: str, arguments: str = "") -> Tool:
         """Start a tool execution. Works as context manager or standalone."""
@@ -395,9 +400,11 @@ class Turn(BaseModel):
     _ended: bool = PrivateAttr(default=False)
 
     # OTel fields
-    _otel_span: Any = PrivateAttr(default=None)
-    _otel_context: Any = PrivateAttr(default=None)  # Context with this span active
-    _tracer: Any = PrivateAttr(default=None)
+    _otel_span: Span | None = PrivateAttr(default=None)
+    _otel_context: Context | None = PrivateAttr(
+        default=None
+    )  # Context with this span active
+    _tracer: Tracer | None = PrivateAttr(default=None)
 
     def user(self, content: str) -> Turn:
         """Record a user message for this turn."""
@@ -517,18 +524,16 @@ class Turn(BaseModel):
         )
 
         ingest_fn = (session._ingest_fn if session else None) or _ingest
-        resp = ingest_fn(req)
+        try:
+            resp = ingest_fn(req)
+        except Exception:
+            logger.exception("session logging: failed to flush")
+            return
         if resp is not None and not self._trace_id:
             if resp.trace_ids:
                 self._trace_id = resp.trace_ids[0]
             if resp.root_span_ids:
                 self._root_span_id = resp.root_span_ids[0]
-
-    # -- OTel: also track steps for aggregation --------------------------------
-
-    def _record_step(self, step: Step) -> None:
-        """Record a step for token aggregation (OTel mode)."""
-        self._flushed_steps.append(step)
 
     def __enter__(self) -> Turn:
         self.started_at = datetime.now(timezone.utc)
@@ -573,7 +578,7 @@ class Session(BaseModel):
     _ended: bool = PrivateAttr(default=False)
 
     # OTel fields
-    _tracer: Any = PrivateAttr(default=None)
+    _tracer: Tracer | None = PrivateAttr(default=None)
 
     @property
     def _use_otel(self) -> bool:
