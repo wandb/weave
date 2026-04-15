@@ -83,7 +83,7 @@ def google_genai_gemini_postprocess_output(output: Any) -> Any:
     import google.genai.types as genai_types
 
     genai_types._response_text_non_text_warning_logged = True
-    return output
+    return _traverse_and_replace_blobs(output)
 
 
 def google_genai_gemini_on_finish(
