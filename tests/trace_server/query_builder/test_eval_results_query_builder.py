@@ -1,15 +1,13 @@
-import datetime
-
 from tests.trace_server.query_builder.utils import assert_raw_sql
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
-from weave.trace_server.eval_results_query_builder import (
+from weave.trace_server.interface.query import Query
+from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.query_builder.eval_results_query_builder import (
     PREDICT_AND_SCORE_OP_PREFIX,
     build_eval_results_cte_chain,
     build_eval_results_query,
 )
-from weave.trace_server.interface.query import Query
-from weave.trace_server.orm import ParamBuilder
 
 
 def test_cte_chain_calls_merged() -> None:

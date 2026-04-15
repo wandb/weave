@@ -45,7 +45,6 @@ from weave.shared.trace_server_interface_util import (
 from weave.trace_server import (
     ch_sentinel_values,
     constants,
-    eval_results_query_builder,
     object_creation_utils,
     usage_utils,
 )
@@ -204,6 +203,7 @@ from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
 from weave.trace_server.project_version.types import WriteTarget
+from weave.trace_server.query_builder import eval_results_query_builder
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_annotator_progress_insert_query,
     make_annotator_progress_state_check_query,
