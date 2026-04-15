@@ -167,7 +167,7 @@ def select_predict_call(
         weave_attrs = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
         if weave_attrs.get(constants.SCORE_ATTR_KEY) == "true":
             continue
-        eval_meta = call.attributes.get("_weave_eval_meta", {})
+        eval_meta = call.attributes.get(constants.WEAVE_EVAL_META_ATTR_KEY, {})
         if isinstance(eval_meta, dict) and eval_meta.get("score"):
             continue
         if isinstance(call.inputs, dict) and call.inputs.get("self") == model_ref:
@@ -206,7 +206,7 @@ def best_effort_scorer_call_ids(
     scorer_calls: list[tsi.CallSchema] = []
     for call in child_calls:
         weave_attrs = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
-        eval_meta = call.attributes.get("_weave_eval_meta", {})
+        eval_meta = call.attributes.get(constants.WEAVE_EVAL_META_ATTR_KEY, {})
         if weave_attrs.get(constants.SCORE_ATTR_KEY) == "true" or (
             isinstance(eval_meta, dict) and eval_meta.get("score")
         ):

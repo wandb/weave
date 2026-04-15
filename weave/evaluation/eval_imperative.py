@@ -33,6 +33,7 @@ from weave.trace.op import Op, as_op, is_tracing_setting_disabled, op
 from weave.trace.table import Table
 from weave.trace.util import Thread
 from weave.trace.view_utils import set_call_view
+from weave.trace_server.constants import WEAVE_EVAL_META_ATTR_KEY
 from weave.type_wrappers.Content.content import Content
 from weave.utils.sentinel import NOT_SET, _NotSetType
 
@@ -80,8 +81,10 @@ current_predict_call: ContextVar[Call | None] = ContextVar(
     "current_predict_call", default=None
 )
 
-IMPERATIVE_EVAL_MARKER = {"_weave_eval_meta": {"imperative": True}}
-IMPERATIVE_SCORE_MARKER = {"_weave_eval_meta": {"imperative": True, "score": True}}
+IMPERATIVE_EVAL_MARKER = {WEAVE_EVAL_META_ATTR_KEY: {"imperative": True}}
+IMPERATIVE_SCORE_MARKER = {
+    WEAVE_EVAL_META_ATTR_KEY: {"imperative": True, "score": True}
+}
 
 
 @contextmanager

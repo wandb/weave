@@ -36,3 +36,6 @@ SCORE_EVALUATION_RUN_ID_ATTR_KEY = "evaluation_run_id"
 
 # Weave attributes namespace
 WEAVE_ATTRIBUTES_NAMESPACE = "weave"
+
+# Key used in call attributes to carry imperative-eval metadata
+WEAVE_EVAL_META_ATTR_KEY = "_weave_eval_meta"

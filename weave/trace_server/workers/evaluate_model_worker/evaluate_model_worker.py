@@ -10,11 +10,14 @@ from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.refs import Ref
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server import constants
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
 
-EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
+EVALUATE_MODEL_WORKER_MARKER = {
+    constants.WEAVE_EVAL_META_ATTR_KEY: {"evaluate_model_worker": True}
+}
 
 
 class EvaluateModelArgs(BaseModel):
