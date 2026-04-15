@@ -70,8 +70,8 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
 
 
 def google_genai_gemini_postprocess_output(output: Any) -> Any:
-    """Suppress the Google GenAI SDK warning about non-text parts before
-    Weave's serialization pipeline accesses the ``.text`` computed property.
+    """Suppress the Google GenAI SDK warning about non-text parts and convert
+    inline image blobs to ``weave.Content`` objects before serialization.
 
     During ``finish_call``, ``map_to_refs`` → ``pydantic_object_record`` →
     ``getmembers`` iterates *all* attributes of the response (including the
@@ -79,11 +79,29 @@ def google_genai_gemini_postprocess_output(output: Any) -> Any:
     response contains non-text parts (e.g. inline_data images), that property
     access emits a noisy ``logger.warning``.  Setting the SDK's internal
     flag before serialization prevents the warning.
+
+    We also replace ``inline_data`` byte blobs with ``Content`` objects
+    in-place on the (mutable) Pydantic model so they render in the Weave UI.
+    The model is returned as-is so ``map_to_refs`` creates an ``ObjectRecord``
+    (which supports attribute access) rather than a plain dict.
     """
     import google.genai.types as genai_types
 
     genai_types._response_text_non_text_warning_logged = True
-    return _traverse_and_replace_blobs(output)
+
+    # Replace inline_data blobs with Content objects in-place
+    try:
+        for candidate in output.candidates or []:
+            for part in (candidate.content and candidate.content.parts) or []:
+                inline = getattr(part, "inline_data", None)
+                if inline and inline.data and inline.mime_type:
+                    inline.data = Content.from_bytes(
+                        bytes(inline.data), mimetype=inline.mime_type
+                    )
+    except (AttributeError, TypeError):
+        pass
+
+    return output
 
 
 def google_genai_gemini_on_finish(
