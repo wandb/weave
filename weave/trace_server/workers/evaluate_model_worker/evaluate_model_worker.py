@@ -35,23 +35,6 @@ class EvaluateModelDispatcher(ABC):
         pass
 
 
-def _assert_safe_ref(client: WeaveClient, ref_uri: str, label: str) -> None:
-    """Read the raw object for a ref and reject it if it contains unsafe CustomWeaveType payloads."""
-    ref = Ref.parse_uri(ref_uri)
-    if not isinstance(ref, ObjectRef):
-        raise TypeError(f"Expected an object ref for {label}, got: {ref_uri}")
-
-    project_id = f"{ref.entity}/{ref.project}"
-    read_res = client.server.obj_read(
-        tsi.ObjReadReq(
-            project_id=project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-        )
-    )
-    assert_safe_payload(read_res.obj.val, label)
-
-
 def evaluate_model(args: EvaluateModelArgs) -> None:
     _evaluate_model(args)
 
@@ -120,3 +103,20 @@ def _run_evaluation(
                 loaded_model, __weave={"call_id": evaluation_call_id}
             )
         )
+
+
+def _assert_safe_ref(client: WeaveClient, ref_uri: str, label: str) -> None:
+    """Read the raw object for a ref and reject it if it contains unsafe CustomWeaveType payloads."""
+    ref = Ref.parse_uri(ref_uri)
+    if not isinstance(ref, ObjectRef):
+        raise TypeError(f"Expected an object ref for {label}, got: {ref_uri}")
+
+    project_id = f"{ref.entity}/{ref.project}"
+    read_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=project_id,
+            object_id=ref.name,
+            digest=ref.digest,
+        )
+    )
+    assert_safe_payload(read_res.obj.val, label)
