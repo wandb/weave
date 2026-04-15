@@ -69,6 +69,26 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     return inputs
 
 
+def google_genai_gemini_postprocess_output(output: Any) -> Any:
+    """Suppress the Google GenAI SDK warning about non-text parts before
+    Weave's serialization pipeline accesses the ``.text`` computed property.
+
+    During ``finish_call``, ``map_to_refs`` → ``pydantic_object_record`` →
+    ``getmembers`` iterates *all* attributes of the response (including the
+    ``.text`` computed property on ``GenerateContentResponse``).  When the
+    response contains non-text parts (e.g. inline_data images), that property
+    access emits a noisy ``logger.warning``.  Setting the SDK's internal
+    flag before serialization prevents the warning.
+    """
+    try:
+        import google.genai.types as genai_types
+
+        genai_types._response_text_non_text_warning_logged = True
+    except (ImportError, AttributeError):
+        pass
+    return output
+
+
 def google_genai_gemini_on_finish(
     call: Call, output: Any, exception: BaseException | None = None
 ) -> None:
@@ -79,31 +99,25 @@ def google_genai_gemini_on_finish(
         raise ValueError("Unknown model type")
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
-    if output:
-        # Use _traverse_and_replace_blobs directly instead of dictify to avoid
-        # triggering the .text computed property on GenerateContentResponse,
-        # which warns when non-text parts (e.g. inline_data images) are present.
-        # _traverse_and_replace_blobs handles Pydantic models via model_dump().
-        call.output = _traverse_and_replace_blobs(output)
-        if hasattr(output, "usage_metadata"):
-            usage_data = {
-                "prompt_tokens": output.usage_metadata.prompt_token_count,
-                "completion_tokens": output.usage_metadata.candidates_token_count,
-                "total_tokens": output.usage_metadata.total_token_count,
-            }
-            # Include thoughts_tokens if available (for thinking models)
-            thoughts_token_count = getattr(
-                output.usage_metadata, "thoughts_token_count", None
-            )
-            if thoughts_token_count is not None:
-                usage_data["thoughts_tokens"] = thoughts_token_count
-            # Map Google's cached_content_token_count to canonical name
-            cached_content_token_count = getattr(
-                output.usage_metadata, "cached_content_token_count", None
-            )
-            if cached_content_token_count is not None:
-                usage_data["cache_read_input_tokens"] = cached_content_token_count
-            usage[model_name].update(usage_data)
+    if output and hasattr(output, "usage_metadata"):
+        usage_data = {
+            "prompt_tokens": output.usage_metadata.prompt_token_count,
+            "completion_tokens": output.usage_metadata.candidates_token_count,
+            "total_tokens": output.usage_metadata.total_token_count,
+        }
+        # Include thoughts_tokens if available (for thinking models)
+        thoughts_token_count = getattr(
+            output.usage_metadata, "thoughts_token_count", None
+        )
+        if thoughts_token_count is not None:
+            usage_data["thoughts_tokens"] = thoughts_token_count
+        # Map Google's cached_content_token_count to canonical name
+        cached_content_token_count = getattr(
+            output.usage_metadata, "cached_content_token_count", None
+        )
+        if cached_content_token_count is not None:
+            usage_data["cache_read_input_tokens"] = cached_content_token_count
+        usage[model_name].update(usage_data)
 
     if call.summary is not None:
         call.summary.update(summary_update)
@@ -182,6 +196,7 @@ def google_genai_gemini_wrapper_sync(
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
 
         op = weave.op(fn, **op_kwargs)
+        op.postprocess_output = google_genai_gemini_postprocess_output
         if op.name not in SKIP_TRACING_FUNCTIONS:
             op._set_on_finish_handler(google_genai_gemini_on_finish)
         return _add_accumulator(
@@ -209,6 +224,7 @@ def google_genai_gemini_wrapper_async(
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
+        op.postprocess_output = google_genai_gemini_postprocess_output
         if op.name not in SKIP_TRACING_FUNCTIONS:
             op._set_on_finish_handler(google_genai_gemini_on_finish)
         return _add_accumulator(

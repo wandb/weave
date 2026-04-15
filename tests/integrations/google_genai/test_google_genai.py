@@ -1,4 +1,5 @@
 import os
+import unittest.mock
 from collections.abc import Generator
 from unittest.mock import Mock
 
@@ -12,6 +13,7 @@ from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_accumulator,
     google_genai_gemini_on_finish,
     google_genai_gemini_postprocess_inputs,
+    google_genai_gemini_postprocess_output,
 )
 from weave.integrations.google_genai.google_genai_sdk import get_google_genai_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
@@ -484,10 +486,9 @@ def test_on_finish_excludes_cached_content_when_missing():
 
 
 def test_on_finish_with_inline_data_output():
-    """Test that on_finish handles responses with inline_data (images) without warnings."""
+    """Test that on_finish handles responses with inline_data (images) correctly."""
     from google.genai import types
 
-    from weave import Content
     from weave.trace.call import Call
 
     call = Mock(spec=Call)
@@ -508,19 +509,51 @@ def test_on_finish_with_inline_data_output():
         ),
     )
 
-    # This should NOT trigger the "non-text parts in the response" warning
-    import warnings
+    # on_finish should handle usage metadata without errors
+    google_genai_gemini_on_finish(call, output, None)
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        google_genai_gemini_on_finish(call, output, None)
+    model_usage = call.summary["usage"]["gemini-2.0-flash"]
+    assert model_usage["prompt_tokens"] == 10
+    assert model_usage["total_tokens"] == 10
 
-    # The inline_data should be converted to a Content object
-    assert call.output is not None
-    output_dict = call.output
-    image_data = output_dict["candidates"][0]["content"]["parts"][0]["inline_data"]
-    assert isinstance(image_data, Content)
-    assert image_data.mimetype == "image/png"
+
+def test_postprocess_output_suppresses_non_text_warning():
+    """Test that postprocess_output suppresses the non-text parts warning."""
+    import logging
+
+    from google.genai import types
+
+    # Build a response with inline_data (image) that triggers the warning
+    image_part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/png")
+    candidate = types.Candidate(
+        content=types.Content(role="model", parts=[image_part]),
+    )
+    output = types.GenerateContentResponse(
+        candidates=[candidate],
+        usage_metadata=types.GenerateContentResponseUsageMetadata(
+            prompt_token_count=10,
+            candidates_token_count=0,
+            total_token_count=10,
+        ),
+    )
+
+    # Reset the SDK's internal warning flag so it would warn again
+    import google.genai.types as genai_types
+
+    genai_types._response_text_non_text_warning_logged = False
+
+    # postprocess_output should suppress the warning
+    result = google_genai_gemini_postprocess_output(output)
+    assert result is output  # Returns unmodified output
+
+    # Now access .text — the warning should NOT fire because the flag was set
+    genai_logger = logging.getLogger("google.genai.types")
+    with unittest.mock.patch.object(genai_logger, "warning") as mock_warn:
+        _ = output.text
+        mock_warn.assert_not_called()
+
+    # Restore the flag
+    genai_types._response_text_non_text_warning_logged = False
 
 
 def _create_mock_part(text: str, thought: bool = False) -> Mock:
