@@ -199,3 +199,44 @@ def validate_alias_name(name: str) -> None:
         )
     if name in _RESERVED_ALIAS_NAMES:
         raise ValueError(f"alias name '{name}' is reserved")
+
+
+# --- Server-side deserialization safety ---
+
+
+class UnsafePayloadError(ValueError):
+    """Raised when a payload contains types that are not safe for server-side deserialization."""
+
+
+def assert_safe_payload(value: Any, path: str = "root") -> None:
+    """Recursively walk a raw serialized payload and reject CustomWeaveType nodes.
+
+    CustomWeaveType payloads can trigger code execution during deserialization
+    (e.g. Op types call __import__ on user-uploaded Python files, and unknown
+    types fall back to a load_op path that does the same). None of these should
+    be deserialized in a server-side worker process.
+
+    https://coreweave.atlassian.net/browse/VULNMGMT-1007
+    """
+    if isinstance(value, list):
+        for idx, item in enumerate(value):
+            assert_safe_payload(item, f"{path}[{idx}]")
+        return
+
+    if not isinstance(value, dict):
+        return
+
+    if value.get("_type") == "CustomWeaveType":
+        weave_type = value.get("weave_type")
+        custom_type = (
+            weave_type.get("type", "unknown")
+            if isinstance(weave_type, dict)
+            else "unknown"
+        )
+        raise UnsafePayloadError(
+            f"Server-side deserialization does not allow CustomWeaveType payloads "
+            f"({custom_type} at {path})"
+        )
+
+    for key, item in value.items():
+        assert_safe_payload(item, f"{path}.{key}")

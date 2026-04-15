@@ -1,6 +1,5 @@
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Any
 
 import ddtrace
 from pydantic import BaseModel, ConfigDict
@@ -15,12 +14,9 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
+from weave.trace_server.validation import assert_safe_payload
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
-
-
-class UnsafePayloadError(TypeError):
-    """Raised when a ref resolves to a payload that is not safe for server-side deserialization."""
 
 
 class EvaluateModelArgs(BaseModel):
@@ -39,43 +35,6 @@ class EvaluateModelDispatcher(ABC):
         pass
 
 
-def _assert_safe_payload(value: Any, path: str = "root") -> None:
-    """Recursively walk a raw serialized payload and reject CustomWeaveType nodes.
-
-    CustomWeaveType payloads can trigger code execution during deserialization
-    (e.g. Op types call __import__ on user-uploaded Python files, and unknown
-    types fall back to a load_op path that does the same). None of these should
-    be deserialized in a server-side worker process.
-
-    https://coreweave.atlassian.net/browse/VULNMGMT-1007
-    """
-    if isinstance(value, str):
-        return
-
-    if isinstance(value, list):
-        for idx, item in enumerate(value):
-            _assert_safe_payload(item, f"{path}[{idx}]")
-        return
-
-    if not isinstance(value, dict):
-        return
-
-    if value.get("_type") == "CustomWeaveType":
-        weave_type = value.get("weave_type")
-        custom_type = (
-            weave_type.get("type", "unknown")
-            if isinstance(weave_type, dict)
-            else "unknown"
-        )
-        raise UnsafePayloadError(
-            f"Evaluate model worker does not allow CustomWeaveType payloads "
-            f"({custom_type} at {path})"
-        )
-
-    for key, item in value.items():
-        _assert_safe_payload(item, f"{path}.{key}")
-
-
 def _assert_safe_ref(client: WeaveClient, ref_uri: str, label: str) -> None:
     """Read the raw object for a ref and reject it if it contains unsafe CustomWeaveType payloads."""
     ref = Ref.parse_uri(ref_uri)
@@ -90,7 +49,7 @@ def _assert_safe_ref(client: WeaveClient, ref_uri: str, label: str) -> None:
             digest=ref.digest,
         )
     )
-    _assert_safe_payload(read_res.obj.val, label)
+    assert_safe_payload(read_res.obj.val, label)
 
 
 def evaluate_model(args: EvaluateModelArgs) -> None:
