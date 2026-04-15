@@ -556,6 +556,42 @@ def test_postprocess_output_suppresses_non_text_warning():
     genai_types._response_text_non_text_warning_logged = False
 
 
+def test_wrapper_sync_sets_postprocess_output():
+    """Test that the sync wrapper sets postprocess_output on the op."""
+    from weave.integrations.google_genai.gemini_utils import (
+        google_genai_gemini_postprocess_output,
+        google_genai_gemini_wrapper_sync,
+    )
+    from weave.trace.autopatch import OpSettings
+
+    settings = OpSettings()
+    wrapper = google_genai_gemini_wrapper_sync(settings)
+
+    def dummy_fn(self, *args, **kwargs):
+        return None
+
+    wrapped = wrapper(dummy_fn)
+    assert wrapped.postprocess_output is google_genai_gemini_postprocess_output
+
+
+def test_wrapper_async_sets_postprocess_output():
+    """Test that the async wrapper sets postprocess_output on the op."""
+    from weave.integrations.google_genai.gemini_utils import (
+        google_genai_gemini_postprocess_output,
+        google_genai_gemini_wrapper_async,
+    )
+    from weave.trace.autopatch import OpSettings
+
+    settings = OpSettings()
+    wrapper = google_genai_gemini_wrapper_async(settings)
+
+    async def dummy_fn(self, *args, **kwargs):
+        return None
+
+    wrapped = wrapper(dummy_fn)
+    assert wrapped.postprocess_output is google_genai_gemini_postprocess_output
+
+
 def _create_mock_part(text: str, thought: bool = False) -> Mock:
     """Helper to create a mock Part with text and optional thought attribute."""
     part = Mock()

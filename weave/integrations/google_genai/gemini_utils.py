@@ -80,12 +80,9 @@ def google_genai_gemini_postprocess_output(output: Any) -> Any:
     access emits a noisy ``logger.warning``.  Setting the SDK's internal
     flag before serialization prevents the warning.
     """
-    try:
-        import google.genai.types as genai_types
+    import google.genai.types as genai_types
 
-        genai_types._response_text_non_text_warning_logged = True
-    except (ImportError, AttributeError):
-        pass
+    genai_types._response_text_non_text_warning_logged = True
     return output
 
 
