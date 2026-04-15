@@ -154,16 +154,16 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.http_utils import (
+    REMOTE_REQUEST_BYTES_LIMIT,
+    ROW_COUNT_CHUNKING_THRESHOLD,
+    check_endpoint_exists,
+)
 from weave.trace_server_bindings.link_asset_to_registry import (
     LinkAssetToRegistryReq,
     LinkAssetToRegistryRes,
     LinkAssetToRegistryTarget,
     link_asset_to_registry,
-)
-from weave.trace_server_bindings.http_utils import (
-    REMOTE_REQUEST_BYTES_LIMIT,
-    ROW_COUNT_CHUNKING_THRESHOLD,
-    check_endpoint_exists,
 )
 from weave.trace_server_bindings.models import StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
