@@ -1,4 +1,4 @@
-"""Tests for weave.trace.session_otel attribute builders.
+"""Tests for weave.trace.session_otel attribute builders and ensure_tracer_provider.
 
 Verifies that the OTel attribute dicts produced by the builder functions
 contain the exact keys that ``genai_extraction.py`` looks for on the server.
@@ -7,7 +7,12 @@ contain the exact keys that ``genai_extraction.py`` looks for on the server.
 from __future__ import annotations
 
 import json
+from unittest.mock import patch
 
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+
+from weave.otel.setup import ensure_tracer_provider
 from weave.trace.session import Message, Reasoning, Usage
 from weave.trace.session_otel import (
     chat_attributes,
@@ -368,3 +373,64 @@ class TestRoundTripWithExtractor:
         assert attrs["gen_ai.tool.call.id"] == "call_1"
         assert extract_tool_call_arguments(attrs, []) == '{"expr": "2+2"}'
         assert extract_tool_call_result(attrs, []) == "4"
+
+
+# ---------------------------------------------------------------------------
+# ensure_tracer_provider
+# ---------------------------------------------------------------------------
+
+
+class TestEnsureTracerProvider:
+    """Tests for ensure_tracer_provider() auto-configuration.
+
+    Uses mocking of ``trace.get_tracer_provider`` because the OTel SDK only
+    allows setting the global provider once per process.
+    """
+
+    def test_returns_tracer_provider_no_op(self) -> None:
+        """When no provider is configured and no env var, returns a new TracerProvider."""
+        proxy = trace.ProxyTracerProvider()
+        with (
+            patch("weave.otel.setup.trace.get_tracer_provider", return_value=proxy),
+            patch("weave.otel.setup.trace.set_tracer_provider"),
+            patch.dict("os.environ", {}, clear=True),
+        ):
+            provider = ensure_tracer_provider()
+            assert isinstance(provider, TracerProvider)
+
+    def test_returns_existing_provider(self) -> None:
+        """If a real provider is already set, ensure_tracer_provider returns it."""
+        existing = TracerProvider()
+        with patch("weave.otel.setup.trace.get_tracer_provider", return_value=existing):
+            result = ensure_tracer_provider()
+            assert result is existing
+
+    def test_idempotent_with_existing(self) -> None:
+        """Calling twice when a provider exists returns the same one both times."""
+        existing = TracerProvider()
+        with patch("weave.otel.setup.trace.get_tracer_provider", return_value=existing):
+            first = ensure_tracer_provider()
+            second = ensure_tracer_provider()
+            assert first is second
+
+    def test_auto_configures_from_env(self) -> None:
+        """When WF_TRACE_SERVER_URL is set, ensure_tracer_provider calls setup_tracing."""
+        proxy = trace.ProxyTracerProvider()
+        mock_provider = TracerProvider()
+        with (
+            patch("weave.otel.setup.trace.get_tracer_provider", return_value=proxy),
+            patch.dict(
+                "os.environ",
+                {"WF_TRACE_SERVER_URL": "http://localhost:6345"},
+                clear=False,
+            ),
+            patch(
+                "weave.otel.setup.setup_tracing", return_value=mock_provider
+            ) as mock_setup,
+        ):
+            result = ensure_tracer_provider()
+            mock_setup.assert_called_once_with(
+                genai_endpoint="http://localhost:6345/otel/v1/genai/traces",
+                enable_live=True,
+            )
+            assert result is mock_provider

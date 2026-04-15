@@ -35,7 +35,7 @@ from weave.version import VERSION
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["SystemPromptInjector", "setup_tracing"]
+__all__ = ["SystemPromptInjector", "ensure_tracer_provider", "setup_tracing"]
 
 
 class SystemPromptInjector:
@@ -178,6 +178,33 @@ class ConversationIdInjector:
         return True
 
 
+def ensure_tracer_provider() -> TracerProvider:
+    """Get the existing global TracerProvider, or create a minimal one.
+
+    If ``setup_tracing()`` was already called, returns that provider.
+    If not, creates a provider that exports to the Weave trace server
+    (auto-detected from ``WF_TRACE_SERVER_URL``) or falls back to no-op.
+    """
+    existing = trace.get_tracer_provider()
+    # ProxyTracerProvider means no one has configured a real provider yet
+    if not isinstance(existing, trace.ProxyTracerProvider):
+        # A real provider is already installed — return it as-is.
+        # The global provider from set_tracer_provider is always a TracerProvider
+        # (or compatible wrapper), so the cast is safe.
+        return existing  # type: ignore[return-value]
+    # Auto-detect endpoint from environment
+    wf_url = os.environ.get("WF_TRACE_SERVER_URL", "")
+    if wf_url:
+        return setup_tracing(
+            genai_endpoint=f"{wf_url.rstrip('/')}/otel/v1/genai/traces",
+            enable_live=True,
+        )
+    # No endpoint available -- return a no-op provider
+    provider = TracerProvider()
+    trace.set_tracer_provider(provider)
+    return provider
+
+
 def _wandb_auth_headers() -> dict[str, str]:
     """Build auth headers from ``WANDB_API_KEY`` if present."""
     api_key = os.environ.get("WANDB_API_KEY", "")
@@ -244,7 +271,10 @@ def setup_tracing(
         wf_url = os.environ.get("WF_TRACE_SERVER_URL", "")
         if wf_url:
             genai_endpoint = f"{wf_url.rstrip('/')}/otel/v1/genai/traces"
-            logger.debug("Auto-detected genai_endpoint from WF_TRACE_SERVER_URL: %s", genai_endpoint)
+            logger.debug(
+                "Auto-detected genai_endpoint from WF_TRACE_SERVER_URL: %s",
+                genai_endpoint,
+            )
 
     if genai_endpoint:
         if enable_live:

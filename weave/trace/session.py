@@ -736,12 +736,15 @@ def start_session(
 
     if use_legacy:
         session._ingest_fn = _ingest_fn
-    # OTel mode
     elif _tracer_provider is not None:
+        # Explicit OTel provider given
         session._tracer = _tracer_provider.get_tracer(_TRACER_NAME)
-        # If no provider given and no _ingest_fn, we still set up OTel mode
-        # but without a tracer (spans won't be emitted). A future task will
-        # wire up a default provider.
+    else:
+        # No provider and no _ingest_fn -- auto-configure a TracerProvider
+        from weave.otel.setup import ensure_tracer_provider
+
+        provider = ensure_tracer_provider()
+        session._tracer = provider.get_tracer(_TRACER_NAME)
 
     return session
 
