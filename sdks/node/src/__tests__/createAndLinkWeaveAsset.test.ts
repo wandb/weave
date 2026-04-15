@@ -2,13 +2,13 @@ import {ContentType} from '../generated/traceServerApi';
 import type {Api as TraceServerApi} from '../generated/traceServerApi';
 import {
   LINK_TO_REGISTRY_PATH,
-  createAndLinkWeaveAsset,
-} from '../traceServerBindings/createAndLinkWeaveAsset';
-import type {CreateAndLinkWeaveAssetReq} from '../traceServerBindings/createAndLinkWeaveAsset';
+  linkAssetToRegistry,
+} from '../traceServerBindings/linkAssetToRegistry';
+import type {LinkAssetToRegistryReq} from '../traceServerBindings/linkAssetToRegistry';
 
 function makeReq(
-  overrides: Partial<CreateAndLinkWeaveAssetReq> = {}
-): CreateAndLinkWeaveAssetReq {
+  overrides: Partial<LinkAssetToRegistryReq> = {}
+): LinkAssetToRegistryReq {
   return {
     ref: 'weave:///source-entity/source-project/object/my-prompt:v1',
     target: {
@@ -21,7 +21,7 @@ function makeReq(
   };
 }
 
-describe('createAndLinkWeaveAsset', () => {
+describe('linkAssetToRegistry', () => {
   let mockTraceServerApi: jest.Mocked<TraceServerApi<unknown>>;
 
   beforeEach(() => {
@@ -37,7 +37,7 @@ describe('createAndLinkWeaveAsset', () => {
       data: {version_index: 7},
     } as any);
 
-    const result = await createAndLinkWeaveAsset(mockTraceServerApi, req);
+    const result = await linkAssetToRegistry(mockTraceServerApi, req);
 
     expect(result).toEqual({version_index: 7});
     expect(mockTraceServerApi.request).toHaveBeenCalledWith({
@@ -56,7 +56,7 @@ describe('createAndLinkWeaveAsset', () => {
     } as any);
 
     await expect(
-      createAndLinkWeaveAsset(mockTraceServerApi, makeReq())
+      linkAssetToRegistry(mockTraceServerApi, makeReq())
     ).rejects.toThrow('Trace server returned invalid JSON');
   });
 
@@ -65,7 +65,7 @@ describe('createAndLinkWeaveAsset', () => {
     mockTraceServerApi.request.mockRejectedValue(error);
 
     await expect(
-      createAndLinkWeaveAsset(mockTraceServerApi, makeReq())
+      linkAssetToRegistry(mockTraceServerApi, makeReq())
     ).rejects.toThrow('Request failed');
   });
 });

@@ -1,7 +1,7 @@
 import {ReadableStream} from 'stream/web';
 import {Api as TraceServerApi} from '../generated/traceServerApi';
 import {StringPrompt} from '../prompt';
-import * as registryLinkBindings from '../traceServerBindings/createAndLinkWeaveAsset';
+import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry';
 import {WandbServerApi} from '../wandb/wandbServerApi';
 import {WeaveClient} from '../weaveClient';
 import {ObjectRef} from '../weaveObject';
@@ -378,7 +378,7 @@ describe('WeaveClient', () => {
         'current-entity/current-project'
       );
       mockTransport = jest
-        .spyOn(registryLinkBindings, 'createAndLinkWeaveAsset')
+        .spyOn(registryLinkBindings, 'linkAssetToRegistry')
         .mockResolvedValue({version_index: 0});
     });
 

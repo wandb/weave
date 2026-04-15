@@ -32,11 +32,11 @@ import {
 } from './opType';
 import {Settings} from './settings';
 import {Table, TableRef, TableRowRef} from './table';
-import {
-  CreateAndLinkWeaveAssetReq,
-  CreateAndLinkWeaveAssetRes,
-  createAndLinkWeaveAsset,
-} from './traceServerBindings/createAndLinkWeaveAsset';
+import {linkAssetToRegistry} from './traceServerBindings/linkAssetToRegistry';
+import type {
+  LinkAssetToRegistryReq,
+  LinkAssetToRegistryRes,
+} from './traceServerBindings/linkAssetToRegistry';
 import {packageVersion} from './utils/userAgent';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
@@ -578,7 +578,7 @@ export class WeaveClient {
   public async linkPromptToRegistry(
     prompt: RegistryLinkable,
     options: LinkPromptToRegistryOptions
-  ): Promise<CreateAndLinkWeaveAssetRes> {
+  ): Promise<LinkAssetToRegistryRes> {
     if (!this.projectId.includes('/')) {
       throw new Error(
         "linkPromptToRegistry requires client.projectId in '<entity>/<project>' format"
@@ -590,7 +590,7 @@ export class WeaveClient {
       options.targetPath
     );
 
-    const req: CreateAndLinkWeaveAssetReq = {
+    const req: LinkAssetToRegistryReq = {
       ref: promptRef.uri(),
       target: {
         entity_name: entityName,
@@ -600,7 +600,7 @@ export class WeaveClient {
       aliases: [...(options.aliases ?? [])],
     };
 
-    return createAndLinkWeaveAsset(this.traceServerApi, req);
+    return linkAssetToRegistry(this.traceServerApi, req);
   }
 
   // save* methods attached __savedRef promises to their values. These must

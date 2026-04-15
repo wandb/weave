@@ -3,36 +3,36 @@ import type {Api as TraceServerApi} from '../generated/traceServerApi';
 
 export const LINK_TO_REGISTRY_PATH = '/link_to_registry';
 
-export interface CreateAndLinkWeaveAssetTarget {
+export interface LinkAssetToRegistryTarget {
   entity_name: string;
   project_name: string;
   portfolio_name: string;
 }
 
-export interface CreateAndLinkWeaveAssetReq {
+export interface LinkAssetToRegistryReq {
   ref: string;
-  target: CreateAndLinkWeaveAssetTarget;
+  target: LinkAssetToRegistryTarget;
   aliases: string[];
 }
 
-export interface CreateAndLinkWeaveAssetRes {
+export interface LinkAssetToRegistryRes {
   version_index: number | null;
 }
 
 /**
- * Link a published Weave prompt version into a registry portfolio.
+ * Link a published Weave asset version into a registry portfolio.
  *
  * @param traceServerApi - Initialized trace server API client.
  * @param req - Registry-link payload matching the `/link_to_registry` contract.
  * @returns Parsed response containing the linked portfolio version index.
  * @throws Error if the trace server returns invalid JSON.
  */
-export async function createAndLinkWeaveAsset(
+export async function linkAssetToRegistry(
   traceServerApi: TraceServerApi<unknown>,
-  req: CreateAndLinkWeaveAssetReq
-): Promise<CreateAndLinkWeaveAssetRes> {
+  req: LinkAssetToRegistryReq
+): Promise<LinkAssetToRegistryRes> {
   const response = await traceServerApi.request<
-    CreateAndLinkWeaveAssetRes,
+    LinkAssetToRegistryRes,
     unknown
   >({
     path: LINK_TO_REGISTRY_PATH,
