@@ -622,12 +622,12 @@ def test_accumulator_updates_all_token_counts():
     assert result.usage_metadata.thoughts_token_count == 100
 
 
-def test_accumulator_skips_parts_with_none_text():
-    """Test that parts with text=None are skipped."""
+def test_accumulator_preserves_non_text_parts():
+    """Test that non-text parts (e.g. inline_data images) are preserved in the accumulator."""
     acc_part = _create_mock_part("Hello")
     acc = _create_mock_response([acc_part])
 
-    # Value part has None text
+    # Value part has None text (e.g. an inline_data image part)
     value_part = Mock()
     value_part.text = None
     value = _create_mock_response([value_part])
@@ -636,6 +636,8 @@ def test_accumulator_skips_parts_with_none_text():
 
     # Text should remain unchanged since value part had None text
     assert acc_part.text == "Hello"
+    # Non-text part should be appended to the accumulated parts
+    assert value_part in result.candidates[0].content.parts
     assert result is acc
 
 

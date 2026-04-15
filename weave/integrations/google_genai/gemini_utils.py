@@ -80,7 +80,11 @@ def google_genai_gemini_on_finish(
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if output:
-        call.output = _traverse_and_replace_blobs(dictify(output))
+        # Use _traverse_and_replace_blobs directly instead of dictify to avoid
+        # triggering the .text computed property on GenerateContentResponse,
+        # which warns when non-text parts (e.g. inline_data images) are present.
+        # _traverse_and_replace_blobs handles Pydantic models via model_dump().
+        call.output = _traverse_and_replace_blobs(output)
         if hasattr(output, "usage_metadata"):
             usage_data = {
                 "prompt_tokens": output.usage_metadata.prompt_token_count,
@@ -88,15 +92,17 @@ def google_genai_gemini_on_finish(
                 "total_tokens": output.usage_metadata.total_token_count,
             }
             # Include thoughts_tokens if available (for thinking models)
-            if output.usage_metadata.thoughts_token_count is not None:
-                usage_data["thoughts_tokens"] = (
-                    output.usage_metadata.thoughts_token_count
-                )
+            thoughts_token_count = getattr(
+                output.usage_metadata, "thoughts_token_count", None
+            )
+            if thoughts_token_count is not None:
+                usage_data["thoughts_tokens"] = thoughts_token_count
             # Map Google's cached_content_token_count to canonical name
-            if output.usage_metadata.cached_content_token_count is not None:
-                usage_data["cache_read_input_tokens"] = (
-                    output.usage_metadata.cached_content_token_count
-                )
+            cached_content_token_count = getattr(
+                output.usage_metadata, "cached_content_token_count", None
+            )
+            if cached_content_token_count is not None:
+                usage_data["cache_read_input_tokens"] = cached_content_token_count
             usage[model_name].update(usage_data)
 
     if call.summary is not None:
@@ -118,6 +124,9 @@ def google_genai_gemini_accumulator(
         value_parts = value_candidate.content.parts or []
         for value_part in value_parts:
             if value_part.text is None:
+                # Preserve non-text parts (e.g. inline_data images) in the
+                # accumulated response instead of silently dropping them.
+                acc.candidates[i].content.parts.append(value_part)
                 continue
 
             # Check if this part is thinking content (thought=True)
