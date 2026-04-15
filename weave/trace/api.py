@@ -614,6 +614,7 @@ __all__ = [
     "get_tags",
     "get_tags_and_aliases",
     "init",
+    "link_prompt_to_registry",
     "list_aliases",
     "list_tags",
     "op",

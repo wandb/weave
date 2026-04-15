@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
+import weave
 from weave.prompt.prompt import StringPrompt
 from weave.trace import api, weave_client
 from weave.trace.context import weave_client_context
@@ -195,6 +196,11 @@ def test_api_delegates_to_active_client(client):
         target_path="wandb-registry-prompts/my-prompt-collection",
         aliases=None,
     )
+
+
+def test_top_level_weave_exports_link_prompt_to_registry():
+    """Ensure weave.link_prompt_to_registry is re-exported from the top-level package."""
+    assert weave.link_prompt_to_registry is api.link_prompt_to_registry
 
 
 # ---------------------------------------------------------------------------
