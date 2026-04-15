@@ -238,6 +238,7 @@ from weave.trace_server.table_query_builder import (
     VAL_DUMP_COLUMN_NAME,
     make_natural_sort_table_query,
     make_standard_table_query,
+    make_table_rows_read_batch_query,
     make_table_stats_query_with_storage_size,
 )
 from weave.trace_server.threads_query_builder import make_threads_query
@@ -5192,16 +5193,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if len(digests) == 0:
             return {}
         pb = ParamBuilder()
-        project_param = pb.add(project_id, None, "String")
-        digests_param = pb.add(digests, None, "Array(String)")
-        sql = f"""
-            SELECT digest, any(val_dump) AS val_dump
-            FROM table_rows
-            PREWHERE project_id = {project_param}
-            WHERE digest IN {digests_param}
-            GROUP BY project_id, digest
-        """
-        result = self.ch_client.query(sql, pb.get_params())
+        sql = make_table_rows_read_batch_query(project_id, digests, pb)
+        result = self._query(sql, pb.get_params())
         out: dict[str, Any] = {}
         for row in result.result_rows:
             d, val_dump = row[0], row[1]
