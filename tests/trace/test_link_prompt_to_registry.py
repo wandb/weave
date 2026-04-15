@@ -89,7 +89,10 @@ def mock_post():
     """Patch API key, server URL, and http_requests.post for the transport."""
     with (
         patch(f"{_TRANSPORT_MODULE}.get_wandb_api_context", return_value="api-key"),
-        patch(f"{_TRANSPORT_MODULE}.weave_trace_server_url", return_value="http://example.com"),
+        patch(
+            f"{_TRANSPORT_MODULE}.weave_trace_server_url",
+            return_value="http://example.com",
+        ),
         patch(f"{_TRANSPORT_MODULE}.http_requests.post") as post,
     ):
         yield post
@@ -105,7 +108,9 @@ def mock_post():
     [
         pytest.param(_published_prompt(), None, [], id="published-prompt"),
         pytest.param(PROMPT_REF, ["prod"], ["prod"], id="object-ref"),
-        pytest.param(PROMPT_REF.uri, ("prod", "latest"), ["prod", "latest"], id="uri-string"),
+        pytest.param(
+            PROMPT_REF.uri, ("prod", "latest"), ["prod", "latest"], id="uri-string"
+        ),
     ],
 )
 def test_resolves_input_and_builds_request(
