@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
@@ -16,7 +18,7 @@ def test_mem_artifact_path_sanitization():
     # Valid relative paths work, including nested
     assert art.path("audio.wav").endswith("audio.wav")
     result = art.path("subdir/file.txt")
-    assert result.endswith("subdir/file.txt")
+    assert result.endswith(os.path.join("subdir", "file.txt"))
 
     # Absolute paths and traversals are rejected in both path() and filename override
     with pytest.raises(ValueError, match="absolute path"):
