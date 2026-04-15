@@ -140,8 +140,10 @@
     "ext": "ts,json",
     "exec": "tsx examples/evaluate.ts"
   },
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.9.1"
+  },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.1",
     "cli-progress": "^3.12.0",
     "cross-spawn": "^7.0.5",
     "form-data": "^4.0.4",
