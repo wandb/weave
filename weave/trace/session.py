@@ -756,6 +756,105 @@ def start_session(
     return session
 
 
+def _get_tracer(
+    _tracer_provider: TracerProvider | None = None,
+) -> Tracer:
+    """Get an OTel Tracer from the given or auto-configured provider."""
+    if _tracer_provider is not None:
+        return _tracer_provider.get_tracer(_TRACER_NAME)
+    # Circular import avoidance: only needed when no explicit provider
+    from weave.otel.setup import ensure_tracer_provider
+
+    return ensure_tracer_provider().get_tracer(_TRACER_NAME)
+
+
+def _emit_step_spans(
+    *,
+    tracer: Tracer,
+    parent_context: Context,
+    step_data: dict[str, Any],
+    conversation_id: str,
+    conversation_name: str,
+    default_model: str,
+) -> int:
+    """Create a chat span (and child execute_tool spans) for one step dict.
+
+    Returns the number of spans created.
+    """
+    builders = _get_otel_builders()
+    span_count = 0
+
+    # -- chat span --
+    step_model = step_data.get("model", "") or default_model
+    input_msgs = [
+        Message(**m) if isinstance(m, dict) else m
+        for m in step_data.get("input_messages", [])
+    ]
+    output_msgs = [
+        Message(**m) if isinstance(m, dict) else m
+        for m in step_data.get("output_messages", [])
+    ]
+    usage = Usage(
+        input_tokens=step_data.get("input_tokens", 0),
+        output_tokens=step_data.get("output_tokens", 0),
+        reasoning_tokens=step_data.get("reasoning_tokens", 0),
+    )
+    reasoning = Reasoning(content=step_data.get("reasoning_content", ""))
+    system_instructions = step_data.get("system_instructions", [])
+    finish_reasons = step_data.get("finish_reasons", [])
+
+    chat_span = tracer.start_span(
+        "chat",
+        context=parent_context,
+        kind=SpanKind.CLIENT,
+    )
+    chat_context = set_span_in_context(chat_span)
+    span_count += 1
+
+    # -- execute_tool child spans --
+    for tc in step_data.get("tool_calls", []):
+        tool_span = tracer.start_span(
+            "execute_tool",
+            context=chat_context,
+            kind=SpanKind.INTERNAL,
+        )
+        tool_attrs = builders["execute_tool"](
+            tool_name=tc.get("tool_name", ""),
+            tool_call_arguments=tc.get("arguments", ""),
+            tool_call_result=tc.get("result", ""),
+            tool_call_id=tc.get("tool_call_id", ""),
+        )
+        if conversation_id:
+            tool_attrs["gen_ai.conversation.id"] = conversation_id
+        if conversation_name:
+            tool_attrs["gen_ai.conversation.name"] = conversation_name
+        for k, v in tool_attrs.items():
+            tool_span.set_attribute(k, v)
+        tool_span.end()
+        span_count += 1
+
+    # Set chat span attributes and end
+    chat_attrs = builders["chat"](
+        model=step_model,
+        provider_name=step_data.get("provider_name", ""),
+        input_messages=input_msgs or None,
+        output_messages=output_msgs or None,
+        system_instructions=system_instructions or None,
+        usage=usage,
+        reasoning=reasoning,
+        finish_reasons=finish_reasons or None,
+    )
+    if conversation_id:
+        chat_attrs["gen_ai.conversation.id"] = conversation_id
+    if conversation_name:
+        chat_attrs["gen_ai.conversation.name"] = conversation_name
+    for k, v in chat_attrs.items():
+        chat_span.set_attribute(k, v)
+    chat_span.end()
+
+    return span_count
+
+
 def log_session(
     *,
     turns: list[dict[str, Any]],
@@ -763,11 +862,13 @@ def log_session(
     model: str = "",
     session_id: str = "",
     session_name: str = "",
+    _tracer_provider: TracerProvider | None = None,
 ) -> LogResult:
     """Batch-ingest a complete session with all turns and steps.
 
     Use this when logging data after the fact (e.g., from an external runtime).
-    Always uses the structured ingest (legacy) path.
+    Emits OTel spans: one ``invoke_agent`` per turn, with ``chat`` and
+    ``execute_tool`` children for each step/tool call.
 
     Args:
         turns: List of turn dicts. Each turn should have ``messages`` (list of
@@ -777,50 +878,86 @@ def log_session(
         model: Default model name.
         session_id: Unique session identifier. Auto-generated if empty.
         session_name: Human-readable session name.
+        _tracer_provider: Optional OTel TracerProvider. When not provided,
+            uses the auto-configured provider.
 
     Returns:
         A ``LogResult`` with session_id, trace_ids, and span_count.
     """
-    project_id = _get_project_id()
     sid = session_id or str(uuid.uuid4())
+    tracer = _get_tracer(_tracer_provider)
+    builders = _get_otel_builders()
 
-    structured_turns: list[tsi.GenAIStructuredTurn] = []
+    trace_ids: list[str] = []
+    root_span_ids: list[str] = []
+    total_span_count = 0
+
     for turn_data in turns:
-        messages = [_msg_to_structured(m) for m in turn_data.get("messages", [])]
-        steps = [_dict_to_structured_step(s) for s in turn_data.get("steps", [])]
-        tool_calls = [
-            tsi.GenAIStructuredToolCall(**tc) for tc in turn_data.get("tool_calls", [])
+        turn_agent = turn_data.get("agent_name", "") or agent_name
+        turn_model = turn_data.get("model", "") or model
+
+        # Messages on the turn
+        turn_messages = [
+            Message(**m) if isinstance(m, dict) else m
+            for m in turn_data.get("messages", [])
         ]
-        structured_turns.append(
-            tsi.GenAIStructuredTurn(
-                messages=messages,
-                steps=steps,
-                tool_calls=tool_calls,
-                agent_name=turn_data.get("agent_name", agent_name),
-                model=turn_data.get("model", model),
-                input_tokens=turn_data.get("input_tokens", 0),
-                output_tokens=turn_data.get("output_tokens", 0),
-                reasoning_content=turn_data.get("reasoning_content", ""),
-                system_instructions=turn_data.get("system_instructions", []),
-            )
+
+        # Create invoke_agent span (new trace per turn)
+        invoke_span = tracer.start_span(
+            "invoke_agent",
+            context=Context(),
+            kind=SpanKind.INTERNAL,
         )
+        invoke_context = set_span_in_context(invoke_span)
+        total_span_count += 1
 
-    req = tsi.GenAIConversationIngestReq(
-        project_id=project_id,
-        conversation_id=sid,
-        conversation_name=session_name,
-        agent_name=agent_name,
-        turns=structured_turns,
-    )
+        # Collect output messages and usage from steps for the turn-level span
+        all_output: list[Message] = []
+        total_input_tokens = 0
+        total_output_tokens = 0
 
-    resp = _ingest(req)
-    if resp is None:
-        return LogResult(session_id=sid)
+        for step_data in turn_data.get("steps", []):
+            total_span_count += _emit_step_spans(
+                tracer=tracer,
+                parent_context=invoke_context,
+                step_data=step_data,
+                conversation_id=sid,
+                conversation_name=session_name,
+                default_model=turn_model,
+            )
+            # Accumulate outputs/tokens for the invoke_agent span
+            for m in step_data.get("output_messages", []):
+                msg = Message(**m) if isinstance(m, dict) else m
+                all_output.append(msg)
+            total_input_tokens += step_data.get("input_tokens", 0)
+            total_output_tokens += step_data.get("output_tokens", 0)
+
+        # Set invoke_agent attributes and end
+        invoke_attrs = builders["invoke_agent"](
+            agent_name=turn_agent,
+            conversation_id=sid,
+            conversation_name=session_name,
+            input_messages=turn_messages or None,
+            output_messages=all_output or None,
+        )
+        if total_input_tokens:
+            invoke_attrs["gen_ai.usage.input_tokens"] = total_input_tokens
+        if total_output_tokens:
+            invoke_attrs["gen_ai.usage.output_tokens"] = total_output_tokens
+        for k, v in invoke_attrs.items():
+            invoke_span.set_attribute(k, v)
+        invoke_span.end()
+
+        # Record IDs
+        ctx = invoke_span.get_span_context()
+        trace_ids.append(format(ctx.trace_id, "032x"))
+        root_span_ids.append(format(ctx.span_id, "016x"))
+
     return LogResult(
-        session_id=resp.conversation_id or sid,
-        trace_ids=resp.trace_ids,
-        root_span_ids=resp.root_span_ids,
-        span_count=resp.span_count,
+        session_id=sid,
+        trace_ids=trace_ids,
+        root_span_ids=root_span_ids,
+        span_count=total_span_count,
     )
 
 
@@ -832,10 +969,12 @@ def log_turn(
     agent_name: str = "",
     model: str = "",
     session_name: str = "",
+    _tracer_provider: TracerProvider | None = None,
 ) -> LogResult:
     """Batch-ingest a single turn into an existing session.
 
-    Always uses the structured ingest (legacy) path.
+    Emits OTel spans: one ``invoke_agent`` root span with ``chat`` and
+    ``execute_tool`` children for each step/tool call.
 
     Args:
         session_id: The session to append to.
@@ -844,46 +983,32 @@ def log_turn(
         agent_name: Agent name for this turn.
         model: Model name for this turn.
         session_name: Human-readable session name.
+        _tracer_provider: Optional OTel TracerProvider.
 
     Returns:
         A ``LogResult``.
     """
-    project_id = _get_project_id()
-
-    structured_messages = [_msg_to_structured(m) for m in (messages or [])]
-    structured_steps = [_dict_to_structured_step(s) for s in (steps or [])]
-
-    turn = tsi.GenAIStructuredTurn(
-        messages=structured_messages,
-        steps=structured_steps,
+    turn_data: dict[str, Any] = {
+        "messages": messages or [],
+        "steps": steps or [],
+        "agent_name": agent_name,
+        "model": model,
+    }
+    return log_session(
+        turns=[turn_data],
         agent_name=agent_name,
         model=model,
-    )
-
-    req = tsi.GenAIConversationIngestReq(
-        project_id=project_id,
-        conversation_id=session_id,
-        conversation_name=session_name,
-        agent_name=agent_name,
-        turns=[turn],
-    )
-
-    resp = _ingest(req)
-    if resp is None:
-        return LogResult(session_id=session_id)
-    return LogResult(
-        session_id=resp.conversation_id or session_id,
-        trace_ids=resp.trace_ids,
-        root_span_ids=resp.root_span_ids,
-        span_count=resp.span_count,
+        session_id=session_id,
+        session_name=session_name,
+        _tracer_provider=_tracer_provider,
     )
 
 
 def log_step(
     *,
     session_id: str,
-    trace_id: str,
-    parent_span_id: str,
+    trace_id: str = "",
+    parent_span_id: str = "",
     model: str = "",
     input_messages: list[dict[str, str]] | None = None,
     output_messages: list[dict[str, str]] | None = None,
@@ -895,15 +1020,21 @@ def log_step(
     system_instructions: list[str] | None = None,
     agent_name: str = "",
     session_name: str = "",
+    _tracer_provider: TracerProvider | None = None,
 ) -> LogResult:
     """Batch-ingest a single step into an existing turn.
 
-    Always uses the structured ingest (legacy) path.
+    Creates a standalone ``chat`` OTel span with the ``conversation_id``
+    attribute set for server-side correlation. The ``trace_id`` and
+    ``parent_span_id`` parameters are accepted for API compatibility but
+    parent relationships are not reconstructed because our 128-bit span IDs
+    do not fit in OTel's 64-bit span_id field.
 
     Args:
         session_id: The session this turn belongs to.
-        trace_id: The trace_id of the parent turn (from a previous log result).
-        parent_span_id: The root_span_id of the parent turn.
+        trace_id: The trace_id of the parent turn (informational; not used
+            for OTel parent linkage).
+        parent_span_id: The root_span_id of the parent turn (informational).
         model: Model name.
         input_messages: Messages sent to the LLM.
         output_messages: Messages produced by the LLM.
@@ -915,49 +1046,40 @@ def log_step(
         system_instructions: System instructions for this step.
         agent_name: Agent name.
         session_name: Human-readable session name.
+        _tracer_provider: Optional OTel TracerProvider.
 
     Returns:
         A ``LogResult``.
     """
-    project_id = _get_project_id()
+    step_data: dict[str, Any] = {
+        "model": model,
+        "input_messages": list(input_messages or []),
+        "output_messages": list(output_messages or []),
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "reasoning_tokens": reasoning_tokens,
+        "reasoning_content": reasoning_content,
+        "tool_calls": list(tool_calls or []),
+        "system_instructions": list(system_instructions or []),
+    }
 
-    step = tsi.GenAIStructuredStep(
-        model=model,
-        input_messages=[_msg_to_structured(m) for m in (input_messages or [])],
-        output_messages=[_msg_to_structured(m) for m in (output_messages or [])],
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        reasoning_tokens=reasoning_tokens,
-        reasoning_content=reasoning_content,
-        tool_calls=[tsi.GenAIStructuredToolCall(**tc) for tc in (tool_calls or [])],
-        system_instructions=list(system_instructions or []),
-    )
+    tracer = _get_tracer(_tracer_provider)
 
-    turn = tsi.GenAIStructuredTurn(
-        messages=[],
-        steps=[step],
-        agent_name=agent_name,
-        model=model,
-        trace_id=trace_id,
-        parent_span_id=parent_span_id,
-    )
-
-    req = tsi.GenAIConversationIngestReq(
-        project_id=project_id,
+    # Create a standalone chat span (new trace) with conversation_id for correlation
+    span_count = _emit_step_spans(
+        tracer=tracer,
+        parent_context=Context(),
+        step_data=step_data,
         conversation_id=session_id,
         conversation_name=session_name,
-        agent_name=agent_name,
-        turns=[turn],
+        default_model=model,
     )
 
-    resp = _ingest(req)
-    if resp is None:
-        return LogResult(session_id=session_id)
     return LogResult(
-        session_id=resp.conversation_id or session_id,
-        trace_ids=resp.trace_ids,
-        root_span_ids=resp.root_span_ids,
-        span_count=resp.span_count,
+        session_id=session_id,
+        trace_ids=[],
+        root_span_ids=[],
+        span_count=span_count,
     )
 
 

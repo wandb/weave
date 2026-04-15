@@ -767,11 +767,12 @@ def test_tool_model_dump():
 
 
 # ---------------------------------------------------------------------------
-# Imperative batch: log_session / log_turn / log_step (always legacy path)
+# Imperative batch: log_session / log_turn / log_step (OTel path)
 # ---------------------------------------------------------------------------
 
 
-def test_log_session(mock_client):
+def test_log_session(otel_setup):
+    provider, exporter = otel_setup
     result = log_session(
         agent_name="bot",
         turns=[
@@ -794,30 +795,107 @@ def test_log_session(mock_client):
                 ],
             }
         ],
+        _tracer_provider=provider,
     )
 
     assert isinstance(result, LogResult)
-    assert result.session_id == "conv-123"
-    assert result.trace_ids == ["trace-1"]
+    assert result.session_id  # auto-generated
+    assert len(result.trace_ids) == 1
+    assert len(result.root_span_ids) == 1
+    # 1 invoke_agent + 1 chat + 1 execute_tool = 3
     assert result.span_count == 3
 
-    req = mock_client.server.genai_conversation_ingest.call_args[0][0]
-    assert len(req.turns) == 1
-    assert len(req.turns[0].steps) == 1
-    assert req.turns[0].steps[0].input_tokens == 10
-    assert req.turns[0].steps[0].tool_calls[0].tool_name == "greet"
+    spans = exporter.get_finished_spans()
+    assert len(spans) == 3
+
+    invoke_spans = [s for s in spans if s.name == "invoke_agent"]
+    chat_spans = [s for s in spans if s.name == "chat"]
+    tool_spans = [s for s in spans if s.name == "execute_tool"]
+    assert len(invoke_spans) == 1
+    assert len(chat_spans) == 1
+    assert len(tool_spans) == 1
+
+    # Check invoke_agent attributes
+    invoke_attrs = dict(invoke_spans[0].attributes)
+    assert invoke_attrs["gen_ai.operation.name"] == "invoke_agent"
+    assert invoke_attrs["gen_ai.agent.name"] == "bot"
+    assert invoke_attrs["gen_ai.usage.input_tokens"] == 10
+    assert invoke_attrs["gen_ai.usage.output_tokens"] == 5
+
+    # Check chat attributes
+    chat_attrs = dict(chat_spans[0].attributes)
+    assert chat_attrs["gen_ai.request.model"] == "gpt-4o"
+    assert chat_attrs["gen_ai.usage.input_tokens"] == 10
+    assert chat_attrs["gen_ai.usage.output_tokens"] == 5
+
+    # Check tool attributes
+    tool_attrs = dict(tool_spans[0].attributes)
+    assert tool_attrs["gen_ai.tool.name"] == "greet"
+    assert tool_attrs["gen_ai.tool.call.result"] == "hi"
+
+    # Check hierarchy: chat is child of invoke_agent, tool is child of chat
+    assert chat_spans[0].parent is not None
+    assert chat_spans[0].parent.span_id == invoke_spans[0].get_span_context().span_id
+    assert tool_spans[0].parent is not None
+    assert tool_spans[0].parent.span_id == chat_spans[0].get_span_context().span_id
 
 
-def test_log_session_custom_id(mock_client):
+def test_log_session_custom_id(otel_setup):
+    provider, exporter = otel_setup
     result = log_session(
         session_id="my-session",
         turns=[{"messages": [{"role": "user", "content": "Hi"}]}],
+        _tracer_provider=provider,
     )
-    req = mock_client.server.genai_conversation_ingest.call_args[0][0]
-    assert req.conversation_id == "my-session"
+    assert result.session_id == "my-session"
+
+    spans = exporter.get_finished_spans()
+    invoke_span = next(s for s in spans if s.name == "invoke_agent")
+    assert dict(invoke_span.attributes)["gen_ai.conversation.id"] == "my-session"
 
 
-def test_log_turn(mock_client):
+def test_log_session_multiple_turns(otel_setup):
+    provider, exporter = otel_setup
+    result = log_session(
+        agent_name="bot",
+        turns=[
+            {
+                "messages": [{"role": "user", "content": "Q1"}],
+                "steps": [
+                    {
+                        "model": "gpt-4o",
+                        "output_messages": [{"role": "assistant", "content": "A1"}],
+                    }
+                ],
+            },
+            {
+                "messages": [{"role": "user", "content": "Q2"}],
+                "steps": [
+                    {
+                        "model": "gpt-4o",
+                        "output_messages": [{"role": "assistant", "content": "A2"}],
+                    }
+                ],
+            },
+        ],
+        _tracer_provider=provider,
+    )
+
+    assert len(result.trace_ids) == 2
+    # Each turn gets a separate trace
+    assert result.trace_ids[0] != result.trace_ids[1]
+
+    spans = exporter.get_finished_spans()
+    invoke_spans = [s for s in spans if s.name == "invoke_agent"]
+    assert len(invoke_spans) == 2
+    assert (
+        invoke_spans[0].get_span_context().trace_id
+        != invoke_spans[1].get_span_context().trace_id
+    )
+
+
+def test_log_turn(otel_setup):
+    provider, exporter = otel_setup
     result = log_turn(
         session_id="session-1",
         messages=[{"role": "user", "content": "Hello"}],
@@ -829,18 +907,26 @@ def test_log_turn(mock_client):
         ],
         agent_name="bot",
         model="gpt-4o",
+        _tracer_provider=provider,
     )
 
     assert isinstance(result, LogResult)
-    assert result.session_id == "conv-123"
+    assert result.session_id == "session-1"
+    assert len(result.trace_ids) == 1
 
-    req = mock_client.server.genai_conversation_ingest.call_args[0][0]
-    assert req.conversation_id == "session-1"
-    assert len(req.turns) == 1
-    assert len(req.turns[0].steps) == 1
+    spans = exporter.get_finished_spans()
+    # 1 invoke_agent + 1 chat = 2
+    assert len(spans) == 2
+
+    invoke_span = next(s for s in spans if s.name == "invoke_agent")
+    chat_span = next(s for s in spans if s.name == "chat")
+
+    assert dict(invoke_span.attributes)["gen_ai.conversation.id"] == "session-1"
+    assert dict(chat_span.attributes)["gen_ai.request.model"] == "gpt-4o"
 
 
-def test_log_step(mock_client):
+def test_log_step(otel_setup):
+    provider, exporter = otel_setup
     result = log_step(
         session_id="session-1",
         trace_id="trace-1",
@@ -852,15 +938,29 @@ def test_log_step(mock_client):
         tool_calls=[
             {"tool_name": "search", "arguments": '{"q":"test"}', "result": "found"}
         ],
+        _tracer_provider=provider,
     )
 
     assert isinstance(result, LogResult)
+    assert result.session_id == "session-1"
 
-    req = mock_client.server.genai_conversation_ingest.call_args[0][0]
-    assert req.turns[0].trace_id == "trace-1"
-    assert req.turns[0].parent_span_id == "span-1"
-    assert req.turns[0].steps[0].input_tokens == 50
-    assert req.turns[0].steps[0].tool_calls[0].tool_name == "search"
+    spans = exporter.get_finished_spans()
+    # 1 chat + 1 execute_tool = 2
+    assert len(spans) == 2
+
+    chat_span = next(s for s in spans if s.name == "chat")
+    tool_span = next(s for s in spans if s.name == "execute_tool")
+
+    chat_attrs = dict(chat_span.attributes)
+    assert chat_attrs["gen_ai.request.model"] == "gpt-4o"
+    assert chat_attrs["gen_ai.usage.input_tokens"] == 50
+    assert chat_attrs["gen_ai.usage.output_tokens"] == 25
+    assert chat_attrs["gen_ai.conversation.id"] == "session-1"
+
+    tool_attrs = dict(tool_span.attributes)
+    assert tool_attrs["gen_ai.tool.name"] == "search"
+    assert tool_attrs["gen_ai.tool.call.arguments"] == '{"q":"test"}'
+    assert tool_attrs["gen_ai.tool.call.result"] == "found"
 
 
 # ---------------------------------------------------------------------------
@@ -894,17 +994,17 @@ def test_flush_error_is_logged_not_raised(mock_client):
     session.end()
 
 
-@pytest.mark.disable_logging_error_check
-def test_log_session_flush_error_returns_empty_result(mock_client):
-    """Batch log should return an empty LogResult on flush error."""
-    mock_client.server.genai_conversation_ingest.side_effect = Exception("fail")
-
+def test_log_session_always_succeeds_with_otel(otel_setup):
+    """OTel-based batch log always produces spans locally (no server dependency)."""
+    provider, exporter = otel_setup
     result = log_session(
         turns=[{"messages": [{"role": "user", "content": "Hi"}]}],
+        _tracer_provider=provider,
     )
     assert isinstance(result, LogResult)
-    assert result.trace_ids == []
-    assert result.span_count == 0
+    # OTel spans are created locally -- always succeeds
+    assert len(result.trace_ids) == 1
+    assert result.span_count == 1  # just invoke_agent, no steps
 
 
 # ---------------------------------------------------------------------------
