@@ -28,6 +28,15 @@ import {
   SpanStatusCode,
   trace,
 } from '@opentelemetry/api';
+import {OTLPTraceExporter} from '@opentelemetry/exporter-trace-otlp-proto';
+import {Resource} from '@opentelemetry/resources';
+import {
+  BasicTracerProvider,
+  BatchSpanProcessor,
+} from '@opentelemetry/sdk-trace-base';
+
+import {getGlobalClient} from '../clientApi';
+import {getWandbConfigs} from '../wandb/settings';
 
 import {GEN_AI_ATTR, GEN_AI_EVENT, OTEL_ATTR} from './common/genai';
 
@@ -143,9 +152,54 @@ export class PiCodingAgentOtelAdapter {
   private agentTotalTokens = 0;
   private agentCostUsd = 0;
 
+  // Private TracerProvider created when auto-configuring from the Weave global client.
+  // null when the user supplied their own tracer or no Weave client is initialised.
+  private readonly privateProvider: BasicTracerProvider | null;
+
   constructor(opts: OtelExtensionOptions = {}) {
-    this.tracer = opts.tracer ?? trace.getTracer('pi-coding-agent-weave-ext');
     this.captureContent = opts.captureContent ?? true;
+
+    if (opts.tracer) {
+      this.tracer = opts.tracer;
+      this.privateProvider = null;
+    } else {
+      const client = getGlobalClient();
+      if (client) {
+        try {
+          const [entity, project] = client.projectId.split('/');
+          const {apiKey} = getWandbConfigs();
+          const endpoint = `${client.traceServerApi.baseUrl}/otel/v1/traces`;
+
+          const authHeader = `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`;
+          const provider = new BasicTracerProvider({
+            resource: new Resource({
+              'wandb.entity': entity,
+              'wandb.project': project,
+            }),
+            spanProcessors: [
+              new BatchSpanProcessor(
+                new OTLPTraceExporter({
+                  url: endpoint,
+                  headers: {
+                    Authorization: authHeader,
+                    project_id: client.projectId,
+                  },
+                })
+              ),
+            ],
+          });
+
+          this.privateProvider = provider;
+          this.tracer = provider.getTracer('pi-coding-agent-weave-ext');
+        } catch {
+          this.privateProvider = null;
+          this.tracer = trace.getTracer('pi-coding-agent-weave-ext');
+        }
+      } else {
+        this.privateProvider = null;
+        this.tracer = trace.getTracer('pi-coding-agent-weave-ext');
+      }
+    }
   }
 
   /** Returns a pi extension definition for use with createAgentSession({ extensions: [...] }). */
@@ -198,8 +252,8 @@ export class PiCodingAgentOtelAdapter {
     this.sessionCtx = trace.setSpan(ROOT_CONTEXT, this.sessionSpan);
   };
 
-  private onSessionShutdown = (): void => {
-    this.endSessionSpan();
+  private onSessionShutdown = async (): Promise<void> => {
+    await this.endSessionSpan();
   };
 
   private onModelSelect = (
@@ -479,12 +533,15 @@ export class PiCodingAgentOtelAdapter {
     }
   }
 
-  private endSessionSpan(): void {
+  private async endSessionSpan(): Promise<void> {
     this.endInvokeAgentSpan();
     if (this.sessionSpan) {
       this.sessionSpan.end();
       this.sessionSpan = null;
       this.sessionCtx = ROOT_CONTEXT;
+    }
+    if (this.privateProvider) {
+      await this.privateProvider.shutdown().catch(() => {});
     }
   }
 }
