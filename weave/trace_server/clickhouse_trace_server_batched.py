@@ -2036,9 +2036,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> None:
         """Raise NotFoundError if the object version doesn't exist or is deleted."""
         query, parameters = make_obj_version_exists_query(project_id, object_id, digest)
-        result = self._query(query, parameters)
-        if not result.result_rows:
-            raise NotFoundError(f"Object version {object_id}:{digest} not found")
+
+        def _check_exists() -> None:
+            result = self._query(query, parameters)
+            if not result.result_rows:
+                raise NotFoundError(f"Object version {object_id}:{digest} not found")
+
+        self._read_with_retry(_check_exists, max_attempts=OBJ_READ_RETRY_ATTEMPTS)
 
     def _insert_tags(
         self,

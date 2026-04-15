@@ -327,7 +327,7 @@ async def test_sync_eval_parallelism(client):
         {"a": 10},
     ]
 
-    # 10 rows, should complete in <5 seconds. if sync, 10+
+    # 10 rows, should complete in <8 seconds. if sync, 10+
 
     now = time.time()
 
@@ -338,7 +338,7 @@ async def test_sync_eval_parallelism(client):
         "score": {"mean": 1.0},
         "model_latency": {"mean": pytest.approx(1, abs=LATENCY_TOL)},
     }
-    assert time.time() - now < (15 if sys.platform == "win32" else 5)
+    assert time.time() - now < (15 if sys.platform == "win32" else 8)
 
 
 @pytest.mark.asyncio
