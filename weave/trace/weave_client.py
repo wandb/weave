@@ -456,7 +456,16 @@ class WeaveClient:
         return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
+    def get(
+        self,
+        ref: ObjectRef,
+        *,
+        objectify: bool = True,
+        # Ops (and some CustomWeaveTypes) may store serialized python code for reuse.
+        # Deserializing these objects requires importing and executing this remote code.
+        # Set this to `True` if you trust this ref and you want to fetch executable code.
+        dangerously_import_remote_ops: bool | None = None,
+    ) -> Any:
         project_id = to_project_id(ref.entity, ref.project)
         try:
             read_res = self.server.obj_read(
@@ -509,7 +518,7 @@ class WeaveClient:
         else:
             data = read_res.obj.val
 
-        val = from_json(data, project_id, self.server)
+        val = from_json(data, project_id, self.server, dangerously_import_remote_ops)
         weave_obj = make_trace_obj(val, ref, self.server, None)
         if objectify:
             return maybe_objectify(weave_obj)

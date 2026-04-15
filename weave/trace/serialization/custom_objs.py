@@ -19,6 +19,7 @@ from weave.trace.serialization.serializer import (
     is_probably_legacy_file_load,
     is_probably_legacy_inline_load,
 )
+from weave.trace.settings import should_dangerously_import_remote_ops
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     TraceServerInterface,
@@ -177,12 +178,16 @@ def _load_custom_obj(
     return res
 
 
-def decode_custom_obj(encoded: EncodedCustomObjDict) -> Any:
+def decode_custom_obj(
+    encoded: EncodedCustomObjDict,
+    dangerously_import_remote_ops: bool | None = None,
+) -> Any:
     return _decode_custom_obj(
         encoded["weave_type"],
         encoded.get("files", {}),
         encoded.get("val"),
         encoded.get("load_op"),
+        dangerously_import_remote_ops=dangerously_import_remote_ops,
     )
 
 
@@ -191,9 +196,32 @@ def _decode_custom_obj(
     encoded_path_contents: Mapping[str, str | bytes],
     val: Any | None,
     load_instance_op_uri: str | None = None,
+    dangerously_import_remote_ops: bool | None = None,
 ) -> Any:
     type_ = weave_type["type"]
     found_serializer = False
+
+    deprecation_msg = (
+        "In a future version, deserializing objects that execute remote code will "
+        "require an explicit opt-in. Pass `dangerously_import_remote_ops=True` to "
+        "`client.get()` to silence this warning."
+    )
+
+    def _allow_remote_ops() -> bool:
+        if dangerously_import_remote_ops is not None:
+            return dangerously_import_remote_ops
+        return should_dangerously_import_remote_ops()
+
+    # Op deserialization imports and executes user-uploaded Python code.
+    if type_ == "Op":
+        if not _allow_remote_ops():
+            raise ValueError(
+                "Deserializing Op objects requires importing and executing remote code. "
+                "Set `WEAVE_DANGEROUSLY_IMPORT_REMOTE_OPS=true` or pass "
+                "`dangerously_import_remote_ops=True` to `client.get()` to allow this."
+            )
+        if dangerously_import_remote_ops is None:
+            logger.warning("Deserializing Op from remote code. %s", deprecation_msg)
 
     # First, try to load the object using a known serializer
     if type_ in KNOWN_TYPES:
@@ -209,14 +237,29 @@ def _decode_custom_obj(
             else:
                 return res
 
-    # Otherwise, fall back to load_instance_op
+    # Otherwise, fall back to load_instance_op which fetches and executes a remote Op.
     if not found_serializer:
         if load_instance_op_uri is None:
             raise ValueError(f"No serializer found for `{type_}`")
 
+        if not _allow_remote_ops():
+            raise ValueError(
+                f"Deserializing unknown type `{type_}` requires fetching and executing a "
+                f"remote load_op. Set `WEAVE_DANGEROUSLY_IMPORT_REMOTE_OPS=true` or pass "
+                f"`dangerously_import_remote_ops=True` to `client.get()` to allow this."
+            )
+        if dangerously_import_remote_ops is None:
+            logger.warning(
+                "Deserializing unknown type `%s` via remote load_op. %s",
+                type_,
+                deprecation_msg,
+            )
+
         obj_ref = ObjectRef.parse_uri(load_instance_op_uri)
         wc = require_weave_client()
-        load_instance_op = wc.get(obj_ref)
+        load_instance_op = wc.get(
+            obj_ref, dangerously_import_remote_ops=dangerously_import_remote_ops
+        )
         if load_instance_op is None:
             raise ValueError(
                 f"Failed to load op needed to decode object of type `{type_}`. See logs above for more information."

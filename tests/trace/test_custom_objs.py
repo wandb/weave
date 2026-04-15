@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
 import rich.markdown
 from PIL import Image
 
@@ -12,6 +13,7 @@ from weave.trace.serialization.custom_objs import (
     decode_custom_obj,
     encode_custom_obj,
 )
+from weave.trace.settings import UserSettings
 
 
 def test_encode_custom_obj_unknown_type(client):
@@ -50,11 +52,8 @@ def test_inline_custom_obj(client):
     assert decoded == dt_with_tz
 
 
-def test_inline_custom_obj_needs_load_op(client):
-    """Test the condition that the current version of the SDK doesn't know how to load the object.
-
-    In that case we fallback to the saved load op.
-    """
+def test_inline_custom_obj_needs_load_op_default(client):
+    """By default (dangerously_import_remote_ops=True), the load_op fallback works."""
     md = rich.markdown.Markdown("# Hello")
 
     @weave.op
@@ -74,6 +73,50 @@ def test_inline_custom_obj_needs_load_op(client):
         assert isinstance(loaded_markdown, rich.markdown.Markdown)
     finally:
         KNOWN_TYPES = original_known_types
+
+
+def test_inline_custom_obj_needs_load_op_blocked_by_setting(client):
+    """When dangerously_import_remote_ops is disabled via settings,
+    the load_op fallback raises ValueError.
+    """
+    md = rich.markdown.Markdown("# Hello")
+
+    @weave.op
+    def return_markdown(md):
+        return md
+
+    _, call = return_markdown.call(md)
+    client.flush()
+
+    global KNOWN_TYPES  # noqa: PLW0603
+    original_known_types = KNOWN_TYPES.copy()
+    KNOWN_TYPES.remove("rich.markdown.Markdown")
+    settings = UserSettings(dangerously_import_remote_ops=False)
+    settings.apply()
+    try:
+        with pytest.raises(ValueError, match="dangerously_import_remote_ops"):
+            client.get_call(call.id)
+    finally:
+        KNOWN_TYPES = original_known_types
+        UserSettings().apply()
+
+
+def test_inline_custom_obj_needs_load_op_per_call_override(client):
+    """Per-call dangerously_import_remote_ops=True overrides a False setting."""
+    md = rich.markdown.Markdown("# Hello")
+    ref = weave.publish(md, "test-markdown")
+
+    global KNOWN_TYPES  # noqa: PLW0603
+    original_known_types = KNOWN_TYPES.copy()
+    KNOWN_TYPES.remove("rich.markdown.Markdown")
+    settings = UserSettings(dangerously_import_remote_ops=False)
+    settings.apply()
+    try:
+        loaded = client.get(ref, dangerously_import_remote_ops=True)
+        assert isinstance(loaded, rich.markdown.Markdown)
+    finally:
+        KNOWN_TYPES = original_known_types
+        UserSettings().apply()
 
 
 def test_no_extra_calls_created(client):

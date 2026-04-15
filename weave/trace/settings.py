@@ -267,6 +267,18 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_DISABLE_WAL_SENDER`
     """
 
+    # TODO: Default to False in a future release.
+    dangerously_import_remote_ops: bool = True
+    """Allows execution of remote code during deserialization.
+
+    When True, deserializing Op objects and certain CustomWeaveType objects
+    will import and execute user-uploaded Python code. Set to False to prevent
+    remote code execution during deserialization (e.g. in server-side workers).
+    Can be overridden with the environment variable `WEAVE_DANGEROUSLY_IMPORT_REMOTE_OPS`
+
+    In the future this will default to False to require explicit opt-in.
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -419,6 +431,11 @@ def should_enable_wal() -> bool:
 def should_disable_wal_sender() -> bool:
     """Returns whether the WAL sender thread should be disabled."""
     return _should("disable_wal_sender")
+
+
+def should_dangerously_import_remote_ops() -> bool:
+    """Returns whether remote code execution during deserialization is allowed."""
+    return _should("dangerously_import_remote_ops")
 
 
 def parse_and_apply_settings(

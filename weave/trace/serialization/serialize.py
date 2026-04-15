@@ -302,15 +302,20 @@ def _load_custom_obj_files(
     return loaded_files
 
 
-def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
+def from_json(
+    obj: Any,
+    project_id: str,
+    server: TraceServerInterface,
+    dangerously_import_remote_ops: bool | None = None,
+) -> Any:
     if isinstance(obj, list):
-        return [from_json(v, project_id, server) for v in obj]
+        return [from_json(v, project_id, server, dangerously_import_remote_ops) for v in obj]
     elif isinstance(obj, dict):
         if (val_type := obj.pop("_type", None)) is None:
-            return {k: from_json(v, project_id, server) for k, v in obj.items()}
+            return {k: from_json(v, project_id, server, dangerously_import_remote_ops) for k, v in obj.items()}
         elif val_type == "ObjectRecord":
             return ObjectRecord(
-                {k: from_json(v, project_id, server) for k, v in obj.items()}
+                {k: from_json(v, project_id, server, dangerously_import_remote_ops) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
             encoded: custom_objs.EncodedCustomObjDict = {
@@ -326,7 +331,7 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                     files = _load_custom_obj_files(project_id, server, file_spec)
                     encoded["files"] = files
 
-            return custom_objs.decode_custom_obj(encoded)
+            return custom_objs.decode_custom_obj(encoded, dangerously_import_remote_ops)
         elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
             from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
                 BUILTIN_OBJECT_REGISTRY,
@@ -341,7 +346,7 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 return cls.model_validate(obj_data)
 
         return ObjectRecord(
-            {k: from_json(v, project_id, server) for k, v in obj.items()}
+            {k: from_json(v, project_id, server, dangerously_import_remote_ops) for k, v in obj.items()}
         )
     elif isinstance(obj, str) and obj.startswith("weave://"):
         return Ref.parse_uri(obj)
