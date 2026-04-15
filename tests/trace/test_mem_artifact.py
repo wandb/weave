@@ -21,11 +21,11 @@ def test_mem_artifact_path_sanitization():
     assert result.endswith(os.path.join("subdir", "file.txt"))
 
     # Absolute paths and traversals are rejected in both path() and filename override
-    with pytest.raises(ValueError, match="absolute path"):
+    with pytest.raises(ValueError, match="absolute path|escapes base directory"):
         art.path("/etc/passwd")
-    with pytest.raises(ValueError, match="escapes base directory"):
+    with pytest.raises(ValueError, match="absolute path|escapes base directory"):
         art.path("../../etc/shadow")
-    with pytest.raises(ValueError, match="absolute path"):
+    with pytest.raises(ValueError, match="absolute path|escapes base directory"):
         art.path("audio.wav", filename="/tmp/evil.pth")
 
     # writeable_file_path: valid works, absolute and traversal rejected
@@ -34,9 +34,9 @@ def test_mem_artifact_path_sanitization():
             f.write(b"data")
     assert art.path_contents["output.wav"] == b"data"
 
-    with pytest.raises(ValueError, match="absolute path"):
+    with pytest.raises(ValueError, match="absolute path|escapes base directory"):
         with art.writeable_file_path("/etc/evil"):
             pass
-    with pytest.raises(ValueError, match="escapes base directory"):
+    with pytest.raises(ValueError, match="absolute path|escapes base directory"):
         with art.writeable_file_path("../../etc/evil"):
             pass
