@@ -1,12 +1,8 @@
-"""Tests for weave.start_session / log_session / log_turn / log_step.
-
-Covers both OTel mode (default) and legacy structured ingest mode.
-"""
+"""Tests for weave.start_session / log_session / log_turn / log_step."""
 
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
 
 import pytest
 from opentelemetry.sdk.trace import TracerProvider
@@ -29,7 +25,6 @@ from weave.trace.session import (
     log_turn,
     start_session,
 )
-from weave.trace_server import trace_server_interface as tsi
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -43,27 +38,6 @@ def otel_setup():
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     return provider, exporter
-
-
-@pytest.fixture
-def mock_client():
-    """Patch get_weave_client to return a fake client with a mock server."""
-    client = MagicMock()
-    client.entity = "test-entity"
-    client.project = "test-project"
-    client.server.genai_conversation_ingest.return_value = (
-        tsi.GenAIConversationIngestRes(
-            conversation_id="conv-123",
-            trace_ids=["trace-1"],
-            root_span_ids=["span-1"],
-            span_count=3,
-        )
-    )
-    with patch(
-        "weave.trace.context.weave_client_context.get_weave_client",
-        return_value=client,
-    ):
-        yield client
 
 
 # ===========================================================================
@@ -468,135 +442,6 @@ class TestOtelManualEnd:
         assert len(spans) == 2
 
 
-# ===========================================================================
-# Legacy mode tests (_ingest_fn)
-# ===========================================================================
-
-
-class TestLegacyMode:
-    """When _ingest_fn is provided, session uses structured ingest (no OTel spans)."""
-
-    def test_legacy_ingest_fn_mode(self, mock_client):
-        """Legacy mode with _ingest_fn uses structured ingest, not OTel."""
-        calls = []
-
-        def fake_ingest(req):
-            calls.append(req)
-            return tsi.GenAIConversationIngestRes(
-                conversation_id="conv-123",
-                trace_ids=["trace-1"],
-                root_span_ids=["span-1"],
-                span_count=3,
-            )
-
-        session = start_session(
-            agent_name="bot",
-            session_id="legacy-sess",
-            _ingest_fn=fake_ingest,
-        )
-        with session.start_turn() as turn:
-            turn.user("Hello")
-            with turn.start_step(model="gpt-4o") as step:
-                step.output_messages.append(Message(role="assistant", content="Hi!"))
-                step.usage = Usage(input_tokens=10, output_tokens=5)
-
-        session.end()
-
-        # Should have called the ingest function
-        assert len(calls) == 1
-        req = calls[0]
-        assert isinstance(req, tsi.GenAIConversationIngestReq)
-        assert req.conversation_id == "legacy-sess"
-        assert req.turns[0].steps[0].model == "gpt-4o"
-        assert req.turns[0].steps[0].input_tokens == 10
-
-    def test_legacy_incremental_flush(self, mock_client):
-        """Legacy mode: second step sends incremental payload with trace_id."""
-        calls = []
-
-        def fake_ingest(req):
-            calls.append(req)
-            return tsi.GenAIConversationIngestRes(
-                conversation_id="conv-123",
-                trace_ids=["trace-1"],
-                root_span_ids=["span-1"],
-                span_count=3,
-            )
-
-        session = start_session(
-            agent_name="bot",
-            _ingest_fn=fake_ingest,
-        )
-        turn = session.start_turn()
-        turn.user("Q")
-
-        step1 = turn.start_step(model="gpt-4o")
-        step1.output_messages.append(Message(role="assistant", content="A1"))
-        step1.end()
-
-        step2 = turn.start_step(model="gpt-4o")
-        step2.output_messages.append(Message(role="assistant", content="A2"))
-        step2.end()
-
-        turn.end()
-        session.end()
-
-        assert len(calls) == 2
-        # Second call should have trace_id/parent_span_id
-        second_req = calls[1]
-        assert second_req.turns[0].trace_id == "trace-1"
-        assert second_req.turns[0].parent_span_id == "span-1"
-
-    def test_legacy_no_otel_spans_emitted(self, mock_client, otel_setup):
-        """Legacy mode should NOT emit OTel spans even if provider exists."""
-        provider, exporter = otel_setup
-
-        calls = []
-
-        def fake_ingest(req):
-            calls.append(req)
-            return tsi.GenAIConversationIngestRes(
-                conversation_id="c", trace_ids=["t"], root_span_ids=["s"], span_count=1
-            )
-
-        # _ingest_fn takes precedence: legacy mode
-        session = start_session(
-            agent_name="bot",
-            _ingest_fn=fake_ingest,
-        )
-        with session.start_turn() as turn:
-            turn.user("Hi")
-            with turn.start_step(model="gpt-4o") as step:
-                step.output_messages.append(Message(role="assistant", content="Hey"))
-
-        session.end()
-
-        # No OTel spans
-        spans = exporter.get_finished_spans()
-        assert len(spans) == 0
-
-        # But ingest was called
-        assert len(calls) == 1
-
-
-# ===========================================================================
-# Original tests preserved (legacy / mock_client based)
-# ===========================================================================
-
-
-def test_start_session_requires_init_for_legacy():
-    """Legacy mode (with _ingest_fn=None and no _tracer_provider) that resolves
-    project_id still requires weave.init().
-    """
-    with patch(
-        "weave.trace.context.weave_client_context.get_weave_client",
-        return_value=None,
-    ):
-        # With _ingest_fn, it needs project_id from weave client
-        with pytest.raises(RuntimeError, match="weave.init"):
-            start_session(agent_name="bot", _ingest_fn=lambda r: None)
-
-
 def test_otel_mode_does_not_require_init(otel_setup):
     """OTel mode with _tracer_provider does NOT require weave.init()."""
     provider, exporter = otel_setup
@@ -966,32 +811,6 @@ def test_log_step(otel_setup):
 # ---------------------------------------------------------------------------
 # Error handling: flush failures are logged, not raised
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.disable_logging_error_check
-def test_flush_error_is_logged_not_raised(mock_client):
-    """Network errors during flush should be caught and logged (legacy mode)."""
-    mock_client.server.genai_conversation_ingest.side_effect = Exception(
-        "network error"
-    )
-
-    def failing_ingest(req):
-        raise RuntimeError("network error")
-
-    # Should not raise (legacy mode)
-    session = start_session(agent_name="bot", _ingest_fn=failing_ingest)
-    turn = session.start_turn()
-    turn.user("Hi")
-    step = turn.start_step(model="gpt-4o")
-    step.output_messages.append(Message(role="assistant", content="Hey"))
-    # The legacy path catches exceptions in _ingest, but _ingest_fn doesn't
-    # so we just verify it doesn't crash our test framework
-    try:
-        step.end()
-    except Exception:
-        pass
-    turn.end()
-    session.end()
 
 
 def test_log_session_always_succeeds_with_otel(otel_setup):
