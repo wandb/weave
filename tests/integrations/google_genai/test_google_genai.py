@@ -433,6 +433,96 @@ def test_thoughts_token_count_not_included_when_missing():
     assert model_usage["requests"] == 1
 
 
+def test_on_finish_includes_cached_content_token_count():
+    """Test that cached_content_token_count is mapped to cache_read_input_tokens."""
+    from weave.trace.call import Call
+
+    call = Mock(spec=Call)
+    call.inputs = {"model": "gemini-2.0-flash"}
+    call.summary = {}
+
+    usage_metadata = Mock()
+    usage_metadata.prompt_token_count = 100
+    usage_metadata.candidates_token_count = 50
+    usage_metadata.total_token_count = 150
+    usage_metadata.thoughts_token_count = None
+    usage_metadata.cached_content_token_count = 30
+
+    output = Mock()
+    output.usage_metadata = usage_metadata
+
+    google_genai_gemini_on_finish(call, output, None)
+
+    model_usage = call.summary["usage"]["gemini-2.0-flash"]
+    assert model_usage["cache_read_input_tokens"] == 30
+    assert "thoughts_tokens" not in model_usage
+
+
+def test_on_finish_excludes_cached_content_when_missing():
+    """Test that cache_read_input_tokens is omitted when cached_content_token_count is absent."""
+    from weave.trace.call import Call
+
+    call = Mock(spec=Call)
+    call.inputs = {"model": "gemini-2.0-flash"}
+    call.summary = {}
+
+    usage_metadata = Mock(
+        spec=["prompt_token_count", "candidates_token_count", "total_token_count"]
+    )
+    usage_metadata.prompt_token_count = 100
+    usage_metadata.candidates_token_count = 50
+    usage_metadata.total_token_count = 150
+
+    output = Mock()
+    output.usage_metadata = usage_metadata
+
+    google_genai_gemini_on_finish(call, output, None)
+
+    model_usage = call.summary["usage"]["gemini-2.0-flash"]
+    assert "cache_read_input_tokens" not in model_usage
+    assert "thoughts_tokens" not in model_usage
+
+
+def test_on_finish_with_inline_data_output():
+    """Test that on_finish handles responses with inline_data (images) without warnings."""
+    from google.genai import types
+
+    from weave import Content
+    from weave.trace.call import Call
+
+    call = Mock(spec=Call)
+    call.inputs = {"model": "gemini-2.0-flash"}
+    call.summary = {}
+
+    # Build a real Pydantic response with inline_data (image) instead of text
+    image_part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/png")
+    candidate = types.Candidate(
+        content=types.Content(role="model", parts=[image_part]),
+    )
+    output = types.GenerateContentResponse(
+        candidates=[candidate],
+        usage_metadata=types.GenerateContentResponseUsageMetadata(
+            prompt_token_count=10,
+            candidates_token_count=0,
+            total_token_count=10,
+        ),
+    )
+
+    # This should NOT trigger the "non-text parts in the response" warning
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        google_genai_gemini_on_finish(call, output, None)
+
+    # The inline_data should be converted to a Content object
+    assert call.output is not None
+    output_dict = call.output
+    image_data = output_dict["candidates"][0]["content"]["parts"][0]["inline_data"]
+    assert isinstance(image_data, Content)
+    assert image_data.mimetype == "image/png"
+
+
 def _create_mock_part(text: str, thought: bool = False) -> Mock:
     """Helper to create a mock Part with text and optional thought attribute."""
     part = Mock()
