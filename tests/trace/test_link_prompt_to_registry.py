@@ -9,16 +9,16 @@ from weave.prompt.prompt import StringPrompt
 from weave.trace import api, weave_client
 from weave.trace.context import weave_client_context
 from weave.trace.refs import ObjectRef
-from weave.trace_server_bindings.create_and_link_weave_asset import (
+from weave.trace_server_bindings.link_asset_to_registry import (
     LINK_TO_REGISTRY_PATH,
-    CreateAndLinkWeaveAssetReq,
-    CreateAndLinkWeaveAssetRes,
-    CreateAndLinkWeaveAssetTarget,
-    create_and_link_weave_asset,
+    LinkAssetToRegistryReq,
+    LinkAssetToRegistryRes,
+    LinkAssetToRegistryTarget,
+    link_asset_to_registry,
 )
 
-MOCK_TARGET = "weave.trace.weave_client.create_and_link_weave_asset"
-_TRANSPORT_MODULE = "weave.trace_server_bindings.create_and_link_weave_asset"
+MOCK_TARGET = "weave.trace.weave_client.link_asset_to_registry"
+_TRANSPORT_MODULE = "weave.trace_server_bindings.link_asset_to_registry"
 
 PROMPT_REF = ObjectRef(
     entity="source-entity",
@@ -27,9 +27,9 @@ PROMPT_REF = ObjectRef(
     _digest="v1",
 )
 
-DEFAULT_TRANSPORT_REQ = CreateAndLinkWeaveAssetReq(
+DEFAULT_TRANSPORT_REQ = LinkAssetToRegistryReq(
     ref="weave:///source-entity/source-project/object/my-prompt:v1",
-    target=CreateAndLinkWeaveAssetTarget(
+    target=LinkAssetToRegistryTarget(
         portfolio_name="prompt-registry",
         entity_name="target-entity",
         project_name="target-project",
@@ -65,7 +65,7 @@ def mock_transport():
     """Patch the transport function and return a canned response."""
     with patch(
         MOCK_TARGET,
-        return_value=CreateAndLinkWeaveAssetRes(version_index=2),
+        return_value=LinkAssetToRegistryRes(version_index=2),
     ) as m:
         yield m
 
@@ -168,7 +168,7 @@ def test_rejects_invalid_target_paths(client, target_path):
 
 def test_api_delegates_to_active_client(client):
     """The top-level API function delegates to the active WeaveClient."""
-    expected = CreateAndLinkWeaveAssetRes(version_index=0)
+    expected = LinkAssetToRegistryRes(version_index=0)
 
     weave_client_context.set_weave_client_global(client)
     try:
@@ -199,14 +199,14 @@ def test_api_delegates_to_active_client(client):
 
 def test_transport_sends_expected_request(mock_post: MagicMock) -> None:
     """POST the correct URL, auth, and payload; parse the typed response."""
-    req = CreateAndLinkWeaveAssetReq(
+    req = LinkAssetToRegistryReq(
         ref=DEFAULT_TRANSPORT_REQ.ref,
         target=DEFAULT_TRANSPORT_REQ.target,
         aliases=["prod", "latest"],
     )
     mock_post.return_value = _http_response(200, {"version_index": 7})
 
-    result = create_and_link_weave_asset(req)
+    result = link_asset_to_registry(req)
 
     assert result.version_index == 7
     mock_post.assert_called_once()
@@ -219,7 +219,7 @@ def test_transport_defaults_aliases_to_empty_list(mock_post: MagicMock) -> None:
     """Omitted aliases serialize as an empty list."""
     mock_post.return_value = _http_response(200, {"version_index": None})
 
-    create_and_link_weave_asset(DEFAULT_TRANSPORT_REQ)
+    link_asset_to_registry(DEFAULT_TRANSPORT_REQ)
 
     payload = mock_post.call_args.kwargs["json"]
     assert payload["aliases"] == []
@@ -230,11 +230,11 @@ def test_transport_surfaces_http_errors(mock_post: MagicMock) -> None:
     mock_post.return_value = _http_response(400, {"message": "invalid request"})
 
     with pytest.raises(httpx.HTTPStatusError, match="invalid request"):
-        create_and_link_weave_asset(DEFAULT_TRANSPORT_REQ)
+        link_asset_to_registry(DEFAULT_TRANSPORT_REQ)
 
 
 def test_transport_raises_when_no_api_key() -> None:
     """Raise ValueError when no API key is available."""
     with patch(f"{_TRANSPORT_MODULE}.get_wandb_api_context", return_value=None):
         with pytest.raises(ValueError, match="No API key found"):
-            create_and_link_weave_asset(DEFAULT_TRANSPORT_REQ)
+            link_asset_to_registry(DEFAULT_TRANSPORT_REQ)

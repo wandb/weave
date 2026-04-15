@@ -154,11 +154,11 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.trace_server_bindings.create_and_link_weave_asset import (
-    CreateAndLinkWeaveAssetReq,
-    CreateAndLinkWeaveAssetRes,
-    CreateAndLinkWeaveAssetTarget,
-    create_and_link_weave_asset,
+from weave.trace_server_bindings.link_asset_to_registry import (
+    LinkAssetToRegistryReq,
+    LinkAssetToRegistryRes,
+    LinkAssetToRegistryTarget,
+    link_asset_to_registry,
 )
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
@@ -1309,7 +1309,7 @@ class WeaveClient:
         *,
         target_path: str,
         aliases: Sequence[str] | None = None,
-    ) -> CreateAndLinkWeaveAssetRes:
+    ) -> LinkAssetToRegistryRes:
         """Link a published prompt or object version into the registry.
 
         Args:
@@ -1321,15 +1321,15 @@ class WeaveClient:
             aliases: Optional aliases to attach to the created registry version.
 
         Returns:
-            CreateAndLinkWeaveAssetRes: Parsed response from the registry-link endpoint.
+            LinkAssetToRegistryRes: Parsed response from the registry-link endpoint.
         """
         prompt_ref = self._resolve_registry_prompt_ref(prompt)
         registry_project, portfolio_name = self._parse_registry_target_path(target_path)
 
-        return create_and_link_weave_asset(
-            CreateAndLinkWeaveAssetReq(
+        return link_asset_to_registry(
+            LinkAssetToRegistryReq(
                 ref=prompt_ref.uri,
-                target=CreateAndLinkWeaveAssetTarget(
+                target=LinkAssetToRegistryTarget(
                     portfolio_name=portfolio_name,
                     entity_name=self.entity,
                     project_name=registry_project,

@@ -27,9 +27,7 @@ from weave.trace.table import Table
 from weave.trace.view_utils import set_call_view
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
-from weave.trace_server_bindings.create_and_link_weave_asset import (
-    CreateAndLinkWeaveAssetRes,
-)
+from weave.trace_server_bindings.link_asset_to_registry import LinkAssetToRegistryRes
 from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
@@ -388,7 +386,7 @@ def link_prompt_to_registry(
     *,
     target_path: str,
     aliases: Sequence[str] | None = None,
-) -> CreateAndLinkWeaveAssetRes:
+) -> LinkAssetToRegistryRes:
     """Link a published prompt or object version into the registry.
 
     Args:
@@ -400,7 +398,7 @@ def link_prompt_to_registry(
         aliases: Optional aliases to attach to the created registry version.
 
     Returns:
-        CreateAndLinkWeaveAssetRes: Parsed response from the registry-link endpoint.
+        LinkAssetToRegistryRes: Parsed response from the registry-link endpoint.
     """
     client = weave_client_context.require_weave_client()
     return client.link_prompt_to_registry(

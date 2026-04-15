@@ -11,25 +11,25 @@ from weave.wandb_interface.context import get_wandb_api_context
 LINK_TO_REGISTRY_PATH = "/link_to_registry"
 
 
-class CreateAndLinkWeaveAssetTarget(BaseModelStrict):
+class LinkAssetToRegistryTarget(BaseModelStrict):
     portfolio_name: str
     entity_name: str
     project_name: str
 
 
-class CreateAndLinkWeaveAssetReq(BaseModelStrict):
+class LinkAssetToRegistryReq(BaseModelStrict):
     ref: str
-    target: CreateAndLinkWeaveAssetTarget
+    target: LinkAssetToRegistryTarget
     aliases: list[str] = Field(default_factory=list)
 
 
-class CreateAndLinkWeaveAssetRes(BaseModel):
+class LinkAssetToRegistryRes(BaseModel):
     version_index: int | None = None
 
 
-def create_and_link_weave_asset(
-    req: CreateAndLinkWeaveAssetReq,
-) -> CreateAndLinkWeaveAssetRes:
+def link_asset_to_registry(
+    req: LinkAssetToRegistryReq,
+) -> LinkAssetToRegistryRes:
     """Post a `/link_to_registry` request to the trace server.
 
     Args:
@@ -37,7 +37,10 @@ def create_and_link_weave_asset(
             registry target, and optional aliases.
 
     Returns:
-        CreateAndLinkWeaveAssetRes: Parsed response from the registry-link endpoint.
+        LinkAssetToRegistryRes: Parsed response from the registry-link endpoint.
+
+    Raises:
+        ValueError: If no authenticated API key is available.
     """
     api_key = get_wandb_api_context()
     if api_key is None:
@@ -51,4 +54,4 @@ def create_and_link_weave_asset(
     )
     handle_response_error(response, url)
 
-    return CreateAndLinkWeaveAssetRes.model_validate(response.json())
+    return LinkAssetToRegistryRes.model_validate(response.json())
