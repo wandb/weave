@@ -1,4 +1,4 @@
--- Migration 027: Add TTL support for per-project call data retention
+-- Migration 029: Add TTL support for per-project call data retention
 --
 -- Safe to deploy alone — all rows get the 2100-01-01 sentinel, nothing expires
 -- until a user explicitly configures TTL via the API.
@@ -18,14 +18,18 @@ SETTINGS
     enable_block_number_column = 1,
     enable_block_offset_column = 1;
 
--- Step 1b: Rename existing ttl_at column on calls_complete (created by migration 024) to expire_at
+-- Step 1b: Rename ttl_at to expire_at on calls_complete
 ALTER TABLE calls_complete RENAME COLUMN ttl_at TO expire_at;
 
--- Step 2: Add expire_at to call_parts (v1 raw storage)
+-- Step 1c: Re-apply TTL expression after column rename.
+-- toDateTime() wrapper required for CH < 25.6 compatibility (PR #80710).
+ALTER TABLE calls_complete MODIFY TTL toDateTime(expire_at) DELETE;
+
+-- Step 2: Add expire_at to call_parts
 ALTER TABLE call_parts
     ADD COLUMN expire_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
--- Step 3: Add expire_at to calls_merged (v1 aggregated table)
+-- Step 3: Add expire_at to calls_merged
 ALTER TABLE calls_merged
     ADD COLUMN expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
@@ -61,33 +65,29 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     GROUP BY project_id,
         id;
 
--- Step 5: Enable TTL deletion on calls_merged
-ALTER TABLE calls_merged MODIFY TTL expire_at DELETE;
+-- Step 5: Enable TTL deletion on call_parts and calls_merged.
+-- toDateTime() wrapper required for CH < 25.6 compatibility (PR #80710).
+ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE;
+ALTER TABLE calls_merged MODIFY TTL toDateTime(expire_at) DELETE;
 
--- Step 6: Enable TTL deletion on call_parts
-ALTER TABLE call_parts MODIFY TTL expire_at DELETE;
-
--- Step 7: Add expire_at column and TTL to calls_merged_stats
+-- Step 6: Add expire_at column and TTL to calls_merged_stats
 ALTER TABLE calls_merged_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
+ALTER TABLE calls_merged_stats MODIFY TTL toDateTime(expire_at) DELETE;
 
-ALTER TABLE calls_merged_stats MODIFY TTL expire_at DELETE;
-
--- Step 8: Add expire_at column and TTL to calls_complete_stats
+-- Step 7: Add expire_at column and TTL to calls_complete_stats
 ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
--- IMPORTANT: `calls_complete` has had `source` since v2, but `calls_complete_stats` missed the matching aggregate column.
--- Fix it here so existing deployments pick it up during this upgrade, then populate it from `calls_complete.source` below.
+-- Add missing source column to calls_complete_stats (was present on calls_complete but not propagated here).
 ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS source SimpleAggregateFunction(any, Enum8('direct' = 1, 'dual' = 2, 'migration' = 3))
     DEFAULT 'direct';
+ALTER TABLE calls_complete_stats MODIFY TTL toDateTime(expire_at) DELETE;
 
-ALTER TABLE calls_complete_stats MODIFY TTL expire_at DELETE;
-
--- Step 9: Update calls_merged_stats_view to propagate expire_at
+-- Step 8: Update calls_merged_stats_view to propagate expire_at
 ALTER TABLE calls_merged_stats_view MODIFY QUERY
 SELECT
     call_parts.project_id,
@@ -118,7 +118,7 @@ GROUP BY
     call_parts.project_id,
     call_parts.id;
 
--- Step 10: Update calls_complete_stats_view to propagate expire_at
+-- Step 9: Update calls_complete_stats_view to propagate expire_at
 ALTER TABLE calls_complete_stats_view MODIFY QUERY
 SELECT
     calls_complete.project_id,

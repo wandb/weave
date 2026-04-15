@@ -11,7 +11,6 @@ from unittest import mock
 
 import boto3
 import pytest
-from azure.storage.blob import BlobServiceClient
 from google.api_core import exceptions
 from google.auth.credentials import AnonymousCredentials
 from moto import mock_aws
@@ -24,11 +23,6 @@ from weave.trace_server.trace_server_interface import FileContentReadReq, FileCr
 # Test Data Constants
 TEST_CONTENT = b"Hello, world!"
 TEST_BUCKET = "test-bucket"
-
-# Azure Constants
-AZURITE_ACCOUNT = "devstoreaccount1"
-AZURITE_KEY = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
-AZURITE_URL = f"http://127.0.0.1:10000/{AZURITE_ACCOUNT}"
 
 
 @pytest.fixture
@@ -314,33 +308,46 @@ class TestGCSStorage:
 
 
 class TestAzureStorage:
-    """Tests for Azure Blob Storage implementation."""
+    """Tests for Azure Blob Storage implementation using mocks."""
 
     @pytest.fixture
     def azure_blob(self):
-        """Azure Blob Storage using Azurite emulator."""
-        conn_str = (
-            f"DefaultEndpointsProtocol=http;"
-            f"AccountName={AZURITE_ACCOUNT};"
-            f"AccountKey={AZURITE_KEY};"
-            f"BlobEndpoint={AZURITE_URL};"
-        )
+        """Fully mocked Azure Blob Storage client."""
+        mock_service_client = mock.MagicMock()
+        mock_container_client = mock.MagicMock()
+        mock_blob_client = mock.MagicMock()
 
-        # Create the Azurite client
-        azurite_client = BlobServiceClient.from_connection_string(conn_str)
+        mock_service_client.get_container_client.return_value = mock_container_client
+        mock_container_client.get_blob_client.return_value = mock_blob_client
 
-        # Mock the client creation to always return our Azurite client
-        with mock.patch("azure.storage.blob.BlobServiceClient") as mock_client:
-            mock_client.from_connection_string.return_value = azurite_client
+        # In-memory storage for blobs
+        blob_data = {}
 
-            # Create test container
-            try:
-                azurite_client.create_container(TEST_BUCKET)
-            except Exception:
-                # Container might already exist
-                pass
+        def mock_upload_blob(data, overwrite=False, **kwargs):
+            blob_name = mock_blob_client.blob_name
+            blob_data[blob_name] = data
 
-            yield azurite_client
+        def mock_download_blob(**kwargs):
+            blob_name = mock_blob_client.blob_name
+            download = mock.MagicMock()
+            download.readall.return_value = blob_data.get(blob_name, b"")
+            return download
+
+        # Track blob_name through get_blob_client calls
+        def mock_get_blob_client(name):
+            mock_blob_client.blob_name = name
+            return mock_blob_client
+
+        mock_container_client.get_blob_client.side_effect = mock_get_blob_client
+        mock_blob_client.upload_blob.side_effect = mock_upload_blob
+        mock_blob_client.download_blob.side_effect = mock_download_blob
+
+        with mock.patch(
+            "weave.trace_server.file_storage.BlobServiceClient",
+            return_value=mock_service_client,
+        ) as mock_cls:
+            mock_cls.from_connection_string.return_value = mock_service_client
+            yield mock_service_client
 
     @pytest.fixture
     def azure_storage_env(self):
@@ -348,23 +355,22 @@ class TestAzureStorage:
         with mock.patch.dict(
             os.environ,
             {
-                "WF_FILE_STORAGE_AZURE_ACCESS_KEY": AZURITE_KEY,
-                "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": AZURITE_URL,
-                "WF_FILE_STORAGE_URI": f"az://{AZURITE_ACCOUNT}/{TEST_BUCKET}",
+                "WF_FILE_STORAGE_AZURE_ACCESS_KEY": "fake-key",
+                "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": "http://fake-account.blob.core.windows.net",
+                "WF_FILE_STORAGE_URI": f"az://fakeaccount/{TEST_BUCKET}",
                 "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
             },
         ):
             yield
 
-    @pytest.mark.flaky(reruns=3, reruns_delay=2)
     @pytest.mark.usefixtures("azure_storage_env")
     def test_azure_storage(self, run_storage_test, azure_blob):
         """Test file storage using Azure Blob Storage."""
         res = run_storage_test()
 
-        # Verify the object exists in Azure
+        # Verify upload was called
+        azure_blob.get_container_client.assert_called()
         container_client = azure_blob.get_container_client(TEST_BUCKET)
-        # Hard-coding project for ease. If we change how CI generates projects, this is ok to change
         project = "c2hhd24vdGVzdC1wcm9qZWN0"
         blob_client = container_client.get_blob_client(
             f"weave/projects/{project}/files/{res.digest}"

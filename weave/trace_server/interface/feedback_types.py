@@ -13,9 +13,17 @@ class FeedbackPayloadNoteReq(BaseModel):
     note: str = Field(min_length=1, max_length=MAX_FEEDBACK_NOTE_LENGTH)
 
 
+REACTION_FEEDBACK_TYPE = "wandb.reaction.1"
+NOTE_FEEDBACK_TYPE = "wandb.note.1"
+
+# Feedback types where multiple entries can exist per call per type.
+# When filtering on these, we use groupArrayIf (collect all values) + has()
+# instead of anyIf (pick one arbitrary value), which could miss matches.
+MULTI_VALUE_FEEDBACK_TYPES = {REACTION_FEEDBACK_TYPE, NOTE_FEEDBACK_TYPE}
+
 FEEDBACK_PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
-    "wandb.reaction.1": FeedbackPayloadReactionReq,
-    "wandb.note.1": FeedbackPayloadNoteReq,
+    REACTION_FEEDBACK_TYPE: FeedbackPayloadReactionReq,
+    NOTE_FEEDBACK_TYPE: FeedbackPayloadNoteReq,
 }
 
 ANNOTATION_FEEDBACK_TYPE_PREFIX = "wandb.annotation"

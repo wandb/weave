@@ -1,4 +1,4 @@
-import asyncio
+import pytest
 
 import weave.integrations.openai_realtime.conversation_manager as cm_mod
 
@@ -82,16 +82,15 @@ def test_conversation_manager_dispatch_sync(monkeypatch):
     assert "session.updated" in mgr.state.calls
 
 
-def test_conversation_manager_worker_queue(monkeypatch):
+@pytest.mark.asyncio
+async def test_conversation_manager_worker_queue(monkeypatch):
     monkeypatch.setattr(cm_mod, "StateExporter", DummyState)
     mgr = cm_mod.ConversationManager()
 
     msg = {"type": "input_audio_buffer.cleared", "event_id": "event_1"}
 
-    async def run():
-        await mgr.submit_event(msg)
-        # Wait until worker drains queue
-        mgr._queue.join()
+    await mgr.submit_event(msg)
+    # Wait until worker drains queue
+    mgr._queue.join()
 
-    asyncio.run(run())
     assert "input_audio_buffer.cleared" in mgr.state.calls

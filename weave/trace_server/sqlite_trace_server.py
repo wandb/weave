@@ -50,7 +50,10 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.interface.feedback_types import (
+    MULTI_VALUE_FEEDBACK_TYPES,
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+)
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.methods.sqlite_feedback_stats import (
     sqlite_feedback_payload_schema,
@@ -239,6 +242,12 @@ def _cost_usage_from_summary(
             "requests": _safe_int_for_costs(usage.get("requests")),
             # Match ClickHouse: keep total_tokens as-reported rather than deriving it.
             "total_tokens": _safe_int_for_costs(usage.get("total_tokens")),
+            "cache_read_input_tokens": _safe_int_for_costs(
+                usage.get("cache_read_input_tokens")
+            ),
+            "cache_creation_input_tokens": _safe_int_for_costs(
+                usage.get("cache_creation_input_tokens")
+            ),
         }
     return normalized_usage
 
@@ -437,6 +446,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 effective_date TEXT NOT NULL,
                 prompt_token_cost REAL NOT NULL,
                 completion_token_cost REAL NOT NULL,
+                cache_read_input_token_cost REAL NOT NULL DEFAULT 0,
+                cache_creation_input_token_cost REAL NOT NULL DEFAULT 0,
                 prompt_token_cost_unit TEXT NOT NULL,
                 completion_token_cost_unit TEXT NOT NULL,
                 created_by TEXT NOT NULL,
@@ -671,6 +682,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 row["effective_date"],
                 row["prompt_token_cost"],
                 row["completion_token_cost"],
+                row.get("cache_read_input_token_cost", 0),
+                row.get("cache_creation_input_token_cost", 0),
                 row["prompt_token_cost_unit"],
                 row["completion_token_cost_unit"],
                 row["created_by"],
@@ -689,11 +702,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 effective_date,
                 prompt_token_cost,
                 completion_token_cost,
+                cache_read_input_token_cost,
+                cache_creation_input_token_cost,
                 prompt_token_cost_unit,
                 completion_token_cost_unit,
                 created_by,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             default_rows,
         )
@@ -767,6 +782,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 effective_date,
                 prompt_token_cost,
                 completion_token_cost,
+                cache_read_input_token_cost,
+                cache_creation_input_token_cost,
                 prompt_token_cost_unit,
                 completion_token_cost_unit,
                 created_by,
@@ -800,6 +817,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         "effective_date",
                         "prompt_token_cost",
                         "completion_token_cost",
+                        "cache_read_input_token_cost",
+                        "cache_creation_input_token_cost",
                         "prompt_token_cost_unit",
                         "completion_token_cost_unit",
                         "created_by",
@@ -836,18 +855,43 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
                 prompt_cost = float(best_row["prompt_token_cost"] or 0.0)
                 completion_cost = float(best_row["completion_token_cost"] or 0.0)
+                cache_read_cost = float(
+                    best_row.get("cache_read_input_token_cost") or 0.0
+                )
+                cache_creation_cost = float(
+                    best_row.get("cache_creation_input_token_cost") or 0.0
+                )
                 prompt_tokens = usage["prompt_tokens"]
                 completion_tokens = usage["completion_tokens"]
+                cache_read_input_tokens = usage.get("cache_read_input_tokens", 0)
+                cache_creation_input_tokens = usage.get(
+                    "cache_creation_input_tokens", 0
+                )
 
                 call_costs[llm_id] = {
                     "prompt_tokens": prompt_tokens,
                     "completion_tokens": completion_tokens,
+                    "cache_read_input_tokens": cache_read_input_tokens,
+                    "cache_creation_input_tokens": cache_creation_input_tokens,
                     "requests": usage["requests"],
                     "total_tokens": usage["total_tokens"],
-                    "prompt_tokens_total_cost": prompt_tokens * prompt_cost,
+                    # Subtract cached tokens: they are billed at the cache
+                    # rate, not the regular input rate.
+                    "prompt_tokens_total_cost": (
+                        prompt_tokens
+                        - cache_read_input_tokens
+                        - cache_creation_input_tokens
+                    )
+                    * prompt_cost,
                     "completion_tokens_total_cost": completion_tokens * completion_cost,
+                    "cache_read_input_tokens_total_cost": cache_read_input_tokens
+                    * cache_read_cost,
+                    "cache_creation_input_tokens_total_cost": cache_creation_input_tokens
+                    * cache_creation_cost,
                     "prompt_token_cost": prompt_cost,
                     "completion_token_cost": completion_cost,
+                    "cache_read_input_token_cost": cache_read_cost,
+                    "cache_creation_input_token_cost": cache_creation_cost,
                     "prompt_token_cost_unit": best_row["prompt_token_cost_unit"],
                     "completion_token_cost_unit": best_row[
                         "completion_token_cost_unit"
@@ -975,11 +1019,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     cond = f"(NOT ({operand_part}))"
                 elif isinstance(operation, tsi_query.EqOperation):
                     lhs_part = process_operand(operation.eq_[0])
+                    is_multi_value_feedback = _is_multi_value_feedback_operand(
+                        operation.eq_[0]
+                    )
                     if (
                         isinstance(operation.eq_[1], tsi_query.LiteralOperation)
                         and operation.eq_[1].literal_ is None
                     ):
                         cond = f"({lhs_part} IS NULL)"
+                    elif is_multi_value_feedback:
+                        # Multi-value: GROUP_CONCAT result, use INSTR to find value
+                        rhs_part = process_operand(operation.eq_[1])
+                        cond = f"instr({lhs_part}, {rhs_part})"
                     else:
                         rhs_part = process_operand(operation.eq_[1])
                         cond = f"({lhs_part} = {rhs_part})"
@@ -1017,6 +1068,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
             def process_operand(operand: tsi_query.Operand) -> str:
                 if isinstance(operand, tsi_query.LiteralOperation):
+                    # Use SQL string literals instead of json.dumps, which wraps strings in
+                    # double quotes that don't match json_extract() output.
+                    if isinstance(operand.literal_, str):
+                        escaped = operand.literal_.replace("'", "''")
+                        return f"'{escaped}'"
                     return json.dumps(operand.literal_)
                 elif isinstance(operand, tsi_query.GetFieldOperator):
                     if operand.get_field_.startswith("feedback."):
@@ -1352,7 +1408,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return iter(self.calls_query(req).calls)
 
     def _calls_query_stream_for_eval_subtree(
-        self, project_id: str, eval_root_ids: list[str]
+        self,
+        project_id: str,
+        eval_root_ids: list[str],
+        include_children: bool = True,
     ) -> Iterator[tsi.CallSchema]:
         columns = [
             "id",
@@ -1376,16 +1435,17 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             )
         )
         yield from eval_root_children
-        eval_root_children_ids = [c.id for c in eval_root_children]
-        if eval_root_children_ids:
-            yield from self.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=project_id,
-                    filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
-                    columns=columns,
-                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+        if include_children:
+            eval_root_children_ids = [c.id for c in eval_root_children]
+            if eval_root_children_ids:
+                yield from self.calls_query_stream(
+                    tsi.CallsQueryReq(
+                        project_id=project_id,
+                        filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
+                        columns=columns,
+                        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                    )
                 )
-            )
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         if req.limit is not None and req.limit < 1:
@@ -4639,7 +4699,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
         all_calls = list(
-            self._calls_query_stream_for_eval_subtree(req.project_id, eval_root_ids)
+            self._calls_query_stream_for_eval_subtree(
+                req.project_id,
+                eval_root_ids,
+                include_children=req.include_predict_and_score_children,
+            )
         )
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
 
@@ -4991,8 +5055,8 @@ def _build_feedback_subquery(field: str) -> str:
         escaped = feedback_type.replace("'", "''")
         type_filter = f" AND feedback_type = '{escaped}'"
 
-    if feedback_type == "*":
-        # For wildcard, concatenate values from all feedback rows so filters
+    if feedback_type == "*" or feedback_type in MULTI_VALUE_FEEDBACK_TYPES:
+        # Concatenate values from all matching feedback rows so filters
         # can search across every entry.
         return (
             f"(SELECT GROUP_CONCAT({value_expr}, ',') FROM feedback"
@@ -5005,3 +5069,12 @@ def _build_feedback_subquery(field: str) -> str:
             f" WHERE feedback.weave_ref = 'weave-trace-internal:///' || calls.project_id || '/call/' || calls.id"
             f"{type_filter} LIMIT 1)"
         )
+
+
+def _is_multi_value_feedback_operand(operand: tsi_query.Operand) -> bool:
+    """Check if an operand references a multi-value feedback field."""
+    if not isinstance(operand, tsi_query.GetFieldOperator):
+        return False
+    return any(
+        f"feedback.[{ft}]" in operand.get_field_ for ft in MULTI_VALUE_FEEDBACK_TYPES
+    )

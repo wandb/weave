@@ -10,6 +10,7 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import NotFoundError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -117,7 +118,7 @@ def test_clickhouse_storage_size_schema_conversion():
     }
 
     # Test ClickHouse conversion
-    ch_schema = chts._ch_call_dict_to_call_schema_dict(test_data)
+    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] == 1000
     assert ch_schema["total_storage_size_bytes"] == 2000
 
@@ -149,7 +150,7 @@ def test_clickhouse_storage_size_null_handling():
     }
 
     # Test ClickHouse conversion
-    ch_schema = chts._ch_call_dict_to_call_schema_dict(test_data)
+    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] is None
     assert ch_schema["total_storage_size_bytes"] is None
 
@@ -932,6 +933,36 @@ def test_insert_retries_empty_query_error():
 
         assert result == mock_summary
         assert mock_ch_client.insert.call_count == 2  # Retried once
+
+
+def test_ensure_obj_version_exists_retries_eventual_consistency():
+    """Object-version existence checks should tolerate transient read-after-write misses."""
+    server = chts.ClickHouseTraceServer(host="test_host")
+
+    # Transient miss: the first lookup doesn't see the row yet, but the retry does.
+    with patch.object(server, "_query") as mock_query:
+        mock_query.side_effect = [
+            MagicMock(result_rows=[]),
+            MagicMock(result_rows=[(1,)]),
+        ]
+
+        server._ensure_obj_version_exists("test_project", "test_object", "digest-1")
+
+        assert mock_query.call_count == 2
+
+    # Real miss: after exhausting retries, the original NotFoundError still surfaces.
+    with patch.object(
+        server,
+        "_query",
+        return_value=MagicMock(result_rows=[]),
+    ) as mock_query:
+        with pytest.raises(
+            NotFoundError,
+            match="Object version test_object:digest-1 not found",
+        ):
+            server._ensure_obj_version_exists("test_project", "test_object", "digest-1")
+
+        assert mock_query.call_count == chts.OBJ_READ_RETRY_ATTEMPTS
 
 
 @pytest.mark.disable_logging_error_check

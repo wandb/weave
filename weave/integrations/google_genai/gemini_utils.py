@@ -88,11 +88,15 @@ def google_genai_gemini_on_finish(
                 "total_tokens": output.usage_metadata.total_token_count,
             }
             # Include thoughts_tokens if available (for thinking models)
-            thoughts_token_count = getattr(
-                output.usage_metadata, "thoughts_token_count", None
-            )
-            if thoughts_token_count is not None:
-                usage_data["thoughts_tokens"] = thoughts_token_count
+            if output.usage_metadata.thoughts_token_count is not None:
+                usage_data["thoughts_tokens"] = (
+                    output.usage_metadata.thoughts_token_count
+                )
+            # Map Google's cached_content_token_count to canonical name
+            if output.usage_metadata.cached_content_token_count is not None:
+                usage_data["cache_read_input_tokens"] = (
+                    output.usage_metadata.cached_content_token_count
+                )
             usage[model_name].update(usage_data)
 
     if call.summary is not None:

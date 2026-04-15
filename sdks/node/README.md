@@ -181,6 +181,53 @@ async function main() {
 main();
 ```
 
+### Querying Calls
+
+Use `client.getCalls({...})` with a single options object:
+
+```typescript
+const calls = await client.getCalls({
+  filter: {op_names: ['my-op']},
+  includeCosts: true,
+  limit: 50,
+});
+```
+
+To fetch all calls with default settings, pass an empty object:
+
+```typescript
+const calls = await client.getCalls({});
+```
+
+#### Upgrade guide
+
+Version 0.13.0 introduces a new signature for getCalls(). getCalls() now supports an object type parameter to specify the call options. The old signature will be deprecated in future releases.
+
+Before:
+
+```typescript
+await client.getCalls({op_names: ['my-op']}, true, 100);
+
+await client.getCallsIterator({op_names: ['my-op']}, true, 100);
+
+```
+
+After:
+
+```typescript
+await client.getCalls({
+  filter: {op_names: ['my-op']},
+  includeCosts: true,
+  limit: 100,
+});
+
+await client.getCallsIterator({
+  filter: {op_names: ['my-op']},
+  includeCosts: true,
+  limit: 100,
+});
+```
+
 ## Configuration
 
 Weave reads API keys from the `.netrc` file located in your home directory. Ensure you have the required API keys configured for seamless integration and tracking.

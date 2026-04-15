@@ -13,7 +13,6 @@ This module tests the V2 API endpoints for:
 The tests run against both SQLite and ClickHouse backends.
 """
 
-import asyncio
 import datetime
 
 import pytest
@@ -2116,7 +2115,8 @@ class TestEvalResultsReadAPI:
         assert distance_stats.numeric_count == 1
         assert distance_stats.numeric_mean == 0.0
 
-    def test_eval_results_from_high_level_evaluation(self, client):
+    @pytest.mark.asyncio
+    async def test_eval_results_from_high_level_evaluation(self, client):
         """Run a real weave.Evaluation then verify eval_results_query and summary."""
         project_id = client.project_id
 
@@ -2143,7 +2143,7 @@ class TestEvalResultsReadAPI:
             dataset=dataset_rows,
             scorers=[MatchScorer(), length_scorer],
         )
-        asyncio.run(evaluation.evaluate(predict))
+        await evaluation.evaluate(predict)
         client.flush()
 
         all_calls = list(

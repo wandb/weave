@@ -71,6 +71,8 @@ def _get_usage_metric_extraction_sql(metric: str, json_col: str) -> str:
             ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, 'completion_tokens')), 0) +
             ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, 'output_tokens')), 0)
         )"""
+    elif metric in {"cache_read_input_tokens", "cache_creation_input_tokens"}:
+        return f"ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, '{metric}')), 0)"
     else:
         return f"toFloat64OrNull(JSONExtractRaw({json_col}, '{metric}'))"
 

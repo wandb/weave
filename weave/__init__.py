@@ -54,7 +54,7 @@ from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.flow.annotation_spec import AnnotationSpec
 from weave.flow.model import Model
-from weave.flow.monitor import Monitor
+from weave.flow.monitor import ClassifierMonitor, Monitor
 from weave.flow.saved_view import SavedView
 from weave.flow.scorer import Scorer
 from weave.object.obj import Object
@@ -75,6 +75,7 @@ __all__ = [
     "AgentState",
     "AnnotationSpec",
     "Audio",
+    "ClassifierMonitor",
     "Content",
     "Dataset",
     "EasyPrompt",
