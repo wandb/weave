@@ -337,6 +337,7 @@ class TestOtelSpanHierarchy:
         session = start_session(
             agent_name="bot",
             session_id="conv-abc",
+            session_name="My Conversation",
             _tracer_provider=provider,
         )
         with session.start_turn() as turn:
@@ -348,9 +349,17 @@ class TestOtelSpanHierarchy:
         session.end()
 
         spans = exporter.get_finished_spans()
-        # conversation_id is on the invoke_agent span
-        invoke_span = next(s for s in spans if s.name == "invoke_agent")
-        assert dict(invoke_span.attributes)["gen_ai.conversation.id"] == "conv-abc"
+        assert len(spans) == 3
+
+        # All spans should have conversation_id and conversation_name
+        for span in spans:
+            attrs = dict(span.attributes)
+            assert attrs["gen_ai.conversation.id"] == "conv-abc", (
+                f"Span '{span.name}' missing gen_ai.conversation.id"
+            )
+            assert attrs["gen_ai.conversation.name"] == "My Conversation", (
+                f"Span '{span.name}' missing gen_ai.conversation.name"
+            )
 
     def test_full_hierarchy_three_levels(self, otel_setup):
         """invoke_agent -> chat -> execute_tool full hierarchy."""

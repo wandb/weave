@@ -183,6 +183,8 @@ class Tool(BaseModel):
 
     # OTel fields
     _otel_span: Any = PrivateAttr(default=None)
+    _conversation_id: str = PrivateAttr(default="")
+    _conversation_name: str = PrivateAttr(default="")
 
     def end(self) -> None:
         """End the tool span. Calculates duration from start time."""
@@ -203,6 +205,14 @@ class Tool(BaseModel):
             )
             for k, v in attrs.items():
                 self._otel_span.set_attribute(k, v)
+            if self._conversation_id:
+                self._otel_span.set_attribute(
+                    "gen_ai.conversation.id", self._conversation_id
+                )
+            if self._conversation_name:
+                self._otel_span.set_attribute(
+                    "gen_ai.conversation.name", self._conversation_name
+                )
             self._otel_span.end()
 
     def _to_structured(self) -> tsi.GenAIStructuredToolCall:
@@ -274,6 +284,11 @@ class Step(BaseModel):
                 kind=SpanKind.INTERNAL,
             )
             t._otel_span = span
+            # Propagate conversation_id/conversation_name to the tool
+            session = self._turn._session if self._turn else None
+            if session:
+                t._conversation_id = session.session_id
+                t._conversation_name = session.session_name
 
         return t
 
@@ -302,6 +317,16 @@ class Step(BaseModel):
             )
             for k, v in attrs.items():
                 self._otel_span.set_attribute(k, v)
+            # Propagate conversation_id/conversation_name from the session
+            session = self._turn._session if self._turn else None
+            if session and session.session_id:
+                self._otel_span.set_attribute(
+                    "gen_ai.conversation.id", session.session_id
+                )
+            if session and session.session_name:
+                self._otel_span.set_attribute(
+                    "gen_ai.conversation.name", session.session_name
+                )
             self._otel_span.end()
             # Record step in parent turn for token aggregation
             if self._turn is not None:
