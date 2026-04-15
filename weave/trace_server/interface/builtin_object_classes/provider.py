@@ -4,7 +4,7 @@ import socket
 from enum import Enum
 from urllib.parse import urlparse
 
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
@@ -30,6 +30,9 @@ BLOCKED_HOSTNAME_RE = re.compile(
 )
 
 
+INVALID_BASE_URL_MSG = "base_url is not a valid provider URL"
+
+
 def _validate_provider_base_url(url: str) -> str:
     """Validate that a provider base_url is a well-formed, publicly-routable HTTP(S) URL.
 
@@ -38,25 +41,21 @@ def _validate_provider_base_url(url: str) -> str:
     try:
         parsed = urlparse(url)
     except Exception as exc:
-        raise ValueError(f"Invalid URL: {url!r}") from exc
+        raise ValueError(INVALID_BASE_URL_MSG) from exc
 
     if parsed.scheme not in {"http", "https"}:
-        raise ValueError(
-            f"base_url scheme must be 'http' or 'https', got {parsed.scheme!r}"
-        )
+        raise ValueError(INVALID_BASE_URL_MSG)
 
     # urlparse silently strips a bare trailing '?', so check the raw string too.
     if "?" in url or parsed.fragment:
-        raise ValueError(
-            "base_url must not contain '?', query parameters, or URL fragments"
-        )
+        raise ValueError(INVALID_BASE_URL_MSG)
 
     host = (parsed.hostname or "").lower().rstrip(".")
     if not host:
-        raise ValueError("base_url must have a valid hostname")
+        raise ValueError(INVALID_BASE_URL_MSG)
 
     if BLOCKED_HOSTNAME_RE.search(host):
-        raise ValueError(f"base_url references a blocked hostname: {host!r}")
+        raise ValueError(INVALID_BASE_URL_MSG)
 
     # Reject non-globally-routable IP addresses.  socket.inet_aton handles
     # alternative IPv4 encodings that ipaddress.ip_address does not.
@@ -72,9 +71,7 @@ def _validate_provider_base_url(url: str) -> str:
             pass  # Not any form of IP — hostname checks above are sufficient.
 
     if addr is not None and not addr.is_global:
-        raise ValueError(
-            "base_url must not reference a non-globally-routable IP address"
-        )
+        raise ValueError(INVALID_BASE_URL_MSG)
 
     return url
 
@@ -84,6 +81,8 @@ class ProviderReturnType(str, Enum):
 
 
 class Provider(base_object_def.BaseObject):
+    model_config = ConfigDict(validate_assignment=True)
+
     base_url: str
     api_key_name: str
     extra_headers: dict[str, str] = Field(default_factory=dict)
@@ -99,7 +98,7 @@ class Provider(base_object_def.BaseObject):
     def validate_extra_headers(cls, v: dict[str, str]) -> dict[str, str]:
         for key in v:
             if BLOCKED_HEADER_RE.match(key):
-                raise ValueError(f"extra_headers contains a blocked header: {key!r}")
+                raise ValueError("extra_headers contains a disallowed header")
         return v
 
 

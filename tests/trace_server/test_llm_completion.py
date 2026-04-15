@@ -1748,6 +1748,13 @@ def test_provider_base_url_validation():
     )
     assert "X-Custom-Header" in p.extra_headers
 
+    # Validation also runs on assignment, not just init
+    p = _make_provider("https://api.example.com")
+    with pytest.raises(ValidationError):
+        p.base_url = "http://169.254.169.254/v1"
+    with pytest.raises(ValidationError):
+        p.extra_headers = {"Metadata-Flavor": "Google"}
+
 
 if __name__ == "__main__":
     unittest.main()
