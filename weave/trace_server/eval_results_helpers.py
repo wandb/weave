@@ -279,6 +279,27 @@ def build_eval_rows_from_calls(
         scores = output.get("scores") if isinstance(output.get("scores"), dict) else {}
         trial_children = child_by_parent.get(pas_call.id, [])
 
+        # Merge scores from child calls added post-hoc via score_create().
+        # score_create() sets the weave.scorer attribute to the scorer's ref
+        # URI, which only it does — normal eval scorer calls don't have this
+        # attribute. We parse the scorer name from the ref and merge the
+        # child call's output into the scores dict, skipping any keys already
+        # present (to avoid double-counting scores baked into output.scores
+        # by prediction_finish).
+        for child in trial_children:
+            weave_attrs = child.attributes.get(
+                constants.WEAVE_ATTRIBUTES_NAMESPACE, {}
+            )
+            scorer_ref_uri = weave_attrs.get(constants.SCORE_SCORER_ATTR_KEY)
+            if not scorer_ref_uri or not isinstance(scorer_ref_uri, str):
+                continue
+            try:
+                scorer_ref = ri.parse_internal_uri(scorer_ref_uri)
+            except Exception:
+                continue
+            if isinstance(scorer_ref, ri.InternalObjectRef) and scorer_ref.name not in scores:
+                scores[scorer_ref.name] = child.output
+
         model_ref = (
             pas_call.inputs.get("model") if isinstance(pas_call.inputs, dict) else None
         )

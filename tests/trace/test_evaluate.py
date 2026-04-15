@@ -9,6 +9,8 @@ from pydantic import BaseModel
 import weave
 from tests.conftest import LATENCY_TOL
 from weave import Dataset, Evaluation, Model
+from weave.trace_server import trace_server_interface as tsi
+from weave.utils.project_id import from_project_id
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
@@ -534,9 +536,6 @@ async def test_post_hoc_score_appears_in_eval_results(client):
     """After running a normal Evaluation, adding a score via score_create()
     should be picked up by eval_results_query rollups.
     """
-    from weave.trace_server import trace_server_interface as tsi
-    from weave.utils.project_id import from_project_id
-
     project_id = client.project_id
     entity, project = from_project_id(project_id)
 
