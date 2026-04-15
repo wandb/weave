@@ -5193,28 +5193,55 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 page_calls.extend(self.calls_query_stream(child_req))
 
-        rows = eval_helpers.build_eval_rows(
+        all_rows = eval_helpers.build_eval_rows(
             page_calls,
             eval_root_ids,
             digest_by_call,
-            req.include_raw_data_rows,
+            req.include_raw_data_rows if req.include_rows else False,
             req.include_predict_and_score_children,
         )
 
-        warnings: list[str] = []
-        if rows and req.include_raw_data_rows and req.resolve_row_refs:
-            unresolved = [r.row_digest for r in rows if isinstance(r.raw_data_row, str)]
-            if unresolved:
-                warnings.append(
-                    "Failed to resolve dataset row refs; raw_data_row may contain refs"
-                )
-
         summary: tsi.EvalResultsSummaryRes | None = None
         if req.include_summary:
+            summary_intersection = (
+                req.summary_require_intersection
+                if req.summary_require_intersection is not None
+                else req.require_intersection
+            )
+            summary_rows, _ = eval_helpers.apply_row_selection(
+                all_rows, eval_root_ids, summary_intersection, 0, None
+            )
             eval_call_metadata = eval_helpers.fetch_eval_root_metadata(
                 self, req.project_id, eval_root_ids
             )
-            summary = eval_helpers.compute_summary_from_rows(rows, eval_call_metadata)
+            summary = eval_helpers.compute_summary_from_rows(
+                summary_rows, eval_call_metadata
+            )
+
+        # apply pagination in python if include_summary is True; otherwise, we already applied pagination in the CH query
+        rows: list[tsi.EvalResultsRow] = []
+        warnings: list[str] = []
+        if req.include_rows:
+            if req.include_summary:
+                # all_rows has everything; apply pagination in Python
+                rows, total_rows = eval_helpers.apply_row_selection(
+                    all_rows,
+                    eval_root_ids,
+                    req.require_intersection,
+                    req.offset,
+                    req.limit,
+                )
+            else:
+                rows = all_rows
+
+            if rows and req.include_raw_data_rows and req.resolve_row_refs:
+                unresolved = [
+                    r.row_digest for r in rows if isinstance(r.raw_data_row, str)
+                ]
+                if unresolved:
+                    warnings.append(
+                        "Failed to resolve dataset row refs; raw_data_row may contain refs"
+                    )
 
         return tsi.EvalResultsQueryRes(
             rows=rows, total_rows=total_rows, summary=summary, warnings=warnings
