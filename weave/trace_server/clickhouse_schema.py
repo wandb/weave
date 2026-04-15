@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field, field_validator
 from weave.shared import refs_internal as ri
 from weave.trace_server import validation
 
+# Sentinel value meaning "never expire". Matches the CH column default.
+EXPIRE_AT_NEVER = datetime.datetime(2100, 1, 1)
+
 # =============================================================================
 # Base Classes for ClickHouse Call Schemas
 # =============================================================================
@@ -66,6 +69,7 @@ class CallStartCHInsertable(
     attributes_dump: str
     inputs_dump: str
     otel_dump: str | None = None
+    expire_at: datetime.datetime = EXPIRE_AT_NEVER
 
 
 class CallEndCHInsertable(CallBaseCHInsertable):
@@ -79,6 +83,7 @@ class CallEndCHInsertable(CallBaseCHInsertable):
     summary_dump: str
     output_dump: str
     wb_run_step_end: int | None = None
+    expire_at: datetime.datetime = EXPIRE_AT_NEVER
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
         validation.wb_run_step_validator
@@ -90,6 +95,7 @@ class CallDeleteCHInsertable(CallBaseCHInsertable):
 
     wb_user_id: str
     deleted_at: datetime.datetime
+    expire_at: datetime.datetime = EXPIRE_AT_NEVER
 
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
 
@@ -99,6 +105,7 @@ class CallUpdateCHInsertable(CallBaseCHInsertable):
 
     wb_user_id: str
     display_name: str | None = None
+    expire_at: datetime.datetime = EXPIRE_AT_NEVER
 
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _display_name_v = field_validator("display_name")(validation.display_name_validator)
@@ -126,7 +133,7 @@ class CallCompleteCHInsertable(
     summary_dump: str
     otel_dump: str | None = None
     wb_run_step_end: int | None = None
-    expire_at: datetime.datetime = datetime.datetime(2100, 1, 1)
+    expire_at: datetime.datetime = EXPIRE_AT_NEVER
     source: str = "direct"
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
