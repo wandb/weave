@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
 
-import pytest
 import rich.markdown
 from PIL import Image
 
@@ -53,9 +51,9 @@ def test_inline_custom_obj(client):
 
 
 def test_inline_custom_obj_needs_load_op(client):
-    """After restricting load_op fallback to Op type only, removing a type
-    from KNOWN_TYPES should raise ValueError instead of falling back to
-    a stored load_op URI.
+    """Test the condition that the current version of the SDK doesn't know how to load the object.
+
+    In that case we fallback to the saved load op.
     """
     md = rich.markdown.Markdown("# Hello")
 
@@ -71,8 +69,9 @@ def test_inline_custom_obj_needs_load_op(client):
     original_known_types = KNOWN_TYPES.copy()
     KNOWN_TYPES.remove("rich.markdown.Markdown")
     try:
-        with pytest.raises(ValueError, match="Cannot use load_op fallback"):
-            client.get_call(call.id)
+        loaded = client.get_call(call.id)
+        loaded_markdown = loaded.inputs["md"]
+        assert isinstance(loaded_markdown, rich.markdown.Markdown)
     finally:
         KNOWN_TYPES = original_known_types
 
@@ -128,63 +127,3 @@ def test_encode_custom_obj_save_exception_does_not_propagate(
 
     # We expect None as the graceful degradation
     assert result is None
-
-
-def test_decode_unknown_type_with_load_op_raises():
-    """Non-Op unknown types must not fall back to load_op, even if a URI is provided."""
-    from weave.trace.serialization.custom_objs import _decode_custom_obj
-
-    with pytest.raises(ValueError, match="Cannot use load_op fallback"):
-        _decode_custom_obj(
-            weave_type={"type": "SomeArbitraryType"},
-            encoded_path_contents={},
-            val=None,
-            load_instance_op_uri="weave:///entity/project/op/load_SomeArbitraryType:abc123",
-        )
-
-
-def test_decode_op_type_uses_load_op_fallback():
-    """The Op type is allowed to use the load_op fallback path."""
-    from weave.trace.serialization.custom_objs import _decode_custom_obj
-
-    fake_op = MagicMock()
-    fake_op._tracing_enabled = True
-
-    fake_client = MagicMock()
-    fake_client.get.return_value = fake_op
-
-    with (
-        patch(
-            "weave.trace.serialization.custom_objs.ObjectRef.parse_uri"
-        ) as mock_parse,
-        patch(
-            "weave.trace.serialization.custom_objs.require_weave_client",
-            return_value=fake_client,
-        ),
-        patch(
-            "weave.trace.serialization.custom_objs.get_serializer_by_id",
-            return_value=None,
-        ),
-    ):
-        mock_parse.return_value = MagicMock()
-        result = _decode_custom_obj(
-            weave_type={"type": "Op"},
-            encoded_path_contents={},
-            val=None,
-            load_instance_op_uri="weave:///entity/project/op/load_Op:abc123",
-        )
-
-    assert result is fake_op.return_value
-
-
-def test_decode_unknown_type_without_load_op_raises():
-    """Unknown types with no load_op URI raise ValueError."""
-    from weave.trace.serialization.custom_objs import _decode_custom_obj
-
-    with pytest.raises(ValueError, match="No serializer found for"):
-        _decode_custom_obj(
-            weave_type={"type": "TotallyUnknown"},
-            encoded_path_contents={},
-            val=None,
-            load_instance_op_uri=None,
-        )

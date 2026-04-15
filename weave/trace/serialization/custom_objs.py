@@ -209,19 +209,10 @@ def _decode_custom_obj(
             else:
                 return res
 
-    # Otherwise, fall back to load_instance_op.
-    # Only allow the load_op fallback for known-safe types ("Op"). Arbitrary
-    # type strings must not trigger wc.get() of a user-supplied URI, since
-    # that would fetch and execute an untrusted Op.
+    # Otherwise, fall back to load_instance_op
     if not found_serializer:
         if load_instance_op_uri is None:
             raise ValueError(f"No serializer found for `{type_}`")
-
-        if type_ != "Op":
-            raise ValueError(
-                f"Cannot use load_op fallback for unknown type `{type_}`. "
-                "Only the 'Op' type is allowed to load via a stored op URI."
-            )
 
         obj_ref = ObjectRef.parse_uri(load_instance_op_uri)
         wc = require_weave_client()
