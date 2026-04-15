@@ -1778,7 +1778,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert(
             "object_versions",
             data=[list(ch_obj.model_dump().values())],
-            column_names=list(ch_obj.model_fields.keys()),
+            column_names=list(type(ch_obj).model_fields.keys()),
         )
 
         return tsi.ObjCreateRes(
@@ -1990,7 +1990,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
 
         data = [list(obj.model_dump().values()) for obj in delete_insertables]
-        column_names = list(delete_insertables[0].model_fields.keys())
+        column_names = list(type(delete_insertables[0]).model_fields.keys())
 
         self._insert("object_versions", data=data, column_names=column_names)
         num_deleted = len(delete_insertables)

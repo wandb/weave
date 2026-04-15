@@ -161,7 +161,7 @@ def pydantic_getattribute(self: BaseModel, name: str) -> Any:
     if name.startswith("__") and name.endswith("__"):
         return attribute
 
-    if name not in object.__getattribute__(self, "model_fields"):  # noqa: PLC2801
+    if name not in type(self).model_fields:
         return attribute
     if name == "ref":
         try:

@@ -271,7 +271,7 @@ class UserSettings(BaseModel):
     _is_first_apply: bool = PrivateAttr(True)
 
     def _reset(self) -> None:
-        for name, field in self.model_fields.items():
+        for name, field in type(self).model_fields.items():
             setattr(self, name, field.default)
 
     def apply(self) -> None:
@@ -280,7 +280,7 @@ class UserSettings(BaseModel):
         else:
             self._reset()
 
-        for name in self.model_fields:
+        for name in type(self).model_fields:
             context_var = _context_vars[name]
             context_var.set(getattr(self, name))
 

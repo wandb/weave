@@ -321,8 +321,9 @@ class ObjSchemaForInsert(BaseModel):
 
     def model_post_init(self, context: Any, /) -> None:
         # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
-        if self.set_base_object_class is not None and self.builtin_object_class is None:
-            self.builtin_object_class = self.set_base_object_class
+        set_base_object_class = self.__dict__.get("set_base_object_class")
+        if set_base_object_class is not None and self.builtin_object_class is None:
+            self.builtin_object_class = set_base_object_class
 
 
 class TableSchemaForInsert(BaseModel):

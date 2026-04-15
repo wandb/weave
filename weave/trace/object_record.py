@@ -11,6 +11,15 @@ from pydantic import BaseModel
 from weave.shared.pydantic_util import pydantic_asdict_one_level
 from weave.trace.op import is_op
 
+_PYDANTIC_DEPRECATED_MEMBER_NAMES = frozenset(
+    {
+        "__fields__",
+        "__fields_set__",
+        "model_computed_fields",
+        "model_fields",
+    }
+)
+
 
 class ObjectRecord:  # noqa: PLW1641
     _class_name: str
@@ -105,6 +114,10 @@ def getmembers(
     results = []
     processed = set()
     names = dir(object)
+    if isinstance(object, BaseModel):
+        names = [
+            name for name in names if name not in _PYDANTIC_DEPRECATED_MEMBER_NAMES
+        ]
     # :dd any DynamicClassAttributes to the list of names if object is a class;
     # this may result in duplicate entries if, for example, a virtual
     # attribute with the same name as a DynamicClassAttribute exists
