@@ -286,9 +286,13 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures before each test."""
-        self.server = chts.ClickHouseTraceServer(host="test_host")
         mock_ch_client = MagicMock()
         mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
+        self._mint_patcher = patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        )
+        self._mint_patcher.start()
+        self.server = chts.ClickHouseTraceServer(host="test_host")
         self.server._thread_local.ch_client = mock_ch_client
         self.mock_secret_fetcher = MagicMock()
         self.mock_secret_fetcher.fetch.return_value = {
@@ -301,6 +305,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         self.token = _secret_fetcher_context.set(self.mock_secret_fetcher)
 
     def tearDown(self):
+        self._mint_patcher.stop()
         _secret_fetcher_context.reset(self.token)
 
     def test_basic_streaming_completion(self):
@@ -1310,11 +1315,14 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 @pytest.fixture
 def completions_mock_server():
     """Create a mock ClickHouseTraceServer for completions tests."""
-    server = chts.ClickHouseTraceServer(host="test_host")
     mock_ch_client = MagicMock()
     mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
-    server._thread_local.ch_client = mock_ch_client
-    return server
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._thread_local.ch_client = mock_ch_client
+        yield server
 
 
 @pytest.fixture
