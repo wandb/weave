@@ -94,6 +94,7 @@ def google_genai_gemini_on_finish(
     """
     if not (model_name := call.inputs.get("model")):
         raise ValueError("Unknown model type")
+    model_name = str(model_name)
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if output and hasattr(output, "usage_metadata"):
@@ -147,7 +148,7 @@ def google_genai_gemini_accumulator(
             matched = False
             for acc_part in acc.candidates[i].content.parts:
                 acc_part_is_thought = getattr(acc_part, "thought", False)
-                if acc_part_is_thought == value_part_is_thought:
+                if acc_part.text is not None and acc_part_is_thought == value_part_is_thought:
                     acc_part.text += value_part.text
                     matched = True
                     break
