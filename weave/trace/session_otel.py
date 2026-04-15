@@ -13,6 +13,18 @@ from typing import Any
 from weave.trace.session import Message, Reasoning, Usage
 
 
+def _message_to_dict(msg: Message) -> dict[str, str]:
+    """Convert a single Message to a plain dict, omitting empty optional fields."""
+    d: dict[str, str] = {"role": msg.role}
+    if msg.content:
+        d["content"] = msg.content
+    if msg.tool_call_id:
+        d["tool_call_id"] = msg.tool_call_id
+    if msg.tool_name:
+        d["tool_name"] = msg.tool_name
+    return d
+
+
 def _encode_messages(messages: list[Message]) -> str:
     """Encode a list of Message objects as a JSON string.
 
@@ -21,17 +33,7 @@ def _encode_messages(messages: list[Message]) -> str:
     The extractor's ``_normalize_raw_messages`` handles JSON-string input
     by parsing it first, then normalizing each ``{role, content, ...}`` dict.
     """
-    encoded: list[dict[str, str]] = []
-    for msg in messages:
-        d: dict[str, str] = {"role": msg.role}
-        if msg.content:
-            d["content"] = msg.content
-        if msg.tool_call_id:
-            d["tool_call_id"] = msg.tool_call_id
-        if msg.tool_name:
-            d["tool_name"] = msg.tool_name
-        encoded.append(d)
-    return json.dumps(encoded)
+    return json.dumps([_message_to_dict(msg) for msg in messages])
 
 
 def invoke_agent_attributes(
@@ -100,7 +102,7 @@ def chat_attributes(
             }
         )
     if output_messages:
-        output_encoded.extend(json.loads(_encode_messages(output_messages)))
+        output_encoded.extend(_message_to_dict(m) for m in output_messages)
     if output_encoded:
         attrs["gen_ai.output.messages"] = json.dumps(output_encoded)
     if system_instructions:

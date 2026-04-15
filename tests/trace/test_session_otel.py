@@ -10,42 +10,70 @@ import json
 
 from weave.trace.session import Message, Reasoning, Usage
 from weave.trace.session_otel import (
-    _encode_messages,
     chat_attributes,
     execute_tool_attributes,
     invoke_agent_attributes,
 )
+from weave.trace_server.opentelemetry.genai_extraction import (
+    _normalize_system_instructions,
+    extract_agent_name,
+    extract_conversation_id,
+    extract_conversation_name,
+    extract_finish_reasons,
+    extract_input_messages,
+    extract_input_tokens,
+    extract_operation_name,
+    extract_output_messages,
+    extract_output_tokens,
+    extract_provider,
+    extract_reasoning_content,
+    extract_reasoning_tokens,
+    extract_tool_call_arguments,
+    extract_tool_call_result,
+)
+from weave.trace_server.opentelemetry.helpers import get_attribute
 
 # ---------------------------------------------------------------------------
 # Message encoding
 # ---------------------------------------------------------------------------
 
 
-class TestEncodeMessages:
+class TestMessageEncoding:
+    """Test message encoding behavior through public attribute builder functions."""
+
     def test_basic_message(self) -> None:
-        msgs = [Message(role="user", content="Hello")]
-        result = json.loads(_encode_messages(msgs))
+        attrs = invoke_agent_attributes(
+            agent_name="Bot",
+            input_messages=[Message(role="user", content="Hello")],
+        )
+        result = json.loads(attrs["gen_ai.input.messages"])
         assert result == [{"role": "user", "content": "Hello"}]
 
     def test_empty_optional_fields_omitted(self) -> None:
         """Empty content / tool fields should NOT appear in the encoded dict."""
-        msgs = [Message(role="user")]
-        result = json.loads(_encode_messages(msgs))
+        attrs = invoke_agent_attributes(
+            agent_name="Bot",
+            input_messages=[Message(role="user")],
+        )
+        result = json.loads(attrs["gen_ai.input.messages"])
         assert result == [{"role": "user"}]
         assert "content" not in result[0]
         assert "tool_call_id" not in result[0]
         assert "tool_name" not in result[0]
 
     def test_tool_message_includes_tool_fields(self) -> None:
-        msgs = [
-            Message(
-                role="tool",
-                content="42",
-                tool_call_id="call_abc",
-                tool_name="calculator",
-            )
-        ]
-        result = json.loads(_encode_messages(msgs))
+        attrs = invoke_agent_attributes(
+            agent_name="Bot",
+            output_messages=[
+                Message(
+                    role="tool",
+                    content="42",
+                    tool_call_id="call_abc",
+                    tool_name="calculator",
+                )
+            ],
+        )
+        result = json.loads(attrs["gen_ai.output.messages"])
         assert result == [
             {
                 "role": "tool",
@@ -56,18 +84,22 @@ class TestEncodeMessages:
         ]
 
     def test_multiple_messages(self) -> None:
-        msgs = [
-            Message(role="user", content="Hi"),
-            Message(role="assistant", content="Hello!"),
-        ]
-        result = json.loads(_encode_messages(msgs))
+        attrs = invoke_agent_attributes(
+            agent_name="Bot",
+            input_messages=[
+                Message(role="user", content="Hi"),
+                Message(role="assistant", content="Hello!"),
+            ],
+        )
+        result = json.loads(attrs["gen_ai.input.messages"])
         assert len(result) == 2
         assert result[0]["role"] == "user"
         assert result[1]["role"] == "assistant"
 
-    def test_empty_list(self) -> None:
-        result = json.loads(_encode_messages([]))
-        assert result == []
+    def test_no_messages_key_when_empty(self) -> None:
+        attrs = invoke_agent_attributes(agent_name="Bot")
+        assert "gen_ai.input.messages" not in attrs
+        assert "gen_ai.output.messages" not in attrs
 
 
 # ---------------------------------------------------------------------------
@@ -258,13 +290,6 @@ class TestRoundTripWithExtractor:
     """Verify our attributes can be parsed back by the server extractor functions."""
 
     def test_invoke_agent_round_trip(self) -> None:
-        from weave.trace_server.opentelemetry.genai_extraction import (
-            extract_agent_name,
-            extract_conversation_id,
-            extract_conversation_name,
-            extract_operation_name,
-        )
-
         attrs = invoke_agent_attributes(
             agent_name="WeatherBot",
             conversation_id="sess-1",
@@ -276,15 +301,6 @@ class TestRoundTripWithExtractor:
         assert extract_conversation_name(attrs) == "Weather Chat"
 
     def test_chat_round_trip(self) -> None:
-        from weave.trace_server.opentelemetry.genai_extraction import (
-            extract_finish_reasons,
-            extract_input_tokens,
-            extract_operation_name,
-            extract_output_tokens,
-            extract_provider,
-            extract_reasoning_tokens,
-        )
-
         usage = Usage(input_tokens=100, output_tokens=50, reasoning_tokens=10)
         attrs = chat_attributes(
             model="gpt-4o",
@@ -301,11 +317,6 @@ class TestRoundTripWithExtractor:
         assert attrs["gen_ai.request.model"] == "gpt-4o"
 
     def test_chat_messages_round_trip(self) -> None:
-        from weave.trace_server.opentelemetry.genai_extraction import (
-            extract_input_messages,
-            extract_output_messages,
-        )
-
         attrs = chat_attributes(
             model="gpt-4o",
             input_messages=[
@@ -326,11 +337,6 @@ class TestRoundTripWithExtractor:
         assert out_msgs[0].content == "It's sunny!"
 
     def test_chat_system_instructions_round_trip(self) -> None:
-        from weave.trace_server.opentelemetry.genai_extraction import (
-            _normalize_system_instructions,
-        )
-        from weave.trace_server.opentelemetry.helpers import get_attribute
-
         attrs = chat_attributes(
             model="gpt-4o",
             system_instructions=["Be helpful", "Be concise"],
@@ -340,10 +346,6 @@ class TestRoundTripWithExtractor:
         assert result == ["Be helpful", "Be concise"]
 
     def test_chat_reasoning_content_round_trip(self) -> None:
-        from weave.trace_server.opentelemetry.genai_extraction import (
-            extract_reasoning_content,
-        )
-
         reasoning = Reasoning(content="Step 1: analyze. Step 2: conclude.")
         attrs = chat_attributes(
             model="o3",
@@ -355,12 +357,6 @@ class TestRoundTripWithExtractor:
         assert result == "Step 1: analyze. Step 2: conclude."
 
     def test_execute_tool_round_trip(self) -> None:
-        from weave.trace_server.opentelemetry.genai_extraction import (
-            extract_operation_name,
-            extract_tool_call_arguments,
-            extract_tool_call_result,
-        )
-
         attrs = execute_tool_attributes(
             tool_name="calculator",
             tool_call_id="call_1",
