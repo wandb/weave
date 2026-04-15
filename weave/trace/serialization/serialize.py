@@ -309,13 +309,21 @@ def from_json(
     dangerously_import_remote_ops: bool | None = None,
 ) -> Any:
     if isinstance(obj, list):
-        return [from_json(v, project_id, server, dangerously_import_remote_ops) for v in obj]
+        return [
+            from_json(v, project_id, server, dangerously_import_remote_ops) for v in obj
+        ]
     elif isinstance(obj, dict):
         if (val_type := obj.pop("_type", None)) is None:
-            return {k: from_json(v, project_id, server, dangerously_import_remote_ops) for k, v in obj.items()}
+            return {
+                k: from_json(v, project_id, server, dangerously_import_remote_ops)
+                for k, v in obj.items()
+            }
         elif val_type == "ObjectRecord":
             return ObjectRecord(
-                {k: from_json(v, project_id, server, dangerously_import_remote_ops) for k, v in obj.items()}
+                {
+                    k: from_json(v, project_id, server, dangerously_import_remote_ops)
+                    for k, v in obj.items()
+                }
             )
         elif val_type == "CustomWeaveType":
             encoded: custom_objs.EncodedCustomObjDict = {
@@ -346,7 +354,10 @@ def from_json(
                 return cls.model_validate(obj_data)
 
         return ObjectRecord(
-            {k: from_json(v, project_id, server, dangerously_import_remote_ops) for k, v in obj.items()}
+            {
+                k: from_json(v, project_id, server, dangerously_import_remote_ops)
+                for k, v in obj.items()
+            }
         )
     elif isinstance(obj, str) and obj.startswith("weave://"):
         return Ref.parse_uri(obj)
