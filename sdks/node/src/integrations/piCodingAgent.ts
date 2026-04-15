@@ -382,11 +382,20 @@ export class PiCodingAgentOtelAdapter {
     this.toolSpans.delete(event.toolCallId);
     if (event.isError) {
       span.setAttribute(ATTR.ERROR_TYPE, 'tool_error');
-      span.setStatus({code: SpanStatusCode.ERROR});
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message:
+          typeof event.content === 'string'
+            ? event.content
+            : JSON.stringify(event.content),
+      });
     }
     if (this.captureContent) {
-      span.addEvent('gen_ai.tool.message', {
-        'gen_ai.event.content': JSON.stringify({role: 'tool', content: event.content}),
+      span.addEvent(GEN_AI_EVENT.TOOL_MESSAGE, {
+        [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
+          role: 'tool',
+          content: event.content,
+        }),
       });
     }
     span.end();
@@ -417,9 +426,9 @@ export class PiCodingAgentOtelAdapter {
     event: Extract<PiExtensionEvent, {type: 'auto_retry_start'}>
   ): void => {
     this.invokeAgentSpan?.addEvent('auto_retry_start', {
-      'auto_retry.attempt': event.attempt,
-      'auto_retry.max_attempts': event.maxAttempts,
-      'auto_retry.error_message': event.errorMessage,
+      [ATTR.PI_AUTO_RETRY_ATTEMPT]: event.attempt,
+      [ATTR.PI_AUTO_RETRY_MAX_ATTEMPTS]: event.maxAttempts,
+      [ATTR.PI_AUTO_RETRY_ERROR_MESSAGE]: event.errorMessage,
     });
   };
 
@@ -427,9 +436,11 @@ export class PiCodingAgentOtelAdapter {
     event: Extract<PiExtensionEvent, {type: 'auto_retry_end'}>
   ): void => {
     this.invokeAgentSpan?.addEvent('auto_retry_end', {
-      'auto_retry.success': event.success,
-      'auto_retry.attempt': event.attempt,
-      ...(event.finalError ? {'auto_retry.final_error': event.finalError} : {}),
+      [ATTR.PI_AUTO_RETRY_SUCCESS]: event.success,
+      [ATTR.PI_AUTO_RETRY_ATTEMPT]: event.attempt,
+      ...(event.finalError
+        ? {[ATTR.PI_AUTO_RETRY_FINAL_ERROR]: event.finalError}
+        : {}),
     });
   };
 
