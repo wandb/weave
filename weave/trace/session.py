@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+import warnings
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
@@ -735,6 +736,12 @@ def start_session(
     session._project_id = resolved_project_id
 
     if use_legacy:
+        warnings.warn(
+            "_ingest_fn is deprecated. Use OTel-based tracing instead by passing "
+            "a _tracer_provider, or rely on the default auto-configured provider.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         session._ingest_fn = _ingest_fn
     elif _tracer_provider is not None:
         # Explicit OTel provider given
