@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from weave.prompt.prompt import StringPrompt
@@ -9,16 +10,36 @@ from weave.trace import api, weave_client
 from weave.trace.context import weave_client_context
 from weave.trace.refs import ObjectRef
 from weave.trace_server_bindings.create_and_link_weave_asset import (
+    LINK_TO_REGISTRY_PATH,
+    CreateAndLinkWeaveAssetReq,
     CreateAndLinkWeaveAssetRes,
+    CreateAndLinkWeaveAssetTarget,
+    create_and_link_weave_asset,
 )
 
 MOCK_TARGET = "weave.trace.weave_client.create_and_link_weave_asset"
+_TRANSPORT_MODULE = "weave.trace_server_bindings.create_and_link_weave_asset"
+
 PROMPT_REF = ObjectRef(
     entity="source-entity",
     project="source-project",
     name="my-prompt",
     _digest="v1",
 )
+
+DEFAULT_TRANSPORT_REQ = CreateAndLinkWeaveAssetReq(
+    ref="weave:///source-entity/source-project/object/my-prompt:v1",
+    target=CreateAndLinkWeaveAssetTarget(
+        portfolio_name="prompt-registry",
+        entity_name="target-entity",
+        project_name="target-project",
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers / fixtures
+# ---------------------------------------------------------------------------
 
 
 class DummyServer:
@@ -41,7 +62,7 @@ def client() -> weave_client.WeaveClient:
 
 @pytest.fixture
 def mock_transport():
-    """Patch the transport and return a canned response."""
+    """Patch the transport function and return a canned response."""
     with patch(
         MOCK_TARGET,
         return_value=CreateAndLinkWeaveAssetRes(version_index=2),
@@ -55,6 +76,30 @@ def _published_prompt() -> StringPrompt:
     return prompt
 
 
+def _http_response(status_code: int, json_data: dict) -> httpx.Response:
+    return httpx.Response(
+        status_code,
+        json=json_data,
+        request=httpx.Request("POST", f"http://example.com{LINK_TO_REGISTRY_PATH}"),
+    )
+
+
+@pytest.fixture
+def mock_post():
+    """Patch API key, server URL, and http_requests.post for the transport."""
+    with (
+        patch(f"{_TRANSPORT_MODULE}.get_wandb_api_context", return_value="api-key"),
+        patch(f"{_TRANSPORT_MODULE}.weave_trace_server_url", return_value="http://example.com"),
+        patch(f"{_TRANSPORT_MODULE}.http_requests.post") as post,
+    ):
+        yield post
+
+
+# ---------------------------------------------------------------------------
+# Client-level tests
+# ---------------------------------------------------------------------------
+
+
 @pytest.mark.parametrize(
     ("prompt_input", "aliases", "expected_aliases"),
     [
@@ -63,7 +108,7 @@ def _published_prompt() -> StringPrompt:
         pytest.param(PROMPT_REF.uri, ("prod", "latest"), ["prod", "latest"], id="uri-string"),
     ],
 )
-def test_link_prompt_to_registry_resolves_input_and_builds_request(
+def test_resolves_input_and_builds_request(
     client, mock_transport, prompt_input, aliases, expected_aliases
 ):
     """Each accepted input type resolves to the same ref and builds a correct request."""
@@ -83,7 +128,7 @@ def test_link_prompt_to_registry_resolves_input_and_builds_request(
     assert req.aliases == expected_aliases
 
 
-def test_link_prompt_to_registry_rejects_unpublished_prompt(client):
+def test_rejects_unpublished_prompt(client):
     """Raise before making the transport call when the prompt has no ref."""
     with patch(MOCK_TARGET) as transport:
         with pytest.raises(ValueError, match="published prompt or object"):
@@ -106,7 +151,7 @@ def test_link_prompt_to_registry_rejects_unpublished_prompt(client):
         "wandb-registry-prompts/my-prompt-collection/extra",
     ],
 )
-def test_link_prompt_to_registry_rejects_invalid_target_paths(client, target_path):
+def test_rejects_invalid_target_paths(client, target_path):
     """Reject malformed target paths before making the transport call."""
     with patch(MOCK_TARGET) as transport:
         with pytest.raises(
@@ -121,7 +166,7 @@ def test_link_prompt_to_registry_rejects_invalid_target_paths(client, target_pat
     transport.assert_not_called()
 
 
-def test_api_link_prompt_to_registry_delegates_to_active_client(client):
+def test_api_delegates_to_active_client(client):
     """The top-level API function delegates to the active WeaveClient."""
     expected = CreateAndLinkWeaveAssetRes(version_index=0)
 
@@ -145,3 +190,51 @@ def test_api_link_prompt_to_registry_delegates_to_active_client(client):
         target_path="wandb-registry-prompts/my-prompt-collection",
         aliases=None,
     )
+
+
+# ---------------------------------------------------------------------------
+# Transport-level tests
+# ---------------------------------------------------------------------------
+
+
+def test_transport_sends_expected_request(mock_post: MagicMock) -> None:
+    """POST the correct URL, auth, and payload; parse the typed response."""
+    req = CreateAndLinkWeaveAssetReq(
+        ref=DEFAULT_TRANSPORT_REQ.ref,
+        target=DEFAULT_TRANSPORT_REQ.target,
+        aliases=["prod", "latest"],
+    )
+    mock_post.return_value = _http_response(200, {"version_index": 7})
+
+    result = create_and_link_weave_asset(req)
+
+    assert result.version_index == 7
+    mock_post.assert_called_once()
+    assert mock_post.call_args.args[0] == "http://example.com/link_to_registry"
+    assert mock_post.call_args.kwargs["auth"] == ("api", "api-key")
+    assert mock_post.call_args.kwargs["json"] == req.model_dump(mode="json")
+
+
+def test_transport_defaults_aliases_to_empty_list(mock_post: MagicMock) -> None:
+    """Omitted aliases serialize as an empty list."""
+    mock_post.return_value = _http_response(200, {"version_index": None})
+
+    create_and_link_weave_asset(DEFAULT_TRANSPORT_REQ)
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["aliases"] == []
+
+
+def test_transport_surfaces_http_errors(mock_post: MagicMock) -> None:
+    """Non-2xx responses raise HTTPStatusError."""
+    mock_post.return_value = _http_response(400, {"message": "invalid request"})
+
+    with pytest.raises(httpx.HTTPStatusError, match="invalid request"):
+        create_and_link_weave_asset(DEFAULT_TRANSPORT_REQ)
+
+
+def test_transport_raises_when_no_api_key() -> None:
+    """Raise ValueError when no API key is available."""
+    with patch(f"{_TRANSPORT_MODULE}.get_wandb_api_context", return_value=None):
+        with pytest.raises(ValueError, match="No API key found"):
+            create_and_link_weave_asset(DEFAULT_TRANSPORT_REQ)
