@@ -162,7 +162,7 @@ def resolve_eval_field_to_sql(
 
     if field_path.startswith("output."):
         remaining = field_path[len("output.") :]
-        parts = ["output"] + split_escaped_field_path(remaining)
+        parts = split_escaped_field_path(remaining)
         path = _string_param(pb, quote_json_path_parts(parts))
         inner = f"nullIf(JSON_VALUE(output_dump, {path}), 'null')"
         inner = _wrap_with_eval_scope(inner, evaluation_call_id, pb)

@@ -1183,7 +1183,7 @@ def test_eval_results_sort_by_output(client):
             project_id=project_id,
             evaluation_call_ids=[run.evaluation_run_id],
             include_raw_data_rows=True,
-            sort_by=[EvalResultsSortBy(field="output.label", direction="asc")],
+            sort_by=[EvalResultsSortBy(field="output.output.label", direction="asc")],
         )
     )
     assert res.total_rows == 3
