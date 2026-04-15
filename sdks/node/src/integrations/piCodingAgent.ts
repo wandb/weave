@@ -354,24 +354,84 @@ export class PiCodingAgentOtelAdapter {
   };
 
   private onToolCall = (
-    _event: Extract<PiExtensionEvent, {type: 'tool_call'}>
-  ): void => {};
+    event: Extract<PiExtensionEvent, {type: 'tool_call'}>
+  ): void => {
+    const span = this.tracer.startSpan(
+      `execute_tool ${event.toolName}`,
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          [ATTR.GEN_AI_OPERATION_NAME]: 'execute_tool',
+          [ATTR.GEN_AI_TOOL_NAME]: event.toolName,
+          [ATTR.GEN_AI_TOOL_CALL_ID]: event.toolCallId,
+          ...(this.conversationId
+            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
+            : {}),
+        },
+      },
+      this.invokeAgentCtx
+    );
+    this.toolSpans.set(event.toolCallId, span);
+  };
 
   private onToolResult = (
-    _event: Extract<PiExtensionEvent, {type: 'tool_result'}>
-  ): void => {};
+    event: Extract<PiExtensionEvent, {type: 'tool_result'}>
+  ): void => {
+    const span = this.toolSpans.get(event.toolCallId);
+    if (!span) return;
+    this.toolSpans.delete(event.toolCallId);
+    if (event.isError) {
+      span.setAttribute(ATTR.ERROR_TYPE, 'tool_error');
+      span.setStatus({code: SpanStatusCode.ERROR});
+    }
+    if (this.captureContent) {
+      span.addEvent('gen_ai.tool.message', {
+        'gen_ai.event.content': JSON.stringify({role: 'tool', content: event.content}),
+      });
+    }
+    span.end();
+  };
 
   private onSessionCompact = (
-    _event: Extract<PiExtensionEvent, {type: 'session_compact'}>
-  ): void => {};
+    event: Extract<PiExtensionEvent, {type: 'session_compact'}>
+  ): void => {
+    const span = this.tracer.startSpan(
+      'pi.coding_agent.compaction',
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          [ATTR.PI_COMPACTION_REASON]: event.reason,
+          [ATTR.PI_COMPACTION_ABORTED]: event.aborted,
+          [ATTR.PI_COMPACTION_WILL_RETRY]: event.willRetry,
+          ...(this.conversationId
+            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
+            : {}),
+        },
+      },
+      this.sessionCtx
+    );
+    span.end();
+  };
 
   private onAutoRetryStart = (
-    _event: Extract<PiExtensionEvent, {type: 'auto_retry_start'}>
-  ): void => {};
+    event: Extract<PiExtensionEvent, {type: 'auto_retry_start'}>
+  ): void => {
+    this.invokeAgentSpan?.addEvent('auto_retry_start', {
+      'auto_retry.attempt': event.attempt,
+      'auto_retry.max_attempts': event.maxAttempts,
+      'auto_retry.error_message': event.errorMessage,
+    });
+  };
 
   private onAutoRetryEnd = (
-    _event: Extract<PiExtensionEvent, {type: 'auto_retry_end'}>
-  ): void => {};
+    event: Extract<PiExtensionEvent, {type: 'auto_retry_end'}>
+  ): void => {
+    this.invokeAgentSpan?.addEvent('auto_retry_end', {
+      'auto_retry.success': event.success,
+      'auto_retry.attempt': event.attempt,
+      ...(event.finalError ? {'auto_retry.final_error': event.finalError} : {}),
+    });
+  };
 
   // ---------------------------------------------------------------------------
   // Span lifecycle helpers
