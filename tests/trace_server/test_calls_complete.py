@@ -1836,7 +1836,7 @@ def test_feedback_filter_does_not_duplicate_calls_complete(
     # verify we are reading from calls_complete
     resolver = clickhouse_trace_server.table_routing_resolver
     read_table = resolver.resolve_read_table(
-        internal_project_id, clickhouse_trace_server.ch_client
+        internal_project_id, clickhouse_trace_server._mint_client
     )
     assert read_table == ReadTable.CALLS_COMPLETE
 
