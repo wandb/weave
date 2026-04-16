@@ -51,9 +51,9 @@ def get_project_retention_days(
 ) -> int:
     """Return retention_days for a project (0 = no TTL / infinite). Cached.
 
-    Read path: L1 (in-process) -> L2 (Redis, optional) -> SOT (ClickHouse argMax).
-    A fall-through to SOT is a full cache miss; on CH miss (no row), returns 0
-    (no TTL configured).
+    Read path: L1 (in-process) -> L2 (Redis, optional) -> ClickHouse (argMax).
+    A fall-through to ClickHouse is a full cache miss; if ClickHouse has no
+    row for the project, returns 0 (no TTL configured).
     """
     cached = _l1_get(project_id)
     if cached is not None:
@@ -67,9 +67,9 @@ def get_project_retention_days(
             set_current_span_dd_tags({"ttl.cache_hit": "L2"})
             return redis_val
 
-    retention_days = _query_source_of_truth(ch_client, project_id)
+    retention_days = _query_clickhouse(ch_client, project_id)
     set_current_span_dd_tags(
-        {"ttl.cache_hit": "SOT", "ttl.retention_days": retention_days}
+        {"ttl.cache_hit": "clickhouse", "ttl.retention_days": retention_days}
     )
 
     if redis_client is not None:
@@ -171,7 +171,7 @@ def _l2_delete(redis_client: redis.Redis, project_id: str) -> None:
         logger.exception("Redis L2 cache delete failed for project %s", project_id)
 
 
-def _query_source_of_truth(ch_client: CHClient, project_id: str) -> int:
+def _query_clickhouse(ch_client: CHClient, project_id: str) -> int:
     """Query ClickHouse for the latest retention_days via argMax. Returns 0 on miss."""
     result = ch_client.query(
         "SELECT argMax(retention_days, updated_at) "
