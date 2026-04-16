@@ -384,6 +384,34 @@ def test_replicated_management_table_follows_database_engine(replicated_migrator
     )
 
 
+def test_distributed_management_table_uses_replicated_engine(distributed_migrator):
+    """Distributed migrator's legacy Replicated-DB management table uses ReplicatedMergeTree."""
+
+    def _normalize(sql: str) -> str:
+        return " ".join(sql.split())
+
+    # Legacy path: management DB uses Replicated engine.
+    # Must emit ReplicatedMergeTree — not plain MergeTree — so the table
+    # actually replicates across replicas.
+    distributed_migrator._replicated_db_engine_cache[
+        distributed_migrator.management_db
+    ] = True
+    sql = distributed_migrator._create_management_table_sql()
+    normalized = _normalize(sql)
+    assert "ReplicatedMergeTree()" in normalized
+    assert "ON CLUSTER" not in normalized
+
+    # Non-legacy path: management DB uses Atomic engine.
+    # Must emit explicit ReplicatedMergeTree with ZK path + ON CLUSTER.
+    distributed_migrator._replicated_db_engine_cache[
+        distributed_migrator.management_db
+    ] = False
+    sql = distributed_migrator._create_management_table_sql()
+    normalized = _normalize(sql)
+    assert "ReplicatedMergeTree(" in normalized
+    assert "ON CLUSTER" in normalized
+
+
 @patch("tenacity.nap.time.sleep")
 def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
     """Engine discovery retries until visible, then uses the result for DDL.

@@ -814,9 +814,9 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in distributed mode.
 
-        If the management DB uses Replicated engine, use MergeTree() (auto-converted
-        by the DB engine) and skip ON CLUSTER. Otherwise, use explicit
-        ReplicatedMergeTree with a shared ZK path so all shards share migration state.
+        If the management DB uses Replicated engine, use ReplicatedMergeTree()
+        and skip ON CLUSTER. Otherwise, use explicit ReplicatedMergeTree with a
+        shared ZK path so all shards share migration state.
         """
         if self._uses_replicated_db_engine(self.management_db):
             # Legacy path: existing deployments where db_management was created with
@@ -826,7 +826,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             return f"""
                 CREATE TABLE IF NOT EXISTS {self.management_db}.migrations
                 ({_MIGRATIONS_TABLE_COLUMNS})
-                ENGINE = MergeTree()
+                ENGINE = ReplicatedMergeTree()
                 ORDER BY (db_name)
             """
         return f"""
@@ -875,8 +875,8 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         if SQLPatterns.CREATE_VIEW_STMT.search(
             command_for_match
         ) or SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
-            # When the DB uses ENGINE = Replicated, it auto-converts MergeTree
-            # and handles DDL replication — skip explicit engine conversion and ON CLUSTER.
+            # Replicated DB: DDL is auto-replicated, so skip ON CLUSTER.
+            # Views have no MergeTree engine to rewrite.
             if self._uses_replicated_db_engine(target_db):
                 formatted_command = command
             else:
