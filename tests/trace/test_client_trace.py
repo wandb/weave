@@ -948,9 +948,11 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
 
 def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush):
     call_spec_1 = simple_line_call_bootstrap()
+    client.flush()
 
     trace_server.set_user_id("second_user")
     call_spec_2 = simple_line_call_bootstrap()
+    client.flush()
 
     trace_server.set_user_id("third_user")
     call_spec_3 = simple_line_call_bootstrap()
