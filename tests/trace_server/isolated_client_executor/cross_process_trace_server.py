@@ -492,13 +492,11 @@ class CrossProcessTraceServerReceiver:
 
     def __init__(self, trace_server: tsi.TraceServerInterface):
         self.trace_server = trace_server
-        # Create manager to enable queue sharing across processes
-        self.manager = multiprocessing.Manager()
         self.request_queue: multiprocessing.Queue[RequestQueueItem] = (
-            self.manager.Queue()
+            multiprocessing.Queue()
         )
         self.response_queue: multiprocessing.Queue[ResponseQueueItem] = (
-            self.manager.Queue()
+            multiprocessing.Queue()
         )
         self._stop_event = threading.Event()
         self._worker_thread: threading.Thread | None = None
@@ -597,8 +595,7 @@ class CrossProcessTraceServerReceiver:
         Returns:
             CrossProcessTraceServerSender: Configured to send requests to this receiver
         """
-        # Create a new lock for this sender instance through the manager
-        sender_lock = self.manager.Lock()
+        sender_lock = multiprocessing.Lock()
         return CrossProcessTraceServerSender(
             self.request_queue, self.response_queue, sender_lock
         )
@@ -611,5 +608,3 @@ class CrossProcessTraceServerReceiver:
         self._stop_event.set()
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=WORKER_SHUTDOWN_TIMEOUT_SECONDS)
-        # Clean up the manager
-        self.manager.shutdown()
