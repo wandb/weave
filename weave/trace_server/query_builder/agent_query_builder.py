@@ -269,7 +269,7 @@ def add_span_filters(
     table_alias: str = "s",
 ) -> None:
     """Add validated equality filters. Only columns in SPAN_FILTERABLE_COLS are allowed."""
-    for attr in SPAN_FILTERABLE_COLS:
+    for attr in sorted(SPAN_FILTERABLE_COLS):
         val = getattr(filters, attr, None)
         if val:
             conditions.append(
