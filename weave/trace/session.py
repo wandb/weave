@@ -1012,17 +1012,16 @@ def log_step(
 ) -> LogResult:
     """Batch-ingest a single step into an existing turn.
 
-    Creates a standalone ``chat`` OTel span with the ``conversation_id``
-    attribute set for server-side correlation. The ``trace_id`` and
-    ``parent_span_id`` parameters are accepted for API compatibility but
-    parent relationships are not reconstructed because our 128-bit span IDs
-    do not fit in OTel's 64-bit span_id field.
+    Creates a ``chat`` OTel span with the ``conversation_id`` attribute set
+    for server-side correlation. When ``trace_id`` and ``parent_span_id``
+    are provided, the span is created as a child of that parent (proper
+    OTel parent-child linkage). Otherwise, a new orphaned trace is created.
 
     Args:
         session_id: The session this turn belongs to.
-        trace_id: The trace_id of the parent turn (informational; not used
-            for OTel parent linkage).
-        parent_span_id: The root_span_id of the parent turn (informational).
+        trace_id: The trace_id of the parent turn (hex string). When provided
+            with ``parent_span_id``, creates proper OTel parent-child linkage.
+        parent_span_id: The span_id of the parent invoke_agent span (hex string).
         model: Model name.
         input_messages: Messages sent to the LLM.
         output_messages: Messages produced by the LLM.
@@ -1053,10 +1052,23 @@ def log_step(
 
     tracer = _get_tracer(_tracer_provider)
 
-    # Create a standalone chat span (new trace) with conversation_id for correlation
+    # Reconstruct parent context if the caller provided IDs from an existing turn
+    if trace_id and parent_span_id:
+        from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
+
+        parent_ctx = SpanContext(
+            trace_id=int(trace_id, 16),
+            span_id=int(parent_span_id, 16),
+            is_remote=True,
+            trace_flags=TraceFlags(0x01),
+        )
+        parent_context = set_span_in_context(NonRecordingSpan(parent_ctx))
+    else:
+        parent_context = Context()
+
     span_count = _emit_step_spans(
         tracer=tracer,
-        parent_context=Context(),
+        parent_context=parent_context,
         step_data=step_data,
         conversation_id=session_id,
         conversation_name=session_name,
