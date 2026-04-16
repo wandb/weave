@@ -1,7 +1,7 @@
 """Scenario-focused tests for weave.trace_server.ttl_settings."""
 
 import datetime
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -42,7 +42,11 @@ class _FakeRedis:
 
 
 def _make_ch_client(rows):
-    """Build a mock ClickHouse client that returns given rows."""
+    """Build a mock ClickHouse client that returns the given rows on query.
+
+    Returns the mock directly; wrap with `lambda: client` when passing as a
+    MintClient factory to `get_project_retention_days`.
+    """
     mock_result = MagicMock()
     mock_result.row_count = len(rows)
     mock_result.first_row = rows[0] if rows else None
@@ -84,26 +88,31 @@ def test_compute_expire_at():
     )
 
 
+EXPECTED_L3_QUERY = (
+    "SELECT argMax(retention_days, updated_at) "
+    "FROM project_ttl_settings "
+    "WHERE project_id = {project_id:String}"
+)
+
+
 def test_get_project_retention_days_l1_cache():
     """L1 caching: single CH query for repeated lookups, zero on CH miss."""
     ch_client = _make_ch_client([[90]])
 
-    first = get_project_retention_days("entity/project", ch_client)
-    second = get_project_retention_days("entity/project", ch_client)
+    first = get_project_retention_days("entity/project", lambda: ch_client)
+    second = get_project_retention_days("entity/project", lambda: ch_client)
 
     assert first == 90
     assert second == 90
     assert ch_client.query.call_count == 1
-    assert ch_client.query.call_args == call(
-        "SELECT argMax(retention_days, updated_at) "
-        "FROM project_ttl_settings "
-        "WHERE project_id = {project_id:String}",
-        parameters={"project_id": "entity/project"},
+    assert ch_client.close.call_count == 1
+    ch_client.query.assert_called_once_with(
+        EXPECTED_L3_QUERY, parameters={"project_id": "entity/project"}
     )
 
     # Different project with no rows → 0 (no TTL configured)
     ch_empty = _make_ch_client([])
-    assert get_project_retention_days("entity/no-ttl", ch_empty) == 0
+    assert get_project_retention_days("entity/no-ttl", lambda: ch_empty) == 0
 
 
 @pytest.mark.disable_logging_error_check
@@ -116,10 +125,10 @@ def test_get_project_retention_days_redis_l2_cache():
     redis.set(_ttl_cache_key("entity/proj"), "45", ex=300)
 
     first = get_project_retention_days(
-        "entity/proj", ch_not_reached, redis_client=redis
+        "entity/proj", lambda: ch_not_reached, redis_client=redis
     )
     second = get_project_retention_days(
-        "entity/proj", ch_not_reached, redis_client=redis
+        "entity/proj", lambda: ch_not_reached, redis_client=redis
     )
     assert first == 45
     assert second == 45
@@ -129,10 +138,13 @@ def test_get_project_retention_days_redis_l2_cache():
     redis_cold = _FakeRedis()
     ch_client = _make_ch_client([[60]])
     result = get_project_retention_days(
-        "entity/other", ch_client, redis_client=redis_cold
+        "entity/other", lambda: ch_client, redis_client=redis_cold
     )
     assert result == 60
     assert ch_client.query.call_count == 1
+    ch_client.query.assert_called_once_with(
+        EXPECTED_L3_QUERY, parameters={"project_id": "entity/other"}
+    )
     key = _ttl_cache_key("entity/other")
     assert redis_cold.get(key) == "60"
     assert redis_cold._store[key][1] == REDIS_TTL_EXPIRY_SECS
@@ -144,7 +156,7 @@ def test_get_project_retention_days_redis_l2_cache():
     ch_fallback = _make_ch_client([[77]])
     assert (
         get_project_retention_days(
-            "entity/broken-redis", ch_fallback, redis_client=broken_redis
+            "entity/broken-redis", lambda: ch_fallback, redis_client=broken_redis
         )
         == 77
     )
@@ -159,8 +171,12 @@ def test_invalidate_ttl_cache():
     key = _ttl_cache_key("entity/proj")
 
     # Populate both cache layers
-    original = get_project_retention_days("entity/proj", ch_client, redis_client=redis)
-    cached = get_project_retention_days("entity/proj", ch_client, redis_client=redis)
+    original = get_project_retention_days(
+        "entity/proj", lambda: ch_client, redis_client=redis
+    )
+    cached = get_project_retention_days(
+        "entity/proj", lambda: ch_client, redis_client=redis
+    )
     assert original == 90
     assert cached == 90
     assert redis.get(key) == "90"
@@ -171,7 +187,9 @@ def test_invalidate_ttl_cache():
     invalidate_ttl_cache("entity/proj", redis_client=redis)
     assert redis.get(key) is None
 
-    refreshed = get_project_retention_days("entity/proj", ch_client, redis_client=redis)
+    refreshed = get_project_retention_days(
+        "entity/proj", lambda: ch_client, redis_client=redis
+    )
     assert refreshed == 30
     assert ch_client.query.call_count == 2
 

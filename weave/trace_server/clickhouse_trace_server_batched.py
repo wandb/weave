@@ -272,7 +272,6 @@ from weave.trace_server.trace_server_common import (
 from weave.trace_server.ttl_settings import (
     compute_expire_at,
     get_project_retention_days,
-    invalidate_ttl_cache,
 )
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
@@ -808,6 +807,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
 
+        self._add_call_expire_at(ch_call, ch_call.started_at)
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
@@ -837,6 +837,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
 
+        self._add_call_expire_at(ch_call, ch_call.ended_at)
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
@@ -892,6 +893,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
 
                 ch_call = complete_call_to_ch_insertable(processed_complete_call)
+                self._add_call_expire_at(ch_call, ch_call.started_at)
                 if write_target == WriteTarget.CALLS_COMPLETE:
                     self._insert_call_complete(ch_call)
                 else:
@@ -921,8 +923,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             ch_complete_start = start_call_insertable_to_complete_start(ch_start)
+            self._add_call_expire_at(ch_complete_start, ch_complete_start.started_at)
             self._insert_call_complete(ch_complete_start)
         else:
+            self._add_call_expire_at(ch_start, ch_start.started_at)
             self._insert_call(ch_start)
 
         return tsi.CallStartV2Res(id=ch_start.id, trace_id=ch_start.trace_id)
@@ -952,6 +956,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._update_call_end_in_calls_complete(req.end)
         elif write_target == WriteTarget.CALLS_MERGED:
             ch_end = end_call_for_insert_to_ch_insertable(req.end)
+            self._add_call_expire_at(ch_end, ch_end.ended_at)
             self._insert_call(ch_end)
             if self._flush_immediately:
                 self._flush_calls()
@@ -6146,6 +6151,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 wb_user_id=req.wb_user_id,
             )
             ch_call = complete_call_to_ch_insertable(completed)
+            self._add_call_expire_at(ch_call, ch_call.started_at)
             self._insert_call_complete(ch_call)
         else:
             # Write to call_parts/calls_merged via start/end pattern
@@ -6281,8 +6287,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Insert immediately so that callers can see the call in progress
             if write_target == WriteTarget.CALLS_COMPLETE:
                 ch_complete_start = start_call_insertable_to_complete_start(start_call)
+                self._add_call_expire_at(
+                    ch_complete_start, ch_complete_start.started_at
+                )
                 self._insert_call_complete(ch_complete_start)
             else:
+                self._add_call_expire_at(start_call, start_call.started_at)
                 self._insert_call(start_call)
 
         # Set the combined messages (with template vars replaced) for LiteLLM
@@ -6319,8 +6329,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     started_at=start_call.started_at,
                 )
             )
+
+        def _insert_end_with_expire_at(ch_end: CallEndCHInsertable) -> None:
+            self._add_call_expire_at(ch_end, ch_end.ended_at)
+            self._insert_call(ch_end)
+
         return _create_tracked_stream_wrapper(
-            self._insert_call,
+            _insert_end_with_expire_at,
             chunk_iter,
             start_call,
             model_name,
@@ -6815,19 +6830,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        ttl_anchor = None
-        if isinstance(ch_call, CallStartCHInsertable):
-            ttl_anchor = ch_call.started_at
-        elif isinstance(ch_call, CallEndCHInsertable):
-            ttl_anchor = ch_call.started_at
-
-        # End-only updates without started_at should not stamp a new expire_at. The
-        # start row already carries the authoritative expire_at for merged calls.
-        if ttl_anchor is not None:
-            retention_days = get_project_retention_days(
-                ch_call.project_id, self.ch_client
-            )
-            ch_call.expire_at = compute_expire_at(retention_days, ttl_anchor)
         parameters = ch_call.model_dump()
         row = []
         for key in ALL_CALL_INSERT_COLUMNS:
@@ -6835,6 +6837,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._call_batch.append(row)
         if self._flush_immediately:
             self._flush_calls()
+
+    def _add_call_expire_at(
+        self,
+        ch_call: CallStartCHInsertable | CallEndCHInsertable | CallCompleteCHInsertable,
+        anchor: datetime.datetime,
+    ) -> None:
+        """Add expire_at to the insertable from the project's retention policy."""
+        retention_days = get_project_retention_days(
+            ch_call.project_id, self._mint_client
+        )
+        ch_call.expire_at = compute_expire_at(retention_days, anchor)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
@@ -6856,8 +6869,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Args:
             ch_call: The complete call to insert.
         """
-        retention_days = get_project_retention_days(ch_call.project_id, self.ch_client)
-        ch_call.expire_at = compute_expire_at(retention_days, ch_call.started_at)
         parameters = ch_call.model_dump()
         row = []
         for key in ALL_CALL_COMPLETE_INSERT_COLUMNS:
@@ -6877,8 +6888,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Args:
             ch_call: The complete call to insert.
         """
-        retention_days = get_project_retention_days(ch_call.project_id, self.ch_client)
-        ch_call.expire_at = compute_expire_at(retention_days, ch_call.started_at)
         parameters = ch_call.model_dump()
         row = []
         for key in ALL_CALL_INSERT_COLUMNS:
