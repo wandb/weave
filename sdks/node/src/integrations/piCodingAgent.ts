@@ -29,7 +29,7 @@ import {
   trace,
 } from '@opentelemetry/api';
 
-import {GEN_AI_ATTR, OTEL_ATTR} from './common/genai';
+import {GEN_AI_ATTR, GEN_AI_EVENT, OTEL_ATTR} from './common/genai';
 
 import type {
   PiAgentMessage,
@@ -64,6 +64,11 @@ const ATTR = {
   PI_COMPACTION_REASON: 'pi.compaction.reason',
   PI_COMPACTION_ABORTED: 'pi.compaction.aborted',
   PI_COMPACTION_WILL_RETRY: 'pi.compaction.will_retry',
+  PI_AUTO_RETRY_ATTEMPT: 'auto_retry.attempt',
+  PI_AUTO_RETRY_MAX_ATTEMPTS: 'auto_retry.max_attempts',
+  PI_AUTO_RETRY_ERROR_MESSAGE: 'auto_retry.error_message',
+  PI_AUTO_RETRY_SUCCESS: 'auto_retry.success',
+  PI_AUTO_RETRY_FINAL_ERROR: 'auto_retry.final_error',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -72,7 +77,8 @@ const ATTR = {
 
 /** Maps a pi provider name to the GenAI semconv gen_ai.provider.name value. */
 function resolveGenAiProviderName(provider: string): string {
-  switch (provider.toLowerCase()) {
+  const providerName = provider.toLowerCase();
+  switch (providerName) {
     case 'anthropic':
       return 'anthropic';
     case 'openai':
@@ -90,7 +96,7 @@ function resolveGenAiProviderName(provider: string): string {
     case 'mistral':
       return 'mistral_ai';
     default:
-      return '_OTHER';
+      return providerName;
   }
 }
 
