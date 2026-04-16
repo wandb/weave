@@ -1938,10 +1938,11 @@ def _handle_status_summary_field(
     use_agg_fn: bool = True,
     read_table: "ReadTable" = ReadTable.CALLS_MERGED,
 ) -> str:
-    # Status logic:
-    # - If exception is not null -> ERROR
-    # - Else if ended_at is null -> RUNNING
-    # - Else -> SUCCESS
+    # Status logic (order matters — first match wins):
+    # 1. If exception is not null -> ERROR
+    # 2. If ended_at is null -> RUNNING (still in progress, regardless of descendant errors)
+    # 3. If status_counts.error > 0 -> DESCENDANT_ERROR
+    # 4. Else -> SUCCESS
     exception_field = get_field_by_name("exception")
     ended_at_field = get_field_by_name("ended_at")
     status_counts_field = get_field_by_name("summary.status_counts.error")
@@ -1949,7 +1950,7 @@ def _handle_status_summary_field(
     exception_sql = _field_as_sql_maybe_agg(
         exception_field, pb, table_alias, use_agg_fn
     )
-    ended_to_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, use_agg_fn)
+    ended_at_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, use_agg_fn)
     status_counts_sql = _field_as_sql_maybe_agg(
         status_counts_field, pb, table_alias, use_agg_fn, cast="int"
     )
@@ -1968,8 +1969,8 @@ def _handle_status_summary_field(
 
     return f"""CASE
         WHEN {exception_check} THEN {param_slot(error_param, "String")}
-        WHEN IFNULL({status_counts_sql}, 0) > 0 THEN {param_slot(descendant_error_param, "String")}
         WHEN {ended_at_null} THEN {param_slot(running_param, "String")}
+        WHEN IFNULL({status_counts_sql}, 0) > 0 THEN {param_slot(descendant_error_param, "String")}
         ELSE {param_slot(success_param, "String")}
     END"""
 

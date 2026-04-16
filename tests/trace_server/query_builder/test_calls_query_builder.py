@@ -888,13 +888,13 @@ def test_query_with_summary_weave_status_sort() -> None:
         )
         ORDER BY CASE
             WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
+            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
             WHEN IFNULL(
                 toInt64OrNull(
                     coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')
                 ),
                 0
             ) > 0 THEN {pb_4:String}
-            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
             ELSE {pb_3:String}
             END ASC
         """,
@@ -939,16 +939,16 @@ def test_query_with_summary_weave_status_sort_and_filter() -> None:
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((CASE
                 WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
                 WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
+                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
                 ELSE {pb_3:String}
             END = {pb_3:String}))
         AND ((any(calls_merged.deleted_at) IS NULL))
         AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         ORDER BY CASE
             WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-            WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
             WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
+            WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
             ELSE {pb_3:String}
         END DESC
         """,
@@ -1721,8 +1721,8 @@ def test_summary_weave_field_select_backtick_quoting(
                 END AS `summary.weave.trace_name`,
                 CASE
                     WHEN any({expected_table}.exception) IS NOT NULL THEN {{pb_1:String}}
-                    WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any({expected_table}.summary_dump), {{pb_0:String}}), 'null'), '')), 0) > 0 THEN {{pb_4:String}}
                     WHEN any({expected_table}.ended_at) IS NULL THEN {{pb_2:String}}
+                    WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any({expected_table}.summary_dump), {{pb_0:String}}), 'null'), '')), 0) > 0 THEN {{pb_4:String}}
                     ELSE {{pb_3:String}}
                 END AS `summary.weave.status`,
                 CASE
@@ -1761,8 +1761,8 @@ def test_summary_weave_field_select_backtick_quoting(
                 END AS `summary.weave.trace_name`,
                 CASE
                     WHEN {expected_table}.exception != {{pb_6:String}} THEN {{pb_2:String}}
-                    WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE({expected_table}.summary_dump, {{pb_1:String}}), 'null'), '')), 0) > 0 THEN {{pb_5:String}}
                     WHEN {expected_table}.ended_at = {{pb_7:DateTime64(6)}} THEN {{pb_3:String}}
+                    WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE({expected_table}.summary_dump, {{pb_1:String}}), 'null'), '')), 0) > 0 THEN {{pb_5:String}}
                     ELSE {{pb_4:String}}
                 END AS `summary.weave.status`,
                 CASE
@@ -3301,13 +3301,13 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
         )
         ORDER BY CASE
             WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
+            WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
             WHEN IFNULL(
                 toInt64OrNull(
                     coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
                 ),
                 0
             ) > 0 THEN {pb_9:String}
-            WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
             ELSE {pb_8:String}
             END ASC
         LIMIT 100
@@ -3525,15 +3525,15 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
           AND (
             (((CASE
                 WHEN calls_complete.exception != {pb_5:String} THEN {pb_1:String}
-                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
                 WHEN calls_complete.ended_at = {pb_6:DateTime64(6)} THEN {pb_2:String}
+                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
                 ELSE {pb_3:String}
             END = {pb_3:String})
             OR
             (CASE
                 WHEN calls_complete.exception != {pb_7:String} THEN {pb_1:String}
-                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
                 WHEN calls_complete.ended_at = {pb_8:DateTime64(6)} THEN {pb_2:String}
+                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
                 ELSE {pb_3:String}
             END = {pb_1:String})))
        AND ((calls_complete.deleted_at = {pb_9:DateTime64(3)})))
@@ -4220,8 +4220,8 @@ def test_status_sort_calls_complete_uses_sentinels() -> None:
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         ORDER BY CASE
                      WHEN calls_complete.exception != {pb_6:String} THEN {pb_2:String}
-                     WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_1:String}), 'null'), '')), 0) > 0 THEN {pb_5:String}
                      WHEN calls_complete.ended_at = {pb_7:DateTime64(6)} THEN {pb_3:String}
+                     WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_1:String}), 'null'), '')), 0) > 0 THEN {pb_5:String}
                      ELSE {pb_4:String}
                  END ASC
         """,
