@@ -1,7 +1,7 @@
 """Integration tests for GenAI agent tables and query layer.
 
 Requires ClickHouse backend (auto-skips on SQLite via ch_server fixture).
-Migration 029 creates the genai tables automatically.
+Migration 030 creates the genai tables automatically.
 """
 
 import base64
