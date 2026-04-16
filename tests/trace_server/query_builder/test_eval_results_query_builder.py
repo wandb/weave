@@ -58,8 +58,8 @@ def test_cte_chain_calls_merged() -> None:
                 LEFT JOIN (
                     SELECT project_id, digest, any(val_dump) AS val_dump
                     FROM table_rows
-                    WHERE project_id = {pb_0:String}
-                        AND digest IN (SELECT row_digest FROM predict_and_score_calls)
+                    PREWHERE project_id = {pb_0:String}
+                    WHERE digest IN (SELECT row_digest FROM predict_and_score_calls)
                     GROUP BY project_id, digest
                 ) AS tr ON tr.digest = predict_and_score_calls.row_digest
             ),
@@ -133,8 +133,8 @@ def test_cte_chain_calls_complete() -> None:
                         ELSE hex(SHA256(JSONExtractRaw(calls_complete.inputs_dump, 'example')))
                     END AS row_digest
                 FROM calls_complete
-                WHERE calls_complete.project_id = {pb_0:String}
-                    AND calls_complete.parent_id IN {pb_1:Array(String)}
+                PREWHERE calls_complete.project_id = {pb_0:String}
+                WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
                     AND position(calls_complete.op_name, {pb_2:String}) > 0
                     AND calls_complete.deleted_at = {pb_3:DateTime64(3)}
@@ -147,8 +147,8 @@ def test_cte_chain_calls_complete() -> None:
                 LEFT JOIN (
                     SELECT project_id, digest, any(val_dump) AS val_dump
                     FROM table_rows
-                    WHERE project_id = {pb_0:String}
-                        AND digest IN (SELECT row_digest FROM predict_and_score_calls)
+                    PREWHERE project_id = {pb_0:String}
+                    WHERE digest IN (SELECT row_digest FROM predict_and_score_calls)
                     GROUP BY project_id, digest
                 ) AS tr ON tr.digest = predict_and_score_calls.row_digest
             ),
@@ -256,8 +256,8 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                         ELSE hex(SHA256(JSONExtractRaw(calls_complete.inputs_dump, 'example')))
                     END AS row_digest
                 FROM calls_complete
-                WHERE calls_complete.project_id = {pb_0:String}
-                    AND calls_complete.parent_id IN {pb_1:Array(String)}
+                PREWHERE calls_complete.project_id = {pb_0:String}
+                WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
                     AND position(calls_complete.op_name, {pb_2:String}) > 0
                     AND calls_complete.deleted_at = {pb_3:DateTime64(3)}
@@ -270,8 +270,8 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                 LEFT JOIN (
                     SELECT project_id, digest, any(val_dump) AS val_dump
                     FROM table_rows
-                    WHERE project_id = {pb_0:String}
-                        AND digest IN (SELECT row_digest FROM predict_and_score_calls)
+                    PREWHERE project_id = {pb_0:String}
+                    WHERE digest IN (SELECT row_digest FROM predict_and_score_calls)
                     GROUP BY project_id, digest
                 ) AS tr ON tr.digest = predict_and_score_calls.row_digest
             ),
@@ -373,8 +373,8 @@ def test_full_query_calls_merged() -> None:
                 LEFT JOIN (
                     SELECT project_id, digest, any(val_dump) AS val_dump
                     FROM table_rows
-                    WHERE project_id = {pb_0:String}
-                        AND digest IN (SELECT row_digest FROM predict_and_score_calls)
+                    PREWHERE project_id = {pb_0:String}
+                    WHERE digest IN (SELECT row_digest FROM predict_and_score_calls)
                     GROUP BY project_id, digest
                 ) AS tr ON tr.digest = predict_and_score_calls.row_digest
             ),
@@ -481,8 +481,8 @@ def test_full_query_calls_complete() -> None:
                         ELSE hex(SHA256(JSONExtractRaw(calls_complete.inputs_dump, 'example')))
                     END AS row_digest
                 FROM calls_complete
-                WHERE calls_complete.project_id = {pb_0:String}
-                    AND calls_complete.parent_id IN {pb_1:Array(String)}
+                PREWHERE calls_complete.project_id = {pb_0:String}
+                WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
                     AND position(calls_complete.op_name, {pb_2:String}) > 0
                     AND calls_complete.deleted_at = {pb_3:DateTime64(3)}
@@ -495,8 +495,8 @@ def test_full_query_calls_complete() -> None:
                 LEFT JOIN (
                     SELECT project_id, digest, any(val_dump) AS val_dump
                     FROM table_rows
-                    WHERE project_id = {pb_0:String}
-                        AND digest IN (SELECT row_digest FROM predict_and_score_calls)
+                    PREWHERE project_id = {pb_0:String}
+                    WHERE digest IN (SELECT row_digest FROM predict_and_score_calls)
                     GROUP BY project_id, digest
                 ) AS tr ON tr.digest = predict_and_score_calls.row_digest
             ),
