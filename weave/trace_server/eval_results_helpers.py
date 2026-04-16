@@ -277,7 +277,9 @@ def build_eval_rows_from_calls(
 
         output = pas_call.output if isinstance(pas_call.output, dict) else {}
         raw_scores = output.get("scores")
-        scores: dict[str, Any] = dict(raw_scores) if isinstance(raw_scores, dict) else {}
+        scores: dict[str, Any] = (
+            dict(raw_scores) if isinstance(raw_scores, dict) else {}
+        )
         trial_children = child_by_parent.get(pas_call.id, [])
 
         # Merge scores from child calls added post-hoc via score_create().
