@@ -6,59 +6,60 @@ from weave import Evaluation
 from weave.trace_server.common_interface import SortBy
 
 
-def test_filter_calls_by_ref_properties(client):
+def test_filter_calls_by_ref_properties(client, no_autoflush):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
 
-    with client.no_autoflush():
-        nested1 = {"nested key with spaces": {"one": "1"}}
-        nested_ref = weave.publish(nested1, "nested")
-        nested2 = {"nested key with spaces": {"one": "2"}}
-        nested2_ref = weave.publish(nested2, "nested")
+    nested1 = {"nested key with spaces": {"one": "1"}}
+    nested_ref = weave.publish(nested1, "nested")
+    nested2 = {"nested key with spaces": {"one": "2"}}
+    nested2_ref = weave.publish(nested2, "nested")
 
-        # Create configuration objects to be referenced
-        config1 = {
-            "temperature": 0.5,
-            "model": "gpt-4",
-            "max_tokens": 100,
-            "nested": nested_ref,
+    # Create configuration objects to be referenced
+    config1 = {
+        "temperature": 0.5,
+        "model": "gpt-4",
+        "max_tokens": 100,
+        "nested": nested_ref,
+    }
+    config1_ref = weave.publish(config1, "config1")
+
+    config2 = {
+        "temperature": 0.8,
+        "model": "gpt-3.5",
+        "max_tokens": 200,
+        "nested": nested2_ref,
+    }
+    config2_ref = weave.publish(config2, "config2")
+
+    # Create nested objects with references
+    worker_info1 = {"id": 1, "status": "active", "config": config1_ref}
+    worker1_ref = weave.publish(worker_info1, "worker1")
+
+    worker_info2 = {"id": 2, "status": "inactive", "config": config2_ref}
+    worker2_ref = weave.publish(worker_info2, "worker2")
+
+    # Create a more complex nested structure
+    project_data = {
+        "name": "test_project",
+        "version": "v1.0",
+        "settings": {"debug": True, "workers": [worker1_ref, worker2_ref]},
+    }
+    project_ref = weave.publish(project_data, "project")
+
+    @weave.op
+    def process_with_config(worker_config, project_info):
+        return {
+            "processed_worker": worker_config,
+            "project_context": project_info,
         }
-        config1_ref = weave.publish(config1, "config1")
 
-        config2 = {
-            "temperature": 0.8,
-            "model": "gpt-3.5",
-            "max_tokens": 200,
-            "nested": nested2_ref,
-        }
-        config2_ref = weave.publish(config2, "config2")
+    # Create calls that use these referenced objects
+    process_with_config(worker1_ref, project_ref)
+    process_with_config(worker2_ref, project_ref)
 
-        # Create nested objects with references
-        worker_info1 = {"id": 1, "status": "active", "config": config1_ref}
-        worker1_ref = weave.publish(worker_info1, "worker1")
-
-        worker_info2 = {"id": 2, "status": "inactive", "config": config2_ref}
-        worker2_ref = weave.publish(worker_info2, "worker2")
-
-        # Create a more complex nested structure
-        project_data = {
-            "name": "test_project",
-            "version": "v1.0",
-            "settings": {"debug": True, "workers": [worker1_ref, worker2_ref]},
-        }
-        project_ref = weave.publish(project_data, "project")
-
-        @weave.op
-        def process_with_config(worker_config, project_info):
-            return {
-                "processed_worker": worker_config,
-                "project_context": project_info,
-            }
-
-        # Create calls that use these referenced objects
-        process_with_config(worker1_ref, project_ref)
-        process_with_config(worker2_ref, project_ref)
+    client.flush()
 
     # Test filtering by simple ref value in inputs
     calls = list(
@@ -346,7 +347,9 @@ def test_filter_calls_by_ref_properties(client):
 
 
 @pytest.mark.asyncio
-async def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
+async def test_filter_calls_by_ref_properties_with_table_rows_simple(
+    client, no_autoflush
+):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
@@ -356,31 +359,31 @@ async def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
     async def model_predict(input) -> str:
         return eval(input)
 
-    with client.no_autoflush():
-        object_ref1 = weave.publish({"a": 1, "b": 2}, "object")
-        object_ref2 = weave.publish({"a": 3, "b": 4}, "object")
-        object_ref3 = weave.publish({"a": 5, "b": 6}, "object")
-        object_ref4 = weave.publish({"a": 7, "b": 8}, "object")
-        object_ref5 = weave.publish({"a": 9, "b": 10}, "object")
+    object_ref1 = weave.publish({"a": 1, "b": 2}, "object")
+    object_ref2 = weave.publish({"a": 3, "b": 4}, "object")
+    object_ref3 = weave.publish({"a": 5, "b": 6}, "object")
+    object_ref4 = weave.publish({"a": 7, "b": 8}, "object")
+    object_ref5 = weave.publish({"a": 9, "b": 10}, "object")
 
-        dataset_rows = [
-            {"input": "1+2", "target": 3, "object": object_ref1},
-            {"input": "2**4", "target": 15, "object": object_ref2},
-            {"input": "3**3", "target": 27, "object": object_ref3},
-            {"input": "4**2", "target": 16, "object": object_ref4},
-            {"input": "5**1", "target": 5, "object": object_ref5},
-        ]
+    dataset_rows = [
+        {"input": "1+2", "target": 3, "object": object_ref1},
+        {"input": "2**4", "target": 15, "object": object_ref2},
+        {"input": "3**3", "target": 27, "object": object_ref3},
+        {"input": "4**2", "target": 16, "object": object_ref4},
+        {"input": "5**1", "target": 5, "object": object_ref5},
+    ]
 
-        @weave.op
-        async def score(target, model_output, object):
-            return target == model_output
+    @weave.op
+    async def score(target, model_output, object):
+        return target == model_output
 
-        evaluation = Evaluation(
-            name="my-eval",
-            dataset=dataset_rows,
-            scorers=[score],
-        )
-        await evaluation.evaluate(model_predict)
+    evaluation = Evaluation(
+        name="my-eval",
+        dataset=dataset_rows,
+        scorers=[score],
+    )
+    await evaluation.evaluate(model_predict)
+    client.flush()
 
     calls = list(
         client.get_calls(

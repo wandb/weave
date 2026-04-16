@@ -1,4 +1,3 @@
-import contextlib
 import dataclasses
 import datetime
 import json
@@ -307,13 +306,7 @@ class OpCallSpec(BaseModel):
     part_sequence: list[tuple[str, str]]
 
 
-def simple_line_call_bootstrap(client=None) -> OpCallSpec:
-    """Bootstrap a set of ops and calls for testing query/filter behavior.
-
-    Args:
-        client: When provided, disables autoflush during bulk call creation
-                for significantly faster execution.
-    """
+def simple_line_call_bootstrap() -> OpCallSpec:
     part_sequence = []
 
     def track_sequence(name: str):
@@ -370,42 +363,40 @@ def simple_line_call_bootstrap(client=None) -> OpCallSpec:
     result["liner"] = OpCallSummary(op=liner)
     root_calls = 0
 
-    cm = client.no_autoflush() if client else contextlib.nullcontext()
-    with cm:
-        # Call each op a distinct number of times (allows for easier assertions later)
-        num_calls = 1
-        for i in range(num_calls):
-            adder_v0(Number(value=i))
-        result["adder_v0"].num_calls += num_calls
-        root_calls += num_calls
+    # Call each op a distinct number of time (allows for easier assertions later)
+    num_calls = 1
+    for i in range(num_calls):
+        adder_v0(Number(value=i))
+    result["adder_v0"].num_calls += num_calls
+    root_calls += num_calls
 
-        num_calls = 2
-        for i in range(num_calls):
-            adder(Number(value=i), i)
-        result["adder"].num_calls += num_calls
-        root_calls += num_calls
+    num_calls = 2
+    for i in range(num_calls):
+        adder(Number(value=i), i)
+    result["adder"].num_calls += num_calls
+    root_calls += num_calls
 
-        num_calls = 3
-        for i in range(num_calls):
-            subtractor(Number(value=i), i)
-        result["subtractor"].num_calls += num_calls
-        root_calls += num_calls
+    num_calls = 3
+    for i in range(num_calls):
+        subtractor(Number(value=i), i)
+    result["subtractor"].num_calls += num_calls
+    root_calls += num_calls
 
-        num_calls = 4
-        for i in range(num_calls):
-            multiplier(Number(value=i), i)
-        result["multiplier"].num_calls += num_calls
-        root_calls += num_calls
+    num_calls = 4
+    for i in range(num_calls):
+        multiplier(Number(value=i), i)
+    result["multiplier"].num_calls += num_calls
+    root_calls += num_calls
 
-        num_calls = 5
-        run_calls = 0
-        for i in range(num_calls):
-            liner(Number(value=i), i, i)
-        result["liner"].num_calls += num_calls
-        result["adder"].num_calls += num_calls
-        result["multiplier"].num_calls += num_calls
-        run_calls += num_calls * 3
-        root_calls += num_calls
+    num_calls = 5
+    run_calls = 0
+    for i in range(num_calls):
+        liner(Number(value=i), i, i)
+    result["liner"].num_calls += num_calls
+    result["adder"].num_calls += num_calls
+    result["multiplier"].num_calls += num_calls
+    run_calls += num_calls * 3
+    root_calls += num_calls
 
     total_calls = sum(op_call.num_calls for op_call in result.values())
 
@@ -422,8 +413,9 @@ def ref_str(op):
     return weave_client.get_ref(op).uri
 
 
-def test_trace_call_query_filter_op_version_refs(client):
-    call_spec = simple_line_call_bootstrap(client)
+def test_trace_call_query_filter_op_version_refs(client, no_autoflush):
+    call_spec = simple_line_call_bootstrap()
+    client.flush()
     call_summaries = call_spec.call_summaries
 
     # This is just a string representation of the ref
@@ -887,8 +879,9 @@ def test_trace_call_query_filter_call_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_trace_roots_only(client):
-    call_spec = simple_line_call_bootstrap(client)
+def test_trace_call_query_filter_trace_roots_only(client, no_autoflush):
+    call_spec = simple_line_call_bootstrap()
+    client.flush()
 
     for trace_roots_only, exp_count in [
         # Test the None case
@@ -908,26 +901,26 @@ def test_trace_call_query_filter_trace_roots_only(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_run_ids(client):
+def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
     from weave.trace import weave_client
     from weave.trace.wandb_run_context import WandbRunContext
 
-    with client.no_autoflush():
-        with mock.patch.object(
-            weave_client,
-            "get_global_wb_run_context",
-            return_value=WandbRunContext(run_id="test-run-1", step=0),
-        ):
-            call_spec_1 = simple_line_call_bootstrap()
-        with mock.patch.object(
-            weave_client,
-            "get_global_wb_run_context",
-            return_value=WandbRunContext(run_id="test-run-2", step=0),
-        ):
-            call_spec_2 = simple_line_call_bootstrap()
-        call_spec_3 = simple_line_call_bootstrap()
+    with mock.patch.object(
+        weave_client,
+        "get_global_wb_run_context",
+        return_value=WandbRunContext(run_id="test-run-1", step=0),
+    ):
+        call_spec_1 = simple_line_call_bootstrap()
+    with mock.patch.object(
+        weave_client,
+        "get_global_wb_run_context",
+        return_value=WandbRunContext(run_id="test-run-2", step=0),
+    ):
+        call_spec_2 = simple_line_call_bootstrap()
+    call_spec_3 = simple_line_call_bootstrap()
+    client.flush()
 
     total_calls = (
         call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls
@@ -953,12 +946,15 @@ def test_trace_call_query_filter_wb_run_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_user_ids(client, trace_server):
-    call_spec_1 = simple_line_call_bootstrap(client)
+def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush):
+    call_spec_1 = simple_line_call_bootstrap()
+
     trace_server.set_user_id("second_user")
-    call_spec_2 = simple_line_call_bootstrap(client)
+    call_spec_2 = simple_line_call_bootstrap()
+
     trace_server.set_user_id("third_user")
-    call_spec_3 = simple_line_call_bootstrap(client)
+    call_spec_3 = simple_line_call_bootstrap()
+    client.flush()
 
     for wb_user_ids, exp_count in [
         (
@@ -986,8 +982,9 @@ def test_trace_call_query_filter_wb_user_ids(client, trace_server):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_limit(client):
-    call_spec = simple_line_call_bootstrap(client)
+def test_trace_call_query_limit(client, no_autoflush):
+    call_spec = simple_line_call_bootstrap()
+    client.flush()
 
     for limit, exp_count in [
         # Test the None case
@@ -1007,8 +1004,9 @@ def test_trace_call_query_limit(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_offset(client):
-    call_spec = simple_line_call_bootstrap(client)
+def test_trace_call_query_offset(client, no_autoflush):
+    call_spec = simple_line_call_bootstrap()
+    client.flush()
 
     for offset, exp_count in [
         # Test the None case
@@ -1028,7 +1026,7 @@ def test_trace_call_query_offset(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_timings(client):
+def test_trace_call_query_timings(client, no_autoflush):
     now = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
     later = now + datetime.timedelta(seconds=1)
     even_later = later + datetime.timedelta(seconds=1)
@@ -1049,10 +1047,9 @@ def test_trace_call_query_timings(client):
         else:  # call 99 gets 'even_later'
             return even_later
 
-    with (
-        client.no_autoflush(),
-        mock.patch("weave.trace.weave_client.datetime.datetime") as mock_datetime_class,
-    ):
+    with mock.patch(
+        "weave.trace.weave_client.datetime.datetime"
+    ) as mock_datetime_class:
         # Mock only the .now() method, keep everything else as-is
         mock_datetime_class.now = mock.Mock(side_effect=mock_now)
         # Preserve other datetime functionality
@@ -1061,6 +1058,7 @@ def test_trace_call_query_timings(client):
         for i in range(num_calls):
             call_index = i
             client.create_call("y", {"a": i})
+    client.flush()
 
     def query_server():
         result = get_client_trace_server(client).calls_query_stream(
@@ -6564,51 +6562,51 @@ def test_calls_query_sort_by_trace_name_with_costs(client):
     assert calls[1].id == call_a.id
 
 
-def test_calls_query_ordering_with_costs_comprehensive(client):
+def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
     @weave.op
     def my_op(x: int) -> int:
         return x
 
-    with client.no_autoflush():
-        # Calls with multiple sortable attributes
-        call1 = client.create_call(
-            my_op, {"x": 1}, attributes={"category": "A", "priority": 2}
-        )
-        client.finish_call(call1, 1)
-        time.sleep(0.01)
+    # Calls with multiple sortable attributes
+    call1 = client.create_call(
+        my_op, {"x": 1}, attributes={"category": "A", "priority": 2}
+    )
+    client.finish_call(call1, 1)
+    time.sleep(0.01)
 
-        call2 = client.create_call(
-            my_op, {"x": 2}, attributes={"category": "A", "priority": 1}
-        )
-        client.finish_call(call2, 2)
-        time.sleep(0.01)
+    call2 = client.create_call(
+        my_op, {"x": 2}, attributes={"category": "A", "priority": 1}
+    )
+    client.finish_call(call2, 2)
+    time.sleep(0.01)
 
-        call3 = client.create_call(
-            my_op, {"x": 3}, attributes={"category": "B", "priority": 1}
-        )
-        client.finish_call(call3, 3)
-        time.sleep(0.01)
+    call3 = client.create_call(
+        my_op, {"x": 3}, attributes={"category": "B", "priority": 1}
+    )
+    client.finish_call(call3, 3)
+    time.sleep(0.01)
 
-        # Calls with deeply nested attributes
-        call4 = client.create_call(
-            my_op,
-            {"x": 4},
-            attributes={"metadata": {"config": {"model": {"temperature": 0.1}}}},
-        )
-        client.finish_call(call4, 4)
-        time.sleep(0.01)
+    # Calls with deeply nested attributes
+    call4 = client.create_call(
+        my_op,
+        {"x": 4},
+        attributes={"metadata": {"config": {"model": {"temperature": 0.1}}}},
+    )
+    client.finish_call(call4, 4)
+    time.sleep(0.01)
 
-        call5 = client.create_call(
-            my_op,
-            {"x": 5},
-            attributes={"metadata": {"config": {"model": {"temperature": 0.9}}}},
-        )
-        client.finish_call(call5, 5)
-        time.sleep(0.01)
+    call5 = client.create_call(
+        my_op,
+        {"x": 5},
+        attributes={"metadata": {"config": {"model": {"temperature": 0.9}}}},
+    )
+    client.finish_call(call5, 5)
+    time.sleep(0.01)
 
-        # Call with missing/NULL attributes
-        call6 = client.create_call(my_op, {"x": 6}, attributes={})
-        client.finish_call(call6, 6)
+    # Call with missing/NULL attributes
+    call6 = client.create_call(my_op, {"x": 6}, attributes={})
+    client.finish_call(call6, 6)
+    client.flush()
 
     # Test Case 1: Multiple order fields with costs
     sort_by = [
