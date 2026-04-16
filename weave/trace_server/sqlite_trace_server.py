@@ -90,6 +90,12 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelDispatcher,
 )
 
+# Python 3.12 deprecated the default datetime adapters/converters in sqlite3.
+# See: https://docs.python.org/3.12/library/sqlite3.html#default-adapters-and-converters-deprecated
+# Register explicit adapters to suppress DeprecationWarning.
+sqlite3.register_adapter(datetime.date, lambda d: d.isoformat())
+sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat(sep=" "))
+
 MAX_REFS_BATCH_SIZE = 1000
 MAX_OTEL_ERROR_MESSAGES = 20
 

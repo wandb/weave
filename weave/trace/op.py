@@ -393,7 +393,7 @@ def is_tracing_setting_disabled() -> bool:
     if settings.should_disable_weave():
         return True
     if weave_client_context.get_weave_client() is None:
-        log_once(logger.warn, UNINITIALIZED_MSG)
+        log_once(logger.warning, UNINITIALIZED_MSG)
         return True
     if not get_tracing_enabled():
         return True
