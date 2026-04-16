@@ -57,8 +57,6 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
-    CHAT_VIEW_COLS,
-    SPANS_LIST_COLS,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
@@ -85,10 +83,8 @@ logger = logging.getLogger(__name__)
 #: Signature of the server's ``_query`` method — takes (sql, params), returns QueryResult.
 QueryFn = Callable[[str, dict[str, Any]], "QueryResult"]
 
-# Backwards-compatible aliases for existing tests that import the column lists
-# by their old underscore-prefixed names.
-_SPANS_LIST_COLS = SPANS_LIST_COLS
-_CHAT_VIEW_COLS = CHAT_VIEW_COLS
+# Maximum number of traces to render in the multi-turn conversation chat view.
+MAX_CONVERSATION_CHAT_TURNS = 50
 
 
 def _rows_as_dicts(result: Any) -> list[dict[str, Any]]:
@@ -428,11 +424,9 @@ class AgentWriteHandler:
             span = AgentSpanSchema.model_construct(**normalize_span_row(r))
             spans_by_trace.setdefault(span.trace_id, []).append(span)
 
-        # Cap to most recent 50 traces
-        max_chat_traces = 50
         trace_ids = list(spans_by_trace.keys())
-        if len(trace_ids) > max_chat_traces:
-            trace_ids = trace_ids[-max_chat_traces:]
+        if len(trace_ids) > MAX_CONVERSATION_CHAT_TURNS:
+            trace_ids = trace_ids[-MAX_CONVERSATION_CHAT_TURNS:]
 
         # Build chat for each trace (turn)
         turns = []

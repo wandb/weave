@@ -77,6 +77,8 @@ from weave.trace_server.agent_types import (
     AgentTracesQueryRes,
     AgentVersionsQueryReq,
     AgentVersionsQueryRes,
+    GenAIOTelExportReq,
+    GenAIOTelExportRes,
 )
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
@@ -6455,7 +6457,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> AgentConversationChatRes:
         return AgentWriteHandler(self.ch_client, self._query).conversation_chat(req)
 
-    def genai_otel_export(self, req: Any) -> Any:
+    def genai_otel_export(
+        self, req: GenAIOTelExportReq
+    ) -> GenAIOTelExportRes:
         return AgentWriteHandler(self.ch_client, self._query).otel_export(req)
 
     # Private Methods

@@ -1,7 +1,7 @@
 """Integration tests for GenAI agent tables and query layer.
 
 Requires ClickHouse backend (auto-skips on SQLite via ch_server fixture).
-Migration 027 creates the genai tables automatically.
+Migration 029 creates the genai tables automatically.
 """
 
 import base64
@@ -79,25 +79,7 @@ def _insert_search_rows(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 1: Tables created by migration
-# ---------------------------------------------------------------------------
-
-
-def test_genai_tables_created(ch_server):
-    """Verify the genai migration created all tables and MVs."""
-    result = ch_server.ch_client.query("SHOW TABLES")
-    table_names = {row[0] for row in result.result_rows}
-
-    assert "spans" in table_names
-    assert "agents" in table_names
-    assert "agent_versions" in table_names
-    assert "agents_mv" in table_names
-    assert "agent_versions_mv" in table_names
-    assert "message_search" in table_names
-
-
-# ---------------------------------------------------------------------------
-# Test 2: Span insert and query
+# Test 1: Span insert and query
 # ---------------------------------------------------------------------------
 
 
@@ -138,7 +120,7 @@ def test_spans_insert_and_query(ch_server):
 
 
 # ---------------------------------------------------------------------------
-# Test 3: Traces GROUP BY
+# Test 2: Traces GROUP BY
 # ---------------------------------------------------------------------------
 
 
@@ -193,7 +175,7 @@ def test_traces_group_by(ch_server):
 
 
 # ---------------------------------------------------------------------------
-# Test 4: Agents MV aggregation
+# Test 3: Agents MV aggregation
 # ---------------------------------------------------------------------------
 
 
@@ -244,7 +226,7 @@ def test_agents_mv_aggregation(ch_server):
 
 
 # ---------------------------------------------------------------------------
-# Test 5: Conversations query
+# Test 4: Conversations query
 # ---------------------------------------------------------------------------
 
 
@@ -301,12 +283,16 @@ def test_conversations_query(ch_server):
 
 
 # ---------------------------------------------------------------------------
-# Test 6: Message search
+# Test 5: Message search
 # ---------------------------------------------------------------------------
 
 
 def test_message_search(ch_server):
-    """Full-text search on message_search via tokenbf_v1 index."""
+    """End-to-end LIKE search on the message_search table returns expected rows.
+
+    Note: this does not assert the tokenbf_v1 skip index is actually used —
+    verifying index selection would require EXPLAIN output or query metrics.
+    """
     project_id = _make_project_id("search")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 

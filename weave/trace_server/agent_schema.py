@@ -1,22 +1,13 @@
 """ClickHouse schema and column definitions for the spans table.
 
-Convention strategy — Weave GenAI semantic conventions:
-
-This module defines a schema that overlaps with, and recognizes, the OTel GenAI
-semantic conventions (https://opentelemetry.io/docs/specs/semconv/gen-ai/) while
-maintaining Weave-specific extensions for product features not covered by the
-standard.  The OTel GenAI semconv is "Development" status (unstable) as of
-April 2026, so having our own convention layer gives us control over the schema
-while staying compatible with the standard as it evolves.
-
 Columns use neutral names (e.g. ``input_tokens``, not ``gen_ai_usage_input_tokens``)
-and are populated from multiple attribute sources via fallback chains:
+and are populated from OTel attributes during ingest.
 
-1. OTel GenAI Semantic Conventions (``gen_ai.*``) — preferred source
-2. Vendor-specific attributes (``agent.*``, ``llm.*``, ``gcp.*``) — fallbacks
-3. Weave extensions (``weave.*``) — product-specific features
-
-See ``opentelemetry/genai_extraction.py`` for the extraction logic.
+For the canonical catalog of which attributes feed which columns — and for the
+``weave.*`` / ``gen_ai.*`` alias resolution — see ``semconv.py``. That module
+is the source of truth; this module is just the ClickHouse row shape. The
+extraction logic that applies those conventions lives in
+``opentelemetry/genai_extraction.py``.
 """
 
 import datetime
