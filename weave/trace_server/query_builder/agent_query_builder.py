@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from weave.trace_server.agent_types import AgentCustomAttrFilter, AgentSortBy
 from weave.trace_server.orm import ParamBuilder
 
 # ---------------------------------------------------------------------------
@@ -58,21 +59,23 @@ _ATTR_OPS: dict[str, str] = {
 
 
 def build_order_by(
-    sort_by: list[Any] | None,
+    sort_by: list[AgentSortBy] | None,
     allowed: frozenset[str],
     default: str,
+    column_exprs: dict[str, str] | None = None,
 ) -> str:
-    """Build a safe ORDER BY clause, rejecting unknown columns."""
+    """Build a safe ORDER BY clause, rejecting unknown columns.
+
+    If column_exprs is provided, the column name is mapped to the given SQL
+    expression (e.g. {"provider_name": "arrayElement(provider_names, 1)"}).
+    """
     if not sort_by:
         return default
     parts: list[str] = []
     for s in sort_by:
-        col = s.field if hasattr(s, "field") else s.get("field", "")
-        direction = (
-            s.direction if hasattr(s, "direction") else s.get("direction", "desc")
-        )
-        if col in allowed and direction in {"asc", "desc"}:
-            parts.append(f"{col} {direction}")
+        if s.field in allowed and s.direction in {"asc", "desc"}:
+            expr = column_exprs.get(s.field, s.field) if column_exprs else s.field
+            parts.append(f"{expr} {s.direction}")
     return ", ".join(parts) if parts else default
 
 
@@ -114,7 +117,7 @@ def add_span_filters(
 def add_custom_attr_filters(
     conditions: list[str],
     pb: ParamBuilder,
-    custom_filters: list[Any] | None,
+    custom_filters: list[AgentCustomAttrFilter] | None,
     *,
     table_alias: str = "s",
 ) -> None:
@@ -122,13 +125,9 @@ def add_custom_attr_filters(
     if not custom_filters:
         return
     for cf in custom_filters:
-        attr_key = cf.attr_key if hasattr(cf, "attr_key") else cf.get("attr_key", "")
-        value = cf.value if hasattr(cf, "value") else cf.get("value", "")
-        operator = cf.operator if hasattr(cf, "operator") else cf.get("operator", "eq")
-
-        op = _ATTR_OPS.get(operator, "=")
-        key_slot = pb.add(str(attr_key), param_type="String")
-        val_slot = pb.add(str(value), param_type="String")
+        op = _ATTR_OPS.get(cf.operator, "=")
+        key_slot = pb.add(str(cf.attr_key), param_type="String")
+        val_slot = pb.add(str(cf.value), param_type="String")
         conditions.append(f"{table_alias}.custom_attrs[{key_slot}] {op} {val_slot}")
 
 
