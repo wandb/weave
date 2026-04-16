@@ -100,9 +100,9 @@ function resolveGenAiProviderName(provider: string): string {
   }
 }
 
-/** Narrows a PiAgentMessage to PiAssistantMessage, or returns undefined. */
-function asAssistant(msg: PiAgentMessage): PiAssistantMessage | undefined {
-  return msg.role === 'assistant' ? (msg as PiAssistantMessage) : undefined;
+/** Type assertion: narrows a PiAgentMessage to PiAssistantMessage. */
+function isAssistant(msg: PiAgentMessage): msg is PiAssistantMessage {
+  return msg.role === 'assistant';
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +136,12 @@ export class PiCodingAgentOtelAdapter {
 
   // Conversation ID for the session — set once in onSessionStart, attached to every span
   private conversationId: string | null = null;
+
+  // Accumulated usage across all turns within the current invoke_agent cycle
+  private agentInputTokens = 0;
+  private agentOutputTokens = 0;
+  private agentTotalTokens = 0;
+  private agentCostUsd = 0;
 
   constructor(opts: OtelExtensionOptions = {}) {
     this.tracer = opts.tracer ?? trace.getTracer('pi-coding-agent-weave-ext');
@@ -229,6 +235,10 @@ export class PiCodingAgentOtelAdapter {
       this.sessionCtx
     );
     this.invokeAgentCtx = trace.setSpan(this.sessionCtx, this.invokeAgentSpan);
+    this.agentInputTokens = 0;
+    this.agentOutputTokens = 0;
+    this.agentTotalTokens = 0;
+    this.agentCostUsd = 0;
 
     if (this.captureContent) {
       if (event.systemPrompt) {
@@ -288,10 +298,10 @@ export class PiCodingAgentOtelAdapter {
     const systemMessages = event.messages.filter(m => m.role === 'system');
     if (systemMessages.length === 0) return;
     this.chatSpan.addEvent(
-      'gen_ai.system.message',
+      GEN_AI_EVENT.SYSTEM_MESSAGE,
       this.captureContent
         ? {
-            'gen_ai.event.content': JSON.stringify(
+            [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify(
               systemMessages.map(m => ({role: 'system', content: m.content}))
             ),
           }
@@ -303,15 +313,14 @@ export class PiCodingAgentOtelAdapter {
     event: Extract<PiExtensionEvent, {type: 'message_end'}>
   ): void => {
     if (!this.chatSpan) return;
-    const msg = asAssistant(event.message);
-    if (!msg) return;
+    if (!isAssistant(event.message)) return;
     this.chatSpan.addEvent(
-      'gen_ai.assistant.message',
+      GEN_AI_EVENT.ASSISTANT_MESSAGE,
       this.captureContent
         ? {
-            'gen_ai.event.content': JSON.stringify({
+            [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
               role: 'assistant',
-              content: msg.content,
+              content: event.message.content,
             }),
           }
         : {}
@@ -321,18 +330,25 @@ export class PiCodingAgentOtelAdapter {
   private onTurnEnd = (
     event: Extract<PiExtensionEvent, {type: 'turn_end'}>
   ): void => {
-    const msg = asAssistant(event.message);
-    if (msg && this.chatSpan) {
-      this.chatSpan.setAttributes({
-        [ATTR.GEN_AI_RESPONSE_MODEL]: msg.model,
-        [ATTR.GEN_AI_RESPONSE_FINISH_REASONS]: [msg.stopReason],
-        [ATTR.GEN_AI_USAGE_INPUT_TOKENS]: msg.usage.input,
-        [ATTR.GEN_AI_USAGE_OUTPUT_TOKENS]: msg.usage.output,
-        [ATTR.GEN_AI_USAGE_TOTAL_TOKENS]: msg.usage.totalTokens,
-        [ATTR.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: msg.usage.cacheRead,
-        [ATTR.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: msg.usage.cacheWrite,
-        [ATTR.PI_USAGE_COST_USD]: msg.usage.cost.total,
-      });
+    if (isAssistant(event.message)) {
+      const {usage} = event.message;
+      this.agentInputTokens += usage.input;
+      this.agentOutputTokens += usage.output;
+      this.agentTotalTokens += usage.totalTokens;
+      this.agentCostUsd += usage.cost.total;
+
+      if (this.chatSpan) {
+        this.chatSpan.setAttributes({
+          [ATTR.GEN_AI_RESPONSE_MODEL]: event.message.model,
+          [ATTR.GEN_AI_RESPONSE_FINISH_REASONS]: [event.message.stopReason],
+          [ATTR.GEN_AI_USAGE_INPUT_TOKENS]: usage.input,
+          [ATTR.GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output,
+          [ATTR.GEN_AI_USAGE_TOTAL_TOKENS]: usage.totalTokens,
+          [ATTR.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.cacheRead,
+          [ATTR.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: usage.cacheWrite,
+          [ATTR.PI_USAGE_COST_USD]: usage.cost.total,
+        });
+      }
     }
     this.endChatSpan();
   };
@@ -380,6 +396,12 @@ export class PiCodingAgentOtelAdapter {
     }
     this.toolSpans.clear();
     if (this.invokeAgentSpan) {
+      this.invokeAgentSpan.setAttributes({
+        [ATTR.GEN_AI_USAGE_INPUT_TOKENS]: this.agentInputTokens,
+        [ATTR.GEN_AI_USAGE_OUTPUT_TOKENS]: this.agentOutputTokens,
+        [ATTR.GEN_AI_USAGE_TOTAL_TOKENS]: this.agentTotalTokens,
+        [ATTR.PI_USAGE_COST_USD]: this.agentCostUsd,
+      });
       this.invokeAgentSpan.end();
       this.invokeAgentSpan = null;
       this.invokeAgentCtx = ROOT_CONTEXT;
