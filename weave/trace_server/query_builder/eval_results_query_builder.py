@@ -12,13 +12,15 @@ Generates ClickHouse CTEs for the eval_results CTE chain:
 from functools import partial
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.calls_query_builder.utils import (
+    json_dump_field_as_sql,
+    param_slot,
+)
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import (
     ParamBuilder,
     _process_query_to_conditions,
-    quote_json_path_parts,
     split_escaped_field_path,
 )
 
@@ -135,53 +137,61 @@ def _string_param(pb: ParamBuilder, value: str) -> str:
     return param_slot(pb.add_param(value), "String")
 
 
-def resolve_eval_field_to_sql(
+def _build_json_field_inner(
     field_path: str,
     pb: ParamBuilder,
     evaluation_call_id: str | None = None,
 ) -> tuple[str, set[str]]:
-    """Translate an eval_results field path to an aggregated ClickHouse SQL expression.
+    """Per-row SQL for an eval field (String-typed, no aggregate).
 
-    Used as a field_resolver callback for _process_query_to_conditions and
-    for building ORDER BY expressions. Results include aggregate functions
-    (avg, any) so they work in HAVING/ORDER BY after GROUP BY row_digest.
+    If evaluation_call_id is set, wraps the extract with CASE WHEN to scope
+    it to a single eval; aggregation is the caller's responsibility (filter
+    wraps with any(), sort wraps with avg(toFloat64OrNull(...)) for scores
+    or any() otherwise).
 
     Returns:
-        (sql_expression, set of physical columns used)
+        (per_row_sql_expression, set of physical columns used)
     """
     if field_path == "row_digest":
         return "row_digest", {"inputs_dump"}
 
     if field_path.startswith("inputs."):
-        remaining = field_path[len("inputs.") :]
-        parts = split_escaped_field_path(remaining)
-        path = _string_param(pb, quote_json_path_parts(parts))
-        inner = f"nullIf(JSON_VALUE(resolved_inputs, {path}), 'null')"
-        inner = _wrap_with_eval_scope(inner, evaluation_call_id, pb)
-        return f"any({inner})", {"inputs_dump"}
+        extra = split_escaped_field_path(field_path[len("inputs.") :])
+        inner = json_dump_field_as_sql(pb, "", "resolved_inputs", extra)
+        cols = {"inputs_dump"}
+    elif field_path.startswith("output."):
+        extra = split_escaped_field_path(field_path[len("output.") :])
+        inner = json_dump_field_as_sql(pb, "", "output_dump", extra)
+        cols = {"output_dump"}
+    elif field_path.startswith("scores."):
+        extra = ["scores"] + split_escaped_field_path(field_path[len("scores.") :])
+        raw = json_dump_field_as_sql(pb, "", "output_dump", extra)
+        inner = f"multiIf({raw} = 'true', '1', {raw} = 'false', '0', {raw})"
+        cols = {"output_dump"}
+    else:
+        raise InvalidRequest(
+            f"Unsupported eval results field: '{field_path}'. "
+            f"Supported prefixes: scores.*, inputs.*, output.*, row_digest."
+        )
 
-    if field_path.startswith("output."):
-        remaining = field_path[len("output.") :]
-        parts = split_escaped_field_path(remaining)
-        path = _string_param(pb, quote_json_path_parts(parts))
-        inner = f"nullIf(JSON_VALUE(output_dump, {path}), 'null')"
-        inner = _wrap_with_eval_scope(inner, evaluation_call_id, pb)
-        return f"any({inner})", {"output_dump"}
+    inner = _wrap_with_eval_scope(inner, evaluation_call_id, pb)
+    return inner, cols
 
-    if field_path.startswith("scores."):
-        remaining = field_path[len("scores.") :]
-        parts = ["scores"] + split_escaped_field_path(remaining)
-        path = _string_param(pb, quote_json_path_parts(parts))
-        raw = f"nullIf(JSON_VALUE(output_dump, {path}), 'null')"
-        # coerce json booleans ('true'/'false') to numeric before avg
-        coerced = f"multiIf({raw} = 'true', '1', {raw} = 'false', '0', {raw})"
-        coerced = _wrap_with_eval_scope(coerced, evaluation_call_id, pb)
-        return f"avg(toFloat64OrNull({coerced}))", {"output_dump"}
 
-    raise InvalidRequest(
-        f"Unsupported eval results field: '{field_path}'. "
-        f"Supported prefixes: scores.*, inputs.*, output.*, row_digest."
-    )
+def resolve_eval_field_to_sql(
+    field_path: str,
+    pb: ParamBuilder,
+    evaluation_call_id: str | None = None,
+) -> tuple[str, set[str]]:
+    """Filter-path field resolver: wraps per-row expression in any().
+
+    Returns:
+        (sql_expression, set of physical columns used)
+    """
+    inner, cols = _build_json_field_inner(field_path, pb, evaluation_call_id)
+    if field_path == "row_digest":
+        return inner, cols
+    return f"any({inner})", cols
 
 
 def _wrap_with_eval_scope(
@@ -194,6 +204,16 @@ def _wrap_with_eval_scope(
         return inner_sql
     id_slot = _string_param(pb, evaluation_call_id)
     return f"CASE WHEN eval_call_id = {id_slot} THEN {inner_sql} ELSE NULL END"
+
+
+def _score_sort_numeric(inner_sql: str) -> str:
+    """Numeric avg applied to a pre-coerced scores per-row String expression.
+
+    The bool coercion lives inside _build_json_field_inner; this only adds the
+    toFloat64OrNull + avg wrapping that the sort path needs. Can't live inside
+    the field resolver because ClickHouse rejects nested aggregates.
+    """
+    return f"avg(toFloat64OrNull({inner_sql}))"
 
 
 def _make_field_resolver(
@@ -222,13 +242,29 @@ def build_sort_expression(
         if s.mode == "difference" and len(eval_root_ids) > 1:
             expr = _build_difference_sort(s.field, eval_root_ids, pb)
         else:
-            expr, _ = resolve_eval_field_to_sql(
-                s.field, pb, evaluation_call_id=s.evaluation_call_id
-            )
+            expr = _build_sort_aggregate(s.field, pb, s.evaluation_call_id)
         parts.append(f"{expr} {direction}")
 
     parts.append("row_digest ASC")
     return ", ".join(parts)
+
+
+def _build_sort_aggregate(
+    field_path: str,
+    pb: ParamBuilder,
+    evaluation_call_id: str | None,
+) -> str:
+    """Build the per-field sort expression, applying the right aggregate.
+
+    Scores get numeric avg (with bool coercion); other fields get any().
+    row_digest is used bare (it's the GROUP BY key).
+    """
+    inner, _ = _build_json_field_inner(field_path, pb, evaluation_call_id)
+    if field_path == "row_digest":
+        return inner
+    if field_path.startswith("scores."):
+        return _score_sort_numeric(inner)
+    return f"any({inner})"
 
 
 def _build_difference_sort(
@@ -239,8 +275,7 @@ def _build_difference_sort(
     """Build greatest(...) - least(...) expression for difference mode sorting."""
     per_eval_exprs: list[str] = []
     for eval_id in eval_root_ids:
-        expr, _ = resolve_eval_field_to_sql(field_path, pb, evaluation_call_id=eval_id)
-        per_eval_exprs.append(expr)
+        per_eval_exprs.append(_build_sort_aggregate(field_path, pb, eval_id))
     joined = ", ".join(per_eval_exprs)
     return f"greatest({joined}) - least({joined})"
 
