@@ -1351,7 +1351,8 @@ class SQLPatterns:
     MATERIALIZE: Pattern = re.compile(r"\bMATERIALIZE\b", re.IGNORECASE)
     INSERT_STMT: Pattern = re.compile(r"\bINSERT\s+INTO\b", re.IGNORECASE)
     LOCAL_ONLY_OPS: Pattern = re.compile(
-        r"\b(ADD|DROP)\s+INDEX\b|\b(DELETE|UPDATE)\b", re.IGNORECASE
+        r"\b(ADD|DROP)\s+INDEX\b|\b(DELETE|UPDATE)\b|\b(MODIFY|REMOVE)\s+TTL\b",
+        re.IGNORECASE,
     )
 
     # Table name extraction patterns
