@@ -26,4 +26,3 @@ pyrightconfig.json
 .coverage/
 coverage.xml
 htmlcov/
-.fixit/
