@@ -1,7 +1,7 @@
 """Scenario-focused tests for weave.trace_server.ttl_settings."""
 
 import datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 
@@ -94,9 +94,12 @@ def test_get_project_retention_days_l1_cache():
     assert first == 90
     assert second == 90
     assert ch_client.query.call_count == 1
-    query_arg = ch_client.query.call_args[0][0]
-    assert "argMax(retention_days, updated_at)" in query_arg
-    assert "FINAL" not in query_arg
+    assert ch_client.query.call_args == call(
+        "SELECT argMax(retention_days, updated_at) "
+        "FROM project_ttl_settings "
+        "WHERE project_id = {project_id:String}",
+        parameters={"project_id": "entity/project"},
+    )
 
     # Different project with no rows → 0 (no TTL configured)
     ch_empty = _make_ch_client([])
