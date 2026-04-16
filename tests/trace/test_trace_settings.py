@@ -347,12 +347,11 @@ def test_retry_max_attempts_env(caplog) -> None:
 def test_retry_max_interval_settings(client_creator, caplog, monkeypatch) -> None:
     caplog.set_level(logging.INFO, logger="weave.utils.retry")
 
-    original_wait = tenacity.wait_exponential_jitter
     call_args = []
 
     def mock_wait_exponential_jitter(initial=0, max=None):
         call_args.append(max)
-        return original_wait(initial=initial, max=max)
+        return tenacity.wait_none()
 
     monkeypatch.setattr(
         tenacity, "wait_exponential_jitter", mock_wait_exponential_jitter

@@ -249,7 +249,7 @@ class EasyPrompt(UserList, Prompt):
         else:
             raise TypeError(f"Cannot append {item} of type {type(item)} to Prompt")
 
-    def __iadd__(self, item: Any) -> "Prompt":
+    def __iadd__(self, item: Any) -> Self:
         self.append(item)
         return self
 

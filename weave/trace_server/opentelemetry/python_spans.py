@@ -322,6 +322,8 @@ class Span:
             prompt_tokens=usage.get("prompt_tokens"),
             total_tokens=usage.get("total_tokens"),
             requests=usage.get("requests"),
+            cache_creation_input_tokens=usage.get("cache_creation_input_tokens"),
+            cache_read_input_tokens=usage.get("cache_read_input_tokens"),
         )
 
         # Read the model name from attributes to load cost info

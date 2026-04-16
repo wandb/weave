@@ -114,7 +114,7 @@ class WeaveTrustScorerV1(weave.Scorer):
     device: str = Field(
         default="cpu",
         description="Device for model inference ('cpu', 'cuda', 'mps', 'auto')",
-        from_default=True,
+        json_schema_extra={"from_default": True},
     )
     context_relevance_model_name_or_path: str = Field(
         default="",
@@ -177,9 +177,9 @@ class WeaveTrustScorerV1(weave.Scorer):
         )
     )
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         """Initialize scorers after model validation."""
-        super().model_post_init(__context)
+        super().model_post_init(context)
         self._load_scorers()
 
     def _load_scorers(self) -> None:

@@ -10,10 +10,7 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_schema import (
-    CallEndCHInsertable,
-    CallStartCHInsertable,
-)
+from weave.trace_server.errors import NotFoundError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -75,7 +72,7 @@ def test_clickhouse_storage_size_query_generation():
 
 
 def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
-    trace_server,
+    ch_server,
 ):
     """Filter with thread_ids=[] against real ClickHouse: query runs and returns 0 rows.
 
@@ -83,16 +80,12 @@ def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
     server. The query builder emits thread_id IN ([]) which ClickHouse accepts and
     returns no rows. Skips when trace_server is SQLite.
     """
-    server = trace_server._internal_trace_server
-    if not isinstance(server, chts.ClickHouseTraceServer):
-        pytest.skip("ClickHouse-only test: run with --trace-server=clickhouse")
-
     req = tsi.CallsQueryReq(
         project_id="test_project",
         filter=tsi.CallsFilter(thread_ids=[]),
         limit=100,
     )
-    result = list(server.calls_query_stream(req))
+    result = list(ch_server.calls_query_stream(req))
 
     # Empty thread_ids -> IN [] -> no rows from ClickHouse
     assert result == []
@@ -125,7 +118,7 @@ def test_clickhouse_storage_size_schema_conversion():
     }
 
     # Test ClickHouse conversion
-    ch_schema = chts._ch_call_dict_to_call_schema_dict(test_data)
+    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] == 1000
     assert ch_schema["total_storage_size_bytes"] == 2000
 
@@ -157,7 +150,7 @@ def test_clickhouse_storage_size_null_handling():
     }
 
     # Test ClickHouse conversion
-    ch_schema = chts._ch_call_dict_to_call_schema_dict(test_data)
+    ch_schema = chts.ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] is None
     assert ch_schema["total_storage_size_bytes"] is None
 
@@ -387,7 +380,12 @@ def test_completions_create_stream_custom_provider_with_tracking():
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+        ) as mock_update_end,
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
@@ -468,13 +466,12 @@ def test_completions_create_stream_custom_provider_with_tracking():
         assert chunks[2]["choices"][0]["finish_reason"] == "stop"
         assert "usage" in chunks[2]
 
-        # Verify call tracking
-        assert mock_insert_call.call_count == 2  # Start and end calls
-        start_call = mock_insert_call.call_args_list[0][0][0]
-        end_call = mock_insert_call.call_args_list[1][0][0]
+        # Verify call tracking via calls_complete (empty project → CALLS_COMPLETE)
+        mock_insert_complete.assert_called_once()
+        mock_update_end.assert_called_once()
+        start_call = mock_insert_complete.call_args[0][0]
         assert start_call.project_id == "dGVzdF9wcm9qZWN0"
-        assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-        assert end_call.id == start_call.id
+        assert start_call.ended_at is None
 
         # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()
@@ -560,7 +557,12 @@ def test_completions_create_stream_multiple_choices():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+        ) as mock_update_end,
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
@@ -599,36 +601,24 @@ def test_completions_create_stream_multiple_choices():
         assert chunks[3]["choices"][0]["finish_reason"] == "stop"
         assert chunks[3]["choices"][1]["finish_reason"] == "stop"
 
-        # Verify call tracking - should have 1 start call + 1 end call = 2 total
-        assert mock_insert_call.call_count == 2
-
-        # Get all the calls
-        call_args = [call[0][0] for call in mock_insert_call.call_args_list]
-        start_calls = [
-            call for call in call_args if isinstance(call, CallStartCHInsertable)
-        ]
-        end_calls = [
-            call for call in call_args if isinstance(call, CallEndCHInsertable)
-        ]
-
-        # Should have 1 start call and 1 end call
-        assert len(start_calls) == 1
-        assert len(end_calls) == 1
+        # Verify call tracking via calls_complete (empty project → CALLS_COMPLETE)
+        mock_insert_complete.assert_called_once()
+        mock_update_end.assert_called_once()
 
         # Verify start call
-        start_call = start_calls[0]
+        start_call = mock_insert_complete.call_args[0][0]
         assert start_call.project_id == "dGVzdF9wcm9qZWN0"
         start_call_inputs = json.loads(start_call.inputs_dump)
         assert start_call_inputs["model"] == "gpt-3.5-turbo"
         assert start_call_inputs["n"] == 2
-        assert "choice_index" not in start_call_inputs  # Should not have choice_index
+        assert "choice_index" not in start_call_inputs
 
         # Verify end call has correct output with BOTH choices
-        end_call = end_calls[0]
+        end_call = mock_update_end.call_args[0][0]
         assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-        end_call_output = json.loads(end_call.output_dump)
+        end_call_output = end_call.output
         assert "choices" in end_call_output
-        assert len(end_call_output["choices"]) == 2  # Should have both choices
+        assert len(end_call_output["choices"]) == 2
 
         # Verify both choices are accumulated correctly
         choices = end_call_output["choices"]
@@ -642,9 +632,6 @@ def test_completions_create_stream_multiple_choices():
         choice_1 = next(c for c in choices if c["index"] == 1)
         assert choice_1["message"]["content"] == "Hi friend!"
         assert choice_1["finish_reason"] == "stop"
-
-        # Verify call IDs match between start and end calls
-        assert start_call.id == end_call.id
 
         # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()
@@ -699,7 +686,12 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
+        ) as mock_update_end,
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
@@ -727,49 +719,34 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         # Verify streaming functionality - should maintain legacy format
         assert len(chunks) == 3  # Meta chunk + 2 content chunks
         assert "_meta" in chunks[0]
-        assert "weave_call_id" in chunks[0]["_meta"]  # Legacy format for n=1
-        assert "weave_call_ids" not in chunks[0]["_meta"]  # Should not have new format
+        assert "weave_call_id" in chunks[0]["_meta"]
+        assert "weave_call_ids" not in chunks[0]["_meta"]
 
         # Verify content
         assert chunks[1]["choices"][0]["delta"]["content"] == "Hello world!"
         assert chunks[2]["choices"][0]["finish_reason"] == "stop"
 
-        # Verify call tracking - should have 1 start call + 1 end call = 2 total
-        assert mock_insert_call.call_count == 2
-
-        # Get all the calls
-        call_args = [call[0][0] for call in mock_insert_call.call_args_list]
-        start_calls = [
-            call for call in call_args if isinstance(call, CallStartCHInsertable)
-        ]
-        end_calls = [
-            call for call in call_args if isinstance(call, CallEndCHInsertable)
-        ]
-
-        # Should have 1 start call and 1 end call
-        assert len(start_calls) == 1
-        assert len(end_calls) == 1
+        # Verify call tracking via calls_complete (empty project → CALLS_COMPLETE)
+        mock_insert_complete.assert_called_once()
+        mock_update_end.assert_called_once()
 
         # Verify start call
-        start_call = start_calls[0]
+        start_call = mock_insert_complete.call_args[0][0]
         assert start_call.project_id == "dGVzdF9wcm9qZWN0"
         start_call_inputs = json.loads(start_call.inputs_dump)
         assert start_call_inputs["model"] == "gpt-3.5-turbo"
         assert start_call_inputs["n"] == 1
-        assert "choice_index" not in start_call_inputs  # Should not have choice_index
+        assert "choice_index" not in start_call_inputs
 
         # Verify end call has correct output
-        end_call = end_calls[0]
+        end_call = mock_update_end.call_args[0][0]
         assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-        end_call_output = json.loads(end_call.output_dump)
+        end_call_output = end_call.output
         assert "choices" in end_call_output
         assert len(end_call_output["choices"]) == 1
         choice = end_call_output["choices"][0]
         assert choice["index"] == 0
         assert choice["message"]["content"] == "Hello world!"
-
-        # Verify call IDs match between start and end calls
-        assert start_call.id == end_call.id
 
         # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()
@@ -956,6 +933,36 @@ def test_insert_retries_empty_query_error():
 
         assert result == mock_summary
         assert mock_ch_client.insert.call_count == 2  # Retried once
+
+
+def test_ensure_obj_version_exists_retries_eventual_consistency():
+    """Object-version existence checks should tolerate transient read-after-write misses."""
+    server = chts.ClickHouseTraceServer(host="test_host")
+
+    # Transient miss: the first lookup doesn't see the row yet, but the retry does.
+    with patch.object(server, "_query") as mock_query:
+        mock_query.side_effect = [
+            MagicMock(result_rows=[]),
+            MagicMock(result_rows=[(1,)]),
+        ]
+
+        server._ensure_obj_version_exists("test_project", "test_object", "digest-1")
+
+        assert mock_query.call_count == 2
+
+    # Real miss: after exhausting retries, the original NotFoundError still surfaces.
+    with patch.object(
+        server,
+        "_query",
+        return_value=MagicMock(result_rows=[]),
+    ) as mock_query:
+        with pytest.raises(
+            NotFoundError,
+            match="Object version test_object:digest-1 not found",
+        ):
+            server._ensure_obj_version_exists("test_project", "test_object", "digest-1")
+
+        assert mock_query.call_count == chts.OBJ_READ_RETRY_ATTEMPTS
 
 
 @pytest.mark.disable_logging_error_check
@@ -1157,3 +1164,79 @@ def test_file_batch_clears_on_insert_failure():
             f"Memory leak: _file_batch retained {len(server._file_batch)} items "
             f"after failed insert. Batch should be cleared on any exception."
         )
+
+
+# ── version_index ordering with MV-backed _first_created_at ─────────
+
+
+def _make_project_id(prefix: str) -> str:
+    raw = f"test/{prefix}_{uuid.uuid4().hex[:8]}"
+    return base64.b64encode(raw.encode()).decode()
+
+
+def _obj_create(server, project_id, obj_id, val):
+    return server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(project_id=project_id, object_id=obj_id, val=val)
+        )
+    )
+
+
+def _objs_query(server, project_id, obj_id):
+    return server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(object_ids=[obj_id]),
+        )
+    ).objs
+
+
+def test_version_index_stable_on_republish(ch_server):
+    """Republishing old content should not shift version indices.
+
+    This verifies that the MV-backed _first_created_at anchors each digest
+    to its original creation time, so re-inserting digest A doesn't push
+    it to the end of the version ordering.
+    """
+    project_id = _make_project_id("vidx")
+    obj_id = "vidx_obj"
+
+    r0 = _obj_create(ch_server, project_id, obj_id, {"v": "A"})
+    r1 = _obj_create(ch_server, project_id, obj_id, {"v": "B"})
+    r2 = _obj_create(ch_server, project_id, obj_id, {"v": "C"})
+
+    # Re-publish A — inserts a duplicate row, but _first_created_at
+    # from the MV should still return A's original timestamp
+    _obj_create(ch_server, project_id, obj_id, {"v": "A"})
+
+    objs = _objs_query(ch_server, project_id, obj_id)
+    assert len(objs) == 3
+
+    by_digest = {o.digest: o for o in objs}
+    assert by_digest[r0.digest].version_index == 0
+    assert by_digest[r1.digest].version_index == 1
+    assert by_digest[r2.digest].version_index == 2
+
+
+def test_delete_preserves_version_index_gaps(ch_server):
+    """Deleting a version should leave a gap, not shift indices."""
+    project_id = _make_project_id("vidx")
+    obj_id = "vidx_gap"
+
+    digests = []
+    for i in range(3):
+        r = _obj_create(ch_server, project_id, obj_id, {"i": i})
+        digests.append(r.digest)
+
+    ch_server.obj_delete(
+        tsi.ObjDeleteReq(project_id=project_id, object_id=obj_id, digests=[digests[1]])
+    )
+
+    non_deleted = [
+        o for o in _objs_query(ch_server, project_id, obj_id) if o.deleted_at is None
+    ]
+    assert len(non_deleted) == 2
+
+    by_digest = {o.digest: o for o in non_deleted}
+    assert by_digest[digests[0]].version_index == 0
+    assert by_digest[digests[2]].version_index == 2

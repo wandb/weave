@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 import weave
@@ -8,7 +6,7 @@ from weave import Evaluation
 from weave.trace_server.common_interface import SortBy
 
 
-def test_filter_calls_by_ref_properties(client):
+def test_filter_calls_by_ref_properties(client, no_autoflush):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
@@ -348,7 +346,10 @@ def test_filter_calls_by_ref_properties(client):
     )
 
 
-def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
+@pytest.mark.asyncio
+async def test_filter_calls_by_ref_properties_with_table_rows_simple(
+    client, no_autoflush
+):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
@@ -381,7 +382,8 @@ def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
         dataset=dataset_rows,
         scorers=[score],
     )
-    asyncio.run(evaluation.evaluate(model_predict))
+    await evaluation.evaluate(model_predict)
+    client.flush()
 
     calls = list(
         client.get_calls(

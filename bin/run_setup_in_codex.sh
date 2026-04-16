@@ -308,7 +308,7 @@ main() {
     echo "🚀 Next steps:"
     echo "   • Your development environment is ready to use"
     echo "   • Run tests with: nox -e tests"
-    echo "   • Check code quality with: pre-commit run --all-files"
+    echo "   • Check code quality with: prek run --all-files"
     echo "   • Start developing with Weave!"
     echo ""
     echo "Happy coding! 🎉"

@@ -37,6 +37,8 @@ class TestInsertCosts(unittest.TestCase):
                 "llm_model_1",
                 0.01,
                 0.02,
+                0,
+                0,
                 datetime.strptime("2023-10-01 12:00:00", "%Y-%m-%d %H:%M:%S").replace(
                     tzinfo=timezone.utc
                 ),
@@ -45,6 +47,8 @@ class TestInsertCosts(unittest.TestCase):
                 "llm_model_3",
                 0.02,
                 0.03,
+                0,
+                0,
                 datetime.strptime("2023-10-02 13:30:00", "%Y-%m-%d %H:%M:%S").replace(
                     tzinfo=timezone.utc
                 ),
@@ -66,9 +70,9 @@ class TestInsertCosts(unittest.TestCase):
         mock_file_open.assert_called_once()
         args, kwargs = mock_file_open.call_args
         opened_file_path = args[0]
-        self.assertTrue(opened_file_path.endswith(insert_costs.COST_FILE))
+        assert opened_file_path.endswith(insert_costs.COST_FILE)
         mock_json_load.assert_called_once()
-        self.assertEqual(result, self.sample_costs_json)
+        assert result == self.sample_costs_json
 
     @patch("weave.trace_server.costs.insert_costs.get_current_costs")
     def test_filter_out_current_costs(self, mock_get_current_costs):
@@ -85,7 +89,7 @@ class TestInsertCosts(unittest.TestCase):
 
         # Assertions
         mock_get_current_costs.assert_called_once_with(self.client)
-        self.assertEqual(filtered_costs, expected_filtered_costs)
+        assert filtered_costs == expected_filtered_costs
 
     @patch("weave.trace_server.costs.insert_costs.uuid.uuid4")
     @patch("weave.trace_server.costs.insert_costs.datetime")
@@ -122,6 +126,8 @@ class TestInsertCosts(unittest.TestCase):
                     "USD",
                     cost.get("output", 0),
                     "USD",
+                    cost.get("cache_read_input", 0),
+                    cost.get("cache_creation_input", 0),
                     "system",
                     created_at,
                 )
@@ -142,6 +148,8 @@ class TestInsertCosts(unittest.TestCase):
                 "prompt_token_cost_unit",
                 "completion_token_cost",
                 "completion_token_cost_unit",
+                "cache_read_input_token_cost",
+                "cache_creation_input_token_cost",
                 "created_by",
                 "created_at",
             ],

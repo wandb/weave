@@ -104,12 +104,12 @@ def test_set_view_inside_op(client):
     assert len(views) == 2
     assert views["markdown"] == to_json(
         markdown_view,
-        client._project_id(),
+        client.project_id,
         client,
     )
     assert views["html"] == to_json(
         html_view,
-        client._project_id(),
+        client.project_id,
         client,
     )
 

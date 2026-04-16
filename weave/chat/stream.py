@@ -43,6 +43,6 @@ class ChatCompletionChunkStream:
                     continue
                 try:
                     yield ChatCompletionChunk.model_validate_json(line)
-                except json.JSONDecodeError as e:
+                except json.JSONDecodeError:
                     print(f"Error parsing line as JSON: {line}")
-                    raise e
+                    raise

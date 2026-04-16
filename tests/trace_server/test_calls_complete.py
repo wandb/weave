@@ -304,7 +304,7 @@ def test_calls_complete_routing_by_residence(
     )
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     if read_table == ReadTable.CALLS_MERGED:
         expected_call_ids = {call.id, *merged_call_ids}
@@ -399,7 +399,7 @@ def test_calls_complete_routing_both_residence_state(
     # Verify resolver detects BOTH residence
     resolver = clickhouse_trace_server.table_routing_resolver
     residence = resolver._get_residence(
-        internal_project_id, clickhouse_trace_server.ch_client
+        internal_project_id, clickhouse_trace_server._mint_client
     )
     assert residence == ProjectDataResidence.BOTH, (
         f"Expected BOTH residence, got {residence}"
@@ -409,7 +409,7 @@ def test_calls_complete_routing_both_residence_state(
     # PART 3: Verify read routing in BOTH state
     # =========================================================================
     read_table = resolver.resolve_read_table(
-        internal_project_id, clickhouse_trace_server.ch_client
+        internal_project_id, clickhouse_trace_server._mint_client
     )
     assert read_table == ReadTable.CALLS_COMPLETE, (
         "BOTH residence should route reads to calls_complete"
@@ -428,7 +428,7 @@ def test_calls_complete_routing_both_residence_state(
     # =========================================================================
     # V2 writes should go to calls_complete
     v2_write_target = resolver.resolve_v2_write_target(
-        internal_project_id, clickhouse_trace_server.ch_client
+        internal_project_id, clickhouse_trace_server._mint_client
     )
     assert v2_write_target == WriteTarget.CALLS_COMPLETE, (
         "BOTH residence should route V2 writes to calls_complete"
@@ -515,7 +515,7 @@ def test_calls_complete_routing_both_residence_state(
     # V1 write target should be COMPLETE (signaling error should be raised)
     # because BOTH state has calls_complete data
     v1_write_target = resolver.resolve_v1_write_target(
-        internal_project_id, clickhouse_trace_server.ch_client
+        internal_project_id, clickhouse_trace_server._mint_client
     )
     assert v1_write_target == WriteTarget.CALLS_COMPLETE, (
         "V1 write target should be CALLS_COMPLETE for BOTH state to trigger error"
@@ -760,7 +760,7 @@ def test_call_start_end_v2_writes_calls_complete_for_empty_project(
     # Verify read-side returns the call with correct data
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     expected_call_ids = {call_id}
     calls = _fetch_calls_stream(trace_server, project_id)
@@ -998,7 +998,7 @@ def test_calls_query_routing_by_residence(
 
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     if seed_complete:
         assert read_table == ReadTable.CALLS_COMPLETE
@@ -1139,7 +1139,7 @@ def test_calls_complete_query_with_status_filter(trace_server, clickhouse_trace_
     # Verify we're reading from calls_complete
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     assert read_table == ReadTable.CALLS_COMPLETE
 
@@ -1432,7 +1432,7 @@ def test_project_stats_with_calls_complete(trace_server, clickhouse_trace_server
     # Verify we're reading from calls_complete
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     assert read_table == ReadTable.CALLS_COMPLETE
 
@@ -1518,10 +1518,10 @@ def test_project_stats_uses_correct_stats_table_based_on_residence(
 
     # Verify project residences
     read_table1 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
-        internal_project1_id, clickhouse_trace_server.ch_client
+        internal_project1_id, clickhouse_trace_server._mint_client
     )
     read_table2 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
-        internal_project2_id, clickhouse_trace_server.ch_client
+        internal_project2_id, clickhouse_trace_server._mint_client
     )
 
     assert read_table1 == ReadTable.CALLS_MERGED
@@ -1635,7 +1635,7 @@ def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
     # Verify we're reading from calls_complete
     read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
         internal_project_id,
-        clickhouse_trace_server.ch_client,
+        clickhouse_trace_server._mint_client,
     )
     assert read_table == ReadTable.CALLS_COMPLETE
 
@@ -1814,3 +1814,75 @@ def test_call_start_v2_converts_wb_run_id(trace_server, clickhouse_trace_server)
     started_call = _find_call_by_id(calls, call_id)
     assert started_call is not None
     assert started_call.wb_run_id == ext_run_id
+
+
+def test_feedback_filter_does_not_duplicate_calls_complete(
+    trace_server, clickhouse_trace_server
+):
+    """Regression test: feedback filter on calls_complete must not return duplicate calls.
+
+    On calls_complete there is no GROUP BY, so a feedback LEFT JOIN multiplies
+    rows when a call has multiple feedback entries. Without SELECT DISTINCT,
+    the same call appears once per matching feedback row.
+    """
+    project_id = f"{TEST_ENTITY}/calls_complete_feedback_dedup"
+    internal_project_id = b64(project_id)
+
+    call_id = _insert_complete_call(
+        clickhouse_trace_server.ch_client, internal_project_id
+    )
+    reset_project_residence_cache()
+
+    # verify we are reading from calls_complete
+    resolver = clickhouse_trace_server.table_routing_resolver
+    read_table = resolver.resolve_read_table(
+        internal_project_id, clickhouse_trace_server._mint_client
+    )
+    assert read_table == ReadTable.CALLS_COMPLETE
+
+    # add 2 feedback entries to the same call
+    call_ref = f"weave-trace-internal:///{internal_project_id}/call/{call_id}"
+    trace_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=call_ref,
+            feedback_type="wandb.reaction.1",
+            payload={"emoji": "👍"},
+            wb_user_id="user_alice",
+        )
+    )
+    trace_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=call_ref,
+            feedback_type="wandb.reaction.1",
+            payload={"emoji": "👍"},
+            wb_user_id="user_bob",
+        )
+    )
+
+    # this should return 1 item in result set
+    results = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query=tsi.Query.model_validate(
+                    {
+                        "$expr": {
+                            "$eq": [
+                                {
+                                    "$getField": "feedback.[wandb.reaction.1].payload.emoji"
+                                },
+                                {"$literal": "👍"},
+                            ]
+                        }
+                    }
+                ),
+            )
+        )
+    )
+
+    assert len(results) == 1, (
+        f"Expected 1 call but got {len(results)} — feedback LEFT JOIN is duplicating rows"
+    )
+    assert results[0].id == call_id

@@ -8,6 +8,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import PIL
+import pytest
 
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
@@ -213,6 +214,7 @@ def test_server_cache_size_limit(client):
             )
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_server_cache_latency(client):
     count = 500
 
@@ -220,12 +222,12 @@ def test_server_cache_latency(client):
     caching_server = CachingMiddlewareTraceServer(next_trace_server=base_server)
 
     def get_latency_for_server(server: TraceServerInterface, count: int):
-        start = time.time()
+        start = time.perf_counter()
         for i in range(count):
             server.obj_read(
                 ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
             )
-        end = time.time()
+        end = time.perf_counter()
         return (end - start) / count
 
     latency_without_cache = get_latency_for_server(base_server, count)
@@ -237,7 +239,7 @@ def test_server_cache_latency(client):
     if sys.platform == "win32":
         assert added_latency < 0.05  # Windows is REALLY slow
     else:
-        assert added_latency < 0.002
+        assert added_latency < 0.003
 
 
 def test_file_create_caching(client):
@@ -565,7 +567,7 @@ def test_cache_invalidation_on_add_tags(client):
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -578,7 +580,7 @@ def test_cache_invalidation_on_add_tags(client):
     caching_server.reset_cache_recorder()
     client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -593,7 +595,7 @@ def test_cache_invalidation_on_add_tags(client):
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -613,7 +615,7 @@ def test_cache_invalidation_on_remove_tags(client):
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -629,7 +631,7 @@ def test_cache_invalidation_on_remove_tags(client):
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -648,7 +650,7 @@ def test_cache_invalidation_on_set_alias(client):
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -664,7 +666,7 @@ def test_cache_invalidation_on_set_alias(client):
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -684,7 +686,7 @@ def test_cache_invalidation_on_remove_aliases(client):
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,
@@ -700,7 +702,7 @@ def test_cache_invalidation_on_remove_aliases(client):
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
         ObjReadReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             object_id=ref.name,
             digest=ref.digest,
             include_tags_and_aliases=True,

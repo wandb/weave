@@ -31,6 +31,9 @@ from weave.trace_server.service_interface import (  # noqa: F401
     ProjectsInfoRes,
 )
 
+DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
+MAX_FEEDBACK_SAMPLE_LIMIT = 5000
+
 
 class ExtraKeysTypedDict(TypedDict):
     pass
@@ -47,6 +50,8 @@ class LLMUsageSchema(TypedDict, total=False):
     output_tokens: int | None
     requests: int | None
     total_tokens: int | None
+    cache_creation_input_tokens: int | None
+    cache_read_input_tokens: int | None
 
 
 class LLMCostSchema(LLMUsageSchema, total=False):
@@ -99,6 +104,10 @@ class SummaryMap(SummaryInsertMap, total=False):
     weave: WeaveSummarySchema | None
 
 
+def _exclude_if_none(value: object) -> bool:
+    return value is None
+
+
 class CallSchema(BaseModel):
     id: str
     project_id: str
@@ -139,6 +148,7 @@ class CallSchema(BaseModel):
 
     # WB Metadata
     wb_user_id: str | None = None
+    wb_username: str | None = Field(default=None, exclude_if=_exclude_if_none)
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
@@ -309,7 +319,7 @@ class ObjSchemaForInsert(BaseModel):
 
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
         if self.set_base_object_class is not None and self.builtin_object_class is None:
             self.builtin_object_class = self.set_base_object_class
@@ -1597,6 +1607,11 @@ class CallsQueryReq(BaseModelStrict):
         description="Beta, subject to change. If true, the response will"
         " include the total storage size for a trace.",
     )
+    include_usernames: bool | None = Field(
+        default=False,
+        description="If true, the response will attempt to resolve each call's "
+        "wb_user_id to a username for the duration of this request.",
+    )
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
@@ -2392,9 +2407,9 @@ class FeedbackPayloadSchemaReq(_FeedbackFilterBase):
     """Request for feedback payload schema discovery."""
 
     sample_limit: int = Field(
-        default=2000,
+        default=DEFAULT_FEEDBACK_SAMPLE_LIMIT,
         ge=1,
-        le=5000,
+        le=MAX_FEEDBACK_SAMPLE_LIMIT,
         description=(
             "Max distinct trigger_refs to sample when discovering the payload schema. "
             "Each distinct trigger_ref (monitor/source) typically has a fixed payload "
@@ -2448,6 +2463,8 @@ class FilesStatsRes(BaseModel):
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
+    cache_read_input_token_cost: float = 0
+    cache_creation_input_token_cost: float = 0
     prompt_token_cost_unit: str | None = Field(
         "USD", description="The unit of the cost for the prompt tokens"
     )
@@ -3714,6 +3731,16 @@ class EvalResultsQueryBody(BaseModelStrict):
             "the value of `require_intersection` is used."
         ),
     )
+    include_predict_and_score_children: bool = Field(
+        default=True,
+        description=(
+            "When true (default), fetch child calls (predict/score) of each "
+            "predict_and_score call to populate predict_call_id, scorer_call_ids, "
+            "and more precise latency/token data. When false, these fields are "
+            "derived from the predict_and_score call itself (predict_call_id and "
+            "scorer_call_ids will be null/empty)."
+        ),
+    )
     limit: int | None = Field(
         default=None,
         description="Optional row-level page size applied after grouping and intersection.",
@@ -3781,9 +3808,9 @@ class EvalResultsScorerStats(BaseModel):
             "token_distance.passed. None for root-level scalar scorers."
         ),
     )
-    value_type: Literal["binary", "continuous"] | None = Field(
+    value_type: Literal["binary", "continuous", "text"] | None = Field(
         default=None,
-        description="Type of the leaf value: binary (bool) or continuous (number).",
+        description="Type of the leaf value: binary (bool), continuous (number), or text (string).",
     )
     trial_count: int = 0
     numeric_count: int = 0
@@ -4096,6 +4123,8 @@ UsageMetric = Literal[
     "input_tokens",
     "output_tokens",
     "total_tokens",
+    "cache_read_input_tokens",
+    "cache_creation_input_tokens",
     "input_cost",
     "output_cost",
     "total_cost",
@@ -4106,11 +4135,15 @@ Token metrics are extracted from summary.usage[model]:
 - input_tokens: Sum of prompt_tokens (OpenAI) and input_tokens (Anthropic/others)
 - output_tokens: Sum of completion_tokens (OpenAI) and output_tokens (Anthropic/others)
 - total_tokens: Total tokens (input + output)
+- cache_read_input_tokens: Tokens read from prompt cache (all providers)
+- cache_creation_input_tokens: Tokens used to create prompt cache (Anthropic)
 
-Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices:
-- input_cost: input_tokens * prompt_token_cost
+Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices.
+Cache tokens are subtracted from input before applying the prompt rate (they are billed
+at their own cache rates instead):
+- input_cost: (input_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost
 - output_cost: output_tokens * completion_token_cost
-- total_cost: input_cost + output_cost
+- total_cost: input_cost + output_cost + cache_read_cost + cache_creation_cost
 """
 
 
@@ -4228,9 +4261,13 @@ class LLMAggregatedUsage(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    cache_read_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
     # Cost fields - only populated when include_costs=True
     prompt_tokens_total_cost: float | None = None
     completion_tokens_total_cost: float | None = None
+    cache_read_input_tokens_total_cost: float | None = None
+    cache_creation_input_tokens_total_cost: float | None = None
 
 
 # --- /trace/usage endpoint (per-call usage with descendant rollup) ---

@@ -2,6 +2,7 @@ import contextlib
 import json
 import logging
 import os
+import sys
 from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -13,20 +14,31 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+
+pytest_plugins = ["tests.trace_server.conftest"]
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
+
+# Tolerance for model_latency assertions in evaluation tests.
+# Set to 2s because TestOnlyFlushingWeaveClient's autoflush after every
+# client method inflates model_latency (which wraps the full async_call_op
+# including flush overhead).  On ClickHouse with concurrent eval rows the
+# flush contention can exceed 1s on loaded CI runners.
+LATENCY_TOL = 10 if sys.platform == "win32" else 2
 
 
 @pytest.fixture(autouse=True)
@@ -390,6 +402,18 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
 
 
 @pytest.fixture
+def no_autoflush(client):
+    """Disable per-method autoflush for speed; call client.flush() before reads."""
+    client.set_autoflush(False)
+    yield
+    for _ in range(10):
+        client.flush()
+        if not client._has_pending_jobs():
+            break
+    client.set_autoflush(True)
+
+
+@pytest.fixture
 def client_creator(zero_stack, request, trace_server, caching_client_isolation):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first).
 
@@ -425,7 +449,7 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
 
 
 @pytest.fixture
-def network_proxy_client(client):
+def network_proxy_client(client, monkeypatch):
     """This fixture is used to test the `RemoteHTTPTraceServer` class. There is
     almost no logic in this class, other than a little batching, so we typically
     skip it for simplicity. However, we can use this fixture to test such logic.
@@ -542,6 +566,25 @@ def network_proxy_client(client):
 
         orig_post = weave.utils.http_requests.post
         weave.utils.http_requests.post = post
+
+        def make_fast_async_batch_processor(*args, **kwargs):
+            kwargs.setdefault("min_batch_interval", 0)
+            return AsyncBatchProcessor(*args, **kwargs)
+
+        def make_fast_call_batch_processor(*args, **kwargs):
+            kwargs.setdefault("min_batch_interval", 0)
+            return CallBatchProcessor(*args, **kwargs)
+
+        monkeypatch.setattr(
+            remote_http_trace_server,
+            "AsyncBatchProcessor",
+            make_fast_async_batch_processor,
+        )
+        monkeypatch.setattr(
+            remote_http_trace_server,
+            "CallBatchProcessor",
+            make_fast_call_batch_processor,
+        )
 
         remote_client = RemoteHTTPTraceServer(
             trace_server_url="",

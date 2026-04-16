@@ -22,7 +22,7 @@ def test_helper_serializes_op_same_way_as_sdk(client: WeaveClient) -> None:
         return x + 1
 
     # Serialize the Op using the SDK's to_json function
-    sdk_val = to_json(test_op, client._project_id(), client)
+    sdk_val = to_json(test_op, client.project_id, client)
     helper_val = object_creation_utils.build_op_val(
         sdk_val["files"][object_creation_utils.OP_SOURCE_FILE_NAME]
     )
@@ -56,7 +56,7 @@ def test_helper_serializes_dataset_same_way_as_sdk(client: WeaveClient) -> None:
     mapped_obj_rec = map_to_refs(obj_rec)
 
     # 4. Finally serialize
-    sdk_val = to_json(mapped_obj_rec, client._project_id(), client)
+    sdk_val = to_json(mapped_obj_rec, client.project_id, client)
 
     # Extract the table reference URI from the serialized data
     table_ref_uri = sdk_val["rows"]
@@ -101,7 +101,7 @@ def test_helper_serializes_scorer_same_way_as_sdk(client: WeaveClient) -> None:
     mapped_obj_rec = map_to_refs(obj_rec)
 
     # 5. Finally serialize
-    sdk_val = to_json(mapped_obj_rec, client._project_id(), client)
+    sdk_val = to_json(mapped_obj_rec, client.project_id, client)
 
     # Extract the score op reference URI and summarize op ref from the serialized data
     score_op_ref_uri = sdk_val["score"]
@@ -173,7 +173,7 @@ def test_helper_serializes_evaluation_same_way_as_sdk(client: WeaveClient) -> No
     mapped_obj_rec = map_to_refs(obj_rec)
 
     # Finally serialize
-    sdk_val = to_json(mapped_obj_rec, client._project_id(), client)
+    sdk_val = to_json(mapped_obj_rec, client.project_id, client)
 
     # Extract references from the serialized data
     dataset_ref_uri = sdk_val["dataset"]

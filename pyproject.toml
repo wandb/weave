@@ -77,7 +77,7 @@ trace_server = [
   # BYOB - GCP
   "google-cloud-storage>=2.7.0",
   # LLM Support
-  "litellm>=1.36.1",
+  "litellm>=1.36.1,<1.82.7",
   # OTEL trace support
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
@@ -135,14 +135,14 @@ langchain_nvidia_ai_endpoints = [
   "langchain-core>=0.2.1",
   "langchain-nvidia-ai-endpoints",
 ]
-litellm = ["litellm>=1.36.1", "openai>=1.99.9,<1.100.0"]
+litellm = ["litellm>=1.36.1,<1.82.7", "openai>=1.99.9,<1.100.0"]
 # temporary max pin b/c 0.12.50 changes call structure and therefor tests
 llamaindex = ["llama-index>=0.10.35", "openai>=1.99.9,<1.100.0"]
 mistral = ["mistralai>=1.0.0"]
 scorers = [
   "numpy>1.21.0",
   "Levenshtein>=0.26.0",
-  "litellm>=1.58",
+  "litellm>=1.58,<1.82.7",
   "sentence-transformers>=3.3.1",
   "scikit-learn>=1.5.2",
   "transformers>=4.51.1",
@@ -175,7 +175,7 @@ verdict = [
 ]
 autogen = ["autogen-agentchat>=0.5.7; python_version >= '3.10'"]
 claude_agent_sdk = ["claude-agent-sdk>=0.1.0"]
-verifiers = ["verifiers>=0.1.3.post0,<0.1.4; python_version >= '3.11'"]
+verifiers = ["verifiers>=0.1.3.post0,<0.1.13; python_version >= '3.11'"]
 
 
 [project.scripts]
@@ -183,7 +183,7 @@ weave = "weave.cli:main"
 
 [project.urls]
 Company = "https://wandb.com"
-Documentation = "https://docs.wandb.com/"
+Documentation = "https://docs.wandb.ai"
 Changes = "https://github.com/wandb/weave/releases"
 "Source Code" = "https://github.com/wandb/weave"
 "Issue Tracker" = "https://github.com/wandb/weave/issues/"
@@ -233,24 +233,14 @@ select = [
   "B", # https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
   "D", # https://docs.astral.sh/ruff/rules/#pydoclint-doc
   #
+  "F",       # https://docs.astral.sh/ruff/rules/#pyflakes-f
   "FIX001",  # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",  # https://docs.astral.sh/ruff/rules/line-contains-xxx/
-  "F541",    # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
   "I",       # https://docs.astral.sh/ruff/rules/#isort-i
   "W",       # https://docs.astral.sh/ruff/rules/#warning-w
-  "F401",    # https://docs.astral.sh/ruff/rules/unused-import/
-  "F402",    # https://docs.astral.sh/ruff/rules/import-shadowed-by-loop-var/
-  "F6",      # https://docs.astral.sh/ruff/rules/multi-value-repeated-key-literal/
-  "F811",    # https://docs.astral.sh/ruff/rules/redefined-while-unused/
-  "F821",    # https://docs.astral.sh/ruff/rules/undefined-name/
-  "F822",    # https://docs.astral.sh/ruff/rules/undefined-export/
   "TID252",  # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
   "UP",      # https://docs.astral.sh/ruff/rules/#pyupgrade-up
-  "TRY002",  # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
-  "TRY004",  # https://docs.astral.sh/ruff/rules/type-check-without-type-error/
-  "TRY300",  # https://docs.astral.sh/ruff/rules/try-consider-else/
-  "TRY400",  # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
-  "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
+  "TRY",     # https://docs.astral.sh/ruff/rules/#tryceratops-try
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
   "SIM101",  # https://docs.astral.sh/ruff/rules/duplicate-isinstance-call/
@@ -262,33 +252,17 @@ select = [
   "N805",    # https://docs.astral.sh/ruff/rules/invalid-first-argument-name-for-method/
   "N806",    # https://docs.astral.sh/ruff/rules/non-lowercase-variable-in-function/
   "PERF102", # https://docs.astral.sh/ruff/rules/incorrect-dict-iterator/
+  "T10",     # https://docs.astral.sh/ruff/rules/#flake8-debugger-t10
   "T20",     # https://docs.astral.sh/ruff/rules/#flake8-print-t20
-  "PT001",   # https://docs.astral.sh/ruff/rules/pytest-fixture-incorrect-parentheses-style/
-  "PT006",   # https://docs.astral.sh/ruff/rules/pytest-parametrize-names-wrong-type/
-  "PT008",   # https://docs.astral.sh/ruff/rules/pytest-parametrize-values-wrong-type/
-  "PT018",   # https://docs.astral.sh/ruff/rules/pytest-composite-assertion/
-  "PT022",   # https://docs.astral.sh/ruff/rules/pytest-useless-yield-fixture/
-  "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
+  "PT",      # https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
   "PLC",     # https://docs.astral.sh/ruff/rules/#pylint-pl
   "PLE",     # https://docs.astral.sh/ruff/rules/#pylint-ple
   "PLR",     # https://docs.astral.sh/ruff/rules/#pylint-plr
   "PLW",     # https://docs.astral.sh/ruff/rules/#pylint-pl
-  "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
-  "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
-  "RUF013",  # https://docs.astral.sh/ruff/rules/implicit-optional/
-  "RUF015",  # https://docs.astral.sh/ruff/rules/unnecessary-iterable-allocation-for-first-element/
-  "RUF018",  # https://docs.astral.sh/ruff/rules/assignment-in-assert/
-  "RUF022",  # https://docs.astral.sh/ruff/rules/unsorted-dunder-all/
-  "RUF031",  # https://docs.astral.sh/ruff/rules/incorrectly-parenthesized-tuple-in-subscript/
-  "RUF039",  # https://docs.astral.sh/ruff/rules/unraw-re-pattern/
-  "RUF046",  # https://docs.astral.sh/ruff/rules/unnecessary-cast-to-int/
-  "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
-  "RUF052",  # https://docs.astral.sh/ruff/rules/used-dummy-variable/
-  "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
-  "RUF100",  # https://docs.astral.sh/ruff/rules/unused-noqa/
+  "RUF",     # https://docs.astral.sh/ruff/rules/#ruff-specific-rules-ruf
   "E711",    # https://docs.astral.sh/ruff/rules/none-comparison/
   "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
-  "PYI019",  # https://docs.astral.sh/ruff/rules/custom-type-var-for-self/
+  "PYI",     # https://docs.astral.sh/ruff/rules/#flake8-pyi-pyi
   "FA",      # https://docs.astral.sh/ruff/rules/#flake8-future-annotations-fa
   "G",       # https://docs.astral.sh/ruff/rules/#flake8-logging-format-g
 ]
@@ -300,13 +274,19 @@ ignore = [
   "D415",
   "D417",
   # This is a more involved change, so disabling for now.
-  "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
+  "C901",   # https://docs.astral.sh/ruff/rules/complex-structure/
+  # Initial TRY rollout: defer high-volume rules for a dedicated cleanup pass.
+  "TRY003", # https://docs.astral.sh/ruff/rules/raise-vanilla-args/
+  "TRY301", # https://docs.astral.sh/ruff/rules/raise-within-try/
   # Existing code intentionally uses many lazy imports and private symbols;
   # keep these disabled until we do a dedicated cleanup.
   "PLC0415", # https://docs.astral.sh/ruff/rules/import-outside-top-level/
   "PLC2701", # https://docs.astral.sh/ruff/rules/import-private-name/
   # Keep explicit empty-string checks for readability in tests and parsing paths.
   "PLC1901", # https://docs.astral.sh/ruff/rules/compare-to-empty-string/
+  # Too many existing unused-variable assignments to fix in one pass; defer for
+  # a dedicated cleanup.
+  "F841",    # https://docs.astral.sh/ruff/rules/unused-variable/
   # Initial PLR rollout: defer broad structural and magic-number checks for a
   # dedicated cleanup pass to keep lint actionable.
   "PLR0904", # https://docs.astral.sh/ruff/rules/too-many-public-methods/
@@ -319,6 +299,13 @@ ignore = [
   "PLR1702", # https://docs.astral.sh/ruff/rules/too-many-nested-blocks/
   "PLR2004", # https://docs.astral.sh/ruff/rules/magic-value-comparison/
   "PLR6301", # https://docs.astral.sh/ruff/rules/no-self-use/
+  # Ambiguous unicode in prompt injection test strings and example data is intentional.
+  "RUF001", # https://docs.astral.sh/ruff/rules/ambiguous-unicode-character-string/
+  "RUF003", # https://docs.astral.sh/ruff/rules/ambiguous-unicode-character-comment/
+  # Collection literal concatenation — stylistic preference, defer for dedicated cleanup.
+  "RUF005", # https://docs.astral.sh/ruff/rules/collection-literal-concatenation/
+  # __init__ modules contain re-exports by design in this codebase.
+  "RUF067", # https://docs.astral.sh/ruff/rules/non-empty-init-module/
 ]
 
 [tool.ruff.lint.isort]
@@ -339,6 +326,9 @@ exclude = ["rules"]
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
 "!/tests/**/*.py" = ["RUF059"]
+# Tests intentionally use async functions without await, compare known float values,
+# and use pytest.raises match strings with regex-like characters.
+"tests/**/*.py" = ["RUF029", "RUF043", "RUF069"]
 "weave/trace/serialization/op_type.py" = ["RUF100", "N802"]
 "weave/trace_server/costs/update_costs.py" = ["PLW1514"]
 "weave/type_handlers/Video/video.py" = ["PLW0603"]
@@ -370,7 +360,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.36-dev0"
+current_version = "0.52.37-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -420,7 +410,7 @@ dev = [
   "tomlkit",
   "python-multipart",
   # linting
-  "pre-commit",
+  "prek",
   "jupyter",
   "ty>=0.0.2",
 ]
@@ -434,7 +424,7 @@ trace_server = [
   # BYOB - GCP
   "google-cloud-storage>=2.7.0",
   # LLM Support
-  "litellm>=1.36.1",
+  "litellm>=1.36.1,<1.82.7",
   # OTEL trace support
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
@@ -453,7 +443,7 @@ autogen_tests = [
   "openai>=1.99.9,<1.100.0",
 ]
 verifiers_test = [
-  "verifiers>=0.1.3.post0,<0.1.4; python_version >= '3.11'",
+  "verifiers>=0.1.3.post0,<0.1.13; python_version >= '3.11'",
   "huggingface_hub>=0.34.6",
   "datasets>=4.1.0",
 ]

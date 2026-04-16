@@ -40,7 +40,7 @@ class TestFileCreateExpectedDigest:
     def test_no_expected_digest(self, client) -> None:
         """file_create without expected_digest succeeds (fallback path)."""
         req = FileCreateReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             name="test.txt",
             content=b"hello world",
         )
@@ -54,7 +54,7 @@ class TestFileCreateExpectedDigest:
         content = b"hello world"
         digest = compute_file_digest(content)
         req = FileCreateReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             name="test.txt",
             content=content,
             expected_digest=digest,
@@ -65,7 +65,7 @@ class TestFileCreateExpectedDigest:
     def test_wrong_expected_digest(self, client) -> None:
         """file_create with wrong expected_digest raises DigestMismatchError."""
         req = FileCreateReq(
-            project_id=client._project_id(),
+            project_id=client.project_id,
             name="test.txt",
             content=b"hello world",
             expected_digest="wrong_digest",
@@ -80,7 +80,7 @@ class TestObjCreateExpectedDigest:
         """obj_create without expected_digest succeeds (fallback path)."""
         req = ObjCreateReq(
             obj=ObjSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 object_id="test_obj",
                 val={"key": "value"},
             )
@@ -92,7 +92,7 @@ class TestObjCreateExpectedDigest:
         """obj_create with wrong expected_digest raises DigestMismatchError."""
         req = ObjCreateReq(
             obj=ObjSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 object_id="test_obj",
                 val={"key": "value"},
                 expected_digest="wrong_digest",
@@ -108,7 +108,7 @@ class TestTableCreateExpectedDigest:
         """table_create without expected_digest succeeds (fallback path)."""
         req = TableCreateReq(
             table=TableSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 rows=[{"val": {"a": 1}}, {"val": {"a": 2}}],
             )
         )
@@ -119,7 +119,7 @@ class TestTableCreateExpectedDigest:
         """table_create with wrong expected_digest raises DigestMismatchError."""
         req = TableCreateReq(
             table=TableSchemaForInsert(
-                project_id=client._project_id(),
+                project_id=client.project_id,
                 rows=[{"val": {"a": 1}}, {"val": {"a": 2}}],
                 expected_digest="wrong_digest",
             )

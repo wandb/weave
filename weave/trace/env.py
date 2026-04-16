@@ -7,6 +7,8 @@ import os
 from urllib.parse import urlparse
 
 WEAVE_PARALLELISM = "WEAVE_PARALLELISM"
+DEFAULT_WEAVE_PARALLELISM = 20
+WEAVE_INSECURE_DISABLE_SSL = "WEAVE_INSECURE_DISABLE_SSL"
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,7 @@ class Settings:
 
 
 def get_weave_parallelism() -> int:
-    return int(os.getenv(WEAVE_PARALLELISM, "20"))
+    return int(os.getenv(WEAVE_PARALLELISM, str(DEFAULT_WEAVE_PARALLELISM)))
 
 
 def wandb_base_url() -> str:
@@ -68,6 +70,15 @@ def weave_trace_server_url() -> str:
 
 def is_mtsaas() -> bool:
     return weave_trace_server_url() == MTSAAS_TRACE_URL
+
+
+def ssl_verify() -> bool:
+    """Whether to verify SSL certificates for outbound requests.
+
+    Returns False when WEAVE_INSECURE_DISABLE_SSL is set to "true",
+    allowing self-signed certificates in local dev environments.
+    """
+    return os.environ.get(WEAVE_INSECURE_DISABLE_SSL, "").lower() != "true"
 
 
 def _wandb_api_key_via_env() -> str | None:

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import importlib
 import logging
+import types
 from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
 from weave.integrations.openai_realtime import connection
+from weave.integrations.openai_realtime.connection import DEFAULT_FINISH_TIMEOUT_SECONDS
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 
@@ -45,7 +47,12 @@ class _WeaveConnectWrapper:
             self._original_connection = await self._original_result
         return connection.WeaveAsyncWebsocketConnection(self._original_connection)
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> bool:
         if hasattr(self._original_result, "__aexit__"):
             return await self._original_result.__aexit__(exc_type, exc_val, exc_tb)  # type: ignore[return-value]
         if self._original_connection is not None:
@@ -112,7 +119,7 @@ class OpenAIRealtimeSettings(IntegrationSettings):
 
     patch_websockets: bool = True
     # Default to 3 seconds; None means skip exit handling
-    finish_timeout: float | None = 3.0
+    finish_timeout: float | None = DEFAULT_FINISH_TIMEOUT_SECONDS
 
 
 def get_openai_realtime_websocket_patcher(
@@ -136,7 +143,7 @@ def get_openai_realtime_websocket_patcher(
         if isinstance(settings, OpenAIRealtimeSettings):
             _conn.configure_realtime_finish_timeout(settings.finish_timeout)
         else:
-            _conn.configure_realtime_finish_timeout(3.0)
+            _conn.configure_realtime_finish_timeout(DEFAULT_FINISH_TIMEOUT_SECONDS)
     except Exception:
         logger.exception("Failed to configure realtime finish timeout; using default")
 

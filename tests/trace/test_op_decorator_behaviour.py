@@ -479,6 +479,18 @@ def test_op_color_attribute():
     assert "kind" not in result["attributes"]["weave"]
 
 
+def test_op_kind_guardrail_attribute():
+    """Test that setting kind='guardrail' on op decorator sets attributes.weave.kind."""
+
+    @op(kind="guardrail")
+    def guardrail_func(x: str) -> bool:
+        return True
+
+    result = setup_dunder_weave_dict(guardrail_func)
+    assert result["attributes"]["weave"]["kind"] == "guardrail"
+    assert "color" not in result["attributes"]["weave"]
+
+
 def test_op_kind_and_color_attributes():
     """Test that setting both kind and color on op decorator sets both attributes."""
 

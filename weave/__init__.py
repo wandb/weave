@@ -9,8 +9,37 @@ if sys.version_info < (3, 10):  # noqa: UP036
         stacklevel=2,
     )
 
+# Side-effect import: applies thread-safety patches to PIL and MoviePy.
+import weave.initialization  # noqa: F401
 from weave import version
-from weave.trace.api import *
+from weave.trace.api import (
+    ObjectRef,
+    Table,
+    ThreadContext,
+    add_tags,
+    as_op,
+    attributes,
+    finish,
+    get,
+    get_aliases,
+    get_client,
+    get_current_call,
+    get_tags,
+    get_tags_and_aliases,
+    init,
+    list_aliases,
+    list_tags,
+    op,
+    publish,
+    ref,
+    remove_aliases,
+    remove_tags,
+    require_current_call,
+    set_aliases,
+    set_view,
+    thread,
+    weave_client_context,
+)
 
 __version__ = version.VERSION
 
@@ -25,10 +54,9 @@ from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.flow.annotation_spec import AnnotationSpec
 from weave.flow.model import Model
-from weave.flow.monitor import Monitor
+from weave.flow.monitor import ClassifierMonitor, Monitor
 from weave.flow.saved_view import SavedView
 from weave.flow.scorer import Scorer
-from weave.initialization import *
 from weave.object.obj import Object
 from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
 from weave.trace.log_call import log_call
@@ -47,6 +75,7 @@ __all__ = [
     "AgentState",
     "AnnotationSpec",
     "Audio",
+    "ClassifierMonitor",
     "Content",
     "Dataset",
     "EasyPrompt",
@@ -60,6 +89,7 @@ __all__ = [
     "Model",
     "Monitor",
     "Object",
+    "ObjectRef",
     "Prompt",
     "Reasoning",
     "SavedView",
@@ -67,14 +97,18 @@ __all__ = [
     "Session",
     "Step",
     "StringPrompt",
+    "Table",
+    "ThreadContext",
     "Tool",
     "Turn",
     "Usage",
     "add_tags",
+    "as_op",
     "attributes",
     "finish",
     "get",
     "get_aliases",
+    "get_client",
     "get_current_call",
     "get_current_session",
     "get_current_turn",
@@ -99,4 +133,5 @@ __all__ = [
     "start_step",
     "start_turn",
     "thread",
+    "weave_client_context",
 ]
