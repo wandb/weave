@@ -68,13 +68,13 @@ def _assert_param_values(expected_values: set, actual_params: dict) -> None:
 
 
 class _QueryCapture:
-    """Mock CH client that records every query() call."""
+    """Mock query_fn that records every call and returns an empty result."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
-    def query(self, sql: str, *, parameters: dict[str, Any] | None = None) -> Any:
-        self.calls.append((sql, copy.deepcopy(parameters or {})))
+    def __call__(self, sql: str, parameters: dict[str, Any]) -> Any:
+        self.calls.append((sql, copy.deepcopy(parameters)))
         result = MagicMock()
         result.result_rows = []
         result.column_names = []
@@ -88,7 +88,7 @@ def ch() -> _QueryCapture:
 
 @pytest.fixture
 def handler(ch: _QueryCapture) -> AgentQueryHandler:
-    return AgentQueryHandler(ch)  # type: ignore[arg-type]
+    return AgentQueryHandler(ch)
 
 
 # ============================================================================

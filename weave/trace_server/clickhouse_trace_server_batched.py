@@ -6425,38 +6425,38 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     # ---- GenAI / Agent Observability ------------------------------------
 
     def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
-        return AgentQueryHandler(self.ch_client).spans_query(req)
+        return AgentQueryHandler(self._query).spans_query(req)
 
     def agent_spans_trace(self, req: AgentSpansTraceReq) -> AgentSpansTraceRes:
-        return AgentQueryHandler(self.ch_client).spans_trace(req)
+        return AgentQueryHandler(self._query).spans_trace(req)
 
     def agent_traces_query(self, req: AgentTracesQueryReq) -> AgentTracesQueryRes:
-        return AgentQueryHandler(self.ch_client).traces_query(req)
+        return AgentQueryHandler(self._query).traces_query(req)
 
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
-        return AgentQueryHandler(self.ch_client).agents_query(req)
+        return AgentQueryHandler(self._query).agents_query(req)
 
     def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
-        return AgentQueryHandler(self.ch_client).agent_versions_query(req)
+        return AgentQueryHandler(self._query).agent_versions_query(req)
 
     def agent_conversations_query(
         self, req: AgentConversationsQueryReq
     ) -> AgentConversationsQueryRes:
-        return AgentQueryHandler(self.ch_client).conversations_query(req)
+        return AgentQueryHandler(self._query).conversations_query(req)
 
     def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
-        return AgentQueryHandler(self.ch_client).search(req)
+        return AgentQueryHandler(self._query).search(req)
 
     def agent_traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
-        return AgentWriteHandler(self.ch_client).traces_chat(req)
+        return AgentWriteHandler(self.ch_client, self._query).traces_chat(req)
 
     def agent_conversation_chat(
         self, req: AgentConversationChatReq
     ) -> AgentConversationChatRes:
-        return AgentWriteHandler(self.ch_client).conversation_chat(req)
+        return AgentWriteHandler(self.ch_client, self._query).conversation_chat(req)
 
     def genai_otel_export(self, req: Any) -> Any:
-        return AgentWriteHandler(self.ch_client).otel_export(req)
+        return AgentWriteHandler(self.ch_client, self._query).otel_export(req)
 
     # Private Methods
     @property

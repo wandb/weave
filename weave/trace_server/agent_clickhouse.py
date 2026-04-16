@@ -1,10 +1,17 @@
-"""ClickHouse query and write handlers for the agent observability system."""
+"""ClickHouse query and write handlers for the agent observability system.
+
+The SQL construction lives in ``query_builder.agent_query_builder``; this module
+wires the builders to the server's ``_query`` method (for logging/tracing/error
+handling) and hydrates result rows into agent schemas.
+"""
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from weave.trace_server.agent_chat_view import build_trace_chat
 from weave.trace_server.agent_helpers import (
     extract_search_rows,
     genai_search_row_to_row,
@@ -15,25 +22,7 @@ from weave.trace_server.agent_helpers import (
 from weave.trace_server.agent_schema import (
     ALL_SEARCH_INSERT_COLUMNS,
     ALL_SPAN_INSERT_COLUMNS,
-    AgentSpanCHInsertable,
 )
-from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
-from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
-from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.query_builder.agent_query_builder import (
-    SPAN_SORTABLE_COLS,
-    add_custom_attr_filters,
-    add_span_filters,
-    add_time_filters,
-    build_order_by,
-    safe_int,
-    safe_str,
-)
-
-if TYPE_CHECKING:
-    from clickhouse_connect.driver.client import Client as CHClient
-from weave.trace_server.agent_chat_view import build_trace_chat
 from weave.trace_server.agent_types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -63,126 +52,65 @@ from weave.trace_server.agent_types import (
     GenAIOTelExportReq,
     GenAIOTelExportRes,
 )
+from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
+from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
+from weave.trace_server.opentelemetry.python_spans import Resource, Span
+from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.query_builder.agent_query_builder import (
+    CHAT_VIEW_COLS,
+    SPANS_LIST_COLS,
+    make_agent_versions_count_query,
+    make_agent_versions_list_query,
+    make_agents_count_query,
+    make_agents_list_query,
+    make_conversation_chat_spans_query,
+    make_conversations_count_query,
+    make_conversations_list_query,
+    make_message_search_query,
+    make_spans_count_query,
+    make_spans_list_query,
+    make_spans_trace_query,
+    make_traces_count_query,
+    make_traces_list_query,
+    safe_int,
+    safe_str,
+)
+
+if TYPE_CHECKING:
+    from clickhouse_connect.driver.client import Client as CHClient
+    from clickhouse_connect.driver.query import QueryResult
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_AGENT_QUERY_LIMIT = 100
-_MAX_AGENT_QUERY_LIMIT = 10_000
+#: Signature of the server's ``_query`` method — takes (sql, params), returns QueryResult.
+QueryFn = Callable[[str, dict[str, Any]], "QueryResult"]
 
-# Conversations are aggregated with GROUP BY conversation_id, so scalar columns
-# like provider_name become arrays in the SELECT and must be sorted via arrayElement.
-_CONV_SORT_EXPRS: dict[str, str] = {
-    "provider_name": "arrayElement(provider_names, 1)",
-    "provider_names": "arrayElement(provider_names, 1)",
-    "agent_name": "arrayElement(agent_names, 1)",
-    "agent_names": "arrayElement(agent_names, 1)",
-    "request_model": "arrayElement(request_models, 1)",
-    "request_models": "arrayElement(request_models, 1)",
-}
-_CONV_SORTABLE_COLS: frozenset[str] = frozenset(
-    {
-        "last_seen",
-        "first_seen",
-        "turn_count",
-        "span_count",
-        "total_input_tokens",
-        "total_output_tokens",
-        "total_duration_ms",
-        "error_count",
-        "conversation_name",
-        "conversation_id",
-        *_CONV_SORT_EXPRS.keys(),
-    }
-)
+# Backwards-compatible aliases for existing tests that import the column lists
+# by their old underscore-prefixed names.
+_SPANS_LIST_COLS = SPANS_LIST_COLS
+_CHAT_VIEW_COLS = CHAT_VIEW_COLS
 
-# Column projections derived from AgentSpanCHInsertable to stay in sync.
-_ALL_SPAN_FIELDS = list(AgentSpanCHInsertable.model_fields.keys())
 
-# Spans list query — lightweight projection that skips blob/message columns.
-_SPANS_LIST_EXCLUDE = frozenset(
-    {
-        "reasoning_content",
-        "tool_description",
-        "tool_definitions",
-        "tool_call_arguments",
-        "tool_call_result",
-        "input_messages",
-        "output_messages",
-        "system_instructions",
-        "compaction_summary",
-        "compaction_items_before",
-        "compaction_items_after",
-        "content_refs",
-        "artifact_refs",
-        "object_refs",
-        "custom_attrs_int",
-        "custom_attrs_float",
-        "request_frequency_penalty",
-        "request_presence_penalty",
-        "request_seed",
-        "request_stop_sequences",
-        "request_choice_count",
-        "request_temperature",
-        "request_max_tokens",
-        "request_top_p",
-        "output_type",
-        "server_address",
-        "server_port",
-        "wb_run_step",
-        "wb_run_step_end",
-        "expire_at",
-        "raw_span_dump",
-        "attributes_dump",
-        "events_dump",
-        "resource_dump",
-    }
-)
-_SPANS_LIST_COLS = ", ".join(
-    c for c in _ALL_SPAN_FIELDS if c not in _SPANS_LIST_EXCLUDE
-)
+def _rows_as_dicts(result: Any) -> list[dict[str, Any]]:
+    """Zip result_rows with column_names into row dicts."""
+    col_names = list(result.column_names) if result.column_names else []
+    return [dict(zip(col_names, row, strict=False)) for row in result.result_rows]
 
-# Chat view projection — includes messages and tool data but skips raw dumps
-# and request params not needed for rendering.
-_CHAT_VIEW_EXCLUDE = frozenset(
-    {
-        "cache_creation_input_tokens",
-        "cache_read_input_tokens",
-        "custom_attrs",
-        "custom_attrs_int",
-        "custom_attrs_float",
-        "raw_span_dump",
-        "attributes_dump",
-        "events_dump",
-        "resource_dump",
-        "wb_user_id",
-        "wb_run_id",
-        "wb_run_step",
-        "wb_run_step_end",
-        "request_temperature",
-        "request_max_tokens",
-        "request_top_p",
-        "request_frequency_penalty",
-        "request_presence_penalty",
-        "request_seed",
-        "request_stop_sequences",
-        "request_choice_count",
-        "output_type",
-        "server_address",
-        "server_port",
-        "expire_at",
-    }
-)
-_CHAT_VIEW_COLS = ", ".join(c for c in _ALL_SPAN_FIELDS if c not in _CHAT_VIEW_EXCLUDE)
+
+def _first_cell_int(result: Any) -> int:
+    return safe_int(result.result_rows[0][0]) if result.result_rows else 0
 
 
 class AgentQueryHandler:
-    """ClickHouse query operations for the Weave Agents observability system.
+    """Read-side query operations for the agent observability system.
 
-    Instantiated with a ClickHouse client and provides all read methods.
+    Takes a ``query_fn`` (typically the server's ``_query`` method) so queries
+    participate in the same logging / ddtrace / error-handling wrapper as the
+    rest of the trace server.
     """
 
-    def __init__(self, ch_client: CHClient) -> None:
-        self._ch = ch_client
+    def __init__(self, query_fn: QueryFn) -> None:
+        self._query = query_fn
 
     # ------------------------------------------------------------------
     # Spans queries
@@ -191,63 +119,26 @@ class AgentQueryHandler:
     def spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
         """Query spans with filters, sort, and pagination."""
         pb = ParamBuilder("genai")
-        conditions = [f"s.project_id = {pb.add(req.project_id, param_type='String')}"]
+        count_sql = make_spans_count_query(pb, req)
+        list_sql = make_spans_list_query(pb, req)
+        params = pb.get_params()
 
-        add_time_filters(conditions, pb, start=req.start, end=req.end)
+        total = _first_cell_int(self._query(count_sql, params))
+        result = self._query(list_sql, params)
 
-        if req.filters:
-            add_span_filters(conditions, pb, req.filters)
-            add_custom_attr_filters(
-                conditions, pb, getattr(req.filters, "custom_filters", None)
-            )
-
-        order_by = build_order_by(req.sort_by, SPAN_SORTABLE_COLS, "started_at DESC")
-        where = " AND ".join(conditions)
-        limit = min(req.limit or _DEFAULT_AGENT_QUERY_LIMIT, _MAX_AGENT_QUERY_LIMIT)
-        offset = req.offset or 0
-
-        count_q = f"SELECT count() FROM spans s WHERE {where}"
-        count_result = self._ch.query(count_q, parameters=pb.get_params())
-        total = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
-
-        limit_slot = pb.add(limit, param_type="UInt64")
-        offset_slot = pb.add(offset, param_type="UInt64")
-        query = f"""
-            SELECT {_SPANS_LIST_COLS}
-            FROM spans s
-            WHERE {where}
-            ORDER BY {order_by}
-            LIMIT {limit_slot} OFFSET {offset_slot}
-        """
-        result = self._ch.query(query, parameters=pb.get_params())
-
-        spans = []
-        col_names = list(result.column_names) if result.column_names else []
-        for row in result.result_rows:
-            span_dict = dict(zip(col_names, row, strict=False))
-            spans.append(AgentSpanSchema(**normalize_span_row(span_dict)))
-
+        spans = [
+            AgentSpanSchema(**normalize_span_row(r)) for r in _rows_as_dicts(result)
+        ]
         return AgentSpansQueryRes(spans=spans, total_count=total)
 
     def spans_trace(self, req: AgentSpansTraceReq) -> AgentSpansTraceRes:
         """Get all spans for a trace."""
         pb = ParamBuilder("genai")
-        pid = pb.add(req.project_id, param_type="String")
-        tid = pb.add(req.trace_id, param_type="String")
-
-        query = f"""
-            SELECT {_CHAT_VIEW_COLS} FROM spans s
-            WHERE s.project_id = {pid}
-              AND s.trace_id = {tid}
-            ORDER BY s.started_at ASC
-        """
-        result = self._ch.query(query, parameters=pb.get_params())
-        col_names = list(result.column_names) if result.column_names else []
+        sql = make_spans_trace_query(pb, req)
+        result = self._query(sql, pb.get_params())
         spans = [
-            AgentSpanSchema.model_construct(
-                **normalize_span_row(dict(zip(col_names, row, strict=False)))
-            )
-            for row in result.result_rows
+            AgentSpanSchema.model_construct(**normalize_span_row(r))
+            for r in _rows_as_dicts(result)
         ]
         return AgentSpansTraceRes(spans=spans)
 
@@ -258,235 +149,93 @@ class AgentQueryHandler:
     def traces_query(self, req: AgentTracesQueryReq) -> AgentTracesQueryRes:
         """Query traces by aggregating spans with time bounds."""
         pb = ParamBuilder("genai")
-        conditions = [f"project_id = {pb.add(req.project_id, param_type='String')}"]
+        count_sql = make_traces_count_query(pb, req)
+        list_sql = make_traces_list_query(pb, req)
+        params = pb.get_params()
 
-        if req.conversation_id:
-            conditions.append(
-                f"conversation_id = {pb.add(req.conversation_id, param_type='String')}"
+        total = _first_cell_int(self._query(count_sql, params))
+        result = self._query(list_sql, params)
+
+        traces = [
+            AgentTraceSchema(
+                project_id=req.project_id,
+                trace_id=safe_str(r.get("trace_id")),
+                span_count=safe_int(r.get("span_count")),
+                total_input_tokens=safe_int(r.get("total_input_tokens")),
+                total_output_tokens=safe_int(r.get("total_output_tokens")),
+                error_count=safe_int(r.get("error_count")),
+                conversation_id=safe_str(r.get("conversation_id")),
+                agent_names=unpack_string_array(r.get("agent_names")),
+                agent_versions=unpack_string_array(r.get("agent_versions")),
+                request_models=unpack_string_array(r.get("request_models")),
+                first_seen=r.get("first_seen"),
+                last_seen=r.get("last_seen"),
             )
-        if req.agent_name:
-            conditions.append(
-                f"agent_name = {pb.add(req.agent_name, param_type='String')}"
-            )
-        if req.agent_version:
-            conditions.append(
-                f"agent_version = {pb.add(req.agent_version, param_type='String')}"
-            )
-
-        add_time_filters(
-            conditions, pb, start=req.start, end=req.end, column="started_at"
-        )
-
-        where = " AND ".join(conditions)
-        order_by = build_order_by(
-            req.sort_by,
-            frozenset(
-                {
-                    "last_seen",
-                    "first_seen",
-                    "span_count",
-                    "total_input_tokens",
-                    "error_count",
-                }
-            ),
-            "last_seen DESC, trace_id",
-        )
-        limit = min(req.limit or _DEFAULT_AGENT_QUERY_LIMIT, _MAX_AGENT_QUERY_LIMIT)
-        offset = req.offset or 0
-
-        count_q = f"""SELECT count() FROM (
-            SELECT trace_id FROM spans WHERE {where} GROUP BY trace_id
-        )"""
-        count_result = self._ch.query(count_q, parameters=pb.get_params())
-        total = (
-            safe_int(count_result.result_rows[0][0]) if count_result.result_rows else 0
-        )
-
-        limit_slot = pb.add(limit, param_type="UInt64")
-        offset_slot = pb.add(offset, param_type="UInt64")
-        query = f"""
-            SELECT trace_id,
-                   count() AS span_count,
-                   sum(input_tokens) AS total_input_tokens,
-                   sum(output_tokens) AS total_output_tokens,
-                   countIf(status_code = 'ERROR') AS error_count,
-                   max(conversation_id) AS conversation_id,
-                   groupUniqArray(agent_name) AS agent_names,
-                   groupUniqArray(agent_version) AS agent_versions,
-                   groupUniqArray(request_model) AS request_models,
-                   min(started_at) AS first_seen,
-                   max(started_at) AS last_seen
-            FROM spans
-            WHERE {where}
-            GROUP BY trace_id
-            ORDER BY {order_by}
-            LIMIT {limit_slot} OFFSET {offset_slot}
-        """
-        result = self._ch.query(query, parameters=pb.get_params())
-        col_names = list(result.column_names) if result.column_names else []
-
-        traces = []
-        for row in result.result_rows:
-            r = dict(zip(col_names, row, strict=False))
-            traces.append(
-                AgentTraceSchema(
-                    project_id=req.project_id,
-                    trace_id=safe_str(r.get("trace_id")),
-                    span_count=safe_int(r.get("span_count")),
-                    total_input_tokens=safe_int(r.get("total_input_tokens")),
-                    total_output_tokens=safe_int(r.get("total_output_tokens")),
-                    error_count=safe_int(r.get("error_count")),
-                    conversation_id=safe_str(r.get("conversation_id")),
-                    agent_names=unpack_string_array(r.get("agent_names")),
-                    agent_versions=unpack_string_array(r.get("agent_versions")),
-                    request_models=unpack_string_array(r.get("request_models")),
-                    first_seen=r.get("first_seen"),
-                    last_seen=r.get("last_seen"),
-                )
-            )
+            for r in _rows_as_dicts(result)
+        ]
         return AgentTracesQueryRes(traces=traces, total_count=total)
 
     # ------------------------------------------------------------------
-    # Agents AMT queries (lean: counters + first/last seen)
+    # Agents AMT queries
     # ------------------------------------------------------------------
 
     def agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         """Query agents AMT for agent list page."""
         pb = ParamBuilder("genai")
-        conditions = [f"project_id = {pb.add(req.project_id, param_type='String')}"]
-
-        if req.filters and req.filters.agent_name:
-            conditions.append(
-                f"agent_name = {pb.add(req.filters.agent_name, param_type='String')}"
-            )
-
-        where = " AND ".join(conditions)
-        order_by = build_order_by(
-            req.sort_by,
-            frozenset(
-                {
-                    "last_seen",
-                    "first_seen",
-                    "invocation_count",
-                    "span_count",
-                    "total_input_tokens",
-                    "error_count",
-                }
-            ),
-            "last_seen DESC, agent_name",
-        )
-
-        limit_slot = pb.add(
-            min(req.limit or _DEFAULT_AGENT_QUERY_LIMIT, _MAX_AGENT_QUERY_LIMIT),
-            param_type="UInt64",
-        )
-        offset_slot = pb.add(req.offset or 0, param_type="UInt64")
-        query = f"""
-            SELECT agent_name,
-                   sum(invocation_count) AS invocation_count,
-                   sum(span_count) AS span_count,
-                   sum(total_input_tokens) AS total_input_tokens,
-                   sum(total_output_tokens) AS total_output_tokens,
-                   sum(total_duration_ms) AS total_duration_ms,
-                   sum(error_count) AS error_count,
-                   min(first_seen) AS first_seen,
-                   max(last_seen) AS last_seen
-            FROM agents
-            WHERE {where}
-            GROUP BY agent_name
-            ORDER BY {order_by}
-            LIMIT {limit_slot} OFFSET {offset_slot}
-        """
+        list_sql = make_agents_list_query(pb, req)
+        count_sql = make_agents_count_query(pb, req)
         params = pb.get_params()
-        result = self._ch.query(query, parameters=params)
-        col_names = list(result.column_names) if result.column_names else []
 
-        agents = []
-        for row in result.result_rows:
-            r = dict(zip(col_names, row, strict=False))
-            agents.append(
-                AgentSchema(
-                    project_id=req.project_id,
-                    agent_name=safe_str(r.get("agent_name")),
-                    invocation_count=safe_int(r.get("invocation_count")),
-                    span_count=safe_int(r.get("span_count")),
-                    total_input_tokens=safe_int(r.get("total_input_tokens")),
-                    total_output_tokens=safe_int(r.get("total_output_tokens")),
-                    total_duration_ms=safe_int(r.get("total_duration_ms")),
-                    error_count=safe_int(r.get("error_count")),
-                    first_seen=r.get("first_seen"),
-                    last_seen=r.get("last_seen"),
-                )
+        result = self._query(list_sql, params)
+        agents = [
+            AgentSchema(
+                project_id=req.project_id,
+                agent_name=safe_str(r.get("agent_name")),
+                invocation_count=safe_int(r.get("invocation_count")),
+                span_count=safe_int(r.get("span_count")),
+                total_input_tokens=safe_int(r.get("total_input_tokens")),
+                total_output_tokens=safe_int(r.get("total_output_tokens")),
+                total_duration_ms=safe_int(r.get("total_duration_ms")),
+                error_count=safe_int(r.get("error_count")),
+                first_seen=r.get("first_seen"),
+                last_seen=r.get("last_seen"),
             )
-        count_q = f"""SELECT count() FROM (
-            SELECT agent_name FROM agents WHERE {where} GROUP BY agent_name
-        )"""
-        count_result = self._ch.query(count_q, parameters=params)
-        total = (
-            safe_int(count_result.result_rows[0][0]) if count_result.result_rows else 0
-        )
+            for r in _rows_as_dicts(result)
+        ]
+        total = _first_cell_int(self._query(count_sql, params))
         return AgentsQueryRes(agents=agents, total_count=total)
 
     # ------------------------------------------------------------------
-    # Agent versions AMT queries (lean: counters + first/last seen)
+    # Agent versions AMT queries
     # ------------------------------------------------------------------
 
-    def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
+    def agent_versions_query(
+        self, req: AgentVersionsQueryReq
+    ) -> AgentVersionsQueryRes:
         """Query agent_versions AMT for version drill-down."""
         pb = ParamBuilder("genai")
-        pid = pb.add(req.project_id, param_type="String")
-        aname = pb.add(req.agent_name, param_type="String")
-        conditions = [f"project_id = {pid}", f"agent_name = {aname}"]
-        where = " AND ".join(conditions)
-
-        limit_slot = pb.add(
-            min(req.limit or _DEFAULT_AGENT_QUERY_LIMIT, _MAX_AGENT_QUERY_LIMIT),
-            param_type="UInt64",
-        )
-        offset_slot = pb.add(req.offset or 0, param_type="UInt64")
-        query = f"""
-            SELECT agent_version,
-                   sum(invocation_count) AS invocation_count,
-                   sum(span_count) AS span_count,
-                   sum(total_input_tokens) AS total_input_tokens,
-                   sum(total_output_tokens) AS total_output_tokens,
-                   sum(total_duration_ms) AS total_duration_ms,
-                   sum(error_count) AS error_count,
-                   min(first_seen) AS first_seen,
-                   max(last_seen) AS last_seen
-            FROM agent_versions
-            WHERE {where}
-            GROUP BY agent_version
-            ORDER BY last_seen DESC
-            LIMIT {limit_slot} OFFSET {offset_slot}
-        """
+        list_sql = make_agent_versions_list_query(pb, req)
+        count_sql = make_agent_versions_count_query(pb, req)
         params = pb.get_params()
-        result = self._ch.query(query, parameters=params)
-        col_names = list(result.column_names) if result.column_names else []
 
-        versions = []
-        for row in result.result_rows:
-            r = dict(zip(col_names, row, strict=False))
-            versions.append(
-                AgentVersionSchema(
-                    project_id=req.project_id,
-                    agent_name=req.agent_name,
-                    agent_version=safe_str(r.get("agent_version")),
-                    invocation_count=safe_int(r.get("invocation_count")),
-                    span_count=safe_int(r.get("span_count")),
-                    total_input_tokens=safe_int(r.get("total_input_tokens")),
-                    total_output_tokens=safe_int(r.get("total_output_tokens")),
-                    total_duration_ms=safe_int(r.get("total_duration_ms")),
-                    error_count=safe_int(r.get("error_count")),
-                    first_seen=r.get("first_seen"),
-                    last_seen=r.get("last_seen"),
-                )
+        result = self._query(list_sql, params)
+        versions = [
+            AgentVersionSchema(
+                project_id=req.project_id,
+                agent_name=req.agent_name,
+                agent_version=safe_str(r.get("agent_version")),
+                invocation_count=safe_int(r.get("invocation_count")),
+                span_count=safe_int(r.get("span_count")),
+                total_input_tokens=safe_int(r.get("total_input_tokens")),
+                total_output_tokens=safe_int(r.get("total_output_tokens")),
+                total_duration_ms=safe_int(r.get("total_duration_ms")),
+                error_count=safe_int(r.get("error_count")),
+                first_seen=r.get("first_seen"),
+                last_seen=r.get("last_seen"),
             )
-        count_q = f"SELECT count() FROM (SELECT agent_version FROM agent_versions WHERE {where} GROUP BY agent_version)"
-        count_result = self._ch.query(count_q, parameters=params)
-        total = (
-            safe_int(count_result.result_rows[0][0]) if count_result.result_rows else 0
-        )
+            for r in _rows_as_dicts(result)
+        ]
+        total = _first_cell_int(self._query(count_sql, params))
         return AgentVersionsQueryRes(versions=versions, total_count=total)
 
     # ------------------------------------------------------------------
@@ -498,108 +247,33 @@ class AgentQueryHandler:
     ) -> AgentConversationsQueryRes:
         """Query conversations by aggregating spans with time bounds."""
         pb = ParamBuilder("genai")
-        conditions = [
-            f"project_id = {pb.add(req.project_id, param_type='String')}",
-            "conversation_id != ''",
-        ]
+        count_sql = make_conversations_count_query(pb, req)
+        list_sql = make_conversations_list_query(pb, req)
+        params = pb.get_params()
 
-        add_time_filters(
-            conditions, pb, start=req.start, end=req.end, column="started_at"
-        )
+        total = _first_cell_int(self._query(count_sql, params))
+        result = self._query(list_sql, params)
 
-        if req.filters:
-            f = req.filters
-            if f.conversation_id:
-                conditions.append(
-                    f"conversation_id = {pb.add(f.conversation_id, param_type='String')}"
-                )
-            if f.agent_name:
-                conditions.append(
-                    f"agent_name = {pb.add(f.agent_name, param_type='String')}"
-                )
-            if f.agent_version:
-                conditions.append(
-                    f"agent_version = {pb.add(f.agent_version, param_type='String')}"
-                )
-            if f.provider_name:
-                conditions.append(
-                    f"provider_name = {pb.add(f.provider_name, param_type='String')}"
-                )
-            if f.started_after:
-                conditions.append(
-                    f"started_at >= parseDateTimeBestEffort({pb.add(str(f.started_after), param_type='String')})"
-                )
-            if f.started_before:
-                conditions.append(
-                    f"started_at < parseDateTimeBestEffort({pb.add(str(f.started_before), param_type='String')})"
-                )
-
-        where = " AND ".join(conditions)
-
-        order_by = build_order_by(
-            req.sort_by,
-            _CONV_SORTABLE_COLS,
-            "last_seen DESC, conversation_id",
-            column_exprs=_CONV_SORT_EXPRS,
-        )
-
-        count_q = f"""SELECT count() FROM (
-            SELECT conversation_id FROM spans WHERE {where} GROUP BY conversation_id
-        )"""
-        count_result = self._ch.query(count_q, parameters=pb.get_params())
-        total = int(count_result.result_rows[0][0]) if count_result.result_rows else 0
-
-        limit_slot = pb.add(
-            min(req.limit or _DEFAULT_AGENT_QUERY_LIMIT, _MAX_AGENT_QUERY_LIMIT),
-            param_type="UInt64",
-        )
-        offset_slot = pb.add(req.offset or 0, param_type="UInt64")
-        query = f"""
-            SELECT conversation_id,
-                   max(conversation_name) AS conversation_name,
-                   countIf(operation_name = 'invoke_agent') AS turn_count,
-                   count() AS span_count,
-                   sum(input_tokens) AS total_input_tokens,
-                   sum(output_tokens) AS total_output_tokens,
-                   sum(toUnixTimestamp64Milli(ended_at) - toUnixTimestamp64Milli(started_at)) AS total_duration_ms,
-                   countIf(status_code = 'ERROR') AS error_count,
-                   groupUniqArray(agent_name) AS agent_names,
-                   groupUniqArray(agent_version) AS agent_versions,
-                   groupUniqArray(provider_name) AS provider_names,
-                   groupUniqArray(request_model) AS request_models,
-                   min(started_at) AS first_seen,
-                   max(started_at) AS last_seen
-            FROM spans
-            WHERE {where}
-            GROUP BY conversation_id
-            ORDER BY {order_by}
-            LIMIT {limit_slot} OFFSET {offset_slot}
-        """
-        result = self._ch.query(query, parameters=pb.get_params())
-        col_names = list(result.column_names) if result.column_names else []
-
-        convs = []
-        for row in result.result_rows:
-            r = dict(zip(col_names, row, strict=False))
-            convs.append(
-                AgentConversationSchema(
-                    project_id=req.project_id,
-                    conversation_id=safe_str(r.get("conversation_id")),
-                    conversation_name=safe_str(r.get("conversation_name")),
-                    turn_count=safe_int(r.get("turn_count")),
-                    span_count=safe_int(r.get("span_count")),
-                    total_input_tokens=safe_int(r.get("total_input_tokens")),
-                    total_output_tokens=safe_int(r.get("total_output_tokens")),
-                    total_duration_ms=safe_int(r.get("total_duration_ms")),
-                    error_count=safe_int(r.get("error_count")),
-                    agent_names=unpack_string_array(r.get("agent_names")),
-                    agent_versions=unpack_string_array(r.get("agent_versions")),
-                    provider_names=unpack_string_array(r.get("provider_names")),
-                    request_models=unpack_string_array(r.get("request_models")),
-                    first_seen=r.get("first_seen"),
-                    last_seen=r.get("last_seen"),
-                )
+        convs = [
+            AgentConversationSchema(
+                project_id=req.project_id,
+                conversation_id=safe_str(r.get("conversation_id")),
+                conversation_name=safe_str(r.get("conversation_name")),
+                turn_count=safe_int(r.get("turn_count")),
+                span_count=safe_int(r.get("span_count")),
+                total_input_tokens=safe_int(r.get("total_input_tokens")),
+                total_output_tokens=safe_int(r.get("total_output_tokens")),
+                total_duration_ms=safe_int(r.get("total_duration_ms")),
+                error_count=safe_int(r.get("error_count")),
+                agent_names=unpack_string_array(r.get("agent_names")),
+                agent_versions=unpack_string_array(r.get("agent_versions")),
+                provider_names=unpack_string_array(r.get("provider_names")),
+                request_models=unpack_string_array(r.get("request_models")),
+                first_seen=r.get("first_seen"),
+                last_seen=r.get("last_seen"),
             )
+            for r in _rows_as_dicts(result)
+        ]
         return AgentConversationsQueryRes(conversations=convs, total_count=total)
 
     # ------------------------------------------------------------------
@@ -609,48 +283,11 @@ class AgentQueryHandler:
     def search(self, req: AgentSearchReq) -> AgentSearchRes:
         """Full-text search across message content."""
         pb = ParamBuilder("genai")
-        conditions = [
-            f"project_id = {pb.add(req.project_id, param_type='String')}",
-            f"content LIKE {pb.add(f'%{req.query}%', param_type='String')}",
-        ]
-        if req.roles:
-            conditions.append(
-                f"role IN {pb.add(req.roles, param_type='Array(String)')}"
-            )
-        if req.agent_name:
-            conditions.append(
-                f"agent_name = {pb.add(req.agent_name, param_type='String')}"
-            )
-        if req.conversation_id:
-            conditions.append(
-                f"conversation_id = {pb.add(req.conversation_id, param_type='String')}"
-            )
-        if req.started_after:
-            conditions.append(
-                f"started_at >= {pb.add(req.started_after, param_type='DateTime64(6)')}"
-            )
-        if req.started_before:
-            conditions.append(
-                f"started_at < {pb.add(req.started_before, param_type='DateTime64(6)')}"
-            )
-
-        where = " AND ".join(conditions)
-        limit_slot = pb.add(min(req.limit or 20, 1000), param_type="UInt64")
-        offset_slot = pb.add(req.offset or 0, param_type="UInt64")
-        query = f"""
-            SELECT conversation_id, conversation_name, agent_name,
-                   span_id, trace_id, role, content, content_digest, started_at
-            FROM message_search FINAL
-            WHERE {where}
-            ORDER BY started_at DESC
-            LIMIT {limit_slot} OFFSET {offset_slot}
-        """
-        result = self._ch.query(query, parameters=pb.get_params())
-        col_names = list(result.column_names) if result.column_names else []
+        sql = make_message_search_query(pb, req)
+        result = self._query(sql, pb.get_params())
 
         convs: dict[str, AgentSearchConversationResult] = {}
-        for row in result.result_rows:
-            r = dict(zip(col_names, row, strict=False))
+        for r in _rows_as_dicts(result):
             cid = safe_str(r.get("conversation_id")) or "(no conversation)"
             if cid not in convs:
                 convs[cid] = AgentSearchConversationResult(
@@ -683,14 +320,15 @@ class AgentQueryHandler:
 
 
 class AgentWriteHandler:
-    """ClickHouse write operations for agent data.
+    """Write-side operations for agent data (inserts + chat projection).
 
-    Separate from AgentQueryHandler to keep read/write concerns apart.
-    Instantiated with a ClickHouse client.
+    Takes both a ``ch_client`` (for ``insert`` calls, which have no wrapper)
+    and a ``query_fn`` (for read queries that feed the chat projection).
     """
 
-    def __init__(self, ch_client: CHClient) -> None:
+    def __init__(self, ch_client: CHClient, query_fn: QueryFn) -> None:
         self._ch = ch_client
+        self._query = query_fn
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -761,7 +399,7 @@ class AgentWriteHandler:
 
     def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
-        reader = AgentQueryHandler(self._ch)
+        reader = AgentQueryHandler(self._query)
         spans_res = reader.spans_trace(
             AgentSpansTraceReq(
                 project_id=req.project_id,
@@ -775,15 +413,8 @@ class AgentWriteHandler:
     ) -> AgentConversationChatRes:
         """Build multi-turn chat view for a conversation."""
         pb = ParamBuilder("genai")
-        pid = pb.add(req.project_id, param_type="String")
-        cid = pb.add(req.conversation_id, param_type="String")
-        spans_q = f"""
-            SELECT {_CHAT_VIEW_COLS} FROM spans s
-            WHERE s.project_id = {pid}
-              AND s.conversation_id = {cid}
-            ORDER BY s.started_at ASC
-        """
-        result = self._ch.query(spans_q, parameters=pb.get_params())
+        sql = make_conversation_chat_spans_query(pb, req)
+        result = self._query(sql, pb.get_params())
 
         if not result.result_rows:
             return AgentConversationChatRes(
@@ -791,13 +422,10 @@ class AgentWriteHandler:
                 turns=[],
             )
 
-        col_names = list(result.column_names) if result.column_names else []
-
         # Group spans by trace_id, preserving insertion order
         spans_by_trace: dict[str, list[Any]] = {}
-        for row in result.result_rows:
-            span_dict = normalize_span_row(dict(zip(col_names, row, strict=False)))
-            span = AgentSpanSchema.model_construct(**span_dict)
+        for r in _rows_as_dicts(result):
+            span = AgentSpanSchema.model_construct(**normalize_span_row(r))
             spans_by_trace.setdefault(span.trace_id, []).append(span)
 
         # Cap to most recent 50 traces
