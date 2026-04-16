@@ -23,7 +23,6 @@ gha-creds-*.json
 */file::memory:?cache=shared
 tests/weave_models/
 .cursor/rules/personal.mdc
-.claude/worktrees/
 pyrightconfig.json
 .coverage/
 coverage.xml
