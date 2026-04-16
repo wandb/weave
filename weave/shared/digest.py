@@ -18,8 +18,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import os
 from dataclasses import dataclass
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 
 from weave.shared.object_class_util import process_incoming_object_val
@@ -27,14 +27,24 @@ from weave.shared.object_class_util import process_incoming_object_val
 CUSTOM_WEAVE_TYPE = "CustomWeaveType"
 
 
+def _is_unsafe_custom_type_file_key(key: str) -> bool:
+    # Check both path dialects so validation is stable regardless of host OS.
+    posix_path = PurePosixPath(key)
+    windows_path = PureWindowsPath(key)
+    return (
+        bool(posix_path.anchor)
+        or bool(windows_path.anchor)
+        or ".." in posix_path.parts
+        or ".." in windows_path.parts
+    )
+
+
 def _validate_custom_type_file_keys(val: Any) -> None:
     """Recursively walk val and reject unsafe file path keys in CustomWeaveType nodes."""
     if isinstance(val, dict):
         if val.get("_type") == CUSTOM_WEAVE_TYPE:
             for key in val.get("files", {}):
-                if os.path.isabs(key):
-                    raise ValueError(f"Invalid file path key: {key!r}")
-                if ".." in os.path.normpath(key).split(os.sep):
+                if _is_unsafe_custom_type_file_key(key):
                     raise ValueError(f"Invalid file path key: {key!r}")
         for v in val.values():
             _validate_custom_type_file_keys(v)

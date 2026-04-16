@@ -26,6 +26,15 @@ def test_custom_type_file_key_validation() -> None:
     with pytest.raises(ValueError, match="Invalid file path"):
         compute_object_digest_result(abs_val)
 
+    # Windows-style absolute path is rejected
+    windows_abs_val = {
+        "_type": "CustomWeaveType",
+        "weave_type": {"type": "wave.Wave_read"},
+        "files": {"C:/Windows/System32/evil.pth": "digest_bad"},
+    }
+    with pytest.raises(ValueError, match="Invalid file path"):
+        compute_object_digest_result(windows_abs_val)
+
     # Path traversal key is rejected
     traversal_val = {
         "_type": "CustomWeaveType",
@@ -34,6 +43,15 @@ def test_custom_type_file_key_validation() -> None:
     }
     with pytest.raises(ValueError, match="Invalid file path"):
         compute_object_digest_result(traversal_val)
+
+    # Windows-style traversal key is rejected
+    windows_traversal_val = {
+        "_type": "CustomWeaveType",
+        "weave_type": {"type": "wave.Wave_read"},
+        "files": {"..\\..\\Windows\\System32\\evil.pth": "digest_bad"},
+    }
+    with pytest.raises(ValueError, match="Invalid file path"):
+        compute_object_digest_result(windows_traversal_val)
 
     # Deeply nested bad key (inside list inside dict) is caught
     nested_val = {
