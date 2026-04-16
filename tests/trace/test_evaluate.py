@@ -574,15 +574,15 @@ async def test_post_hoc_score_appears_in_eval_results(client):
     all_calls = calls_res.calls
 
     eval_calls = [
-        c for c in all_calls
-        if op_name_endswith(c.op_name, "Evaluation.evaluate")
+        c for c in all_calls if op_name_endswith(c.op_name, "Evaluation.evaluate")
     ]
     assert len(eval_calls) >= 1
     eval_call_id = eval_calls[0].id
 
     # 3. Find predict_and_score calls (direct children of eval root)
     pas_calls = [
-        c for c in all_calls
+        c
+        for c in all_calls
         if c.parent_id == eval_call_id
         and op_name_endswith(c.op_name, "Evaluation.predict_and_score")
     ]
@@ -606,7 +606,9 @@ async def test_post_hoc_score_appears_in_eval_results(client):
             op_source_code="def score(output):\n    return 1.0",
         )
     )
-    scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+    scorer_ref = (
+        f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+    )
 
     for predict_call in predict_calls:
         client.server.score_create(
