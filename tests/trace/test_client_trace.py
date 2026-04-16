@@ -413,8 +413,9 @@ def ref_str(op):
     return weave_client.get_ref(op).uri
 
 
-def test_trace_call_query_filter_op_version_refs(client):
+def test_trace_call_query_filter_op_version_refs(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
+    client.flush()
     call_summaries = call_spec.call_summaries
 
     # This is just a string representation of the ref
@@ -878,8 +879,9 @@ def test_trace_call_query_filter_call_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_trace_roots_only(client):
+def test_trace_call_query_filter_trace_roots_only(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
+    client.flush()
 
     for trace_roots_only, exp_count in [
         # Test the None case
@@ -899,7 +901,7 @@ def test_trace_call_query_filter_trace_roots_only(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_run_ids(client):
+def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
     from weave.trace import weave_client
@@ -918,6 +920,7 @@ def test_trace_call_query_filter_wb_run_ids(client):
     ):
         call_spec_2 = simple_line_call_bootstrap()
     call_spec_3 = simple_line_call_bootstrap()
+    client.flush()
 
     total_calls = (
         call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls
@@ -943,14 +946,17 @@ def test_trace_call_query_filter_wb_run_ids(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_filter_wb_user_ids(client, trace_server):
+def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush):
     call_spec_1 = simple_line_call_bootstrap()
+    client.flush()
 
     trace_server.set_user_id("second_user")
     call_spec_2 = simple_line_call_bootstrap()
+    client.flush()
 
     trace_server.set_user_id("third_user")
     call_spec_3 = simple_line_call_bootstrap()
+    client.flush()
 
     for wb_user_ids, exp_count in [
         (
@@ -978,8 +984,9 @@ def test_trace_call_query_filter_wb_user_ids(client, trace_server):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_limit(client):
+def test_trace_call_query_limit(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
+    client.flush()
 
     for limit, exp_count in [
         # Test the None case
@@ -999,8 +1006,9 @@ def test_trace_call_query_limit(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_offset(client):
+def test_trace_call_query_offset(client, no_autoflush):
     call_spec = simple_line_call_bootstrap()
+    client.flush()
 
     for offset, exp_count in [
         # Test the None case
@@ -1020,7 +1028,7 @@ def test_trace_call_query_offset(client):
         assert len(inner_res.calls) == exp_count
 
 
-def test_trace_call_query_timings(client):
+def test_trace_call_query_timings(client, no_autoflush):
     now = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
     later = now + datetime.timedelta(seconds=1)
     even_later = later + datetime.timedelta(seconds=1)
@@ -1052,6 +1060,7 @@ def test_trace_call_query_timings(client):
         for i in range(num_calls):
             call_index = i
             client.create_call("y", {"a": i})
+    client.flush()
 
     def query_server():
         result = get_client_trace_server(client).calls_query_stream(
@@ -6555,7 +6564,7 @@ def test_calls_query_sort_by_trace_name_with_costs(client):
     assert calls[1].id == call_a.id
 
 
-def test_calls_query_ordering_with_costs_comprehensive(client):
+def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
     @weave.op
     def my_op(x: int) -> int:
         return x
@@ -6599,6 +6608,7 @@ def test_calls_query_ordering_with_costs_comprehensive(client):
     # Call with missing/NULL attributes
     call6 = client.create_call(my_op, {"x": 6}, attributes={})
     client.finish_call(call6, 6)
+    client.flush()
 
     # Test Case 1: Multiple order fields with costs
     sort_by = [
