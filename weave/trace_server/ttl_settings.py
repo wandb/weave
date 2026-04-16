@@ -3,7 +3,13 @@
 Provides a cached lookup of per-project retention settings from ClickHouse,
 and helpers to compute the expire_at timestamp for new inserts.
 
-Two-layer cache: L1 in-process TTLCache, L2 Redis (optional).
+Two-layer cache over per-project retention_days:
+  L1: in-process, time-based eviction via cachetools.TTLCache
+  L2: Redis (optional)
+
+Noun overload warning: the cached *value* is itself a TTL setting
+(retention_days). "TTLCache" here refers to the L1 eviction strategy, not the
+value being cached.
 """
 
 from __future__ import annotations
@@ -45,8 +51,9 @@ def get_project_retention_days(
 ) -> int:
     """Return retention_days for a project (0 = no TTL / infinite). Cached.
 
-    Read path: L1 (TTLCache) -> L2 (Redis, optional) -> L3 (ClickHouse argMax).
-    On CH miss (no row), returns 0 (no TTL configured).
+    Read path: L1 (in-process) -> L2 (Redis, optional) -> SOT (ClickHouse argMax).
+    A fall-through to SOT is a full cache miss; on CH miss (no row), returns 0
+    (no TTL configured).
     """
     cached = _l1_get(project_id)
     if cached is not None:
@@ -60,9 +67,9 @@ def get_project_retention_days(
             set_current_span_dd_tags({"ttl.cache_hit": "L2"})
             return redis_val
 
-    retention_days = _l3_query(ch_client, project_id)
+    retention_days = _query_source_of_truth(ch_client, project_id)
     set_current_span_dd_tags(
-        {"ttl.cache_hit": "L3", "ttl.retention_days": retention_days}
+        {"ttl.cache_hit": "SOT", "ttl.retention_days": retention_days}
     )
 
     if redis_client is not None:
@@ -164,7 +171,7 @@ def _l2_delete(redis_client: redis.Redis, project_id: str) -> None:
         logger.exception("Redis L2 cache delete failed for project %s", project_id)
 
 
-def _l3_query(ch_client: CHClient, project_id: str) -> int:
+def _query_source_of_truth(ch_client: CHClient, project_id: str) -> int:
     """Query ClickHouse for the latest retention_days via argMax. Returns 0 on miss."""
     result = ch_client.query(
         "SELECT argMax(retention_days, updated_at) "
