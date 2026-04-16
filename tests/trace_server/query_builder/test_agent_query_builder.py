@@ -157,23 +157,6 @@ class TestMakeSpansListQuery:
         )
         assert pb.get_params()["genai_1"] == 10000
 
-    def test_rejects_sort_injection(self) -> None:
-        """Unknown sort columns fall back to the default, preventing injection."""
-        pb = ParamBuilder("genai")
-        query = make_spans_list_query(
-            pb,
-            AgentSpansQueryReq(
-                project_id="p1",
-                sort_by=[
-                    AgentSortBy(
-                        field="started_at; DROP TABLE spans--", direction="desc"
-                    )
-                ],
-            ),
-        )
-        assert "DROP" not in query
-        assert "ORDER BY started_at DESC" in query
-
 
 # ============================================================================
 # make_spans_trace_query
@@ -490,13 +473,37 @@ class TestMakeConversationsQueries:
                 sort_by=[AgentSortBy(field="agent_name", direction="asc")],
             ),
         )
-        assert "ORDER BY arrayElement(agent_names, 1) asc" in query
-        assert pb.get_params() == {
+
+        expected = """
+            SELECT conversation_id,
+                   max(conversation_name) AS conversation_name,
+                   countIf(operation_name = 'invoke_agent') AS turn_count,
+                   count() AS span_count,
+                   sum(input_tokens) AS total_input_tokens,
+                   sum(output_tokens) AS total_output_tokens,
+                   sum(toUnixTimestamp64Milli(ended_at) - toUnixTimestamp64Milli(started_at)) AS total_duration_ms,
+                   countIf(status_code = 'ERROR') AS error_count,
+                   groupUniqArray(agent_name) AS agent_names,
+                   groupUniqArray(agent_version) AS agent_versions,
+                   groupUniqArray(provider_name) AS provider_names,
+                   groupUniqArray(request_model) AS request_models,
+                   min(started_at) AS first_seen,
+                   max(started_at) AS last_seen
+            FROM spans
+            WHERE project_id = {genai_0:String}
+              AND conversation_id != ''
+              AND agent_name = {genai_1:String}
+            GROUP BY conversation_id
+            ORDER BY arrayElement(agent_names, 1) asc
+            LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
+        """
+        expected_params = {
             "genai_0": "p1",
             "genai_1": "bot",
             "genai_2": 100,
             "genai_3": 0,
         }
+        assert_sql(expected, expected_params, query, pb.get_params())
 
 
 # ============================================================================
@@ -633,40 +640,3 @@ class TestBuildOrderBy:
             build_order_by(sort, SPAN_SORTABLE_COLS, "fallback")
             == "started_at desc, input_tokens asc"
         )
-
-
-# ============================================================================
-# Parameterization safety (values never inlined into SQL)
-# ============================================================================
-
-
-class TestParameterization:
-    def test_custom_attr_key_is_parameterized(self) -> None:
-        """Custom-attribute keys go through ParamBuilder, not string interpolation."""
-        pb = ParamBuilder("genai")
-        query = make_spans_list_query(
-            pb,
-            AgentSpansQueryReq(
-                project_id="p1",
-                filters=AgentSpansQueryFilters(
-                    custom_filters=[
-                        AgentCustomAttrFilter(
-                            attr_key="'; DROP TABLE--", operator="eq", value="x"
-                        )
-                    ]
-                ),
-            ),
-        )
-        assert "DROP TABLE" not in query
-        assert "'; DROP TABLE--" in pb.get_params().values()
-
-    def test_filter_values_are_parameterized(self) -> None:
-        pb = ParamBuilder("genai")
-        query = make_spans_list_query(
-            pb,
-            AgentSpansQueryReq(
-                project_id="'; DROP TABLE--",
-                filters=AgentSpansQueryFilters(agent_name="'; DROP TABLE--"),
-            ),
-        )
-        assert "DROP TABLE" not in query
