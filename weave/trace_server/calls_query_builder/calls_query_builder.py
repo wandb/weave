@@ -1947,10 +1947,9 @@ def _handle_status_summary_field(
     ended_at_field = get_field_by_name("ended_at")
     status_counts_field = get_field_by_name("summary.status_counts.error")
 
-    exception_sql = _field_as_sql_maybe_agg(
-        exception_field, pb, table_alias, use_agg_fn
-    )
-    ended_at_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, use_agg_fn)
+    # These calls register parameters in pb as a side effect; results unused.
+    _field_as_sql_maybe_agg(exception_field, pb, table_alias, use_agg_fn)
+    _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, use_agg_fn)
     status_counts_sql = _field_as_sql_maybe_agg(
         status_counts_field, pb, table_alias, use_agg_fn, cast="int"
     )
