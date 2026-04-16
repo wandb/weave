@@ -5192,6 +5192,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Batch read table_rows by digest. Returns {digest: parsed_val}."""
         if len(digests) == 0:
             return {}
+
         pb = ParamBuilder()
         sql = make_table_rows_read_batch_query(project_id, digests, pb)
         result = self._query(sql, pb.get_params())
