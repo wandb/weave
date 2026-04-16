@@ -1,4 +1,5 @@
 import os
+import unittest.mock
 from collections.abc import Generator
 from unittest.mock import Mock
 
@@ -12,6 +13,7 @@ from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_accumulator,
     google_genai_gemini_on_finish,
     google_genai_gemini_postprocess_inputs,
+    google_genai_gemini_postprocess_output,
 )
 from weave.integrations.google_genai.google_genai_sdk import get_google_genai_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
@@ -433,6 +435,163 @@ def test_thoughts_token_count_not_included_when_missing():
     assert model_usage["requests"] == 1
 
 
+def test_on_finish_includes_cached_content_token_count():
+    """Test that cached_content_token_count is mapped to cache_read_input_tokens."""
+    from weave.trace.call import Call
+
+    call = Mock(spec=Call)
+    call.inputs = {"model": "gemini-2.0-flash"}
+    call.summary = {}
+
+    usage_metadata = Mock()
+    usage_metadata.prompt_token_count = 100
+    usage_metadata.candidates_token_count = 50
+    usage_metadata.total_token_count = 150
+    usage_metadata.thoughts_token_count = None
+    usage_metadata.cached_content_token_count = 30
+
+    output = Mock()
+    output.usage_metadata = usage_metadata
+
+    google_genai_gemini_on_finish(call, output, None)
+
+    model_usage = call.summary["usage"]["gemini-2.0-flash"]
+    assert model_usage["cache_read_input_tokens"] == 30
+    assert "thoughts_tokens" not in model_usage
+
+
+def test_on_finish_excludes_cached_content_when_missing():
+    """Test that cache_read_input_tokens is omitted when cached_content_token_count is absent."""
+    from weave.trace.call import Call
+
+    call = Mock(spec=Call)
+    call.inputs = {"model": "gemini-2.0-flash"}
+    call.summary = {}
+
+    usage_metadata = Mock(
+        spec=["prompt_token_count", "candidates_token_count", "total_token_count"]
+    )
+    usage_metadata.prompt_token_count = 100
+    usage_metadata.candidates_token_count = 50
+    usage_metadata.total_token_count = 150
+
+    output = Mock()
+    output.usage_metadata = usage_metadata
+
+    google_genai_gemini_on_finish(call, output, None)
+
+    model_usage = call.summary["usage"]["gemini-2.0-flash"]
+    assert "cache_read_input_tokens" not in model_usage
+    assert "thoughts_tokens" not in model_usage
+
+
+def test_on_finish_with_inline_data_output():
+    """Test that on_finish handles responses with inline_data (images) correctly."""
+    from google.genai import types
+
+    from weave.trace.call import Call
+
+    call = Mock(spec=Call)
+    call.inputs = {"model": "gemini-2.0-flash"}
+    call.summary = {}
+
+    # Build a real Pydantic response with inline_data (image) instead of text
+    image_part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/png")
+    candidate = types.Candidate(
+        content=types.Content(role="model", parts=[image_part]),
+    )
+    output = types.GenerateContentResponse(
+        candidates=[candidate],
+        usage_metadata=types.GenerateContentResponseUsageMetadata(
+            prompt_token_count=10,
+            candidates_token_count=0,
+            total_token_count=10,
+        ),
+    )
+
+    # on_finish should handle usage metadata without errors
+    google_genai_gemini_on_finish(call, output, None)
+
+    model_usage = call.summary["usage"]["gemini-2.0-flash"]
+    assert model_usage["prompt_tokens"] == 10
+    assert model_usage["total_tokens"] == 10
+
+
+def test_postprocess_output_suppresses_non_text_warning():
+    """Test that postprocess_output suppresses the non-text parts warning."""
+    import logging
+
+    from google.genai import types
+
+    # Build a response with inline_data (image) that triggers the warning
+    image_part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/png")
+    candidate = types.Candidate(
+        content=types.Content(role="model", parts=[image_part]),
+    )
+    output = types.GenerateContentResponse(
+        candidates=[candidate],
+        usage_metadata=types.GenerateContentResponseUsageMetadata(
+            prompt_token_count=10,
+            candidates_token_count=0,
+            total_token_count=10,
+        ),
+    )
+
+    # Reset the SDK's internal warning flag so it would warn again
+    import google.genai.types as genai_types
+
+    genai_types._response_text_non_text_warning_logged = False
+
+    # postprocess_output should suppress the warning
+    result = google_genai_gemini_postprocess_output(output)
+    assert result is output  # Returns unmodified output
+
+    # Now access .text — the warning should NOT fire because the flag was set
+    genai_logger = logging.getLogger("google.genai.types")
+    with unittest.mock.patch.object(genai_logger, "warning") as mock_warn:
+        _ = output.text
+        mock_warn.assert_not_called()
+
+    # Restore the flag
+    genai_types._response_text_non_text_warning_logged = False
+
+
+def test_wrapper_sync_sets_postprocess_output():
+    """Test that the sync wrapper sets postprocess_output on the op."""
+    from weave.integrations.google_genai.gemini_utils import (
+        google_genai_gemini_postprocess_output,
+        google_genai_gemini_wrapper_sync,
+    )
+    from weave.trace.autopatch import OpSettings
+
+    settings = OpSettings()
+    wrapper = google_genai_gemini_wrapper_sync(settings)
+
+    def dummy_fn(self, *args, **kwargs):
+        return None
+
+    wrapped = wrapper(dummy_fn)
+    assert wrapped.postprocess_output is google_genai_gemini_postprocess_output
+
+
+def test_wrapper_async_sets_postprocess_output():
+    """Test that the async wrapper sets postprocess_output on the op."""
+    from weave.integrations.google_genai.gemini_utils import (
+        google_genai_gemini_postprocess_output,
+        google_genai_gemini_wrapper_async,
+    )
+    from weave.trace.autopatch import OpSettings
+
+    settings = OpSettings()
+    wrapper = google_genai_gemini_wrapper_async(settings)
+
+    async def dummy_fn(self, *args, **kwargs):
+        return None
+
+    wrapped = wrapper(dummy_fn)
+    assert wrapped.postprocess_output is google_genai_gemini_postprocess_output
+
+
 def _create_mock_part(text: str, thought: bool = False) -> Mock:
     """Helper to create a mock Part with text and optional thought attribute."""
     part = Mock()
@@ -622,12 +781,12 @@ def test_accumulator_updates_all_token_counts():
     assert result.usage_metadata.thoughts_token_count == 100
 
 
-def test_accumulator_skips_parts_with_none_text():
-    """Test that parts with text=None are skipped."""
+def test_accumulator_preserves_non_text_parts():
+    """Test that non-text parts (e.g. inline_data images) are preserved in the accumulator."""
     acc_part = _create_mock_part("Hello")
     acc = _create_mock_response([acc_part])
 
-    # Value part has None text
+    # Value part has None text (e.g. an inline_data image part)
     value_part = Mock()
     value_part.text = None
     value = _create_mock_response([value_part])
@@ -636,6 +795,8 @@ def test_accumulator_skips_parts_with_none_text():
 
     # Text should remain unchanged since value part had None text
     assert acc_part.text == "Hello"
+    # Non-text part should be appended to the accumulated parts
+    assert value_part in result.candidates[0].content.parts
     assert result is acc
 
 
