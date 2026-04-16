@@ -256,6 +256,7 @@ from weave.trace_server.trace_server_common import (
     hydrate_calls_with_feedback,
     make_feedback_query_req,
     set_nested_key,
+    try_parse_json,
 )
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
@@ -5199,10 +5200,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         out: dict[str, Any] = {}
         for row in result.result_rows:
             d, val_dump = row[0], row[1]
-            try:
-                out[d] = json.loads(val_dump)
-            except (json.JSONDecodeError, TypeError):
-                pass
+            parsed = try_parse_json(val_dump)
+            if parsed is not None:
+                out[d] = parsed
         return out
 
     @staticmethod

@@ -71,8 +71,8 @@ def build_predict_and_score_calls_cte(
         calls_complete.summary_dump,
         {row_digest_expr} AS row_digest
     FROM calls_complete
-    WHERE calls_complete.project_id = {project_id_param}
-      AND calls_complete.parent_id IN {eval_root_ids_param}
+    PREWHERE calls_complete.project_id = {project_id_param}
+    WHERE calls_complete.parent_id IN {eval_root_ids_param}
       AND calls_complete.id NOT IN {eval_root_ids_param}
       AND position(calls_complete.op_name, {op_prefix_param}) > 0
 )"""
@@ -97,8 +97,8 @@ def build_predict_and_score_calls_resolved_cte(
     LEFT JOIN (
         SELECT project_id, digest, any(val_dump) AS val_dump
         FROM table_rows
-        WHERE project_id = {project_id_param}
-          AND digest IN (SELECT row_digest FROM predict_and_score_calls)
+        PREWHERE project_id = {project_id_param}
+        WHERE digest IN (SELECT row_digest FROM predict_and_score_calls)
         GROUP BY project_id, digest
     ) AS tr ON tr.digest = predict_and_score_calls.row_digest
 )"""
