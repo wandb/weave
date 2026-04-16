@@ -32,6 +32,7 @@ All paths emit OpenTelemetry spans via a TracerProvider.
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -45,6 +46,17 @@ if TYPE_CHECKING:
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Contextvars for current session/turn (thread/async-task safe)
+# ---------------------------------------------------------------------------
+
+_current_session: contextvars.ContextVar[Session | None] = contextvars.ContextVar(
+    "weave_session", default=None
+)
+_current_turn: contextvars.ContextVar[Turn | None] = contextvars.ContextVar(
+    "weave_turn", default=None
+)
 
 # OTel instrumentation library name used for the tracer.
 _TRACER_NAME = "weave.session"
@@ -445,6 +457,10 @@ class Session(BaseModel):
             turn._otel_context = set_span_in_context(span)
             turn._tracer = self._tracer
 
+        # Set contextvars so get_current_turn() works from anywhere
+        _current_session.set(self)
+        _current_turn.set(turn)
+
         return turn
 
     def end(self) -> None:
@@ -454,8 +470,12 @@ class Session(BaseModel):
         self._ended = True
         if self._current_turn is not None:
             self._current_turn.end()
+        # Clear contextvars
+        _current_session.set(None)
+        _current_turn.set(None)
 
     def __enter__(self) -> Session:
+        _current_session.set(self)
         return self
 
     def __exit__(
@@ -493,6 +513,10 @@ def start_session(
     model: str = "",
     session_id: str = "",
     session_name: str = "",
+    base_url: str = "",
+    api_key: str = "",
+    entity: str = "",
+    project: str = "",
     _tracer_provider: TracerProvider | None = None,
 ) -> Session:
     """Start an agent session. Works as context manager or standalone.
@@ -520,14 +544,30 @@ def start_session(
         turn.end()
         session.end()
 
+        # With explicit endpoint and auth (e.g. per-user delegated auth)
+        session = weave.start_session(
+            agent_name="bot",
+            base_url="https://trace.wandb.ai",
+            api_key="user-api-key",
+            entity="my-entity",
+            project="my-project",
+        )
+
     Args:
         agent_name: Name of the agent.
         model: Default model name for turns/steps.
         session_id: Unique session identifier. Auto-generated if empty.
         session_name: Human-readable session name.
+        base_url: Weave trace server base URL (e.g. ``https://trace.wandb.ai``).
+            When provided with ``api_key``, creates a TracerProvider that exports
+            to this endpoint with the given auth. Ignored if ``_tracer_provider``
+            is given.
+        api_key: W&B API key for authentication. Used with ``base_url``.
+        entity: W&B entity name. Used with ``base_url`` for resource attributes.
+        project: W&B project name. Used with ``base_url`` for resource attributes.
         _tracer_provider: Optional OTel TracerProvider. When provided, the
-            session emits OTel spans via this provider. Otherwise, uses the
-            auto-configured provider.
+            session emits OTel spans via this provider. Takes precedence over
+            ``base_url``/``api_key``.
 
     Returns:
         A ``Session`` instance.
@@ -541,6 +581,15 @@ def start_session(
 
     if _tracer_provider is not None:
         session._tracer = _tracer_provider.get_tracer(_TRACER_NAME)
+    elif base_url:
+        # Build a TracerProvider with explicit endpoint and auth
+        provider = _build_tracer_provider(
+            base_url=base_url,
+            api_key=api_key,
+            entity=entity,
+            project=project,
+        )
+        session._tracer = provider.get_tracer(_TRACER_NAME)
     else:
         # Auto-configure a TracerProvider
         from weave.otel.setup import ensure_tracer_provider
@@ -548,7 +597,117 @@ def start_session(
         provider = ensure_tracer_provider()
         session._tracer = provider.get_tracer(_TRACER_NAME)
 
+    _current_session.set(session)
     return session
+
+
+def get_current_session() -> Session | None:
+    """Return the active session, or ``None`` if no session is active."""
+    return _current_session.get()
+
+
+def get_current_turn() -> Turn | None:
+    """Return the active turn, or ``None`` if no turn is active."""
+    return _current_turn.get()
+
+
+def start_step(
+    *,
+    model: str = "",
+    provider_name: str = "",
+    system_instructions: list[str] | None = None,
+) -> Step:
+    """Start an LLM call step under the current turn.
+
+    Convenience wrapper around ``get_current_turn().start_step(...)``.
+    Works as a context manager or standalone (call ``.end()``).
+
+    If no turn is active, returns a disconnected ``Step`` that records
+    data locally but emits no OTel spans (safe no-op).
+
+    Examples::
+
+        with weave.start_step(model="gpt-4o") as step:
+            step.usage = Usage(input_tokens=100, output_tokens=50)
+            step.output_messages.append(Message(role="assistant", content="Hi!"))
+
+    Args:
+        model: Model name for this LLM call.
+        provider_name: Provider name (e.g. ``"openai"``).
+        system_instructions: System instructions for this step.
+
+    Returns:
+        A ``Step`` instance.
+    """
+    turn = _current_turn.get()
+    if turn is not None:
+        return turn.start_step(
+            model=model,
+            provider_name=provider_name,
+            system_instructions=system_instructions,
+        )
+    # No active turn — return a disconnected Step (no OTel span)
+    return Step(
+        model=model,
+        provider_name=provider_name,
+        system_instructions=list(system_instructions or []),
+    )
+
+
+def _build_tracer_provider(
+    *,
+    base_url: str,
+    api_key: str,
+    entity: str,
+    project: str,
+) -> TracerProvider:
+    """Create an OTel TracerProvider that exports to a specific endpoint with auth."""
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+        OTLPSpanExporter as OTLPHTTPSpanExporter,
+    )
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    from weave.otel.live_processor import LiveSpanProcessor
+    from weave.version import VERSION
+
+    headers: dict[str, str] = {}
+    if api_key:
+        headers["wandb-api-key"] = api_key
+
+    base = base_url.rstrip("/")
+    genai_endpoint = f"{base}/otel/v1/genai/traces"
+
+    resource = Resource.create(
+        {
+            "service.name": "weave-session",
+            "service.version": VERSION,
+            "wandb.entity": entity,
+            "wandb.project": project,
+        }
+    )
+    provider = SDKTracerProvider(resource=resource)
+
+    # Live span streaming
+    provider.add_span_processor(
+        LiveSpanProcessor(
+            endpoint=f"{base}/otel/v1/genai/span/start",
+            headers=headers,
+        )
+    )
+
+    # Batch export
+    provider.add_span_processor(
+        BatchSpanProcessor(
+            OTLPHTTPSpanExporter(
+                endpoint=genai_endpoint,
+                headers=headers,
+            )
+        )
+    )
+
+    return provider
 
 
 def _get_tracer(
