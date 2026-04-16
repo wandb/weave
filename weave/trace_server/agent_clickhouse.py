@@ -69,6 +69,32 @@ logger = logging.getLogger(__name__)
 _DEFAULT_AGENT_QUERY_LIMIT = 100
 _MAX_AGENT_QUERY_LIMIT = 10_000
 
+# Conversations are aggregated with GROUP BY conversation_id, so scalar columns
+# like provider_name become arrays in the SELECT and must be sorted via arrayElement.
+_CONV_SORT_EXPRS: dict[str, str] = {
+    "provider_name": "arrayElement(provider_names, 1)",
+    "provider_names": "arrayElement(provider_names, 1)",
+    "agent_name": "arrayElement(agent_names, 1)",
+    "agent_names": "arrayElement(agent_names, 1)",
+    "request_model": "arrayElement(request_models, 1)",
+    "request_models": "arrayElement(request_models, 1)",
+}
+_CONV_SORTABLE_COLS: frozenset[str] = frozenset(
+    {
+        "last_seen",
+        "first_seen",
+        "turn_count",
+        "span_count",
+        "total_input_tokens",
+        "total_output_tokens",
+        "total_duration_ms",
+        "error_count",
+        "conversation_name",
+        "conversation_id",
+        *_CONV_SORT_EXPRS.keys(),
+    }
+)
+
 # Column projections derived from AgentSpanCHInsertable to stay in sync.
 _ALL_SPAN_FIELDS = list(AgentSpanCHInsertable.model_fields.keys())
 
@@ -510,39 +536,12 @@ class AgentQueryHandler:
 
         where = " AND ".join(conditions)
 
-        conv_sort_map: dict[str, str] = {
-            "last_seen": "last_seen",
-            "first_seen": "first_seen",
-            "turn_count": "turn_count",
-            "span_count": "span_count",
-            "total_input_tokens": "total_input_tokens",
-            "total_output_tokens": "total_output_tokens",
-            "total_duration_ms": "total_duration_ms",
-            "error_count": "error_count",
-            "conversation_name": "conversation_name",
-            "conversation_id": "conversation_id",
-            "provider_name": "arrayElement(provider_names, 1)",
-            "provider_names": "arrayElement(provider_names, 1)",
-            "agent_name": "arrayElement(agent_names, 1)",
-            "agent_names": "arrayElement(agent_names, 1)",
-            "request_model": "arrayElement(request_models, 1)",
-            "request_models": "arrayElement(request_models, 1)",
-        }
-        order_by = "last_seen DESC, conversation_id"
-        if req.sort_by:
-            parts = []
-            for s in req.sort_by:
-                col = s.field if hasattr(s, "field") else s.get("field", "")
-                direction = (
-                    s.direction
-                    if hasattr(s, "direction")
-                    else s.get("direction", "desc")
-                )
-                expr = conv_sort_map.get(col)
-                if expr and direction in {"asc", "desc"}:
-                    parts.append(f"{expr} {direction}")
-            if parts:
-                order_by = ", ".join(parts)
+        order_by = build_order_by(
+            req.sort_by,
+            _CONV_SORTABLE_COLS,
+            "last_seen DESC, conversation_id",
+            column_exprs=_CONV_SORT_EXPRS,
+        )
 
         count_q = f"""SELECT count() FROM (
             SELECT conversation_id FROM spans WHERE {where} GROUP BY conversation_id
