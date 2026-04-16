@@ -25,6 +25,7 @@ from weave.trace.session import (
     log_turn,
     start_session,
     start_step,
+    start_turn,
 )
 
 # ---------------------------------------------------------------------------
@@ -452,13 +453,59 @@ def test_otel_mode_does_not_require_init(otel_setup):
     session.end()
 
 
+class TestTopLevelStartTurn:
+    """weave.start_turn() reads session from contextvar."""
+
+    def test_start_turn_with_active_session(self, otel_setup):
+        provider, exporter = otel_setup
+        with start_session(agent_name="bot", _tracer_provider=provider):
+            with start_turn() as turn:
+                turn.user("Hello")
+                with start_step(model="gpt-4o") as step:
+                    step.usage = Usage(input_tokens=10, output_tokens=5)
+                    step.output_messages.append(
+                        Message(role="assistant", content="Hi!")
+                    )
+
+        spans = exporter.get_finished_spans()
+        names = {s.name for s in spans}
+        assert "invoke_agent" in names
+        assert "chat" in names
+
+    def test_start_turn_without_session_returns_disconnected_turn(self):
+        """No active session — returns a Turn that works but emits no spans."""
+        turn = start_turn(agent_name="bot")
+        assert isinstance(turn, Turn)
+        turn.user("Hello")
+        turn.end()  # should not crash
+
+    def test_start_turn_separate_traces(self, otel_setup):
+        provider, exporter = otel_setup
+        with start_session(agent_name="bot", _tracer_provider=provider):
+            with start_turn() as t1:
+                t1.user("Hello")
+                with start_step(model="gpt-4o") as s:
+                    s.output_messages.append(Message(role="assistant", content="Hi!"))
+            with start_turn() as t2:
+                t2.user("Bye")
+                with start_step(model="gpt-4o") as s:
+                    s.output_messages.append(
+                        Message(role="assistant", content="Goodbye!")
+                    )
+
+        spans = exporter.get_finished_spans()
+        invoke_spans = [s for s in spans if s.name == "invoke_agent"]
+        assert len(invoke_spans) == 2
+        assert invoke_spans[0].context.trace_id != invoke_spans[1].context.trace_id
+
+
 class TestTopLevelStartStep:
     """weave.start_step() reads turn from contextvar."""
 
     def test_start_step_with_active_turn(self, otel_setup):
         provider, exporter = otel_setup
-        with start_session(agent_name="bot", _tracer_provider=provider) as session:
-            with session.start_turn() as turn:
+        with start_session(agent_name="bot", _tracer_provider=provider):
+            with start_turn() as turn:
                 turn.user("Hello")
                 with start_step(model="gpt-4o") as step:
                     step.usage = Usage(input_tokens=10, output_tokens=5)
@@ -485,8 +532,8 @@ class TestTopLevelStartStep:
 
     def test_start_step_with_tool(self, otel_setup):
         provider, exporter = otel_setup
-        with start_session(agent_name="bot", _tracer_provider=provider) as session:
-            with session.start_turn() as turn:
+        with start_session(agent_name="bot", _tracer_provider=provider):
+            with start_turn() as turn:
                 turn.user("Hello")
                 with start_step(model="gpt-4o") as step:
                     with step.start_tool(name="calc", arguments="1+1") as tool:
@@ -497,6 +544,35 @@ class TestTopLevelStartStep:
         assert "execute_tool" in names
         assert "chat" in names
         assert "invoke_agent" in names
+
+
+class TestFullTopLevelAPI:
+    """All top-level functions work together."""
+
+    def test_full_flow(self, otel_setup):
+        provider, exporter = otel_setup
+        with start_session(
+            agent_name="bot", session_id="s1", _tracer_provider=provider
+        ):
+            with start_turn() as turn:
+                turn.user("What is 2+2?")
+                with start_step(model="gpt-4o") as step:
+                    step.usage = Usage(input_tokens=10, output_tokens=5)
+                    step.output_messages.append(
+                        Message(role="assistant", content="Let me calculate.")
+                    )
+                    with step.start_tool(name="calc", arguments="2+2") as tool:
+                        tool.result = "4"
+                with start_step(model="gpt-4o") as step:
+                    step.usage = Usage(input_tokens=15, output_tokens=3)
+                    step.output_messages.append(Message(role="assistant", content="4"))
+
+        spans = exporter.get_finished_spans()
+        assert len(spans) == 4  # invoke_agent, chat, execute_tool, chat
+        names = [s.name for s in spans]
+        assert names.count("chat") == 2
+        assert "invoke_agent" in names
+        assert "execute_tool" in names
 
 
 def test_context_manager_full(otel_setup):

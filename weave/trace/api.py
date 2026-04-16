@@ -34,6 +34,7 @@ from weave.trace.session import (
     log_turn,
     start_session,
     start_step,
+    start_turn,
 )
 from weave.trace.settings import (
     UserSettings,
@@ -584,6 +585,7 @@ __all__ = [
     "set_view",
     "start_session",
     "start_step",
+    "start_turn",
     "thread",
     "weave_client_context",
 ]

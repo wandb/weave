@@ -611,6 +611,40 @@ def get_current_turn() -> Turn | None:
     return _current_turn.get()
 
 
+def start_turn(
+    *,
+    model: str = "",
+    agent_name: str = "",
+) -> Turn:
+    """Start a new turn under the current session.
+
+    Convenience wrapper around ``get_current_session().start_turn(...)``.
+    Works as a context manager or standalone (call ``.end()``).
+
+    If no session is active, returns a disconnected ``Turn`` that records
+    data locally but emits no OTel spans (safe no-op).
+
+    Examples::
+
+        with weave.start_turn() as turn:
+            turn.user("Hello")
+            with weave.start_step(model="gpt-4o") as step:
+                ...
+
+    Args:
+        model: Default model name for steps in this turn.
+        agent_name: Agent name for this turn.
+
+    Returns:
+        A ``Turn`` instance.
+    """
+    session = _current_session.get()
+    if session is not None:
+        return session.start_turn(model=model, agent_name=agent_name)
+    # No active session — return a disconnected Turn (no OTel span)
+    return Turn(model=model, agent_name=agent_name)
+
+
 def start_step(
     *,
     model: str = "",
