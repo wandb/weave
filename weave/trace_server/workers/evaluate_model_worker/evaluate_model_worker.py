@@ -8,11 +8,13 @@ import weave
 from weave.evaluation.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.refs import Ref
+from weave.trace.refs import ObjectRef, Ref
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
+from weave.trace_server.validation import assert_safe_payload
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
@@ -40,6 +42,11 @@ def evaluate_model(args: EvaluateModelArgs) -> None:
 @ddtrace.tracer.wrap(name="evaluate_model_worker.evaluate_model")
 def _evaluate_model(args: EvaluateModelArgs) -> None:
     client = require_weave_client()
+
+    # Validate raw payloads before deserialization.
+    # https://coreweave.atlassian.net/browse/VULNMGMT-1007
+    _assert_safe_ref(client, args.evaluation_ref, "evaluation_ref")
+    _assert_safe_ref(client, args.model_ref, "model_ref")
 
     loaded_evaluation = _get_valid_evaluation(client, args.evaluation_ref)
 
@@ -96,3 +103,20 @@ def _run_evaluation(
                 loaded_model, __weave={"call_id": evaluation_call_id}
             )
         )
+
+
+def _assert_safe_ref(client: WeaveClient, ref_uri: str, label: str) -> None:
+    """Read the raw object for a ref and reject it if it contains unsafe CustomWeaveType payloads."""
+    ref = Ref.parse_uri(ref_uri)
+    if not isinstance(ref, ObjectRef):
+        raise TypeError(f"Expected an object ref for {label}, got: {ref_uri}")
+
+    project_id = f"{ref.entity}/{ref.project}"
+    read_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=project_id,
+            object_id=ref.name,
+            digest=ref.digest,
+        )
+    )
+    assert_safe_payload(read_res.obj.val, label)

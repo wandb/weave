@@ -1223,6 +1223,38 @@ def test_index_operations_only_on_local_tables_distributed(distributed_migrator)
         distributed_migrator.ch_client.command.reset_mock()
 
 
+def test_ttl_operations_only_on_local_tables_distributed(distributed_migrator):
+    """Test that MODIFY TTL and REMOVE TTL are only applied to local tables in distributed mode."""
+    test_cases = [
+        (
+            "ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE",
+            "ALTER TABLE call_parts_local ON CLUSTER test_cluster MODIFY TTL toDateTime(expire_at) DELETE",
+        ),
+        (
+            "ALTER TABLE call_parts REMOVE TTL",
+            "ALTER TABLE call_parts_local ON CLUSTER test_cluster REMOVE TTL",
+        ),
+        (
+            "ALTER TABLE calls_complete MODIFY TTL toDateTime(expire_at) DELETE",
+            "ALTER TABLE calls_complete_local ON CLUSTER test_cluster MODIFY TTL toDateTime(expire_at) DELETE",
+        ),
+    ]
+
+    for command, expected_local_sql in test_cases:
+        distributed_migrator._execute_migration_command("test_db", command)
+
+        # Should only execute ALTER on local table (1 command, not 2)
+        assert distributed_migrator.ch_client.command.call_count == 1
+        assert distributed_migrator.ch_client.database == "original_db"
+
+        # Verify it was applied to the local table
+        local_alter_sql = distributed_migrator.ch_client.command.call_args_list[0][0][0]
+        assert local_alter_sql == expected_local_sql
+
+        # Reset for next test case
+        distributed_migrator.ch_client.command.reset_mock()
+
+
 @patch("tenacity.nap.time.sleep")
 def test_run_ddl_with_retry(mock_sleep, mock_costs):
     """Verify retry behavior for transient CH errors (e.g. 517 CANNOT_ASSIGN_ALTER)."""
