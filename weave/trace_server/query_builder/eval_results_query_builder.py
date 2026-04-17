@@ -2,15 +2,17 @@
 
 Generates ClickHouse CTEs for the eval_results CTE chain:
   predict_and_score_calls          → filter to predict-and-score calls, extract row_digest
-  predict_and_score_calls_resolved → LEFT JOIN table_rows to resolve dataset-backed inputs
+  predict_and_score_calls_resolved → (conditionally) LEFT JOIN table_rows so sort/filter on inputs.* can read the dataset row
   ranked_digests                   → GROUP BY row_digest, HAVING filters, ROW_NUMBER for sort
   ranked_digest_count              → total matching rows (for pagination metadata)
   page_digests                     → paginated slice of ranked_digests
+  page_resolved_inputs             → table_rows JOIN for the paginated digests only
   page_rows                        → call IDs + resolved_inputs for the page
 """
 
 from functools import partial
 
+from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
@@ -41,6 +43,35 @@ END"""
 def _or_any_prefix_matches(op_name_expr: str, op_prefix_params: list[str]) -> str:
     """`position(op_name, p) > 0` OR'd across every prefix param."""
     return " OR ".join(f"position({op_name_expr}, {p}) > 0" for p in op_prefix_params)
+
+
+def _sort_filter_uses_inputs(
+    sort_by: list[tsi.EvalResultsSortBy] | None,
+    filters: list[tsi.EvalResultsFilter] | None,
+) -> bool:
+    """True if any sort_by.field or filter $getField references ``inputs.*``."""
+    if sort_by:
+        for s in sort_by:
+            if s.field.startswith("inputs."):
+                return True
+
+    if not filters:
+        return False
+
+    found = False
+
+    def collector(path: str, _pb: ParamBuilder) -> tuple[str, set[str]]:
+        nonlocal found
+        if path.startswith("inputs."):
+            found = True
+        return "NULL", set()
+
+    pb = ParamBuilder()
+    for f in filters:
+        _process_query_to_conditions(
+            f.query, [], [], param_builder=pb, field_resolver=collector
+        )
+    return found
 
 
 def build_predict_and_score_calls_cte(
@@ -86,6 +117,8 @@ def build_predict_and_score_calls_cte(
     GROUP BY (calls_merged.project_id, calls_merged.id)
     HAVING any(calls_merged.parent_id) IN {eval_root_ids_param}
         AND ({op_match_having})
+        AND any(calls_merged.deleted_at) IS NULL
+        AND any(calls_merged.started_at) IS NOT NULL
 )"""
     else:
         op_match_calls_complete = _or_any_prefix_matches(
@@ -103,17 +136,25 @@ def build_predict_and_score_calls_cte(
     WHERE calls_complete.parent_id IN {eval_root_ids_param}
       AND calls_complete.id NOT IN {eval_root_ids_param}
       AND ({op_match_calls_complete})
+      AND calls_complete.deleted_at = {deleted_at_sentinel_param}
 )"""
 
 
 def build_predict_and_score_calls_resolved_cte(
     project_id_param: str,
+    needs_inputs_resolution: bool,
 ) -> str:
     """Build the predict_and_score_calls_resolved CTE SQL.
 
-    LEFT JOINs table_rows to resolve dataset-backed inputs.
-    For inline rows, COALESCE falls through to the raw inputs_dump.example.
+    When ``needs_inputs_resolution`` is True (sort/filter references an
+    ``inputs.*`` field), LEFT JOIN table_rows so ``resolved_inputs`` is
+    available to HAVING/ORDER BY.
     """
+    if not needs_inputs_resolution:
+        return """predict_and_score_calls_resolved AS (
+    SELECT * FROM predict_and_score_calls
+)"""
+
     return f"""predict_and_score_calls_resolved AS (
     SELECT
         predict_and_score_calls.*,
@@ -349,17 +390,34 @@ page_digests AS (
 )"""
 
 
+def build_page_resolved_inputs_cte(project_id_param: str) -> str:
+    """Hydrate dataset-row val_dump for just the page's digests."""
+    return f"""page_resolved_inputs AS (
+    SELECT digest, any(val_dump) AS val_dump
+    FROM table_rows
+    PREWHERE project_id = {project_id_param}
+    WHERE digest IN (SELECT row_digest FROM page_digests)
+    GROUP BY digest
+)"""
+
+
 def build_page_rows_cte() -> str:
-    """Build page_rows CTE: metadata only, heavy columns hydrated in outer SELECT."""
+    """Build page_rows CTE: joins page digests with the per-page val_dump
+    resolution.
+    """
     return """page_rows AS (
     SELECT
-        predict_and_score_calls_resolved.call_id,
-        predict_and_score_calls_resolved.eval_call_id,
-        predict_and_score_calls_resolved.row_digest,
-        page_digests.row_order,
-        predict_and_score_calls_resolved.resolved_inputs
+        predict_and_score_calls_resolved.call_id AS call_id,
+        predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
+        predict_and_score_calls_resolved.row_digest AS row_digest,
+        page_digests.row_order AS row_order,
+        COALESCE(
+            page_resolved_inputs.val_dump,
+            JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')
+        ) AS resolved_inputs
     FROM predict_and_score_calls_resolved
     INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
+    LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
 )"""
 
 
@@ -472,7 +530,10 @@ def build_eval_results_cte_chain(
     """
     project_id_param = pb.add(project_id, None, "String")
     eval_root_ids_param = pb.add(eval_root_ids, None, "Array(String)")
-    op_prefix_param = pb.add(PREDICT_AND_SCORE_OP_PREFIX, None, "String")
+    op_prefix_params = [
+        pb.add(name, None, "String")
+        for name in constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES
+    ]
 
     # for calls_complete, deleted_at uses epoch zero instead of NULL.
     deleted_at_sentinel_param = None
@@ -487,15 +548,19 @@ def build_eval_results_cte_chain(
         else "calls_complete.inputs_dump"
     )
 
+    needs_inputs_resolution = _sort_filter_uses_inputs(sort_by, filters)
+
     calls_cte = build_predict_and_score_calls_cte(
         project_id_param,
         eval_root_ids_param,
-        op_prefix_param,
+        op_prefix_params,
         inputs_field,
         read_table,
         deleted_at_sentinel_param,
     )
-    resolved_cte = build_predict_and_score_calls_resolved_cte(project_id_param)
+    resolved_cte = build_predict_and_score_calls_resolved_cte(
+        project_id_param, needs_inputs_resolution
+    )
     ranked_cte = build_ranked_digests_cte(
         eval_root_ids,
         sort_by,
@@ -505,6 +570,7 @@ def build_eval_results_cte_chain(
         offset,
         pb,
     )
+    page_resolved_cte = build_page_resolved_inputs_cte(project_id_param)
     page_rows_cte = build_page_rows_cte()
 
     return f"""{calls_cte},
@@ -512,5 +578,7 @@ def build_eval_results_cte_chain(
 {resolved_cte},
 
 {ranked_cte},
+
+{page_resolved_cte},
 
 {page_rows_cte}"""
