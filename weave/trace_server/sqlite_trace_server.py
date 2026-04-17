@@ -33,6 +33,7 @@ from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
+from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
@@ -84,6 +85,7 @@ from weave.trace_server.trace_server_common import (
     scorer_read_res_from_obj,
     set_nested_key,
 )
+from weave.trace_server.ttl_settings import compute_expire_at
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
@@ -330,6 +332,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         cursor.execute(TABLE_FEEDBACK.drop_sql())
         cursor.execute("DROP TABLE IF EXISTS calls")
+        cursor.execute("DROP TABLE IF EXISTS project_ttl_settings")
         cursor.execute("DROP TABLE IF EXISTS objects")
         cursor.execute("DROP TABLE IF EXISTS tables")
         cursor.execute("DROP TABLE IF EXISTS table_rows")
@@ -365,9 +368,19 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 deleted_at TEXT,
                 display_name TEXT,
                 otel_dump TEXT,
-                storage_size_bytes INTEGER
+                storage_size_bytes INTEGER,
+                expire_at TEXT NOT NULL DEFAULT '2100-01-01 00:00:00'
             )
         """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS project_ttl_settings (
+                project_id TEXT NOT NULL,
+                retention_days INTEGER NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
         )
         cursor.execute(
             """
@@ -469,6 +482,26 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         cursor.execute(TABLE_FEEDBACK.create_sql())
 
+    def _get_project_retention_days(self, project_id: str) -> int:
+        """Return retention_days for a project (0 = no TTL). SQLite-local, uncached."""
+        _, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
+            "SELECT retention_days FROM project_ttl_settings "
+            "WHERE project_id = ? ORDER BY updated_at DESC LIMIT 1",
+            (project_id,),
+        )
+        row = cursor.fetchone()
+        return int(row[0]) if row is not None else 0
+
+    def _compute_call_expire_at(
+        self, project_id: str, anchor: datetime.datetime
+    ) -> str:
+        """Compute the ISO-formatted expire_at for a call row."""
+        retention_days = self._get_project_retention_days(project_id)
+        if retention_days == 0:
+            return EXPIRE_AT_NEVER.isoformat(sep=" ")
+        return compute_expire_at(retention_days, anchor).isoformat(sep=" ")
+
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         res = []
         for item in req.batch:
@@ -505,14 +538,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     + len(summary_json)
                 )
 
+                expire_at = self._compute_call_expire_at(
+                    call.project_id, call.started_at
+                )
+
                 cursor.execute(
                     """INSERT INTO calls (
                         project_id, id, trace_id, parent_id, thread_id, turn_id,
                         op_name, display_name, started_at, ended_at, exception,
                         attributes, inputs, input_refs, output, output_refs,
                         summary, wb_user_id, wb_run_id, wb_run_step, wb_run_step_end,
-                        otel_dump, storage_size_bytes
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        otel_dump, storage_size_bytes, expire_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         call.project_id,
                         call.id,
@@ -541,6 +578,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         call.wb_run_step_end,
                         otel_dump_str,
                         storage_size,
+                        expire_at,
                     ),
                 )
             conn.commit()
@@ -581,6 +619,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if hasattr(req.start, "otel_dump") and req.start.otel_dump is not None:
                 otel_dump_str = json.dumps(req.start.otel_dump)
 
+            expire_at = self._compute_call_expire_at(
+                req.start.project_id, req.start.started_at
+            )
             cursor.execute(
                 """INSERT INTO calls (
                     project_id,
@@ -598,8 +639,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     wb_user_id,
                     wb_run_id,
                     wb_run_step,
-                    otel_dump
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    otel_dump,
+                    expire_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
@@ -619,6 +661,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     req.start.wb_run_id,
                     req.start.wb_run_step,
                     otel_dump_str,
+                    expire_at,
                 ),
             )
             conn.commit()
