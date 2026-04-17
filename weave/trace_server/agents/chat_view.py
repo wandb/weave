@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, NamedTuple
 
-from weave.trace_server.agent_types import (
+from weave.trace_server.agents.types import (
     AgentChatMessage,
     AgentSpanSchema,
     AgentTraceChatRes,

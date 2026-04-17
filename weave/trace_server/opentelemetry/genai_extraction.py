@@ -12,14 +12,17 @@ The main entry point is ``extract_genai_span()`` which takes a parsed OTel
 import json
 from typing import Any
 
-from weave.trace_server.agent_schema import (
+from weave.trace_server.agents.schema import (
     AgentSpanCHInsertable,
     NormalizedMessage,
 )
+from weave.trace_server.agents.semconv import KNOWN_KEYS, K
 from weave.trace_server.opentelemetry.helpers import get_attribute, to_json_serializable
 from weave.trace_server.opentelemetry.python_spans import Span
-from weave.trace_server.query_builder.agent_query_builder import safe_float, safe_int
-from weave.trace_server.semconv import KNOWN_KEYS, K
+from weave.trace_server.query_builder.agent_query_builder import (
+    safe_float,
+    safe_int,
+)
 
 # Known operation name prefixes for span-name inference.
 _KNOWN_OP_PREFIXES = (

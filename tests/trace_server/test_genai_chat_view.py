@@ -8,11 +8,11 @@ trace shapes end-to-end against ClickHouse.
 
 import datetime
 
-from weave.trace_server.agent_chat_view import (
+from weave.trace_server.agents.chat_view import (
     build_chat_messages,
     build_trace_chat,
 )
-from weave.trace_server.agent_types import AgentSpanSchema
+from weave.trace_server.agents.types import AgentSpanSchema
 
 
 def _span(

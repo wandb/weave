@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from weave.trace_server.agent_schema import AgentSpanCHInsertable
-from weave.trace_server.agent_types import (
+from weave.trace_server.agents.schema import AgentSpanCHInsertable
+from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationsQueryReq,
     AgentCustomAttrFilter,

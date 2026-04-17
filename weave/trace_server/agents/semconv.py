@@ -6,7 +6,7 @@ columns.  Each attribute has a canonical ``weave.*`` key and an optional
 
 Usage::
 
-    from weave.trace_server.semconv import ATTRIBUTES, resolve
+    from weave.trace_server.agents.semconv import ATTRIBUTES, resolve
 
     # Look up by canonical key
     attr = ATTRIBUTES["weave.operation.name"]

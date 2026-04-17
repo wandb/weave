@@ -57,8 +57,8 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
 
 # GenAI / Agent observability imports
-from weave.trace_server.agent_clickhouse import AgentQueryHandler, AgentWriteHandler
-from weave.trace_server.agent_types import (
+from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
+from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
     AgentConversationsQueryReq,
