@@ -14,6 +14,25 @@ from weave.trace.serialization.serialize import to_json
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
 
 
+@pytest.fixture(autouse=True, params=["v1", "v2"])
+def eval_logger_impl(request, monkeypatch):
+    """Parametrize every test in this module over the V1 and V2
+    EvaluationLogger implementations.
+    """
+    from weave.evaluation import eval_imperative_v1
+
+    if request.param == "v2":
+        monkeypatch.setenv("WEAVE_USE_V2_EVAL_LOGGER", "true")
+    else:
+        monkeypatch.delenv("WEAVE_USE_V2_EVAL_LOGGER", raising=False)
+
+    # The scorer cache is module-global and carries stale refs between
+    # parametrized runs (each parametrize uses a fresh client fixture).
+    # Reset it so cached instances don't leak across runs.
+    eval_imperative_v1.global_scorer_cache._cached_scorers.clear()
+    return request.param
+
+
 class ExampleRow(TypedDict):
     a: int
     b: int
@@ -261,7 +280,10 @@ def test_evaluation_with_custom_models_and_scorers(
 
 
 def test_evaluation_version_reuse(
-    client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
+    client,
+    eval_logger_impl,
+    user_dataset: list[ExampleRow],
+    user_model: Callable[[int, int], int],
 ):
     """Test that running the same evaluation twice results in only one version."""
     model = {"name": "test_model", "a": 1, "b": "two"}
@@ -289,11 +311,14 @@ def test_evaluation_version_reuse(
     assert len(evaluations) == 1
 
     # Check that only one version of the evaluation exists (none of the methods
-    # nor any of the attributes should have changed)
+    # nor any of the attributes should have changed).
+    # V2 additionally persists an Evaluation via the V2 ``evaluation_create``
+    # API which lives as a distinct object.
     evaluations = client._objects(
         filter=ObjectVersionFilter(base_object_classes=["Evaluation"])
     )
-    assert len(evaluations) == 1
+    expected = 2 if eval_logger_impl == "v2" else 1
+    assert len(evaluations) == expected
 
 
 def generate_evaluation_logger_kwargs_permutations():

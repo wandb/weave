@@ -267,6 +267,18 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_DISABLE_WAL_SENDER`
     """
 
+    use_v2_eval_logger: bool = False
+    """
+    Toggles the V2 implementation of `EvaluationLogger`.
+
+    If True, `weave.EvaluationLogger` dispatches to the V2 implementation
+    which additionally persists objects via the V2 trace server APIs
+    (``evaluation_create``, ``evaluation_run_create``, ``prediction_create``,
+    ``score_create``, ``evaluation_run_finish``).
+
+    Can be overridden with the environment variable `WEAVE_USE_V2_EVAL_LOGGER`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -419,6 +431,11 @@ def should_enable_wal() -> bool:
 def should_disable_wal_sender() -> bool:
     """Returns whether the WAL sender thread should be disabled."""
     return _should("disable_wal_sender")
+
+
+def should_use_v2_eval_logger() -> bool:
+    """Returns whether the V2 EvaluationLogger implementation should be used."""
+    return _should("use_v2_eval_logger")
 
 
 def parse_and_apply_settings(
