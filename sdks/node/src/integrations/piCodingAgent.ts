@@ -231,6 +231,14 @@ export class PiCodingAgentOtelAdapter {
     this.invokeAgentCtx = trace.setSpan(this.sessionCtx, this.invokeAgentSpan);
 
     if (this.captureContent) {
+      if (event.systemPrompt) {
+        this.invokeAgentSpan.addEvent(GEN_AI_EVENT.SYSTEM_MESSAGE, {
+          [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
+            role: 'system',
+            content: event.systemPrompt,
+          }),
+        });
+      }
       this.invokeAgentSpan.addEvent(GEN_AI_EVENT.USER_MESSAGE, {
         [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
           role: 'user',
