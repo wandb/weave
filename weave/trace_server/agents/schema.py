@@ -15,10 +15,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-_EPOCH = datetime.datetime(1970, 1, 1)
+from weave.trace_server.agents.constants import MSG_TUPLE_FIELDS
 
-# Named tuple field order — must match the ClickHouse Tuple definition exactly.
-MSG_TUPLE_FIELDS = ("role", "content", "finish_reason")
+_EPOCH = datetime.datetime(1970, 1, 1)
 
 
 class NormalizedMessage(BaseModel):
