@@ -15,6 +15,7 @@ from weave.integrations.integration_utilities import (
     flattened_calls_to_names,
 )
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server.trace_server_interface import CallsFilter
 
 
 @pytest.fixture(autouse=True)
@@ -92,13 +93,25 @@ def test_gepa_optimize_traces_lifecycle(client: WeaveClient) -> None:
         skip_perfect_score=False,
     )
 
-    calls = list(client.get_calls())
-    flattened = flatten_calls(calls)
-    names = flattened_calls_to_names(flattened)
-
-    assert any("gepa.optimize" in n for (n, _) in names), names
-    assert any("gepa.iteration" in n for (n, _) in names), names
-    assert any("gepa.evaluate" in n for (n, _) in names), names
+    # Walk the hierarchy from the root `gepa.optimize` call so we can assert on
+    # the parent/child structure of the trace rather than just the flat set of
+    # op names present.
+    roots = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    assert len(roots) == 1
+    got = flattened_calls_to_names(flatten_calls(roots))
+    expected = [
+        ("gepa.optimize", 0),
+        # Seed candidate is evaluated on the full valset before iteration 1.
+        ("gepa.valset_evaluated", 1),
+        ("gepa.iteration", 1),
+        # Within an iteration: evaluate current candidate, propose a new one,
+        # evaluate the proposal, then (on acceptance) run the full valset eval.
+        ("gepa.evaluate", 2),
+        ("gepa.propose", 2),
+        ("gepa.evaluate", 2),
+        ("gepa.valset_evaluated", 2),
+    ]
+    assert got == expected, got
 
 
 @pytest.mark.skip_clickhouse_client
