@@ -242,6 +242,18 @@ def test_transport_sends_expected_request(
     assert mock_post.call_args.kwargs["json"]["aliases"] == expected_aliases
 
 
+def test_transport_ignores_unknown_response_fields(mock_post: MagicMock) -> None:
+    """Ignore newly added server response fields for backward compatibility."""
+    mock_post.return_value = _http_response(
+        200,
+        {"version_index": 7, "server_metadata": {"source": "future-server"}},
+    )
+
+    result = link_asset_to_registry(DEFAULT_TRANSPORT_REQ)
+
+    assert result.version_index == 7
+
+
 def test_transport_surfaces_http_errors(mock_post: MagicMock) -> None:
     """Non-2xx responses raise HTTPStatusError."""
     mock_post.return_value = _http_response(400, {"message": "invalid request"})

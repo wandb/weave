@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace_server.common_interface import BaseModelStrict
@@ -24,6 +24,9 @@ class LinkAssetToRegistryReq(BaseModelStrict):
 
 
 class LinkAssetToRegistryRes(BaseModel):
+    # Be lenient on responses so older clients tolerate newly added server fields.
+    model_config = ConfigDict(extra="ignore")
+
     version_index: int | None = None
 
 
