@@ -209,7 +209,7 @@ def test_top_level_weave_exports_link_prompt_to_registry():
 
 
 @pytest.mark.parametrize(
-    ("req", "expected_index", "expected_aliases"),
+    ("req", "response_json", "expected_index", "expected_aliases"),
     [
         pytest.param(
             LinkAssetToRegistryReq(
@@ -217,21 +217,36 @@ def test_top_level_weave_exports_link_prompt_to_registry():
                 target=DEFAULT_TRANSPORT_REQ.target,
                 aliases=["prod", "latest"],
             ),
+            {"version_index": 7},
             7,
             ["prod", "latest"],
             id="explicit-aliases",
         ),
-        pytest.param(DEFAULT_TRANSPORT_REQ, None, [], id="default-aliases"),
+        pytest.param(
+            DEFAULT_TRANSPORT_REQ,
+            {"version_index": None},
+            None,
+            [],
+            id="default-aliases",
+        ),
+        pytest.param(
+            DEFAULT_TRANSPORT_REQ,
+            {"version_index": 7, "server_metadata": {"source": "future-server"}},
+            7,
+            [],
+            id="ignores-extra-response-fields",
+        ),
     ],
 )
 def test_transport_sends_expected_request(
     mock_post: MagicMock,
     req: LinkAssetToRegistryReq,
+    response_json: dict,
     expected_index: int | None,
     expected_aliases: list[str],
 ) -> None:
     """POST the correct URL, auth, and payload; default aliases to empty list."""
-    mock_post.return_value = _http_response(200, {"version_index": expected_index})
+    mock_post.return_value = _http_response(200, response_json)
 
     result = link_asset_to_registry(req)
 
@@ -240,18 +255,6 @@ def test_transport_sends_expected_request(
     assert mock_post.call_args.kwargs["auth"] == ("api", "api-key")
     assert mock_post.call_args.kwargs["json"] == req.model_dump(mode="json")
     assert mock_post.call_args.kwargs["json"]["aliases"] == expected_aliases
-
-
-def test_transport_ignores_unknown_response_fields(mock_post: MagicMock) -> None:
-    """Ignore newly added server response fields for backward compatibility."""
-    mock_post.return_value = _http_response(
-        200,
-        {"version_index": 7, "server_metadata": {"source": "future-server"}},
-    )
-
-    result = link_asset_to_registry(DEFAULT_TRANSPORT_REQ)
-
-    assert result.version_index == 7
 
 
 def test_transport_surfaces_http_errors(mock_post: MagicMock) -> None:
