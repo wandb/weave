@@ -8,7 +8,7 @@ formatted SQL + param dict against an expected value, matching the style of
 
 import sqlparse
 
-from weave.trace_server.agent_types import (
+from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationsQueryFilters,
     AgentConversationsQueryReq,

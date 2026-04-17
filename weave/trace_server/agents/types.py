@@ -140,6 +140,7 @@ class AgentSearchReq(BaseModel):
     """
 
     project_id: str
+    # queries: list[str] | None = None
     query: str
 
     roles: list[str] | None = None

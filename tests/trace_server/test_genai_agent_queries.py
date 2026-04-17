@@ -8,18 +8,18 @@ import base64
 import datetime
 import uuid
 
-from weave.trace_server.agent_helpers import (
+from weave.trace_server.agents.helpers import (
     extract_search_rows,
     genai_search_row_to_row,
     genai_span_to_row,
 )
-from weave.trace_server.agent_schema import (
+from weave.trace_server.agents.schema import (
     ALL_SEARCH_INSERT_COLUMNS,
     ALL_SPAN_INSERT_COLUMNS,
     AgentSpanCHInsertable,
     NormalizedMessage,
 )
-from weave.trace_server.agent_types import (
+from weave.trace_server.agents.types import (
     AgentConversationsQueryReq,
     AgentSearchReq,
     AgentSpansQueryFilters,

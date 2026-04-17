@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-from weave.trace_server.agent_schema import (
+from weave.trace_server.agents.schema import (
     ALL_SEARCH_INSERT_COLUMNS,
     ALL_SPAN_INSERT_COLUMNS,
     AgentMessageSearchRow,

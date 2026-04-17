@@ -11,19 +11,19 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from weave.trace_server.agent_chat_view import build_trace_chat
-from weave.trace_server.agent_helpers import (
+from weave.trace_server.agents.chat_view import build_trace_chat
+from weave.trace_server.agents.helpers import (
     extract_search_rows,
     genai_search_row_to_row,
     genai_span_to_row,
     normalize_span_row,
     unpack_string_array,
 )
-from weave.trace_server.agent_schema import (
+from weave.trace_server.agents.schema import (
     ALL_SEARCH_INSERT_COLUMNS,
     ALL_SPAN_INSERT_COLUMNS,
 )
-from weave.trace_server.agent_types import (
+from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
     AgentConversationSchema,
