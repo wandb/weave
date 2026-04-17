@@ -26,6 +26,3 @@ pyrightconfig.json
 .coverage/
 coverage.xml
 htmlcov/
-docs/
-examples/otel_genai/
-*.ipynb
