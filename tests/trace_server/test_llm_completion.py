@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
@@ -12,6 +13,7 @@ from weave.trace_server.errors import (
     MissingLLMApiKeyError,
     NotFoundError,
 )
+from weave.trace_server.interface.builtin_object_classes.provider import Provider
 from weave.trace_server.llm_completion import get_custom_provider_info
 from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import (
@@ -284,9 +286,13 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures before each test."""
-        self.server = chts.ClickHouseTraceServer(host="test_host")
         mock_ch_client = MagicMock()
         mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
+        self._mint_patcher = patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        )
+        self._mint_patcher.start()
+        self.server = chts.ClickHouseTraceServer(host="test_host")
         self.server._thread_local.ch_client = mock_ch_client
         self.mock_secret_fetcher = MagicMock()
         self.mock_secret_fetcher.fetch.return_value = {
@@ -299,6 +305,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         self.token = _secret_fetcher_context.set(self.mock_secret_fetcher)
 
     def tearDown(self):
+        self._mint_patcher.stop()
         _secret_fetcher_context.reset(self.token)
 
     def test_basic_streaming_completion(self):
@@ -1308,11 +1315,14 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 @pytest.fixture
 def completions_mock_server():
     """Create a mock ClickHouseTraceServer for completions tests."""
-    server = chts.ClickHouseTraceServer(host="test_host")
     mock_ch_client = MagicMock()
     mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
-    server._thread_local.ch_client = mock_ch_client
-    return server
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._thread_local.ch_client = mock_ch_client
+        yield server
 
 
 @pytest.fixture
@@ -1675,6 +1685,83 @@ def test_streaming_completions_error_routes_correctly(
 
         assert mock_insert_complete.called == expect_complete_called
         assert mock_update_end.called == expect_update_end_called
+
+
+def _make_provider(base_url: str, extra_headers: dict | None = None):
+    return Provider(
+        name="test",
+        base_url=base_url,
+        api_key_name="MY_KEY",
+        extra_headers=extra_headers or {},
+    )
+
+
+def test_provider_base_url_validation():
+    """Verify that Provider.base_url only accepts well-formed, public HTTP(S) URLs."""
+    # Valid URLs accepted
+    p = _make_provider("https://api.openai.com/v1")
+    assert p.base_url == "https://api.openai.com/v1"
+    p = _make_provider("http://my-ollama-server.example.com:11434")
+    assert p.base_url == "http://my-ollama-server.example.com:11434"
+
+    # Non-http schemes rejected
+    with pytest.raises(ValidationError):
+        _make_provider("ftp://bad.example.com")
+    with pytest.raises(ValidationError):
+        _make_provider("file:///etc/passwd")
+
+    # Query strings, bare '?', and fragments rejected
+    with pytest.raises(ValidationError):
+        _make_provider("https://api.example.com/v1?foo=bar")
+    with pytest.raises(ValidationError):
+        _make_provider("https://api.example.com/v1#section")
+    with pytest.raises(ValidationError):
+        _make_provider("http://10.0.0.1/path?")
+
+    # Blocked hostnames rejected
+    for hostname in (
+        "metadata.google.internal",
+        "metadata.google.internal.",
+        "foo.metadata.google.internal",
+        "169.254.169.254",
+    ):
+        with pytest.raises(ValidationError):
+            _make_provider(f"http://{hostname}/v1")
+
+    # Non-globally-routable IPs rejected
+    for addr in ("10.0.0.1", "172.16.0.1", "192.168.1.1", "127.0.0.1"):
+        with pytest.raises(ValidationError):
+            _make_provider(f"http://{addr}/v1")
+
+    # Alternative IP encodings rejected
+    for alt_ip in ("0xa9fea9fe", "2852039166", "0x7f000001", "0"):
+        with pytest.raises(ValidationError):
+            _make_provider(f"http://{alt_ip}/v1")
+
+    # IPv6 non-global addresses rejected
+    with pytest.raises(ValidationError):
+        _make_provider("http://[::1]/v1")
+    with pytest.raises(ValidationError):
+        _make_provider("http://[::ffff:169.254.169.254]/v1")
+
+    # Blocked extra_headers rejected
+    for blocked in ("Metadata-Flavor", "METADATA-FLAVOR", "X-aws-ec2-metadata-token"):
+        with pytest.raises(ValidationError):
+            _make_provider("https://api.example.com", extra_headers={blocked: "val"})
+
+    # Allowed headers accepted
+    p = _make_provider(
+        "https://api.example.com",
+        extra_headers={"X-Custom-Header": "value", "Authorization": "Bearer tok"},
+    )
+    assert "X-Custom-Header" in p.extra_headers
+
+    # Validation also runs on assignment, not just init
+    p = _make_provider("https://api.example.com")
+    with pytest.raises(ValidationError):
+        p.base_url = "http://169.254.169.254/v1"
+    with pytest.raises(ValidationError):
+        p.extra_headers = {"Metadata-Flavor": "Google"}
 
 
 if __name__ == "__main__":

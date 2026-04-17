@@ -654,8 +654,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     self._op_ref_cache[req.project_id, op_name] = op_ref_uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
-            req.project_id,
-            self.ch_client,
+            req.project_id, self._mint_client
         )
 
         # Build event callbacks (same for both write targets)
@@ -784,8 +783,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Check write target - v1 call_start cannot write to calls_complete
         write_target = self.table_routing_resolver.resolve_v1_write_target(
-            ch_call.project_id,
-            self.ch_client,
+            ch_call.project_id, self._mint_client
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
@@ -813,8 +811,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Check write target - v1 call_end cannot write to calls_complete
         write_target = self.table_routing_resolver.resolve_v1_write_target(
-            ch_call.project_id,
-            self.ch_client,
+            ch_call.project_id, self._mint_client
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
@@ -869,8 +866,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 # is here for technical correctness, in case we relax project_id target
                 # constraints intra-batch
                 write_target = self.table_routing_resolver.resolve_v2_write_target(
-                    processed_complete_call.project_id,
-                    self.ch_client,
+                    processed_complete_call.project_id, self._mint_client
                 )
 
                 ch_call = complete_call_to_ch_insertable(processed_complete_call)
@@ -898,8 +894,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ch_start = start_call_for_insert_to_ch_insertable(start_req.start)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
-            ch_start.project_id,
-            self.ch_client,
+            ch_start.project_id, self._mint_client
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             ch_complete_start = start_call_insertable_to_complete_start(ch_start)
@@ -925,8 +920,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         req = process_call_req_to_content(req, self)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
-            req.end.project_id,
-            self.ch_client,
+            req.end.project_id, self._mint_client
         )
 
         # If writing to calls_complete, perform lightweight UPDATE
@@ -1048,7 +1042,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         aggregate statistics that are not directly queryable from the calls themselves.
         """
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self.ch_client
+            req.project_id, self._mint_client
         )
         pb = ParamBuilder()
         query, columns = build_calls_stats_query(req, pb, read_table)
@@ -1190,7 +1184,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Resolve which table to read from based on project data residence
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self.ch_client
+            req.project_id, self._mint_client
         )
 
         token_metrics, requested_cost_metrics = split_usage_metrics(req.usage_metrics)
@@ -1361,7 +1355,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self.ch_client
+            req.project_id, self._mint_client
         )
         settings = None
         cq = CallsQuery(
@@ -1502,7 +1496,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> Iterator[tsi.CallSchema]:
         """Fetch direct children of eval root IDs and optionally their children."""
         read_table = self.table_routing_resolver.resolve_read_table(
-            project_id, self.ch_client
+            project_id, self._mint_client
         )
         columns = sorted(
             [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
@@ -1659,8 +1653,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         write_target = self.table_routing_resolver.resolve_v1_write_target(
-            req.project_id,
-            self.ch_client,
+            req.project_id, self._mint_client
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             self._delete_calls_complete(req.project_id, all_descendants)
@@ -1716,8 +1709,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._ensure_valid_update_field(req)
 
         write_target = self.table_routing_resolver.resolve_v1_write_target(
-            req.project_id,
-            self.ch_client,
+            req.project_id, self._mint_client
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             self._update_calls_complete(req.project_id, req.call_id, req.display_name)
@@ -2593,7 +2585,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Resolve which table to read from based on project data residence
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self.ch_client
+            req.project_id, self._mint_client
         )
 
         pb = ParamBuilder()
@@ -2620,7 +2612,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self.ch_client
+            req.project_id, self._mint_client
         )
         pb = ParamBuilder()
 
@@ -2963,7 +2955,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Step 0: Determine which table to query based on project data residence
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self.ch_client
+            req.project_id, self._mint_client
         )
 
         # Step 1: Check for existing calls (duplicate prevention)
@@ -6029,8 +6021,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return tsi.CompletionsCreateRes(response=res.response)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
-            req.project_id,
-            self.ch_client,
+            req.project_id, self._mint_client
         )
 
         req.inputs.messages = initial_messages
@@ -6174,8 +6165,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         write_target: WriteTarget | None = None
         if req.track_llm_call:
             write_target = self.table_routing_resolver.resolve_v2_write_target(
-                req.project_id,
-                self.ch_client,
+                req.project_id, self._mint_client
             )
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars

@@ -6,7 +6,7 @@ from weave.shared import refs_internal as ri
 from weave.trace_server import validation
 
 # Sentinel value meaning "never expire". Matches the CH column default.
-EXPIRE_AT_NEVER = datetime.datetime(2100, 1, 1)
+EXPIRE_AT_NEVER = datetime.datetime(2100, 1, 1, tzinfo=datetime.timezone.utc)
 
 # =============================================================================
 # Base Classes for ClickHouse Call Schemas

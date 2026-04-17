@@ -243,7 +243,7 @@ if not _import_failed:
             gc = get_weave_client()
             if gc is None:
                 log_once(
-                    logger.warn,
+                    logger.warning,
                     "Please call `weave.init()` to enable LlamaIndex tracing",
                 )
                 return
@@ -386,7 +386,7 @@ if not _import_failed:
             gc = get_weave_client()
             if gc is None:
                 log_once(
-                    logger.warn,
+                    logger.warning,
                     "Please call `weave.init()` to enable LlamaIndex tracing",
                 )
                 return
