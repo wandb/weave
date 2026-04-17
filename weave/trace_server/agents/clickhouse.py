@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.agents.chat_view import build_trace_chat
+from weave.trace_server.agents.constants import MAX_CONVERSATION_CHAT_TURNS
 from weave.trace_server.agents.helpers import (
     extract_search_rows,
     genai_search_row_to_row,
@@ -82,9 +83,6 @@ logger = logging.getLogger(__name__)
 
 #: Signature of the server's ``_query`` method — takes (sql, params), returns QueryResult.
 QueryFn = Callable[[str, dict[str, Any]], "QueryResult"]
-
-# Maximum number of traces to render in the multi-turn conversation chat view.
-MAX_CONVERSATION_CHAT_TURNS = 50
 
 
 def _rows_as_dicts(result: Any) -> list[dict[str, Any]]:

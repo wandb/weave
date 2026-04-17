@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, NamedTuple
 
+from weave.trace_server.agents.constants import MAX_WALK_DEPTH, NOISE_TOOL_NAMES
 from weave.trace_server.agents.types import (
     AgentChatMessage,
     AgentSpanSchema,
@@ -193,9 +194,6 @@ def _find_user_prompt(spans: list[AgentSpanSchema]) -> UserPrompt:
 # Message emission helpers
 # ---------------------------------------------------------------------------
 
-_NOISE_TOOL_NAMES = frozenset({"(merged tools)", "(merged)", "transfer_to_agent"})
-_MAX_WALK_DEPTH = 200
-
 
 def _emit_agent_message(
     span: AgentSpanSchema,
@@ -264,7 +262,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
         )
 
     def _walk(node: SpanNode, nearest_agent: str = "", _depth: int = 0) -> None:
-        if _depth > _MAX_WALK_DEPTH:
+        if _depth > MAX_WALK_DEPTH:
             return
         span = node.span
         op = span.operation_name
@@ -327,7 +325,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                         started_at=_dt_to_iso(span.started_at),
                     )
                 )
-            elif tool_name not in _NOISE_TOOL_NAMES:
+            elif tool_name not in NOISE_TOOL_NAMES:
                 messages.append(
                     AgentChatMessage(
                         type="tool_call",

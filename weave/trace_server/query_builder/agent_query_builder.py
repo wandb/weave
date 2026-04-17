@@ -13,6 +13,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from weave.trace_server.agents.constants import (
+    DEFAULT_AGENT_QUERY_LIMIT,
+    DEFAULT_SEARCH_LIMIT,
+    MAX_AGENT_QUERY_LIMIT,
+    MAX_SEARCH_LIMIT,
+)
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
@@ -27,15 +33,6 @@ from weave.trace_server.agents.types import (
     AgentVersionsQueryReq,
 )
 from weave.trace_server.orm import ParamBuilder
-
-# ---------------------------------------------------------------------------
-# Limits
-# ---------------------------------------------------------------------------
-
-DEFAULT_AGENT_QUERY_LIMIT = 100
-MAX_AGENT_QUERY_LIMIT = 10_000
-DEFAULT_SEARCH_LIMIT = 20
-MAX_SEARCH_LIMIT = 1000
 
 # ---------------------------------------------------------------------------
 # Column whitelists — only these can appear in WHERE/ORDER BY/GROUP BY
