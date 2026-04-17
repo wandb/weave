@@ -183,7 +183,7 @@ def resolve_eval_field_to_sql(
     pb: ParamBuilder,
     evaluation_call_id: str | None = None,
 ) -> tuple[str, set[str]]:
-    """Filter-path field resolver: wraps per-row expression in any().
+    """Filter-path field resolver.
 
     Returns:
         (sql_expression, set of physical columns used)
@@ -191,6 +191,8 @@ def resolve_eval_field_to_sql(
     inner, cols = _build_json_field_inner(field_path, pb, evaluation_call_id)
     if field_path == "row_digest":
         return inner, cols
+    if field_path.startswith("scores."):
+        return _score_numeric_aggregate(inner), cols
     return f"any({inner})", cols
 
 
@@ -206,12 +208,12 @@ def _wrap_with_eval_scope(
     return f"CASE WHEN eval_call_id = {id_slot} THEN {inner_sql} ELSE NULL END"
 
 
-def _score_sort_numeric(inner_sql: str) -> str:
+def _score_numeric_aggregate(inner_sql: str) -> str:
     """Numeric avg applied to a pre-coerced scores per-row String expression.
 
     The bool coercion lives inside _build_json_field_inner; this only adds the
-    toFloat64OrNull + avg wrapping that the sort path needs. Can't live inside
-    the field resolver because ClickHouse rejects nested aggregates.
+    toFloat64OrNull + avg wrapping. Used by both the sort and filter paths so
+    scores are compared numerically.
     """
     return f"avg(toFloat64OrNull({inner_sql}))"
 
@@ -263,7 +265,7 @@ def _build_sort_aggregate(
     if field_path == "row_digest":
         return inner
     if field_path.startswith("scores."):
-        return _score_sort_numeric(inner)
+        return _score_numeric_aggregate(inner)
     return f"any({inner})"
 
 
