@@ -1,7 +1,7 @@
 -- Agent observability tables.
 
 -- spans
-CREATE TABLE spans (
+CREATE TABLE IF NOT EXISTS spans (
     project_id          String,
     trace_id            String,
     span_id             String,
@@ -117,7 +117,7 @@ SETTINGS min_bytes_for_wide_part=0;
 
 
 -- agents (materialized from spans)
-CREATE TABLE agents (
+CREATE TABLE IF NOT EXISTS agents (
     project_id String,
     agent_name String,
     invocation_count SimpleAggregateFunction(sum, UInt64),
@@ -131,7 +131,7 @@ CREATE TABLE agents (
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, agent_name);
 
-CREATE MATERIALIZED VIEW agents_mv TO agents AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS agents_mv TO agents AS
 SELECT
     project_id,
     agent_name,
@@ -148,7 +148,7 @@ WHERE agent_name != '';
 
 
 -- agent_versions (materialized from spans)
-CREATE TABLE agent_versions (
+CREATE TABLE IF NOT EXISTS agent_versions (
     project_id String,
     agent_name String,
     agent_version String,
@@ -163,7 +163,7 @@ CREATE TABLE agent_versions (
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, agent_name, agent_version);
 
-CREATE MATERIALIZED VIEW agent_versions_mv TO agent_versions AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS agent_versions_mv TO agent_versions AS
 SELECT
     project_id,
     agent_name,
@@ -181,7 +181,7 @@ WHERE agent_name != '';
 
 
 -- message_search
-CREATE TABLE message_search (
+CREATE TABLE IF NOT EXISTS message_search (
     project_id String,
     content_digest String,
     conversation_id String DEFAULT '',
