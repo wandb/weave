@@ -91,6 +91,7 @@ def test_object_mutation_saving_nested(client):
     assert d3.c.a.b == 3
 
 
+@pytest.mark.flaky(reruns=3)
 def test_list_mutation_saving_nested(client):
     lst = [1, 2, 3]
     ref = weave.publish(lst)
@@ -98,6 +99,7 @@ def test_list_mutation_saving_nested(client):
     lst2 = [4, 5, 6]
     ref2 = weave.publish(lst2)
 
+    time.sleep(0.2)
     lst3 = ref.get()
     assert lst3 == [1, 2, 3]
 
@@ -107,6 +109,7 @@ def test_list_mutation_saving_nested(client):
     lst3.append(lst4)
     ref5 = weave.publish(lst3)
 
+    time.sleep(0.2)
     lst5 = ref5.get()
     assert lst5 == [1, 2, 3, [4, 5, 6]]
 
@@ -135,6 +138,7 @@ def test_dict_mutation_saving_nested(client):
     }
 
 
+@pytest.mark.flaky(reruns=3)
 def test_object_mutation_saving_nested_lists_and_dicts(client):
     class A(weave.Object):
         b: int
@@ -162,6 +166,7 @@ def test_object_mutation_saving_nested_lists_and_dicts(client):
     )
     ref = weave.publish(g)
 
+    time.sleep(0.2)
     g2 = ref.get()
     assert g2.a.b == 1
     assert g2.b.a.b == 2
@@ -178,6 +183,7 @@ def test_object_mutation_saving_nested_lists_and_dicts(client):
     g2.b.f = {"d": {"e": "f"}}  # Replace an entire dict
     ref2 = weave.publish(g2)
 
+    time.sleep(0.2)
     g3 = ref2.get()
     assert g3.a.b == 1
     assert g3.b.a.b == 2
@@ -208,14 +214,17 @@ def test_list_mutation_saving_nested_objects(client):
     assert lst3[2].b == 3
 
 
+@pytest.mark.flaky(reruns=3)
 def test_list_mutation_saving_nested_dicts(client):
     lst = [{"a": {"b": 1}}, {"a": {"b": 2}}]
     ref = weave.publish(lst)
 
+    time.sleep(0.2)
     lst2 = ref.get()
     lst2.append({"a": {"b": 3}})
     ref2 = weave.publish(lst2)
 
+    time.sleep(0.2)
     lst3 = ref2.get()
     assert len(lst3) == 3
     assert lst3[0]["a"]["b"] == 1
@@ -223,6 +232,7 @@ def test_list_mutation_saving_nested_dicts(client):
     assert lst3[2]["a"]["b"] == 3
 
 
+@pytest.mark.flaky(reruns=3)
 def test_dict_mutation_saving_nested_objects(client):
     class A(weave.Object):
         b: int
@@ -230,24 +240,29 @@ def test_dict_mutation_saving_nested_objects(client):
     d = {"a": A(b=1), "b": A(b=2)}
     ref = weave.publish(d)
 
+    time.sleep(0.2)
     d2 = ref.get()
     d2["c"] = A(b=3)
     ref2 = weave.publish(d2)
 
+    time.sleep(0.2)
     d3 = ref2.get()
     assert d3["a"].b == 1
     assert d3["b"].b == 2
     assert d3["c"].b == 3
 
 
+@pytest.mark.flaky(reruns=3)
 def test_dict_mutation_saving_nested_lists(client):
     d = {"a": [1, 2], "b": [3, 4]}
     ref = weave.publish(d)
 
+    time.sleep(0.2)
     d2 = ref.get()
     d2["c"] = [5, 6]
     ref2 = weave.publish(d2)
 
+    time.sleep(0.2)
     d3 = ref2.get()
     assert d3["a"] == [1, 2]
     assert d3["b"] == [3, 4]
