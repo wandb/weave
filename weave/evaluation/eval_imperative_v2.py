@@ -140,9 +140,7 @@ class EvaluationLogger(_V1EvaluationLogger):
         if dataset_ref is None:
             return
         eval_name = (
-            self.name
-            or getattr(self._pseudo_evaluation, "name", None)
-            or "Evaluation"
+            self.name or getattr(self._pseudo_evaluation, "name", None) or "Evaluation"
         )
         try:
             res = wc.server.evaluation_create(
@@ -161,17 +159,13 @@ class EvaluationLogger(_V1EvaluationLogger):
     def _v2_on_prediction(self, pred: ScoreLogger, output: Any) -> None:
         """Hook called each time a prediction is finished."""
 
-    def _v2_on_score(
-        self, pred: ScoreLogger, scorer: Scorer, score: ScoreType
-    ) -> None:
+    def _v2_on_score(self, pred: ScoreLogger, scorer: Scorer, score: ScoreType) -> None:
         """Hook called each time a score is recorded."""
 
     def _v2_on_summary(self, summary: dict | None) -> None:
         """Hook called at the end of log_summary."""
 
-    def log_prediction(
-        self, inputs: dict[str, Any], output: Any = None
-    ) -> ScoreLogger:
+    def log_prediction(self, inputs: dict[str, Any], output: Any = None) -> ScoreLogger:
         v1_pred = super().log_prediction(inputs=inputs, output=output)
         pred = ScoreLogger(
             predict_and_score_call=v1_pred.predict_and_score_call,
