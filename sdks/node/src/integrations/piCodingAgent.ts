@@ -8,14 +8,17 @@
  * Usage:
  * ```typescript
  * import { init } from 'weave';
- * import { createAgentSession } from '@mariozechner/pi-coding-agent';
  * import { createOtelExtension } from 'weave';
+ * import { createAgentSession, DefaultResourceLoader } from '@mariozechner/pi-coding-agent';
  *
  * await init('my-entity/my-project');
  *
- * const session = await createAgentSession({
- *   extensions: [createOtelExtension()],
+ * const resourceLoader = new DefaultResourceLoader({
+ *   extensionFactories: [createOtelExtension()],
  * });
+ * await resourceLoader.reload();
+ *
+ * const { session } = await createAgentSession({ resourceLoader });
  * ```
  */
 
@@ -32,7 +35,7 @@ import {OTLPTraceExporter} from '@opentelemetry/exporter-trace-otlp-proto';
 import {Resource} from '@opentelemetry/resources';
 import {
   BasicTracerProvider,
-  BatchSpanProcessor,
+  SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
 
 import {getGlobalClient} from '../clientApi';
@@ -152,16 +155,11 @@ export class PiCodingAgentOtelAdapter {
   private agentTotalTokens = 0;
   private agentCostUsd = 0;
 
-  // Private TracerProvider created when auto-configuring from the Weave global client.
-  // null when the user supplied their own tracer or no Weave client is initialised.
-  private readonly privateProvider: BasicTracerProvider | null;
-
   constructor(opts: OtelExtensionOptions = {}) {
     this.captureContent = opts.captureContent ?? true;
 
     if (opts.tracer) {
       this.tracer = opts.tracer;
-      this.privateProvider = null;
     } else {
       const client = getGlobalClient();
       if (client) {
@@ -177,7 +175,7 @@ export class PiCodingAgentOtelAdapter {
               'wandb.project': project,
             }),
             spanProcessors: [
-              new BatchSpanProcessor(
+              new SimpleSpanProcessor(
                 new OTLPTraceExporter({
                   url: endpoint,
                   headers: {
@@ -189,14 +187,25 @@ export class PiCodingAgentOtelAdapter {
             ],
           });
 
-          this.privateProvider = provider;
           this.tracer = provider.getTracer('pi-coding-agent-weave-ext');
+
+          // Ensure all spans are flushed before the process exits.
+          // The pi agent doesn't await async shutdown handlers, so
+          // endSessionSpan may not complete. This hook catches the
+          // event loop draining and flushes any remaining spans.
+          process.once('beforeExit', async () => {
+            this.endInvokeAgentSpan();
+            if (this.sessionSpan) {
+              this.sessionSpan.end();
+              this.sessionSpan = null;
+              this.sessionCtx = ROOT_CONTEXT;
+            }
+            await provider.shutdown().catch(() => {});
+          });
         } catch {
-          this.privateProvider = null;
           this.tracer = trace.getTracer('pi-coding-agent-weave-ext');
         }
       } else {
-        this.privateProvider = null;
         this.tracer = trace.getTracer('pi-coding-agent-weave-ext');
       }
     }
@@ -252,8 +261,8 @@ export class PiCodingAgentOtelAdapter {
     this.sessionCtx = trace.setSpan(ROOT_CONTEXT, this.sessionSpan);
   };
 
-  private onSessionShutdown = async (): Promise<void> => {
-    await this.endSessionSpan();
+  private onSessionShutdown = (): void => {
+    this.endSessionSpan();
   };
 
   private onModelSelect = (
@@ -402,6 +411,14 @@ export class PiCodingAgentOtelAdapter {
           [ATTR.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: usage.cacheWrite,
           [ATTR.PI_USAGE_COST_USD]: usage.cost.total,
         });
+
+        if (event.message.stopReason === 'error' && event.message.errorMessage) {
+          this.chatSpan.setAttribute(ATTR.ERROR_TYPE, 'llm_error');
+          this.chatSpan.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: event.message.errorMessage,
+          });
+        }
       }
     }
     this.endChatSpan();
@@ -533,15 +550,12 @@ export class PiCodingAgentOtelAdapter {
     }
   }
 
-  private async endSessionSpan(): Promise<void> {
+  private endSessionSpan(): void {
     this.endInvokeAgentSpan();
     if (this.sessionSpan) {
       this.sessionSpan.end();
       this.sessionSpan = null;
       this.sessionCtx = ROOT_CONTEXT;
-    }
-    if (this.privateProvider) {
-      await this.privateProvider.shutdown().catch(() => {});
     }
   }
 }
@@ -560,15 +574,16 @@ export class PiCodingAgentOtelAdapter {
  *
  * @example
  * ```typescript
- * const session = await createAgentSession({
- *   extensions: [createOtelExtension()],
+ * const resourceLoader = new DefaultResourceLoader({
+ *   extensionFactories: [createOtelExtension()],
  * });
  * ```
  */
 export function createOtelExtension(
   opts: OtelExtensionOptions = {}
-): PiExtensionDefinition {
-  return new PiCodingAgentOtelAdapter(opts).asExtension();
+): (pi: PiExtensionApi) => void {
+  const {setup} = new PiCodingAgentOtelAdapter(opts).asExtension();
+  return setup;
 }
 
 // Re-export types for consumers
