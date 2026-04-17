@@ -1016,7 +1016,14 @@ def test_eval_results_filter_score_gte(client):
                         {
                             "$expr": {
                                 "$gte": [
-                                    {"$getField": "scores.accuracy"},
+                                    {
+                                        "$convert": {
+                                            "input": {
+                                                "$getField": "scores.accuracy"
+                                            },
+                                            "to": "double",
+                                        }
+                                    },
                                     {"$literal": 0.5},
                                 ]
                             }
@@ -1054,7 +1061,14 @@ def test_eval_results_sort_and_filter_combined(client):
                         {
                             "$expr": {
                                 "$gte": [
-                                    {"$getField": "scores.accuracy"},
+                                    {
+                                        "$convert": {
+                                            "input": {
+                                                "$getField": "scores.accuracy"
+                                            },
+                                            "to": "double",
+                                        }
+                                    },
                                     {"$literal": 0.4},
                                 ]
                             }
@@ -1099,7 +1113,14 @@ def test_eval_results_filter_with_evaluation_call_id_scope(client):
                         {
                             "$expr": {
                                 "$gte": [
-                                    {"$getField": "scores.accuracy"},
+                                    {
+                                        "$convert": {
+                                            "input": {
+                                                "$getField": "scores.accuracy"
+                                            },
+                                            "to": "double",
+                                        }
+                                    },
                                     {"$literal": 0.5},
                                 ]
                             }
@@ -1214,7 +1235,14 @@ def test_eval_results_summary_with_filter(client):
                         {
                             "$expr": {
                                 "$gte": [
-                                    {"$getField": "scores.accuracy"},
+                                    {
+                                        "$convert": {
+                                            "input": {
+                                                "$getField": "scores.accuracy"
+                                            },
+                                            "to": "double",
+                                        }
+                                    },
                                     {"$literal": 0.5},
                                 ]
                             }

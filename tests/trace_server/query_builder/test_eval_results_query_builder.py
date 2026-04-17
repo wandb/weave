@@ -210,7 +210,12 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                 {
                     "$expr": {
                         "$gte": [
-                            {"$getField": "scores.accuracy"},
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "scores.accuracy"},
+                                    "to": "double",
+                                }
+                            },
                             {"$literal": 0.5},
                         ]
                     }
@@ -223,7 +228,12 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                 {
                     "$expr": {
                         "$lte": [
-                            {"$getField": "scores.accuracy"},
+                            {
+                                "$convert": {
+                                    "input": {"$getField": "scores.accuracy"},
+                                    "to": "double",
+                                }
+                            },
                             {"$literal": 0.9},
                         ]
                     }
@@ -283,8 +293,8 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                 GROUP BY row_digest
                 HAVING 1=1
                     AND countDistinct(eval_call_id) >= {pb_6:UInt64}
-                    AND (avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_5:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '')) ELSE NULL END)) >= {pb_7:Float64})
-                    AND (avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_8:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '')) ELSE NULL END)) <= {pb_9:Float64})
+                    AND (toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_5:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '')) ELSE NULL END)) >= {pb_7:Float64})
+                    AND (toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_8:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_4:String}), 'null'), '')) ELSE NULL END)) <= {pb_9:Float64})
             ),
 
             ranked_digest_count AS (
