@@ -982,8 +982,13 @@ class WeaveClient:
         call.output = postprocessed_output
 
         # Summary handling
+        # When server-side aggregation is enabled (default), skip client-side
+        # rollup of child summaries. Otherwise, fall back to legacy behavior.
         computed_summary: dict[str, Any] = {}
-        if call._children:
+        if (
+            not settings.should_use_server_side_summary_aggregation()
+            and call._children
+        ):
             computed_summary = sum_dict_leaves(
                 [child.summary or {} for child in call._children]
             )

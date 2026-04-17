@@ -256,6 +256,20 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_ENABLE_WAL`
     """
 
+    server_side_summary_aggregation: bool = True
+    """
+    Toggles server-side aggregation of child call summaries.
+
+    If True (default), the client does not roll up child call summaries into
+    the parent's summary; the server performs this aggregation.
+
+    If False, the client rolls up child summaries locally (legacy behavior).
+    Use this if the server does not yet support summary aggregation.
+
+    Can be overridden with the environment variable
+    `WEAVE_SERVER_SIDE_SUMMARY_AGGREGATION`
+    """
+
     disable_wal_sender: bool = False
     """
     Disables the background WAL sender thread.
@@ -419,6 +433,11 @@ def should_enable_wal() -> bool:
 def should_disable_wal_sender() -> bool:
     """Returns whether the WAL sender thread should be disabled."""
     return _should("disable_wal_sender")
+
+
+def should_use_server_side_summary_aggregation() -> bool:
+    """Returns whether child summaries should be aggregated server-side."""
+    return _should("server_side_summary_aggregation")
 
 
 def parse_and_apply_settings(
