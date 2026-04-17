@@ -1136,9 +1136,7 @@ def test_call_end_adds_expire_at_from_ended_at(server_with_mock_kafka):
         server.call_batch(),
     ):
         server.call_end(req)
-        assert server._call_batch[-1][expire_index] == ended_at + dt.timedelta(
-            days=30
-        )
+        assert server._call_batch[-1][expire_index] == ended_at + dt.timedelta(days=30)
 
 
 def test_call_batch_flushes_kafka_once_not_per_call_end(server_with_mock_kafka):
