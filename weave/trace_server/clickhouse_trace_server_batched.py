@@ -6741,11 +6741,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls()
 
@@ -6769,12 +6765,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Args:
             ch_call: The complete call to insert.
         """
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_COMPLETE_INSERT_COLUMNS:
-            val = parameters.get(key, None)
-            row.append(ch_sentinel_values.to_ch_value(key, val))
-        self._calls_complete_batch.append(row)
+        self._calls_complete_batch.append(ch_complete_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls_complete()
 
@@ -6788,11 +6779,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Args:
             ch_call: The complete call to insert.
         """
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls()
 

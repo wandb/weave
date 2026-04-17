@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -150,20 +150,83 @@ F = TypeVar("F")
 
 
 def _map_values(obj: E, func: Callable[[E], E]) -> E:
+    new_obj, _ = _map_values_copy_on_write(obj, func)
+    return cast(E, new_obj)
+
+
+def _map_values_copy_on_write(
+    obj: E,
+    func: Callable[[E], E],
+) -> tuple[E, bool]:
     if isinstance(obj, BaseModel):
-        # `by_alias` is required since we have Mongo-style properties in the
-        # query models that are aliased to conform to start with `$`. Without
-        # this, the model_dump will use the internal property names which are
-        # not valid for the `model_validate` step.
-        orig = obj.model_dump(by_alias=True)
-        new = _map_values(orig, func)
-        return obj.model_validate(new)
+        return _map_model_values(obj, func)
     if isinstance(obj, dict):
-        return cast(E, {k: _map_values(v, func) for k, v in obj.items()})
+        updated_dict: dict[Any, Any] | None = None
+        for key, value in obj.items():
+            new_value, changed = _map_values_copy_on_write(value, func)
+            if changed:
+                if updated_dict is None:
+                    updated_dict = dict(obj)
+                updated_dict[key] = new_value
+        if updated_dict is None:
+            return obj, False
+        return cast(E, updated_dict), True
     if isinstance(obj, list):
-        return cast(E, [_map_values(v, func) for v in obj])
+        updated_list: list[Any] | None = None
+        for index, value in enumerate(obj):
+            new_value, changed = _map_values_copy_on_write(value, func)
+            if changed:
+                if updated_list is None:
+                    updated_list = list(obj)
+                updated_list[index] = new_value
+        if updated_list is None:
+            return obj, False
+        return cast(E, updated_list), True
     if isinstance(obj, tuple):
-        return cast(E, tuple(_map_values(v, func) for v in obj))
+        updated_items: list[Any] | None = None
+        for index, value in enumerate(obj):
+            new_value, changed = _map_values_copy_on_write(value, func)
+            if changed:
+                if updated_items is None:
+                    updated_items = list(obj)
+                updated_items[index] = new_value
+        if updated_items is None:
+            return obj, False
+        return cast(E, tuple(updated_items)), True
     if isinstance(obj, set):
-        return cast(E, {_map_values(v, func) for v in obj})
-    return func(obj)
+        values = []
+        changed = False
+        for value in obj:
+            new_value, value_changed = _map_values_copy_on_write(value, func)
+            values.append(new_value)
+            changed = changed or value_changed
+        if not changed:
+            return obj, False
+        return cast(E, set(values)), True
+
+    new_obj = func(obj)
+    return new_obj, new_obj is not obj
+
+
+def _map_model_values(
+    obj: BaseModel,
+    func: Callable[[Any], Any],
+) -> tuple[BaseModel, bool]:
+    updates: dict[str, Any] = {}
+    for field_name, field_info in obj.__class__.model_fields.items():
+        if field_info.exclude is True:
+            continue
+        current_value = getattr(obj, field_name)
+        new_value, changed = _map_values_copy_on_write(current_value, func)
+        if changed:
+            updates[field_name] = new_value
+
+    if not updates:
+        return obj, False
+
+    if obj.__class__.model_config.get("frozen"):
+        return obj.model_copy(update=updates), True
+
+    for field_name, new_value in updates.items():
+        setattr(obj, field_name, new_value)
+    return obj, True

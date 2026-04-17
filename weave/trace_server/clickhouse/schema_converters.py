@@ -98,8 +98,7 @@ def ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
 
 def ch_call_to_row(ch_call: CallCHInsertable) -> list[Any]:
     """Convert a CH insertable call to a row for batch insertion with the correct defaults."""
-    call_dict = ch_call.model_dump()
-    return [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+    return [getattr(ch_call, col, None) for col in ALL_CALL_INSERT_COLUMNS]
 
 
 def start_call_for_insert_to_ch_insertable(
@@ -250,9 +249,8 @@ def start_end_calls_to_ch_complete_insertable(
 
 def ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
     """Convert a CallCompleteCHInsertable to a row for batch insertion."""
-    call_dict = ch_call.model_dump()
     return [
-        ch_sentinel_values.to_ch_value(col, call_dict.get(col))
+        ch_sentinel_values.to_ch_value(col, getattr(ch_call, col, None))
         for col in ALL_CALL_COMPLETE_INSERT_COLUMNS
     ]
 
