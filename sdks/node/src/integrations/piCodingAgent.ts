@@ -100,9 +100,9 @@ function resolveGenAiProviderName(provider: string): string {
   }
 }
 
-/** Narrows a PiAgentMessage to PiAssistantMessage, or returns undefined. */
-function asAssistant(msg: PiAgentMessage): PiAssistantMessage | undefined {
-  return msg.role === 'assistant' ? (msg as PiAssistantMessage) : undefined;
+/** Type assertion: narrows a PiAgentMessage to PiAssistantMessage. */
+function isAssistant(msg: PiAgentMessage): msg is PiAssistantMessage {
+  return msg.role === 'assistant';
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +136,12 @@ export class PiCodingAgentOtelAdapter {
 
   // Conversation ID for the session — set once in onSessionStart, attached to every span
   private conversationId: string | null = null;
+
+  // Accumulated usage across all turns within the current invoke_agent cycle
+  private agentInputTokens = 0;
+  private agentOutputTokens = 0;
+  private agentTotalTokens = 0;
+  private agentCostUsd = 0;
 
   constructor(opts: OtelExtensionOptions = {}) {
     this.tracer = opts.tracer ?? trace.getTracer('pi-coding-agent-weave-ext');
@@ -229,6 +235,10 @@ export class PiCodingAgentOtelAdapter {
       this.sessionCtx
     );
     this.invokeAgentCtx = trace.setSpan(this.sessionCtx, this.invokeAgentSpan);
+    this.agentInputTokens = 0;
+    this.agentOutputTokens = 0;
+    this.agentTotalTokens = 0;
+    this.agentCostUsd = 0;
 
     if (this.captureContent) {
       if (event.systemPrompt) {
@@ -254,20 +264,94 @@ export class PiCodingAgentOtelAdapter {
 
   private onTurnStart = (
     _event: Extract<PiExtensionEvent, {type: 'turn_start'}>,
-    _ctx: PiExtensionContext
-  ): void => {};
+    ctx: PiExtensionContext
+  ): void => {
+    const model = this.currentModel ?? ctx.model ?? null;
+    const modelId = model?.id ?? 'unknown';
+    this.chatSpan = this.tracer.startSpan(
+      `chat ${modelId}`,
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          [ATTR.GEN_AI_OPERATION_NAME]: 'chat',
+          ...(model
+            ? {
+                [ATTR.GEN_AI_PROVIDER_NAME]: resolveGenAiProviderName(
+                  model.provider
+                ),
+                [ATTR.GEN_AI_REQUEST_MODEL]: model.id,
+              }
+            : {}),
+          ...(this.conversationId
+            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
+            : {}),
+        },
+      },
+      this.invokeAgentCtx
+    );
+  };
 
   private onContext = (
-    _event: Extract<PiExtensionEvent, {type: 'context'}>
-  ): void => {};
+    event: Extract<PiExtensionEvent, {type: 'context'}>
+  ): void => {
+    if (!this.chatSpan) return;
+    const systemMessages = event.messages.filter(m => m.role === 'system');
+    if (systemMessages.length === 0) return;
+    this.chatSpan.addEvent(
+      GEN_AI_EVENT.SYSTEM_MESSAGE,
+      this.captureContent
+        ? {
+            [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify(
+              systemMessages.map(m => ({role: 'system', content: m.content}))
+            ),
+          }
+        : {}
+    );
+  };
 
   private onMessageEnd = (
-    _event: Extract<PiExtensionEvent, {type: 'message_end'}>
-  ): void => {};
+    event: Extract<PiExtensionEvent, {type: 'message_end'}>
+  ): void => {
+    if (!this.chatSpan) return;
+    if (!isAssistant(event.message)) return;
+    this.chatSpan.addEvent(
+      GEN_AI_EVENT.ASSISTANT_MESSAGE,
+      this.captureContent
+        ? {
+            [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
+              role: 'assistant',
+              content: event.message.content,
+            }),
+          }
+        : {}
+    );
+  };
 
   private onTurnEnd = (
-    _event: Extract<PiExtensionEvent, {type: 'turn_end'}>
-  ): void => {};
+    event: Extract<PiExtensionEvent, {type: 'turn_end'}>
+  ): void => {
+    if (isAssistant(event.message)) {
+      const {usage} = event.message;
+      this.agentInputTokens += usage.input;
+      this.agentOutputTokens += usage.output;
+      this.agentTotalTokens += usage.totalTokens;
+      this.agentCostUsd += usage.cost.total;
+
+      if (this.chatSpan) {
+        this.chatSpan.setAttributes({
+          [ATTR.GEN_AI_RESPONSE_MODEL]: event.message.model,
+          [ATTR.GEN_AI_RESPONSE_FINISH_REASONS]: [event.message.stopReason],
+          [ATTR.GEN_AI_USAGE_INPUT_TOKENS]: usage.input,
+          [ATTR.GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output,
+          [ATTR.GEN_AI_USAGE_TOTAL_TOKENS]: usage.totalTokens,
+          [ATTR.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.cacheRead,
+          [ATTR.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: usage.cacheWrite,
+          [ATTR.PI_USAGE_COST_USD]: usage.cost.total,
+        });
+      }
+    }
+    this.endChatSpan();
+  };
 
   private onToolCall = (
     _event: Extract<PiExtensionEvent, {type: 'tool_call'}>
@@ -293,7 +377,12 @@ export class PiCodingAgentOtelAdapter {
   // Span lifecycle helpers
   // ---------------------------------------------------------------------------
 
-  private endChatSpan(): void {}
+  private endChatSpan(): void {
+    if (this.chatSpan) {
+      this.chatSpan.end();
+      this.chatSpan = null;
+    }
+  }
 
   private endInvokeAgentSpan(): void {
     this.endChatSpan();
@@ -307,6 +396,12 @@ export class PiCodingAgentOtelAdapter {
     }
     this.toolSpans.clear();
     if (this.invokeAgentSpan) {
+      this.invokeAgentSpan.setAttributes({
+        [ATTR.GEN_AI_USAGE_INPUT_TOKENS]: this.agentInputTokens,
+        [ATTR.GEN_AI_USAGE_OUTPUT_TOKENS]: this.agentOutputTokens,
+        [ATTR.GEN_AI_USAGE_TOTAL_TOKENS]: this.agentTotalTokens,
+        [ATTR.PI_USAGE_COST_USD]: this.agentCostUsd,
+      });
       this.invokeAgentSpan.end();
       this.invokeAgentSpan = null;
       this.invokeAgentCtx = ROOT_CONTEXT;
