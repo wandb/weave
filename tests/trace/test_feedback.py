@@ -375,6 +375,7 @@ async def populate_feedback(client: WeaveClient) -> None:
         _, c = my_model.call(x)
         ids.append(c.id)
         await c.apply_scorer(my_scorer)
+    client.flush()
 
     assert len(list(my_scorer.calls())) == 4
     assert len(list(my_model.calls())) == 4
@@ -383,7 +384,7 @@ async def populate_feedback(client: WeaveClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_sort_by_feedback(client: WeaveClient) -> None:
+async def test_sort_by_feedback(client: WeaveClient, no_autoflush) -> None:
     """Test sorting by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
 
@@ -444,7 +445,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_filter_by_feedback(client: WeaveClient) -> None:
+async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
     """Test filtering by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
     for field, value, eq_ids, gt_ids in [
@@ -548,7 +549,7 @@ class MatchAnyDatetime:  # noqa: PLW1641
 
 
 @pytest.mark.asyncio
-async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
+async def test_filter_and_sort_by_feedback(client: WeaveClient, no_autoflush) -> None:
     """Test filtering and sorting by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
     calls = client.server.calls_query_stream(

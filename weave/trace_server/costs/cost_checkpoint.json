@@ -23383,6 +23383,14 @@
       "input": 5e-07,
       "output": 2.85e-06,
       "created_at": "2026-02-24 16:41:24"
+    },
+    {
+      "provider": "coreweave",
+      "input": 6e-07,
+      "output": 3e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-16 12:32:59"
     }
   ],
   "azure/gpt-audio-1.5-2026-02-23": [
@@ -24511,6 +24519,726 @@
       "cache_read_input": 0.0,
       "cache_creation_input": 0.0,
       "created_at": "2026-04-01 13:02:37"
+    }
+  ],
+  "anthropic.claude-opus-4-7": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "global.anthropic.claude-opus-4-7": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "us.anthropic.claude-opus-4-7": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5.5e-06,
+      "output": 2.75e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 6.875e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "eu.anthropic.claude-opus-4-7": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5.5e-06,
+      "output": 2.75e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 6.875e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "au.anthropic.claude-opus-4-7": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5.5e-06,
+      "output": 2.75e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 6.875e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "azure_ai/claude-opus-4-7": [
+    {
+      "provider": "azure_ai",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/ap-northeast-1/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-07,
+      "output": 1.44e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/ap-south-1/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-07,
+      "output": 1.44e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/ap-southeast-2/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3.09e-07,
+      "output": 1.236e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/ap-southeast-3/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-07,
+      "output": 1.44e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/eu-north-1/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-07,
+      "output": 1.44e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/eu-central-1/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-07,
+      "output": 1.44e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/eu-west-1/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-07,
+      "output": 1.44e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/eu-west-2/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 4.7e-07,
+      "output": 1.86e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/eu-south-1/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-07,
+      "output": 1.44e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/sa-east-1/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-07,
+      "output": 1.44e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/us-east-1/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/us-east-2/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/us-gov-east-1/anthropic.claude-sonnet-4-5-20250929-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3.3e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 3.3e-07,
+      "cache_creation_input": 4.125e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/us-gov-west-1/anthropic.claude-sonnet-4-5-20250929-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3.3e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 3.3e-07,
+      "cache_creation_input": 4.125e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/us-west-2/minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "claude-opus-4-7": [
+    {
+      "provider": "anthropic",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "claude-opus-4-7-20260416": [
+    {
+      "provider": "anthropic",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/MiniMaxAI/MiniMax-M2.5": [
+    {
+      "provider": "baseten",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/nvidia/Nemotron-120B-A12B": [
+    {
+      "provider": "baseten",
+      "input": 3e-07,
+      "output": 7.5e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/zai-org/GLM-5": [
+    {
+      "provider": "baseten",
+      "input": 9.5e-07,
+      "output": 3.15e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/zai-org/GLM-4.7": [
+    {
+      "provider": "baseten",
+      "input": 6e-07,
+      "output": 2.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/zai-org/GLM-4.6": [
+    {
+      "provider": "baseten",
+      "input": 6e-07,
+      "output": 2.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/moonshotai/Kimi-K2.5": [
+    {
+      "provider": "baseten",
+      "input": 6e-07,
+      "output": 3e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/moonshotai/Kimi-K2-Thinking": [
+    {
+      "provider": "baseten",
+      "input": 6e-07,
+      "output": 2.5e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/moonshotai/Kimi-K2-Instruct-0905": [
+    {
+      "provider": "baseten",
+      "input": 6e-07,
+      "output": 2.5e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/openai/gpt-oss-120b": [
+    {
+      "provider": "baseten",
+      "input": 1e-07,
+      "output": 5e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/deepseek-ai/DeepSeek-V3.1": [
+    {
+      "provider": "baseten",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "baseten/deepseek-ai/DeepSeek-V3-0324": [
+    {
+      "provider": "baseten",
+      "input": 7.7e-07,
+      "output": 7.7e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "minimax.minimax-m2.5": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "nvidia.nemotron-super-3-120b": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-07,
+      "output": 6.5e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.command-a-reasoning-08-2025": [
+    {
+      "provider": "oci",
+      "input": 1.56e-06,
+      "output": 1.56e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.command-a-vision-07-2025": [
+    {
+      "provider": "oci",
+      "input": 1.56e-06,
+      "output": 1.56e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.command-a-translate-08-2025": [
+    {
+      "provider": "oci",
+      "input": 9e-08,
+      "output": 9e-08,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.command-r-08-2024": [
+    {
+      "provider": "oci",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.command-r-plus-08-2024": [
+    {
+      "provider": "oci",
+      "input": 1.56e-06,
+      "output": 1.56e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/meta.llama-3.2-11b-vision-instruct": [
+    {
+      "provider": "oci",
+      "input": 2e-06,
+      "output": 2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/meta.llama-3.1-70b-instruct": [
+    {
+      "provider": "oci",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/meta.llama-3.3-70b-instruct-fp8-dynamic": [
+    {
+      "provider": "oci",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/xai.grok-4-fast": [
+    {
+      "provider": "oci",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/xai.grok-4.1-fast": [
+    {
+      "provider": "oci",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/xai.grok-4.20": [
+    {
+      "provider": "oci",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/xai.grok-4.20-multi-agent": [
+    {
+      "provider": "oci",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/xai.grok-code-fast-1": [
+    {
+      "provider": "oci",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/google.gemini-2.5-pro": [
+    {
+      "provider": "oci",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/google.gemini-2.5-flash": [
+    {
+      "provider": "oci",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/google.gemini-2.5-flash-lite": [
+    {
+      "provider": "oci",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.embed-english-v3.0": [
+    {
+      "provider": "oci",
+      "input": 1e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.embed-english-light-v3.0": [
+    {
+      "provider": "oci",
+      "input": 1e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.embed-multilingual-v3.0": [
+    {
+      "provider": "oci",
+      "input": 1e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.embed-multilingual-light-v3.0": [
+    {
+      "provider": "oci",
+      "input": 1e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.embed-english-image-v3.0": [
+    {
+      "provider": "oci",
+      "input": 1e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.embed-english-light-image-v3.0": [
+    {
+      "provider": "oci",
+      "input": 1e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.embed-multilingual-light-image-v3.0": [
+    {
+      "provider": "oci",
+      "input": 1e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "oci/cohere.embed-v4.0": [
+    {
+      "provider": "oci",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "us-gov.anthropic.claude-sonnet-4-5-20250929-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3.3e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 3.3e-07,
+      "cache_creation_input": 4.125e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "vertex_ai/claude-haiku-4-5": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1e-06,
+      "output": 5e-06,
+      "cache_read_input": 1e-07,
+      "cache_creation_input": 1.25e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "vertex_ai/claude-opus-4-7": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "vertex_ai/claude-opus-4-7@default": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "wandb/moonshotai/Kimi-K2.5": [
+    {
+      "provider": "wandb",
+      "input": 6e-07,
+      "output": 3e-06,
+      "cache_read_input": 1e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "wandb/MiniMaxAI/MiniMax-M2.5": [
+    {
+      "provider": "wandb",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "zai.glm-5": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1e-06,
+      "output": 3.2e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/us-gov-east-1/anthropic.claude-haiku-4-5-20251001-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1.2e-06,
+      "output": 6e-06,
+      "cache_read_input": 1.2e-07,
+      "cache_creation_input": 1.5e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "bedrock/us-gov-west-1/anthropic.claude-haiku-4-5-20251001-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1.2e-06,
+      "output": 6e-06,
+      "cache_read_input": 1.2e-07,
+      "cache_creation_input": 1.5e-06,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "coreweave/google/gemma-4-31B-it": [
+    {
+      "provider": "coreweave",
+      "input": 3e-07,
+      "output": 1.25e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "coreweave/zai-org/GLM-5.1": [
+    {
+      "provider": "coreweave",
+      "input": 1.4e-06,
+      "output": 4.4e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "coreweave/Qwen/Qwen3.5-35B-A3B": [
+    {
+      "provider": "coreweave",
+      "input": 2.5e-07,
+      "output": 1.25e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-16 12:32:59"
     }
   ]
 }
