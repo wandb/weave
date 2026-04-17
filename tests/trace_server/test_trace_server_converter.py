@@ -1,5 +1,7 @@
 import datetime
+import json
 
+from weave.trace.refs import ObjectRef
 from weave.trace_server import ch_sentinel_values
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_to_row,
@@ -15,6 +17,8 @@ from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
 from weave.trace_server.trace_server_interface import (
     CallStartReq,
+    ObjCreateReq,
+    ObjSchemaForInsert,
     StartedCallSchemaForInsert,
 )
 
@@ -187,3 +191,27 @@ def test_clickhouse_row_helpers_match_previous_model_dump_behavior():
         for col in ALL_CALL_COMPLETE_INSERT_COLUMNS
     ]
     assert ch_complete_call_to_row(complete_row) == expected_complete_row
+
+
+def test_universal_ext_to_int_ref_converter_roundtrips_models_with_any_payloads():
+    req = ObjCreateReq(
+        obj=ObjSchemaForInsert(
+            project_id="entity/project",
+            object_id="thing",
+            val={
+                "ref": ObjectRef(
+                    entity="entity",
+                    project="project",
+                    name="name",
+                    _digest="digest",
+                ).with_attr("_class_name")
+            },
+        )
+    )
+
+    converted = universal_ext_to_int_ref_converter(
+        req, lambda project: "internal-project"
+    )
+
+    assert isinstance(converted.obj.val["ref"], dict)
+    json.dumps(converted.obj.val)

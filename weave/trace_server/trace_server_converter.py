@@ -1,3 +1,4 @@
+import dataclasses
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
@@ -150,83 +151,111 @@ F = TypeVar("F")
 
 
 def _map_values(obj: E, func: Callable[[E], E]) -> E:
-    new_obj, _ = _map_values_copy_on_write(obj, func)
+    new_obj, _, _ = _map_values_copy_on_write(obj, func)
     return cast(E, new_obj)
 
 
 def _map_values_copy_on_write(
     obj: E,
     func: Callable[[E], E],
-) -> tuple[E, bool]:
+) -> tuple[E, bool, bool]:
     if isinstance(obj, BaseModel):
         return _map_model_values(obj, func)
     if isinstance(obj, dict):
         updated_dict: dict[Any, Any] | None = None
+        fully_supported = True
         for key, value in obj.items():
-            new_value, changed = _map_values_copy_on_write(value, func)
+            new_value, changed, supported = _map_values_copy_on_write(value, func)
             if changed:
                 if updated_dict is None:
                     updated_dict = dict(obj)
                 updated_dict[key] = new_value
+            fully_supported = fully_supported and supported
         if updated_dict is None:
-            return obj, False
-        return cast(E, updated_dict), True
+            return obj, False, fully_supported
+        return cast(E, updated_dict), True, fully_supported
     if isinstance(obj, list):
         updated_list: list[Any] | None = None
+        fully_supported = True
         for index, value in enumerate(obj):
-            new_value, changed = _map_values_copy_on_write(value, func)
+            new_value, changed, supported = _map_values_copy_on_write(value, func)
             if changed:
                 if updated_list is None:
                     updated_list = list(obj)
                 updated_list[index] = new_value
+            fully_supported = fully_supported and supported
         if updated_list is None:
-            return obj, False
-        return cast(E, updated_list), True
+            return obj, False, fully_supported
+        return cast(E, updated_list), True, fully_supported
     if isinstance(obj, tuple):
         updated_items: list[Any] | None = None
+        fully_supported = True
         for index, value in enumerate(obj):
-            new_value, changed = _map_values_copy_on_write(value, func)
+            new_value, changed, supported = _map_values_copy_on_write(value, func)
             if changed:
                 if updated_items is None:
                     updated_items = list(obj)
                 updated_items[index] = new_value
+            fully_supported = fully_supported and supported
         if updated_items is None:
-            return obj, False
-        return cast(E, tuple(updated_items)), True
+            return obj, False, fully_supported
+        return cast(E, tuple(updated_items)), True, fully_supported
     if isinstance(obj, set):
         values = []
         changed = False
+        fully_supported = True
         for value in obj:
-            new_value, value_changed = _map_values_copy_on_write(value, func)
+            new_value, value_changed, supported = _map_values_copy_on_write(value, func)
             values.append(new_value)
             changed = changed or value_changed
+            fully_supported = fully_supported and supported
         if not changed:
-            return obj, False
-        return cast(E, set(values)), True
+            return obj, False, fully_supported
+        return cast(E, set(values)), True, fully_supported
 
     new_obj = func(obj)
-    return new_obj, new_obj is not obj
+    if new_obj is not obj:
+        return new_obj, True, True
+    return new_obj, False, not dataclasses.is_dataclass(obj)
 
 
 def _map_model_values(
     obj: BaseModel,
     func: Callable[[Any], Any],
-) -> tuple[BaseModel, bool]:
+) -> tuple[BaseModel, bool, bool]:
     updates: dict[str, Any] = {}
+    fully_supported = True
     for field_name, field_info in obj.__class__.model_fields.items():
         if field_info.exclude is True:
             continue
         current_value = getattr(obj, field_name)
-        new_value, changed = _map_values_copy_on_write(current_value, func)
+        new_value, changed, supported = _map_values_copy_on_write(current_value, func)
         if changed:
             updates[field_name] = new_value
+        fully_supported = fully_supported and supported
+
+    if not fully_supported:
+        return _map_model_values_with_roundtrip(obj, func), True, True
 
     if not updates:
-        return obj, False
+        return obj, False, True
 
     if obj.__class__.model_config.get("frozen"):
-        return obj.model_copy(update=updates), True
+        return obj.model_copy(update=updates), True, True
 
     for field_name, new_value in updates.items():
         setattr(obj, field_name, new_value)
-    return obj, True
+    return obj, True, True
+
+
+def _map_model_values_with_roundtrip(
+    obj: BaseModel,
+    func: Callable[[Any], Any],
+) -> BaseModel:
+    # `by_alias` is required since we have Mongo-style properties in the
+    # query models that are aliased to conform to start with `$`. Without
+    # this, the model_dump will use the internal property names which are
+    # not valid for the `model_validate` step.
+    orig = obj.model_dump(by_alias=True)
+    new_obj, _, _ = _map_values_copy_on_write(orig, func)
+    return obj.model_validate(new_obj)
