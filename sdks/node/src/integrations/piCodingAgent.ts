@@ -134,6 +134,9 @@ export class PiCodingAgentOtelAdapter {
   // Current model, updated on model_select events
   private currentModel: PiModel | null = null;
 
+  // Conversation ID for the session — set once in onSessionStart, attached to every span
+  private conversationId: string | null = null;
+
   constructor(opts: OtelExtensionOptions = {}) {
     this.tracer = opts.tracer ?? trace.getTracer('pi-coding-agent-weave-ext');
     this.captureContent = opts.captureContent ?? true;
@@ -170,21 +173,84 @@ export class PiCodingAgentOtelAdapter {
 
   private onSessionStart = (
     _event: Extract<PiExtensionEvent, {type: 'session_start'}>,
-    _ctx: PiExtensionContext
-  ): void => {};
+    ctx: PiExtensionContext
+  ): void => {
+    this.currentModel = ctx.model ?? null;
+    this.conversationId = ctx.sessionManager.getSessionId();
+    this.sessionSpan = this.tracer.startSpan(
+      'pi.coding_agent.session',
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          [ATTR.GEN_AI_AGENT_NAME]: 'pi-coding-agent',
+          [ATTR.PI_SESSION_CWD]: ctx.cwd,
+          [ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId,
+        },
+      },
+      ROOT_CONTEXT
+    );
+    this.sessionCtx = trace.setSpan(ROOT_CONTEXT, this.sessionSpan);
+  };
 
-  private onSessionShutdown = (): void => {};
+  private onSessionShutdown = (): void => {
+    this.endSessionSpan();
+  };
 
   private onModelSelect = (
-    _event: Extract<PiExtensionEvent, {type: 'model_select'}>
-  ): void => {};
+    event: Extract<PiExtensionEvent, {type: 'model_select'}>
+  ): void => {
+    this.currentModel = event.model;
+  };
 
   private onBeforeAgentStart = (
-    _event: Extract<PiExtensionEvent, {type: 'before_agent_start'}>,
-    _ctx: PiExtensionContext
-  ): void => {};
+    event: Extract<PiExtensionEvent, {type: 'before_agent_start'}>,
+    ctx: PiExtensionContext
+  ): void => {
+    const model = this.currentModel ?? ctx.model ?? null;
+    this.invokeAgentSpan = this.tracer.startSpan(
+      'invoke_agent pi-coding-agent',
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          [ATTR.GEN_AI_OPERATION_NAME]: 'invoke_agent',
+          [ATTR.GEN_AI_AGENT_NAME]: 'pi-coding-agent',
+          ...(model
+            ? {
+                [ATTR.GEN_AI_PROVIDER_NAME]: resolveGenAiProviderName(
+                  model.provider
+                ),
+              }
+            : {}),
+          ...(this.conversationId
+            ? {[ATTR.GEN_AI_CONVERSATION_ID]: this.conversationId}
+            : {}),
+        },
+      },
+      this.sessionCtx
+    );
+    this.invokeAgentCtx = trace.setSpan(this.sessionCtx, this.invokeAgentSpan);
 
-  private onAgentEnd = (): void => {};
+    if (this.captureContent) {
+      if (event.systemPrompt) {
+        this.invokeAgentSpan.addEvent(GEN_AI_EVENT.SYSTEM_MESSAGE, {
+          [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
+            role: 'system',
+            content: event.systemPrompt,
+          }),
+        });
+      }
+      this.invokeAgentSpan.addEvent(GEN_AI_EVENT.USER_MESSAGE, {
+        [GEN_AI_EVENT.CONTENT_ATTR]: JSON.stringify({
+          role: 'user',
+          content: event.prompt,
+        }),
+      });
+    }
+  };
+
+  private onAgentEnd = (): void => {
+    this.endInvokeAgentSpan();
+  };
 
   private onTurnStart = (
     _event: Extract<PiExtensionEvent, {type: 'turn_start'}>,
@@ -229,9 +295,32 @@ export class PiCodingAgentOtelAdapter {
 
   private endChatSpan(): void {}
 
-  private endInvokeAgentSpan(): void {}
+  private endInvokeAgentSpan(): void {
+    this.endChatSpan();
+    for (const [, span] of this.toolSpans) {
+      span.setAttribute(ATTR.ERROR_TYPE, 'aborted');
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: 'Agent ended with open tool span',
+      });
+      span.end();
+    }
+    this.toolSpans.clear();
+    if (this.invokeAgentSpan) {
+      this.invokeAgentSpan.end();
+      this.invokeAgentSpan = null;
+      this.invokeAgentCtx = ROOT_CONTEXT;
+    }
+  }
 
-  private endSessionSpan(): void {}
+  private endSessionSpan(): void {
+    this.endInvokeAgentSpan();
+    if (this.sessionSpan) {
+      this.sessionSpan.end();
+      this.sessionSpan = null;
+      this.sessionCtx = ROOT_CONTEXT;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
