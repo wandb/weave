@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     import wandb
 
 
-@dataclass
+@dataclass(slots=True, frozen=True)
 class WandbRunContext:
     """Context for WandB run information.
 

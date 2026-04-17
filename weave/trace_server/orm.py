@@ -202,7 +202,7 @@ class Table:
 Action = Literal["SELECT", "DELETE"]
 
 
-@dataclass
+@dataclass(slots=True)
 class PreparedSelect:
     sql: str
     parameters: dict[str, Any]
@@ -427,7 +427,7 @@ class Select:
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)
 
 
-@dataclass
+@dataclass(slots=True)
 class PreparedInsert:
     sql: str
     column_names: list[str]
