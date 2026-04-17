@@ -60,6 +60,24 @@ from weave.flow.scorer import Scorer
 from weave.object.obj import Object
 from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
 from weave.trace.log_call import log_call
+from weave.trace.session import (
+    LogResult,
+    Message,
+    Reasoning,
+    Session,
+    Step,
+    Tool,
+    Turn,
+    Usage,
+    get_current_session,
+    get_current_turn,
+    log_session,
+    log_step,
+    log_turn,
+    start_session,
+    start_step,
+    start_turn,
+)
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 from weave.type_handlers.Audio.audio import Audio
