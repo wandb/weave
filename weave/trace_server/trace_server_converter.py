@@ -238,14 +238,18 @@ def _map_model_values(
         return _map_model_values_with_roundtrip(obj, func), True, True
 
     if not updates:
-        return obj, False, True
+        # Revalidate the existing instance so callers that intentionally
+        # bypassed model validation with `model_construct(...)` still see the
+        # same validation behavior without paying for a full dump/rebuild.
+        return obj.__class__.model_validate(obj), False, True
 
     if obj.__class__.model_config.get("frozen"):
-        return obj.model_copy(update=updates), True, True
+        updated_obj = obj.model_copy(update=updates)
+        return updated_obj.__class__.model_validate(updated_obj), True, True
 
     for field_name, new_value in updates.items():
         setattr(obj, field_name, new_value)
-    return obj, True, True
+    return obj.__class__.model_validate(obj), True, True
 
 
 def _map_model_values_with_roundtrip(
