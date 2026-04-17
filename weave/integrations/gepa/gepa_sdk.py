@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import importlib
+import inspect
 from collections.abc import Callable
 from typing import Any
 
@@ -13,8 +14,27 @@ from weave.trace.autopatch import IntegrationSettings, OpSettings
 _gepa_patcher: MultiPatcher | None = None
 
 
-def _inject_weave_callback(kwargs: dict[str, Any]) -> None:
+def _fn_accepts_callbacks(fn: Callable) -> bool:
+    """Return True if `fn` accepts a `callbacks` keyword argument.
+
+    gepa < 0.1 (which dspy 3.1.x pins) doesn't have the callback protocol yet,
+    so we must not try to pass `callbacks=` on those versions or we'd break
+    `dspy.GEPA.compile()`.
+    """
+    try:
+        sig = inspect.signature(fn)
+    except (TypeError, ValueError):
+        return False
+    params = sig.parameters
+    if "callbacks" in params:
+        return True
+    return any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
+
+
+def _inject_weave_callback(fn: Callable, kwargs: dict[str, Any]) -> None:
     """Add a WeaveGEPACallback to the `callbacks` kwarg if one is not present."""
+    if not _fn_accepts_callbacks(fn):
+        return
     existing = kwargs.get("callbacks")
     if existing is None:
         kwargs["callbacks"] = [WeaveGEPACallback()]
@@ -63,7 +83,7 @@ def _wrap_optimize(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         @functools.wraps(fn)
         def _inner(*args: Any, **kwargs: Any) -> Any:
-            _inject_weave_callback(kwargs)
+            _inject_weave_callback(fn, kwargs)
             return fn(*args, **kwargs)
 
         op_kwargs = settings.model_dump()
