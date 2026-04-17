@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import json
+from collections import defaultdict
 from collections.abc import Callable
 from typing import TypedDict
 
@@ -36,7 +37,6 @@ def user_model():
     return func
 
 
-@pytest.mark.flaky(reruns=3)
 def test_basic_evaluation(
     client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
 ):
@@ -68,9 +68,9 @@ def test_basic_evaluation(
     # indexing. get_calls() sorts by (started_at, id); on Windows time.time()
     # has ~15ms resolution so a parent op and its immediate child can share a
     # millisecond, and the UUIDv7 tiebreak is random within that bucket.
-    by_op: dict[str, list] = {}
+    by_op: dict[str, list] = defaultdict(list)
     for c in calls:
-        by_op.setdefault(op_name_from_call(c), []).append(c)
+        by_op[op_name_from_call(c)].append(c)
 
     assert len(by_op["Evaluation.evaluate"]) == 1
     assert len(by_op["Evaluation.predict_and_score"]) == 3
