@@ -1018,9 +1018,7 @@ def test_eval_results_filter_score_gte(client):
                                 "$gte": [
                                     {
                                         "$convert": {
-                                            "input": {
-                                                "$getField": "scores.accuracy"
-                                            },
+                                            "input": {"$getField": "scores.accuracy"},
                                             "to": "double",
                                         }
                                     },
@@ -1063,9 +1061,7 @@ def test_eval_results_sort_and_filter_combined(client):
                                 "$gte": [
                                     {
                                         "$convert": {
-                                            "input": {
-                                                "$getField": "scores.accuracy"
-                                            },
+                                            "input": {"$getField": "scores.accuracy"},
                                             "to": "double",
                                         }
                                     },
@@ -1115,9 +1111,7 @@ def test_eval_results_filter_with_evaluation_call_id_scope(client):
                                 "$gte": [
                                     {
                                         "$convert": {
-                                            "input": {
-                                                "$getField": "scores.accuracy"
-                                            },
+                                            "input": {"$getField": "scores.accuracy"},
                                             "to": "double",
                                         }
                                     },
@@ -1237,9 +1231,7 @@ def test_eval_results_summary_with_filter(client):
                                 "$gte": [
                                     {
                                         "$convert": {
-                                            "input": {
-                                                "$getField": "scores.accuracy"
-                                            },
+                                            "input": {"$getField": "scores.accuracy"},
                                             "to": "double",
                                         }
                                     },
