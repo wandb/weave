@@ -9,7 +9,7 @@ import keyword
 import logging
 import re
 import types
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock
@@ -32,6 +32,7 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op, as_op, is_tracing_setting_disabled, op
 from weave.trace.table import Table
 from weave.trace.util import Thread
+from weave.utils.type_utils import is_pandas_data_frame, is_wandb_table
 from weave.trace.view_utils import set_call_view
 from weave.type_wrappers.Content.content import Content
 from weave.utils.sentinel import NOT_SET, _NotSetType
@@ -44,6 +45,7 @@ DEFAULT_SCORER_CACHE_SIZE = 1000
 T = TypeVar("T")
 ID = str
 ScoreType = float | bool | dict
+
 
 logger = logging.getLogger(__name__)
 
@@ -616,6 +618,14 @@ class ScoreLogger:
                 self._call_stack_context.__exit__(exc_type, exc_val, exc_tb)
 
 
+def _normalize_rows(data: Any) -> Iterable[dict[str, Any]]:
+    if is_wandb_table(data):
+        return data.iter_records_unwrapped()
+    if is_pandas_data_frame(data):
+        return (row.to_dict() for _, row in data.iterrows())
+    return data  # assume already Iterable[dict]
+
+
 class EvaluationLogger:
     """This class provides an imperative interface for logging evaluations.
 
@@ -918,6 +928,36 @@ class EvaluationLogger:
 
         # Finish the prediction
         pred.finish()
+
+    def log_batch(
+        self,
+        data: Any,
+        input_columns: list[str],
+        output_columns: list[str],
+        score_columns: list[str],
+    ) -> None:
+        """Log all rows of a table-like or DataFrame as evaluation examples.
+
+        Args:
+            data: A wandb.Table, pandas DataFrame, or any Iterable[dict[str, Any]].
+            input_columns: Column names to include in each example's inputs dict.
+            output_columns: Column names to include in each example's output.
+                If exactly one column, the value (not a dict) is used as output.
+            score_columns: Column names to include in each example's scores dict.
+        """
+        for row in _normalize_rows(data):
+            inputs = {col: row[col] for col in input_columns}
+
+            if len(output_columns) == 1:
+                output: Any = row[output_columns[0]]
+            elif output_columns:
+                output = {col: row[col] for col in output_columns}
+            else:
+                output = None
+
+            scores = {col: row[col] for col in score_columns}
+
+            self.log_example(inputs=inputs, output=output, scores=scores)
 
     def log_summary(
         self,
