@@ -2787,6 +2787,153 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             )
         return tsi.OTelExportRes()
 
+    def genai_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        raise NotImplementedError(
+            "genai_otel_export is not implemented for SQLite trace server"
+        )
+
+    def genai_spans_query(
+        self, req: tsi.GenAISpansQueryReq
+    ) -> tsi.GenAISpansQueryRes:
+        raise NotImplementedError(
+            "genai_spans_query is not implemented for SQLite trace server"
+        )
+
+    def genai_spans_trace(
+        self, req: tsi.GenAISpansTraceReq
+    ) -> tsi.GenAISpansTraceRes:
+        raise NotImplementedError(
+            "genai_spans_trace is not implemented for SQLite trace server"
+        )
+
+    def genai_traces_chat(
+        self, req: tsi.GenAITraceChatReq
+    ) -> tsi.GenAITraceChatRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_traces_chat is not implemented for SQLite trace server"
+        )
+
+    def genai_agents_query(
+        self, req: tsi.GenAIAgentsQueryReq
+    ) -> tsi.GenAIAgentsQueryRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_agents_query is not implemented for SQLite trace server"
+        )
+
+    def genai_agent_metrics(
+        self, req: tsi.GenAIAgentMetricsReq
+    ) -> tsi.GenAIAgentMetricsRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_agent_metrics is not implemented for SQLite trace server"
+        )
+
+    def genai_conversations_query(
+        self, req: tsi.GenAIConversationsQueryReq
+    ) -> tsi.GenAIConversationsQueryRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_conversations_query is not implemented for SQLite trace server"
+        )
+
+    def genai_search(self, req: tsi.GenAISearchReq) -> tsi.GenAISearchRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_search is not implemented for SQLite trace server"
+        )
+
+    def genai_conversation_ingest(
+        self, req: tsi.GenAIConversationIngestReq
+    ) -> tsi.GenAIConversationIngestRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_conversation_ingest is not implemented for SQLite trace server"
+        )
+
+    def genai_ingest_atif(
+        self, req: tsi.GenAIATIFIngestReq
+    ) -> tsi.GenAIATIFIngestRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_ingest_atif is not implemented for SQLite trace server"
+        )
+
+    def genai_ingest_openhands(
+        self, req: tsi.GenAIOpenHandsIngestReq
+    ) -> tsi.GenAIOpenHandsIngestRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_ingest_openhands is not implemented for SQLite trace server"
+        )
+
+    def genai_conversation_chat(
+        self, req: tsi.GenAIConversationChatReq
+    ) -> tsi.GenAIConversationChatRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_conversation_chat is not implemented for SQLite trace server"
+        )
+
+    def genai_conversation_export_atif(
+        self, req: tsi.GenAIExportATIFReq
+    ) -> tsi.GenAIExportATIFRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_conversation_export_atif is not implemented for SQLite trace server"
+        )
+
+    def genai_scores_insert(
+        self, req: tsi.GenAIScoresInsertReq
+    ) -> tsi.GenAIScoresInsertRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_scores_insert is not implemented for SQLite trace server"
+        )
+
+    def genai_scores_query(
+        self, req: tsi.GenAIScoresQueryReq
+    ) -> tsi.GenAIScoresQueryRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_scores_query is not implemented for SQLite trace server"
+        )
+
+    def genai_score_stats(
+        self, req: tsi.GenAIScoreStatsReq
+    ) -> tsi.GenAIScoreStatsRes:
+        """Not implemented for SQLite trace server."""
+        raise NotImplementedError(
+            "genai_score_stats is not implemented for SQLite trace server"
+        )
+
+    def genai_turn_stats(self, req: tsi.GenAITurnStatsReq) -> tsi.GenAITurnStatsRes:
+        raise NotImplementedError("genai_turn_stats not supported in SQLite")
+
+    def genai_conversation_stats(
+        self, req: tsi.GenAIConversationStatsReq
+    ) -> tsi.GenAIConversationStatsRes:
+        raise NotImplementedError("genai_conversation_stats not supported in SQLite")
+
+    def genai_annotations_upsert(
+        self, req: tsi.GenAIAnnotationsUpsertReq
+    ) -> tsi.GenAIAnnotationsUpsertRes:
+        """Upsert annotations on entities."""
+        raise NotImplementedError("genai_annotations_upsert not supported on SQLite")
+
+    def genai_annotations_delete(
+        self, req: tsi.GenAIAnnotationsDeleteReq
+    ) -> tsi.GenAIAnnotationsDeleteRes:
+        """Soft-delete annotations."""
+        raise NotImplementedError("genai_annotations_delete not supported on SQLite")
+
+    def genai_annotations_query(
+        self, req: tsi.GenAIAnnotationsQueryReq
+    ) -> tsi.GenAIAnnotationsQueryRes:
+        """Query annotations for entities."""
+        raise NotImplementedError("genai_annotations_query not supported on SQLite")
+
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         raise NotImplementedError(
             "project_stats is not implemented for SQLite trace server"

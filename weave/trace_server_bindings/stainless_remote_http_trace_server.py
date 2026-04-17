@@ -448,6 +448,112 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
+    def genai_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        """Export GenAI OTel traces."""
+        raise NotImplementedError(
+            "Sending GenAI otel traces directly is not yet supported."
+        )
+
+    def genai_spans_query(
+        self, req: tsi.GenAISpansQueryReq
+    ) -> tsi.GenAISpansQueryRes:
+        """Query GenAI spans."""
+        raise NotImplementedError("GenAI spans query is not yet supported.")
+
+    def genai_spans_trace(
+        self, req: tsi.GenAISpansTraceReq
+    ) -> tsi.GenAISpansTraceRes:
+        """Get all GenAI spans for a trace."""
+        raise NotImplementedError("GenAI spans trace is not yet supported.")
+
+    def genai_traces_chat(
+        self, req: tsi.GenAITraceChatReq
+    ) -> tsi.GenAITraceChatRes:
+        """Get the structured chat view for a trace."""
+        raise NotImplementedError("GenAI traces chat is not yet supported.")
+
+    def genai_agents_query(
+        self, req: tsi.GenAIAgentsQueryReq
+    ) -> tsi.GenAIAgentsQueryRes:
+        """Query agents with aggregated stats."""
+        raise NotImplementedError("GenAI agents query is not yet supported.")
+
+    def genai_agent_metrics(
+        self, req: tsi.GenAIAgentMetricsReq
+    ) -> tsi.GenAIAgentMetricsRes:
+        """Get time-bucketed metrics for an agent."""
+        raise NotImplementedError("GenAI agent metrics is not yet supported.")
+
+    def genai_conversations_query(
+        self, req: tsi.GenAIConversationsQueryReq
+    ) -> tsi.GenAIConversationsQueryRes:
+        """Query conversations with aggregate stats."""
+        raise NotImplementedError(
+            "GenAI conversations query is not yet supported."
+        )
+
+    def genai_search(self, req: tsi.GenAISearchReq) -> tsi.GenAISearchRes:
+        """Full-text search across GenAI message content."""
+        raise NotImplementedError("GenAI search is not yet supported.")
+
+    def genai_conversation_ingest(
+        self, req: tsi.GenAIConversationIngestReq
+    ) -> tsi.GenAIConversationIngestRes:
+        """Ingest a structured conversation."""
+        raise NotImplementedError(
+            "GenAI conversation ingest is not yet supported."
+        )
+
+    def genai_ingest_atif(
+        self, req: tsi.GenAIATIFIngestReq
+    ) -> tsi.GenAIATIFIngestRes:
+        """Ingest an ATIF trajectory."""
+        raise NotImplementedError(
+            "GenAI ATIF ingest is not yet supported."
+        )
+
+    def genai_ingest_openhands(
+        self, req: tsi.GenAIOpenHandsIngestReq
+    ) -> tsi.GenAIOpenHandsIngestRes:
+        """Ingest an OpenHands event stream."""
+        raise NotImplementedError(
+            "GenAI OpenHands ingest is not yet supported."
+        )
+
+    def genai_conversation_chat(
+        self, req: tsi.GenAIConversationChatReq
+    ) -> tsi.GenAIConversationChatRes:
+        """Get the multi-turn chat view for a conversation."""
+        raise NotImplementedError(
+            "GenAI conversation chat is not yet supported."
+        )
+
+    def genai_turn_stats(self, req: tsi.GenAITurnStatsReq) -> tsi.GenAITurnStatsRes:
+        raise NotImplementedError
+
+    def genai_conversation_stats(
+        self, req: tsi.GenAIConversationStatsReq
+    ) -> tsi.GenAIConversationStatsRes:
+        raise NotImplementedError
+
+    def genai_annotations_upsert(
+        self, req: tsi.GenAIAnnotationsUpsertReq
+    ) -> tsi.GenAIAnnotationsUpsertRes:
+        """Upsert annotations on entities."""
+        raise NotImplementedError("genai_annotations_upsert")
+
+    def genai_annotations_delete(
+        self, req: tsi.GenAIAnnotationsDeleteReq
+    ) -> tsi.GenAIAnnotationsDeleteRes:
+        """Soft-delete annotations."""
+        raise NotImplementedError("genai_annotations_delete")
+
+    def genai_annotations_query(
+        self, req: tsi.GenAIAnnotationsQueryReq
+    ) -> tsi.GenAIAnnotationsQueryRes:
+        """Query annotations for entities."""
+        raise NotImplementedError("genai_annotations_query")
+
     # Call API
     @validate_call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

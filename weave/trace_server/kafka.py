@@ -25,6 +25,7 @@ from weave.trace_server.environment import (
 
 CALL_ENDED_TOPIC = "weave.call_ended"
 SCORE_CALLS_TOPIC = "weave.score_calls"
+GENAI_SPAN_ENDED_TOPIC = "weave.genai_span_ended"
 
 DEFAULT_MAX_BUFFER_SIZE = 10000
 
@@ -180,6 +181,42 @@ class KafkaProducer(ConfluentKafkaProducer):
                 value=req.model_copy(update={"call_ids": chunk}).model_dump_json(),
                 key=publish_key,
             )
+
+        if flush_immediately:
+            self.flush(0)
+
+    def produce_genai_span_end(
+        self, message_json: str, project_id: str, flush_immediately: bool = False
+    ) -> None:
+        """Produce a genai span ended event to Kafka for sink scoring.
+
+        Args:
+            message_json: JSON-serialized GenAISpanEndedEvent.
+            project_id: Project ID for partition routing.
+            flush_immediately: Whether to flush the producer immediately.
+        """
+        buffer_size = len(self)
+
+        if buffer_size >= self.max_buffer_size:
+            logger.error(
+                "Kafka producer buffer full, dropping genai_span_ended message",
+                extra={
+                    "buffer_size": buffer_size,
+                    "max_buffer_size": self.max_buffer_size,
+                    "project_id": project_id,
+                },
+            )
+            return
+
+        publish_key = None
+        if kafka_partition_by_project_id():
+            publish_key = project_id
+
+        self.produce(
+            topic=GENAI_SPAN_ENDED_TOPIC,
+            value=message_json,
+            key=publish_key,
+        )
 
         if flush_immediately:
             self.flush(0)

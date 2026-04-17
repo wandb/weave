@@ -599,6 +599,137 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
+    def genai_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        raise NotImplementedError(
+            "Sending GenAI otel traces directly is not yet supported."
+        )
+
+    def genai_spans_query(
+        self, req: tsi.GenAISpansQueryReq
+    ) -> tsi.GenAISpansQueryRes:
+        r = self._post_request_executor("/genai/spans/query", req)
+        handle_response_error(r, "/genai/spans/query")
+        return tsi.GenAISpansQueryRes.model_validate(r.json())
+
+    def genai_spans_trace(
+        self, req: tsi.GenAISpansTraceReq
+    ) -> tsi.GenAISpansTraceRes:
+        r = self._post_request_executor("/genai/spans/trace", req)
+        handle_response_error(r, "/genai/spans/trace")
+        return tsi.GenAISpansTraceRes.model_validate(r.json())
+
+    def genai_traces_chat(
+        self, req: tsi.GenAITraceChatReq
+    ) -> tsi.GenAITraceChatRes:
+        """Get the structured chat view for a trace."""
+        r = self._post_request_executor("/genai/traces/chat", req)
+        handle_response_error(r, "/genai/traces/chat")
+        return tsi.GenAITraceChatRes.model_validate(r.json())
+
+    def genai_agents_query(
+        self, req: tsi.GenAIAgentsQueryReq
+    ) -> tsi.GenAIAgentsQueryRes:
+        """Query agents with aggregated stats."""
+        r = self._post_request_executor("/genai/agents/query", req)
+        handle_response_error(r, "/genai/agents/query")
+        return tsi.GenAIAgentsQueryRes.model_validate(r.json())
+
+    def genai_agent_metrics(
+        self, req: tsi.GenAIAgentMetricsReq
+    ) -> tsi.GenAIAgentMetricsRes:
+        """Get time-bucketed metrics for an agent."""
+        r = self._post_request_executor("/genai/agents/metrics", req)
+        handle_response_error(r, "/genai/agents/metrics")
+        return tsi.GenAIAgentMetricsRes.model_validate(r.json())
+
+    def genai_conversations_query(
+        self, req: tsi.GenAIConversationsQueryReq
+    ) -> tsi.GenAIConversationsQueryRes:
+        """Query conversations with aggregate stats."""
+        r = self._post_request_executor("/genai/conversations/query", req)
+        handle_response_error(r, "/genai/conversations/query")
+        return tsi.GenAIConversationsQueryRes.model_validate(r.json())
+
+    def genai_search(self, req: tsi.GenAISearchReq) -> tsi.GenAISearchRes:
+        """Full-text search across GenAI message content."""
+        r = self._post_request_executor("/genai/search", req)
+        handle_response_error(r, "/genai/search")
+        return tsi.GenAISearchRes.model_validate(r.json())
+
+    def genai_conversation_ingest(
+        self, req: tsi.GenAIConversationIngestReq
+    ) -> tsi.GenAIConversationIngestRes:
+        """Ingest a structured conversation."""
+        r = self._post_request_executor("/genai/conversations/ingest", req)
+        handle_response_error(r, "/genai/conversations/ingest")
+        return tsi.GenAIConversationIngestRes.model_validate(r.json())
+
+    def genai_ingest_atif(
+        self, req: tsi.GenAIATIFIngestReq
+    ) -> tsi.GenAIATIFIngestRes:
+        """Ingest an ATIF trajectory."""
+        r = self._post_request_executor("/genai/ingest/atif", req)
+        handle_response_error(r, "/genai/ingest/atif")
+        return tsi.GenAIATIFIngestRes.model_validate(r.json())
+
+    def genai_ingest_openhands(
+        self, req: tsi.GenAIOpenHandsIngestReq
+    ) -> tsi.GenAIOpenHandsIngestRes:
+        """Ingest an OpenHands event stream."""
+        r = self._post_request_executor("/genai/ingest/openhands", req)
+        handle_response_error(r, "/genai/ingest/openhands")
+        return tsi.GenAIOpenHandsIngestRes.model_validate(r.json())
+
+    def genai_conversation_chat(
+        self, req: tsi.GenAIConversationChatReq
+    ) -> tsi.GenAIConversationChatRes:
+        """Get the multi-turn chat view for a conversation."""
+        r = self._post_request_executor("/genai/conversations/chat", req)
+        handle_response_error(r, "/genai/conversations/chat")
+        return tsi.GenAIConversationChatRes.model_validate(r.json())
+
+    def genai_turn_stats(self, req: tsi.GenAITurnStatsReq) -> tsi.GenAITurnStatsRes:
+        return self._generic_request(
+            "/genai/turns/stats",
+            req,
+            tsi.GenAITurnStatsReq,
+            tsi.GenAITurnStatsRes,
+        )
+
+    def genai_conversation_stats(
+        self, req: tsi.GenAIConversationStatsReq
+    ) -> tsi.GenAIConversationStatsRes:
+        return self._generic_request(
+            "/genai/conversations/stats",
+            req,
+            tsi.GenAIConversationStatsReq,
+            tsi.GenAIConversationStatsRes,
+        )
+
+    def genai_annotations_upsert(
+        self, req: tsi.GenAIAnnotationsUpsertReq
+    ) -> tsi.GenAIAnnotationsUpsertRes:
+        """Upsert annotations on entities."""
+        r = self._post_request_executor("/genai/annotations/upsert", req)
+        handle_response_error(r, "/genai/annotations/upsert")
+        return tsi.GenAIAnnotationsUpsertRes.model_validate(r.json())
+
+    def genai_annotations_delete(
+        self, req: tsi.GenAIAnnotationsDeleteReq
+    ) -> tsi.GenAIAnnotationsDeleteRes:
+        """Soft-delete annotations."""
+        r = self._post_request_executor("/genai/annotations/delete", req)
+        handle_response_error(r, "/genai/annotations/delete")
+        return tsi.GenAIAnnotationsDeleteRes.model_validate(r.json())
+
+    def genai_annotations_query(
+        self, req: tsi.GenAIAnnotationsQueryReq
+    ) -> tsi.GenAIAnnotationsQueryRes:
+        """Query annotations for entities."""
+        r = self._post_request_executor("/genai/annotations/query", req)
+        handle_response_error(r, "/genai/annotations/query")
+        return tsi.GenAIAnnotationsQueryRes.model_validate(r.json())
+
     # Call API
     @validate_call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

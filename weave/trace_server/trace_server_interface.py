@@ -362,6 +362,1021 @@ class OTelExportRes(BaseModel):
     )
 
 
+class GenAISpanEndedEvent(BaseModel):
+    """Minimal event published to Kafka when a GenAI span is inserted."""
+
+    project_id: str
+    span_id: str
+    trace_id: str
+    operation_name: str = ""
+    conversation_id: str = ""
+    agent_name: str = ""
+    started_at: datetime.datetime
+
+
+class GenAISpanSchema(BaseModel):
+    """A normalized GenAI span returned by query APIs."""
+
+    project_id: str
+    trace_id: str
+    span_id: str
+    parent_span_id: str = ""
+    span_name: str = ""
+    span_kind: str = ""
+    started_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    status_code: str = ""
+    status_message: str = ""
+    operation_name: str = ""
+    provider_name: str = ""
+    agent_name: str = ""
+    agent_id: str = ""
+    agent_description: str = ""
+    agent_version: str = ""
+    request_model: str = ""
+    response_model: str = ""
+    response_id: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    reasoning_tokens: int = 0
+    reasoning_content: str = ""
+    conversation_id: str = ""
+    conversation_name: str = ""
+    tool_name: str = ""
+    tool_type: str = ""
+    tool_call_id: str = ""
+    tool_description: str = ""
+    tool_definitions: str = ""
+    finish_reasons: list[str] = Field(default_factory=list)
+    request_temperature: float = 0.0
+    request_max_tokens: int = 0
+    request_top_p: float = 0.0
+    input_messages: list[dict] = Field(default_factory=list)
+    output_messages: list[dict] = Field(default_factory=list)
+    system_instructions: list[str] = Field(default_factory=list)
+    tool_call_arguments: str = ""
+    tool_call_result: str = ""
+    compaction_summary: str = ""
+    compaction_items_before: int = 0
+    compaction_items_after: int = 0
+    content_refs: list[str] = Field(default_factory=list)
+    artifact_refs: list[str] = Field(default_factory=list)
+    object_refs: list[str] = Field(default_factory=list)
+    attributes_dump: str = ""
+    events_dump: str = ""
+    resource_dump: str = ""
+    wb_user_id: str = ""
+
+
+class GenAISortBy(BaseModel):
+    """Sort specification for GenAI query endpoints."""
+
+    field: str
+    direction: Literal["asc", "desc"] = "desc"
+
+
+class GenAISpansQueryFilters(BaseModel):
+    """Optional filters for querying genai_spans."""
+
+    trace_id: str | None = None
+    operation_name: str | None = None
+    agent_name: str | None = None
+    provider_name: str | None = None
+    tool_name: str | None = None
+    request_model: str | None = None
+    conversation_id: str | None = None
+    status_code: str | None = None
+
+
+class GenAISpansQueryReq(BaseModel):
+    """Request to list GenAI spans for a project."""
+
+    project_id: str
+    filters: GenAISpansQueryFilters | None = None
+    sort_by: list[GenAISortBy] | None = None
+    limit: int = 100
+    offset: int = 0
+
+
+class GenAISpansQueryRes(BaseModel):
+    """Response containing a list of GenAI spans."""
+
+    spans: list[GenAISpanSchema]
+    total_count: int = 0
+
+
+class GenAISpansTraceReq(BaseModel):
+    """Request to get all GenAI spans for a specific trace."""
+
+    project_id: str
+    trace_id: str
+
+
+class GenAISpansTraceRes(BaseModel):
+    """Response containing all spans for a trace, ordered by start time."""
+
+    spans: list[GenAISpanSchema]
+
+
+# ---------------------------------------------------------------------------
+# GenAI full-text search
+# ---------------------------------------------------------------------------
+
+
+class GenAISearchReq(BaseModel):
+    """Full-text search across message content and span metadata.
+
+    Searches the genai_message_search index for messages matching the query
+    string, returning results grouped by conversation.
+    """
+
+    project_id: str
+    query: str
+
+    roles: list[str] | None = None
+    conversation_id: str | None = None
+    agent_name: str | None = None
+    provider_name: str | None = None
+    request_model: str | None = None
+    started_after: datetime.datetime | None = None
+    started_before: datetime.datetime | None = None
+
+    limit: int = 20
+    offset: int = 0
+
+
+class GenAISearchMatchedMessage(BaseModel):
+    """A single message that matched the search query."""
+
+    span_id: str
+    trace_id: str
+    role: str
+    content_preview: str
+    content_digest: str
+    started_at: datetime.datetime
+
+
+class GenAISearchConversationResult(BaseModel):
+    """A conversation containing messages that matched the search query."""
+
+    conversation_id: str
+    conversation_name: str
+    agent_name: str
+    matched_messages: list[GenAISearchMatchedMessage]
+    total_matches: int
+    last_activity: datetime.datetime
+
+
+class GenAISearchRes(BaseModel):
+    """Response from a full-text search across GenAI messages."""
+
+    results: list[GenAISearchConversationResult]
+    total_conversations: int
+
+
+class GenAIChatMessage(BaseModel):
+    """A single element in the structured agent trajectory / chat view.
+
+    Produced by the backend normalization of GenAI spans into a linear
+    sequence of user messages, agent responses, tool calls, handoffs,
+    and agent boundaries.
+    """
+
+    type: Literal[
+        "user_message",
+        "agent_message",
+        "tool_call",
+        "agent_handoff",
+        "agent_start",
+        "context_compacted",
+    ]
+    span_id: str = ""
+    agent_name: str = ""
+    text: str = ""
+    model: str = ""
+    system_instructions: str = ""
+    reasoning_content: str = ""
+    reasoning_tokens: int = 0
+    tool_name: str = ""
+    tool_arguments: str = ""
+    tool_result: str = ""
+    tool_definitions: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    duration_ms: int = 0
+    started_at: str = ""
+    status: str = "OK"
+    content_refs: list[str] = Field(default_factory=list)
+    compaction_summary: str = ""
+    compaction_items_before: int = 0
+    compaction_items_after: int = 0
+
+
+class GenAITraceChatReq(BaseModel):
+    """Request to get the structured chat / trajectory view for a trace."""
+
+    project_id: str
+    trace_id: str
+
+
+class GenAITraceChatRes(BaseModel):
+    """Structured chat view: a linear sequence of messages representing
+    the agent trajectory for a single trace.
+    """
+
+    trace_id: str
+    root_span_name: str = ""
+    provider: str = ""
+    total_duration_ms: int = 0
+    messages: list[GenAIChatMessage] = Field(default_factory=list)
+
+
+class GenAIConversationSchema(BaseModel):
+    """Metadata for a single multi-turn conversation, keyed by conversation_id."""
+
+    conversation_id: str
+    conversation_name: str = ""
+    project_id: str
+    turn_count: int = 0
+    span_count: int = 0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_duration_ms: int = 0
+    error_count: int = 0
+    agent_name: str = ""
+    agent_names: list[str] = []
+    provider_name: str = ""
+    first_seen: datetime.datetime | None = None
+    last_seen: datetime.datetime | None = None
+
+
+class GenAIConversationsQueryFilters(BaseModel):
+    """Filters for querying the genai_conversations materialized table."""
+
+    conversation_id: str | None = None
+    agent_name: str | None = None
+    provider_name: str | None = None
+    has_errors: bool | None = None
+    min_turns: int | None = None
+    max_turns: int | None = None
+    started_after: datetime.datetime | None = None
+    started_before: datetime.datetime | None = None
+
+
+class GenAIConversationsQueryReq(BaseModel):
+    """Request to list conversations for a project, ordered by most recent."""
+
+    project_id: str
+    filters: GenAIConversationsQueryFilters | None = None
+    sort_by: list[GenAISortBy] | None = None
+    limit: int = 100
+    offset: int = 0
+
+
+class GenAIConversationsQueryRes(BaseModel):
+    """Response containing a list of conversations."""
+
+    conversations: list[GenAIConversationSchema]
+    total_count: int = 0
+
+
+class GenAIConversationChatReq(BaseModel):
+    """Request to get the multi-turn chat view for a conversation."""
+
+    project_id: str
+    conversation_id: str
+
+
+class GenAIConversationChatRes(BaseModel):
+    """Multi-turn chat view: an ordered list of per-turn chat responses.
+
+    Each entry in ``turns`` corresponds to one OTel trace (one agent
+    invocation / one user turn).  The frontend can render turn-number
+    dividers between them and still reuse ``GenAITraceChatRes`` rendering
+    for each individual turn.
+    """
+
+    conversation_id: str
+    provider: str = ""
+    turn_count: int = 0
+    total_duration_ms: int = 0
+    turns: list[GenAITraceChatRes] = Field(default_factory=list)
+
+
+class GenAIModelUsage(BaseModel):
+    """Token usage for a specific model within an agent's runs."""
+
+    model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+
+
+class GenAIAgentSchema(BaseModel):
+    """Aggregated per-agent stats from the genai_agents table."""
+
+    project_id: str
+    agent_name: str
+    invocation_count: int = 0
+    span_count: int = 0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_duration_ms: int = 0
+    error_count: int = 0
+    model_usage: list[GenAIModelUsage] = Field(default_factory=list)
+    agent_description: str = ""
+    agent_id: str = ""
+    provider_name: str = ""
+    system_instructions: str = ""
+    first_seen: datetime.datetime | None = None
+    last_seen: datetime.datetime | None = None
+    llm_summary: str = ""
+
+
+class GenAIAgentsQueryFilters(BaseModel):
+    """Optional filters for querying agents."""
+
+    agent_name: str | None = None
+    provider_name: str | None = None
+
+
+class GenAIAgentsQueryReq(BaseModel):
+    """Request to list agents with aggregated stats for a project."""
+
+    project_id: str
+    filters: GenAIAgentsQueryFilters | None = None
+    sort_by: list[GenAISortBy] | None = None
+    limit: int = 100
+    offset: int = 0
+
+
+class GenAIAgentsQueryRes(BaseModel):
+    """Response containing aggregated agent stats."""
+
+    agents: list[GenAIAgentSchema]
+    total_count: int = 0
+
+
+class GenAIAgentMetricsReq(BaseModel):
+    """Request for time-bucketed metrics for a specific agent."""
+
+    project_id: str
+    agent_name: str
+    start: str | None = None
+    end: str | None = None
+    granularity_seconds: int = 3600
+    group_by: str = ""
+
+
+class GenAIAgentMetricsBucket(BaseModel):
+    """A single time bucket of agent metrics."""
+
+    timestamp: str
+    group: str = ""
+    invocation_count: int = 0
+    span_count: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    error_count: int = 0
+    avg_duration_ms: float = 0.0
+
+
+class GenAIAgentMetricsRes(BaseModel):
+    """Response with time-bucketed agent metrics."""
+
+    agent_name: str
+    buckets: list[GenAIAgentMetricsBucket] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# GenAI entity annotations
+# ---------------------------------------------------------------------------
+
+
+class GenAIAnnotationValue(BaseModel):
+    """A single annotation entry for an entity."""
+
+    entity_type: str
+    entity_id: str
+    namespace: str
+    key: str
+    string_value: str = ""
+    float_value: float = 0.0
+    int_value: int = 0
+    json_value: str = ""
+    value_type: Literal["string", "float", "int", "json"] = "string"
+    source: str = ""
+    source_id: str = ""
+
+
+class GenAIAnnotationRow(BaseModel):
+    """A stored annotation row, including server-managed fields."""
+
+    project_id: str
+    entity_type: str
+    entity_id: str
+    namespace: str
+    key: str
+    string_value: str = ""
+    float_value: float = 0.0
+    int_value: int = 0
+    json_value: str = ""
+    value_type: str = "string"
+    source: str = ""
+    source_id: str = ""
+    updated_at: str = ""
+    deleted_at: str = ""
+
+
+class GenAIAnnotationsUpsertReq(BaseModel):
+    """Upsert one or more annotations on entities."""
+
+    project_id: str
+    annotations: list[GenAIAnnotationValue]
+
+
+class GenAIAnnotationsUpsertRes(BaseModel):
+    """Response for annotation upsert."""
+
+    inserted: int = 0
+
+
+class GenAIAnnotationsDeleteReq(BaseModel):
+    """Soft-delete annotations matching the given filters."""
+
+    project_id: str
+    entity_type: str
+    entity_id: str
+    namespace: str | None = None
+    key: str | None = None
+
+
+class GenAIAnnotationsDeleteRes(BaseModel):
+    """Response for annotation delete."""
+
+    deleted: int = 0
+
+
+class GenAIAnnotationsQueryReq(BaseModel):
+    """Query annotations for entities."""
+
+    project_id: str
+    entity_type: str | None = None
+    entity_ids: list[str] | None = None
+    namespace: str | None = None
+    key: str | None = None
+    limit: int = 1000
+    offset: int = 0
+
+
+class GenAIAnnotationsQueryRes(BaseModel):
+    """Response containing matching annotations."""
+
+    annotations: list[GenAIAnnotationRow]
+
+
+# ---------------------------------------------------------------------------
+# GenAI scores
+# ---------------------------------------------------------------------------
+
+
+class GenAIScoreInsert(BaseModel):
+    """A single score to insert into ``genai_scores``.
+
+    ``entity_type`` is one of ``span``, ``conversation``, or ``trace``.
+    ``outcome`` is one of ``pass``, ``fail``, ``error``, or ``unknown``.
+    """
+
+    score_id: str = ""
+    entity_type: str  # 'span', 'conversation', 'trace'
+    entity_id: str
+    conversation_id: str = ""
+    signal_name: str
+    outcome: str  # 'pass', 'fail', 'error', 'unknown'
+    score_value: float = 0.0
+    label: str = ""
+    explanation: str = ""
+    scorer_model: str = ""
+    scorer_prompt: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    duration_ms: int = 0
+    scored_at: str = ""  # ISO timestamp
+
+
+class GenAIScoresInsertReq(BaseModel):
+    """Insert one or more scores into ``genai_scores``."""
+
+    project_id: str
+    scores: list[GenAIScoreInsert]
+
+
+class GenAIScoresInsertRes(BaseModel):
+    """Result of inserting scores."""
+
+    inserted: int
+
+
+class GenAIScoreRow(BaseModel):
+    """A score row read from ``genai_scores``."""
+
+    project_id: str = ""
+    score_id: str = ""
+    entity_type: str = ""
+    entity_id: str = ""
+    conversation_id: str = ""
+    signal_name: str = ""
+    outcome: str = ""
+    score_value: float = 0.0
+    label: str = ""
+    explanation: str = ""
+    scorer_model: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    duration_ms: int = 0
+    scored_at: str = ""
+
+
+class GenAIScoresQueryReq(BaseModel):
+    """Query scores from ``genai_scores`` with optional filters."""
+
+    project_id: str
+    signal_name: str = ""
+    entity_type: str = ""
+    entity_ids: list[str] = Field(default_factory=list)
+    outcome: str = ""
+    limit: int = 100
+    offset: int = 0
+
+
+class GenAIScoresQueryRes(BaseModel):
+    """Response containing matching score rows."""
+
+    scores: list[GenAIScoreRow]
+
+
+class GenAIScoreStatsReq(BaseModel):
+    """Request for time-bucketed score statistics."""
+
+    project_id: str
+    signal_name: str = ""
+    entity_type: str = ""
+    start: str | None = None
+    end: str | None = None
+    granularity_seconds: int = 3600
+    group_by: str = ""
+
+
+class GenAIScoreStatsBucket(BaseModel):
+    """Aggregated score counts for one time bucket."""
+
+    timestamp: str
+    group: str = ""
+    total: int = 0
+    pass_count: int = 0
+    fail_count: int = 0
+    error_count: int = 0
+    unknown_count: int = 0
+
+
+class GenAIScoreStatsRes(BaseModel):
+    """Response with time-bucketed score statistics and optional overall totals."""
+
+    buckets: list[GenAIScoreStatsBucket] = Field(default_factory=list)
+    totals: GenAIScoreStatsBucket | None = None
+
+
+# ---------------------------------------------------------------------------
+# GenAI stats — time-bucketed analytics across spans, conversations, scores
+# ---------------------------------------------------------------------------
+
+
+class GenAICustomAttrFilter(BaseModel):
+    """Filter on a custom attribute stored in ``genai_span_attributes``.
+
+    Attributes:
+        attr_key: Key of the attribute to filter on.
+        operator: Comparison operator; default is equality (``eq``).
+        value: Value to compare against (string, integer, or float).
+    """
+
+    attr_key: str
+    operator: str = "eq"
+    value: str | int | float = ""
+
+
+class GenAIStatsBucket(BaseModel):
+    """Common time bucket for GenAI stats endpoints.
+
+    Attributes:
+        timestamp: Bucket start as an ISO timestamp string.
+        group: Grouping dimension value when the request uses ``group_by``.
+        count: Number of items (e.g. spans) in the bucket.
+        input_tokens: Sum of input tokens in the bucket.
+        output_tokens: Sum of output tokens in the bucket.
+        error_count: Number of errors in the bucket.
+        avg_duration_ms: Average duration in milliseconds.
+    """
+
+    timestamp: str
+    group: str = ""
+    count: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    error_count: int = 0
+    avg_duration_ms: float = 0.0
+
+
+class GenAITurnStatsReq(BaseModel):
+    """Request for time-bucketed turn (span) statistics.
+
+    Attributes:
+        project_id: Project to query.
+        start: Optional ISO range start.
+        end: Optional ISO range end.
+        granularity_seconds: Bucket width in seconds.
+        group_by: Optional dimension name to group buckets (empty for none).
+        operation_names: Filter by OpenTelemetry operation names.
+        agent_names: Filter by agent name.
+        provider_names: Filter by provider name.
+        request_models: Filter by model name.
+        tool_names: Filter by tool name.
+        conversation_ids: Restrict to these conversations.
+        status_codes: Filter by status code.
+        custom_filters: Additional filters on ``genai_span_attributes``.
+    """
+
+    project_id: str
+    start: str | None = None
+    end: str | None = None
+    granularity_seconds: int = 3600
+    group_by: str = ""
+    operation_names: list[str] = Field(default_factory=list)
+    agent_names: list[str] = Field(default_factory=list)
+    provider_names: list[str] = Field(default_factory=list)
+    request_models: list[str] = Field(default_factory=list)
+    tool_names: list[str] = Field(default_factory=list)
+    conversation_ids: list[str] = Field(default_factory=list)
+    status_codes: list[str] = Field(default_factory=list)
+    custom_filters: list[GenAICustomAttrFilter] = Field(default_factory=list)
+
+
+class GenAITurnStatsRes(BaseModel):
+    """Response with time-bucketed turn statistics.
+
+    Attributes:
+        buckets: One entry per time bucket (and optional group).
+    """
+
+    buckets: list[GenAIStatsBucket] = Field(default_factory=list)
+
+
+class GenAIConversationStatsReq(BaseModel):
+    """Request for time-bucketed conversation statistics.
+
+    Attributes:
+        project_id: Project to query.
+        start: Optional ISO range start.
+        end: Optional ISO range end.
+        granularity_seconds: Bucket width in seconds.
+        group_by: Optional dimension name to group buckets (empty for none).
+        conversation_ids: Restrict to these conversations.
+        agent_names: Filter by agent name.
+        provider_names: Filter by provider name.
+        custom_filters: Additional filters on ``genai_span_attributes``.
+    """
+
+    project_id: str
+    start: str | None = None
+    end: str | None = None
+    granularity_seconds: int = 3600
+    group_by: str = ""
+    conversation_ids: list[str] = Field(default_factory=list)
+    agent_names: list[str] = Field(default_factory=list)
+    provider_names: list[str] = Field(default_factory=list)
+    custom_filters: list[GenAICustomAttrFilter] = Field(default_factory=list)
+
+
+class GenAIConversationStatsBucket(BaseModel):
+    """Time bucket for conversation-level stats.
+
+    Attributes:
+        timestamp: Bucket start as an ISO timestamp string.
+        group: Grouping dimension value when the request uses ``group_by``.
+        conversation_count: Number of distinct conversations.
+        turn_count: Total turns (spans) in the bucket.
+        input_tokens: Sum of input tokens.
+        output_tokens: Sum of output tokens.
+        error_count: Number of errors.
+    """
+
+    timestamp: str
+    group: str = ""
+    conversation_count: int = 0
+    turn_count: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    error_count: int = 0
+
+
+class GenAIConversationStatsRes(BaseModel):
+    """Response with time-bucketed conversation statistics.
+
+    Attributes:
+        buckets: One entry per time bucket (and optional group).
+    """
+
+    buckets: list[GenAIConversationStatsBucket] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# GenAI structured conversation ingest
+# ---------------------------------------------------------------------------
+
+
+class GenAIStructuredMessage(BaseModel):
+    """A single message in a structured conversation turn."""
+
+    role: Literal["user", "assistant", "system", "tool"]
+    content: str = ""
+    tool_call_id: str = ""
+    tool_name: str = ""
+
+
+class GenAIStructuredToolCall(BaseModel):
+    """A tool invocation within a conversation turn."""
+
+    tool_name: str
+    arguments: str = ""
+    result: str = ""
+    duration_ms: int = 0
+
+
+class GenAIStructuredStep(BaseModel):
+    """One LLM invocation within a turn.
+
+    When provided on a turn, each step becomes a ``chat`` child span under
+    the turn's root ``invoke_agent`` span.  Tool calls within a step become
+    ``execute_tool`` children of that step's chat span.
+    """
+
+    model: str = ""
+    provider_name: str = ""
+    input_messages: list[GenAIStructuredMessage] = Field(default_factory=list)
+    output_messages: list[GenAIStructuredMessage] = Field(default_factory=list)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    reasoning_content: str = ""
+    started_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    finish_reasons: list[str] = Field(default_factory=list)
+    tool_calls: list[GenAIStructuredToolCall] = Field(default_factory=list)
+    system_instructions: list[str] = Field(default_factory=list)
+
+
+class GenAIStructuredTurn(BaseModel):
+    """One user-agent interaction within a conversation.
+
+    Each turn maps to a unique ``trace_id`` in the underlying span storage.
+
+    When ``steps`` is non-empty, each step produces a ``chat`` child span
+    with its own tool call children.  The turn-level ``model``, ``input_tokens``,
+    ``output_tokens``, and ``tool_calls`` fields are ignored in favour of
+    the per-step data.  When ``steps`` is empty, existing flat behaviour
+    is preserved.
+    """
+
+    messages: list[GenAIStructuredMessage]
+    tool_calls: list[GenAIStructuredToolCall] = Field(default_factory=list)
+    steps: list[GenAIStructuredStep] = Field(default_factory=list)
+    agent_name: str = ""
+    model: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_content: str = ""
+    started_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    system_instructions: list[str] = Field(default_factory=list)
+    trace_id: str = ""
+    parent_span_id: str = ""
+
+
+class GenAIConversationIngestReq(BaseModel):
+    """Ingest a structured conversation (one or more turns).
+
+    Converts the provided turns into ``genai_spans`` rows so that all
+    existing read APIs (conversation list, chat view, search) work
+    unchanged.  ``project_id`` is optional — when empty the HTTP handler
+    infers it from auth context.
+    """
+
+    project_id: str = ""
+    conversation_id: str = ""
+    conversation_name: str = ""
+    provider_name: str = ""
+    agent_name: str = ""
+    turns: list[GenAIStructuredTurn]
+
+
+class GenAIConversationIngestRes(BaseModel):
+    """Result of a structured conversation ingest."""
+
+    conversation_id: str
+    trace_ids: list[str]
+    root_span_ids: list[str] = Field(default_factory=list)
+    span_count: int
+
+
+# ---------------------------------------------------------------------------
+# ATIF (Agent Trace Interchange Format) ingest
+# ---------------------------------------------------------------------------
+
+
+class ATIFMetrics(BaseModel):
+    """Per-step LLM metrics from an ATIF trajectory."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cached_tokens: int = 0
+    cost_usd: float = 0.0
+
+
+class ATIFToolCall(BaseModel):
+    """A tool invocation in an ATIF step."""
+
+    tool_call_id: str = ""
+    function_name: str = ""
+    arguments: str | dict = ""
+
+
+class ATIFObservationResult(BaseModel):
+    """A single tool result in an ATIF observation."""
+
+    source_call_id: str = ""
+    content: str = ""
+
+
+class ATIFObservation(BaseModel):
+    """Environment feedback in an ATIF step."""
+
+    results: list[ATIFObservationResult] = Field(default_factory=list)
+
+
+class ATIFStep(BaseModel):
+    """A single step in an ATIF trajectory."""
+
+    step_id: int = 0
+    timestamp: str = ""
+    source: Literal["user", "agent", "system"] = "agent"
+    message: str = ""
+    reasoning_content: str = ""
+    tool_calls: list[ATIFToolCall] = Field(default_factory=list)
+    observation: ATIFObservation | None = None
+    metrics: ATIFMetrics | None = None
+    extra: dict = Field(default_factory=dict)
+
+
+class ATIFAgent(BaseModel):
+    """Agent metadata from an ATIF trajectory."""
+
+    name: str = ""
+    version: str = ""
+    model_name: str = ""
+    extra: dict = Field(default_factory=dict)
+
+
+class ATIFTrajectory(BaseModel):
+    """An ATIF trajectory document."""
+
+    schema_version: str = ""
+    session_id: str = ""
+    agent: ATIFAgent = Field(default_factory=ATIFAgent)
+    steps: list[ATIFStep] = Field(default_factory=list)
+    extra: dict = Field(default_factory=dict)
+
+
+class GenAIATIFIngestReq(BaseModel):
+    """Ingest an ATIF (Agent Trace Interchange Format) trajectory.
+
+    Accepts either the wrapped format (``project_id`` + ``trajectory``) or a
+    raw ATIF trajectory posted directly (detected by the presence of
+    ``schema_version`` at the top level).  ``project_id`` is optional — when
+    empty the HTTP handler infers it from auth context.
+    """
+
+    project_id: str = ""
+    trajectory: ATIFTrajectory = Field(default_factory=ATIFTrajectory)
+    conversation_name: str = ""
+    provider_name: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _auto_wrap_raw_trajectory(cls, data: Any) -> Any:
+        """Allow posting a raw ATIF document without the wrapper."""
+        if (
+            isinstance(data, dict)
+            and "schema_version" in data
+            and "trajectory" not in data
+        ):
+            pid = data.pop("project_id", "")
+            cname = data.pop("conversation_name", "")
+            pname = data.pop("provider_name", "")
+            return {
+                "project_id": pid,
+                "conversation_name": cname,
+                "provider_name": pname,
+                "trajectory": data,
+            }
+        return data
+
+
+class GenAIATIFIngestRes(BaseModel):
+    """Result of an ATIF trajectory ingest."""
+
+    conversation_id: str
+    trace_ids: list[str]
+    span_count: int
+
+
+class GenAIExportATIFReq(BaseModel):
+    """Export a stored conversation as an ATIF trajectory."""
+
+    project_id: str = ""
+    conversation_id: str = ""
+
+
+class GenAIExportATIFRes(BaseModel):
+    """ATIF document built from the conversation chat projection."""
+
+    trajectory: ATIFTrajectory = Field(default_factory=ATIFTrajectory)
+
+
+# ---------------------------------------------------------------------------
+# OpenHands event-stream ingest
+# ---------------------------------------------------------------------------
+
+
+class OpenHandsEvent(BaseModel):
+    """A single event from an OpenHands event stream.
+
+    The ``event_type`` discriminates between message, action, observation,
+    and system_prompt events.
+    """
+
+    id: int = 0
+    timestamp: str = ""
+    source: Literal["user", "agent", "environment"] = "agent"
+    event_type: Literal[
+        "message", "action", "observation", "system_prompt", "other"
+    ] = "other"
+
+    # message fields
+    content: str = ""
+
+    # action fields
+    tool_name: str = ""
+    tool_call_id: str = ""
+    thought: str = ""
+    arguments: str | dict = ""
+
+    # observation fields
+    observation_content: str = ""
+    action_id: int = 0
+
+    # system_prompt fields
+    system_prompt: str = ""
+
+    # LLM response grouping
+    llm_response_id: str = ""
+
+    extra: dict = Field(default_factory=dict)
+
+
+class GenAIOpenHandsIngestReq(BaseModel):
+    """Ingest an OpenHands event stream as a conversation.
+
+    ``project_id`` is optional — when empty the HTTP handler infers it from
+    auth context.
+    """
+
+    project_id: str = ""
+    session_id: str = ""
+    events: list[OpenHandsEvent]
+    conversation_name: str = ""
+    agent_name: str = ""
+    provider_name: str = ""
+
+
+class GenAIOpenHandsIngestRes(BaseModel):
+    """Result of an OpenHands event stream ingest."""
+
+    conversation_id: str
+    trace_ids: list[str]
+    span_count: int
+
+
 class CallStartReq(BaseModelStrict):
     start: StartedCallSchemaForInsert
 
@@ -2825,6 +3840,53 @@ class EvalResultsSummaryRes(BaseModel):
 class TraceServerInterface(Protocol):
     # OTEL API
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
+
+    # GenAI OTEL API
+    def genai_otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
+    def genai_spans_query(self, req: GenAISpansQueryReq) -> GenAISpansQueryRes: ...
+    def genai_spans_trace(self, req: GenAISpansTraceReq) -> GenAISpansTraceRes: ...
+    def genai_agents_query(self, req: GenAIAgentsQueryReq) -> GenAIAgentsQueryRes: ...
+    def genai_agent_metrics(
+        self, req: GenAIAgentMetricsReq
+    ) -> GenAIAgentMetricsRes: ...
+    def genai_conversations_query(
+        self, req: GenAIConversationsQueryReq
+    ) -> GenAIConversationsQueryRes: ...
+    def genai_conversation_chat(
+        self, req: GenAIConversationChatReq
+    ) -> GenAIConversationChatRes: ...
+    def genai_traces_chat(self, req: GenAITraceChatReq) -> GenAITraceChatRes: ...
+    def genai_annotations_upsert(
+        self, req: GenAIAnnotationsUpsertReq
+    ) -> GenAIAnnotationsUpsertRes: ...
+    def genai_annotations_delete(
+        self, req: GenAIAnnotationsDeleteReq
+    ) -> GenAIAnnotationsDeleteRes: ...
+    def genai_annotations_query(
+        self, req: GenAIAnnotationsQueryReq
+    ) -> GenAIAnnotationsQueryRes: ...
+    def genai_scores_insert(
+        self, req: GenAIScoresInsertReq
+    ) -> GenAIScoresInsertRes: ...
+    def genai_scores_query(self, req: GenAIScoresQueryReq) -> GenAIScoresQueryRes: ...
+    def genai_score_stats(self, req: GenAIScoreStatsReq) -> GenAIScoreStatsRes: ...
+    def genai_turn_stats(self, req: GenAITurnStatsReq) -> GenAITurnStatsRes: ...
+    def genai_conversation_stats(
+        self, req: GenAIConversationStatsReq
+    ) -> GenAIConversationStatsRes: ...
+    def genai_search(self, req: GenAISearchReq) -> GenAISearchRes: ...
+
+    # GenAI structured ingest API
+    def genai_conversation_ingest(
+        self, req: GenAIConversationIngestReq
+    ) -> GenAIConversationIngestRes: ...
+    def genai_ingest_atif(self, req: GenAIATIFIngestReq) -> GenAIATIFIngestRes: ...
+    def genai_ingest_openhands(
+        self, req: GenAIOpenHandsIngestReq
+    ) -> GenAIOpenHandsIngestRes: ...
+    def genai_conversation_export_atif(
+        self, req: GenAIExportATIFReq
+    ) -> GenAIExportATIFRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

@@ -18,6 +18,24 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.display.term import configure_logger, update_logger_level
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, Ref
+from weave.trace.session import (
+    LogResult,
+    Message,
+    Reasoning,
+    Session,
+    Step,
+    Tool,
+    Turn,
+    Usage,
+    get_current_session,
+    get_current_turn,
+    log_session,
+    log_step,
+    log_turn,
+    start_session,
+    start_step,
+    start_turn,
+)
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
@@ -572,9 +590,17 @@ def finish() -> None:
 
 
 __all__ = [
+    "LogResult",
+    "Message",
     "ObjectRef",
+    "Reasoning",
+    "Session",
+    "Step",
     "Table",
     "ThreadContext",
+    "Tool",
+    "Turn",
+    "Usage",
     "add_tags",
     "as_op",
     "attributes",
@@ -583,11 +609,16 @@ __all__ = [
     "get_aliases",
     "get_client",
     "get_current_call",
+    "get_current_session",
+    "get_current_turn",
     "get_tags",
     "get_tags_and_aliases",
     "init",
     "list_aliases",
     "list_tags",
+    "log_session",
+    "log_step",
+    "log_turn",
     "op",
     "publish",
     "ref",
@@ -596,6 +627,9 @@ __all__ = [
     "require_current_call",
     "set_aliases",
     "set_view",
+    "start_session",
+    "start_step",
+    "start_turn",
     "thread",
     "weave_client_context",
 ]

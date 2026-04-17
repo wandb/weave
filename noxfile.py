@@ -68,6 +68,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "autogen_tests",
     "verifiers_test",
     "pandas_test",
+    "otel_genai",
 }
 
 
@@ -113,6 +114,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "claude_agent_sdk",
         "verifiers_test",
         "autogen_tests",
+        "otel_genai",
         "trace",
         "trace_calls_complete_only",
         "trace_no_server",
@@ -134,7 +136,7 @@ def tests(session: nox.Session, shard: str):
 
     if shard not in SHARDS_WITHOUT_EXTRAS:
         sync_args.extend(["--extra", shard])
-    elif shard in {"autogen_tests", "verifiers_test", "pandas_test"}:
+    elif shard in {"autogen_tests", "verifiers_test", "pandas_test", "otel_genai"}:
         sync_args.extend(["--group", shard])
     elif shard in {"trace_server", "trace_server_migrator"}:
         # trace_server shards need both trace_server dependency group and trace_server_tests
@@ -173,6 +175,13 @@ def tests(session: nox.Session, shard: str):
     if shard == "openai_agents":
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
 
+    if shard == "otel_genai":
+        env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
+        env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
+        env["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY", "MISSING")
+        # google-adk conflicts with vertexai in the lockfile, so install it separately
+        session.run("uv", "pip", "install", "google-adk>=1.0", external=True)
+
     default_test_dirs = [f"tests/integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
@@ -197,6 +206,7 @@ def tests(session: nox.Session, shard: str):
             "tests/wandb_interface/",
         ],
         "trace_no_server": ["tests/trace/", "tests/durability/"],
+        "otel_genai": ["tests/integrations/otel_genai/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
