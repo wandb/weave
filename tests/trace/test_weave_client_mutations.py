@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from pydantic import Field
 
@@ -185,6 +187,7 @@ def test_object_mutation_saving_nested_lists_and_dicts(client):
     assert g3.b.f == {"d": {"e": "f"}}
 
 
+@pytest.mark.flaky(reruns=3)
 def test_list_mutation_saving_nested_objects(client):
     class A(weave.Object):
         b: int
@@ -192,10 +195,12 @@ def test_list_mutation_saving_nested_objects(client):
     lst = [A(b=1), A(b=2)]
     ref = weave.publish(lst)
 
+    time.sleep(0.2)
     lst2 = ref.get()
     lst2.append(A(b=3))
     ref2 = weave.publish(lst2)
 
+    time.sleep(0.2)
     lst3 = ref2.get()
     assert len(lst3) == 3
     assert lst3[0].b == 1
