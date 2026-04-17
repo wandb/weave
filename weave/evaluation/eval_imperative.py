@@ -1,17 +1,16 @@
 """EvaluationLogger dispatcher.
 
-This module provides the public ``EvaluationLogger`` class and dispatches at
-construction time to either the V1 or V2 implementation based on
-``weave.trace.settings.should_use_v2_eval_logger()`` (controlled by the
-``use_v2_eval_logger`` setting / ``WEAVE_USE_V2_EVAL_LOGGER`` env var).
+Dispatches at construction time to either the V1 or V2 implementation
+based on ``weave.trace.settings.should_use_v2_eval_logger()`` (controlled
+by the ``use_v2_eval_logger`` setting / ``WEAVE_USE_V2_EVAL_LOGGER`` env
+var).
 
 - V1: ``weave.evaluation.eval_imperative_v1``
 - V2: ``weave.evaluation.eval_imperative_v2``
 
-The V1 and V2 implementations share the same public API. V2 additionally
-persists evaluations via the V2 trace server APIs (``evaluation_create``,
-``evaluation_run_create``, ``prediction_create``, ``score_create``,
-``evaluation_run_finish``).
+``EvaluationLogger`` and ``ScoreLogger`` are factory functions that
+return instances of the selected implementation. V2 subclasses V1, so
+the return type is ``_V1EvaluationLogger`` / ``_V1ScoreLogger``.
 """
 
 from __future__ import annotations
@@ -42,52 +41,35 @@ from weave.trace import settings
 logger = logging.getLogger(__name__)
 
 
-def _select_impl() -> type[_V1EvaluationLogger]:
+def EvaluationLogger(*args: Any, **kwargs: Any) -> _V1EvaluationLogger:  # noqa: N802
+    """Create an EvaluationLogger (V1 or V2 based on settings).
+
+    See module docstring.
+    """
     if settings.should_use_v2_eval_logger():
-        return _V2EvaluationLogger
-    return _V1EvaluationLogger
+        return _V2EvaluationLogger(*args, **kwargs)
+    return _V1EvaluationLogger(*args, **kwargs)
 
 
-class EvaluationLogger:
-    """Dispatching EvaluationLogger.
+def ScoreLogger(*args: Any, **kwargs: Any) -> _V1ScoreLogger:  # noqa: N802
+    """Create a ScoreLogger (V1 or V2 based on settings).
 
-    Instantiating this class returns an instance of either the V1 or V2
-    implementation depending on the ``use_v2_eval_logger`` setting.
+    Most users obtain ScoreLoggers via ``EvaluationLogger.log_prediction``;
+    this factory is exposed mainly for completeness.
     """
-
-    def __new__(cls, *args: Any, **kwargs: Any) -> _V1EvaluationLogger:
-        impl = _select_impl()
-        return impl(*args, **kwargs)
-
-
-class ScoreLogger:
-    """Dispatching ScoreLogger.
-
-    Instantiating this class returns an instance of either the V1 or V2
-    implementation. Typically users obtain a ScoreLogger via
-    ``EvaluationLogger.log_prediction(...)`` rather than constructing one
-    directly; this class exists primarily for re-export and isinstance checks.
-    """
-
-    def __new__(cls, *args: Any, **kwargs: Any) -> _V1ScoreLogger:
-        if settings.should_use_v2_eval_logger():
-            return _V2ScoreLogger(*args, **kwargs)
-        return _V1ScoreLogger(*args, **kwargs)
+    if settings.should_use_v2_eval_logger():
+        return _V2ScoreLogger(*args, **kwargs)
+    return _V1ScoreLogger(*args, **kwargs)
 
 
-class ImperativeEvaluationLogger:
-    """Legacy class name for EvaluationLogger.
-
-    Maintained for backward compatibility. Please use EvaluationLogger.
-    """
-
-    def __new__(cls, *args: Any, **kwargs: Any) -> _V1EvaluationLogger:
-        logger.warning(
-            "ImperativeEvaluationLogger was renamed to EvaluationLogger in 0.51.44"
-            "Please use EvaluationLogger instead.  ImperativeEvaluationLogger will"
-            "be removed in a future version."
-        )
-        return EvaluationLogger(*args, **kwargs)
+def ImperativeEvaluationLogger(*args: Any, **kwargs: Any) -> _V1EvaluationLogger:  # noqa: N802
+    """Legacy alias for EvaluationLogger."""
+    logger.warning(
+        "ImperativeEvaluationLogger was renamed to EvaluationLogger in 0.51.44"
+        "Please use EvaluationLogger instead.  ImperativeEvaluationLogger will"
+        "be removed in a future version."
+    )
+    return EvaluationLogger(*args, **kwargs)
 
 
 __all__ = [

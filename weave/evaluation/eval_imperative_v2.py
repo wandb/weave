@@ -59,10 +59,14 @@ def _ref_str(obj: Any) -> str | None:
     uri = getattr(ref, "uri", None)
     if callable(uri):
         try:
-            return uri()
+            value = uri()
         except Exception:
             return None
-    return uri
+    else:
+        value = uri
+    if isinstance(value, str):
+        return value
+    return None
 
 
 class ScoreLogger(_V1ScoreLogger):
