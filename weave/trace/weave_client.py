@@ -74,6 +74,11 @@ from weave.trace.refs import (
     Ref,
     TableRef,
 )
+from weave.trace.registry_links import (
+    RegistryLinkable,
+    parse_registry_target_path,
+    resolve_linkable_ref,
+)
 from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
@@ -1270,42 +1275,10 @@ class WeaveClient:
         )
         return result.num_deleted
 
-    @staticmethod
-    def _resolve_obj_ref(obj_ref: ObjectRef | str) -> ObjectRef:
-        """Resolve an ObjectRef or weave:/// URI string to an ObjectRef."""
-        if isinstance(obj_ref, str):
-            return ObjectRef.parse_uri(obj_ref)
-        return obj_ref
-
-    @staticmethod
-    def _resolve_registry_prompt_ref(prompt: Any | ObjectRef | str) -> ObjectRef:
-        """Resolve a published prompt or object to an `ObjectRef`."""
-        if isinstance(prompt, (str, ObjectRef)):
-            return WeaveClient._resolve_obj_ref(prompt)
-
-        prompt_ref = get_ref(prompt)
-        if prompt_ref is None:
-            raise ValueError(
-                "link_prompt_to_registry requires a published prompt or object. "
-                "Call weave.publish() first or pass an ObjectRef / weave:/// URI."
-            )
-        return prompt_ref
-
-    @staticmethod
-    def _parse_registry_target_path(target_path: str) -> tuple[str, str]:
-        """Parse `<registry_project>/<portfolio_name>` into its two parts."""
-        match = re.fullmatch(r"(wandb-registry-[^/]+)/([^/]+)", target_path)
-        if match is None:
-            raise ValueError(
-                "target_path must match '<registry_project>/<portfolio_name>' "
-                "where registry_project starts with 'wandb-registry-'"
-            )
-        return cast(tuple[str, str], match.groups())
-
     @trace_sentry.global_trace_sentry.watch()
     def link_prompt_to_registry(
         self,
-        prompt: Any | ObjectRef | str,
+        prompt: RegistryLinkable,
         *,
         target_path: str,
         aliases: Sequence[str] | None = None,
@@ -1323,16 +1296,16 @@ class WeaveClient:
         Returns:
             LinkAssetToRegistryRes: Parsed response from the registry-link endpoint.
         """
-        prompt_ref = self._resolve_registry_prompt_ref(prompt)
-        registry_project, portfolio_name = self._parse_registry_target_path(target_path)
+        prompt_ref = resolve_linkable_ref(prompt)
+        target = parse_registry_target_path(target_path)
 
         return link_asset_to_registry(
             LinkAssetToRegistryReq(
                 ref=prompt_ref.uri,
                 target=LinkAssetToRegistryTarget(
-                    portfolio_name=portfolio_name,
+                    portfolio_name=target.portfolio_name,
                     entity_name=self.entity,
-                    project_name=registry_project,
+                    project_name=target.registry_project,
                 ),
                 aliases=list(aliases or []),
             )
@@ -1347,7 +1320,7 @@ class WeaveClient:
                 or a weave:/// URI string.
             tags: List of tag strings to add.
         """
-        obj_ref = self._resolve_obj_ref(obj_ref)
+        obj_ref = resolve_linkable_ref(obj_ref)
         self.server.obj_add_tags(
             ObjAddTagsReq(
                 project_id=self.project_id,
@@ -1366,7 +1339,7 @@ class WeaveClient:
                 or a weave:/// URI string.
             tags: List of tag strings to remove.
         """
-        obj_ref = self._resolve_obj_ref(obj_ref)
+        obj_ref = resolve_linkable_ref(obj_ref)
         self.server.obj_remove_tags(
             ObjRemoveTagsReq(
                 project_id=self.project_id,
@@ -1388,7 +1361,7 @@ class WeaveClient:
             List of tag strings. Returns empty list if the object version
             has no tags.
         """
-        obj_ref = self._resolve_obj_ref(obj_ref)
+        obj_ref = resolve_linkable_ref(obj_ref)
         res = self.server.obj_read(
             ObjReadReq(
                 project_id=self.project_id,
@@ -1413,7 +1386,7 @@ class WeaveClient:
             A tuple of (tags, aliases). Each is a list of strings.
             Returns empty lists if the object version has no tags or aliases.
         """
-        obj_ref = self._resolve_obj_ref(obj_ref)
+        obj_ref = resolve_linkable_ref(obj_ref)
         res = self.server.obj_read(
             ObjReadReq(
                 project_id=self.project_id,
@@ -1433,7 +1406,7 @@ class WeaveClient:
                 or a weave:/// URI string.
             alias: An alias name or list of alias names to set (e.g., "production").
         """
-        obj_ref = self._resolve_obj_ref(obj_ref)
+        obj_ref = resolve_linkable_ref(obj_ref)
         aliases = [alias] if isinstance(alias, str) else alias
         if not aliases:
             return
@@ -1455,7 +1428,7 @@ class WeaveClient:
                 or a weave:/// URI string (digest is not used since aliases are object-scoped).
             alias: An alias name or list of alias names to remove.
         """
-        obj_ref = self._resolve_obj_ref(obj_ref)
+        obj_ref = resolve_linkable_ref(obj_ref)
         aliases = [alias] if isinstance(alias, str) else alias
         if not aliases:
             return
@@ -1479,7 +1452,7 @@ class WeaveClient:
             List of alias strings. Includes the virtual "latest" alias
             if the object version is the latest.
         """
-        obj_ref = self._resolve_obj_ref(obj_ref)
+        obj_ref = resolve_linkable_ref(obj_ref)
         res = self.server.obj_read(
             ObjReadReq(
                 project_id=self.project_id,

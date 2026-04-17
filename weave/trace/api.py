@@ -18,6 +18,7 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.display.term import configure_logger, update_logger_level
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, Ref
+from weave.trace.registry_links import RegistryLinkable
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
@@ -382,7 +383,7 @@ def ref(location: str) -> ObjectRef:
 
 
 def link_prompt_to_registry(
-    prompt: Any | ObjectRef | str,
+    prompt: RegistryLinkable,
     *,
     target_path: str,
     aliases: Sequence[str] | None = None,

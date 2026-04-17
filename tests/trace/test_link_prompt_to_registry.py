@@ -137,7 +137,7 @@ def test_resolves_input_and_builds_request(
 def test_rejects_unpublished_prompt(client):
     """Raise before making the transport call when the prompt has no ref."""
     with patch(MOCK_TARGET) as transport:
-        with pytest.raises(ValueError, match="published prompt or object"):
+        with pytest.raises(ValueError, match="published object"):
             client.link_prompt_to_registry(
                 StringPrompt("Hello {name}"),
                 target_path="wandb-registry-prompts/my-prompt-collection",
@@ -208,32 +208,38 @@ def test_top_level_weave_exports_link_prompt_to_registry():
 # ---------------------------------------------------------------------------
 
 
-def test_transport_sends_expected_request(mock_post: MagicMock) -> None:
-    """POST the correct URL, auth, and payload; parse the typed response."""
-    req = LinkAssetToRegistryReq(
-        ref=DEFAULT_TRANSPORT_REQ.ref,
-        target=DEFAULT_TRANSPORT_REQ.target,
-        aliases=["prod", "latest"],
-    )
-    mock_post.return_value = _http_response(200, {"version_index": 7})
+@pytest.mark.parametrize(
+    ("req", "expected_index", "expected_aliases"),
+    [
+        pytest.param(
+            LinkAssetToRegistryReq(
+                ref=DEFAULT_TRANSPORT_REQ.ref,
+                target=DEFAULT_TRANSPORT_REQ.target,
+                aliases=["prod", "latest"],
+            ),
+            7,
+            ["prod", "latest"],
+            id="explicit-aliases",
+        ),
+        pytest.param(DEFAULT_TRANSPORT_REQ, None, [], id="default-aliases"),
+    ],
+)
+def test_transport_sends_expected_request(
+    mock_post: MagicMock,
+    req: LinkAssetToRegistryReq,
+    expected_index: int | None,
+    expected_aliases: list[str],
+) -> None:
+    """POST the correct URL, auth, and payload; default aliases to empty list."""
+    mock_post.return_value = _http_response(200, {"version_index": expected_index})
 
     result = link_asset_to_registry(req)
 
-    assert result.version_index == 7
-    mock_post.assert_called_once()
+    assert result.version_index == expected_index
     assert mock_post.call_args.args[0] == "http://example.com/link_to_registry"
     assert mock_post.call_args.kwargs["auth"] == ("api", "api-key")
     assert mock_post.call_args.kwargs["json"] == req.model_dump(mode="json")
-
-
-def test_transport_defaults_aliases_to_empty_list(mock_post: MagicMock) -> None:
-    """Omitted aliases serialize as an empty list."""
-    mock_post.return_value = _http_response(200, {"version_index": None})
-
-    link_asset_to_registry(DEFAULT_TRANSPORT_REQ)
-
-    payload = mock_post.call_args.kwargs["json"]
-    assert payload["aliases"] == []
+    assert mock_post.call_args.kwargs["json"]["aliases"] == expected_aliases
 
 
 def test_transport_surfaces_http_errors(mock_post: MagicMock) -> None:
