@@ -530,9 +530,8 @@ def test_eval_results_query_post_hoc_score(client):
     are picked up by eval_results_query.
     """
     project_id = client.project_id
-    entity, project = from_project_id(project_id)
 
-    # Create two scorers
+    # Create two scorers (ScorerCreateRes.scorer is the full ref URI)
     scorer_a_res = client.server.scorer_create(
         ScorerCreateReq(
             project_id=project_id,
@@ -540,8 +539,6 @@ def test_eval_results_query_post_hoc_score(client):
             op_source_code="def score(output):\n    return 1",
         )
     )
-    scorer_a_ref = f"weave:///{entity}/{project}/object/{scorer_a_res.object_id}:{scorer_a_res.digest}"
-
     scorer_b_res = client.server.scorer_create(
         ScorerCreateReq(
             project_id=project_id,
@@ -549,7 +546,6 @@ def test_eval_results_query_post_hoc_score(client):
             op_source_code="def score(output):\n    return 1",
         )
     )
-    scorer_b_ref = f"weave:///{entity}/{project}/object/{scorer_b_res.object_id}:{scorer_b_res.digest}"
 
     # Create eval run with one prediction and one score, then finish
     run = client.server.evaluation_run_create(
@@ -572,7 +568,7 @@ def test_eval_results_query_post_hoc_score(client):
         ScoreCreateReq(
             project_id=project_id,
             prediction_id=pred.prediction_id,
-            scorer=scorer_a_ref,
+            scorer=scorer_a_res.scorer,
             value=0.9,
             evaluation_run_id=run.evaluation_run_id,
         )
@@ -589,7 +585,7 @@ def test_eval_results_query_post_hoc_score(client):
         ScoreCreateReq(
             project_id=project_id,
             prediction_id=pred.prediction_id,
-            scorer=scorer_b_ref,
+            scorer=scorer_b_res.scorer,
             value=0.75,
             evaluation_run_id=run.evaluation_run_id,
         )
