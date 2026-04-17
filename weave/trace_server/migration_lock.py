@@ -1,7 +1,7 @@
 """Distributed migration lock backed by a ClickHouse MergeTree table.
 
 On multi-replica deployments, init containers race to apply migrations.
-This module provides a simple advisory lock: one replica INSERTTs a lock row,
+This module provides a simple advisory lock: one replica writes a lock row,
 others see it and wait (with backoff) until it expires or is released.
 
 The lock is best-effort — ClickHouse reads are eventually consistent, so
@@ -17,9 +17,11 @@ from collections.abc import Generator
 from contextlib import contextmanager
 
 from clickhouse_connect.driver.client import Client as CHClient
+from clickhouse_connect.driver.exceptions import OperationalError
 from tenacity import (
     RetryError,
     Retrying,
+    retry_if_exception_type,
     retry_if_result,
     stop_after_delay,
     wait_exponential,
@@ -155,8 +157,13 @@ def acquire_with_retry(
     if holder is None:
         holder = _generate_holder_id()
 
+    # Retry both on a lost race (returned False) and on transient CH
+    # connection errors during init-container startup.
     retrying = Retrying(
-        retry=retry_if_result(lambda acquired: not acquired),
+        retry=(
+            retry_if_result(lambda acquired: not acquired)
+            | retry_if_exception_type(OperationalError)
+        ),
         wait=wait_exponential(
             multiplier=LOCK_WAIT_INITIAL_DELAY_SECONDS,
             max=LOCK_WAIT_MAX_DELAY_SECONDS,
@@ -167,7 +174,7 @@ def acquire_with_retry(
 
     try:
         retrying(try_acquire, ch_client, management_db, holder)
-    except RetryError as exc:
+    except (RetryError, OperationalError) as exc:
         raise MigrationLockError(
             f"Could not acquire migration lock after {timeout_seconds:.0f}s. "
             f"Another migration may be stuck — check {management_db}.{LOCK_TABLE} "

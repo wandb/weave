@@ -2,6 +2,7 @@ from unittest.mock import Mock
 
 import clickhouse_connect
 import pytest
+from clickhouse_connect.driver.exceptions import OperationalError
 
 from weave.trace_server.migration_lock import (
     MigrationLockError,
@@ -146,6 +147,42 @@ def test_migration_lock_acquires_releases_and_handles_errors():
 def test_acquire_with_retry_times_out_when_lock_held():
     other_holder = _generate_holder_id()
     ch_client = _make_ch_client(initial_rows=[(other_holder, "2026-01-01 00:00:00")])
+
+    with pytest.raises(MigrationLockError, match="Could not acquire migration lock"):
+        acquire_with_retry(ch_client, MANAGEMENT_DB, timeout_seconds=1.0)
+
+
+def test_acquire_with_retry_recovers_from_transient_error():
+    """Transient OperationalError should retry, not fail fast."""
+    ch_client = Mock()
+    empty_result = Mock()
+    empty_result.result_rows = []
+    call_count = 0
+
+    def _query_side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        # First call on first attempt: raise transient error.
+        # Subsequent calls: behave like a normal successful acquire.
+        if call_count == 1:
+            raise OperationalError("connection reset")
+        if ch_client.insert.call_count == 0:
+            return empty_result
+        result = Mock()
+        result.result_rows = [(ch_client.insert.call_args.kwargs["data"][0][1],)]
+        return result
+
+    ch_client.query.side_effect = _query_side_effect
+
+    holder = acquire_with_retry(ch_client, MANAGEMENT_DB, timeout_seconds=5.0)
+    assert len(holder) == 12
+    assert call_count >= 2  # proves we retried
+
+
+def test_acquire_with_retry_surfaces_persistent_error():
+    """Persistent OperationalError should raise MigrationLockError, not bubble raw."""
+    ch_client = Mock()
+    ch_client.query.side_effect = OperationalError("clickhouse down")
 
     with pytest.raises(MigrationLockError, match="Could not acquire migration lock"):
         acquire_with_retry(ch_client, MANAGEMENT_DB, timeout_seconds=1.0)
