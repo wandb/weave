@@ -17,6 +17,10 @@ def _safe(value: Any) -> Any:
     return repr(value)
 
 
+def _kind_attrs(kind: str) -> dict[str, Any]:
+    return {"weave": {"kind": kind}}
+
+
 class WeaveGEPACallback:
     """GEPA callback that mirrors optimization lifecycle events into Weave.
 
@@ -37,6 +41,7 @@ class WeaveGEPACallback:
         self._iteration_call = gc.create_call(
             "gepa.iteration",
             inputs={"iteration": iteration},
+            attributes=_kind_attrs("agent"),
             display_name=f"gepa.iteration.{iteration}",
         )
 
@@ -64,6 +69,7 @@ class WeaveGEPACallback:
         self._evaluation_call = gc.create_call(
             "gepa.evaluate",
             inputs=inputs,
+            attributes=_kind_attrs("scorer"),
             display_name="gepa.evaluate",
         )
 
@@ -91,6 +97,7 @@ class WeaveGEPACallback:
         self._proposal_call = gc.create_call(
             "gepa.propose",
             inputs=inputs,
+            attributes=_kind_attrs("llm"),
             display_name="gepa.propose",
         )
 
@@ -113,6 +120,7 @@ class WeaveGEPACallback:
                 "num_examples_evaluated": event.get("num_examples_evaluated"),
                 "total_valset_size": event.get("total_valset_size"),
             },
+            attributes=_kind_attrs("scorer"),
             display_name="gepa.valset_evaluated",
         )
         gc.finish_call(
