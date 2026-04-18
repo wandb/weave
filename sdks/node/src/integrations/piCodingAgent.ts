@@ -412,7 +412,10 @@ export class PiCodingAgentOtelAdapter {
           [ATTR.PI_USAGE_COST_USD]: usage.cost.total,
         });
 
-        if (event.message.stopReason === 'error' && event.message.errorMessage) {
+        if (
+          event.message.stopReason === 'error' &&
+          event.message.errorMessage
+        ) {
           this.chatSpan.setAttribute(ATTR.ERROR_TYPE, 'llm_error');
           this.chatSpan.setStatus({
             code: SpanStatusCode.ERROR,
