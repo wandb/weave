@@ -631,6 +631,52 @@ def _normalize_rows(data: Any) -> Iterable[dict[str, Any]]:
     return data  # assume already Iterable[dict]
 
 
+def _get_column_names(data: Any) -> list[str] | None:
+    """Return column names for structured data, or None for generic iterables."""
+    if is_wandb_table(data):
+        return list(data.columns)
+    if is_pandas_data_frame(data):
+        return list(data.columns)
+    return None
+
+
+def _validate_log_batch_columns(
+    data: Any,
+    input_columns: list[str],
+    output_columns: list[str],
+    score_columns: list[str],
+) -> None:
+    all_listed = input_columns + output_columns + score_columns
+    listed_set = set(all_listed)
+
+    # Check for duplicates across lists
+    if len(listed_set) < len(all_listed):
+        seen: set[str] = set()
+        dupes = [c for c in all_listed if c in seen or seen.add(c)]  # type: ignore[func-returns-value]
+        raise ValueError(
+            f"Column(s) {sorted(set(dupes))} appear in more than one of "
+            "input_columns, output_columns, score_columns."
+        )
+
+    col_names = _get_column_names(data)
+    if col_names is None:
+        return  # generic iterable — can't inspect columns upfront
+
+    data_cols = set(col_names)
+    unknown = listed_set - data_cols
+    if unknown:
+        raise ValueError(
+            f"Column(s) {sorted(unknown)} listed in input/output/score_columns "
+            "do not exist in the data."
+        )
+    unassigned = data_cols - listed_set
+    if unassigned:
+        raise ValueError(
+            f"Column(s) {sorted(unassigned)} exist in the data but are not listed in "
+            "input_columns, output_columns, or score_columns."
+        )
+
+
 class EvaluationLogger:
     """This class provides an imperative interface for logging evaluations.
 
@@ -950,6 +996,7 @@ class EvaluationLogger:
                 If exactly one column, the value (not a dict) is used as output.
             score_columns: Column names to include in each example's scores dict.
         """
+        _validate_log_batch_columns(data, input_columns, output_columns, score_columns)
         for row in _normalize_rows(data):
             inputs = {col: row[col] for col in input_columns}
 
