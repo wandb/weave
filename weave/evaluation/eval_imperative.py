@@ -983,9 +983,9 @@ class EvaluationLogger:
     def log_batch(
         self,
         data: Any,
-        input_columns: list[str],
-        output_columns: list[str],
-        score_columns: list[str],
+        input_columns: list[str] | None = None,
+        output_columns: list[str] | None = None,
+        score_columns: list[str] | None = None,
     ) -> None:
         """Log all rows of a table-like or DataFrame as evaluation examples.
 
@@ -996,6 +996,9 @@ class EvaluationLogger:
                 If exactly one column, the value (not a dict) is used as output.
             score_columns: Column names to include in each example's scores dict.
         """
+        input_columns = input_columns or []
+        output_columns = output_columns or []
+        score_columns = score_columns or []
         _validate_log_batch_columns(data, input_columns, output_columns, score_columns)
         for row in _normalize_rows(data):
             inputs = {col: row[col] for col in input_columns}
