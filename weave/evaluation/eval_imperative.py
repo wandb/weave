@@ -620,6 +620,11 @@ class ScoreLogger:
 
 def _normalize_rows(data: Any) -> Iterable[dict[str, Any]]:
     if is_wandb_table(data):
+        if not hasattr(data, "iter_records_unwrapped"):
+            raise AttributeError(
+                f"{type(data).__name__} does not have iter_records_unwrapped(). "
+                "Upgrade wandb to a version that supports Weave eval table logging."
+            )
         return data.iter_records_unwrapped()
     if is_pandas_data_frame(data):
         return (row.to_dict() for _, row in data.iterrows())
