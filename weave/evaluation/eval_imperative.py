@@ -32,10 +32,10 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op, as_op, is_tracing_setting_disabled, op
 from weave.trace.table import Table
 from weave.trace.util import Thread
-from weave.utils.type_utils import is_pandas_data_frame, is_wandb_table
 from weave.trace.view_utils import set_call_view
 from weave.type_wrappers.Content.content import Content
 from weave.utils.sentinel import NOT_SET, _NotSetType
+from weave.utils.type_utils import is_pandas_data_frame, is_wandb_table
 
 if TYPE_CHECKING:
     from weave.trace.call import Call
