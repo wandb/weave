@@ -791,6 +791,8 @@ class WeaveClient:
             attributes_dict._set_weave_item("os_name", platform.system())
             attributes_dict._set_weave_item("os_version", platform.version())
             attributes_dict._set_weave_item("os_release", platform.release())
+        if settings.should_use_server_side_summary_aggregation():
+            attributes_dict._set_weave_item("server-side-rollup", True)
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri)
 
