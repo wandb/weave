@@ -6,11 +6,12 @@ tables is constructed here via ``make_*_query`` functions. Consumers build a
 returned SQL through the server's ``_query`` method.
 
 Keeping the SQL in this module makes it unit-testable without a live ClickHouse:
-see ``tests/trace_server/test_genai_query_sql.py``.
+see ``tests/trace_server/query_builder/test_agent_query_builder.py``.
 """
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from weave.trace_server.agents.constants import (
@@ -22,14 +23,12 @@ from weave.trace_server.agents.constants import (
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
-    AgentConversationsQueryReq,
     AgentCustomAttrFilter,
+    AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
     AgentSpansQueryReq,
-    AgentSpansTraceReq,
     AgentsQueryReq,
-    AgentTracesQueryReq,
     AgentVersionsQueryReq,
 )
 from weave.trace_server.orm import ParamBuilder
@@ -59,7 +58,33 @@ SPAN_FILTERABLE_COLS: frozenset[str] = frozenset(
     }
 )
 
-#: Columns on spans that can be sorted
+#: Columns on spans that can be grouped by (superset of filterable).
+#: Kept separate so aggregation-only dimensions like agent_id can be added
+#: without widening the filter surface.
+SPAN_GROUP_BY_COLS: frozenset[str] = SPAN_FILTERABLE_COLS | frozenset(
+    {
+        "agent_id",
+        "tool_call_id",
+        "wb_user_id",
+    }
+)
+
+#: Aggregate aliases produced by a grouped spans list query.
+SPAN_GROUP_AGGREGATE_COLS: frozenset[str] = frozenset(
+    {
+        "span_count",
+        "trace_count",
+        "conversation_count",
+        "total_input_tokens",
+        "total_output_tokens",
+        "total_duration_ms",
+        "error_count",
+        "first_seen",
+        "last_seen",
+    }
+)
+
+#: Columns on spans that can be sorted in ungrouped mode
 SPAN_SORTABLE_COLS: frozenset[str] = SPAN_FILTERABLE_COLS | frozenset(
     {
         "started_at",
@@ -68,16 +93,6 @@ SPAN_SORTABLE_COLS: frozenset[str] = SPAN_FILTERABLE_COLS | frozenset(
         "output_tokens",
         "total_tokens",
         "reasoning_tokens",
-    }
-)
-
-TRACE_SORTABLE_COLS: frozenset[str] = frozenset(
-    {
-        "last_seen",
-        "first_seen",
-        "span_count",
-        "total_input_tokens",
-        "error_count",
     }
 )
 
@@ -92,33 +107,6 @@ AGENT_SORTABLE_COLS: frozenset[str] = frozenset(
     }
 )
 
-# Conversations are aggregated with GROUP BY conversation_id, so scalar columns
-# like provider_name become arrays in the SELECT and must be sorted via arrayElement.
-CONVERSATION_SORT_EXPRS: dict[str, str] = {
-    "provider_name": "arrayElement(provider_names, 1)",
-    "provider_names": "arrayElement(provider_names, 1)",
-    "agent_name": "arrayElement(agent_names, 1)",
-    "agent_names": "arrayElement(agent_names, 1)",
-    "request_model": "arrayElement(request_models, 1)",
-    "request_models": "arrayElement(request_models, 1)",
-}
-
-CONVERSATION_SORTABLE_COLS: frozenset[str] = frozenset(
-    {
-        "last_seen",
-        "first_seen",
-        "turn_count",
-        "span_count",
-        "total_input_tokens",
-        "total_output_tokens",
-        "total_duration_ms",
-        "error_count",
-        "conversation_name",
-        "conversation_id",
-        *CONVERSATION_SORT_EXPRS.keys(),
-    }
-)
-
 #: Allowed operators for custom attribute filters
 _ATTR_OPS: dict[str, str] = {
     "eq": "=",
@@ -128,6 +116,14 @@ _ATTR_OPS: dict[str, str] = {
     "gte": ">=",
     "lte": "<=",
 }
+
+#: Valid SQL identifier (used to validate group_by aliases)
+_IDENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+#: Sources that read from a Map(...) column on spans, keyed by user-supplied key
+_CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(
+    {"custom_attrs", "custom_attrs_int", "custom_attrs_float"}
+)
 
 # ---------------------------------------------------------------------------
 # Column projections
@@ -302,6 +298,52 @@ def _pagination_slots(
 
 
 # ---------------------------------------------------------------------------
+# Group-by resolution
+# ---------------------------------------------------------------------------
+
+
+def resolve_group_by(
+    pb: ParamBuilder,
+    refs: list[AgentGroupByRef],
+    *,
+    table_alias: str = "s",
+) -> list[tuple[str, str]]:
+    """Resolve group_by refs to [(sql_expr, alias), ...].
+
+    Validates that:
+      - column refs target an allowlisted span column (``SPAN_GROUP_BY_COLS``)
+      - custom_attrs refs target one of the three Map columns
+      - the resulting alias is a valid SQL identifier
+      - aliases are unique within the request
+    """
+    seen: set[str] = set()
+    out: list[tuple[str, str]] = []
+    for ref in refs:
+        alias = ref.alias or ref.key
+        if not _IDENT_RE.match(alias):
+            raise ValueError(
+                f"group_by alias must match [a-zA-Z_][a-zA-Z0-9_]*, got {alias!r}"
+            )
+        if alias in seen:
+            raise ValueError(f"duplicate group_by alias: {alias!r}")
+        seen.add(alias)
+
+        if ref.source == "column":
+            if ref.key not in SPAN_GROUP_BY_COLS:
+                raise ValueError(
+                    f"group_by column {ref.key!r} is not in the allowlist"
+                )
+            sql_expr = f"{table_alias}.{ref.key}"
+        elif ref.source in _CUSTOM_ATTR_SOURCES:
+            key_slot = pb.add(str(ref.key), param_type="String")
+            sql_expr = f"{table_alias}.{ref.source}[{key_slot}]"
+        else:
+            raise ValueError(f"unknown group_by source: {ref.source!r}")
+        out.append((sql_expr, alias))
+    return out
+
+
+# ---------------------------------------------------------------------------
 # WHERE builders (private — shared between count + list variants)
 # ---------------------------------------------------------------------------
 
@@ -314,26 +356,6 @@ def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         add_custom_attr_filters(
             conditions, pb, getattr(req.filters, "custom_filters", None)
         )
-    return " AND ".join(conditions)
-
-
-def _traces_where(pb: ParamBuilder, req: AgentTracesQueryReq) -> str:
-    conditions = [f"project_id = {pb.add(req.project_id, param_type='String')}"]
-    if req.conversation_id:
-        conditions.append(
-            f"conversation_id = {pb.add(req.conversation_id, param_type='String')}"
-        )
-    if req.agent_name:
-        conditions.append(
-            f"agent_name = {pb.add(req.agent_name, param_type='String')}"
-        )
-    if req.agent_version:
-        conditions.append(
-            f"agent_version = {pb.add(req.agent_version, param_type='String')}"
-        )
-    add_time_filters(
-        conditions, pb, start=req.start, end=req.end, column="started_at"
-    )
     return " AND ".join(conditions)
 
 
@@ -350,43 +372,6 @@ def _agent_versions_where(pb: ParamBuilder, req: AgentVersionsQueryReq) -> str:
     pid = pb.add(req.project_id, param_type="String")
     aname = pb.add(req.agent_name, param_type="String")
     return f"project_id = {pid} AND agent_name = {aname}"
-
-
-def _conversations_where(pb: ParamBuilder, req: AgentConversationsQueryReq) -> str:
-    conditions = [
-        f"project_id = {pb.add(req.project_id, param_type='String')}",
-        "conversation_id != ''",
-    ]
-    add_time_filters(
-        conditions, pb, start=req.start, end=req.end, column="started_at"
-    )
-    if req.filters:
-        f = req.filters
-        if f.conversation_id:
-            conditions.append(
-                f"conversation_id = {pb.add(f.conversation_id, param_type='String')}"
-            )
-        if f.agent_name:
-            conditions.append(
-                f"agent_name = {pb.add(f.agent_name, param_type='String')}"
-            )
-        if f.agent_version:
-            conditions.append(
-                f"agent_version = {pb.add(f.agent_version, param_type='String')}"
-            )
-        if f.provider_name:
-            conditions.append(
-                f"provider_name = {pb.add(f.provider_name, param_type='String')}"
-            )
-        if f.started_after:
-            conditions.append(
-                f"started_at >= parseDateTimeBestEffort({pb.add(str(f.started_after), param_type='String')})"
-            )
-        if f.started_before:
-            conditions.append(
-                f"started_at < parseDateTimeBestEffort({pb.add(str(f.started_before), param_type='String')})"
-            )
-    return " AND ".join(conditions)
 
 
 def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
@@ -416,31 +401,87 @@ def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Public make_*_query functions
+# Spans queries (ungrouped + grouped share the same entry points)
 # ---------------------------------------------------------------------------
 
 
+#: Aggregate SELECT list shared between grouped list queries.
+_GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
+               uniqExact(s.trace_id) AS trace_count,
+               uniqExact(s.conversation_id) AS conversation_count,
+               sum(s.input_tokens) AS total_input_tokens,
+               sum(s.output_tokens) AS total_output_tokens,
+               sum(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)) AS total_duration_ms,
+               countIf(s.status_code = 'ERROR') AS error_count,
+               groupUniqArray(s.agent_name) AS agent_names,
+               groupUniqArray(s.agent_version) AS agent_versions,
+               groupUniqArray(s.provider_name) AS provider_names,
+               groupUniqArray(s.request_model) AS request_models,
+               min(s.started_at) AS first_seen,
+               max(s.started_at) AS last_seen"""
+
+
 def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
+    """Count spans matching the request, or count of distinct groups if grouped."""
     where = _spans_where(pb, req)
-    return f"SELECT count() FROM spans s WHERE {where}"
+    if not req.group_by:
+        return f"SELECT count() FROM spans s WHERE {where}"
+    resolved = resolve_group_by(pb, req.group_by)
+    group_exprs = ", ".join(expr for expr, _ in resolved)
+    return (
+        f"SELECT count() FROM ("
+        f"SELECT {group_exprs} FROM spans s WHERE {where} GROUP BY {group_exprs}"
+        f")"
+    )
 
 
 def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
+    """List spans (ungrouped) or aggregate groups (grouped)."""
     where = _spans_where(pb, req)
-    order_by = build_order_by(req.sort_by, SPAN_SORTABLE_COLS, "started_at DESC")
     limit_slot, offset_slot, _ = _pagination_slots(pb, req.limit, req.offset)
+
+    if not req.group_by:
+        order_by = build_order_by(
+            req.sort_by, SPAN_SORTABLE_COLS, "started_at DESC"
+        )
+        return f"""
+            SELECT {SPANS_LIST_COLS}
+            FROM spans s
+            WHERE {where}
+            ORDER BY {order_by}
+            LIMIT {limit_slot} OFFSET {offset_slot}
+        """
+
+    resolved = resolve_group_by(pb, req.group_by)
+    aliases = [a for _, a in resolved]
+    select_group_cols = ", ".join(f"{expr} AS {alias}" for expr, alias in resolved)
+    group_by_clause = ", ".join(aliases)
+
+    sortable = SPAN_GROUP_AGGREGATE_COLS | frozenset(aliases)
+    order_by = build_order_by(req.sort_by, sortable, "last_seen DESC")
+
     return f"""
-        SELECT {SPANS_LIST_COLS}
+        SELECT {select_group_cols},
+               {_GROUPED_SPAN_AGGREGATES}
         FROM spans s
         WHERE {where}
+        GROUP BY {group_by_clause}
         ORDER BY {order_by}
         LIMIT {limit_slot} OFFSET {offset_slot}
     """
 
 
-def make_spans_trace_query(pb: ParamBuilder, req: AgentSpansTraceReq) -> str:
-    pid = pb.add(req.project_id, param_type="String")
-    tid = pb.add(req.trace_id, param_type="String")
+def make_trace_detail_spans_query(
+    pb: ParamBuilder, project_id: str, trace_id: str
+) -> str:
+    """Fetch all spans for a single trace with chat-view projection.
+
+    Internal helper for the chat view; not exposed as a public endpoint.
+    Use ``make_spans_list_query`` with a ``trace_id`` filter for general
+    span listings.
+    """
+    pid = pb.add(project_id, param_type="String")
+    tid = pb.add(trace_id, param_type="String")
     return f"""
         SELECT {CHAT_VIEW_COLS} FROM spans s
         WHERE s.project_id = {pid}
@@ -449,37 +490,9 @@ def make_spans_trace_query(pb: ParamBuilder, req: AgentSpansTraceReq) -> str:
     """
 
 
-def make_traces_count_query(pb: ParamBuilder, req: AgentTracesQueryReq) -> str:
-    where = _traces_where(pb, req)
-    return f"""SELECT count() FROM (
-        SELECT trace_id FROM spans WHERE {where} GROUP BY trace_id
-    )"""
-
-
-def make_traces_list_query(pb: ParamBuilder, req: AgentTracesQueryReq) -> str:
-    where = _traces_where(pb, req)
-    order_by = build_order_by(
-        req.sort_by, TRACE_SORTABLE_COLS, "last_seen DESC, trace_id"
-    )
-    limit_slot, offset_slot, _ = _pagination_slots(pb, req.limit, req.offset)
-    return f"""
-        SELECT trace_id,
-               count() AS span_count,
-               sum(input_tokens) AS total_input_tokens,
-               sum(output_tokens) AS total_output_tokens,
-               countIf(status_code = 'ERROR') AS error_count,
-               max(conversation_id) AS conversation_id,
-               groupUniqArray(agent_name) AS agent_names,
-               groupUniqArray(agent_version) AS agent_versions,
-               groupUniqArray(request_model) AS request_models,
-               min(started_at) AS first_seen,
-               max(started_at) AS last_seen
-        FROM spans
-        WHERE {where}
-        GROUP BY trace_id
-        ORDER BY {order_by}
-        LIMIT {limit_slot} OFFSET {offset_slot}
-    """
+# ---------------------------------------------------------------------------
+# AMT-backed queries (agents, agent_versions)
+# ---------------------------------------------------------------------------
 
 
 def make_agents_count_query(pb: ParamBuilder, req: AgentsQueryReq) -> str:
@@ -547,47 +560,9 @@ def make_agent_versions_list_query(
     """
 
 
-def make_conversations_count_query(
-    pb: ParamBuilder, req: AgentConversationsQueryReq
-) -> str:
-    where = _conversations_where(pb, req)
-    return f"""SELECT count() FROM (
-        SELECT conversation_id FROM spans WHERE {where} GROUP BY conversation_id
-    )"""
-
-
-def make_conversations_list_query(
-    pb: ParamBuilder, req: AgentConversationsQueryReq
-) -> str:
-    where = _conversations_where(pb, req)
-    order_by = build_order_by(
-        req.sort_by,
-        CONVERSATION_SORTABLE_COLS,
-        "last_seen DESC, conversation_id",
-        column_exprs=CONVERSATION_SORT_EXPRS,
-    )
-    limit_slot, offset_slot, _ = _pagination_slots(pb, req.limit, req.offset)
-    return f"""
-        SELECT conversation_id,
-               max(conversation_name) AS conversation_name,
-               countIf(operation_name = 'invoke_agent') AS turn_count,
-               count() AS span_count,
-               sum(input_tokens) AS total_input_tokens,
-               sum(output_tokens) AS total_output_tokens,
-               sum(toUnixTimestamp64Milli(ended_at) - toUnixTimestamp64Milli(started_at)) AS total_duration_ms,
-               countIf(status_code = 'ERROR') AS error_count,
-               groupUniqArray(agent_name) AS agent_names,
-               groupUniqArray(agent_version) AS agent_versions,
-               groupUniqArray(provider_name) AS provider_names,
-               groupUniqArray(request_model) AS request_models,
-               min(started_at) AS first_seen,
-               max(started_at) AS last_seen
-        FROM spans
-        WHERE {where}
-        GROUP BY conversation_id
-        ORDER BY {order_by}
-        LIMIT {limit_slot} OFFSET {offset_slot}
-    """
+# ---------------------------------------------------------------------------
+# Message search + chat spans
+# ---------------------------------------------------------------------------
 
 
 def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:

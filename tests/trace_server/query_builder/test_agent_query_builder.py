@@ -6,21 +6,19 @@ formatted SQL + param dict against an expected value, matching the style of
 ``test_annotation_queues_query_builder.py`` etc.
 """
 
+import pytest
 import sqlparse
 
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
-    AgentConversationsQueryFilters,
-    AgentConversationsQueryReq,
     AgentCustomAttrFilter,
+    AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
     AgentSpansQueryFilters,
     AgentSpansQueryReq,
-    AgentSpansTraceReq,
     AgentsQueryFilters,
     AgentsQueryReq,
-    AgentTracesQueryReq,
     AgentVersionsQueryReq,
 )
 from weave.trace_server.orm import ParamBuilder
@@ -34,14 +32,11 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_agents_count_query,
     make_agents_list_query,
     make_conversation_chat_spans_query,
-    make_conversations_count_query,
-    make_conversations_list_query,
     make_message_search_query,
     make_spans_count_query,
     make_spans_list_query,
-    make_spans_trace_query,
-    make_traces_count_query,
-    make_traces_list_query,
+    make_trace_detail_spans_query,
+    resolve_group_by,
 )
 
 
@@ -60,7 +55,7 @@ def assert_sql(
 
 
 # ============================================================================
-# make_spans_count_query
+# make_spans_count_query (ungrouped)
 # ============================================================================
 
 
@@ -111,7 +106,7 @@ class TestMakeSpansCountQuery:
 
 
 # ============================================================================
-# make_spans_list_query
+# make_spans_list_query (ungrouped)
 # ============================================================================
 
 
@@ -159,16 +154,255 @@ class TestMakeSpansListQuery:
 
 
 # ============================================================================
-# make_spans_trace_query
+# make_spans_count_query (grouped)
 # ============================================================================
 
 
-class TestMakeSpansTraceQuery:
+#: The fixed aggregate tail emitted by the grouped list query, as it would
+#: appear after ``SELECT <group_cols>,``. Used to keep test expected SQL
+#: readable without duplicating the bundle across every test.
+_GROUPED_AGG_TAIL = """count() AS span_count,
+               uniqExact(s.trace_id) AS trace_count,
+               uniqExact(s.conversation_id) AS conversation_count,
+               sum(s.input_tokens) AS total_input_tokens,
+               sum(s.output_tokens) AS total_output_tokens,
+               sum(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)) AS total_duration_ms,
+               countIf(s.status_code = 'ERROR') AS error_count,
+               groupUniqArray(s.agent_name) AS agent_names,
+               groupUniqArray(s.agent_version) AS agent_versions,
+               groupUniqArray(s.provider_name) AS provider_names,
+               groupUniqArray(s.request_model) AS request_models,
+               min(s.started_at) AS first_seen,
+               max(s.started_at) AS last_seen"""
+
+
+class TestMakeGroupedSpansCountQuery:
+    def test_group_by_column(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_count_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="trace_id")],
+            ),
+        )
+
+        expected = """
+            SELECT count() FROM (
+                SELECT s.trace_id FROM spans s
+                WHERE s.project_id = {genai_0:String}
+                GROUP BY s.trace_id
+            )
+        """
+        assert_sql(expected, {"genai_0": "p1"}, query, pb.get_params())
+
+    def test_group_by_custom_attr(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_count_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="custom_attrs", key="env")],
+            ),
+        )
+
+        expected = """
+            SELECT count() FROM (
+                SELECT s.custom_attrs[{genai_1:String}] FROM spans s
+                WHERE s.project_id = {genai_0:String}
+                GROUP BY s.custom_attrs[{genai_1:String}]
+            )
+        """
+        expected_params = {"genai_0": "p1", "genai_1": "env"}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+
+# ============================================================================
+# make_spans_list_query (grouped)
+# ============================================================================
+
+
+class TestMakeGroupedSpansListQuery:
+    def test_group_by_trace_id(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="trace_id")],
+            ),
+        )
+
+        expected = f"""
+            SELECT s.trace_id AS trace_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM spans s
+            WHERE s.project_id = {{genai_0:String}}
+            GROUP BY trace_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_group_by_conversation_id_with_time(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[
+                    AgentGroupByRef(source="column", key="conversation_id"),
+                ],
+                start="2026-01-01",
+                end="2026-02-01",
+            ),
+        )
+
+        expected = f"""
+            SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM spans s
+            WHERE s.project_id = {{genai_0:String}}
+              AND s.started_at >= parseDateTimeBestEffort({{genai_1:String}})
+              AND s.started_at < parseDateTimeBestEffort({{genai_2:String}})
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_3:UInt64}} OFFSET {{genai_4:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "2026-01-01",
+            "genai_2": "2026-02-01",
+            "genai_3": 100,
+            "genai_4": 0,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_group_by_custom_attr(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[
+                    AgentGroupByRef(source="custom_attrs", key="env"),
+                ],
+            ),
+        )
+
+        expected = f"""
+            SELECT s.custom_attrs[{{genai_3:String}}] AS env,
+                   {_GROUPED_AGG_TAIL}
+            FROM spans s
+            WHERE s.project_id = {{genai_0:String}}
+            GROUP BY env
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "env",
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_group_by_multi_column_and_sort_by_alias(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[
+                    AgentGroupByRef(source="column", key="agent_name"),
+                    AgentGroupByRef(source="column", key="request_model"),
+                ],
+                sort_by=[AgentSortBy(field="agent_name", direction="asc")],
+            ),
+        )
+
+        expected = f"""
+            SELECT s.agent_name AS agent_name,
+                   s.request_model AS request_model,
+                   {_GROUPED_AGG_TAIL}
+            FROM spans s
+            WHERE s.project_id = {{genai_0:String}}
+            GROUP BY agent_name, request_model
+            ORDER BY agent_name asc
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+
+# ============================================================================
+# resolve_group_by validation
+# ============================================================================
+
+
+class TestResolveGroupBy:
+    def test_rejects_non_allowlisted_column(self) -> None:
+        pb = ParamBuilder("genai")
+        with pytest.raises(ValueError, match="not in the allowlist"):
+            resolve_group_by(
+                pb, [AgentGroupByRef(source="column", key="raw_span_dump")]
+            )
+
+    def test_rejects_duplicate_alias(self) -> None:
+        pb = ParamBuilder("genai")
+        with pytest.raises(ValueError, match="duplicate group_by alias"):
+            resolve_group_by(
+                pb,
+                [
+                    AgentGroupByRef(source="column", key="agent_name"),
+                    AgentGroupByRef(source="column", key="agent_name"),
+                ],
+            )
+
+    def test_rejects_invalid_alias(self) -> None:
+        pb = ParamBuilder("genai")
+        with pytest.raises(ValueError, match="must match"):
+            resolve_group_by(
+                pb,
+                [
+                    AgentGroupByRef(
+                        source="custom_attrs", key="has spaces", alias="bad alias"
+                    )
+                ],
+            )
+
+    def test_defaults_alias_to_key_when_valid(self) -> None:
+        pb = ParamBuilder("genai")
+        out = resolve_group_by(
+            pb, [AgentGroupByRef(source="custom_attrs", key="env")]
+        )
+        assert out == [("s.custom_attrs[{genai_0:String}]", "env")]
+
+    def test_custom_alias_used_when_key_non_identifier(self) -> None:
+        pb = ParamBuilder("genai")
+        out = resolve_group_by(
+            pb,
+            [
+                AgentGroupByRef(
+                    source="custom_attrs",
+                    key="has spaces",
+                    alias="spaced_attr",
+                )
+            ],
+        )
+        assert out == [("s.custom_attrs[{genai_0:String}]", "spaced_attr")]
+
+
+# ============================================================================
+# make_trace_detail_spans_query (internal helper — chat view only)
+# ============================================================================
+
+
+class TestMakeTraceDetailSpansQuery:
     def test_basic(self) -> None:
         pb = ParamBuilder("genai")
-        query = make_spans_trace_query(
-            pb, AgentSpansTraceReq(project_id="p1", trace_id="t1")
-        )
+        query = make_trace_detail_spans_query(pb, "p1", "t1")
 
         expected = f"""
             SELECT {CHAT_VIEW_COLS} FROM spans s
@@ -182,94 +416,6 @@ class TestMakeSpansTraceQuery:
             query,
             pb.get_params(),
         )
-
-
-# ============================================================================
-# make_traces_count_query
-# ============================================================================
-
-
-class TestMakeTracesCountQuery:
-    def test_basic(self) -> None:
-        pb = ParamBuilder("genai")
-        query = make_traces_count_query(pb, AgentTracesQueryReq(project_id="p1"))
-
-        expected = """
-            SELECT count() FROM (
-                SELECT trace_id FROM spans
-                WHERE project_id = {genai_0:String}
-                GROUP BY trace_id
-            )
-        """
-        assert_sql(expected, {"genai_0": "p1"}, query, pb.get_params())
-
-    def test_with_filters(self) -> None:
-        pb = ParamBuilder("genai")
-        query = make_traces_count_query(
-            pb,
-            AgentTracesQueryReq(
-                project_id="p1",
-                conversation_id="conv-1",
-                agent_name="bot",
-                agent_version="v2",
-                start="2026-01-01",
-                end="2026-02-01",
-            ),
-        )
-
-        expected = """
-            SELECT count() FROM (
-                SELECT trace_id FROM spans
-                WHERE project_id = {genai_0:String}
-                  AND conversation_id = {genai_1:String}
-                  AND agent_name = {genai_2:String}
-                  AND agent_version = {genai_3:String}
-                  AND started_at >= parseDateTimeBestEffort({genai_4:String})
-                  AND started_at < parseDateTimeBestEffort({genai_5:String})
-                GROUP BY trace_id
-            )
-        """
-        expected_params = {
-            "genai_0": "p1",
-            "genai_1": "conv-1",
-            "genai_2": "bot",
-            "genai_3": "v2",
-            "genai_4": "2026-01-01",
-            "genai_5": "2026-02-01",
-        }
-        assert_sql(expected, expected_params, query, pb.get_params())
-
-
-# ============================================================================
-# make_traces_list_query
-# ============================================================================
-
-
-class TestMakeTracesListQuery:
-    def test_basic(self) -> None:
-        pb = ParamBuilder("genai")
-        query = make_traces_list_query(pb, AgentTracesQueryReq(project_id="p1"))
-
-        expected = """
-            SELECT trace_id,
-                   count() AS span_count,
-                   sum(input_tokens) AS total_input_tokens,
-                   sum(output_tokens) AS total_output_tokens,
-                   countIf(status_code = 'ERROR') AS error_count,
-                   max(conversation_id) AS conversation_id,
-                   groupUniqArray(agent_name) AS agent_names,
-                   groupUniqArray(agent_version) AS agent_versions,
-                   groupUniqArray(request_model) AS request_models,
-                   min(started_at) AS first_seen,
-                   max(started_at) AS last_seen
-            FROM spans
-            WHERE project_id = {genai_0:String}
-            GROUP BY trace_id
-            ORDER BY last_seen DESC, trace_id
-            LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
-        """
-        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
-        assert_sql(expected, expected_params, query, pb.get_params())
 
 
 # ============================================================================
@@ -403,103 +549,6 @@ class TestMakeAgentVersionsQueries:
         expected_params = {
             "genai_0": "p1",
             "genai_1": "a1",
-            "genai_2": 100,
-            "genai_3": 0,
-        }
-        assert_sql(expected, expected_params, query, pb.get_params())
-
-
-# ============================================================================
-# make_conversations_{count,list}_query
-# ============================================================================
-
-
-class TestMakeConversationsQueries:
-    def test_count_basic(self) -> None:
-        pb = ParamBuilder("genai")
-        query = make_conversations_count_query(
-            pb, AgentConversationsQueryReq(project_id="p1")
-        )
-
-        expected = """
-            SELECT count() FROM (
-                SELECT conversation_id FROM spans
-                WHERE project_id = {genai_0:String}
-                  AND conversation_id != ''
-                GROUP BY conversation_id
-            )
-        """
-        assert_sql(expected, {"genai_0": "p1"}, query, pb.get_params())
-
-    def test_list_basic(self) -> None:
-        pb = ParamBuilder("genai")
-        query = make_conversations_list_query(
-            pb, AgentConversationsQueryReq(project_id="p1")
-        )
-
-        expected = """
-            SELECT conversation_id,
-                   max(conversation_name) AS conversation_name,
-                   countIf(operation_name = 'invoke_agent') AS turn_count,
-                   count() AS span_count,
-                   sum(input_tokens) AS total_input_tokens,
-                   sum(output_tokens) AS total_output_tokens,
-                   sum(toUnixTimestamp64Milli(ended_at) - toUnixTimestamp64Milli(started_at)) AS total_duration_ms,
-                   countIf(status_code = 'ERROR') AS error_count,
-                   groupUniqArray(agent_name) AS agent_names,
-                   groupUniqArray(agent_version) AS agent_versions,
-                   groupUniqArray(provider_name) AS provider_names,
-                   groupUniqArray(request_model) AS request_models,
-                   min(started_at) AS first_seen,
-                   max(started_at) AS last_seen
-            FROM spans
-            WHERE project_id = {genai_0:String}
-              AND conversation_id != ''
-            GROUP BY conversation_id
-            ORDER BY last_seen DESC, conversation_id
-            LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
-        """
-        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
-        assert_sql(expected, expected_params, query, pb.get_params())
-
-    def test_list_sort_by_array_alias(self) -> None:
-        """Sorting by ``agent_name`` must emit ``arrayElement(agent_names, 1)``."""
-        pb = ParamBuilder("genai")
-        query = make_conversations_list_query(
-            pb,
-            AgentConversationsQueryReq(
-                project_id="p1",
-                filters=AgentConversationsQueryFilters(agent_name="bot"),
-                sort_by=[AgentSortBy(field="agent_name", direction="asc")],
-            ),
-        )
-
-        expected = """
-            SELECT conversation_id,
-                   max(conversation_name) AS conversation_name,
-                   countIf(operation_name = 'invoke_agent') AS turn_count,
-                   count() AS span_count,
-                   sum(input_tokens) AS total_input_tokens,
-                   sum(output_tokens) AS total_output_tokens,
-                   sum(toUnixTimestamp64Milli(ended_at) - toUnixTimestamp64Milli(started_at)) AS total_duration_ms,
-                   countIf(status_code = 'ERROR') AS error_count,
-                   groupUniqArray(agent_name) AS agent_names,
-                   groupUniqArray(agent_version) AS agent_versions,
-                   groupUniqArray(provider_name) AS provider_names,
-                   groupUniqArray(request_model) AS request_models,
-                   min(started_at) AS first_seen,
-                   max(started_at) AS last_seen
-            FROM spans
-            WHERE project_id = {genai_0:String}
-              AND conversation_id != ''
-              AND agent_name = {genai_1:String}
-            GROUP BY conversation_id
-            ORDER BY arrayElement(agent_names, 1) asc
-            LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
-        """
-        expected_params = {
-            "genai_0": "p1",
-            "genai_1": "bot",
             "genai_2": 100,
             "genai_3": 0,
         }
