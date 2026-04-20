@@ -83,7 +83,7 @@ def _db_engines_across_cluster(ch_client, db_name: str) -> dict[str, str]:
 
     A DB missing from a replica shows up as that host being absent from
     the returned dict. That is the silent-misconfig failure mode of the
-    ``ON CLUSTER + ENGINE = Replicated`` combination on CH <= 25.3: peer
+    `ON CLUSTER + ENGINE = Replicated` combination on CH <= 25.3: peer
     replicas never got the DB, and the migrator saw success because the
     entrypoint pod had it.
     """
@@ -291,9 +291,9 @@ def test_all_production_migrations_replicated(ch_client):
     # On multi-replica topologies (1s3r / 2s2r in CI), the DB must exist on
     # every replica with a consistent engine. Historical failure modes this
     # assertion guards against:
-    #   * ``ON CLUSTER`` combined with ``ENGINE = Replicated`` (silent plain
+    #   * `ON CLUSTER` combined with `ENGINE = Replicated` (silent plain
     #     MergeTree on CH <= 25.3, deadlock on CH >= 25.10).
-    #   * ``ENGINE = Replicated`` with ``ON CLUSTER`` stripped (split-brain:
+    #   * `ENGINE = Replicated` with `ON CLUSTER` stripped (split-brain:
     #     only the migrator's entrypoint pod gets the DB, sibling replicas
     #     never join the ZK path).
     _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
@@ -321,7 +321,7 @@ def test_all_production_migrations_distributed(ch_client):
     assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
     assert _get_db_engine(ch_client, target_db) == "Atomic"
     # Distributed mode uses ON CLUSTER to fan DBs to every shard/replica.
-    # If the fan-out is broken (e.g. the ``ON CLUSTER + ENGINE = Replicated``
+    # If the fan-out is broken (e.g. the `ON CLUSTER + ENGINE = Replicated`
     # collision), peer replicas never receive the CREATE DATABASE.
     _assert_db_on_every_replica(ch_client, mgmt_db, expected_engine="Atomic")
     _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")

@@ -201,7 +201,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         "ON CLUSTER is not allowed for Replicated database."
 
         The base class always returns False. The replicated subclass overrides
-        this to read from ``_replicated_db_engine_cache``.
+        this to read from `_replicated_db_engine_cache`.
         """
         return False
 
@@ -209,7 +209,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         """Create a database if it does not exist.
 
         Subclasses that need engine introspection override this to also
-        populate ``_replicated_db_engine_cache``.
+        populate `_replicated_db_engine_cache`.
         """
         db_sql = self._create_db_sql(db_name)
         self._run_ddl_with_retry(db_sql)
@@ -506,18 +506,18 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
     """Migrator for replicated ClickHouse deployments.
 
     In replicated mode:
-    - Databases use ``ENGINE = Atomic`` and are created with ``ON CLUSTER`` so
+    - Databases use `ENGINE = Atomic` and are created with `ON CLUSTER` so
       the DDL fans out to every replica.
-    - Tables inside are rewritten to ``ReplicatedMergeTree`` and also emitted
-      ``ON CLUSTER``. Data replicates via ZooKeeper using the server-side
-      ``default_replica_path`` / ``default_replica_name`` macros.
-    - ``WF_CLICKHOUSE_REPLICATED=true`` means "ReplicatedMergeTree tables",
+    - Tables inside are rewritten to `ReplicatedMergeTree` and also emitted
+      `ON CLUSTER`. Data replicates via ZooKeeper using the server-side
+      `default_replica_path` / `default_replica_name` macros.
+    - `WF_CLICKHOUSE_REPLICATED=true` means "ReplicatedMergeTree tables",
       NOT "Replicated database engine". The Replicated DB engine has a
-      bootstrap hole against ``ON CLUSTER`` on CH 25.8+ and is not used
+      bootstrap hole against `ON CLUSTER` on CH 25.8+ and is not used
       for new deployments.
-    - Legacy deployments with ``ENGINE = Replicated`` data databases keep
+    - Legacy deployments with `ENGINE = Replicated` data databases keep
       working via the engine-discovery cache; see
-      ``_prepare_ddl_for_database``.
+      `_prepare_ddl_for_database`.
     """
 
     replicated_path: str
@@ -571,10 +571,10 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
     def _ensure_database(self, db_name: str) -> None:
         """Create the database and discover its engine for the DDL cache.
 
-        After ``CREATE DATABASE IF NOT EXISTS``, the engine may not be
-        immediately visible in ``system.databases`` (metadata propagation lag
+        After `CREATE DATABASE IF NOT EXISTS`, the engine may not be
+        immediately visible in `system.databases` (metadata propagation lag
         on replicated clusters).  We poll with back-off so that all later DDL
-        knows whether to emit ``ON CLUSTER`` / ``ReplicatedMergeTree``.
+        knows whether to emit `ON CLUSTER` / `ReplicatedMergeTree`.
         """
         db_sql = self._create_db_sql(db_name)
         self._run_ddl_with_retry(db_sql)
@@ -592,24 +592,24 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
     def _create_db_sql(self, db_name: str) -> str:
         """Generate SQL to create a database in replicated mode.
 
-        Uses ``ENGINE = Atomic + ON CLUSTER``. Atomic does not self-replicate
-        DDL, so ``ON CLUSTER`` is the sole fan-out mechanism and reaches
+        Uses `ENGINE = Atomic + ON CLUSTER`. Atomic does not self-replicate
+        DDL, so `ON CLUSTER` is the sole fan-out mechanism and reaches
         every replica in the cluster. Tables inside are rewritten to
-        ``ReplicatedMergeTree`` by ``_format_replicated_sql`` so data
+        `ReplicatedMergeTree` by `_format_replicated_sql` so data
         still replicates via ZooKeeper.
 
-        This avoids the ``ON CLUSTER + ENGINE = Replicated`` collision that
-        silently created plain ``MergeTree`` tables on CH <= 25.3 and
-        deadlocked ``CREATE DATABASE`` on CH >= 25.10. The ``Replicated``
+        This avoids the `ON CLUSTER + ENGINE = Replicated` collision that
+        silently created plain `MergeTree` tables on CH <= 25.3 and
+        deadlocked `CREATE DATABASE` on CH >= 25.10. The `Replicated`
         database engine is also a bootstrap trap: it does not auto-join
         sibling hosts at the database level, each host has to issue its
-        own ``CREATE DATABASE`` with the shared ZooKeeper path, and the
-        only official way to do that is ``ON CLUSTER`` which 25.8+ rejects.
+        own `CREATE DATABASE` with the shared ZooKeeper path, and the
+        only official way to do that is `ON CLUSTER` which 25.8+ rejects.
 
-        Legacy deployments that already have ``ENGINE = Replicated`` data
-        DBs stay on that engine (``IF NOT EXISTS`` is a no-op). Engine
+        Legacy deployments that already have `ENGINE = Replicated` data
+        DBs stay on that engine (`IF NOT EXISTS` is a no-op). Engine
         discovery caches the real engine, and the DDL path in
-        ``_prepare_ddl_for_database`` branches on that cache, so both
+        `_prepare_ddl_for_database` branches on that cache, so both
         shapes continue to work.
         """
         if not self._is_safe_identifier(db_name):
@@ -627,18 +627,18 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         Two shapes, picked by the engine-discovery cache:
 
         * **Atomic database (default for new deployments).** Rewrite
-          ``MergeTree`` to ``Replicated*MergeTree`` so data replicates via
-          ZooKeeper, and add ``ON CLUSTER`` so the DDL fans out to every
+          `MergeTree` to `Replicated*MergeTree` so data replicates via
+          ZooKeeper, and add `ON CLUSTER` so the DDL fans out to every
           replica.
         * **Replicated database (legacy deployments only).** The Replicated
-          DB engine auto-replicates DDL and rejects ``ON CLUSTER`` with
-          error 80 on CH 25.8+. Rewrite to ``Replicated*MergeTree`` but
-          omit ``ON CLUSTER``; the engine handles the fan-out itself
+          DB engine auto-replicates DDL and rejects `ON CLUSTER` with
+          error 80 on CH 25.8+. Rewrite to `Replicated*MergeTree` but
+          omit `ON CLUSTER`; the engine handles the fan-out itself
           within the shard.
 
         New deployments always get the Atomic shape. The Replicated-DB shape
         exists only as a compatibility path for clusters installed by earlier
-        weave versions that explicitly created ``ENGINE = Replicated(...)``.
+        weave versions that explicitly created `ENGINE = Replicated(...)`.
         """
         sql_query = self._format_replicated_sql(sql_query)
         if self._uses_replicated_db_engine(target_db):
@@ -810,7 +810,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         All databases (management and data) use ENGINE = Atomic + ON CLUSTER.
 
         The Replicated DB engine only auto-syncs within a single replication
-        group (same ``{shard}`` value), so it cannot fan a CREATE DATABASE
+        group (same `{shard}` value), so it cannot fan a CREATE DATABASE
         out across shards on its own. ON CLUSTER fans across every shard and
         replica in the cluster, and Atomic — unlike Replicated — does not
         also try to replicate DDL itself, so there is no collision between
@@ -819,7 +819,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
 
         Tables inside Atomic databases are rewritten to explicit
         ReplicatedMergeTree engines with per-shard ZK paths by
-        ``_format_replicated_sql_distributed``, so data still replicates
+        `_format_replicated_sql_distributed`, so data still replicates
         correctly within each shard.
 
         Legacy deployments that already have ENGINE = Replicated data

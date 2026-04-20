@@ -25,7 +25,7 @@ DEFAULT_MIGRATION_DIR = os.path.abspath(
 def _make_ch_client(database_engine: str = "Atomic") -> Mock:
     """Create a mock CH client that returns *database_engine* for system.databases queries.
 
-    Only ``system.databases`` queries are stubbed; all other ``query()`` calls
+    Only `system.databases` queries are stubbed; all other `query()` calls
     fall through to the default Mock behaviour so they don't silently return
     engine data for unrelated code paths.
     """
