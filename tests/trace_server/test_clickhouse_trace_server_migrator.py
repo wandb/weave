@@ -307,6 +307,10 @@ def test_create_db_sql(mock_costs):
 
     # Test replicated mode — should use ENGINE = Replicated(...) so DDL is
     # auto-replicated via ZooKeeper without needing ON CLUSTER per-statement.
+    # ON CLUSTER is explicitly omitted on the CREATE DATABASE itself: the
+    # Replicated engine auto-syncs across replicas via ZK, and combining that
+    # with the legacy distributed-DDL queue deadlocks on CH 25.10 (and
+    # silently misconfigures replicas on 25.3).
     replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
         _make_ch_client(),
         replicated_cluster="test_cluster",
@@ -314,9 +318,10 @@ def test_create_db_sql(mock_costs):
     )
     sql = replicated_migrator._create_db_sql("test_db")
     assert sql.strip() == (
-        "CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster"
+        "CREATE DATABASE IF NOT EXISTS test_db"
         " ENGINE = Replicated('/clickhouse/tables/test_db', '{shard}', '{replica}')"
     )
+    assert "ON CLUSTER" not in sql
 
     # Test invalid cluster name
     with pytest.raises(MigrationError, match="Invalid cluster name"):

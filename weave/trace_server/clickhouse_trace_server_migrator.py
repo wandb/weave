@@ -583,6 +583,15 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         automatically replicated via ZooKeeper, without needing ON CLUSTER
         on every subsequent CREATE TABLE / ALTER TABLE statement.
 
+        ON CLUSTER is intentionally omitted from this CREATE DATABASE
+        statement: the Replicated database engine propagates itself across
+        replicas via ZooKeeper, and combining it with the legacy
+        distributed-DDL queue (``ON CLUSTER``) causes the two replication
+        mechanisms to collide. On CH 25.3 this silently created a plain
+        (non-Replicated) database on the peer replicas; on CH 25.10 the
+        peer replicas hang indefinitely waiting on the distributed-DDL
+        queue while the Replicated engine also tries to auto-sync.
+
         If the database already exists (IF NOT EXISTS), this is a no-op
         regardless of the existing engine. Databases created by older weave
         versions already use Replicated; databases created by the intermediate
@@ -603,7 +612,6 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
 
         return (
             f"CREATE DATABASE IF NOT EXISTS {db_name}"
-            f" ON CLUSTER {self.replicated_cluster}"
             f" ENGINE = Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
         )
 
