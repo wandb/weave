@@ -1875,9 +1875,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         object_query_builder.set_include_deleted(include_deleted=True)
         metadata_only = req.metadata_only or False
 
-        objs = self._select_objs_query(object_query_builder, metadata_only)
-        if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+        def _query_objs() -> list[SelectableCHObjSchema]:
+            results = self._select_objs_query(object_query_builder, metadata_only)
+            if len(results) == 0:
+                raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+            return results
+
+        objs = self._read_with_retry(_query_objs, max_attempts=OBJ_READ_RETRY_ATTEMPTS)
 
         obj = objs[0]
         if obj.deleted_at is not None:
@@ -1962,7 +1966,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_query_builder.add_digests_conditions(*req.digests)
             metadata_only = False
 
-        object_versions = self._select_objs_query(object_query_builder, metadata_only)
+        def _select_delete_candidates() -> list[SelectableCHObjSchema]:
+            versions = self._select_objs_query(object_query_builder, metadata_only)
+            if len(versions) == 0:
+                raise NotFoundError(
+                    f"Object {req.object_id} ({req.digests}) not found when deleting."
+                )
+            return versions
+
+        object_versions = self._read_with_retry(
+            _select_delete_candidates, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         delete_insertables = []
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -1983,11 +1997,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     # Keep the original created_at timestamp
                     created_at=original_created_at,
                 )
-            )
-
-        if len(delete_insertables) == 0:
-            raise NotFoundError(
-                f"Object {req.object_id} ({req.digests}) not found when deleting."
             )
 
         if req.digests:
@@ -3315,9 +3324,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=object_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(
-            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
-        )
+        obj_read_res = self.obj_read(obj_read_req)
 
         return tsi.OpCreateRes(
             digest=obj_result.digest,
@@ -3374,7 +3381,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # Load the actual source code
             try:
-                file_content_res = self._file_content_read_with_retry(
+                file_content_res = self.file_content_read(
                     tsi.FileContentReadReq(
                         project_id=req.project_id, digest=file_digest
                     )
@@ -3441,7 +3448,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
                         # Load the actual source code
                         try:
-                            file_content_res = self._file_content_read_with_retry(
+                            file_content_res = self.file_content_read(
                                 tsi.FileContentReadReq(
                                     project_id=req.project_id, digest=file_digest
                                 )
@@ -3472,13 +3479,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_query_builder.add_digests_conditions(*req.digests)
             metadata_only = False
 
-        object_versions = self._select_objs_query(object_query_builder, metadata_only)
+        def _select_op_delete_candidates() -> list[SelectableCHObjSchema]:
+            versions = self._select_objs_query(object_query_builder, metadata_only)
+            if len(versions) == 0:
+                raise NotFoundError(
+                    f"Op object {req.object_id} ({req.digests}) not found when deleting."
+                )
+            return versions
 
-        # If no op objects found, raise NotFoundError
-        if len(object_versions) == 0:
-            raise NotFoundError(
-                f"Op object {req.object_id} ({req.digests}) not found when deleting."
-            )
+        object_versions = self._read_with_retry(
+            _select_op_delete_candidates, max_attempts=OBJ_READ_RETRY_ATTEMPTS
+        )
 
         # Verify we found all requested digests if they were specified
         if req.digests:
@@ -3544,9 +3555,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=dataset_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(
-            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
-        )
+        obj_read_res = self.obj_read(obj_read_req)
 
         return tsi.DatasetCreateRes(
             digest=obj_result.digest,
@@ -3564,7 +3573,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=req.object_id,
             digest=req.digest,
         )
-        result = self._obj_read_with_retry(obj_req)
+        result = self.obj_read(obj_req)
         val = result.obj.val
 
         # Extract name, description, and rows ref from val data
@@ -3693,9 +3702,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=scorer_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(
-            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
-        )
+        obj_read_res = self.obj_read(obj_read_req)
 
         # Get the ref and return the create result
         scorer_ref = ri.InternalObjectRef(
@@ -3717,7 +3724,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=req.object_id,
             digest=req.digest,
         )
-        result = self._obj_read_with_retry(obj_req)
+        result = self.obj_read(obj_req)
         return tsc.scorer_read_res_from_obj(result.obj)
 
     def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
@@ -3815,9 +3822,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=evaluation_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(
-            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
-        )
+        obj_read_res = self.obj_read(obj_read_req)
 
         # Get the ref and return the create result
         evaluation_ref = ri.InternalObjectRef(
@@ -3839,7 +3844,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=req.object_id,
             digest=req.digest,
         )
-        result = self._obj_read_with_retry(obj_req)
+        result = self.obj_read(obj_req)
         val = result.obj.val
 
         # Extract name and description from val data
@@ -3963,9 +3968,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=object_id,
             digest=obj_result.digest,
         )
-        obj_read_res = self._obj_read_with_retry(
-            obj_read_req, max_attempts=OBJ_READ_RETRY_ATTEMPTS
-        )
+        obj_read_res = self.obj_read(obj_read_req)
 
         # Build model reference - external adapter will convert to external format
         model_ref = ri.InternalObjectRef(
@@ -3996,7 +3999,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=req.object_id,
             digest=req.digest,
         )
-        obj_read_res = self._obj_read_with_retry(obj_read_req)
+        obj_read_res = self.obj_read(obj_read_req)
 
         # Extract model properties from the val dict
         val = obj_read_res.obj.val
@@ -4013,7 +4016,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             digest=source_file_digest,
         )
-        file_content_res = self._file_content_read_with_retry(file_content_req)
+        file_content_res = self.file_content_read(file_content_req)
         source_code = file_content_res.content.decode("utf-8")
 
         # Extract additional attributes (exclude system fields)
@@ -4062,7 +4065,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     project_id=req.project_id,
                     digest=source_file_digest,
                 )
-                file_content_res = self._file_content_read_with_retry(file_content_req)
+                file_content_res = self.file_content_read(file_content_req)
                 source_code = file_content_res.content.decode("utf-8")
             else:
                 source_code = ""
@@ -5192,26 +5195,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return _do_read()
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._obj_read_with_retry")
-    def _obj_read_with_retry(
-        self, req: tsi.ObjReadReq, max_attempts: int = 2
-    ) -> tsi.ObjReadRes:
-        """Read an object with retry for ClickHouse eventual consistency."""
-        return self._read_with_retry(
-            lambda: self.obj_read(req), max_attempts=max_attempts
-        )
-
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._file_content_read_with_retry"
-    )
-    def _file_content_read_with_retry(
-        self, req: tsi.FileContentReadReq, max_attempts: int = 2
-    ) -> tsi.FileContentReadRes:
-        """Read file content with retry for ClickHouse eventual consistency."""
-        return self._read_with_retry(
-            lambda: self.file_content_read(req), max_attempts=max_attempts
-        )
-
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
     def _parsed_refs_read_batch(
         self,
@@ -5625,17 +5608,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=req.digest,
             pb=pb,
         )
-        query_result = self.ch_client.query(
-            query,
-            parameters=pb.get_params(),
-            column_formats={"val_bytes": "bytes"},
+
+        def _query_file_rows() -> list[list[Any]]:
+            query_result = self.ch_client.query(
+                query,
+                parameters=pb.get_params(),
+                column_formats={"val_bytes": "bytes"},
+            )
+            if len(query_result.result_rows) == 0:
+                raise NotFoundError(f"File with digest {req.digest} not found")
+            return list(query_result.result_rows)
+
+        result_rows = self._read_with_retry(
+            _query_file_rows, max_attempts=OBJ_READ_RETRY_ATTEMPTS
         )
-
-        if len(query_result.result_rows) == 0:
-            raise NotFoundError(f"File with digest {req.digest} not found")
-
-        n_chunks = query_result.result_rows[0][0]
-        result_rows = list(query_result.result_rows)
+        n_chunks = result_rows[0][0]
 
         if len(result_rows) < n_chunks:
             raise ValueError("Missing chunks")
