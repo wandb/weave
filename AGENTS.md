@@ -254,6 +254,13 @@ npm run test
 - Add JSDoc comments for TypeScript code
 - Update this file when introducing new patterns or concepts
 
+### OTel Export
+
+- `UserSettings(export_otel=True)` bypasses the normal call write path (`call_start` / `call_end` / `calls_complete`) and emits GenAI-style OTLP spans instead.
+- OTLP export requires installing the optional `weave[otel]` extra.
+- OTLP export uses standard environment variables such as `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`; exported calls are not written to the Weave trace server, so `client.get_calls()` remains empty for those executions.
+- For local validation, a minimal OpenTelemetry Collector with an `otlp` receiver on `4318` and a `debug` exporter is sufficient.
+
 ---
 
 ## Integration Patching

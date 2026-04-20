@@ -228,6 +228,22 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_CALLS_COMPLETE`
     """
 
+    export_otel: bool = False
+    """
+    Export calls as GenAI-flavored OpenTelemetry spans via OTLP.
+
+    If True, call lifecycle data is emitted directly to the configured OTLP
+    endpoint instead of being written to the Weave trace server via
+    call_start/call_end or calls_complete.
+
+    Requires installing the optional `weave[otel]` extra.
+
+    This uses standard OTLP exporter environment variables such as
+    `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`.
+
+    Can be overridden with the environment variable `WEAVE_EXPORT_OTEL`
+    """
+
     enable_client_side_digests: bool = False
     """
     Toggles client-side digest computation for objects and tables.
@@ -404,6 +420,11 @@ def should_use_stainless_server() -> bool:
 def should_use_calls_complete() -> bool:
     """Returns whether the calls_complete write path should be used."""
     return _should("use_calls_complete")
+
+
+def should_export_otel() -> bool:
+    """Returns whether calls should be exported directly via OTLP."""
+    return _should("export_otel")
 
 
 def should_enable_client_side_digests() -> bool:

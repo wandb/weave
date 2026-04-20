@@ -154,6 +154,22 @@ def test_print_call_link_env(client):
     del os.environ["WEAVE_PRINT_CALL_LINK"]
 
 
+def test_export_otel_setting() -> None:
+    parse_and_apply_settings(UserSettings(export_otel=True))
+    assert weave.trace.settings.should_export_otel() is True
+
+    parse_and_apply_settings(UserSettings(export_otel=False))
+    assert weave.trace.settings.should_export_otel() is False
+
+
+def test_export_otel_env(monkeypatch) -> None:
+    monkeypatch.setenv("WEAVE_EXPORT_OTEL", "true")
+    assert weave.trace.settings.should_export_otel() is True
+
+    monkeypatch.setenv("WEAVE_EXPORT_OTEL", "false")
+    assert weave.trace.settings.should_export_otel() is False
+
+
 def test_should_capture_code_setting(client):
     parse_and_apply_settings(UserSettings(capture_code=False))
 

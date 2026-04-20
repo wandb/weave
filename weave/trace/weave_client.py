@@ -42,6 +42,7 @@ from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
+from weave.trace.display.term import configure_logger
 from weave.trace.feedback import FeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -65,6 +66,7 @@ from weave.trace.op import (
 )
 from weave.trace.op import op as op_deco
 from weave.trace.op_protocol import Op
+from weave.trace.otel_export import OTelCallExporter
 from weave.trace.project_id_resolver import ProjectIdResolver
 from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
@@ -262,6 +264,10 @@ def _remove_empty_ref(obj: ObjectRecord) -> ObjectRecord:
     return obj
 
 
+def _json_dumps_as_bytes(value: Any) -> bytes:
+    return json.dumps(value, default=str).encode("utf-8")
+
+
 def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, Ref):
         return obj
@@ -356,6 +362,7 @@ class WeaveClient:
         server: TraceServerClientInterface,
         ensure_project_exists: bool = True,
     ):
+        configure_logger()
         self.entity = entity
         self.project = project
         self.server = server
@@ -376,6 +383,7 @@ class WeaveClient:
             None
         )
         self._server_feedback_processor: AsyncBatchProcessor | None = None
+        self._otel_exporter: OTelCallExporter | None = None
         # This is a short-term hack to get around the fact that we are reaching into
         # the underlying implementation of the specific server to get the call processor.
         # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
@@ -403,6 +411,13 @@ class WeaveClient:
                     on_send=self._on_wal_send,
                 )
                 logger.debug("WAL enabled: %s", self._wal.wal_dir)
+
+        if settings.should_export_otel():
+            self._otel_exporter = OTelCallExporter(
+                entity=self.entity,
+                project=self.project,
+                project_id=self.project_id,
+            )
 
         # No-op when the feature flag is off (returns immediately).
         self._warm_project_id_resolver()
@@ -849,6 +864,47 @@ class WeaveClient:
         call.started_at = started_at
         project_id = self.project_id
 
+        if self._otel_exporter is not None:
+            maybe_redacted_inputs_with_refs = inputs_with_refs
+            if should_redact_pii():
+                from weave.utils.pii_redaction import redact_pii
+
+                maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
+
+            inputs_json = to_json(
+                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
+            )
+            bytes_size = len(_json_dumps_as_bytes(inputs_json))
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    "Trace input size (%s bytes) exceeds the maximum allowed size of %s bytes. Inputs may be dropped.",
+                    bytes_size,
+                    MAX_TRACE_PAYLOAD_SIZE,
+                )
+
+            try:
+                self._otel_exporter.start_call(
+                    call_id=call_id,
+                    trace_id=trace_id,
+                    parent_id=parent_id,
+                    op_name_ref=op_def_ref.uri,
+                    display_name=call.display_name,
+                    started_at=started_at,
+                    inputs=inputs_json,
+                    attributes=attributes_dict.unwrap(),
+                    thread_id=thread_id,
+                    turn_id=turn_id,
+                    wb_run_id=current_wb_run_id,
+                    wb_run_step=current_wb_run_step,
+                )
+            except Exception:
+                logger.exception("Failed to export OTel start span for call %s", call_id)
+
+            if use_stack:
+                call_context.push_call(call)
+
+            return call
+
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
 
@@ -1048,6 +1104,57 @@ class WeaveClient:
         # to customize what gets logged for a call.
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
+
+        if self._otel_exporter is not None:
+            maybe_redacted_output_as_refs = output_as_refs
+            if should_redact_pii():
+                from weave.utils.pii_redaction import redact_pii
+
+                maybe_redacted_output_as_refs = redact_pii(output_as_refs)
+
+            output_json = to_json(
+                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+            )
+
+            wb_run_context_end = self._get_current_wb_run_context()
+            current_wb_run_step_end = (
+                wb_run_context_end.step if wb_run_context_end else None
+            )
+
+            bytes_size = len(
+                _json_dumps_as_bytes(
+                    {
+                        "output": output_json,
+                        "summary": merged_summary,
+                        "exception": exception_str,
+                    }
+                )
+            )
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    "Trace output size (%s bytes) exceeds the maximum allowed size of %s bytes. Output may be dropped.",
+                    bytes_size,
+                    MAX_TRACE_PAYLOAD_SIZE,
+                )
+
+            try:
+                self._otel_exporter.finish_call(
+                    call_id=call.id,
+                    ended_at=ended_at,
+                    output=output_json,
+                    summary=merged_summary,
+                    exception=exception,
+                    exception_str=exception_str,
+                    wb_run_step_end=current_wb_run_step_end,
+                )
+            except Exception:
+                logger.exception("Failed to export OTel end span for call %s", call.id)
+
+            if call.turn_id == call.id and call.thread_id:
+                call_context.set_turn_id(None)
+
+            call_context.pop_call(call.id)
+            return
 
         def send_end_call() -> None:
             maybe_redacted_output_as_refs = output_as_refs
@@ -2557,6 +2664,9 @@ class WeaveClient:
         if self._wal is not None:
             self._wal.close()
             self._wal = None
+        if self._otel_exporter is not None:
+            self._otel_exporter.shutdown()
+            self._otel_exporter = None
 
     def flush(self) -> None:
         """Flushes background asynchronous tasks, safe to call multiple times."""
@@ -2669,6 +2779,8 @@ class WeaveClient:
             self._server_feedback_processor.accept_new_work()
         if self._wal is not None:
             self._wal.flush()
+        if self._otel_exporter is not None:
+            self._otel_exporter.force_flush()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.

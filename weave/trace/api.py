@@ -105,6 +105,11 @@ def init(
                     call data (start and end) into a single request instead of separate start/end requests.
                     This reduces server load and improves performance, especially for short-lived ops.
                     Default: `False`
+                - `export_otel` (bool): Exports calls directly as GenAI OpenTelemetry spans via OTLP
+                    instead of writing calls to the Weave trace server. Requires the optional
+                    `weave[otel]` extra and uses standard OTLP environment variables such as
+                    `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`.
+                    Default: `False`
         autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
