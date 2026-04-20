@@ -97,22 +97,16 @@ class AgentQueryHandler:
         in ``groups`` (with the same fixed aggregate bundle regardless of
         which columns / custom_attrs are grouped on).
         """
-        pb = ParamBuilder("genai")
-        count_sql = make_spans_count_query(pb, req)
-        list_sql = make_spans_list_query(pb, req)
-        params = pb.get_params()
-
-        total = _first_cell_int(self._query(count_sql, params))
-        result = self._query(list_sql, params)
+        total, rows = self._run_paginated(
+            make_spans_count_query, make_spans_list_query, req
+        )
 
         if not req.group_by:
-            spans = [
-                AgentSpanSchema(**normalize_span_row(r)) for r in _rows_as_dicts(result)
-            ]
+            spans = [AgentSpanSchema(**normalize_span_row(r)) for r in rows]
             return AgentSpansQueryRes(spans=spans, total_count=total)
 
         aliases = [ref.alias or ref.key for ref in req.group_by]
-        groups = [_hydrate_group_row(r, aliases) for r in _rows_as_dicts(result)]
+        groups = [_hydrate_group_row(r, aliases) for r in rows]
         return AgentSpansQueryRes(groups=groups, total_count=total)
 
     # ------------------------------------------------------------------
@@ -121,12 +115,9 @@ class AgentQueryHandler:
 
     def agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         """Query agents AMT for agent list page."""
-        pb = ParamBuilder("genai")
-        list_sql = make_agents_list_query(pb, req)
-        count_sql = make_agents_count_query(pb, req)
-        params = pb.get_params()
-
-        result = self._query(list_sql, params)
+        total, rows = self._run_paginated(
+            make_agents_count_query, make_agents_list_query, req
+        )
         agents = [
             AgentSchema(
                 project_id=req.project_id,
@@ -140,19 +131,15 @@ class AgentQueryHandler:
                 first_seen=r.get("first_seen"),
                 last_seen=r.get("last_seen"),
             )
-            for r in _rows_as_dicts(result)
+            for r in rows
         ]
-        total = _first_cell_int(self._query(count_sql, params))
         return AgentsQueryRes(agents=agents, total_count=total)
 
     def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
         """Query agent_versions AMT for version drill-down."""
-        pb = ParamBuilder("genai")
-        list_sql = make_agent_versions_list_query(pb, req)
-        count_sql = make_agent_versions_count_query(pb, req)
-        params = pb.get_params()
-
-        result = self._query(list_sql, params)
+        total, rows = self._run_paginated(
+            make_agent_versions_count_query, make_agent_versions_list_query, req
+        )
         versions = [
             AgentVersionSchema(
                 project_id=req.project_id,
@@ -167,9 +154,8 @@ class AgentQueryHandler:
                 first_seen=r.get("first_seen"),
                 last_seen=r.get("last_seen"),
             )
-            for r in _rows_as_dicts(result)
+            for r in rows
         ]
-        total = _first_cell_int(self._query(count_sql, params))
         return AgentVersionsQueryRes(versions=versions, total_count=total)
 
     # ------------------------------------------------------------------
@@ -178,12 +164,10 @@ class AgentQueryHandler:
 
     def search(self, req: AgentSearchReq) -> AgentSearchRes:
         """Full-text search across message content."""
-        pb = ParamBuilder("genai")
-        sql = make_message_search_query(pb, req)
-        result = self._query(sql, pb.get_params())
+        rows = self._run_query(make_message_search_query, req)
 
         convs: dict[str, AgentSearchConversationResult] = {}
-        for r in _rows_as_dicts(result):
+        for r in rows:
             cid = safe_str(r.get("conversation_id")) or "(no conversation)"
             if cid not in convs:
                 convs[cid] = AgentSearchConversationResult(
@@ -221,13 +205,41 @@ class AgentQueryHandler:
         Used by the chat view handler to build ``AgentTraceChatRes``; not a
         public query endpoint.
         """
+        rows = self._run_query(make_trace_detail_spans_query, project_id, trace_id)
+        return [AgentSpanSchema.model_construct(**normalize_span_row(r)) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Query plumbing
+    # ------------------------------------------------------------------
+
+    def _run_paginated(
+        self,
+        count_builder: Callable[[ParamBuilder, Any], str],
+        list_builder: Callable[[ParamBuilder, Any], str],
+        req: Any,
+    ) -> tuple[int, list[dict[str, Any]]]:
+        """Run a (count, list) SQL pair with a shared ``ParamBuilder``.
+
+        Returns ``(total_count, list_rows_as_dicts)``. Both queries reuse the
+        same ``pb`` so the ``WHERE`` parameters aren't added twice.
+        """
         pb = ParamBuilder("genai")
-        sql = make_trace_detail_spans_query(pb, project_id, trace_id)
-        result = self._query(sql, pb.get_params())
-        return [
-            AgentSpanSchema.model_construct(**normalize_span_row(r))
-            for r in _rows_as_dicts(result)
-        ]
+        count_sql = count_builder(pb, req)
+        list_sql = list_builder(pb, req)
+        params = pb.get_params()
+        total = _first_cell_int(self._query(count_sql, params))
+        rows = _rows_as_dicts(self._query(list_sql, params))
+        return total, rows
+
+    def _run_query(
+        self,
+        builder: Callable[..., str],
+        *args: Any,
+    ) -> list[dict[str, Any]]:
+        """Build a single SQL statement via ``builder(pb, *args)`` and return rows as dicts."""
+        pb = ParamBuilder("genai")
+        sql = builder(pb, *args)
+        return _rows_as_dicts(self._query(sql, pb.get_params()))
 
 
 # ---------------------------------------------------------------------------

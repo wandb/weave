@@ -20,13 +20,13 @@ from weave.trace_server.agents.constants import (
     MAX_AGENT_QUERY_LIMIT,
     MAX_SEARCH_LIMIT,
 )
-from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentCustomAttrFilter,
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
+    AgentSpanSchema,
     AgentSpansQueryReq,
     AgentsQueryReq,
     AgentVersionsQueryReq,
@@ -130,7 +130,12 @@ _CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(
 # Column projections
 # ---------------------------------------------------------------------------
 
-_ALL_SPAN_FIELDS = list(AgentSpanCHInsertable.model_fields.keys())
+#: Every column we ever SELECT into an ``AgentSpanSchema`` response. Driving
+#: this off the response schema (instead of the storage-side
+#: ``AgentSpanCHInsertable``) guarantees we never SELECT a column with no home
+#: in the response, and adding a response field is enough to make it flow
+#: through — no separate "include this column" list to maintain.
+_ALL_SPAN_FIELDS: list[str] = list(AgentSpanSchema.model_fields.keys())
 
 # Spans list query — lightweight projection that skips blob/message columns.
 _SPANS_LIST_EXCLUDE = frozenset(
@@ -149,22 +154,11 @@ _SPANS_LIST_EXCLUDE = frozenset(
         "content_refs",
         "artifact_refs",
         "object_refs",
-        "custom_attrs_int",
-        "custom_attrs_float",
-        "request_frequency_penalty",
-        "request_presence_penalty",
-        "request_seed",
-        "request_stop_sequences",
-        "request_choice_count",
         "request_temperature",
         "request_max_tokens",
         "request_top_p",
-        "output_type",
-        "server_address",
-        "server_port",
         "wb_run_step",
         "wb_run_step_end",
-        "expire_at",
         "raw_span_dump",
         "attributes_dump",
         "events_dump",
@@ -179,11 +173,7 @@ SPANS_LIST_COLS: str = ", ".join(
 # and request params not needed for rendering.
 _CHAT_VIEW_EXCLUDE = frozenset(
     {
-        "cache_creation_input_tokens",
-        "cache_read_input_tokens",
         "custom_attrs",
-        "custom_attrs_int",
-        "custom_attrs_float",
         "raw_span_dump",
         "attributes_dump",
         "events_dump",
@@ -195,15 +185,6 @@ _CHAT_VIEW_EXCLUDE = frozenset(
         "request_temperature",
         "request_max_tokens",
         "request_top_p",
-        "request_frequency_penalty",
-        "request_presence_penalty",
-        "request_seed",
-        "request_stop_sequences",
-        "request_choice_count",
-        "output_type",
-        "server_address",
-        "server_port",
-        "expire_at",
     }
 )
 CHAT_VIEW_COLS: str = ", ".join(
