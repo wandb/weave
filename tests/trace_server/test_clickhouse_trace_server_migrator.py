@@ -321,7 +321,6 @@ def test_create_db_sql(mock_costs):
         "CREATE DATABASE IF NOT EXISTS test_db"
         " ENGINE = Replicated('/clickhouse/tables/test_db', '{shard}', '{replica}')"
     )
-    assert "ON CLUSTER" not in sql
 
     # Test invalid cluster name
     with pytest.raises(MigrationError, match="Invalid cluster name"):
