@@ -36,3 +36,9 @@ SCORE_EVALUATION_RUN_ID_ATTR_KEY = "evaluation_run_id"
 
 # Weave attributes namespace
 WEAVE_ATTRIBUTES_NAMESPACE = "weave"
+
+# Imperative evaluation markers — written onto trace call attributes so the
+# UI and feedback system can recognize imperatively-logged evaluations.
+IMPERATIVE_EVAL_META_KEY = "_weave_eval_meta"
+IMPERATIVE_EVAL_META_EVAL = {"imperative": True}
+IMPERATIVE_EVAL_META_SCORE = {"imperative": True, "score": True}

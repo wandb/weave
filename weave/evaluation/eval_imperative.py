@@ -9,8 +9,9 @@ var).
 - V2: ``weave.evaluation.eval_imperative_v2``
 
 ``EvaluationLogger`` and ``ScoreLogger`` are factory functions that
-return instances of the selected implementation. V2 subclasses V1, so
-the return type is ``_V1EvaluationLogger`` / ``_V1ScoreLogger``.
+return an instance of the selected implementation. V1 and V2 are
+independent classes sharing the same public API, so the return type is
+a union of the two.
 """
 
 from __future__ import annotations
@@ -40,8 +41,11 @@ from weave.trace import settings
 
 logger = logging.getLogger(__name__)
 
+AnyEvaluationLogger = _V1EvaluationLogger | _V2EvaluationLogger
+AnyScoreLogger = _V1ScoreLogger | _V2ScoreLogger
 
-def EvaluationLogger(*args: Any, **kwargs: Any) -> _V1EvaluationLogger:  # noqa: N802
+
+def EvaluationLogger(*args: Any, **kwargs: Any) -> AnyEvaluationLogger:  # noqa: N802
     """Create an EvaluationLogger (V1 or V2 based on settings).
 
     See module docstring.
@@ -51,7 +55,7 @@ def EvaluationLogger(*args: Any, **kwargs: Any) -> _V1EvaluationLogger:  # noqa:
     return _V1EvaluationLogger(*args, **kwargs)
 
 
-def ScoreLogger(*args: Any, **kwargs: Any) -> _V1ScoreLogger:  # noqa: N802
+def ScoreLogger(*args: Any, **kwargs: Any) -> AnyScoreLogger:  # noqa: N802
     """Create a ScoreLogger (V1 or V2 based on settings).
 
     Most users obtain ScoreLoggers via ``EvaluationLogger.log_prediction``;
@@ -62,7 +66,7 @@ def ScoreLogger(*args: Any, **kwargs: Any) -> _V1ScoreLogger:  # noqa: N802
     return _V1ScoreLogger(*args, **kwargs)
 
 
-def ImperativeEvaluationLogger(*args: Any, **kwargs: Any) -> _V1EvaluationLogger:  # noqa: N802
+def ImperativeEvaluationLogger(*args: Any, **kwargs: Any) -> AnyEvaluationLogger:  # noqa: N802
     """Legacy alias for EvaluationLogger."""
     logger.warning(
         "ImperativeEvaluationLogger was renamed to EvaluationLogger in 0.51.44"

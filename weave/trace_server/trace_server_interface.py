@@ -2390,6 +2390,13 @@ class EvaluationRunCreateBody(BaseModel):
         ..., description="Reference to the evaluation (weave:// URI)"
     )
     model: str = Field(..., description="Reference to the model (weave:// URI)")
+    eval_attributes: dict[str, Any] | None = Field(
+        None,
+        description=(
+            "Optional attributes to attach to the Evaluation.evaluate trace call "
+            "(merged under the call's root attributes dict)."
+        ),
+    )
 
 
 class EvaluationRunCreateReq(EvaluationRunCreateBody):
@@ -2599,7 +2606,13 @@ class ScoreCreateBody(BaseModel):
 
     prediction_id: str = Field(..., description="The prediction ID")
     scorer: str = Field(..., description="The scorer reference (weave:// URI)")
-    value: float = Field(..., description="The value of the score")
+    value: float | None = Field(
+        ...,
+        description=(
+            "The value of the score. ``None`` is permitted for scorers that "
+            "intentionally record an absent/failed evaluation."
+        ),
+    )
     evaluation_run_id: str | None = Field(
         None,
         description="Optional evaluation run ID to link this score as a child call",
@@ -2633,7 +2646,7 @@ class ScoreReadReq(BaseModel):
 class ScoreReadRes(BaseModel):
     score_id: str = Field(..., description="The score ID")
     scorer: str = Field(..., description="The scorer reference (weave:// URI)")
-    value: float = Field(..., description="The value of the score")
+    value: float | None = Field(..., description="The value of the score")
     evaluation_run_id: str | None = Field(
         None, description="Evaluation run ID if this score is linked to one"
     )

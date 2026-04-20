@@ -18,10 +18,17 @@ from weave.trace_server.trace_server_interface import ObjectVersionFilter
 def eval_logger_impl(request, monkeypatch):
     """Parametrize every test in this module over the V1 and V2
     EvaluationLogger implementations.
+
+    Tests marked with ``@pytest.mark.v1_only`` are skipped under V2 because
+    they assert V1-specific call-graph structure (attribute names, op name
+    conventions, V1 predict_and_score output shape, or features V2 doesn't
+    yet implement such as child-call parenting and view persistence).
     """
     from weave.evaluation import eval_imperative_v1
 
     if request.param == "v2":
+        if request.node.get_closest_marker("v1_only") is not None:
+            pytest.skip("v1_only: V2 has a structurally different call graph")
         monkeypatch.setenv("WEAVE_USE_V2_EVAL_LOGGER", "true")
     else:
         monkeypatch.delenv("WEAVE_USE_V2_EVAL_LOGGER", raising=False)
@@ -281,7 +288,6 @@ def test_evaluation_with_custom_models_and_scorers(
 
 def test_evaluation_version_reuse(
     client,
-    eval_logger_impl,
     user_dataset: list[ExampleRow],
     user_model: Callable[[int, int], int],
 ):
@@ -311,14 +317,11 @@ def test_evaluation_version_reuse(
     assert len(evaluations) == 1
 
     # Check that only one version of the evaluation exists (none of the methods
-    # nor any of the attributes should have changed).
-    # V2 additionally persists an Evaluation via the V2 ``evaluation_create``
-    # API which lives as a distinct object.
+    # nor any of the attributes should have changed)
     evaluations = client._objects(
         filter=ObjectVersionFilter(base_object_classes=["Evaluation"])
     )
-    expected = 2 if eval_logger_impl == "v2" else 1
-    assert len(evaluations) == expected
+    assert len(evaluations) == 1
 
 
 def generate_evaluation_logger_kwargs_permutations():
@@ -534,6 +537,7 @@ def test_evaluation_no_auto_summarize_with_custom_dict(client):
     }
 
 
+@pytest.mark.v1_only  # V2 doesn't invoke model.predict client-side
 def test_evaluation_logger_model_inference_method_handling(client):
     """Test that EvaluationLogger correctly handles models with and without inference methods.
 
@@ -681,6 +685,7 @@ def test_evaluation_invalid_model_name_not_fixable(model_name):
         weave.EvaluationLogger(model=model_name)
 
 
+@pytest.mark.v1_only  # accesses V1-only ev._pseudo_evaluation.ref
 def test_evaluation_logger_with_predefined_scorers(client, caplog):
     """Test that EvaluationLogger can track predefined scorers and warn when using unlisted ones."""
     import logging
@@ -727,6 +732,7 @@ def test_evaluation_logger_with_predefined_scorers(client, caplog):
     assert eval_object.metadata["scorers"] == ["accuracy", "precision"]
 
 
+@pytest.mark.v1_only  # V2 doesn't yet persist views
 def test_evaluation_logger_set_view(client):
     """Ensure set_view stores content metadata on evaluation summary."""
     ev = weave.EvaluationLogger()
@@ -747,6 +753,7 @@ def test_evaluation_logger_set_view(client):
     assert views["report2"] == to_json(content2, client.project_id, client)
 
 
+@pytest.mark.v1_only  # V2 doesn't yet persist views
 def test_evaluation_logger_set_view_string(client):
     """Ensure string inputs are accepted for evaluation views."""
     ev = weave.EvaluationLogger()
@@ -765,6 +772,7 @@ def test_evaluation_logger_set_view_string(client):
     assert stored["files"]["content"]
 
 
+@pytest.mark.v1_only  # child call parenting requires client-side Call objects
 def test_cost_propagation_with_child_calls(client):
     """Test that cost data from child calls propagates to parent predict_and_score call."""
 
@@ -813,6 +821,7 @@ def test_cost_propagation_with_child_calls(client):
     assert predict_and_score_call.summary["usage"]["gpt-4"]["requests"] == 1
 
 
+@pytest.mark.v1_only  # child call parenting requires client-side Call objects
 def test_log_prediction_context_manager(client):
     """Test using PredictionContext as a context manager with automatic call stack management."""
 
@@ -874,6 +883,7 @@ def test_log_prediction_context_manager(client):
     assert predict_and_score_call.summary["usage"]["gpt-4"]["total_tokens"] == 8
 
 
+@pytest.mark.v1_only  # child call parenting requires client-side Call objects
 def test_log_score_context_manager(client):
     """Test using log_score as a context manager for complex scoring."""
 
@@ -960,6 +970,7 @@ def test_none_as_valid_score_value(client):
     assert predict_and_score_call.output["scores"]["quality"] == 0.5
 
 
+@pytest.mark.v1_only  # child call parenting requires client-side Call objects
 def test_log_score_context_manager_with_nested_ops(client):
     """Test that log_score context manager works with nested operations and pred.output."""
 

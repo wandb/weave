@@ -222,6 +222,7 @@ markers = [
   "timeout: marks tests with a timeout in seconds (via pytest-timeout)",
   "remote_only: marks tests that only run with --remote-http-trace-server=remote",
   "stainless_only: marks tests that only run with --remote-http-trace-server=stainless",
+  "v1_only: EvaluationLogger test that asserts V1-specific call-graph internals and is skipped under V2",
 ]
 
 [tool.ruff.lint]

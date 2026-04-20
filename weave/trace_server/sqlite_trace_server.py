@@ -3685,6 +3685,22 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Create an evaluation run as a call with special attributes."""
         evaluation_run_id = generate_id()
 
+        attributes: dict[str, Any] = {
+            constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                constants.EVALUATION_RUN_ATTR_KEY: "true",
+                constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
+                constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
+            },
+            constants.IMPERATIVE_EVAL_META_KEY: dict(
+                constants.IMPERATIVE_EVAL_META_EVAL
+            ),
+        }
+        if req.eval_attributes:
+            # Caller-provided attributes are merged at the call's root level,
+            # mirroring V1's `attributes()` context manager.
+            for k, v in req.eval_attributes.items():
+                attributes.setdefault(k, v)
+
         # Start a call to represent the evaluation run
         call_start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
@@ -3693,13 +3709,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 trace_id=evaluation_run_id,
                 op_name=constants.EVALUATION_RUN_OP_NAME,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
-                attributes={
-                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                        constants.EVALUATION_RUN_ATTR_KEY: "true",
-                        constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
-                        constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
-                    }
-                },
+                attributes=attributes,
                 inputs={
                     "self": req.evaluation,
                     "model": req.model,
@@ -3903,27 +3913,29 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 if isinstance(score_value, (int, float)):
                     scorer_outputs_by_name[scorer_name].append(float(score_value))
 
-        # Build the evaluation run output with means
-        eval_output = {}
-
-        # Add scorer means first (before output)
-        for scorer_name, scores in scorer_outputs_by_name.items():
-            if scores:
-                eval_output[scorer_name] = {"mean": sum(scores) / len(scores)}
-
-        # Add model output mean last
-        if model_outputs:
-            # If outputs are numeric, compute mean
-            try:
-                numeric_outputs = [
-                    float(o) for o in model_outputs if isinstance(o, (int, float))
-                ]
-                if numeric_outputs:
-                    eval_output["output"] = {
-                        "mean": sum(numeric_outputs) / len(numeric_outputs)
-                    }
-            except (ValueError, TypeError):
-                pass
+        # Build the evaluation run output. If the caller provided a summary,
+        # use it verbatim as the call output (client-side code — e.g. V1's
+        # `auto_summarize` — has already computed the per-scorer aggregates
+        # in a shape the UI/tests expect). Otherwise fall back to a
+        # server-computed mean per scorer.
+        if req.summary is not None:
+            eval_output: dict[str, Any] = dict(req.summary)
+        else:
+            eval_output = {}
+            for scorer_name, scores in scorer_outputs_by_name.items():
+                if scores:
+                    eval_output[scorer_name] = {"mean": sum(scores) / len(scores)}
+            if model_outputs:
+                try:
+                    numeric_outputs = [
+                        float(o) for o in model_outputs if isinstance(o, (int, float))
+                    ]
+                    if numeric_outputs:
+                        eval_output["output"] = {
+                            "mean": sum(numeric_outputs) / len(numeric_outputs)
+                        }
+                except (ValueError, TypeError):
+                    pass
 
         # Create a summarize call as a child of the evaluation run
         summarize_id = generate_id()
@@ -3935,7 +3947,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 parent_id=req.evaluation_run_id,
                 op_name=constants.EVALUATION_SUMMARIZE_OP_NAME,
                 started_at=datetime.datetime.now(datetime.timezone.utc),
-                attributes={},
+                attributes={
+                    constants.IMPERATIVE_EVAL_META_KEY: dict(
+                        constants.IMPERATIVE_EVAL_META_EVAL
+                    ),
+                },
                 inputs={
                     "self": evaluation_ref,
                 },
@@ -3956,7 +3972,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         self.call_end(summarize_end_req)
 
-        # End the evaluation run call
+        # End the evaluation run call. ``summary`` goes in the call's
+        # ``summary`` field; the semantic run output lives in ``output``.
         call_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
@@ -4029,7 +4046,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     attributes={
                         constants.WEAVE_ATTRIBUTES_NAMESPACE: {
                             constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
-                        }
+                        },
+                        constants.IMPERATIVE_EVAL_META_KEY: dict(
+                            constants.IMPERATIVE_EVAL_META_EVAL
+                        ),
                     },
                     inputs={
                         "self": evaluation_ref,
@@ -4048,20 +4068,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             trace_id = prediction_id
             parent_id = None
 
-        # Parse the model ref to get the model name
-        try:
-            model_ref = ri.parse_internal_uri(req.model)
-            if isinstance(model_ref, (ri.InternalObjectRef, ri.InternalOpRef)):
-                model_name = model_ref.name
-            else:
-                # Fallback to default if not an object/op ref
-                model_name = "Model"
-        except ri.InvalidInternalRef:
-            # Fallback to default if parsing fails
-            model_name = "Model"
-
-        # Create the predict op with the model-specific name
-        predict_op_name = f"{model_name}.predict"
+        # Create the predict op with V1's canonical name so that filters like
+        # ``op_name == "Model.predict"`` work regardless of the concrete
+        # model subclass. V1's imperative logger always uses this name.
+        predict_op_name = constants.MODEL_PREDICT_OP_NAME
         predict_op_req = tsi.OpCreateReq(
             project_id=req.project_id,
             name=predict_op_name,
@@ -4077,11 +4087,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
 
         # Start a call to represent the prediction
-        prediction_attributes = {
+        prediction_attributes: dict[str, Any] = {
             constants.WEAVE_ATTRIBUTES_NAMESPACE: {
                 constants.PREDICTION_ATTR_KEY: "true",
                 constants.PREDICTION_MODEL_ATTR_KEY: req.model,
-            }
+            },
+            constants.IMPERATIVE_EVAL_META_KEY: dict(
+                constants.IMPERATIVE_EVAL_META_EVAL
+            ),
         }
         # Store evaluation_run_id as attribute if provided
         if req.evaluation_run_id:
@@ -4288,24 +4301,15 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         Returns:
             PredictionFinishRes with success status
         """
-        # Read the prediction to check if it has a parent (predict_and_score call)
+        # Read the prediction to check if it has a parent (predict_and_score call).
+        # The prediction (Model.predict) call was already ended inside
+        # ``prediction_create`` with the real predict output; we must NOT
+        # re-end it here or we would overwrite that output.
         prediction_read_req = tsi.CallReadReq(
             project_id=req.project_id,
             id=req.prediction_id,
         )
         prediction_res = self.call_read(prediction_read_req)
-
-        # Finish the prediction call
-        call_end_req = tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=req.project_id,
-                id=req.prediction_id,
-                ended_at=datetime.datetime.now(datetime.timezone.utc),
-                output=None,
-                summary={},
-            )
-        )
-        self.call_end(call_end_req)
 
         # If this prediction has a parent (predict_and_score call), finish that too
         prediction_call = prediction_res.call
@@ -4354,8 +4358,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
 
         for score_call in self.calls_query_stream(calls_query_req):
-            if score_call.output is None:
-                continue
+            # ``None`` is a valid score value (indicates an intentionally
+            # absent/failed evaluation), so we include it in the aggregated
+            # dict rather than skipping the call.
 
             # Get scorer name from the scorer ref in attributes
             weave_attrs = score_call.attributes.get(
@@ -4455,8 +4460,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             raise TypeError(f"Invalid scorer ref: {req.scorer}")
         scorer_name = scorer_ref.name
 
-        # Create the score op with scorer-specific name
-        score_op_name = f"{scorer_name}.score"
+        # Create the score op with scorer-specific name.
+        # Matches V1's imperative logger which uses the raw scorer name
+        # (not `{scorer_name}.score`) as the op name.
+        score_op_name = scorer_name
         score_op_req = tsi.OpCreateReq(
             project_id=req.project_id,
             name=score_op_name,
@@ -4472,12 +4479,15 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
 
         # Start a call to represent the score
-        score_attributes = {
+        score_attributes: dict[str, Any] = {
             constants.WEAVE_ATTRIBUTES_NAMESPACE: {
                 constants.SCORE_ATTR_KEY: "true",
                 constants.SCORE_PREDICTION_ID_ATTR_KEY: req.prediction_id,
                 constants.SCORE_SCORER_ATTR_KEY: req.scorer,
-            }
+            },
+            constants.IMPERATIVE_EVAL_META_KEY: dict(
+                constants.IMPERATIVE_EVAL_META_SCORE
+            ),
         }
         # Store evaluation_run_id as attribute if provided
         if req.evaluation_run_id:
