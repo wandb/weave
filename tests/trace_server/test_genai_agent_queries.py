@@ -235,10 +235,14 @@ def test_group_by_conversation_id(ch_server):
     assert conv_b in by_conv
 
     assert by_conv[conv_a].span_count == 2
+    assert by_conv[conv_a].turn_count == 1  # one invoke_agent span
     assert "agent-x" in by_conv[conv_a].agent_names
+    assert "Alpha Chat" in by_conv[conv_a].conversation_names
 
     assert by_conv[conv_b].span_count == 1
+    assert by_conv[conv_b].turn_count == 1
     assert "agent-y" in by_conv[conv_b].agent_names
+    assert "Beta Chat" in by_conv[conv_b].conversation_names
 
 
 # ---------------------------------------------------------------------------
