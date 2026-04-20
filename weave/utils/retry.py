@@ -101,11 +101,13 @@ def _is_retryable_exception(e: BaseException) -> bool:
     if isinstance(e, ValidationError):
         return False
 
-    # Don't retry CallsCompleteModeRequired - should trigger immediate mode switch
-    # Lazy import to avoid circular dependency (http_utils imports from this module)
+    # Don't retry ObjectDeletedError or CallsCompleteModeRequired: the server
+    # response is authoritative. Lazy import avoids circular dependency
+    # (http_utils imports from this module).
+    from weave.trace_server.errors import ObjectDeletedError
     from weave.trace_server_bindings.http_utils import CallsCompleteModeRequired
 
-    if isinstance(e, CallsCompleteModeRequired):
+    if isinstance(e, (ObjectDeletedError, CallsCompleteModeRequired)):
         return False
 
     # Don't retry on HTTP 4xx (except 429)

@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 from collections.abc import Callable
@@ -264,6 +265,7 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
     # Try to extract custom error message from JSON response
     extracted_message = None
     error_code = None
+    error_data: Any = None
     try:
         error_data = response.json()
         if isinstance(error_data, dict):
@@ -282,6 +284,18 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
     if error_code == ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED:
         message = extracted_message or default_message or "Calls complete mode required"
         raise CallsCompleteModeRequired(message)
+
+    # Authoritative delete: the server formats `ObjectDeletedError` as a 404
+    # with `deleted_at` in the JSON body. Surface it as the typed exception so
+    # SDK callers see the same error class regardless of local vs remote
+    # server, and so retry layers can tell it apart from a replica-lag 404.
+    if response.status_code == 404:
+        deleted_at = _parse_deleted_at(error_data)
+        if deleted_at is not None:
+            raise ObjectDeletedError(
+                extracted_message or default_message or "Object deleted",
+                deleted_at=deleted_at,
+            )
 
     # Combine messages
     if default_message and extracted_message:
@@ -350,6 +364,24 @@ def _is_413_error(e: Exception) -> bool:
     )
 
 
+def _parse_deleted_at(body: Any) -> datetime.datetime | None:
+    """Return a parsed `deleted_at` from an error response body, or None.
+
+    The server emits an ISO-8601 string via `_format_object_deleted_error`.
+    Anything that doesn't parse is treated as absent so callers fall back to
+    the generic HTTPStatusError path.
+    """
+    if not isinstance(body, dict):
+        return None
+    raw = body.get("deleted_at")
+    if not isinstance(raw, str):
+        return None
+    try:
+        return datetime.datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
 def _is_retryable_not_found(exc: BaseException) -> bool:
     """True only for 404-like misses worth retrying.
 
@@ -373,9 +405,7 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
         body = exc.response.json()
     except (json.JSONDecodeError, ValueError):
         return False
-    if not isinstance(body, dict):
-        return False
-    return body.get("deleted_at") is None
+    return _parse_deleted_at(body) is None
 
 
 def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:

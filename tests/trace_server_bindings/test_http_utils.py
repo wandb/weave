@@ -111,3 +111,37 @@ def test_retry_on_not_found_behavior(monkeypatch):
     with pytest.raises(ObjectDeletedError):
         deleted_local()
     assert calls["deleted_local"] == 1
+
+
+def test_object_deleted_404_raises_typed_error():
+    """A 404 with `deleted_at` in the body surfaces as ObjectDeletedError.
+
+    Other 404s fall through to HTTPStatusError so retry layers can distinguish.
+    A malformed `deleted_at` also falls through (conservative).
+    """
+    deleted_at_iso = "2024-01-01T00:00:00+00:00"
+    deleted_response = httpx.Response(
+        404,
+        json={"reason": "obj was deleted", "deleted_at": deleted_at_iso},
+        request=httpx.Request("POST", "http://example.com"),
+    )
+
+    with pytest.raises(ObjectDeletedError) as exc_info:
+        handle_response_error(deleted_response, "/obj/read")
+    assert exc_info.value.deleted_at == datetime.datetime.fromisoformat(deleted_at_iso)
+
+    plain_404 = httpx.Response(
+        404,
+        json={"reason": "Obj foo:bar not found"},
+        request=httpx.Request("POST", "http://example.com"),
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        handle_response_error(plain_404, "/obj/read")
+
+    malformed_deleted_at = httpx.Response(
+        404,
+        json={"reason": "deleted", "deleted_at": "not-a-date"},
+        request=httpx.Request("POST", "http://example.com"),
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        handle_response_error(malformed_deleted_at, "/obj/read")
