@@ -402,6 +402,18 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
 
 
 @pytest.fixture
+def no_autoflush(client):
+    """Disable per-method autoflush for speed; call client.flush() before reads."""
+    client.set_autoflush(False)
+    yield
+    for _ in range(10):
+        client.flush()
+        if not client._has_pending_jobs():
+            break
+    client.set_autoflush(True)
+
+
+@pytest.fixture
 def client_creator(zero_stack, request, trace_server, caching_client_isolation):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first).
 

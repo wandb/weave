@@ -1,7 +1,10 @@
 import {ReadableStream} from 'stream/web';
 import {Api as TraceServerApi} from '../generated/traceServerApi';
+import {StringPrompt} from '../prompt';
+import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry';
 import {WandbServerApi} from '../wandb/wandbServerApi';
 import {WeaveClient} from '../weaveClient';
+import {ObjectRef} from '../weaveObject';
 
 // Mock the TraceServerApi and WandbServerApi
 jest.mock('../generated/traceServerApi');
@@ -354,6 +357,140 @@ describe('WeaveClient', () => {
       mockStreamResponse(mockTraceServerApi, []);
       expect(client.getCall('non-existent-id')).rejects.toThrow(
         'Call not found: non-existent-id'
+      );
+    });
+  });
+
+  describe('linkPromptToRegistry', () => {
+    let client: WeaveClient;
+    let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
+    let mockWandbServerApi: jest.Mocked<WandbServerApi>;
+    let mockTransport: jest.SpyInstance;
+
+    beforeEach(() => {
+      mockTraceServerApi = {
+        request: jest.fn(),
+      } as any;
+      mockWandbServerApi = {} as any;
+      client = new WeaveClient(
+        mockTraceServerApi,
+        mockWandbServerApi,
+        'current-entity/current-project'
+      );
+      mockTransport = jest
+        .spyOn(registryLinkBindings, 'linkAssetToRegistry')
+        .mockResolvedValue({version_index: 0});
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('resolves a published prompt object and uses the current client entity', async () => {
+      const prompt = new StringPrompt({content: 'Hello {name}'});
+      prompt.__savedRef = Promise.resolve(
+        new ObjectRef('source-entity/source-project', 'my-prompt', 'v1')
+      );
+
+      const result = await client.linkPromptToRegistry(prompt, {
+        targetPath: 'wandb-registry-prompts/my-prompt-collection',
+      });
+
+      expect(result).toEqual({version_index: 0});
+      expect(mockTransport).toHaveBeenCalledWith(mockTraceServerApi, {
+        ref: 'weave:///source-entity/source-project/object/my-prompt:v1',
+        target: {
+          entity_name: 'current-entity',
+          project_name: 'wandb-registry-prompts',
+          portfolio_name: 'my-prompt-collection',
+        },
+        aliases: [],
+      });
+    });
+
+    it('accepts ObjectRef input and normalizes aliases', async () => {
+      const promptRef = new ObjectRef(
+        'source-entity/source-project',
+        'my-prompt',
+        'v1'
+      );
+
+      await client.linkPromptToRegistry(promptRef, {
+        targetPath: 'wandb-registry-prompts/my-prompt-collection',
+        aliases: ['prod', 'latest'],
+      });
+
+      expect(mockTransport).toHaveBeenCalledWith(mockTraceServerApi, {
+        ref: 'weave:///source-entity/source-project/object/my-prompt:v1',
+        target: {
+          entity_name: 'current-entity',
+          project_name: 'wandb-registry-prompts',
+          portfolio_name: 'my-prompt-collection',
+        },
+        aliases: ['prod', 'latest'],
+      });
+    });
+
+    it('accepts URI string input directly', async () => {
+      await client.linkPromptToRegistry(
+        'weave:///source-entity/source-project/object/my-prompt:v1',
+        {
+          targetPath: 'wandb-registry-prompts/my-prompt-collection',
+        }
+      );
+
+      expect(mockTransport).toHaveBeenCalledWith(
+        mockTraceServerApi,
+        expect.objectContaining({
+          ref: 'weave:///source-entity/source-project/object/my-prompt:v1',
+        })
+      );
+    });
+
+    it('throws for unpublished prompt objects', async () => {
+      const prompt = new StringPrompt({content: 'Hello {name}'});
+
+      await expect(
+        client.linkPromptToRegistry(prompt, {
+          targetPath: 'wandb-registry-prompts/my-prompt-collection',
+        })
+      ).rejects.toThrow('linkPromptToRegistry requires a published prompt');
+    });
+
+    it('rejects invalid target paths', async () => {
+      const promptRef = new ObjectRef(
+        'source-entity/source-project',
+        'my-prompt',
+        'v1'
+      );
+
+      await expect(
+        client.linkPromptToRegistry(promptRef, {
+          targetPath: 'prompts/my-prompt-collection',
+        })
+      ).rejects.toThrow(
+        "targetPath must match '<registry_project>/<portfolio_name>' where registry_project starts with 'wandb-registry-'"
+      );
+    });
+
+    it('rejects projectId without entity scope', async () => {
+      const unscopedClient = new WeaveClient(
+        mockTraceServerApi,
+        mockWandbServerApi,
+        'project-only'
+      );
+      const promptRef = new ObjectRef(
+        'source-entity/source-project',
+        'my-prompt',
+        'v1'
+      );
+
+      await expect(
+        unscopedClient.linkPromptToRegistry(promptRef, {
+          targetPath: 'wandb-registry-prompts/my-prompt-collection',
+        })
+      ).rejects.toThrow(
+        "linkPromptToRegistry requires client.projectId in '<entity>/<project>' format"
       );
     });
   });

@@ -1,0 +1,92 @@
+# 1 shard × 3 replicas topology for pre-merge migrator CI.
+#
+# Keeper is embedded in ch-s1-r1 (same pattern as the existing 1s1r setup,
+# just with two additional replicas joining the same Keeper instance).
+# Only ch-s1-r1 exposes the HTTP port to the host — all tests drive the
+# cluster via that entrypoint. The other replicas are reachable
+# container-to-container via the compose network.
+#
+# Design decision: 1 Keeper, not 3.
+#   Keeper replica count and CH replica count are independent. 3 CH
+#   replicas exercise data replication, ON CLUSTER DDL propagation, and
+#   ReplicatedMergeTree path templating — which is where every
+#   replication-related production bug in our history has lived. 3
+#   Keepers would additionally exercise Raft quorum / leader-election
+#   behavior, which is NOT in our incident history. The cost of 3
+#   Keepers (extra memory, Raft flake risk) isn't justified for the
+#   bugs we're trying to catch. Revisit only if an incident proves
+#   Keeper HA is part of our bug surface.
+#
+# Resource limits target the GH Actions ubuntu-latest runner (7 GB RAM,
+# 2 vCPU). Each CH node caps at 1.5 GB; total committed memory across
+# 3 CH nodes is 4.5 GB, leaving ~2.5 GB headroom for the test runner
+# and OS. Do not raise without verifying CI runner capacity.
+#
+# Usage (local):
+#   docker compose -f 1s3r.yaml up -d --wait
+#   docker compose -f 1s3r.yaml exec -T ch-s1-r1 \
+#     clickhouse-client -q "SELECT host_name, errors_count FROM system.clusters WHERE cluster='weave_cluster'"
+#   docker compose -f 1s3r.yaml down -v
+
+x-ch-node: &ch-node
+  image: clickhouse/clickhouse-server:25.11.2.24
+  environment:
+    CLICKHOUSE_DB: default
+    CLICKHOUSE_USER: default
+    CLICKHOUSE_PASSWORD: ""
+    CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+  ulimits:
+    nofile:
+      soft: 262144
+      hard: 262144
+  deploy:
+    resources:
+      limits:
+        memory: 1536M
+  healthcheck:
+    test: ["CMD-SHELL", "wget -q -O- http://localhost:8123/ping || exit 1"]
+    interval: 3s
+    timeout: 2s
+    retries: 20
+    start_period: 10s
+
+services:
+  ch-s1-r1:
+    <<: *ch-node
+    container_name: weave-ci-ch-s1-r1
+    hostname: ch-s1-r1
+    ports:
+      # Host-side port 8130 matches the default expected by
+      # tests/trace_server_migrator/conftest.py::_DEFAULT_PORT,
+      # so the existing fixture works without WF_CLICKHOUSE_KEEPER_PORT overrides.
+      - "8130:8123"     # HTTP interface (host entrypoint)
+      - "9000:9000"     # native TCP
+    volumes:
+      - ../keeper_1s3r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./macros_s1_r1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+
+  ch-s1-r2:
+    <<: *ch-node
+    container_name: weave-ci-ch-s1-r2
+    hostname: ch-s1-r2
+    volumes:
+      - ../keeper_1s3r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./macros_s1_r2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+    depends_on:
+      ch-s1-r1:
+        condition: service_healthy
+
+  ch-s1-r3:
+    <<: *ch-node
+    container_name: weave-ci-ch-s1-r3
+    hostname: ch-s1-r3
+    volumes:
+      - ../keeper_1s3r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./macros_s1_r3.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+    depends_on:
+      ch-s1-r1:
+        condition: service_healthy
+
+networks:
+  default:
+    name: weave-ci-1s3r

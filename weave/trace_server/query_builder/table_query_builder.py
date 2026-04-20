@@ -195,3 +195,43 @@ def make_table_stats_query_with_storage_size(
     GROUP BY tb_digest
     """
     return query
+
+
+def make_table_stats_basic_query(
+    project_id: str,
+    table_digests: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Generate a basic query for table row counts without storage size."""
+    project_id_name = pb.add_param(project_id)
+    digest_ids = pb.add_param(table_digests)
+    return f"""
+    SELECT digest, any(length(row_digests))
+    FROM tables
+    WHERE project_id = {{{project_id_name}: String}} AND digest IN {{{digest_ids}: Array(String)}}
+    GROUP BY digest
+    """
+
+
+def make_table_row_digests_query(
+    project_id: str,
+    digest: str,
+    pb: ParamBuilder,
+) -> str:
+    """Generate a query to fetch the row_digests array for a single table version.
+
+    Uses row_number() to deduplicate across ReplacingMergeTree parts.
+    """
+    project_id_name = pb.add_param(project_id)
+    digest_name = pb.add_param(digest)
+    return f"""
+    SELECT *
+    FROM (
+            SELECT *,
+                row_number() OVER (PARTITION BY project_id, digest) AS rn
+            FROM tables
+            WHERE project_id = {{{project_id_name}: String}} AND digest = {{{digest_name}: String}}
+        )
+    WHERE rn = 1
+    ORDER BY project_id, digest
+    """

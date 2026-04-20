@@ -69,6 +69,41 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     return inputs
 
 
+def google_genai_gemini_postprocess_output(output: Any) -> Any:
+    """Suppress the Google GenAI SDK warning about non-text parts and convert
+    inline image blobs to ``weave.Content`` objects before serialization.
+
+    During ``finish_call``, ``map_to_refs`` → ``pydantic_object_record`` →
+    ``getmembers`` iterates *all* attributes of the response (including the
+    ``.text`` computed property on ``GenerateContentResponse``).  When the
+    response contains non-text parts (e.g. inline_data images), that property
+    access emits a noisy ``logger.warning``.  Setting the SDK's internal
+    flag before serialization prevents the warning.
+
+    We also replace ``inline_data`` byte blobs with ``Content`` objects
+    in-place on the (mutable) Pydantic model so they render in the Weave UI.
+    The model is returned as-is so ``map_to_refs`` creates an ``ObjectRecord``
+    (which supports attribute access) rather than a plain dict.
+    """
+    import google.genai.types as genai_types
+
+    genai_types._response_text_non_text_warning_logged = True
+
+    # Replace inline_data blobs with Content objects in-place
+    try:
+        for candidate in output.candidates or []:
+            for part in (candidate.content and candidate.content.parts) or []:
+                inline = getattr(part, "inline_data", None)
+                if inline and inline.data and inline.mime_type:
+                    inline.data = Content.from_bytes(
+                        bytes(inline.data), mimetype=inline.mime_type
+                    )
+    except (AttributeError, TypeError):
+        pass
+
+    return output
+
+
 def google_genai_gemini_on_finish(
     call: Call, output: Any, exception: BaseException | None = None
 ) -> None:
@@ -77,27 +112,28 @@ def google_genai_gemini_on_finish(
     """
     if not (model_name := call.inputs.get("model")):
         raise ValueError("Unknown model type")
+    model_name = str(model_name)
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
-    if output:
-        call.output = _traverse_and_replace_blobs(dictify(output))
-        if hasattr(output, "usage_metadata"):
-            usage_data = {
-                "prompt_tokens": output.usage_metadata.prompt_token_count,
-                "completion_tokens": output.usage_metadata.candidates_token_count,
-                "total_tokens": output.usage_metadata.total_token_count,
-            }
-            # Include thoughts_tokens if available (for thinking models)
-            if output.usage_metadata.thoughts_token_count is not None:
-                usage_data["thoughts_tokens"] = (
-                    output.usage_metadata.thoughts_token_count
-                )
-            # Map Google's cached_content_token_count to canonical name
-            if output.usage_metadata.cached_content_token_count is not None:
-                usage_data["cache_read_input_tokens"] = (
-                    output.usage_metadata.cached_content_token_count
-                )
-            usage[model_name].update(usage_data)
+    if output and hasattr(output, "usage_metadata"):
+        usage_data = {
+            "prompt_tokens": output.usage_metadata.prompt_token_count,
+            "completion_tokens": output.usage_metadata.candidates_token_count,
+            "total_tokens": output.usage_metadata.total_token_count,
+        }
+        # Include thoughts_tokens if available (for thinking models)
+        thoughts_token_count = getattr(
+            output.usage_metadata, "thoughts_token_count", None
+        )
+        if thoughts_token_count is not None:
+            usage_data["thoughts_tokens"] = thoughts_token_count
+        # Map Google's cached_content_token_count to canonical name
+        cached_content_token_count = getattr(
+            output.usage_metadata, "cached_content_token_count", None
+        )
+        if cached_content_token_count is not None:
+            usage_data["cache_read_input_tokens"] = cached_content_token_count
+        usage[model_name].update(usage_data)
 
     if call.summary is not None:
         call.summary.update(summary_update)
@@ -118,6 +154,9 @@ def google_genai_gemini_accumulator(
         value_parts = value_candidate.content.parts or []
         for value_part in value_parts:
             if value_part.text is None:
+                # Preserve non-text parts (e.g. inline_data images) in the
+                # accumulated response instead of silently dropping them.
+                acc.candidates[i].content.parts.append(value_part)
                 continue
 
             # Check if this part is thinking content (thought=True)
@@ -127,7 +166,10 @@ def google_genai_gemini_accumulator(
             matched = False
             for acc_part in acc.candidates[i].content.parts:
                 acc_part_is_thought = getattr(acc_part, "thought", False)
-                if acc_part_is_thought == value_part_is_thought:
+                if (
+                    acc_part.text is not None
+                    and acc_part_is_thought == value_part_is_thought
+                ):
                     acc_part.text += value_part.text
                     matched = True
                     break
@@ -173,6 +215,7 @@ def google_genai_gemini_wrapper_sync(
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
 
         op = weave.op(fn, **op_kwargs)
+        op.postprocess_output = google_genai_gemini_postprocess_output
         if op.name not in SKIP_TRACING_FUNCTIONS:
             op._set_on_finish_handler(google_genai_gemini_on_finish)
         return _add_accumulator(
@@ -200,6 +243,7 @@ def google_genai_gemini_wrapper_async(
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
+        op.postprocess_output = google_genai_gemini_postprocess_output
         if op.name not in SKIP_TRACING_FUNCTIONS:
             op._set_on_finish_handler(google_genai_gemini_on_finish)
         return _add_accumulator(
