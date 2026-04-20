@@ -74,41 +74,6 @@ logger = logging.getLogger(__name__)
 QueryFn = Callable[[str, dict[str, Any]], "QueryResult"]
 
 
-def _rows_as_dicts(result: Any) -> list[dict[str, Any]]:
-    """Zip result_rows with column_names into row dicts."""
-    col_names = list(result.column_names) if result.column_names else []
-    return [dict(zip(col_names, row, strict=False)) for row in result.result_rows]
-
-
-def _first_cell_int(result: Any) -> int:
-    return safe_int(result.result_rows[0][0]) if result.result_rows else 0
-
-
-def _hydrate_group_row(
-    row: dict[str, Any], group_aliases: list[str]
-) -> AgentSpanGroupRow:
-    """Split a result row into (group_keys, aggregates) and build the response row."""
-    group_keys = {alias: row.get(alias) for alias in group_aliases}
-    return AgentSpanGroupRow(
-        group_keys=group_keys,
-        span_count=safe_int(row.get("span_count")),
-        turn_count=safe_int(row.get("turn_count")),
-        trace_count=safe_int(row.get("trace_count")),
-        conversation_count=safe_int(row.get("conversation_count")),
-        total_input_tokens=safe_int(row.get("total_input_tokens")),
-        total_output_tokens=safe_int(row.get("total_output_tokens")),
-        total_duration_ms=safe_int(row.get("total_duration_ms")),
-        error_count=safe_int(row.get("error_count")),
-        agent_names=unpack_string_array(row.get("agent_names")),
-        agent_versions=unpack_string_array(row.get("agent_versions")),
-        provider_names=unpack_string_array(row.get("provider_names")),
-        request_models=unpack_string_array(row.get("request_models")),
-        conversation_names=unpack_string_array(row.get("conversation_names")),
-        first_seen=row.get("first_seen"),
-        last_seen=row.get("last_seen"),
-    )
-
-
 class AgentQueryHandler:
     """Read-side query operations for the agent observability system.
 
@@ -394,3 +359,43 @@ class AgentWriteHandler:
             total_duration_ms=total_duration,
             turns=turns,
         )
+
+
+# ---------------------------------------------------------------------------
+# Private helpers
+# ---------------------------------------------------------------------------
+
+
+def _rows_as_dicts(result: Any) -> list[dict[str, Any]]:
+    """Zip result_rows with column_names into row dicts."""
+    col_names = list(result.column_names) if result.column_names else []
+    return [dict(zip(col_names, row, strict=False)) for row in result.result_rows]
+
+
+def _first_cell_int(result: Any) -> int:
+    return safe_int(result.result_rows[0][0]) if result.result_rows else 0
+
+
+def _hydrate_group_row(
+    row: dict[str, Any], group_aliases: list[str]
+) -> AgentSpanGroupRow:
+    """Split a result row into (group_keys, aggregates) and build the response row."""
+    group_keys = {alias: row.get(alias) for alias in group_aliases}
+    return AgentSpanGroupRow(
+        group_keys=group_keys,
+        span_count=safe_int(row.get("span_count")),
+        turn_count=safe_int(row.get("turn_count")),
+        trace_count=safe_int(row.get("trace_count")),
+        conversation_count=safe_int(row.get("conversation_count")),
+        total_input_tokens=safe_int(row.get("total_input_tokens")),
+        total_output_tokens=safe_int(row.get("total_output_tokens")),
+        total_duration_ms=safe_int(row.get("total_duration_ms")),
+        error_count=safe_int(row.get("error_count")),
+        agent_names=unpack_string_array(row.get("agent_names")),
+        agent_versions=unpack_string_array(row.get("agent_versions")),
+        provider_names=unpack_string_array(row.get("provider_names")),
+        request_models=unpack_string_array(row.get("request_models")),
+        conversation_names=unpack_string_array(row.get("conversation_names")),
+        first_seen=row.get("first_seen"),
+        last_seen=row.get("last_seen"),
+    )
