@@ -29,11 +29,13 @@ def with_retry(_func: Callable[P, R]) -> Callable[P, R]: ...
 def with_retry(
     *,
     retry_if: Callable[[BaseException], bool] | None = None,
+    wait: tenacity.wait.wait_base | None = None,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
 def with_retry(
     _func: Callable[P, R] | None = None,
     *,
     retry_if: Callable[[BaseException], bool] | None = None,
+    wait: tenacity.wait.wait_base | None = None,
 ) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator that applies configurable retry logic to a function.
     Retry configuration is determined by:
@@ -45,6 +47,10 @@ def with_retry(
     Pass `retry_if` to extend the default transport-error predicate with a
     caller-specific condition (e.g. retrying a 404 that looks like an
     eventual-consistency race on a write-then-read path).
+
+    Pass `wait` to override the default exponential-jitter wait strategy. The
+    override is resolved at decoration time, so callers that need the value to
+    track a mutable module constant should wrap `with_retry` themselves.
     """
 
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
@@ -61,7 +67,8 @@ def with_retry(
 
             retry = tenacity.Retrying(
                 stop=tenacity.stop_after_attempt(retry_max_attempts()),
-                wait=tenacity.wait_exponential_jitter(
+                wait=wait
+                or tenacity.wait_exponential_jitter(
                     initial=1, max=retry_max_interval()
                 ),
                 retry=tenacity.retry_if_exception(_should_retry),

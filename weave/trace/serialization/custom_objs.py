@@ -23,6 +23,7 @@ from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     TraceServerInterface,
 )
+from weave.trace_server_bindings.http_utils import retry_on_not_found
 
 logger = logging.getLogger(__name__)
 
@@ -136,8 +137,9 @@ def _load_custom_obj_files(
     project_id: str, server: TraceServerInterface, file_digests: dict
 ) -> dict[str, bytes]:
     loaded_files: dict[str, bytes] = {}
+    file_content_read = retry_on_not_found(server.file_content_read)
     for name, digest in file_digests.items():
-        file_response = server.file_content_read(
+        file_response = file_content_read(
             FileContentReadReq(project_id=project_id, digest=digest)
         )
         loaded_files[name] = file_response.content

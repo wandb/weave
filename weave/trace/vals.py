@@ -33,6 +33,7 @@ from weave.trace_server.trace_server_interface import (
     TableRowFilter,
     TraceServerInterface,
 )
+from weave.trace_server_bindings.http_utils import retry_on_not_found
 from weave.utils.iterators import ThreadSafeLazyList
 from weave.utils.project_id import to_project_id
 
@@ -801,7 +802,7 @@ def make_trace_obj(
         extra = val.extra
         try:
             project_id = to_project_id(val.entity, val.project)
-            read_res = server.obj_read(
+            read_res = retry_on_not_found(server.obj_read)(
                 ObjReadReq(
                     project_id=project_id,
                     object_id=val.name,

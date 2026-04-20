@@ -159,6 +159,7 @@ from weave.trace_server_bindings.http_utils import (
     ROW_COUNT_CHUNKING_THRESHOLD,
     check_endpoint_exists,
     retry_on_not_found,
+    write_then_read_scope,
 )
 from weave.trace_server_bindings.models import StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
@@ -454,25 +455,17 @@ class WeaveClient:
         ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
             raise TypeError(f"Expected ObjectRef, got {ref}")
-        # Write-then-read: absorb eventual-consistency 404s on the read-back.
-        return self.get(ref, _retry_on_missing=True)
+        # Write-then-read: absorb eventual-consistency 404s on the read-back
+        # and on any nested reads (custom-type files, nested refs) during
+        # deserialization within `get()`.
+        with write_then_read_scope():
+            return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get(
-        self,
-        ref: ObjectRef,
-        *,
-        objectify: bool = True,
-        _retry_on_missing: bool = False,
-    ) -> Any:
+    def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
         project_id = to_project_id(ref.entity, ref.project)
-        obj_read = (
-            retry_on_not_found(self.server.obj_read)
-            if _retry_on_missing
-            else self.server.obj_read
-        )
         try:
-            read_res = obj_read(
+            read_res = retry_on_not_found(self.server.obj_read)(
                 ObjReadReq(
                     project_id=project_id,
                     object_id=ref.name,

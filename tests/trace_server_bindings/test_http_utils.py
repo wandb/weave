@@ -5,11 +5,13 @@ from unittest.mock import Mock
 import httpx
 import pytest
 
+from weave.trace_server_bindings import http_utils
 from weave.trace_server_bindings.http_utils import (
     CallsCompleteModeRequired,
     handle_response_error,
     process_batch_with_retry,
     retry_on_not_found,
+    write_then_read_scope,
 )
 
 
@@ -64,10 +66,13 @@ def _make_404(body: dict) -> httpx.HTTPStatusError:
 
 
 def test_retry_on_not_found_behavior(monkeypatch):
-    """Retries on a non-deleted 404; skips deleted 404s (same error class)."""
+    """Retries a non-deleted 404 inside `write_then_read_scope`; pass-through outside.
+
+    `deleted_at` 404s are never retried (authoritative ObjectDeletedError).
+    """
     monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "2")
-    monkeypatch.setenv("WEAVE_RETRY_MAX_INTERVAL", "0.01")
-    calls = {"missing": 0, "deleted": 0}
+    monkeypatch.setattr(http_utils, "NOT_FOUND_RETRY_WAIT_SECONDS", 0.0)
+    calls = {"missing": 0, "deleted": 0, "unscoped": 0}
 
     @retry_on_not_found
     def flaky_missing():
@@ -81,9 +86,19 @@ def test_retry_on_not_found_behavior(monkeypatch):
         calls["deleted"] += 1
         raise _make_404({"reason": "deleted", "deleted_at": "2024-01-01T00:00:00Z"})
 
-    assert flaky_missing() == "ok"
+    @retry_on_not_found
+    def unscoped_missing():
+        calls["unscoped"] += 1
+        raise _make_404({"reason": "Obj foo:bar not found"})
+
+    with write_then_read_scope():
+        assert flaky_missing() == "ok"
     assert calls["missing"] == 2
 
-    with pytest.raises(httpx.HTTPStatusError):
+    with write_then_read_scope(), pytest.raises(httpx.HTTPStatusError):
         deleted()
     assert calls["deleted"] == 1
+
+    with pytest.raises(httpx.HTTPStatusError):
+        unscoped_missing()
+    assert calls["unscoped"] == 1
