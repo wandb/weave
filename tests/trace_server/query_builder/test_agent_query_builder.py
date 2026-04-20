@@ -162,6 +162,7 @@ class TestMakeSpansListQuery:
 #: appear after ``SELECT <group_cols>,``. Used to keep test expected SQL
 #: readable without duplicating the bundle across every test.
 _GROUPED_AGG_TAIL = """count() AS span_count,
+               countIf(s.operation_name = 'invoke_agent') AS turn_count,
                uniqExact(s.trace_id) AS trace_count,
                uniqExact(s.conversation_id) AS conversation_count,
                sum(s.input_tokens) AS total_input_tokens,
@@ -172,6 +173,7 @@ _GROUPED_AGG_TAIL = """count() AS span_count,
                groupUniqArray(s.agent_version) AS agent_versions,
                groupUniqArray(s.provider_name) AS provider_names,
                groupUniqArray(s.request_model) AS request_models,
+               groupUniqArray(s.conversation_name) AS conversation_names,
                min(s.started_at) AS first_seen,
                max(s.started_at) AS last_seen"""
 

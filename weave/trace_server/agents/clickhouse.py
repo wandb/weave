@@ -92,6 +92,7 @@ def _hydrate_group_row(
     return AgentSpanGroupRow(
         group_keys=group_keys,
         span_count=safe_int(row.get("span_count")),
+        turn_count=safe_int(row.get("turn_count")),
         trace_count=safe_int(row.get("trace_count")),
         conversation_count=safe_int(row.get("conversation_count")),
         total_input_tokens=safe_int(row.get("total_input_tokens")),
@@ -102,6 +103,7 @@ def _hydrate_group_row(
         agent_versions=unpack_string_array(row.get("agent_versions")),
         provider_names=unpack_string_array(row.get("provider_names")),
         request_models=unpack_string_array(row.get("request_models")),
+        conversation_names=unpack_string_array(row.get("conversation_names")),
         first_seen=row.get("first_seen"),
         last_seen=row.get("last_seen"),
     )

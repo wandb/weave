@@ -122,6 +122,7 @@ class AgentSpanGroupRow(BaseModel):
 
     group_keys: dict[str, str | int | float | None] = Field(default_factory=dict)
     span_count: int = 0
+    turn_count: int = 0  # countIf(operation_name = 'invoke_agent')
     trace_count: int = 0
     conversation_count: int = 0
     total_input_tokens: int = 0
@@ -132,6 +133,7 @@ class AgentSpanGroupRow(BaseModel):
     agent_versions: list[str] = Field(default_factory=list)
     provider_names: list[str] = Field(default_factory=list)
     request_models: list[str] = Field(default_factory=list)
+    conversation_names: list[str] = Field(default_factory=list)
     first_seen: datetime.datetime | None = None
     last_seen: datetime.datetime | None = None
 
