@@ -454,25 +454,16 @@ class WeaveClient:
         ref = self._save_object(val, name, branch)
         if not isinstance(ref, ObjectRef):
             raise TypeError(f"Expected ObjectRef, got {ref}")
-        # Write-then-read: absorb eventual-consistency 404s on the read-back.
-        return self.get(ref, _retry_on_missing=True)
+        return self.get(ref)
 
     @trace_sentry.global_trace_sentry.watch()
-    def get(
-        self,
-        ref: ObjectRef,
-        *,
-        objectify: bool = True,
-        _retry_on_missing: bool = False,
-    ) -> Any:
+    def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
         project_id = to_project_id(ref.entity, ref.project)
-        obj_read = (
-            retry_on_not_found(self.server.obj_read)
-            if _retry_on_missing
-            else self.server.obj_read
-        )
+        # Always retry on 404: the `publish(); ref.get()` pattern races against
+        # server-side eventual consistency, and the 250ms cost on a genuinely
+        # missing ref is not user-visible.
         try:
-            read_res = obj_read(
+            read_res = retry_on_not_found(self.server.obj_read)(
                 ObjReadReq(
                     project_id=project_id,
                     object_id=ref.name,
