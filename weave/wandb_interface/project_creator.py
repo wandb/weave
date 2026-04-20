@@ -45,9 +45,16 @@ def wandb_logging_disabled() -> Iterator[None]:
     wandb.termerror = original_termerror
 
 
-def ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]:
+def ensure_project_exists(
+    entity_name: str,
+    project_name: str,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> dict[str, str]:
     with wandb_logging_disabled():
-        return _ensure_project_exists(entity_name, project_name)
+        return _ensure_project_exists(
+            entity_name, project_name, api_key=api_key, base_url=base_url
+        )
 
 
 def _call_wandb_api_with_retry(
@@ -98,13 +105,18 @@ def _raise_project_access_error(
     raise exception
 
 
-def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]:
+def _ensure_project_exists(
+    entity_name: str,
+    project_name: str,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> dict[str, str]:
     """Ensures that a W&B project exists by trying to access it, returns the project_name,
     which is not guaranteed to be the same if the provided project_name contains invalid
     characters. Adheres to trace_server_interface.EnsureProjectExistsRes.
     """
     wandb_logging_disabled()
-    api = wandb.Api()
+    api = wandb.Api(api_key=api_key, base_url=base_url)
 
     # Check if the project already exists
     project_exception = None

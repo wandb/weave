@@ -23,6 +23,7 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
+from weave.wandb_interface.context import get_wandb_api_context
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +31,19 @@ logger = logging.getLogger(__name__)
 class WeaveWandbAuthenticationException(Exception): ...
 
 
-def get_username() -> str | None:
-    api = wandb.Api()
+def get_username(api_key: str | None = None, base_url: str | None = None) -> str | None:
+    api = wandb.Api(api_key=api_key, base_url=base_url)
     try:
         return api.username()
     except AttributeError:
         return None
 
 
-def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
+def get_entity_project_from_project_name(
+    project_name: str,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> tuple[str, str]:
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
@@ -48,7 +53,7 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
         entity_name = os.environ.get("WANDB_ENTITY")
         if entity_name is None:
             # Fall back to wandb default entity
-            api = wandb.Api()
+            api = wandb.Api(api_key=api_key, base_url=base_url)
             entity_name = api.default_entity_name()
             if entity_name is None:
                 raise WeaveWandbAuthenticationException(
@@ -69,16 +74,6 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     return entity_name, project_name
 
 
-"""
-This is the main entrypoint for the weave library. It initializes the weave client
-and sets up the global state for the weave library.
-
-Args:
-    project_name (str): The project name to use for the weave client.
-    ensure_project_exists (bool): If True (default), the client will attempt to create the project if it does not exist.
-"""
-
-
 def _weave_is_available(server: TraceServerClientInterface) -> bool:
     try:
         server.server_info()
@@ -95,40 +90,83 @@ def _weave_is_available(server: TraceServerClientInterface) -> bool:
 def init_weave(
     project_name: str,
     ensure_project_exists: bool = True,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    trace_server_url: str | None = None,
 ) -> weave_client.WeaveClient:
+    """Initialize the weave client and set up global state.
+
+    Args:
+        project_name: The project name to use for the weave client.
+        ensure_project_exists: If True (default), the client will attempt to
+            create the project if it does not exist.
+        api_key: Optional W&B API key. If provided, skips env var / netrc /
+            wandb.login() auth flow.
+        base_url: Optional W&B platform API URL (replaces WANDB_BASE_URL).
+            The trace server URL is derived from this if trace_server_url
+            is not provided.
+        trace_server_url: Optional trace server URL (replaces
+            WF_TRACE_SERVER_URL). If omitted, derived from base_url.
+    """
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
-        # TODO: Prob should move into settings
-        if (
+        # Reuse the existing client when every caller-supplied parameter
+        # matches.  When api_key is None the value comes from the
+        # environment which may have changed, so we only reuse when an
+        # explicit api_key was provided and all params match.
+        params_match = (
             current_client.project == project_name
             and current_client.ensure_project_exists == ensure_project_exists
-        ):
+            and current_client.init_api_key == api_key
+            and current_client.init_base_url == base_url
+            and current_client.init_trace_server_url == trace_server_url
+        )
+        if api_key is not None and params_match:
             return current_client
-        else:
-            # Flush any pending calls before switching to a new project
-            current_client.finish()
-            weave_client_context.set_weave_client_global(None)
+        # Flush any pending calls before switching to a new client
+        current_client.finish()
+        weave_client_context.set_weave_client_global(None)
 
-    from weave.wandb_interface.context import get_wandb_api_context
-
-    api_key = get_wandb_api_context()
-    if api_key is None:
-        url = wandb.app_url(env.wandb_base_url())
-        logger.info("Please login to Weights & Biases (%s) to continue...", url)
-        wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
-        api_key = get_wandb_api_context()
+    # Resolve credentials — use separate locals so the raw api_key/base_url/
+    # trace_server_url params stay available for storing on the client.
+    resolved_api_key = api_key
+    if resolved_api_key is None:
+        resolved_api_key = get_wandb_api_context()
+        if resolved_api_key is None:
+            effective_base_url = (
+                base_url if base_url is not None else env.wandb_base_url()
+            )
+            url = wandb.app_url(effective_base_url)
+            logger.info("Please login to Weights & Biases (%s) to continue...", url)
+            wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
+            resolved_api_key = get_wandb_api_context()
 
     # Resolve entity name after authentication is ensured
-    entity_name, project_name = get_entity_project_from_project_name(project_name)
+    entity_name, project_name = get_entity_project_from_project_name(
+        project_name, api_key=resolved_api_key, base_url=base_url
+    )
     wb_run_context = get_global_wb_run_context()
     if wb_run_context:
         wandb_run_id = f"{entity_name}/{project_name}/{wb_run_context.run_id}"
         check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
-    remote_server = init_weave_get_server(api_key)
+    # Derive trace_server_url from base_url when not explicitly provided,
+    # honoring the documented contract: "The trace server URL is derived from
+    # this if trace_server_url is not provided."
+    resolved_trace_server_url = trace_server_url
+    if resolved_trace_server_url is None and base_url is not None:
+        normalized = base_url.rstrip("/")
+        if normalized == "https://api.wandb.ai":
+            resolved_trace_server_url = env.MTSAAS_TRACE_URL
+        else:
+            resolved_trace_server_url = normalized + "/traces"
+
+    remote_server = init_weave_get_server(
+        resolved_api_key, trace_server_url=resolved_trace_server_url
+    )
     if not _weave_is_available(remote_server):
         raise RuntimeError(
             "Weave is not available on the server.  Please contact support."
@@ -138,7 +176,15 @@ def init_weave(
         server = CachingMiddlewareTraceServer.from_env(server)
 
     client = weave_client.WeaveClient(
-        entity_name, project_name, server, ensure_project_exists
+        entity_name,
+        project_name,
+        server,
+        ensure_project_exists,
+        api_key=resolved_api_key,
+        base_url=base_url,
+        init_api_key=api_key,
+        init_base_url=base_url,
+        init_trace_server_url=trace_server_url,
     )
 
     # If the project name was formatted by init, update the project name
@@ -154,7 +200,7 @@ def init_weave(
     implicit_patch()
     register_import_hook()
 
-    username = get_username()
+    username = get_username(api_key=resolved_api_key, base_url=base_url)
 
     # This is a temporary event to track the number of users who have enabled PII redaction.
     if should_redact_pii():
@@ -173,17 +219,27 @@ def init_weave(
         # In the future, we may want to throw here.
         min_required_version = "0.0.0"
         trace_server_version = None
-    trace_server_url = env.weave_trace_server_url()
-    if not init_message.check_min_weave_version(min_required_version, trace_server_url):
+    effective_trace_server_url = (
+        resolved_trace_server_url
+        if resolved_trace_server_url is not None
+        else env.weave_trace_server_url()
+    )
+    if not init_message.check_min_weave_version(
+        min_required_version, effective_trace_server_url
+    ):
         return init_weave_disabled()
     if not init_message.check_min_trace_server_version(
         trace_server_version,
         MIN_TRACE_SERVER_VERSION,
-        trace_server_url,
+        effective_trace_server_url,
     ):
         return init_weave_disabled()
     init_message.print_init_message(
-        username, entity_name, project_name, read_only=not ensure_project_exists
+        username,
+        entity_name,
+        project_name,
+        read_only=not ensure_project_exists,
+        base_url=base_url,
     )
 
     user_context = {"username": username} if username else None
@@ -227,9 +283,19 @@ def init_weave_disabled() -> weave_client.WeaveClient:
 def init_weave_get_server(
     api_key: str | None = None,
     should_batch: bool = True,
+    trace_server_url: str | None = None,
 ) -> TraceServerClientInterface:
     res: TraceServerClientInterface
-    if should_use_stainless_server():
+    if trace_server_url is not None:
+        if should_use_stainless_server():
+            from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+                StainlessRemoteHTTPTraceServer,
+            )
+
+            res = StainlessRemoteHTTPTraceServer(trace_server_url, should_batch)  # type: ignore[abstract]  # pyright: ignore[reportAbstractUsage]
+        else:
+            res = RemoteHTTPTraceServer(trace_server_url, should_batch)  # type: ignore[abstract]  # pyright: ignore[reportAbstractUsage]
+    elif should_use_stainless_server():
         from weave.trace_server_bindings.stainless_remote_http_trace_server import (
             StainlessRemoteHTTPTraceServer,
         )

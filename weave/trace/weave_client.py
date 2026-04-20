@@ -29,7 +29,7 @@ from weave.shared.digest import (
     compute_table_digest,
 )
 from weave.telemetry import trace_sentry
-from weave.trace import settings
+from weave.trace import env, settings
 from weave.trace.call import (
     DEFAULT_CALLS_PAGE_SIZE,
     Call,
@@ -165,6 +165,7 @@ from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
 from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
+from weave.wandb_interface.context import get_wandb_api_context
 
 if TYPE_CHECKING:
     from weave.evaluation.eval import Evaluation
@@ -347,6 +348,11 @@ class WeaveClient:
         project: The project name.
         server: The server to use for communication.
         ensure_project_exists: Whether to ensure the project exists on the server.
+        api_key: Resolved API key for downstream use.
+        base_url: Resolved base URL for downstream use.
+        init_api_key: Raw caller-supplied API key (for client reuse checks).
+        init_base_url: Raw caller-supplied base URL (for client reuse checks).
+        init_trace_server_url: Raw caller-supplied trace server URL (for client reuse checks).
     """
 
     def __init__(
@@ -355,10 +361,27 @@ class WeaveClient:
         project: str,
         server: TraceServerClientInterface,
         ensure_project_exists: bool = True,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        init_api_key: str | None = None,
+        init_base_url: str | None = None,
+        init_trace_server_url: str | None = None,
     ):
         self.entity = entity
         self.project = project
         self.server = server
+        # Raw caller-supplied values (before env resolution) for client reuse
+        # decisions in init_weave.
+        self.init_api_key = init_api_key
+        self.init_base_url = init_base_url
+        self.init_trace_server_url = init_trace_server_url
+        # Eagerly resolve credentials so downstream consumers never need
+        # fallback logic.  When the caller provides an explicit value we
+        # use it; otherwise we snapshot the current env / netrc value once.
+        self._api_key: str | None = (
+            api_key if api_key is not None else get_wandb_api_context()
+        )
+        self._base_url: str = base_url if base_url is not None else env.wandb_base_url()
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
         self.project_id_resolver = ProjectIdResolver(server)
@@ -368,7 +391,9 @@ class WeaveClient:
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
-            resp = self.server.ensure_project_exists(entity, project)
+            resp = self.server.ensure_project_exists(
+                entity, project, api_key=self._api_key, base_url=self._base_url
+            )
             # Set Client project name with updated project name
             self.project = resp.project_name
 
@@ -419,7 +444,7 @@ class WeaveClient:
             self._wal_pending_call_ids.discard(call_id)
             project_id = start.get("project_id", "")
             entity, project = from_project_id(project_id)
-            url = redirect_call(entity, project, call_id)
+            url = redirect_call(entity, project, call_id, base_url=self._base_url)
             logger.info("%s %s", TRACE_CALL_EMOJI, url)
         except Exception:
             pass
@@ -672,6 +697,7 @@ class WeaveClient:
             expand_columns=expand_columns,
             return_expanded_column_values=return_expanded_column_values,
             page_size=page_size,
+            base_url=self._base_url,
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -709,7 +735,13 @@ class WeaveClient:
         if not calls:
             raise ValueError(f"Call not found: {call_id}")
         response_call = calls[0]
-        return make_client_call(self.entity, self.project, response_call, self.server)
+        return make_client_call(
+            self.entity,
+            self.project,
+            response_call,
+            self.server,
+            base_url=self._base_url,
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
@@ -823,6 +855,7 @@ class WeaveClient:
             attributes=attributes_dict,
             thread_id=thread_id,
             turn_id=turn_id,
+            _base_url=self._base_url,
         )
         # Disallow further modification of attributes after the call is created
         attributes_dict.freeze()

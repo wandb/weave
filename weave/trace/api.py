@@ -47,6 +47,9 @@ def init(
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    trace_server_url: str | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -109,6 +112,16 @@ def init(
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
+        api_key: Optional W&B API key. If provided, skips all environment-based
+            authentication (WANDB_API_KEY, ~/.netrc, wandb.login()). The key is also
+            used for entity resolution, so no environment variables are needed.
+        base_url: Optional W&B platform API URL (replaces WANDB_BASE_URL). Used for
+            entity resolution and authentication. If not provided, the trace server URL
+            is derived from this automatically. Example: "https://api.wandb.ai".
+        trace_server_url: Optional trace server URL (replaces WF_TRACE_SERVER_URL).
+            Where trace data is sent. If omitted, derived from base_url. Only needed
+            when the trace server is on a different host than the platform API.
+            Example: "https://trace.wandb.ai".
 
     NOTE: Global postprocessing settings are applied to all ops after each op's own
     postprocessing.  The order is always:
@@ -152,6 +165,9 @@ def init(
 
     return weave_init.init_weave(
         project_name,
+        api_key=api_key,
+        base_url=base_url,
+        trace_server_url=trace_server_url,
     )
 
 
@@ -205,18 +221,21 @@ def publish(
             client.add_tags(ref, tags)
         if aliases:
             client.set_aliases(ref, aliases)
+        client_base_url = client._base_url
         if isinstance(ref, weave_client.OpRef):
             url = urls.op_version_path(
                 ref.entity,
                 ref.project,
                 ref.name,
                 ref.digest,
+                base_url=client_base_url,
             )
         elif isinstance(obj, leaderboard.Leaderboard):
             url = urls.leaderboard_path(
                 ref.entity,
                 ref.project,
                 ref.name,
+                base_url=client_base_url,
             )
         # TODO(gst): once frontend has direct dataset/model links
         # elif isinstance(obj, weave_client.Dataset):
@@ -226,6 +245,7 @@ def publish(
                 ref.project,
                 ref.name,
                 ref.digest,
+                base_url=client_base_url,
             )
         # Ensure logger level is up to date before logging
         update_logger_level()
@@ -562,13 +582,11 @@ def finish() -> None:
     Following finish, calls of weave.op decorated functions will no longer be logged. You will need to run weave.init() again to resume logging.
 
     """
-    # Capture client before teardown so we can still flush outstanding work.
     wc = weave_client_context.get_weave_client()
-    weave_init.finish()
-
-    # Flush any remaining calls
     if wc is not None:
         wc.finish()
+
+    weave_init.finish()
 
 
 __all__ = [
