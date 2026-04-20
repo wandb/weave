@@ -7,8 +7,6 @@ from typing import Any, Optional
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 
-from weave.trace_server.validation_util import CHValidationError
-
 # =============================================================================
 # Error Codes - Machine-readable codes for client-side error detection
 # =============================================================================
@@ -123,6 +121,17 @@ class InvalidFieldError(Error):
 
 class NotFoundError(Error):
     """Raised when a general not found error occurs."""
+
+    pass
+
+
+class CHValidationError(Exception):
+    """Raised when a ClickHouse-bound value fails validation (IDs, refs, base64, length).
+
+    Defined here so that ``errors.py`` is self-contained and has no dependency on
+    server-side validation helpers; ``validation_util.py`` re-exports it for
+    backwards compatibility.
+    """
 
     pass
 

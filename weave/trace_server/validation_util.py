@@ -2,15 +2,24 @@ import base64
 import uuid
 
 from weave.shared import refs_internal
+from weave.trace_server.errors import CHValidationError
+
+__all__ = [
+    "OTEL_SPAN_ID_HEX_LENGTH",
+    "OTEL_TRACE_ID_HEX_LENGTH",
+    "CHValidationError",
+    "require_base64",
+    "require_internal_ref_uri",
+    "require_max_str_len",
+    "require_otel_span_id",
+    "require_otel_trace_id",
+    "require_uuid",
+]
 
 # OTel trace ID: 16 bytes encoded as 32 hex characters
 OTEL_TRACE_ID_HEX_LENGTH = 32
 # OTel span ID: 8 bytes encoded as 16 hex characters
 OTEL_SPAN_ID_HEX_LENGTH = 16
-
-
-class CHValidationError(Exception):
-    pass
 
 
 def require_otel_trace_id(s: str) -> str:
