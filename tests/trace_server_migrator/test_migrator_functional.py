@@ -172,8 +172,14 @@ def test_replicated_creates_replicated_db_and_tables(ch_client):
     )
 
 
-def test_distributed_fresh_creates_atomic_management_db(ch_client):
-    """New deployment: management DB is Atomic with explicit shared ReplicatedMergeTree."""
+def test_distributed_fresh_creates_atomic_dbs(ch_client):
+    """New deployment: both management DB and data DB are Atomic + ON CLUSTER.
+
+    Atomic + ON CLUSTER is the only shape that fans out across every shard
+    without racing the Replicated DB engine's own DDL propagation. Tables
+    inside Atomic DBs get explicit ReplicatedMergeTree with per-shard ZK
+    paths so data still replicates within each shard.
+    """
     mgmt_db = _unique_name("db_mgmt_dist")
     target_db = _unique_name("test_dist")
     ch_client.track_db(mgmt_db)
@@ -197,7 +203,7 @@ def test_distributed_fresh_creates_atomic_management_db(ch_client):
     assert mgmt_engine.startswith("ReplicatedMergeTree")
     assert "/shared/" in mgmt_engine
 
-    assert _get_db_engine(ch_client, target_db) == "Replicated"
+    assert _get_db_engine(ch_client, target_db) == "Atomic"
     assert _table_exists(ch_client, target_db, "test_tbl_local")
     assert _get_table_engine_full(ch_client, target_db, "test_tbl_local").startswith(
         "ReplicatedMergeTree"
@@ -238,7 +244,10 @@ def test_distributed_legacy_replicated_management_db(ch_client):
 
     migrator.apply_migrations(target_db)
 
-    assert _get_db_engine(ch_client, target_db) == "Replicated"
+    # target_db is freshly created by the migrator, which now uses Atomic +
+    # ON CLUSTER for every DB in distributed mode. The legacy Replicated
+    # management DB keeps its engine via IF NOT EXISTS.
+    assert _get_db_engine(ch_client, target_db) == "Atomic"
     assert _table_exists(ch_client, target_db, "test_tbl_local")
     assert _get_table_engine_full(ch_client, target_db, "test_tbl_local").startswith(
         "ReplicatedMergeTree"
@@ -296,12 +305,12 @@ def test_all_production_migrations_distributed(ch_client):
     migrator.apply_migrations(target_db)
 
     assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
-    assert _get_db_engine(ch_client, target_db) == "Replicated"
+    assert _get_db_engine(ch_client, target_db) == "Atomic"
     # Distributed mode uses ON CLUSTER to fan DBs to every shard/replica.
     # If the fan-out is broken (e.g. the pre-#6659 ON CLUSTER + Replicated
     # collision), peer replicas never receive the CREATE DATABASE.
     _assert_db_on_every_replica(ch_client, mgmt_db, expected_engine="Atomic")
-    _assert_db_on_every_replica(ch_client, target_db, expected_engine="Replicated")
+    _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
 
 
 def test_all_production_down_migrations_replicated(ch_client):
@@ -354,7 +363,7 @@ def test_all_production_down_migrations_distributed(ch_client):
     # Migrate up to latest
     migrator.apply_migrations(target_db)
     assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
-    assert _get_db_engine(ch_client, target_db) == "Replicated"
+    assert _get_db_engine(ch_client, target_db) == "Atomic"
 
     # ALTER TABLE UPDATE mutations are async; wait for them to settle
     _sync_mutations(ch_client, mgmt_db, "migrations")

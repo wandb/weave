@@ -805,19 +805,33 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
     def _create_db_sql(self, db_name: str) -> str:
         """Generate SQL to create a database in distributed mode.
 
-        The management database uses ENGINE = Atomic (not Replicated) so that the
-        migrations table can use explicit ReplicatedMergeTree with a shared ZK path
-        across all shards. Data databases still use ENGINE = Replicated.
+        All databases (management and data) use ENGINE = Atomic + ON CLUSTER.
+
+        The Replicated DB engine only auto-syncs within a single replication
+        group (same ``{shard}`` value), so it cannot fan a CREATE DATABASE
+        out across shards on its own. ON CLUSTER fans across every shard and
+        replica in the cluster, and Atomic — unlike Replicated — does not
+        also try to replicate DDL itself, so there is no collision between
+        the two mechanisms (the bug that deadlocks CH 25.10 with Replicated
+        + ON CLUSTER).
+
+        Tables inside Atomic databases are rewritten to explicit
+        ReplicatedMergeTree engines with per-shard ZK paths by
+        ``_format_replicated_sql_distributed``, so data still replicates
+        correctly within each shard.
+
+        Legacy deployments that already have ENGINE = Replicated data
+        databases stay Replicated (IF NOT EXISTS is a no-op). Engine
+        discovery caches the real engine; the DDL path branches on that
+        cache, so both shapes continue to work.
         """
-        if db_name == self.management_db:
-            if not self._is_safe_identifier(db_name):
-                raise MigrationError(f"Invalid database name: {db_name}")
-            return (
-                f"CREATE DATABASE IF NOT EXISTS {db_name}"
-                f" ON CLUSTER {self.replicated_cluster}"
-                f" ENGINE = Atomic"
-            )
-        return super()._create_db_sql(db_name)
+        if not self._is_safe_identifier(db_name):
+            raise MigrationError(f"Invalid database name: {db_name}")
+        return (
+            f"CREATE DATABASE IF NOT EXISTS {db_name}"
+            f" ON CLUSTER {self.replicated_cluster}"
+            f" ENGINE = Atomic"
+        )
 
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in distributed mode.

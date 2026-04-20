@@ -330,6 +330,26 @@ def test_create_db_sql(mock_costs):
             migration_dir=DEFAULT_MIGRATION_DIR,
         )
 
+    # Test distributed mode — uses ENGINE = Atomic + ON CLUSTER for both the
+    # management DB and data DBs. Atomic doesn't self-replicate DDL, so
+    # ON CLUSTER is the sole fan-out mechanism (no collision like Replicated
+    # + ON CLUSTER) and it reaches every shard in the cluster, which is
+    # required for multi-shard deployments.
+    distributed_migrator = DistributedClickHouseTraceServerMigrator(
+        _make_ch_client(),
+        replicated_cluster="test_cluster",
+        migration_dir=DEFAULT_MIGRATION_DIR,
+    )
+    mgmt_sql = distributed_migrator._create_db_sql(distributed_migrator.management_db)
+    assert mgmt_sql.strip() == (
+        f"CREATE DATABASE IF NOT EXISTS {distributed_migrator.management_db}"
+        " ON CLUSTER test_cluster ENGINE = Atomic"
+    )
+    data_sql = distributed_migrator._create_db_sql("test_db")
+    assert data_sql.strip() == (
+        "CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster ENGINE = Atomic"
+    )
+
 
 def test_engine_discovery_init_behavior():
     """Cloud mode skips system.databases; replicated mode queries it and is configurable."""
