@@ -20,22 +20,33 @@ ROW_DIGEST_SQL_TEMPLATE = """CASE
     ELSE hex(SHA256(JSONExtractRaw({inputs_field}, 'example')))
 END"""
 
-PREDICT_AND_SCORE_OP_PREFIX = "Evaluation.predict_and_score"
+
+def _or_any_prefix_matches(op_name_expr: str, op_prefix_params: list[str]) -> str:
+    """`position(op_name, p) > 0` OR'd across every prefix param."""
+    return " OR ".join(
+        f"position({op_name_expr}, {p}) > 0" for p in op_prefix_params
+    )
 
 
 def build_predict_and_score_calls_cte(
     project_id_param: str,
     eval_root_ids_param: str,
-    op_prefix_param: str,
+    op_prefix_params: list[str],
     inputs_field: str,
     read_table: str,
 ) -> str:
     """Build the predict_and_score_calls CTE SQL.
 
     Filters to predict-and-score calls that are direct children of eval roots
-    and extracts row_digest from inputs.
+    and extracts row_digest from inputs. ``op_prefix_params`` must contain
+    every known op-name variant (Python/TS imperative snake_case, TS
+    non-imperative camelCase); a call matches if any prefix appears in op_name.
     """
     row_digest_expr = ROW_DIGEST_SQL_TEMPLATE.format(inputs_field=inputs_field)
+    op_match_where = _or_any_prefix_matches("calls_merged.op_name", op_prefix_params)
+    op_match_having = _or_any_prefix_matches(
+        "any(calls_merged.op_name)", op_prefix_params
+    )
 
     if read_table == "calls_merged":
         return f"""predict_and_score_calls AS (
@@ -54,14 +65,17 @@ def build_predict_and_score_calls_cte(
     )
     AND calls_merged.id NOT IN {eval_root_ids_param}
     AND (
-        position(calls_merged.op_name, {op_prefix_param}) > 0
+        {op_match_where}
         OR calls_merged.op_name IS NULL
     )
     GROUP BY (calls_merged.project_id, calls_merged.id)
     HAVING any(calls_merged.parent_id) IN {eval_root_ids_param}
-        AND position(any(calls_merged.op_name), {op_prefix_param}) > 0
+        AND ({op_match_having})
 )"""
     else:
+        op_match_calls_complete = _or_any_prefix_matches(
+            "calls_complete.op_name", op_prefix_params
+        )
         return f"""predict_and_score_calls AS (
     SELECT
         calls_complete.id AS call_id,
@@ -74,7 +88,7 @@ def build_predict_and_score_calls_cte(
     PREWHERE calls_complete.project_id = {project_id_param}
     WHERE calls_complete.parent_id IN {eval_root_ids_param}
       AND calls_complete.id NOT IN {eval_root_ids_param}
-      AND position(calls_complete.op_name, {op_prefix_param}) > 0
+      AND ({op_match_calls_complete})
 )"""
 
 

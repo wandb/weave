@@ -766,7 +766,14 @@ def test_eval_results_resolved_inputs_inline(client):
     assert row.raw_data_row["question"] == "What is 2+2?"
 
 
-def test_eval_results_dataset_backed_no_resolve(client):
+@pytest.mark.parametrize(
+    "predict_and_score_op_name",
+    [
+        "Evaluation.predict_and_score",
+        "Evaluation.predictAndScore",  # ts-sdk camelCase variant
+    ],
+)
+def test_eval_results_dataset_backed_no_resolve(client, predict_and_score_op_name):
     """Dataset-backed inputs should remain as ref strings when resolve_row_refs=False."""
     project_id = client.project_id
 
@@ -795,7 +802,7 @@ def test_eval_results_dataset_backed_no_resolve(client):
                 id=predict_and_score_id,
                 trace_id=run.evaluation_run_id,
                 parent_id=run.evaluation_run_id,
-                op_name="Evaluation.predict_and_score",
+                op_name=predict_and_score_op_name,
                 started_at=datetime.datetime.now(tz=datetime.timezone.utc),
                 attributes={},
                 inputs={"example": ref_str, "model": "model://no-resolve"},

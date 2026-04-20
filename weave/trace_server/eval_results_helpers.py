@@ -89,8 +89,9 @@ def filter_predict_and_score_calls(
         call
         for call in calls
         if call.parent_id in eval_root_set
-        and tsc.op_name_matches(
-            call.op_name, constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME
+        and any(
+            tsc.op_name_matches(call.op_name, variant)
+            for variant in constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES
         )
     ]
 
