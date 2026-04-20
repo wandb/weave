@@ -1,16 +1,21 @@
 import base64
+import logging
 import time
 from collections.abc import Callable
+from contextlib import contextmanager
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
 )
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server.service_interface import (
     ProjectsInfoReq,
     ProjectsInfoRes,
+)
+
+_clickhouse_logger = logging.getLogger(
+    "weave.trace_server.clickhouse_trace_server_batched"
 )
 
 
@@ -217,24 +222,29 @@ class EventuallyConsistentUserInjectingExternalTraceServer(
     _settle_timeout_s = 2.0
     _settle_poll_interval_s = 0.05
 
-    def _should_settle(self) -> bool:
-        return isinstance(self._internal_trace_server, ClickHouseTraceServer)
+    @contextmanager
+    def _mute_clickhouse_query_logs(self):
+        previous_level = _clickhouse_logger.level
+        _clickhouse_logger.setLevel(logging.WARNING)
+        try:
+            yield
+        finally:
+            _clickhouse_logger.setLevel(previous_level)
 
     def _wait_until(self, check: Callable[[], bool]) -> None:
-        if not self._should_settle():
-            return
-
         deadline = time.monotonic() + self._settle_timeout_s
         while time.monotonic() < deadline:
             try:
-                if check():
-                    return
+                with self._mute_clickhouse_query_logs():
+                    if check():
+                        return
             except (NotFoundError, ObjectDeletedError):
                 pass
             time.sleep(self._settle_poll_interval_s)
 
         try:
-            check()
+            with self._mute_clickhouse_query_logs():
+                check()
         except (NotFoundError, ObjectDeletedError):
             pass
 
