@@ -275,7 +275,6 @@ jobs:
         env:
           CI: 1
           WF_CLICKHOUSE_KEEPER_PORT: 8130
-          WF_CLICKHOUSE_TOPOLOGY: 1s1r
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server_migrator')"
@@ -327,14 +326,11 @@ jobs:
           CI: 1
           # Existing fixture reads WF_CLICKHOUSE_KEEPER_PORT and connects
           # to localhost at that port — we map the 1s3r entrypoint to 8130.
-          WF_CLICKHOUSE_KEEPER_PORT: 8130
-          # Topology marker read by tests/trace_server_migrator/conftest.py
-          # hook that skips @pytest.mark.topology-gated tests. Other
-          # WF_CLICKHOUSE_* vars are intentionally NOT set here: the
+          # Other WF_CLICKHOUSE_* vars are intentionally NOT set: the
           # existing migrator tests pass replicated/distributed flags
           # explicitly to the migrator factory, so env vars would be
-          # misleading (unread) documentation.
-          WF_CLICKHOUSE_TOPOLOGY: 1s3r
+          # unread documentation.
+          WF_CLICKHOUSE_KEEPER_PORT: 8130
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server_migrator')"
@@ -397,10 +393,8 @@ jobs:
         env:
           CI: 1
           # 2s2r entrypoint is on host port 8131 (1s3r uses 8130).
+          # See 1s3r job for why only KEEPER_PORT is set.
           WF_CLICKHOUSE_KEEPER_PORT: 8131
-          # See 1s3r job for why only TOPOLOGY is set; other
-          # WF_CLICKHOUSE_* vars would be unread today.
-          WF_CLICKHOUSE_TOPOLOGY: 2s2r
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server_migrator')"
