@@ -15,7 +15,7 @@ else:
         ResourceSpans = Any
 
 from weave.trace_server import http_service_interface as his
-from weave.trace_server.agents.types import *  # noqa: F403
+from weave.trace_server.agents import types as agent_types  # noqa: F401
 from weave.trace_server.common_interface import (
     WB_USER_ID_DESCRIPTION,
     AnnotationState,
