@@ -65,6 +65,60 @@ def _table_exists(ch_client, db_name: str, table_name: str) -> bool:
     return result.result_rows[0][0] > 0
 
 
+def _cluster_replica_count(ch_client) -> int:
+    """Return the number of replicas in the test cluster."""
+    result = ch_client.query(
+        f"SELECT count() FROM system.clusters WHERE cluster = '{_CLUSTER}'"
+    )
+    return int(result.result_rows[0][0])
+
+
+def _db_engines_across_cluster(ch_client, db_name: str) -> dict[str, str]:
+    """{host: engine} for db_name across every replica in the cluster.
+
+    Uses clusterAllReplicas so this works through a single HTTP entrypoint
+    on multi-replica topologies (1s3r / 2s2r) where only one CH node
+    exposes a host port. On a single-node local fallback, returns a
+    one-entry dict.
+
+    A DB missing from a replica shows up as that host being absent from
+    the returned dict — which is exactly the silent-misconfig failure
+    mode from the pre-#6659 ON CLUSTER + ENGINE = Replicated bug on
+    CH <= 25.3 (peer replicas never got the DB; migrator saw success
+    because pod 0 had it).
+    """
+    result = ch_client.query(
+        f"SELECT hostName(), engine FROM clusterAllReplicas('{_CLUSTER}', system.databases) "
+        f"WHERE name = '{db_name}'"
+    )
+    return {row[0]: row[1] for row in result.result_rows}
+
+
+def _assert_db_on_every_replica(
+    ch_client, db_name: str, expected_engine: str | None = None
+) -> None:
+    """Fail if the DB is missing from any replica or has an inconsistent engine.
+
+    Pass expected_engine to pin the engine; leave it None to only check
+    that every replica reports the same engine.
+    """
+    engines = _db_engines_across_cluster(ch_client, db_name)
+    expected_count = _cluster_replica_count(ch_client)
+    assert len(engines) == expected_count, (
+        f"{db_name} missing from {expected_count - len(engines)} replica(s). "
+        f"Got: {engines}"
+    )
+    distinct = set(engines.values())
+    assert len(distinct) == 1, (
+        f"{db_name} engine inconsistent across replicas: {engines}"
+    )
+    if expected_engine is not None:
+        (actual,) = distinct
+        assert actual == expected_engine, (
+            f"{db_name} engine = {actual!r}, expected {expected_engine!r}"
+        )
+
+
 def test_cloud_creates_db_and_tables(ch_client):
     mgmt_db = _unique_name("db_mgmt_cloud")
     target_db = _unique_name("test_cloud")
@@ -214,6 +268,12 @@ def test_all_production_migrations_replicated(ch_client):
     migrator.apply_migrations(target_db)
 
     assert _get_db_engine(ch_client, target_db) == "Replicated"
+    # On multi-replica topologies (1s3r / 2s2r in CI), the DB must exist on
+    # every replica with a consistent engine. A silent-misconfig bug like
+    # the pre-#6659 ON CLUSTER + ENGINE = Replicated collision would leave
+    # the DB on only the migrator's entrypoint pod — this assertion is the
+    # observable signal for that class of failure.
+    _assert_db_on_every_replica(ch_client, target_db, expected_engine="Replicated")
 
 
 def test_all_production_migrations_distributed(ch_client):
@@ -237,6 +297,11 @@ def test_all_production_migrations_distributed(ch_client):
 
     assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
     assert _get_db_engine(ch_client, target_db) == "Replicated"
+    # Distributed mode uses ON CLUSTER to fan DBs to every shard/replica.
+    # If the fan-out is broken (e.g. the pre-#6659 ON CLUSTER + Replicated
+    # collision), peer replicas never receive the CREATE DATABASE.
+    _assert_db_on_every_replica(ch_client, mgmt_db, expected_engine="Atomic")
+    _assert_db_on_every_replica(ch_client, target_db, expected_engine="Replicated")
 
 
 def test_all_production_down_migrations_replicated(ch_client):
