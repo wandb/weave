@@ -5123,7 +5123,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvalResultsQueryRes:
         """Sort/filter/paginate eval results with a single ClickHouse query."""
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self.ch_client
+            req.project_id, self._mint_client
         )
 
         # when summary is requested, fetch all rows
