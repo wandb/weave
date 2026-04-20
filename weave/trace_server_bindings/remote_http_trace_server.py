@@ -30,6 +30,7 @@ from weave.trace_server_bindings.http_utils import (
     log_dropped_call_batch,
     log_dropped_feedback_batch,
     process_batch_with_retry,
+    retry_on_not_found,
 )
 from weave.trace_server_bindings.models import (
     Batch,
@@ -685,6 +686,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    @retry_on_not_found
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         return self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes)
 
@@ -862,6 +864,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         return tsi.FileCreateRes.model_validate(r.json())
 
     @with_retry
+    @retry_on_not_found
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         r = self.post(
             "/files/content",

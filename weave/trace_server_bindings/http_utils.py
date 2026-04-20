@@ -1,9 +1,14 @@
 import json
 import logging
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from functools import wraps
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 import httpx
+import tenacity
+from typing_extensions import ParamSpec
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -21,8 +26,15 @@ _ENDPOINT_CACHE: set[str] = set()
 REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
 ROW_COUNT_CHUNKING_THRESHOLD = 1000
 
+# Retry once on a replica-lag 404 (short fixed wait to keep added latency bounded
+# when the object legitimately does not exist).
+NOT_FOUND_RETRY_ATTEMPTS = 2
+NOT_FOUND_RETRY_WAIT_SECONDS = 1.0
+
 # Type variable for batch items
 T = TypeVar("T")
+P = ParamSpec("P")
+R = TypeVar("R")
 
 # Use AsyncBatchProcessor as the batch processor type
 BatchProcessor = AsyncBatchProcessor
@@ -338,6 +350,60 @@ def _is_413_error(e: Exception) -> bool:
         and e.response is not None
         and e.response.status_code == 413
     )
+
+
+_not_found_retry_disabled: ContextVar[bool] = ContextVar(
+    "weave_not_found_retry_disabled", default=False
+)
+
+
+@contextmanager
+def not_found_retry_disabled() -> Iterator[None]:
+    """Disable the 404 read retry for calls made inside this block.
+
+    Useful for callers doing existence checks where a clean, fast 404 is
+    preferable to retrying on replica lag.
+    """
+    token = _not_found_retry_disabled.set(True)
+    try:
+        yield
+    finally:
+        _not_found_retry_disabled.reset(token)
+
+
+def _is_retryable_not_found(exc: BaseException) -> bool:
+    """Return True for a 404 that looks like ClickHouse replica lag.
+
+    Skips retry when the response body carries `deleted_at`, which the server
+    includes for ObjectDeletedError: that 404 is authoritative, not a race.
+    """
+    if not isinstance(exc, httpx.HTTPStatusError) or exc.response is None:
+        return False
+    if exc.response.status_code != 404:
+        return False
+    try:
+        body = exc.response.json()
+    except (json.JSONDecodeError, ValueError):
+        return True
+    return not (isinstance(body, dict) and "deleted_at" in body)
+
+
+def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
+    """Retry a single time on replica-lag 404s, not on ObjectDeletedError."""
+
+    @wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        if _not_found_retry_disabled.get():
+            return func(*args, **kwargs)
+        retry = tenacity.Retrying(
+            stop=tenacity.stop_after_attempt(NOT_FOUND_RETRY_ATTEMPTS),
+            wait=tenacity.wait_fixed(NOT_FOUND_RETRY_WAIT_SECONDS),
+            retry=tenacity.retry_if_exception(_is_retryable_not_found),
+            reraise=True,
+        )
+        return cast(R, retry(func, *args, **kwargs))
+
+    return wrapper
 
 
 # Error code from server when project requires calls_complete mode
