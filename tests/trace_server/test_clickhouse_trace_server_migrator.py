@@ -319,8 +319,7 @@ def test_create_db_sql(mock_costs):
     )
     sql = replicated_migrator._create_db_sql("test_db")
     assert sql.strip() == (
-        "CREATE DATABASE IF NOT EXISTS test_db"
-        " ON CLUSTER test_cluster ENGINE = Atomic"
+        "CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster ENGINE = Atomic"
     )
 
     # Test invalid cluster name
