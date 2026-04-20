@@ -123,6 +123,7 @@ from weave.trace_server.trace_server_interface import (
     CostQueryOutput,
     CostQueryReq,
     EndedCallSchemaForInsertWithStartedAt,
+    EvalResultsQueryReq,
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
@@ -1701,6 +1702,27 @@ class WeaveClient:
             )
         )
         return res.results
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_eval_predict_call_ids(self, evaluation_call_id: str) -> list[str]:
+        """Return the predict call IDs for an evaluation call.
+
+        Useful for attaching post-hoc scores (via score_create) to each
+        prediction in a completed evaluation.
+        """
+        res = self.server.eval_results_query(
+            EvalResultsQueryReq(
+                project_id=self.project_id,
+                evaluation_call_ids=[evaluation_call_id],
+            )
+        )
+        return [
+            trial.predict_call_id
+            for row in res.rows
+            for evaluation_entry in row.evaluations
+            for trial in evaluation_entry.trials
+            if trial.predict_call_id
+        ]
 
     @trace_sentry.global_trace_sentry.watch()
     def _send_score_call(

@@ -525,6 +525,89 @@ def test_eval_results_query_multiple_evals(client):
     }
 
 
+def test_eval_results_query_post_hoc_score(client):
+    """Verify that scores added via score_create() after prediction_finish()
+    are picked up by eval_results_query.
+    """
+    project_id = client.project_id
+
+    # Create two scorers (ScorerCreateRes.scorer is the full ref URI)
+    scorer_a_res = client.server.scorer_create(
+        ScorerCreateReq(
+            project_id=project_id,
+            name="original_scorer",
+            op_source_code="def score(output):\n    return 1",
+        )
+    )
+    scorer_b_res = client.server.scorer_create(
+        ScorerCreateReq(
+            project_id=project_id,
+            name="post_hoc_scorer",
+            op_source_code="def score(output):\n    return 1",
+        )
+    )
+
+    # Create eval run with one prediction and one score, then finish
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://post-hoc",
+            model="model://post-hoc",
+        )
+    )
+    pred = client.server.prediction_create(
+        PredictionCreateReq(
+            project_id=project_id,
+            model="model://post-hoc",
+            inputs={"x": 1},
+            output="result",
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.score_create(
+        ScoreCreateReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+            scorer=scorer_a_res.scorer,
+            value=0.9,
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+    client.server.prediction_finish(
+        PredictionFinishReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+        )
+    )
+
+    # Now add a second score AFTER prediction_finish
+    client.server.score_create(
+        ScoreCreateReq(
+            project_id=project_id,
+            prediction_id=pred.prediction_id,
+            scorer=scorer_b_res.scorer,
+            value=0.75,
+            evaluation_run_id=run.evaluation_run_id,
+        )
+    )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+        )
+    )
+
+    assert res.total_rows == 1
+    trial = res.rows[0].evaluations[0].trials[0]
+    # Original score (added before prediction_finish) should be in output.scores
+    assert "original_scorer" in trial.scores
+    assert trial.scores["original_scorer"] == 0.9
+    # Post-hoc score (added after prediction_finish) should be merged from child call
+    assert "post_hoc_scorer" in trial.scores
+    assert trial.scores["post_hoc_scorer"] == 0.75
+
+
 def test_eval_results_resolve_refs_only_for_paginated_rows(client):
     """Verify that resolve_row_refs only resolves refs for the paginated slice"""
     project_id = client.project_id
