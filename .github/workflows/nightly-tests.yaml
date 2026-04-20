@@ -17,6 +17,8 @@ jobs:
     name: Nightly Tests
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    env:
+      MAX_ATTEMPTS: 3
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -148,7 +150,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DD_TRACE_ENABLED: false
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
             -m "trace_server" \
             --trace-server=sqlite
       - name: Run nox (Clickhouse Trace Server)
@@ -163,7 +165,7 @@ jobs:
           DD_TRACE_ENABLED: false
           OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
       - name: Run nox (No marker filters for integration-only shards)
         if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
@@ -182,7 +184,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DD_TRACE_ENABLED: false
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
+          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
 
   slack-notification:
     name: Slack Notification
