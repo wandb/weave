@@ -12,6 +12,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from weave.trace_server.interface.query import Query
+
 
 class AgentSpanSchema(BaseModel):
     """A normalized agent span returned by query APIs."""
@@ -150,6 +152,10 @@ class AgentSpansQueryReq(BaseModel):
 
     project_id: str
     filters: AgentSpansQueryFilters | None = None
+    #: Mongo-style filter expression applied alongside ``filters``. Both are
+    #: AND-ed. Field names resolve via semconv, direct span columns, or the
+    #: ``custom_attrs*`` Map columns — see :mod:`agent_query_compiler`.
+    query: Query | None = None
     group_by: list[AgentGroupByRef] | None = None
     sort_by: list[AgentSortBy] | None = None
     limit: int = 100

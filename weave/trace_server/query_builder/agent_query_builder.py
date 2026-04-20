@@ -334,6 +334,14 @@ def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         add_custom_attr_filters(
             conditions, pb, getattr(req.filters, "custom_filters", None)
         )
+    if req.query is not None:
+        # Imported lazily to avoid a circular import between this module
+        # (used by agent_query_compiler) and the compiler itself.
+        from weave.trace_server.query_builder.agent_query_compiler import (
+            compile_agent_query,
+        )
+
+        conditions.extend(compile_agent_query(req.query, pb))
     return " AND ".join(conditions)
 
 

@@ -282,3 +282,80 @@ def resolve(key: str) -> str | None:
 #: into dedicated columns.  Used by the extraction layer to exclude these
 #: from the custom_attrs overflow map.
 KNOWN_KEYS: frozenset[str] = frozenset(_ALIAS_TO_CANONICAL.keys())
+
+
+# ---------------------------------------------------------------------------
+# Query-DSL filtering: canonical attribute -> span column
+# ---------------------------------------------------------------------------
+
+#: Maps each filterable canonical attribute key to its span column name.
+#:
+#: Only attributes that land in dedicated span columns with a meaningful
+#: scalar equality / comparison surface are listed. Array and JSON columns
+#: (``finish_reasons``, ``content_refs``, ``input_messages``, etc.) are
+#: intentionally omitted — filtering those needs different operators.
+CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
+    # string scalars
+    "weave.operation.name": "operation_name",
+    "weave.provider.name": "provider_name",
+    "weave.agent.name": "agent_name",
+    "weave.agent.id": "agent_id",
+    "weave.agent.description": "agent_description",
+    "weave.agent.version": "agent_version",
+    "weave.request.model": "request_model",
+    "weave.response.model": "response_model",
+    "weave.response.id": "response_id",
+    "weave.conversation.id": "conversation_id",
+    "weave.conversation.name": "conversation_name",
+    "weave.tool.name": "tool_name",
+    "weave.tool.type": "tool_type",
+    "weave.tool.call.id": "tool_call_id",
+    "weave.tool.description": "tool_description",
+    "weave.tool.call.arguments": "tool_call_arguments",
+    "weave.tool.call.result": "tool_call_result",
+    "weave.reasoning_content": "reasoning_content",
+    "weave.output.type": "output_type",
+    "weave.error.type": "error_type",
+    "weave.server.address": "server_address",
+    "weave.compaction.summary": "compaction_summary",
+    # int scalars
+    "weave.usage.input_tokens": "input_tokens",
+    "weave.usage.output_tokens": "output_tokens",
+    "weave.usage.reasoning_tokens": "reasoning_tokens",
+    "weave.usage.cache_creation.input_tokens": "cache_creation_input_tokens",
+    "weave.usage.cache_read.input_tokens": "cache_read_input_tokens",
+    "weave.request.max_tokens": "request_max_tokens",
+    "weave.request.seed": "request_seed",
+    "weave.request.choice.count": "request_choice_count",
+    "weave.server.port": "server_port",
+    "weave.compaction.items_before": "compaction_items_before",
+    "weave.compaction.items_after": "compaction_items_after",
+    # float scalars
+    "weave.request.temperature": "request_temperature",
+    "weave.request.top_p": "request_top_p",
+    "weave.request.frequency_penalty": "request_frequency_penalty",
+    "weave.request.presence_penalty": "request_presence_penalty",
+}
+
+
+def _build_filterable_lookup() -> dict[str, str]:
+    """Flatten CANONICAL_KEY_TO_COLUMN to also accept gen_ai.* aliases and
+    prefix-stripped short-forms (``agent.name`` alongside ``weave.agent.name``).
+    """
+    out: dict[str, str] = {}
+    for canonical, col in CANONICAL_KEY_TO_COLUMN.items():
+        out[canonical] = col
+        attr = ATTRIBUTES[canonical]
+        if attr.gen_ai_alias:
+            out[attr.gen_ai_alias] = col
+        for k in (canonical, attr.gen_ai_alias):
+            for prefix in ("weave.", "gen_ai."):
+                if k and k.startswith(prefix):
+                    out[k[len(prefix) :]] = col
+    return out
+
+
+#: Lookup: any attribute name a caller types in the query DSL -> span column.
+#: Covers canonical ``weave.*``, ``gen_ai.*`` alias, and the short-form
+#: with the prefix stripped (e.g. ``agent.name``).
+FILTERABLE_KEY_TO_COLUMN: dict[str, str] = _build_filterable_lookup()

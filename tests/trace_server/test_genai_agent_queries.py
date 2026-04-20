@@ -26,6 +26,7 @@ from weave.trace_server.agents.types import (
     AgentSpansQueryReq,
     AgentsQueryReq,
 )
+from weave.trace_server.interface.query import Query
 
 
 def _make_project_id(prefix: str) -> str:
@@ -400,3 +401,103 @@ def test_message_search(ch_server):
         AgentSearchReq(project_id=project_id, query="xyznonexistent")
     )
     assert res_empty.total_conversations == 0
+
+
+# ---------------------------------------------------------------------------
+# Test: Query DSL end-to-end
+# ---------------------------------------------------------------------------
+
+
+def test_query_dsl_combines_semconv_column_and_custom_attr(ch_server):
+    """Compile and execute a Mongo-style query mixing a semconv-mapped column
+    and an unprefixed custom_attrs key dispatched via sibling-literal type.
+    """
+    project_id = _make_project_id("dsl")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        # alpha / prod — matches
+        _make_span(
+            project_id,
+            agent_name="alpha",
+            custom_attrs={"env": "prod"},
+            started_at=now,
+        ),
+        # alpha / staging — agent matches but env doesn't
+        _make_span(
+            project_id,
+            agent_name="alpha",
+            custom_attrs={"env": "staging"},
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        # beta / prod — env matches but agent doesn't
+        _make_span(
+            project_id,
+            agent_name="beta",
+            custom_attrs={"env": "prod"},
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    q = Query.model_validate(
+        {
+            "$expr": {
+                "$and": [
+                    {
+                        "$eq": [
+                            {"$getField": "agent.name"},
+                            {"$literal": "alpha"},
+                        ]
+                    },
+                    # `env` is unknown -> falls through to custom_attrs
+                    # (sibling literal is a str, so the String map).
+                    {"$eq": [{"$getField": "env"}, {"$literal": "prod"}]},
+                ]
+            }
+        }
+    )
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, query=q)
+    )
+    assert res.total_count == 1
+    assert len(res.spans) == 1
+    assert res.spans[0].agent_name == "alpha"
+
+
+def test_query_dsl_typed_custom_attr_comparison(ch_server):
+    """Int-typed custom attributes route to ``custom_attrs_int`` via the
+    sibling-literal type and compare numerically.
+    """
+    project_id = _make_project_id("dsl_int")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        # retries=5 — matches > 3
+        _make_span(
+            project_id,
+            custom_attrs_int={"retries": 5},
+            started_at=now,
+        ),
+        # retries=1 — doesn't match
+        _make_span(
+            project_id,
+            custom_attrs_int={"retries": 1},
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        # no retries attr — doesn't match
+        _make_span(
+            project_id,
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    q = Query.model_validate(
+        {"$expr": {"$gt": [{"$getField": "retries"}, {"$literal": 3}]}}
+    )
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, query=q)
+    )
+    assert res.total_count == 1
+    assert len(res.spans) == 1
