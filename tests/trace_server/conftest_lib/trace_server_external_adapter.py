@@ -1,9 +1,13 @@
 import base64
+import time
+from collections.abc import Callable
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server.service_interface import (
     ProjectsInfoReq,
     ProjectsInfoRes,
@@ -196,6 +200,221 @@ class UserInjectingExternalTraceServer(
     ) -> tsi.ObjRemoveAliasesRes:
         req.wb_user_id = self._user_id
         return super().obj_remove_aliases(req)
+
+
+class EventuallyConsistentUserInjectingExternalTraceServer(
+    UserInjectingExternalTraceServer
+):
+    """Tests-only ClickHouse adapter that waits for write visibility.
+
+    ClickHouse tests already force synchronous batch flushing, but that only
+    guarantees the write request has been sent. It does not guarantee the write
+    is immediately query-visible on subsequent reads. This wrapper keeps the
+    workaround in one place by waiting for a small set of object/tag/alias
+    mutations to become externally readable before returning.
+    """
+
+    _settle_timeout_s = 2.0
+    _settle_poll_interval_s = 0.05
+
+    def _should_settle(self) -> bool:
+        return isinstance(self._internal_trace_server, ClickHouseTraceServer)
+
+    def _wait_until(self, check: Callable[[], bool]) -> None:
+        if not self._should_settle():
+            return
+
+        deadline = time.monotonic() + self._settle_timeout_s
+        while time.monotonic() < deadline:
+            try:
+                if check():
+                    return
+            except (NotFoundError, ObjectDeletedError):
+                pass
+            time.sleep(self._settle_poll_interval_s)
+
+        try:
+            check()
+        except (NotFoundError, ObjectDeletedError):
+            pass
+
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        project_id = req.obj.project_id
+        object_id = req.obj.object_id
+        res = super().obj_create(req)
+        self._wait_until(
+            lambda: (
+                self.obj_read(
+                    tsi.ObjReadReq(
+                        project_id=project_id,
+                        object_id=object_id,
+                        digest=res.digest,
+                    )
+                ).obj.digest
+                == res.digest
+            )
+        )
+        return res
+
+    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        project_id = req.project_id
+        object_id = req.object_id
+        digests = list(req.digests or [])
+        res = super().obj_delete(req)
+
+        if digests:
+
+            def deleted() -> bool:
+                for digest in digests:
+                    try:
+                        self.obj_read(
+                            tsi.ObjReadReq(
+                                project_id=project_id,
+                                object_id=object_id,
+                                digest=digest,
+                            )
+                        )
+                    except (NotFoundError, ObjectDeletedError):
+                        continue
+                    else:
+                        return False
+                return True
+
+            self._wait_until(deleted)
+        else:
+            self._wait_until(
+                lambda: (
+                    len(
+                        self.objs_query(
+                            tsi.ObjQueryReq(
+                                project_id=project_id,
+                                filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
+                            )
+                        ).objs
+                    )
+                    == 0
+                )
+            )
+        return res
+
+    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+        project_id = req.project_id
+        object_id = req.object_id
+        digest = req.digest
+        tags = set(req.tags)
+        res = super().obj_add_tags(req)
+        self._wait_until(
+            lambda: tags.issubset(
+                set(
+                    self.obj_read(
+                        tsi.ObjReadReq(
+                            project_id=project_id,
+                            object_id=object_id,
+                            digest=digest,
+                            include_tags_and_aliases=True,
+                        )
+                    ).obj.tags
+                    or []
+                )
+            )
+        )
+        return res
+
+    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+        project_id = req.project_id
+        object_id = req.object_id
+        digest = req.digest
+        tags = set(req.tags)
+        res = super().obj_remove_tags(req)
+        self._wait_until(
+            lambda: tags.isdisjoint(
+                set(
+                    self.obj_read(
+                        tsi.ObjReadReq(
+                            project_id=project_id,
+                            object_id=object_id,
+                            digest=digest,
+                            include_tags_and_aliases=True,
+                        )
+                    ).obj.tags
+                    or []
+                )
+            )
+        )
+        return res
+
+    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+        project_id = req.project_id
+        object_id = req.object_id
+        digest = req.digest
+        aliases = list(req.aliases)
+        res = super().obj_set_aliases(req)
+
+        def aliases_visible() -> bool:
+            read_res = self.obj_read(
+                tsi.ObjReadReq(
+                    project_id=project_id,
+                    object_id=object_id,
+                    digest=digest,
+                    include_tags_and_aliases=True,
+                )
+            )
+            existing_aliases = set(read_res.obj.aliases or [])
+            if not set(aliases).issubset(existing_aliases):
+                return False
+            for alias in aliases:
+                alias_res = self.obj_read(
+                    tsi.ObjReadReq(
+                        project_id=project_id,
+                        object_id=object_id,
+                        digest=alias,
+                    )
+                )
+                if alias_res.obj.digest != digest:
+                    return False
+            return True
+
+        self._wait_until(aliases_visible)
+        return res
+
+    def obj_remove_aliases(
+        self, req: tsi.ObjRemoveAliasesReq
+    ) -> tsi.ObjRemoveAliasesRes:
+        project_id = req.project_id
+        object_id = req.object_id
+        aliases = list(req.aliases)
+        res = super().obj_remove_aliases(req)
+
+        def aliases_removed() -> bool:
+            query_res = self.objs_query(
+                tsi.ObjQueryReq(
+                    project_id=project_id,
+                    filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
+                    include_tags_and_aliases=True,
+                )
+            )
+            if any(
+                not set(aliases).isdisjoint(set(obj.aliases or []))
+                for obj in query_res.objs
+            ):
+                return False
+            for alias in aliases:
+                try:
+                    self.obj_read(
+                        tsi.ObjReadReq(
+                            project_id=project_id,
+                            object_id=object_id,
+                            digest=alias,
+                        )
+                    )
+                except (NotFoundError, ObjectDeletedError):
+                    continue
+                else:
+                    return False
+            return True
+
+        self._wait_until(aliases_removed)
+        return res
 
 
 def externalize_trace_server(

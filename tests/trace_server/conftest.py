@@ -10,6 +10,7 @@ from tests.trace.server_utils import TEST_ENTITY, find_server_layer
 from tests.trace.util import client_is_sqlite
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
+    EventuallyConsistentUserInjectingExternalTraceServer,
     UserInjectingExternalTraceServer,
     externalize_trace_server,
 )
@@ -290,7 +291,11 @@ def get_ch_trace_server(
         server._evaluate_model_dispatcher = EvaluateModelTestDispatcher(
             id_converter=id_converter
         )
-        return externalize_trace_server(server, TEST_ENTITY, id_converter=id_converter)
+        return EventuallyConsistentUserInjectingExternalTraceServer(
+            server,
+            id_converter=id_converter,
+            user_id=TEST_ENTITY,
+        )
 
     return ch_trace_server_inner
 
