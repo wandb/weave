@@ -11,6 +11,7 @@ import tenacity
 from typing_extensions import ParamSpec
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.utils.retry import _is_retryable_exception, with_retry
 
@@ -353,7 +354,20 @@ def _is_413_error(e: Exception) -> bool:
 
 
 def _is_retryable_not_found(exc: BaseException) -> bool:
-    """True for a 404 worth retrying; False if the body signals a deleted object."""
+    """True only for 404-like misses worth retrying.
+
+    Skips authoritative deletes (local `ObjectDeletedError` or HTTP response
+    body carrying `deleted_at`). Covers both local server domain exceptions
+    (`NotFoundError`) and remote HTTP 404s; anything else is not in scope for
+    this retry layer and returns False.
+    """
+    # Authoritative delete -- never retry.
+    if isinstance(exc, ObjectDeletedError):
+        return False
+    # Local server raised a plain not-found -- retry.
+    if isinstance(exc, NotFoundError):
+        return True
+    # Remote HTTP 404 -- retry unless the body indicates a delete.
     if not isinstance(exc, httpx.HTTPStatusError) or exc.response is None:
         return False
     if exc.response.status_code != 404:

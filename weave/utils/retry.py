@@ -44,9 +44,10 @@ def with_retry(
 
     Automatically generates a retry ID for request correlation across all attempts.
 
-    Pass `retry_if` to extend the default transport-error predicate with a
-    caller-specific condition (e.g. retrying a 404 that looks like an
-    eventual-consistency race on a write-then-read path).
+    Pass `retry_if` to replace the default transport-error predicate with a
+    caller-specific one (e.g. a 404-matcher for eventual-consistency races on
+    write-then-read paths). Callers that want both transport retries and a
+    domain retry should layer two `with_retry` calls.
 
     Pass `wait` to override the default exponential-jitter wait strategy. The
     override is resolved at decoration time, so callers that need the value to
@@ -60,10 +61,7 @@ def with_retry(
             retry_id = generate_id()
             retry_id_token = _retry_id.set(retry_id)
 
-            def _should_retry(exc: BaseException) -> bool:
-                if _is_retryable_exception(exc):
-                    return True
-                return bool(retry_if and retry_if(exc))
+            predicate = retry_if if retry_if is not None else _is_retryable_exception
 
             retry = tenacity.Retrying(
                 stop=tenacity.stop_after_attempt(retry_max_attempts()),
@@ -71,7 +69,7 @@ def with_retry(
                 or tenacity.wait_exponential_jitter(
                     initial=1, max=retry_max_interval()
                 ),
-                retry=tenacity.retry_if_exception(_should_retry),
+                retry=tenacity.retry_if_exception(predicate),
                 before_sleep=_log_retry,
                 retry_error_callback=_log_failure,
                 reraise=True,

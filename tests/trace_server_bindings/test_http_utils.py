@@ -1,10 +1,12 @@
 """Tests for http_utils error handling."""
 
+import datetime
 from unittest.mock import Mock
 
 import httpx
 import pytest
 
+from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings import http_utils
 from weave.trace_server_bindings.http_utils import (
     CallsCompleteModeRequired,
@@ -66,38 +68,66 @@ def _make_404(body: dict) -> httpx.HTTPStatusError:
 
 
 def test_retry_on_not_found_behavior(monkeypatch):
-    """Retries a non-deleted 404 inside `write_then_read_scope`; pass-through outside.
+    """Retry a non-deleted 404 inside `write_then_read_scope`; pass-through outside.
 
-    `deleted_at` 404s are never retried (authoritative ObjectDeletedError).
+    Authoritative deletes (`ObjectDeletedError` locally, or `deleted_at` in the
+    HTTP body) are never retried.
     """
     monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "2")
     monkeypatch.setattr(http_utils, "NOT_FOUND_RETRY_WAIT_SECONDS", 0.0)
-    calls = {"missing": 0, "deleted": 0, "unscoped": 0}
+    calls = {
+        "http": 0,
+        "local": 0,
+        "deleted_http": 0,
+        "deleted_local": 0,
+        "unscoped": 0,
+    }
 
     @retry_on_not_found
-    def flaky_missing():
-        calls["missing"] += 1
-        if calls["missing"] == 1:
+    def flaky_http_404():
+        calls["http"] += 1
+        if calls["http"] == 1:
             raise _make_404({"reason": "Obj foo:bar not found"})
         return "ok"
 
     @retry_on_not_found
-    def deleted():
-        calls["deleted"] += 1
+    def flaky_local_not_found():
+        calls["local"] += 1
+        if calls["local"] == 1:
+            raise NotFoundError("Obj foo:bar not found")
+        return "ok"
+
+    @retry_on_not_found
+    def deleted_http():
+        calls["deleted_http"] += 1
         raise _make_404({"reason": "deleted", "deleted_at": "2024-01-01T00:00:00Z"})
+
+    @retry_on_not_found
+    def deleted_local():
+        calls["deleted_local"] += 1
+        raise ObjectDeletedError(
+            "deleted",
+            deleted_at=datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc),
+        )
 
     @retry_on_not_found
     def unscoped_missing():
         calls["unscoped"] += 1
-        raise _make_404({"reason": "Obj foo:bar not found"})
+        raise _make_404({"reason": "not found"})
 
     with write_then_read_scope():
-        assert flaky_missing() == "ok"
-    assert calls["missing"] == 2
+        assert flaky_http_404() == "ok"
+        assert flaky_local_not_found() == "ok"
+    assert calls["http"] == 2
+    assert calls["local"] == 2
 
     with write_then_read_scope(), pytest.raises(httpx.HTTPStatusError):
-        deleted()
-    assert calls["deleted"] == 1
+        deleted_http()
+    assert calls["deleted_http"] == 1
+
+    with write_then_read_scope(), pytest.raises(ObjectDeletedError):
+        deleted_local()
+    assert calls["deleted_local"] == 1
 
     with pytest.raises(httpx.HTTPStatusError):
         unscoped_missing()
