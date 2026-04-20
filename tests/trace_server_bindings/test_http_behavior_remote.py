@@ -18,6 +18,7 @@ import tenacity
 from pydantic import ValidationError
 
 from tests.trace_server_bindings.conftest import (
+    generate_call_start_end_pair,
     generate_end,
     generate_id,
     generate_start,
@@ -304,8 +305,10 @@ def test_other_error_retry(mock_post, unbatched_server, monkeypatch):
 
 
 @patch("weave.utils.http_requests.post")
-def test_timeout_retry_mechanism(mock_post, success_response):
+def test_timeout_retry_mechanism(mock_post, success_response, monkeypatch):
     """Test that timeouts trigger the retry mechanism."""
+    monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "3")
+    monkeypatch.setenv("WEAVE_RETRY_MAX_INTERVAL", "0.1")
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
 
     # Mock server to raise errors twice, then succeed
@@ -317,8 +320,14 @@ def test_timeout_retry_mechanism(mock_post, success_response):
         success_response,
     ]
 
-    # Trying to send a batch should fail 2 times, then succeed
-    server.call_start(tsi.CallStartReq(start=generate_start()))
+    # Send a start+end pair so CallBatchProcessor produces a CompleteBatchItem
+    # and the background thread actually sends it to the server (and retries).
+    call_id = generate_id()
+    start_req, end_req = generate_call_start_end_pair(
+        id=call_id, project_id="entity/project"
+    )
+    server.call_start(start_req)
+    server.call_end(end_req)
     server.call_processor.stop_accepting_new_work_and_flush_queue()
 
     # Verify that requests.post was called 3 times
@@ -329,21 +338,31 @@ def test_timeout_retry_mechanism(mock_post, success_response):
 def fast_retrying_server():
     """Create a RemoteHTTPTraceServer with fast retry settings for testing."""
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
-    fast_retry = tenacity.retry(
-        wait=tenacity.wait_fixed(0.1),
-        stop=tenacity.stop_after_attempt(2),
-        reraise=True,
-    )
-    unwrapped_send_batch_to_server = MethodType(
-        server._send_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
-        server,
-    )
-    server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+    _apply_fast_retry(server)
     yield server
     if server.call_processor:
         server.call_processor.stop_accepting_new_work_and_flush_queue()
     if server.feedback_processor:
         server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+
+def _apply_fast_retry(server: RemoteHTTPTraceServer) -> None:
+    """Replace the retry wrappers on both legacy and calls_complete send paths."""
+    fast_retry = tenacity.retry(
+        wait=tenacity.wait_fixed(0.1),
+        stop=tenacity.stop_after_attempt(2),
+        reraise=True,
+    )
+    unwrapped_send_batch = MethodType(
+        server._send_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
+        server,
+    )
+    server._send_batch_to_server = fast_retry(unwrapped_send_batch)
+    unwrapped_send_complete = MethodType(
+        server._send_calls_complete_to_server.__wrapped__,  # type: ignore[attr-defined]
+        server,
+    )
+    server._send_calls_complete_to_server = fast_retry(unwrapped_send_complete)
 
 
 @pytest.mark.disable_logging_error_check
@@ -361,8 +380,16 @@ def test_post_timeout(mock_post, success_response, fast_retrying_server, log_col
         httpx.TimeoutException("Connection timed out"),
     ]
 
-    # Phase 1: Try but fail to process the first batch
-    fast_retrying_server.call_start(tsi.CallStartReq(start=generate_start()))
+    # Phase 1: Try but fail to process the first batch.
+    # Send a start+end pair so CallBatchProcessor produces a CompleteBatchItem
+    # that actually hits the send path (a lone start is held in _pending_starts
+    # and is dropped at flush timeout without being sent).
+    call_id = generate_id()
+    start_req, end_req = generate_call_start_end_pair(
+        id=call_id, project_id="entity/project"
+    )
+    fast_retrying_server.call_start(start_req)
+    fast_retrying_server.call_end(end_req)
     fast_retrying_server.call_processor.stop_accepting_new_work_and_flush_queue()
     logs = log_collector.get_warning_logs()
     assert len(logs) >= 1
@@ -377,16 +404,7 @@ def test_post_timeout(mock_post, success_response, fast_retrying_server, log_col
 
     # Create a new server since the old one has shutdown its batch processor
     new_server = RemoteHTTPTraceServer("http://example.com", should_batch=False)
-    fast_retry = tenacity.retry(
-        wait=tenacity.wait_fixed(0.1),
-        stop=tenacity.stop_after_attempt(2),
-        reraise=True,
-    )
-    unwrapped_send_batch_to_server = MethodType(
-        new_server._send_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
-        new_server,
-    )
-    new_server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+    _apply_fast_retry(new_server)
 
     # Should succeed with retry
     start_req = tsi.CallStartReq(start=generate_start())

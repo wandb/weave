@@ -19,6 +19,7 @@ import requests
 from tests.trace_server_bindings.conftest import (
     generate_call_start_end_pair,
     generate_end,
+    generate_id,
     generate_start,
 )
 from weave.trace_server import trace_server_interface as tsi
@@ -226,7 +227,13 @@ def test_drop_data_when_queue_is_full(server, server_class, log_collector):
     mock_queue.put_nowait.side_effect = Full
     server.call_processor.queue = mock_queue
 
-    server.call_start(tsi.CallStartReq(start=generate_start()))
+    # Send a start+end pair so CallBatchProcessor pairs them into a CompleteBatchItem
+    # and attempts to queue it (triggering put_nowait). A lone start is held in
+    # _pending_starts and never hits the queue.
+    call_id = generate_id()
+    start_req, end_req = generate_call_start_end_pair(id=call_id)
+    server.call_start(start_req)
+    server.call_end(end_req)
 
     # Verify that the put_nowait method was called (meaning we tried to enqueue the item)
     mock_queue.put_nowait.assert_called_once()
