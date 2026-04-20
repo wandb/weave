@@ -1,18 +1,14 @@
 import json
 import logging
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
-from functools import wraps
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 import httpx
-import tenacity
 from typing_extensions import ParamSpec
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.utils.retry import _is_retryable_exception
+from weave.utils.retry import _is_retryable_exception, with_retry
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
@@ -25,11 +21,6 @@ _ENDPOINT_CACHE: set[str] = set()
 # Default remote request bytes limit (32 MiB real limit - 1 MiB buffer)
 REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
 ROW_COUNT_CHUNKING_THRESHOLD = 1000
-
-# Retry once on a 404 to smooth over eventual consistency. Short fixed wait
-# keeps added latency bounded for genuinely missing objects.
-NOT_FOUND_RETRY_ATTEMPTS = 2
-NOT_FOUND_RETRY_WAIT_SECONDS = 1.0
 
 # Type variable for batch items
 T = TypeVar("T")
@@ -352,21 +343,6 @@ def _is_413_error(e: Exception) -> bool:
     )
 
 
-_not_found_retry_disabled: ContextVar[bool] = ContextVar(
-    "weave_not_found_retry_disabled", default=False
-)
-
-
-@contextmanager
-def not_found_retry_disabled() -> Iterator[None]:
-    """Disable the 404 read retry for calls made inside this block."""
-    token = _not_found_retry_disabled.set(True)
-    try:
-        yield
-    finally:
-        _not_found_retry_disabled.reset(token)
-
-
 def _is_retryable_not_found(exc: BaseException) -> bool:
     """True for a 404 worth retrying; False if the body signals a deleted object."""
     if not isinstance(exc, httpx.HTTPStatusError) or exc.response is None:
@@ -381,21 +357,13 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
 
 
 def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
-    """Retry a read once on 404 to absorb eventual consistency."""
+    """Wrap a callable so 404s that look like eventual-consistency races retry.
 
-    @wraps(func)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        if _not_found_retry_disabled.get():
-            return func(*args, **kwargs)
-        retry = tenacity.Retrying(
-            stop=tenacity.stop_after_attempt(NOT_FOUND_RETRY_ATTEMPTS),
-            wait=tenacity.wait_fixed(NOT_FOUND_RETRY_WAIT_SECONDS),
-            retry=tenacity.retry_if_exception(_is_retryable_not_found),
-            reraise=True,
-        )
-        return cast(R, retry(func, *args, **kwargs))
-
-    return wrapper
+    Intended for write-then-read sites. ObjectDeletedError 404s (body carries
+    `deleted_at`) pass through without retrying. Shares `with_retry`'s
+    attempt/interval config and retry-id correlation.
+    """
+    return with_retry(retry_if=_is_retryable_not_found)(func)
 
 
 # Error code from server when project requires calls_complete mode

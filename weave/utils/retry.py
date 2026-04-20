@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 from contextvars import ContextVar
 from functools import wraps
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, cast, overload
 
 import httpx
 import tenacity
@@ -23,37 +23,64 @@ R = TypeVar("R")
 _retry_id: ContextVar[str] = ContextVar("retry_id")
 
 
-def with_retry(func: Callable[P, R]) -> Callable[P, R]:
+@overload
+def with_retry(_func: Callable[P, R]) -> Callable[P, R]: ...
+@overload
+def with_retry(
+    *,
+    retry_if: Callable[[BaseException], bool] | None = None,
+) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
+def with_retry(
+    _func: Callable[P, R] | None = None,
+    *,
+    retry_if: Callable[[BaseException], bool] | None = None,
+) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator that applies configurable retry logic to a function.
     Retry configuration is determined by:
     1. Values from weave.trace.settings (if available)
     2. Values set via configure_retry().
 
     Automatically generates a retry ID for request correlation across all attempts.
+
+    Pass `retry_if` to extend the default transport-error predicate with a
+    caller-specific condition (e.g. retrying a 404 that looks like an
+    eventual-consistency race on a write-then-read path).
     """
 
-    @wraps(func)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        # Generate a retry ID for this request (shared across all attempts)
-        retry_id = generate_id()
-        retry_id_token = _retry_id.set(retry_id)
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        @wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            # Generate a retry ID for this request (shared across all attempts)
+            retry_id = generate_id()
+            retry_id_token = _retry_id.set(retry_id)
 
-        retry = tenacity.Retrying(
-            stop=tenacity.stop_after_attempt(retry_max_attempts()),
-            wait=tenacity.wait_exponential_jitter(initial=1, max=retry_max_interval()),
-            retry=tenacity.retry_if_exception(_is_retryable_exception),
-            before_sleep=_log_retry,
-            retry_error_callback=_log_failure,
-            reraise=True,
-        )
+            def _should_retry(exc: BaseException) -> bool:
+                if _is_retryable_exception(exc):
+                    return True
+                return bool(retry_if and retry_if(exc))
 
-        try:
-            return cast(R, retry(func, *args, **kwargs))
-        finally:
-            # Always clean up the retry ID
-            _retry_id.reset(retry_id_token)
+            retry = tenacity.Retrying(
+                stop=tenacity.stop_after_attempt(retry_max_attempts()),
+                wait=tenacity.wait_exponential_jitter(
+                    initial=1, max=retry_max_interval()
+                ),
+                retry=tenacity.retry_if_exception(_should_retry),
+                before_sleep=_log_retry,
+                retry_error_callback=_log_failure,
+                reraise=True,
+            )
 
-    return wrapper
+            try:
+                return cast(R, retry(func, *args, **kwargs))
+            finally:
+                # Always clean up the retry ID
+                _retry_id.reset(retry_id_token)
+
+        return wrapper
+
+    if _func is not None:
+        return decorator(_func)
+    return decorator
 
 
 def get_current_retry_id() -> str | None:
