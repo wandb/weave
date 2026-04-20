@@ -1240,3 +1240,31 @@ def test_delete_preserves_version_index_gaps(ch_server):
     by_digest = {o.digest: o for o in non_deleted}
     assert by_digest[digests[0]].version_index == 0
     assert by_digest[digests[2]].version_index == 2
+
+
+# Regression guard for SESSION_IS_LOCKED (ClickHouse error code 373).
+# weave-trace does not use server-side ClickHouse sessions; if _mint_client
+# ever starts auto-generating a session_id again, two concurrent requests
+# that share a thread-local client will race and ClickHouse will reject one
+# of them with code 373.
+
+
+def test_mint_client_disables_session_autogeneration():
+    """_mint_client must pass autogenerate_session_id=False to clickhouse_connect."""
+    captured_kwargs: dict = {}
+
+    def fake_get_client(**kwargs):
+        captured_kwargs.update(kwargs)
+        return MagicMock()
+
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_ensure_database", return_value=None),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client",
+            side_effect=fake_get_client,
+        ),
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._mint_client()
+
+    assert captured_kwargs.get("autogenerate_session_id") is False
