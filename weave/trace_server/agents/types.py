@@ -95,11 +95,58 @@ class AgentSpansQueryFilters(BaseModel):
     custom_filters: list[AgentCustomAttrFilter] = Field(default_factory=list)
 
 
+class AgentGroupByRef(BaseModel):
+    """Reference to a column or map-key that spans should be grouped by.
+
+    ``source="column"`` targets a named span column (allowlisted server-side).
+    The other sources target keys inside the ``custom_attrs*`` Map columns,
+    which accept arbitrary user-defined keys.
+    """
+
+    source: Literal[
+        "column",
+        "custom_attrs",
+        "custom_attrs_int",
+        "custom_attrs_float",
+    ] = "column"
+    key: str
+    alias: str | None = None  # output key in AgentSpanGroupRow.group_keys (defaults to `key`)
+
+
+class AgentSpanGroupRow(BaseModel):
+    """A single row in a grouped spans query response.
+
+    ``group_keys`` maps each group_by ref's alias to its value for this row.
+    The remaining fields are a fixed aggregate bundle computed per group.
+    """
+
+    group_keys: dict[str, str | int | float | None] = Field(default_factory=dict)
+    span_count: int = 0
+    trace_count: int = 0
+    conversation_count: int = 0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_duration_ms: int = 0
+    error_count: int = 0
+    agent_names: list[str] = Field(default_factory=list)
+    agent_versions: list[str] = Field(default_factory=list)
+    provider_names: list[str] = Field(default_factory=list)
+    request_models: list[str] = Field(default_factory=list)
+    first_seen: datetime.datetime | None = None
+    last_seen: datetime.datetime | None = None
+
+
 class AgentSpansQueryReq(BaseModel):
-    """Request to list agent spans for a project."""
+    """Request to query agent spans for a project.
+
+    When ``group_by`` is empty (or omitted), returns raw span rows in the
+    response's ``spans`` field. When ``group_by`` is non-empty, returns
+    aggregate group rows in the response's ``groups`` field.
+    """
 
     project_id: str
     filters: AgentSpansQueryFilters | None = None
+    group_by: list[AgentGroupByRef] | None = None
     sort_by: list[AgentSortBy] | None = None
     limit: int = 100
     offset: int = 0
@@ -108,23 +155,15 @@ class AgentSpansQueryReq(BaseModel):
 
 
 class AgentSpansQueryRes(BaseModel):
-    """Response containing a list of agent spans."""
+    """Response from a spans query.
 
-    spans: list[AgentSpanSchema]
+    Exactly one of ``spans`` or ``groups`` will be populated, based on
+    whether the request specified ``group_by``.
+    """
+
+    spans: list[AgentSpanSchema] = Field(default_factory=list)
+    groups: list[AgentSpanGroupRow] = Field(default_factory=list)
     total_count: int = 0
-
-
-class AgentSpansTraceReq(BaseModel):
-    """Request to get all agent spans for a specific trace."""
-
-    project_id: str
-    trace_id: str
-
-
-class AgentSpansTraceRes(BaseModel):
-    """Response containing all spans for a trace, ordered by start time."""
-
-    spans: list[AgentSpanSchema]
 
 
 # ---------------------------------------------------------------------------
@@ -249,59 +288,6 @@ class AgentTraceChatRes(BaseModel):
     messages: list[AgentChatMessage] = Field(default_factory=list)
 
 
-class AgentConversationSchema(BaseModel):
-    """Metadata for a single multi-turn conversation, keyed by conversation_id."""
-
-    conversation_id: str
-    conversation_name: str = ""
-    project_id: str
-    turn_count: int = 0
-    span_count: int = 0
-    total_input_tokens: int = 0
-    total_output_tokens: int = 0
-    total_duration_ms: int = 0
-    error_count: int = 0
-    agent_names: list[str] = Field(default_factory=list)
-    agent_versions: list[str] = Field(default_factory=list)
-    provider_names: list[str] = Field(default_factory=list)
-    request_models: list[str] = Field(default_factory=list)
-    first_seen: datetime.datetime | None = None
-    last_seen: datetime.datetime | None = None
-
-
-class AgentConversationsQueryFilters(BaseModel):
-    """Filters for querying conversations (GROUP BY on spans)."""
-
-    conversation_id: str | None = None
-    agent_name: str | None = None
-    agent_version: str | None = None
-    provider_name: str | None = None
-    has_errors: bool | None = None
-    min_turns: int | None = None
-    max_turns: int | None = None
-    started_after: datetime.datetime | None = None
-    started_before: datetime.datetime | None = None
-
-
-class AgentConversationsQueryReq(BaseModel):
-    """Request to list conversations for a project, ordered by most recent."""
-
-    project_id: str
-    filters: AgentConversationsQueryFilters | None = None
-    sort_by: list[AgentSortBy] | None = None
-    limit: int = 100
-    offset: int = 0
-    start: str | None = None
-    end: str | None = None
-
-
-class AgentConversationsQueryRes(BaseModel):
-    """Response containing a list of conversations."""
-
-    conversations: list[AgentConversationSchema]
-    total_count: int = 0
-
-
 class AgentConversationChatReq(BaseModel):
     """Request to get the multi-turn chat view for a conversation."""
 
@@ -366,7 +352,7 @@ class AgentsQueryRes(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Custom attribute filters (used by spans, conversations queries)
+# Custom attribute filters (used by spans queries)
 # ---------------------------------------------------------------------------
 
 
@@ -376,49 +362,6 @@ class AgentCustomAttrFilter(BaseModel):
     attr_key: str
     operator: str = "eq"
     value: str | int | float = ""
-
-
-# ---------------------------------------------------------------------------
-# Agent traces (GROUP BY trace_id on spans)
-# ---------------------------------------------------------------------------
-
-
-class AgentTraceSchema(BaseModel):
-    """Aggregated per-trace stats from GROUP BY trace_id on spans."""
-
-    project_id: str = ""
-    trace_id: str = ""
-    span_count: int = 0
-    total_input_tokens: int = 0
-    total_output_tokens: int = 0
-    error_count: int = 0
-    conversation_id: str = ""
-    agent_names: list[str] = Field(default_factory=list)
-    agent_versions: list[str] = Field(default_factory=list)
-    request_models: list[str] = Field(default_factory=list)
-    first_seen: datetime.datetime | None = None
-    last_seen: datetime.datetime | None = None
-
-
-class AgentTracesQueryReq(BaseModel):
-    """Request to list traces for a project."""
-
-    project_id: str
-    conversation_id: str | None = None
-    agent_name: str | None = None
-    agent_version: str | None = None
-    start: str | None = None
-    end: str | None = None
-    sort_by: list[AgentSortBy] | None = None
-    limit: int = 100
-    offset: int = 0
-
-
-class AgentTracesQueryRes(BaseModel):
-    """Response containing traces list."""
-
-    traces: list[AgentTraceSchema]
-    total_count: int = 0
 
 
 # ---------------------------------------------------------------------------

@@ -61,20 +61,14 @@ from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHa
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
-    AgentConversationsQueryReq,
-    AgentConversationsQueryRes,
     AgentSearchReq,
     AgentSearchRes,
     AgentSpansQueryReq,
     AgentSpansQueryRes,
-    AgentSpansTraceReq,
-    AgentSpansTraceRes,
     AgentsQueryReq,
     AgentsQueryRes,
     AgentTraceChatReq,
     AgentTraceChatRes,
-    AgentTracesQueryReq,
-    AgentTracesQueryRes,
     AgentVersionsQueryReq,
     AgentVersionsQueryRes,
     GenAIOTelExportReq,
@@ -6541,22 +6535,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
         return AgentQueryHandler(self._query).spans_query(req)
 
-    def agent_spans_trace(self, req: AgentSpansTraceReq) -> AgentSpansTraceRes:
-        return AgentQueryHandler(self._query).spans_trace(req)
-
-    def agent_traces_query(self, req: AgentTracesQueryReq) -> AgentTracesQueryRes:
-        return AgentQueryHandler(self._query).traces_query(req)
-
     def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
         return AgentQueryHandler(self._query).agents_query(req)
 
     def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
         return AgentQueryHandler(self._query).agent_versions_query(req)
-
-    def agent_conversations_query(
-        self, req: AgentConversationsQueryReq
-    ) -> AgentConversationsQueryRes:
-        return AgentQueryHandler(self._query).conversations_query(req)
 
     def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
         return AgentQueryHandler(self._query).search(req)

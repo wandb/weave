@@ -20,12 +20,11 @@ from weave.trace_server.agents.schema import (
     NormalizedMessage,
 )
 from weave.trace_server.agents.types import (
-    AgentConversationsQueryReq,
+    AgentGroupByRef,
     AgentSearchReq,
     AgentSpansQueryFilters,
     AgentSpansQueryReq,
     AgentsQueryReq,
-    AgentTracesQueryReq,
 )
 
 
@@ -79,12 +78,12 @@ def _insert_search_rows(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 1: Span insert and query
+# Test: ungrouped spans query
 # ---------------------------------------------------------------------------
 
 
 def test_spans_insert_and_query(ch_server):
-    """Insert spans and query with filters."""
+    """Insert spans and query with filters (ungrouped mode)."""
     project_id = _make_project_id("spans")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
@@ -107,6 +106,7 @@ def test_spans_insert_and_query(ch_server):
     res = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
     assert res.total_count == 3
     assert len(res.spans) == 3
+    assert res.groups == []
 
     # Filter by agent_name
     res_filtered = ch_server.agent_spans_query(
@@ -120,12 +120,12 @@ def test_spans_insert_and_query(ch_server):
 
 
 # ---------------------------------------------------------------------------
-# Test 2: Traces GROUP BY
+# Test: group by trace_id (replaces old traces_query)
 # ---------------------------------------------------------------------------
 
 
-def test_traces_group_by(ch_server):
-    """Traces query groups spans by trace_id with correct aggregation."""
+def test_group_by_trace_id(ch_server):
+    """Grouping spans by trace_id returns per-trace aggregates."""
     project_id = _make_project_id("traces")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     trace_a = uuid.uuid4().hex
@@ -161,10 +161,16 @@ def test_traces_group_by(ch_server):
     ]
     _insert_spans(ch_server.ch_client, spans)
 
-    res = ch_server.agent_traces_query(AgentTracesQueryReq(project_id=project_id))
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            group_by=[AgentGroupByRef(source="column", key="trace_id")],
+        )
+    )
     assert res.total_count == 2
+    assert res.spans == []
 
-    by_trace = {t.trace_id: t for t in res.traces}
+    by_trace = {g.group_keys["trace_id"]: g for g in res.groups}
     assert by_trace[trace_a].span_count == 2
     assert by_trace[trace_a].total_input_tokens == 300
     assert by_trace[trace_a].total_output_tokens == 50
@@ -175,7 +181,118 @@ def test_traces_group_by(ch_server):
 
 
 # ---------------------------------------------------------------------------
-# Test 3: Agents MV aggregation
+# Test: group by conversation_id (replaces old conversations_query)
+# ---------------------------------------------------------------------------
+
+
+def test_group_by_conversation_id(ch_server):
+    """Grouping spans by conversation_id returns per-conversation aggregates."""
+    project_id = _make_project_id("convs")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            conversation_name="Alpha Chat",
+            operation_name="invoke_agent",
+            agent_name="agent-x",
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_a,
+            conversation_name="Alpha Chat",
+            operation_name="chat",
+            agent_name="agent-x",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv_b,
+            conversation_name="Beta Chat",
+            operation_name="invoke_agent",
+            agent_name="agent-y",
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            filters=AgentSpansQueryFilters(),
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+        )
+    )
+    # Only inserted rows have our conversation_ids, but project may include
+    # a row with the default empty conversation_id from other tests; guard
+    # by filtering to the conversation_ids we actually created.
+    by_conv = {g.group_keys["conversation_id"]: g for g in res.groups}
+    assert conv_a in by_conv
+    assert conv_b in by_conv
+
+    assert by_conv[conv_a].span_count == 2
+    assert "agent-x" in by_conv[conv_a].agent_names
+
+    assert by_conv[conv_b].span_count == 1
+    assert "agent-y" in by_conv[conv_b].agent_names
+
+
+# ---------------------------------------------------------------------------
+# Test: group by a custom_attrs map key (the new capability)
+# ---------------------------------------------------------------------------
+
+
+def test_group_by_custom_attrs(ch_server):
+    """Grouping on a custom_attrs key buckets spans by the user-supplied label."""
+    project_id = _make_project_id("cattr")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            agent_name="a1",
+            custom_attrs={"env": "prod"},
+            input_tokens=100,
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            agent_name="a1",
+            custom_attrs={"env": "prod"},
+            input_tokens=200,
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            agent_name="a1",
+            custom_attrs={"env": "staging"},
+            input_tokens=50,
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            group_by=[
+                AgentGroupByRef(source="custom_attrs", key="env"),
+            ],
+        )
+    )
+    by_env = {g.group_keys["env"]: g for g in res.groups}
+    assert by_env["prod"].span_count == 2
+    assert by_env["prod"].total_input_tokens == 300
+    assert by_env["staging"].span_count == 1
+    assert by_env["staging"].total_input_tokens == 50
+
+
+# ---------------------------------------------------------------------------
+# Test: Agents MV aggregation
 # ---------------------------------------------------------------------------
 
 
@@ -226,64 +343,7 @@ def test_agents_mv_aggregation(ch_server):
 
 
 # ---------------------------------------------------------------------------
-# Test 4: Conversations query
-# ---------------------------------------------------------------------------
-
-
-def test_conversations_query(ch_server):
-    """Conversations are grouped from spans by conversation_id."""
-    project_id = _make_project_id("convs")
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
-    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
-
-    spans = [
-        # Conversation A: 2 spans, 1 invoke_agent
-        _make_span(
-            project_id,
-            conversation_id=conv_a,
-            conversation_name="Alpha Chat",
-            operation_name="invoke_agent",
-            agent_name="agent-x",
-            started_at=now,
-        ),
-        _make_span(
-            project_id,
-            conversation_id=conv_a,
-            conversation_name="Alpha Chat",
-            operation_name="chat",
-            agent_name="agent-x",
-            started_at=now + datetime.timedelta(seconds=1),
-        ),
-        # Conversation B: 1 span
-        _make_span(
-            project_id,
-            conversation_id=conv_b,
-            conversation_name="Beta Chat",
-            operation_name="invoke_agent",
-            agent_name="agent-y",
-            started_at=now + datetime.timedelta(seconds=2),
-        ),
-    ]
-    _insert_spans(ch_server.ch_client, spans)
-
-    res = ch_server.agent_conversations_query(
-        AgentConversationsQueryReq(project_id=project_id)
-    )
-    assert res.total_count == 2
-
-    by_conv = {c.conversation_id: c for c in res.conversations}
-    assert by_conv[conv_a].turn_count == 1
-    assert by_conv[conv_a].span_count == 2
-    assert "agent-x" in by_conv[conv_a].agent_names
-
-    assert by_conv[conv_b].turn_count == 1
-    assert by_conv[conv_b].span_count == 1
-    assert "agent-y" in by_conv[conv_b].agent_names
-
-
-# ---------------------------------------------------------------------------
-# Test 5: Message search
+# Test: Message search
 # ---------------------------------------------------------------------------
 
 

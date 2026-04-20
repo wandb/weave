@@ -27,26 +27,19 @@ from weave.trace_server.agents.schema import (
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
-    AgentConversationSchema,
-    AgentConversationsQueryReq,
-    AgentConversationsQueryRes,
     AgentSchema,
     AgentSearchConversationResult,
     AgentSearchMatchedMessage,
     AgentSearchReq,
     AgentSearchRes,
+    AgentSpanGroupRow,
     AgentSpanSchema,
     AgentSpansQueryReq,
     AgentSpansQueryRes,
-    AgentSpansTraceReq,
-    AgentSpansTraceRes,
     AgentsQueryReq,
     AgentsQueryRes,
     AgentTraceChatReq,
     AgentTraceChatRes,
-    AgentTraceSchema,
-    AgentTracesQueryReq,
-    AgentTracesQueryRes,
     AgentVersionSchema,
     AgentVersionsQueryReq,
     AgentVersionsQueryRes,
@@ -63,14 +56,10 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_agents_count_query,
     make_agents_list_query,
     make_conversation_chat_spans_query,
-    make_conversations_count_query,
-    make_conversations_list_query,
     make_message_search_query,
     make_spans_count_query,
     make_spans_list_query,
-    make_spans_trace_query,
-    make_traces_count_query,
-    make_traces_list_query,
+    make_trace_detail_spans_query,
     safe_int,
     safe_str,
 )
@@ -95,6 +84,29 @@ def _first_cell_int(result: Any) -> int:
     return safe_int(result.result_rows[0][0]) if result.result_rows else 0
 
 
+def _hydrate_group_row(
+    row: dict[str, Any], group_aliases: list[str]
+) -> AgentSpanGroupRow:
+    """Split a result row into (group_keys, aggregates) and build the response row."""
+    group_keys = {alias: row.get(alias) for alias in group_aliases}
+    return AgentSpanGroupRow(
+        group_keys=group_keys,
+        span_count=safe_int(row.get("span_count")),
+        trace_count=safe_int(row.get("trace_count")),
+        conversation_count=safe_int(row.get("conversation_count")),
+        total_input_tokens=safe_int(row.get("total_input_tokens")),
+        total_output_tokens=safe_int(row.get("total_output_tokens")),
+        total_duration_ms=safe_int(row.get("total_duration_ms")),
+        error_count=safe_int(row.get("error_count")),
+        agent_names=unpack_string_array(row.get("agent_names")),
+        agent_versions=unpack_string_array(row.get("agent_versions")),
+        provider_names=unpack_string_array(row.get("provider_names")),
+        request_models=unpack_string_array(row.get("request_models")),
+        first_seen=row.get("first_seen"),
+        last_seen=row.get("last_seen"),
+    )
+
+
 class AgentQueryHandler:
     """Read-side query operations for the agent observability system.
 
@@ -107,11 +119,17 @@ class AgentQueryHandler:
         self._query = query_fn
 
     # ------------------------------------------------------------------
-    # Spans queries
+    # Spans query (ungrouped + grouped)
     # ------------------------------------------------------------------
 
     def spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
-        """Query spans with filters, sort, and pagination."""
+        """Query spans with filters, sort, and pagination.
+
+        If ``req.group_by`` is empty, returns raw span rows in ``spans``.
+        Otherwise, groups by the supplied refs and returns aggregate rows
+        in ``groups`` (with the same fixed aggregate bundle regardless of
+        which columns / custom_attrs are grouped on).
+        """
         pb = ParamBuilder("genai")
         count_sql = make_spans_count_query(pb, req)
         list_sql = make_spans_list_query(pb, req)
@@ -120,57 +138,19 @@ class AgentQueryHandler:
         total = _first_cell_int(self._query(count_sql, params))
         result = self._query(list_sql, params)
 
-        spans = [
-            AgentSpanSchema(**normalize_span_row(r)) for r in _rows_as_dicts(result)
-        ]
-        return AgentSpansQueryRes(spans=spans, total_count=total)
+        if not req.group_by:
+            spans = [
+                AgentSpanSchema(**normalize_span_row(r))
+                for r in _rows_as_dicts(result)
+            ]
+            return AgentSpansQueryRes(spans=spans, total_count=total)
 
-    def spans_trace(self, req: AgentSpansTraceReq) -> AgentSpansTraceRes:
-        """Get all spans for a trace."""
-        pb = ParamBuilder("genai")
-        sql = make_spans_trace_query(pb, req)
-        result = self._query(sql, pb.get_params())
-        spans = [
-            AgentSpanSchema.model_construct(**normalize_span_row(r))
-            for r in _rows_as_dicts(result)
-        ]
-        return AgentSpansTraceRes(spans=spans)
+        aliases = [ref.alias or ref.key for ref in req.group_by]
+        groups = [_hydrate_group_row(r, aliases) for r in _rows_as_dicts(result)]
+        return AgentSpansQueryRes(groups=groups, total_count=total)
 
     # ------------------------------------------------------------------
-    # Traces queries (GROUP BY trace_id on spans)
-    # ------------------------------------------------------------------
-
-    def traces_query(self, req: AgentTracesQueryReq) -> AgentTracesQueryRes:
-        """Query traces by aggregating spans with time bounds."""
-        pb = ParamBuilder("genai")
-        count_sql = make_traces_count_query(pb, req)
-        list_sql = make_traces_list_query(pb, req)
-        params = pb.get_params()
-
-        total = _first_cell_int(self._query(count_sql, params))
-        result = self._query(list_sql, params)
-
-        traces = [
-            AgentTraceSchema(
-                project_id=req.project_id,
-                trace_id=safe_str(r.get("trace_id")),
-                span_count=safe_int(r.get("span_count")),
-                total_input_tokens=safe_int(r.get("total_input_tokens")),
-                total_output_tokens=safe_int(r.get("total_output_tokens")),
-                error_count=safe_int(r.get("error_count")),
-                conversation_id=safe_str(r.get("conversation_id")),
-                agent_names=unpack_string_array(r.get("agent_names")),
-                agent_versions=unpack_string_array(r.get("agent_versions")),
-                request_models=unpack_string_array(r.get("request_models")),
-                first_seen=r.get("first_seen"),
-                last_seen=r.get("last_seen"),
-            )
-            for r in _rows_as_dicts(result)
-        ]
-        return AgentTracesQueryRes(traces=traces, total_count=total)
-
-    # ------------------------------------------------------------------
-    # Agents AMT queries
+    # AMT-backed agents queries
     # ------------------------------------------------------------------
 
     def agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
@@ -198,10 +178,6 @@ class AgentQueryHandler:
         ]
         total = _first_cell_int(self._query(count_sql, params))
         return AgentsQueryRes(agents=agents, total_count=total)
-
-    # ------------------------------------------------------------------
-    # Agent versions AMT queries
-    # ------------------------------------------------------------------
 
     def agent_versions_query(
         self, req: AgentVersionsQueryReq
@@ -231,44 +207,6 @@ class AgentQueryHandler:
         ]
         total = _first_cell_int(self._query(count_sql, params))
         return AgentVersionsQueryRes(versions=versions, total_count=total)
-
-    # ------------------------------------------------------------------
-    # Conversations queries (GROUP BY conversation_id on spans)
-    # ------------------------------------------------------------------
-
-    def conversations_query(
-        self, req: AgentConversationsQueryReq
-    ) -> AgentConversationsQueryRes:
-        """Query conversations by aggregating spans with time bounds."""
-        pb = ParamBuilder("genai")
-        count_sql = make_conversations_count_query(pb, req)
-        list_sql = make_conversations_list_query(pb, req)
-        params = pb.get_params()
-
-        total = _first_cell_int(self._query(count_sql, params))
-        result = self._query(list_sql, params)
-
-        convs = [
-            AgentConversationSchema(
-                project_id=req.project_id,
-                conversation_id=safe_str(r.get("conversation_id")),
-                conversation_name=safe_str(r.get("conversation_name")),
-                turn_count=safe_int(r.get("turn_count")),
-                span_count=safe_int(r.get("span_count")),
-                total_input_tokens=safe_int(r.get("total_input_tokens")),
-                total_output_tokens=safe_int(r.get("total_output_tokens")),
-                total_duration_ms=safe_int(r.get("total_duration_ms")),
-                error_count=safe_int(r.get("error_count")),
-                agent_names=unpack_string_array(r.get("agent_names")),
-                agent_versions=unpack_string_array(r.get("agent_versions")),
-                provider_names=unpack_string_array(r.get("provider_names")),
-                request_models=unpack_string_array(r.get("request_models")),
-                first_seen=r.get("first_seen"),
-                last_seen=r.get("last_seen"),
-            )
-            for r in _rows_as_dicts(result)
-        ]
-        return AgentConversationsQueryRes(conversations=convs, total_count=total)
 
     # ------------------------------------------------------------------
     # Message search
@@ -306,6 +244,26 @@ class AgentQueryHandler:
 
         results = sorted(convs.values(), key=lambda c: c.last_activity, reverse=True)
         return AgentSearchRes(results=results, total_conversations=len(results))
+
+    # ------------------------------------------------------------------
+    # Internal: spans-for-one-trace with chat projection
+    # ------------------------------------------------------------------
+
+    def _trace_detail_spans(
+        self, project_id: str, trace_id: str
+    ) -> list[AgentSpanSchema]:
+        """Fetch all spans for a trace using the chat-view projection.
+
+        Used by the chat view handler to build ``AgentTraceChatRes``; not a
+        public query endpoint.
+        """
+        pb = ParamBuilder("genai")
+        sql = make_trace_detail_spans_query(pb, project_id, trace_id)
+        result = self._query(sql, pb.get_params())
+        return [
+            AgentSpanSchema.model_construct(**normalize_span_row(r))
+            for r in _rows_as_dicts(result)
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -394,13 +352,8 @@ class AgentWriteHandler:
     def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
         reader = AgentQueryHandler(self._query)
-        spans_res = reader.spans_trace(
-            AgentSpansTraceReq(
-                project_id=req.project_id,
-                trace_id=req.trace_id,
-            )
-        )
-        return build_trace_chat(spans_res.spans, req.trace_id)
+        spans = reader._trace_detail_spans(req.project_id, req.trace_id)
+        return build_trace_chat(spans, req.trace_id)
 
     def conversation_chat(
         self, req: AgentConversationChatReq
