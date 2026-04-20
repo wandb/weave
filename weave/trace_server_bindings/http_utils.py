@@ -26,8 +26,8 @@ _ENDPOINT_CACHE: set[str] = set()
 REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
 ROW_COUNT_CHUNKING_THRESHOLD = 1000
 
-# Retry once on a replica-lag 404 (short fixed wait to keep added latency bounded
-# when the object legitimately does not exist).
+# Retry once on a 404 to smooth over eventual consistency. Short fixed wait
+# keeps added latency bounded for genuinely missing objects.
 NOT_FOUND_RETRY_ATTEMPTS = 2
 NOT_FOUND_RETRY_WAIT_SECONDS = 1.0
 
@@ -359,11 +359,7 @@ _not_found_retry_disabled: ContextVar[bool] = ContextVar(
 
 @contextmanager
 def not_found_retry_disabled() -> Iterator[None]:
-    """Disable the 404 read retry for calls made inside this block.
-
-    Useful for callers doing existence checks where a clean, fast 404 is
-    preferable to retrying on replica lag.
-    """
+    """Disable the 404 read retry for calls made inside this block."""
     token = _not_found_retry_disabled.set(True)
     try:
         yield
@@ -372,11 +368,7 @@ def not_found_retry_disabled() -> Iterator[None]:
 
 
 def _is_retryable_not_found(exc: BaseException) -> bool:
-    """Return True for a 404 that looks like ClickHouse replica lag.
-
-    Skips retry when the response body carries `deleted_at`, which the server
-    includes for ObjectDeletedError: that 404 is authoritative, not a race.
-    """
+    """True for a 404 worth retrying; False if the body signals a deleted object."""
     if not isinstance(exc, httpx.HTTPStatusError) or exc.response is None:
         return False
     if exc.response.status_code != 404:
@@ -389,7 +381,7 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
 
 
 def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
-    """Retry a single time on replica-lag 404s, not on ObjectDeletedError."""
+    """Retry a read once on 404 to absorb eventual consistency."""
 
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
