@@ -246,6 +246,7 @@ from weave.trace_server.query_builder.table_query_builder import (
     make_natural_sort_table_query,
     make_standard_table_query,
     make_table_row_digests_query,
+    make_table_rows_read_batch_query,
     make_table_stats_basic_query,
     make_table_stats_query_with_storage_size,
 )
@@ -5246,6 +5247,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.EvalResultsQueryRes(
             rows=rows, total_rows=total_rows, summary=summary, warnings=warnings
         )
+
+    def _table_rows_read_batch(
+        self, project_id: str, digests: list[str]
+    ) -> dict[str, Any]:
+        """Batch read table_rows by digest. Returns {digest: parsed_val}."""
+        if len(digests) == 0:
+            return {}
+
+        pb = ParamBuilder()
+        sql = make_table_rows_read_batch_query(project_id, digests, pb)
+        result = self._query(sql, pb.get_params())
+        out: dict[str, Any] = {}
+        for row in result.result_rows:
+            d, val_dump = row[0], row[1]
+            parsed = try_parse_json(val_dump)
+            if parsed is not None:
+                out[d] = parsed
+        return out
 
     @staticmethod
     def _read_with_retry(
