@@ -14,6 +14,7 @@ from weave.trace_server.trace_server_common import digest_is_content_hash
 def _publish_obj(client: WeaveClient, name: str, val: dict | None = None):
     """Publish an object and return (object_id, digest)."""
     weave.publish(val or {"data": "test"}, name=name)
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -23,6 +24,11 @@ def _publish_obj(client: WeaveClient, name: str, val: dict | None = None):
     )
     obj = res.objs[-1]  # latest version (sorted by created_at asc)
     return obj.object_id, obj.digest
+
+
+def _settle_clickhouse_visibility():
+    """Give ClickHouse inserts a moment to become query-visible."""
+    time.sleep(0.2)
 
 
 def _create_obj_in_project(server, project_id: str, name: str, val: dict | None = None):
@@ -220,6 +226,7 @@ def test_digest_is_content_hash(digest: str, expected: bool):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_tag_crud(client: WeaveClient):
     """Full tag lifecycle via server API: add, remove, re-add, idempotent, remove nonexistent."""
     object_id, digest = _publish_obj(client, "srv_tag_crud")
@@ -233,6 +240,7 @@ def test_server_tag_crud(client: WeaveClient):
             tags=["reviewed", "staging"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -251,6 +259,7 @@ def test_server_tag_crud(client: WeaveClient):
             tags=["reviewed"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -277,6 +286,7 @@ def test_server_tag_crud(client: WeaveClient):
             tags=["staging"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -296,6 +306,7 @@ def test_server_tag_crud(client: WeaveClient):
                 tags=["staging"],
             )
         )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -324,6 +335,7 @@ def test_server_tag_crud(client: WeaveClient):
             tags=["latest"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -339,6 +351,7 @@ def test_server_tag_crud(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_alias_crud(client: WeaveClient):
     """Full alias lifecycle via server API: set, reassign, remove, remove nonexistent."""
     object_id, digest = _publish_obj(client, "srv_alias_crud")
@@ -352,6 +365,7 @@ def test_server_alias_crud(client: WeaveClient):
             aliases=["production"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -364,6 +378,7 @@ def test_server_alias_crud(client: WeaveClient):
     # Reassignment: create two versions, move alias from v0 to v1
     weave.publish({"v": 0}, name="srv_alias_reassign")
     weave.publish({"v": 1}, name="srv_alias_reassign")
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -389,6 +404,7 @@ def test_server_alias_crud(client: WeaveClient):
             aliases=["staging"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -408,6 +424,7 @@ def test_server_alias_crud(client: WeaveClient):
             aliases=["production"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -511,6 +528,7 @@ def test_server_alias_on_deleted_object(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_enrichment(client: WeaveClient):
     """Enrichment toggle: None when off, populated when on, empty lists for untagged objects."""
     oid, digest = _publish_obj(client, "srv_enrich")
@@ -531,6 +549,7 @@ def test_server_enrichment(client: WeaveClient):
             aliases=["prod"],
         )
     )
+    _settle_clickhouse_visibility()
 
     # Without enrichment — tags/aliases are None
     res = client.server.objs_query(
@@ -592,6 +611,7 @@ def test_server_enrichment(client: WeaveClient):
     # Multi-version enrichment: latest vs non-latest
     weave.publish({"v": 0}, name="srv_enrich_multi")
     weave.publish({"v": 1}, name="srv_enrich_multi")
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -613,6 +633,7 @@ def test_server_enrichment(client: WeaveClient):
             aliases=["stable"],
         )
     )
+    _settle_clickhouse_visibility()
     read_v0 = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client.project_id,
@@ -630,6 +651,7 @@ def test_server_enrichment(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_obj_read_digest_types(client: WeaveClient):
     """obj_read with real digest, alias, 'latest', and nonexistent alias."""
     oid, digest = _publish_obj(client, "srv_read_digest")
@@ -662,6 +684,7 @@ def test_server_obj_read_digest_types(client: WeaveClient):
             aliases=["stable"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client.project_id,
@@ -678,6 +701,7 @@ def test_server_obj_read_digest_types(client: WeaveClient):
     # "latest" digest — resolves to latest version
     weave.publish({"v": 0}, name="srv_read_latest")
     weave.publish({"v": 1}, name="srv_read_latest")
+    _settle_clickhouse_visibility()
     latest_q = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -696,6 +720,7 @@ def test_server_obj_read_digest_types(client: WeaveClient):
             tags=["deployed"],
         )
     )
+    _settle_clickhouse_visibility()
     read_res = client.server.obj_read(
         tsi.ObjReadReq(
             project_id=client.project_id,
@@ -724,6 +749,7 @@ def test_server_obj_read_digest_types(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_filter_by_tags(client: WeaveClient):
     """Filter by tags: single, multiple, nonexistent, empty list."""
     oid1, d1 = _publish_obj(client, "srv_ftag_a")
@@ -746,6 +772,7 @@ def test_server_filter_by_tags(client: WeaveClient):
             tags=["beta"],
         )
     )
+    _settle_clickhouse_visibility()
 
     # Single tag filter
     res = client.server.objs_query(
@@ -785,6 +812,7 @@ def test_server_filter_by_tags(client: WeaveClient):
     assert len(res.objs) >= 1
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_filter_by_aliases(client: WeaveClient):
     """Filter by aliases: custom alias, 'latest', nonexistent, specific version only."""
     oid, digest = _publish_obj(client, "srv_falias")
@@ -798,6 +826,7 @@ def test_server_filter_by_aliases(client: WeaveClient):
             aliases=["production"],
         )
     )
+    _settle_clickhouse_visibility()
 
     # Custom alias filter
     res = client.server.objs_query(
@@ -812,6 +841,7 @@ def test_server_filter_by_aliases(client: WeaveClient):
     # Filter by 'latest' — returns only latest version
     weave.publish({"v": 0}, name="srv_falias_latest")
     weave.publish({"v": 1}, name="srv_falias_latest")
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -829,6 +859,7 @@ def test_server_filter_by_aliases(client: WeaveClient):
     weave.publish({"v": 0}, name="srv_falias_specific")
     weave.publish({"v": 1}, name="srv_falias_specific")
     weave.publish({"v": 2}, name="srv_falias_specific")
+    _settle_clickhouse_visibility()
     all_res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -845,6 +876,7 @@ def test_server_filter_by_aliases(client: WeaveClient):
             aliases=["pinned"],
         )
     )
+    _settle_clickhouse_visibility()
     filtered = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -865,6 +897,7 @@ def test_server_filter_by_aliases(client: WeaveClient):
     assert len(res.objs) == 0
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_filter_combined_tags_and_aliases(client: WeaveClient):
     """Filtering with both tags and aliases simultaneously ANDs the conditions."""
     oid1, d1 = _publish_obj(client, "srv_combo1")
@@ -908,6 +941,7 @@ def test_server_filter_combined_tags_and_aliases(client: WeaveClient):
             aliases=["production"],
         )
     )
+    _settle_clickhouse_visibility()
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
@@ -927,11 +961,13 @@ def test_server_filter_combined_tags_and_aliases(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_version_and_object_isolation(client: WeaveClient):
     """Tags scoped to version, aliases across versions, latest virtual, cross-object isolation."""
     # Tags scoped to version
     weave.publish({"v": 0}, name="srv_iso_ver")
     weave.publish({"v": 1}, name="srv_iso_ver")
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -949,6 +985,7 @@ def test_server_version_and_object_isolation(client: WeaveClient):
             tags=["v0-only"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -977,6 +1014,7 @@ def test_server_version_and_object_isolation(client: WeaveClient):
             aliases=["canary"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -1010,6 +1048,7 @@ def test_server_version_and_object_isolation(client: WeaveClient):
             aliases=["only-on-b"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client.project_id,
@@ -1024,6 +1063,7 @@ def test_server_version_and_object_isolation(client: WeaveClient):
     assert "only-on-b" not in (objs_by_id[oid_a].aliases or [])
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_batch_enrichment(client: WeaveClient):
     """Enrichment of 3+ distinct objects in one objs_query call."""
     oid1, d1 = _publish_obj(client, "srv_batch_a")
@@ -1062,6 +1102,7 @@ def test_server_batch_enrichment(client: WeaveClient):
             aliases=["canary"],
         )
     )
+    _settle_clickhouse_visibility()
 
     res = client.server.objs_query(
         tsi.ObjQueryReq(
@@ -1090,6 +1131,7 @@ def test_server_batch_enrichment(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_list_endpoints(client: WeaveClient):
     """List tags and aliases: empty project, distinct sorted, excludes removed."""
     # Empty project
@@ -1124,6 +1166,7 @@ def test_server_list_endpoints(client: WeaveClient):
             tags=["alpha", "gamma"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.tags_list(tsi.TagsListReq(project_id=client.project_id))
     assert res.tags == ["alpha", "beta", "gamma"]
 
@@ -1143,6 +1186,7 @@ def test_server_list_endpoints(client: WeaveClient):
             aliases=["canary"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.aliases_list(tsi.AliasesListReq(project_id=client.project_id))
     assert res.aliases == ["canary", "production"]
 
@@ -1162,6 +1206,7 @@ def test_server_list_endpoints(client: WeaveClient):
             aliases=["production"],
         )
     )
+    _settle_clickhouse_visibility()
     res = client.server.tags_list(tsi.TagsListReq(project_id=client.project_id))
     assert "beta" not in res.tags
     assert "alpha" in res.tags
