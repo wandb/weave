@@ -110,7 +110,9 @@ class AgentGroupByRef(BaseModel):
         "custom_attrs_float",
     ] = "column"
     key: str
-    alias: str | None = None  # output key in AgentSpanGroupRow.group_keys (defaults to `key`)
+    alias: str | None = (
+        None  # output key in AgentSpanGroupRow.group_keys (defaults to `key`)
+    )
 
 
 class AgentSpanGroupRow(BaseModel):

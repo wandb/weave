@@ -142,8 +142,7 @@ class AgentQueryHandler:
 
         if not req.group_by:
             spans = [
-                AgentSpanSchema(**normalize_span_row(r))
-                for r in _rows_as_dicts(result)
+                AgentSpanSchema(**normalize_span_row(r)) for r in _rows_as_dicts(result)
             ]
             return AgentSpansQueryRes(spans=spans, total_count=total)
 
@@ -181,9 +180,7 @@ class AgentQueryHandler:
         total = _first_cell_int(self._query(count_sql, params))
         return AgentsQueryRes(agents=agents, total_count=total)
 
-    def agent_versions_query(
-        self, req: AgentVersionsQueryReq
-    ) -> AgentVersionsQueryRes:
+    def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
         """Query agent_versions AMT for version drill-down."""
         pb = ParamBuilder("genai")
         list_sql = make_agent_versions_list_query(pb, req)

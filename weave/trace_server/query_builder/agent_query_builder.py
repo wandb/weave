@@ -331,9 +331,7 @@ def resolve_group_by(
 
         if ref.source == "column":
             if ref.key not in SPAN_GROUP_BY_COLS:
-                raise ValueError(
-                    f"group_by column {ref.key!r} is not in the allowlist"
-                )
+                raise ValueError(f"group_by column {ref.key!r} is not in the allowlist")
             sql_expr = f"{table_alias}.{ref.key}"
         elif ref.source in _CUSTOM_ATTR_SOURCES:
             key_slot = pb.add(str(ref.key), param_type="String")
@@ -383,9 +381,7 @@ def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
     if req.roles:
         conditions.append(f"role IN {pb.add(req.roles, param_type='Array(String)')}")
     if req.agent_name:
-        conditions.append(
-            f"agent_name = {pb.add(req.agent_name, param_type='String')}"
-        )
+        conditions.append(f"agent_name = {pb.add(req.agent_name, param_type='String')}")
     if req.conversation_id:
         conditions.append(
             f"conversation_id = {pb.add(req.conversation_id, param_type='String')}"
@@ -447,9 +443,7 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     limit_slot, offset_slot, _ = _pagination_slots(pb, req.limit, req.offset)
 
     if not req.group_by:
-        order_by = build_order_by(
-            req.sort_by, SPAN_SORTABLE_COLS, "started_at DESC"
-        )
+        order_by = build_order_by(req.sort_by, SPAN_SORTABLE_COLS, "started_at DESC")
         return f"""
             SELECT {SPANS_LIST_COLS}
             FROM spans s
@@ -543,9 +537,7 @@ def make_agent_versions_count_query(
     )
 
 
-def make_agent_versions_list_query(
-    pb: ParamBuilder, req: AgentVersionsQueryReq
-) -> str:
+def make_agent_versions_list_query(pb: ParamBuilder, req: AgentVersionsQueryReq) -> str:
     where = _agent_versions_where(pb, req)
     limit_slot, offset_slot, _ = _pagination_slots(pb, req.limit, req.offset)
     return f"""

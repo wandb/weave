@@ -147,9 +147,7 @@ class TestMakeSpansListQuery:
 
     def test_limit_capped_to_max(self) -> None:
         pb = ParamBuilder("genai")
-        make_spans_list_query(
-            pb, AgentSpansQueryReq(project_id="p1", limit=99999)
-        )
+        make_spans_list_query(pb, AgentSpansQueryReq(project_id="p1", limit=99999))
         assert pb.get_params()["genai_1"] == 10000
 
 
@@ -376,9 +374,7 @@ class TestResolveGroupBy:
 
     def test_defaults_alias_to_key_when_valid(self) -> None:
         pb = ParamBuilder("genai")
-        out = resolve_group_by(
-            pb, [AgentGroupByRef(source="custom_attrs", key="env")]
-        )
+        out = resolve_group_by(pb, [AgentGroupByRef(source="custom_attrs", key="env")])
         assert out == [("s.custom_attrs[{genai_0:String}]", "env")]
 
     def test_custom_alias_used_when_key_non_identifier(self) -> None:
