@@ -235,3 +235,25 @@ def make_table_row_digests_query(
     WHERE rn = 1
     ORDER BY project_id, digest
     """
+
+
+def make_table_rows_read_batch_query(
+    project_id: str,
+    digests: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Generate a query to batch-read table_rows by digest.
+
+    Returns one row per digest with the resolved val_dump.
+    Uses any() because table_rows is a ReplacingMergeTree and
+    may have duplicate rows per digest.
+    """
+    project_param = pb.add(project_id, None, "String")
+    digests_param = pb.add(digests, None, "Array(String)")
+    return f"""
+        SELECT digest, any(val_dump) AS val_dump
+        FROM table_rows
+        PREWHERE project_id = {project_param}
+        WHERE digest IN {digests_param}
+        GROUP BY project_id, digest
+    """

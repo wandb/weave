@@ -245,6 +245,7 @@ from weave.trace_server.query_builder.table_query_builder import (
     make_natural_sort_table_query,
     make_standard_table_query,
     make_table_row_digests_query,
+    make_table_rows_read_batch_query,
     make_table_stats_basic_query,
     make_table_stats_query_with_storage_size,
 )
