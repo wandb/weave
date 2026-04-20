@@ -23,9 +23,7 @@ END"""
 
 def _or_any_prefix_matches(op_name_expr: str, op_prefix_params: list[str]) -> str:
     """`position(op_name, p) > 0` OR'd across every prefix param."""
-    return " OR ".join(
-        f"position({op_name_expr}, {p}) > 0" for p in op_prefix_params
-    )
+    return " OR ".join(f"position({op_name_expr}, {p}) > 0" for p in op_prefix_params)
 
 
 def build_predict_and_score_calls_cte(
