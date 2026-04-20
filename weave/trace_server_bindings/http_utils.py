@@ -1,9 +1,6 @@
 import json
 import logging
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
-from functools import wraps
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 import httpx
@@ -357,9 +354,9 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
     """True only for 404-like misses worth retrying.
 
     Skips authoritative deletes (local `ObjectDeletedError` or HTTP response
-    body carrying `deleted_at`). Covers both local server domain exceptions
-    (`NotFoundError`) and remote HTTP 404s; anything else is not in scope for
-    this retry layer and returns False.
+    body with `deleted_at`). Covers both local server domain exceptions
+    (`NotFoundError`) and remote HTTP 404s; anything else (including a 404
+    with a non-JSON body) is out of scope for this retry layer.
     """
     # Authoritative delete -- never retry.
     if isinstance(exc, ObjectDeletedError):
@@ -375,51 +372,24 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
     try:
         body = exc.response.json()
     except (json.JSONDecodeError, ValueError):
+        return False
+    if not isinstance(body, dict):
         return True
-    return not (isinstance(body, dict) and "deleted_at" in body)
-
-
-_in_write_then_read: ContextVar[bool] = ContextVar(
-    "weave_in_write_then_read", default=False
-)
-
-
-@contextmanager
-def write_then_read_scope() -> Iterator[None]:
-    """Mark the enclosed block as a write-then-read flow.
-
-    Calls wrapped with `retry_on_not_found` within this scope retry 404s that
-    look like eventual-consistency races. Outside the scope the same wrapping
-    is a pass-through, so genuine 404s stay fast.
-    """
-    token = _in_write_then_read.set(True)
-    try:
-        yield
-    finally:
-        _in_write_then_read.reset(token)
+    return body.get("deleted_at") is None
 
 
 def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
-    """Retry 404s on write-then-read paths; pass-through otherwise.
+    """Retry a callable once on an eventual-consistency 404.
 
-    Activates only inside `write_then_read_scope()`, so nested deserialization
-    reads (object, custom-type files, nested refs) can opt into retry without
-    affecting user-initiated reads on arbitrary refs. ObjectDeletedError 404s
-    (body carries `deleted_at`) never retry. Uses a short fixed wait since
-    eventual-consistency windows are typically sub-second.
+    Intended for explicit opt-in at write-then-read call sites. Skips
+    authoritative deletes (`ObjectDeletedError` or body with `deleted_at`).
+    Uses a short fixed wait since eventual-consistency windows are typically
+    sub-second.
     """
-    retrying = with_retry(
+    return with_retry(
         retry_if=_is_retryable_not_found,
         wait=tenacity.wait_fixed(NOT_FOUND_RETRY_WAIT_SECONDS),
     )(func)
-
-    @wraps(func)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        if _in_write_then_read.get():
-            return retrying(*args, **kwargs)
-        return func(*args, **kwargs)
-
-    return wrapper
 
 
 # Error code from server when project requires calls_complete mode

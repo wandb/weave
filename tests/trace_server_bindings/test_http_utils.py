@@ -13,7 +13,6 @@ from weave.trace_server_bindings.http_utils import (
     handle_response_error,
     process_batch_with_retry,
     retry_on_not_found,
-    write_then_read_scope,
 )
 
 
@@ -68,20 +67,10 @@ def _make_404(body: dict) -> httpx.HTTPStatusError:
 
 
 def test_retry_on_not_found_behavior(monkeypatch):
-    """Retry a non-deleted 404 inside `write_then_read_scope`; pass-through outside.
-
-    Authoritative deletes (`ObjectDeletedError` locally, or `deleted_at` in the
-    HTTP body) are never retried.
-    """
+    """Retry a non-deleted 404; skip authoritative deletes and non-404s."""
     monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "2")
     monkeypatch.setattr(http_utils, "NOT_FOUND_RETRY_WAIT_SECONDS", 0.0)
-    calls = {
-        "http": 0,
-        "local": 0,
-        "deleted_http": 0,
-        "deleted_local": 0,
-        "unscoped": 0,
-    }
+    calls = {"http": 0, "local": 0, "deleted_http": 0, "deleted_local": 0}
 
     @retry_on_not_found
     def flaky_http_404():
@@ -110,25 +99,15 @@ def test_retry_on_not_found_behavior(monkeypatch):
             deleted_at=datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc),
         )
 
-    @retry_on_not_found
-    def unscoped_missing():
-        calls["unscoped"] += 1
-        raise _make_404({"reason": "not found"})
-
-    with write_then_read_scope():
-        assert flaky_http_404() == "ok"
-        assert flaky_local_not_found() == "ok"
+    assert flaky_http_404() == "ok"
+    assert flaky_local_not_found() == "ok"
     assert calls["http"] == 2
     assert calls["local"] == 2
 
-    with write_then_read_scope(), pytest.raises(httpx.HTTPStatusError):
+    with pytest.raises(httpx.HTTPStatusError):
         deleted_http()
     assert calls["deleted_http"] == 1
 
-    with write_then_read_scope(), pytest.raises(ObjectDeletedError):
+    with pytest.raises(ObjectDeletedError):
         deleted_local()
     assert calls["deleted_local"] == 1
-
-    with pytest.raises(httpx.HTTPStatusError):
-        unscoped_missing()
-    assert calls["unscoped"] == 1
