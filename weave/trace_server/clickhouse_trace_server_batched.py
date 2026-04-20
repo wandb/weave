@@ -1860,6 +1860,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return obj_results
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_read")
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         # Check if digest is an alias name (not a hash, not version-like, not "latest")
         digest = req.digest
@@ -1943,6 +1944,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._enrich_objs_with_tags_and_aliases(req.project_id, obj_schemas)
         return tsi.ObjQueryRes(objs=obj_schemas)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_delete")
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         """Delete object versions by digest, belonging to given object_id.
         All deletion in this method is "soft". Deletion occurs by inserting
@@ -3468,6 +3470,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 code=code,
             )
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.op_delete")
     def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
         """Delete op object versions by delegating to obj_delete with op filtering."""
         # First verify that the objects are indeed ops by querying them
@@ -5184,10 +5187,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             NotFoundError: If the data is not found after all attempts.
         """
 
+        def _tag_retry(retry_state: Any) -> None:
+            span = ddtrace.tracer.current_span()
+            if span is not None:
+                span.set_tag(
+                    "clickhouse.read_retry.attempt", retry_state.attempt_number
+                )
+
         @retry(
             stop=stop_after_attempt(max_attempts),
             wait=wait_exponential(multiplier=1, min=initial_delay_seconds, max=1.0),
             retry=retry_if_exception_type(NotFoundError),
+            before_sleep=_tag_retry,
             reraise=True,
         )
         def _do_read() -> T:
@@ -5601,6 +5612,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return True
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.file_content_read")
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         pb = ParamBuilder()
         query = make_file_content_read_query(
