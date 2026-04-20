@@ -246,13 +246,11 @@ def add_time_filters(
 ) -> None:
     """Add start/end time range conditions using parseDateTimeBestEffort."""
     if start:
-        conditions.append(
-            f"{column} >= parseDateTimeBestEffort({pb.add(str(start), param_type='String')})"
-        )
+        start_slot = pb.add(str(start), param_type="String")
+        conditions.append(f"{column} >= parseDateTimeBestEffort({start_slot})")
     if end:
-        conditions.append(
-            f"{column} < parseDateTimeBestEffort({pb.add(str(end), param_type='String')})"
-        )
+        end_slot = pb.add(str(end), param_type="String")
+        conditions.append(f"{column} < parseDateTimeBestEffort({end_slot})")
 
 
 def add_span_filters(
@@ -266,9 +264,8 @@ def add_span_filters(
     for attr in sorted(SPAN_FILTERABLE_COLS):
         val = getattr(filters, attr, None)
         if val:
-            conditions.append(
-                f"{table_alias}.{attr} = {pb.add(val, param_type='String')}"
-            )
+            val_slot = pb.add(val, param_type="String")
+            conditions.append(f"{table_alias}.{attr} = {val_slot}")
 
 
 def add_custom_attr_filters(
@@ -348,7 +345,8 @@ def resolve_group_by(
 
 
 def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
-    conditions = [f"s.project_id = {pb.add(req.project_id, param_type='String')}"]
+    pid_slot = pb.add(req.project_id, param_type="String")
+    conditions = [f"s.project_id = {pid_slot}"]
     add_time_filters(conditions, pb, start=req.start, end=req.end)
     if req.filters:
         add_span_filters(conditions, pb, req.filters)
@@ -359,11 +357,11 @@ def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
 
 
 def _agents_where(pb: ParamBuilder, req: AgentsQueryReq) -> str:
-    conditions = [f"project_id = {pb.add(req.project_id, param_type='String')}"]
+    pid_slot = pb.add(req.project_id, param_type="String")
+    conditions = [f"project_id = {pid_slot}"]
     if req.filters and req.filters.agent_name:
-        conditions.append(
-            f"agent_name = {pb.add(req.filters.agent_name, param_type='String')}"
-        )
+        aname_slot = pb.add(req.filters.agent_name, param_type="String")
+        conditions.append(f"agent_name = {aname_slot}")
     return " AND ".join(conditions)
 
 
@@ -374,26 +372,27 @@ def _agent_versions_where(pb: ParamBuilder, req: AgentVersionsQueryReq) -> str:
 
 
 def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
+    pid_slot = pb.add(req.project_id, param_type="String")
+    content_slot = pb.add(f"%{req.query}%", param_type="String")
     conditions = [
-        f"project_id = {pb.add(req.project_id, param_type='String')}",
-        f"content LIKE {pb.add(f'%{req.query}%', param_type='String')}",
+        f"project_id = {pid_slot}",
+        f"content LIKE {content_slot}",
     ]
     if req.roles:
-        conditions.append(f"role IN {pb.add(req.roles, param_type='Array(String)')}")
+        roles_slot = pb.add(req.roles, param_type="Array(String)")
+        conditions.append(f"role IN {roles_slot}")
     if req.agent_name:
-        conditions.append(f"agent_name = {pb.add(req.agent_name, param_type='String')}")
+        agent_slot = pb.add(req.agent_name, param_type="String")
+        conditions.append(f"agent_name = {agent_slot}")
     if req.conversation_id:
-        conditions.append(
-            f"conversation_id = {pb.add(req.conversation_id, param_type='String')}"
-        )
+        conv_slot = pb.add(req.conversation_id, param_type="String")
+        conditions.append(f"conversation_id = {conv_slot}")
     if req.started_after:
-        conditions.append(
-            f"started_at >= {pb.add(req.started_after, param_type='DateTime64(6)')}"
-        )
+        after_slot = pb.add(req.started_after, param_type="DateTime64(6)")
+        conditions.append(f"started_at >= {after_slot}")
     if req.started_before:
-        conditions.append(
-            f"started_at < {pb.add(req.started_before, param_type='DateTime64(6)')}"
-        )
+        before_slot = pb.add(req.started_before, param_type="DateTime64(6)")
+        conditions.append(f"started_at < {before_slot}")
     return " AND ".join(conditions)
 
 
