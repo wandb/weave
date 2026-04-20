@@ -138,6 +138,11 @@ class MissingLLMApiKeyError(Error):
 class ObjectDeletedError(Error):
     """Raised when an object has been deleted."""
 
+    # Surfaced in the HTTP body via `_format_error_to_json_with_extra` so
+    # clients can distinguish an authoritative delete from a generic 404
+    # without sniffing message fields.
+    error_code = "OBJECT_DELETED"
+
     def __init__(self, message: str, deleted_at: datetime.datetime):
         self.deleted_at = deleted_at
         super().__init__(message)

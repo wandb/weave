@@ -285,11 +285,16 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
         message = extracted_message or default_message or "Calls complete mode required"
         raise CallsCompleteModeRequired(message)
 
-    # Authoritative delete: the server formats `ObjectDeletedError` as a 404
-    # with `deleted_at` in the JSON body. Surface it as the typed exception so
-    # SDK callers see the same error class regardless of local vs remote
-    # server, and so retry layers can tell it apart from a replica-lag 404.
-    if response.status_code == 404:
+    # Authoritative delete: surface the typed exception so SDK callers see
+    # the same error class regardless of local vs remote server, and so
+    # retry layers can tell it apart from a replica-lag 404. `error_code` is
+    # the official discriminator going forward (matches how
+    # CallsCompleteModeRequired is identified); `error_code is None` covers
+    # pre-error_code servers that only set `deleted_at`.
+    if response.status_code == 404 and error_code in {
+        ERROR_CODE_OBJECT_DELETED,
+        None,
+    }:
         deleted_at = _parse_deleted_at(error_data)
         if deleted_at is not None:
             raise ObjectDeletedError(
@@ -425,6 +430,9 @@ def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
 # Error code from server when project requires calls_complete mode
 # This matches the ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.trace_server.errors
 ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
+
+# Matches `ObjectDeletedError.error_code` on the server.
+ERROR_CODE_OBJECT_DELETED = "OBJECT_DELETED"
 
 
 class CallsCompleteModeRequired(Exception):
