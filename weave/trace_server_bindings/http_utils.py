@@ -374,7 +374,7 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
     except (json.JSONDecodeError, ValueError):
         return False
     if not isinstance(body, dict):
-        return True
+        return False
     return body.get("deleted_at") is None
 
 
