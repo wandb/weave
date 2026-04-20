@@ -204,16 +204,23 @@ from weave.trace_server.project_version.project_version import (
 )
 from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
+    make_annotator_progress_insert_query,
+    make_annotator_progress_state_check_query,
     make_annotator_progress_update_query,
     make_queue_add_calls_check_duplicates_query,
     make_queue_add_calls_fetch_calls_query,
     make_queue_create_query,
     make_queue_delete_query,
+    make_queue_item_existence_query,
     make_queue_items_query,
     make_queue_read_query,
     make_queue_update_query,
     make_queues_query,
     make_queues_stats_query,
+)
+from weave.trace_server.query_builder.files_query_builder import (
+    make_file_content_read_query,
+    make_files_stats_query,
 )
 from weave.trace_server.query_builder.obj_tags_query_builder import (
     make_get_aliases_query,
@@ -231,15 +238,17 @@ from weave.trace_server.query_builder.objects_query_builder import (
 from weave.trace_server.query_builder.project_query_builder import (
     make_project_stats_query,
 )
-from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
-from weave.trace_server.table_query_builder import (
+from weave.trace_server.query_builder.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
     TABLE_ROWS_ALIAS,
     VAL_DUMP_COLUMN_NAME,
     make_natural_sort_table_query,
     make_standard_table_query,
+    make_table_row_digests_query,
+    make_table_stats_basic_query,
     make_table_stats_query_with_storage_size,
 )
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -2281,24 +2290,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        query = """
-            SELECT *
-            FROM (
-                    SELECT *,
-                        row_number() OVER (PARTITION BY project_id, digest) AS rn
-                    FROM tables
-                    WHERE project_id = {project_id:String} AND digest = {digest:String}
-                )
-            WHERE rn = 1
-            ORDER BY project_id, digest
-        """
-
+        pb = ParamBuilder()
+        query = make_table_row_digests_query(
+            project_id=req.project_id,
+            digest=req.base_digest,
+            pb=pb,
+        )
         row_digest_result_query = self.ch_client.query(
             query,
-            parameters={
-                "project_id": req.project_id,
-                "digest": req.base_digest,
-            },
+            parameters=pb.get_params(),
         )
 
         if len(row_digest_result_query.result_rows) == 0:
@@ -2522,29 +2522,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def table_query_stats_batch(
         self, req: tsi.TableQueryStatsBatchReq
     ) -> tsi.TableQueryStatsBatchRes:
-        parameters: dict[str, Any] = {
-            "project_id": req.project_id,
-            "digests": req.digests,
-        }
-
-        query = """
-        SELECT digest, any(length(row_digests))
-        FROM tables
-        WHERE project_id = {project_id:String} AND digest IN {digests:Array(String)}
-        GROUP BY digest
-        """
-
+        pb = ParamBuilder()
         if req.include_storage_size:
-            # Use an advanced query builder to get the storage size
-            pb = ParamBuilder()
             query = make_table_stats_query_with_storage_size(
                 project_id=req.project_id,
                 table_digests=cast(list[str], req.digests),
                 pb=pb,
             )
-            parameters = pb.get_params()
+        else:
+            query = make_table_stats_basic_query(
+                project_id=req.project_id,
+                table_digests=cast(list[str], req.digests),
+                pb=pb,
+            )
 
-        query_result = self.ch_client.query(query, parameters=parameters)
+        query_result = self.ch_client.query(query, parameters=pb.get_params())
 
         tables = [
             ch_table_stats_to_table_stats_schema(row)
@@ -3189,26 +3181,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not annotator_id:
             raise ValueError("wb_user_id is required")
 
-        pb = ParamBuilder()
-        project_id_param = pb.add(req.project_id)
-        queue_id_param = pb.add(req.queue_id)
-        item_id_param = pb.add(req.item_id)
-        annotator_id_param = pb.add(annotator_id)
-
         # First, check current state and validate the queue item exists
-        check_query = f"""
-        SELECT
-            annotation_state,
-            COUNT(*) as record_exists
-        FROM annotator_queue_items_progress
-        WHERE project_id = {project_id_param}
-          AND queue_item_id = {item_id_param}
-          AND annotator_id = {annotator_id_param}
-          AND deleted_at IS NULL
-        GROUP BY annotation_state
-        """
-
-        check_result = self.ch_client.query(check_query, parameters=pb.get_params())
+        check_pb = ParamBuilder()
+        check_query = make_annotator_progress_state_check_query(
+            project_id=req.project_id,
+            queue_item_id=req.item_id,
+            annotator_id=annotator_id,
+            pb=check_pb,
+        )
+        check_result = self.ch_client.query(
+            check_query, parameters=check_pb.get_params()
+        )
         current_state = None
         has_record = False
 
@@ -3243,18 +3226,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         # Also verify the queue item exists in annotation_queue_items
-        item_check_query = f"""
-        SELECT id
-        FROM annotation_queue_items
-        WHERE id = {item_id_param}
-          AND project_id = {project_id_param}
-          AND queue_id = {queue_id_param}
-          AND deleted_at IS NULL
-        LIMIT 1
-        """
-
+        existence_pb = ParamBuilder()
+        item_check_query = make_queue_item_existence_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            queue_item_id=req.item_id,
+            pb=existence_pb,
+        )
         item_check_result = self.ch_client.query(
-            item_check_query, parameters=pb.get_params()
+            item_check_query, parameters=existence_pb.get_params()
         )
         if not list(item_check_result.named_results()):
             raise ValueError(
@@ -3263,37 +3243,34 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if has_record:
             # Use ClickHouse lightweight UPDATE for existing record
+            update_pb = ParamBuilder()
             update_query = make_annotator_progress_update_query(
                 project_id=req.project_id,
                 queue_item_id=req.item_id,
                 annotator_id=annotator_id,
                 annotation_state=req.annotation_state,
-                pb=pb,
+                pb=update_pb,
                 cluster_name=self.clickhouse_cluster_name,
             )
             self._command(
                 update_query,
-                parameters=pb.get_params(),
+                parameters=update_pb.get_params(),
                 settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
             )
         else:
             # Create new record
-            progress_id = generate_id()
-            progress_id_param = pb.add(progress_id)
-            new_state_param = pb.add(req.annotation_state)
-            now = datetime.datetime.now(datetime.timezone.utc)
-            now_param = pb.add(now)
-
-            insert_query = f"""
-            INSERT INTO annotator_queue_items_progress
-                (id, project_id, queue_item_id, queue_id, annotator_id,
-                 annotation_state, created_at, updated_at, deleted_at)
-            VALUES
-                ({progress_id_param}, {project_id_param}, {item_id_param},
-                 {queue_id_param}, {annotator_id_param}, {new_state_param},
-                 {now_param}, {now_param}, NULL)
-            """
-            self._command(insert_query, parameters=pb.get_params())
+            insert_pb = ParamBuilder()
+            insert_query = make_annotator_progress_insert_query(
+                project_id=req.project_id,
+                queue_id=req.queue_id,
+                queue_item_id=req.item_id,
+                annotator_id=annotator_id,
+                progress_id=generate_id(),
+                annotation_state=req.annotation_state,
+                now=datetime.datetime.now(datetime.timezone.utc),
+                pb=insert_pb,
+            )
+            self._command(insert_query, parameters=insert_pb.get_params())
 
         return self._fetch_queue_item_for_progress_update(
             req.project_id, req.queue_id, req.item_id
@@ -5642,23 +5619,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return True
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        # The subquery is responsible for deduplication of file chunks by digest
+        pb = ParamBuilder()
+        query = make_file_content_read_query(
+            project_id=req.project_id,
+            digest=req.digest,
+            pb=pb,
+        )
         query_result = self.ch_client.query(
-            """
-            SELECT n_chunks, val_bytes, file_storage_uri
-            FROM (
-                SELECT *
-                FROM (
-                        SELECT *,
-                            row_number() OVER (PARTITION BY project_id, digest, chunk_index) AS rn
-                        FROM files
-                        WHERE project_id = {project_id:String} AND digest = {digest:String}
-                    )
-                WHERE rn = 1
-                ORDER BY project_id, digest, chunk_index
-            )
-            WHERE project_id = {project_id:String} AND digest = {digest:String}""",
-            parameters={"project_id": req.project_id, "digest": req.digest},
+            query,
+            parameters=pb.get_params(),
             column_formats={"val_bytes": "bytes"},
         )
 
@@ -5731,14 +5700,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         pb = ParamBuilder()
-
-        project_id_param = pb.add_param(req.project_id)
-
-        query = f"""
-        SELECT sum(size_bytes) as total_size_bytes
-        FROM files_stats
-        WHERE project_id = {{{project_id_param}: String}}
-        """
+        query = make_files_stats_query(project_id=req.project_id, pb=pb)
         result = self.ch_client.query(query, parameters=pb.get_params())
 
         if len(result.result_rows) == 0 or result.result_rows[0][0] is None:
