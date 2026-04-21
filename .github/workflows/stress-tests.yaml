@@ -20,8 +20,11 @@ on:
       - "**/stress-*"
 
 jobs:
-  stress-obj-read:
-    name: Stress obj_read flake
+  stress-isolated:
+    # Runs only the stress file against a fresh CH container. Serves as a
+    # baseline: if this flakes, the publish→get path is broken under its
+    # own load and we don't need co-tenant noise to repro.
+    name: Stress (isolated)
     timeout-minutes: 45
     runs-on: ubuntu-latest-8-cores
     services:
@@ -50,7 +53,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install nox uv
-      - name: Run stress tests (ClickHouse)
+      - name: Run stress tests in isolation
         env:
           CI: 1
           WF_CLICKHOUSE_HOST: localhost
@@ -60,10 +63,8 @@ jobs:
           REPEATS: ${{ github.event.inputs.repeats || '3' }}
         run: |
           set -euxo pipefail
-          # Repeat the stress file several times per job so a single run
-          # amortizes enough publish/get cycles to surface a rare race.
           for i in $(seq 1 "${REPEATS}"); do
-            echo "=== stress pass ${i}/${REPEATS} ==="
+            echo "=== stress-isolated pass ${i}/${REPEATS} ==="
             nox -e "tests-3.${{ github.event.inputs.python-minor || '10' }}(shard='trace')" -- \
               --run-stress \
               -m "stress" \
@@ -72,13 +73,78 @@ jobs:
               -o log_cli_level=INFO \
               tests/trace/test_obj_read_stress.py
           done
-      - name: Upload pytest logs
-        if: always()
-        uses: actions/upload-artifact@v4
+
+  stress-in-shard:
+    # Runs the entire trace shard WITH --run-stress enabled. This is the
+    # actual repro condition: stress tests run alongside ~900 other tests
+    # sharing the same CH container under xdist -n8 contention.
+    name: Stress (in full trace shard)
+    timeout-minutes: 60
+    runs-on: ubuntu-latest-8-cores
+    services:
+      wandbservice:
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+        credentials:
+          username: _json_key
+          password: ${{ secrets.gcp_wb_sa_key }}
+        env:
+          CI: 1
+          WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
+        ports:
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
+      weave_clickhouse:
+        image: clickhouse/clickhouse-server:25.11.2.24
+        env:
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_DB: default
+        ports:
+          - "8123:8123"
+        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install SQLite dev package
+        run: sudo apt update && sudo apt install -y libsqlite3-dev
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
+      - name: Set up Python 3.${{ github.event.inputs.python-minor || '10' }}
+        uses: actions/setup-python@v5
         with:
-          name: stress-pytest-logs
-          path: |
-            **/.pytest_cache
-            **/pytest.log
-          retention-days: 7
-          if-no-files-found: ignore
+          python-version: "3.${{ github.event.inputs.python-minor || '10' }}"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run full trace shard with stress tests enabled
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
+          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
+          REPEATS: ${{ github.event.inputs.repeats || '3' }}
+        run: |
+          set -euxo pipefail
+          # Reproduces the real failure conditions: xdist -n8 with all
+          # trace_server-marked tests hitting the same CH container. The
+          # stress tests add co-tenant pressure + probes that dump state
+          # at the moment any NotFoundError fires (theirs or others').
+          for i in $(seq 1 "${REPEATS}"); do
+            echo "=== stress-in-shard pass ${i}/${REPEATS} ==="
+            nox -e "tests-3.${{ github.event.inputs.python-minor || '10' }}(shard='trace')" -- \
+              --run-stress \
+              -m "trace_server and not skip_clickhouse_client"
+          done
