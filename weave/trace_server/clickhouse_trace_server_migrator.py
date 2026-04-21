@@ -8,10 +8,13 @@
 
 ## Replicated Mode (replicated=True, use_distributed=False)
 - Multi-node ClickHouse cluster with automatic replication
-- Tables have 'Replicated' prepended to MergeTree engine with ZooKeeper coordination
-- DDL statements include `ON CLUSTER {cluster_name}` UNLESS the target database uses the
-  ClickHouse Replicated database engine (ENGINE = Replicated(...)), which auto-replicates
-  DDL and rejects ON CLUSTER with error 80 (INCORRECT_QUERY)
+- Databases are `ENGINE = Atomic` and created `ON CLUSTER` so the DDL fans out
+  to every replica. Tables are rewritten to `Replicated*MergeTree` and also
+  emitted `ON CLUSTER`. Data replicates via ZooKeeper.
+- Legacy deployments with `ENGINE = Replicated` data DBs keep working: engine
+  discovery caches the real engine and DDL paths skip `ON CLUSTER` for those,
+  since `ON CLUSTER` against a Replicated DB is rejected with error 80 on
+  CH 25.8+.
 
 ## Distributed Mode (replicated=True, use_distributed=True)
 - Extends replicated mode with sharding and distributed query capabilities
@@ -198,7 +201,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         "ON CLUSTER is not allowed for Replicated database."
 
         The base class always returns False. The replicated subclass overrides
-        this to read from ``_replicated_db_engine_cache``.
+        this to read from `_replicated_db_engine_cache`.
         """
         return False
 
@@ -206,7 +209,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         """Create a database if it does not exist.
 
         Subclasses that need engine introspection override this to also
-        populate ``_replicated_db_engine_cache``.
+        populate `_replicated_db_engine_cache`.
         """
         db_sql = self._create_db_sql(db_name)
         self._run_ddl_with_retry(db_sql)
@@ -503,8 +506,18 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
     """Migrator for replicated ClickHouse deployments.
 
     In replicated mode:
-    - Tables use ReplicatedMergeTree engines with ZooKeeper coordination
-    - All DDL statements include `ON CLUSTER {cluster_name}`
+    - Databases use `ENGINE = Atomic` and are created with `ON CLUSTER` so
+      the DDL fans out to every replica.
+    - Tables inside are rewritten to `ReplicatedMergeTree` and also emitted
+      `ON CLUSTER`. Data replicates via ZooKeeper using the server-side
+      `default_replica_path` / `default_replica_name` macros.
+    - `WF_CLICKHOUSE_REPLICATED=true` means "ReplicatedMergeTree tables",
+      NOT "Replicated database engine". The Replicated DB engine has a
+      bootstrap hole against `ON CLUSTER` on CH 25.8+ and is not used
+      for new deployments.
+    - Legacy deployments with `ENGINE = Replicated` data databases keep
+      working via the engine-discovery cache; see
+      `_prepare_ddl_for_database`.
     """
 
     replicated_path: str
@@ -558,10 +571,10 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
     def _ensure_database(self, db_name: str) -> None:
         """Create the database and discover its engine for the DDL cache.
 
-        After ``CREATE DATABASE IF NOT EXISTS``, the engine may not be
-        immediately visible in ``system.databases`` (metadata propagation lag
+        After `CREATE DATABASE IF NOT EXISTS`, the engine may not be
+        immediately visible in `system.databases` (metadata propagation lag
         on replicated clusters).  We poll with back-off so that all later DDL
-        knows whether to emit ``ON CLUSTER`` / ``ReplicatedMergeTree``.
+        knows whether to emit `ON CLUSTER` / `ReplicatedMergeTree`.
         """
         db_sql = self._create_db_sql(db_name)
         self._run_ddl_with_retry(db_sql)
@@ -579,56 +592,53 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
     def _create_db_sql(self, db_name: str) -> str:
         """Generate SQL to create a database in replicated mode.
 
-        Uses ENGINE = Replicated(...) so that DDL within the database is
-        automatically replicated via ZooKeeper, without needing ON CLUSTER
-        on every subsequent CREATE TABLE / ALTER TABLE statement.
+        Uses `ENGINE = Atomic + ON CLUSTER`. Atomic does not self-replicate
+        DDL, so `ON CLUSTER` is the sole fan-out mechanism and reaches
+        every replica in the cluster. Tables inside are rewritten to
+        `ReplicatedMergeTree` by `_format_replicated_sql` so data
+        still replicates via ZooKeeper.
 
-        If the database already exists (IF NOT EXISTS), this is a no-op
-        regardless of the existing engine. Databases created by older weave
-        versions already use Replicated; databases created by the intermediate
-        code (19052e896c..HEAD~) may be Atomic. Both are handled: the
-        auto-detection in _add_on_cluster_clause skips ON CLUSTER for
-        Replicated databases and keeps it for Atomic ones.
+        This avoids the `ON CLUSTER + ENGINE = Replicated` collision that
+        silently created plain `MergeTree` tables on CH <= 25.3 and
+        deadlocked `CREATE DATABASE` on CH >= 25.10. The `Replicated`
+        database engine is also a bootstrap trap: it does not auto-join
+        sibling hosts at the database level, each host has to issue its
+        own `CREATE DATABASE` with the shared ZooKeeper path, and the
+        only official way to do that is `ON CLUSTER` which 25.8+ rejects.
+
+        Legacy deployments that already have `ENGINE = Replicated` data
+        DBs stay on that engine (`IF NOT EXISTS` is a no-op). Engine
+        discovery caches the real engine, and the DDL path in
+        `_prepare_ddl_for_database` branches on that cache, so both
+        shapes continue to work.
         """
         if not self._is_safe_identifier(db_name):
             raise MigrationError(f"Invalid database name: {db_name}")
 
-        replicated_path = self.replicated_path.replace("{db}", db_name)
-        if not all(
-            self._is_safe_identifier(part)
-            for part in replicated_path.split("/")
-            if part
-        ):
-            raise MigrationError(f"Invalid replicated path: {replicated_path}")
-
         return (
             f"CREATE DATABASE IF NOT EXISTS {db_name}"
             f" ON CLUSTER {self.replicated_cluster}"
-            f" ENGINE = Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
+            f" ENGINE = Atomic"
         )
 
     def _prepare_ddl_for_database(self, sql_query: str, target_db: str) -> str:
         """Adapt DDL for the target database's engine type.
 
-        Engine handling matrix:
-        - replicated-only DB: Replicated*MergeTree() with no ON CLUSTER
-        - distributed + Atomic DB: explicit ZK args plus ON CLUSTER
-        - distributed + Replicated DB: Replicated*MergeTree() with no explicit
-          ZK args and no ON CLUSTER
+        Two shapes, picked by the engine-discovery cache:
 
-        * **Replicated engine** — DDL is auto-replicated by the database, so
-          ``ON CLUSTER`` must be omitted to avoid ClickHouse error 80
-          (INCORRECT_QUERY). We still rewrite MergeTree-family engines to
-          ``Replicated*MergeTree`` so table data replicates across replicas.
-        * **Atomic engine** — the database does not auto-replicate, so we must
-          explicitly rewrite ``MergeTree`` → ``ReplicatedMergeTree`` and add
-          ``ON CLUSTER`` to every DDL statement.
+        * **Atomic database (default for new deployments).** Rewrite
+          `MergeTree` to `Replicated*MergeTree` so data replicates via
+          ZooKeeper, and add `ON CLUSTER` so the DDL fans out to every
+          replica.
+        * **Replicated database (legacy deployments only).** The Replicated
+          DB engine auto-replicates DDL and rejects `ON CLUSTER` with
+          error 80 on CH 25.8+. Rewrite to `Replicated*MergeTree` but
+          omit `ON CLUSTER`; the engine handles the fan-out itself
+          within the shard.
 
-        In the distributed migrator, ``db_management`` is intentionally Atomic
-        so the migrations table can use an explicit ``ReplicatedMergeTree``
-        with a shared ZooKeeper path across all shards.  A Replicated-engine
-        database would auto-assign per-shard ZK paths, causing each shard to
-        track migration state independently instead of sharing it.
+        New deployments always get the Atomic shape. The Replicated-DB shape
+        exists only as a compatibility path for clusters installed by earlier
+        weave versions that explicitly created `ENGINE = Replicated(...)`.
         """
         sql_query = self._format_replicated_sql(sql_query)
         if self._uses_replicated_db_engine(target_db):
@@ -797,19 +807,33 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
     def _create_db_sql(self, db_name: str) -> str:
         """Generate SQL to create a database in distributed mode.
 
-        The management database uses ENGINE = Atomic (not Replicated) so that the
-        migrations table can use explicit ReplicatedMergeTree with a shared ZK path
-        across all shards. Data databases still use ENGINE = Replicated.
+        All databases (management and data) use ENGINE = Atomic + ON CLUSTER.
+
+        The Replicated DB engine only auto-syncs within a single replication
+        group (same `{shard}` value), so it cannot fan a CREATE DATABASE
+        out across shards on its own. ON CLUSTER fans across every shard and
+        replica in the cluster, and Atomic — unlike Replicated — does not
+        also try to replicate DDL itself, so there is no collision between
+        the two mechanisms (the bug that deadlocks CH 25.10 with Replicated
+        + ON CLUSTER).
+
+        Tables inside Atomic databases are rewritten to explicit
+        ReplicatedMergeTree engines with per-shard ZK paths by
+        `_format_replicated_sql_distributed`, so data still replicates
+        correctly within each shard.
+
+        Legacy deployments that already have ENGINE = Replicated data
+        databases stay Replicated (IF NOT EXISTS is a no-op). Engine
+        discovery caches the real engine; the DDL path branches on that
+        cache, so both shapes continue to work.
         """
-        if db_name == self.management_db:
-            if not self._is_safe_identifier(db_name):
-                raise MigrationError(f"Invalid database name: {db_name}")
-            return (
-                f"CREATE DATABASE IF NOT EXISTS {db_name}"
-                f" ON CLUSTER {self.replicated_cluster}"
-                f" ENGINE = Atomic"
-            )
-        return super()._create_db_sql(db_name)
+        if not self._is_safe_identifier(db_name):
+            raise MigrationError(f"Invalid database name: {db_name}")
+        return (
+            f"CREATE DATABASE IF NOT EXISTS {db_name}"
+            f" ON CLUSTER {self.replicated_cluster}"
+            f" ENGINE = Atomic"
+        )
 
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in distributed mode.
