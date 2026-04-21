@@ -1326,7 +1326,7 @@ class WeaveClient:
             has no tags.
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
-        res = self.server.obj_read(
+        res = retry_on_not_found(self.server.obj_read)(
             ObjReadReq(
                 project_id=self.project_id,
                 object_id=obj_ref.name,
@@ -1351,7 +1351,7 @@ class WeaveClient:
             Returns empty lists if the object version has no tags or aliases.
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
-        res = self.server.obj_read(
+        res = retry_on_not_found(self.server.obj_read)(
             ObjReadReq(
                 project_id=self.project_id,
                 object_id=obj_ref.name,
@@ -1417,7 +1417,7 @@ class WeaveClient:
             if the object version is the latest.
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
-        res = self.server.obj_read(
+        res = retry_on_not_found(self.server.obj_read)(
             ObjReadReq(
                 project_id=self.project_id,
                 object_id=obj_ref.name,
