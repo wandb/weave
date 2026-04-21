@@ -110,17 +110,9 @@ def get_gepa_patcher(
         return _gepa_patcher
 
     base = settings.op_settings
-    optimize_settings = base.model_copy(
-        update={
-            "name": base.name or "gepa.optimize",
-            "kind": base.kind or "agent",
-        }
-    )
+    optimize_settings = base.model_copy(update={"name": base.name or "gepa.optimize"})
     optimize_anything_settings = base.model_copy(
-        update={
-            "name": base.name or "gepa.optimize_anything",
-            "kind": base.kind or "agent",
-        }
+        update={"name": base.name or "gepa.optimize_anything"}
     )
 
     _gepa_patcher = MultiPatcher(
