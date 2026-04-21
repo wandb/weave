@@ -20,16 +20,11 @@ MAX_SEARCH_LIMIT = 1000
 MAX_CONVERSATION_CHAT_TURNS = 50
 
 # ---------------------------------------------------------------------------
-# Chat view walk limits / noise filters
+# Chat view walk limits
 # ---------------------------------------------------------------------------
 
 # Safety cap on recursion depth when walking a trace's span tree.
 MAX_WALK_DEPTH = 200
-
-# Tool names that should be suppressed from the rendered chat view.
-NOISE_TOOL_NAMES: frozenset[str] = frozenset(
-    {"(merged tools)", "(merged)", "transfer_to_agent"}
-)
 
 # ---------------------------------------------------------------------------
 # Custom attribute limits (enforced at OTel ingest time)

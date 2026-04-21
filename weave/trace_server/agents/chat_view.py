@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, NamedTuple
 
-from weave.trace_server.agents.constants import MAX_WALK_DEPTH, NOISE_TOOL_NAMES
+from weave.trace_server.agents.constants import MAX_WALK_DEPTH
 from weave.trace_server.agents.types import (
     AgentChatMessage,
     AgentSpanSchema,
@@ -166,7 +166,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                         started_at=_dt_to_iso(span.started_at),
                     )
                 )
-            elif tool_name not in NOISE_TOOL_NAMES:
+            else:
                 messages.append(
                     AgentChatMessage(
                         type="tool_call",
