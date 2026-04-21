@@ -246,12 +246,16 @@ def test_distributed_legacy_replicated_management_db(ch_client):
 
     assert _get_db_engine(ch_client, mgmt_db) == "Replicated"
 
-    # On a Replicated management DB, the migrations table is auto-converted
-    # to ReplicatedMergeTree by the DB engine itself (per-shard ZK path
-    # derived from the DB's UUID). That shape is distinct from the Atomic
-    # branch, which uses an explicit shared ZK path.
+    # Legacy Replicated management DB: the migrator sends plain
+    # `ENGINE = MergeTree()` and lets the DB engine handle replication.
+    # On single-node CI the DB engine does NOT auto-convert to
+    # ReplicatedMergeTree (single host, no peers to replicate to), so the
+    # engine_full column reports plain MergeTree. The important property
+    # here is the absence of the Atomic branch's shared ZK path
+    # (`/clickhouse/tables/shared/...`) - this assertion pins both the
+    # engine and the full ORDER BY / SETTINGS tail so any drift surfaces.
     mgmt_engine = _get_table_engine_full(ch_client, mgmt_db, "migrations")
-    assert mgmt_engine.startswith("ReplicatedMergeTree")
+    assert mgmt_engine == "MergeTree ORDER BY db_name SETTINGS index_granularity = 8192"
 
     migrator.apply_migrations(target_db)
 
