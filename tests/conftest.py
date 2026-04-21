@@ -110,13 +110,12 @@ def reset_digest_settings():
 
 @pytest.fixture(autouse=True)
 def force_flake_reproduction(monkeypatch):
-    """DO NOT MERGE: force replica-lag flakes to surface by disabling the
-    retry_on_not_found safety net. Any write-then-read race that is
-    currently masked by the 3-attempt/0.25s retry window will now fail
-    on first attempt.
+    """DO NOT MERGE: zero the inter-attempt wait so the 3 retries fire
+    back-to-back (~sub-10ms total window). Any race wider than that will
+    surface as a hard failure. Not setting WEAVE_RETRY_MAX_ATTEMPTS
+    because that breaks tests that assert on retry behavior.
     """
     monkeypatch.setattr(http_utils, "NOT_FOUND_RETRY_WAIT_SECONDS", 0.0)
-    monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "1")
 
 
 @pytest.fixture(autouse=True)
