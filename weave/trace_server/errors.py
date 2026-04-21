@@ -151,9 +151,7 @@ class ObjectDeletedError(Error):
     # without sniffing message fields.
     error_code: str = ErrorCode.OBJECT_DELETED
 
-    def __init__(
-        self, message: str, deleted_at: datetime.datetime | None = None
-    ):
+    def __init__(self, message: str, deleted_at: datetime.datetime | None = None):
         self.deleted_at = deleted_at
         super().__init__(message)
 

@@ -30,6 +30,13 @@ ROW_COUNT_CHUNKING_THRESHOLD = 1000
 # when the object is genuinely missing.
 NOT_FOUND_RETRY_WAIT_SECONDS = 0.25
 
+# Fallback messages when the server response has neither a default httpx
+# status line nor an extracted `reason`/`message`/`error`/`detail` field. In
+# practice the server always sends one of those, so these are belt-and-
+# suspenders for the typed-exception paths.
+DEFAULT_OBJECT_DELETED_MESSAGE = "Object deleted"
+DEFAULT_CALLS_COMPLETE_REQUIRED_MESSAGE = "Calls complete mode required"
+
 # Type variable for batch items
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -284,7 +291,11 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
 
     # Handle calls_complete mode requirement for automatic SDK upgrade
     if error_code == ErrorCode.CALLS_COMPLETE_MODE_REQUIRED:
-        message = extracted_message or default_message or "Calls complete mode required"
+        message = (
+            extracted_message
+            or default_message
+            or DEFAULT_CALLS_COMPLETE_REQUIRED_MESSAGE
+        )
         raise CallsCompleteModeRequired(message)
 
     # Authoritative delete: surface the typed exception so SDK callers see
@@ -296,7 +307,7 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
             # if `deleted_at` fails to parse (server bug); the discriminator
             # is the error_code, not the timestamp.
             raise ObjectDeletedError(
-                extracted_message or default_message or "Object deleted",
+                extracted_message or default_message or DEFAULT_OBJECT_DELETED_MESSAGE,
                 deleted_at=(
                     None if error_data is None else _parse_deleted_at(error_data)
                 ),
@@ -308,7 +319,9 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
             deleted_at = _parse_deleted_at(error_data)
             if deleted_at is not None:
                 raise ObjectDeletedError(
-                    extracted_message or default_message or "Object deleted",
+                    extracted_message
+                    or default_message
+                    or DEFAULT_OBJECT_DELETED_MESSAGE,
                     deleted_at=deleted_at,
                 )
 
@@ -379,6 +392,23 @@ def _is_413_error(e: Exception) -> bool:
     )
 
 
+def _extract_error_code(response: httpx.Response) -> str | None:
+    """Return the server-emitted `error_code` string from a response, or None.
+
+    Returns None if the body isn't JSON, isn't a dict, lacks `error_code`,
+    or the value isn't a string. Use this as the single reader for the
+    error_code discriminator so the enum comparison lives in one place.
+    """
+    try:
+        body = response.json()
+    except (json.JSONDecodeError, ValueError, AttributeError):
+        return None
+    if not isinstance(body, dict):
+        return None
+    code = body.get("error_code")
+    return code if isinstance(code, str) else None
+
+
 def _parse_deleted_at(body: dict[str, Any]) -> datetime.datetime | None:
     """Return a parsed `deleted_at` from an error response body, or None.
 
@@ -418,13 +448,7 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
         return False
     if exc.response.status_code != 404:
         return False
-    try:
-        body = exc.response.json()
-    except (json.JSONDecodeError, ValueError):
-        return False
-    if not isinstance(body, dict):
-        return False
-    return body.get("error_code") != ErrorCode.OBJECT_DELETED
+    return _extract_error_code(exc.response) != ErrorCode.OBJECT_DELETED
 
 
 def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
@@ -462,13 +486,4 @@ def is_calls_complete_mode_error(error: Exception) -> bool:
     response = getattr(error, "response", None)
     if response is None:
         return False
-
-    try:
-        error_data = response.json()
-    except (json.JSONDecodeError, ValueError, AttributeError):
-        return False
-    else:
-        return (
-            isinstance(error_data, dict)
-            and error_data.get("error_code") == ErrorCode.CALLS_COMPLETE_MODE_REQUIRED
-        )
+    return _extract_error_code(response) == ErrorCode.CALLS_COMPLETE_MODE_REQUIRED
