@@ -8,11 +8,47 @@ import pytest
 from util import generate_media
 
 import weave
+from tests.trace.server_utils import find_server_layer
 from weave import Dataset
 from weave.trace.table import Table
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.errors import NotFoundError
 from weave.type_wrappers.Content.content import Content
 from weave.utils import http_requests as _http_requests
+
+
+def _probe_ch_state(client, ref, tag: str) -> None:
+    """DO NOT MERGE: post-failure probe (see tests/trace/test_dataset.py)."""
+    try:
+        ch = find_server_layer(client.server, ClickHouseTraceServer)
+    except TypeError:
+        print(f"FLAKE_PROBE {tag}: backend is not ClickHouse, skipping")
+        return
+    try:
+        rows = ch.ch_client.query(
+            "SELECT "
+            "countIf(object_id = {object_id: String}) AS by_object, "
+            "countIf(object_id = {object_id: String} AND digest = {digest: String}) AS by_obj_digest, "
+            "countIf(digest = {digest: String}) AS by_digest, "
+            "count() AS total, "
+            "groupArray((project_id, object_id, digest))[1:20] AS sample "
+            "FROM object_versions",
+            parameters={"object_id": ref.name, "digest": ref.digest},
+        ).result_rows
+    except Exception as exc:
+        print(f"FLAKE_PROBE {tag}: query failed: {exc!r}")
+        return
+    if not rows:
+        print(f"FLAKE_PROBE {tag}: empty probe result")
+        return
+    by_object, by_obj_digest, by_digest, total, sample = rows[0]
+    print(
+        f"FLAKE_PROBE {tag}: ref={ref.name!r} digest={ref.digest!r} "
+        f"database={ch._database!r} total_rows={total} "
+        f"by_object={by_object} by_obj_digest={by_obj_digest} "
+        f"by_digest={by_digest} sample={sample}"
+    )
 
 
 class _FakeHTTPError(Exception):
@@ -409,7 +445,12 @@ class TestWeaveContent:
         ref = weave.publish(dataset, name="test_content_dataset")
 
         # Retrieve and verify
-        retrieved_dataset = ref.get()
+        try:
+            retrieved_dataset = ref.get()
+        except (NotFoundError, ValueError) as exc:
+            _probe_ch_state(client, ref, "test_content_in_dataset.ref.get")
+            print(f"FLAKE_PROBE raised: {type(exc).__name__}: {exc}")
+            raise
         assert len(retrieved_dataset.rows) == len(rows)
 
         for row in retrieved_dataset.rows:

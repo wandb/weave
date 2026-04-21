@@ -1,8 +1,48 @@
 import pytest
 
 import weave
+from tests.trace.server_utils import find_server_layer
 from tests.trace.test_evaluate import Dataset
 from weave.trace.context.tests_context import raise_on_captured_errors
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.errors import NotFoundError
+
+
+def _probe_ch_state(client, ref, tag: str) -> None:
+    """DO NOT MERGE: post-failure probe. On flake, dumps what ClickHouse
+    actually contains for the ref we couldn't find, so we can tell whether
+    the row is genuinely absent, present under a different digest, or
+    present in a different project.
+    """
+    try:
+        ch = find_server_layer(client.server, ClickHouseTraceServer)
+    except TypeError:
+        print(f"FLAKE_PROBE {tag}: backend is not ClickHouse, skipping")
+        return
+    try:
+        rows = ch.ch_client.query(
+            "SELECT "
+            "countIf(object_id = {object_id: String}) AS by_object, "
+            "countIf(object_id = {object_id: String} AND digest = {digest: String}) AS by_obj_digest, "
+            "countIf(digest = {digest: String}) AS by_digest, "
+            "count() AS total, "
+            "groupArray((project_id, object_id, digest))[1:20] AS sample "
+            "FROM object_versions",
+            parameters={"object_id": ref.name, "digest": ref.digest},
+        ).result_rows
+    except Exception as exc:
+        print(f"FLAKE_PROBE {tag}: query failed: {exc!r}")
+        return
+    if not rows:
+        print(f"FLAKE_PROBE {tag}: empty probe result")
+        return
+    by_object, by_obj_digest, by_digest, total, sample = rows[0]
+    print(
+        f"FLAKE_PROBE {tag}: ref={ref.name!r} digest={ref.digest!r} "
+        f"database={ch._database!r} total_rows={total} "
+        f"by_object={by_object} by_obj_digest={by_obj_digest} "
+        f"by_digest={by_digest} sample={sample}"
+    )
 
 
 def test_basic_dataset_lifecycle(client):
@@ -92,7 +132,12 @@ def test_published_dataset_laziness(client):
     assert _top_level_logs(log) == ["table_create", "obj_create"]
     client.server.attribute_access_log = []
 
-    dataset = ref.get()
+    try:
+        dataset = ref.get()
+    except (NotFoundError, ValueError) as exc:
+        _probe_ch_state(client, ref, "test_published_dataset_laziness.ref.get")
+        print(f"FLAKE_PROBE raised: {type(exc).__name__}: {exc}")
+        raise
     log = client.server.attribute_access_log
     assert _top_level_logs(log) == ["obj_read"]
     client.server.attribute_access_log = []
