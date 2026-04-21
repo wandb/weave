@@ -200,12 +200,24 @@ export class PiCodingAgentOtelAdapter {
               this.sessionSpan = null;
               this.sessionCtx = ROOT_CONTEXT;
             }
-            await provider.shutdown().catch(() => {});
+            await provider.shutdown().catch(err => {
+              console.warn(
+                '[weave] OTEL provider shutdown failed; some spans may not have been flushed.',
+                err instanceof Error ? err.message : err
+              );
+            });
           });
-        } catch {
+        } catch (err) {
+          console.warn(
+            '[weave] OTEL auto-configure failed; spans will not be sent. Check WANDB_API_KEY.',
+            err instanceof Error ? err.message : err
+          );
           this.tracer = trace.getTracer('pi-coding-agent-weave-ext');
         }
       } else {
+        console.warn(
+          '[weave] No Weave client; spans will not be sent. Call weave.init() first or pass { tracer }.'
+        );
         this.tracer = trace.getTracer('pi-coding-agent-weave-ext');
       }
     }
