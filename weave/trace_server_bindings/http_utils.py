@@ -298,7 +298,7 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
             raise ObjectDeletedError(
                 extracted_message or default_message or "Object deleted",
                 deleted_at=(
-                    _parse_deleted_at(error_data) if error_data else None
+                    None if error_data is None else _parse_deleted_at(error_data)
                 ),
             )
         # TODO(#6658 follow-up): remove the legacy `deleted_at`-only branch
