@@ -1,6 +1,7 @@
 import base64
 import datetime as dt
 import json
+import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -8,7 +9,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import clickhouse_connect
 import pytest
-from clickhouse_connect.driver.exceptions import DatabaseError
+from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
@@ -1248,8 +1249,9 @@ def test_delete_preserves_version_index_gaps(ch_server):
 def test_concurrent_queries_on_one_client_vs_session_autogeneration(
     ch_server, autogenerate_session_id: bool
 ) -> None:
-    """With session_id enabled, overlapping queries on one client raise
-    SESSION_IS_LOCKED (code 373); with it disabled, they succeed.
+    """Session-id guard: clickhouse-connect rejects overlapping queries on one
+    client with ProgrammingError when a session_id is present; with it
+    disabled, overlapping queries succeed. See fix PR #6655.
     """
     client = clickhouse_connect.get_client(
         host=ch_server._host,
@@ -1260,9 +1262,14 @@ def test_concurrent_queries_on_one_client_vs_session_autogeneration(
         autogenerate_session_id=autogenerate_session_id,
     )
     n_workers = 8
+    # Barrier makes all workers fire their query in the same instant; without
+    # it the 8 queries can serialize on a cold container and the True branch
+    # never produces an overlap.
+    barrier = threading.Barrier(n_workers)
 
     def run_slow_query() -> None:
-        client.query("SELECT sleep(0.2)")
+        barrier.wait()
+        client.query("SELECT sleep(1.0)")
 
     try:
         errors: list[Exception] = []
@@ -1277,8 +1284,11 @@ def test_concurrent_queries_on_one_client_vs_session_autogeneration(
         client.close()
 
     if autogenerate_session_id:
-        assert errors, "expected overlapping queries to be rejected"
-        joined = " | ".join(str(e) for e in errors).lower()
-        assert "session" in joined or "373" in joined, joined
+        # Exactly one query wins the session mutex; the remaining n-1 are
+        # rejected client-side by clickhouse-connect.
+        assert len(errors) == n_workers - 1, errors
+        for e in errors:
+            assert isinstance(e, ProgrammingError), (type(e), e)
+            assert "concurrent queries within the same session" in str(e), e
     else:
         assert not errors, errors

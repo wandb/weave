@@ -6503,7 +6503,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         autogenerate_session_id=False: weave-trace uses no session features,
         and the default collides on overlapping queries with SESSION_IS_LOCKED
-        (code 373).
+        (code 373). See PR #6655.
         """
         client = clickhouse_connect.get_client(
             host=self._host,
