@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import json
+from collections import defaultdict
 from collections.abc import Callable
 from typing import TypedDict
 
@@ -60,11 +61,25 @@ def test_basic_evaluation(
 
     client.flush()
 
-    calls = client.get_calls()
+    calls = list(client.get_calls())
     assert len(calls) == 14
 
-    evaluate_call = calls[0]
-    assert op_name_from_call(evaluate_call) == "Evaluation.evaluate"
+    # Group by op_name and match children by parent_id instead of positional
+    # indexing. get_calls() sorts by (started_at, id); on Windows time.time()
+    # has ~15ms resolution so a parent op and its immediate child can share a
+    # millisecond, and the UUIDv7 tiebreak is random within that bucket.
+    by_op: dict[str, list] = defaultdict(list)
+    for c in calls:
+        by_op[op_name_from_call(c)].append(c)
+
+    assert len(by_op["Evaluation.evaluate"]) == 1
+    assert len(by_op["Evaluation.predict_and_score"]) == 3
+    assert len(by_op["Model.predict"]) == 3
+    assert len(by_op["greater_than_2_scorer"]) == 3
+    assert len(by_op["greater_than_4_scorer"]) == 3
+    assert len(by_op["Evaluation.summarize"]) == 1
+
+    evaluate_call = by_op["Evaluation.evaluate"][0]
     assert evaluate_call.attributes["_weave_eval_meta"]["imperative"] is True
     assert evaluate_call.inputs["self"]._class_name == "Evaluation"
     assert evaluate_call.inputs["model"]._class_name == "Model"
@@ -77,25 +92,28 @@ def test_basic_evaluation(
         },
     }
 
-    for i, (inputs, output_val, score1, score2) in enumerate(
-        zip(user_dataset, outputs, score1_results, score2_results, strict=False)
+    for inputs, output_val, score1, score2 in zip(
+        user_dataset, outputs, score1_results, score2_results, strict=False
     ):
-        predict_index = 1 + i * 4
-
-        predict_and_score_call = calls[predict_index]
-        assert (
-            op_name_from_call(predict_and_score_call) == "Evaluation.predict_and_score"
-        )
+        pas_matches = [
+            c
+            for c in by_op["Evaluation.predict_and_score"]
+            if c.inputs["example"] == inputs
+        ]
+        assert len(pas_matches) == 1
+        predict_and_score_call = pas_matches[0]
         assert (
             predict_and_score_call.attributes["_weave_eval_meta"]["imperative"] is True
         )
         assert predict_and_score_call.inputs["self"]._class_name == "Evaluation"
         assert predict_and_score_call.inputs["model"]._class_name == "Model"
-        assert predict_and_score_call.inputs["example"] == inputs
         assert predict_and_score_call.output["output"] == output_val
 
-        predict_call = calls[predict_index + 1]
-        assert op_name_from_call(predict_call) == "Model.predict"
+        predict_call = next(
+            c
+            for c in by_op["Model.predict"]
+            if c.parent_id == predict_and_score_call.id
+        )
         assert predict_call.attributes["_weave_eval_meta"]["imperative"] is True
         assert predict_call.inputs["self"]._class_name == "Model"
         assert predict_call.inputs["inputs"] == inputs
@@ -106,22 +124,27 @@ def test_basic_evaluation(
         assert feedbacks[0].feedback_type == "wandb.runnable.greater_than_2_scorer"
         assert feedbacks[1].feedback_type == "wandb.runnable.greater_than_4_scorer"
 
-        scorer1_call = calls[predict_index + 2]
-        assert op_name_from_call(scorer1_call) == "greater_than_2_scorer"
+        scorer1_call = next(
+            c
+            for c in by_op["greater_than_2_scorer"]
+            if c.parent_id == predict_and_score_call.id
+        )
         assert scorer1_call.attributes["_weave_eval_meta"]["imperative"] is True
         assert scorer1_call.inputs["output"] == output_val
         assert scorer1_call.inputs["inputs"] == inputs
         assert scorer1_call.output == score1
 
-        scorer2_call = calls[predict_index + 3]
-        assert op_name_from_call(scorer2_call) == "greater_than_4_scorer"
+        scorer2_call = next(
+            c
+            for c in by_op["greater_than_4_scorer"]
+            if c.parent_id == predict_and_score_call.id
+        )
         assert scorer2_call.attributes["_weave_eval_meta"]["imperative"] is True
         assert scorer2_call.inputs["output"] == output_val
         assert scorer2_call.inputs["inputs"] == inputs
         assert scorer2_call.output == score2
 
-    summarize_call = calls[13]
-    assert op_name_from_call(summarize_call) == "Evaluation.summarize"
+    summarize_call = by_op["Evaluation.summarize"][0]
     assert summarize_call.attributes["_weave_eval_meta"]["imperative"] is True
     assert summarize_call.inputs["self"]._class_name == "Evaluation"
     assert summarize_call.output == {

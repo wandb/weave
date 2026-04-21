@@ -203,17 +203,25 @@ from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
 from weave.trace_server.project_version.types import WriteTarget
+from weave.trace_server.query_builder import eval_results_query_builder
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
+    make_annotator_progress_insert_query,
+    make_annotator_progress_state_check_query,
     make_annotator_progress_update_query,
     make_queue_add_calls_check_duplicates_query,
     make_queue_add_calls_fetch_calls_query,
     make_queue_create_query,
     make_queue_delete_query,
+    make_queue_item_existence_query,
     make_queue_items_query,
     make_queue_read_query,
     make_queue_update_query,
     make_queues_query,
     make_queues_stats_query,
+)
+from weave.trace_server.query_builder.files_query_builder import (
+    make_file_content_read_query,
+    make_files_stats_query,
 )
 from weave.trace_server.query_builder.obj_tags_query_builder import (
     make_get_aliases_query,
@@ -231,15 +239,18 @@ from weave.trace_server.query_builder.objects_query_builder import (
 from weave.trace_server.query_builder.project_query_builder import (
     make_project_stats_query,
 )
-from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
-from weave.trace_server.table_query_builder import (
+from weave.trace_server.query_builder.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
     TABLE_ROWS_ALIAS,
     VAL_DUMP_COLUMN_NAME,
     make_natural_sort_table_query,
     make_standard_table_query,
+    make_table_row_digests_query,
+    make_table_rows_read_batch_query,
+    make_table_stats_basic_query,
     make_table_stats_query_with_storage_size,
 )
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -248,6 +259,7 @@ from weave.trace_server.token_costs import (
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
+    MAX_FILTER_LENGTH,
     DynamicBatchProcessor,
     LRUCache,
     determine_call_status,
@@ -255,6 +267,7 @@ from weave.trace_server.trace_server_common import (
     hydrate_calls_with_feedback,
     make_feedback_query_req,
     set_nested_key,
+    try_parse_json,
 )
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
@@ -1488,40 +1501,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if hasattr(raw_res, "close"):
                 raw_res.close()
 
-    def _calls_query_stream_for_eval_subtree(
-        self,
-        project_id: str,
-        eval_root_ids: list[str],
-        include_children: bool = True,
-    ) -> Iterator[tsi.CallSchema]:
-        """Fetch direct children of eval root IDs and optionally their children."""
-        read_table = self.table_routing_resolver.resolve_read_table(
-            project_id, self._mint_client
-        )
-        columns = sorted(
-            [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
-        )
-        cq = CallsQuery(project_id=project_id, read_table=read_table)
-        for col in columns:
-            cq.add_field(col)
-        cq.eval_root_ids = eval_root_ids
-        cq.include_predict_and_score_children = include_children
-        cq.add_order("started_at", "asc")
-        cq.add_order("id", "asc")
-        pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
-        select_columns = [c.field for c in cq.select_fields]
-        try:
-            for row in raw_res:
-                yield tsi.CallSchema.model_validate(
-                    ch_call_dict_to_call_schema_dict(
-                        dict(zip(select_columns, row, strict=True))
-                    )
-                )
-        finally:
-            if hasattr(raw_res, "close"):
-                raw_res.close()
-
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
         self, project_id: str, calls: list[dict[str, Any]]
@@ -2281,24 +2260,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        query = """
-            SELECT *
-            FROM (
-                    SELECT *,
-                        row_number() OVER (PARTITION BY project_id, digest) AS rn
-                    FROM tables
-                    WHERE project_id = {project_id:String} AND digest = {digest:String}
-                )
-            WHERE rn = 1
-            ORDER BY project_id, digest
-        """
-
+        pb = ParamBuilder()
+        query = make_table_row_digests_query(
+            project_id=req.project_id,
+            digest=req.base_digest,
+            pb=pb,
+        )
         row_digest_result_query = self.ch_client.query(
             query,
-            parameters={
-                "project_id": req.project_id,
-                "digest": req.base_digest,
-            },
+            parameters=pb.get_params(),
         )
 
         if len(row_digest_result_query.result_rows) == 0:
@@ -2522,29 +2492,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def table_query_stats_batch(
         self, req: tsi.TableQueryStatsBatchReq
     ) -> tsi.TableQueryStatsBatchRes:
-        parameters: dict[str, Any] = {
-            "project_id": req.project_id,
-            "digests": req.digests,
-        }
-
-        query = """
-        SELECT digest, any(length(row_digests))
-        FROM tables
-        WHERE project_id = {project_id:String} AND digest IN {digests:Array(String)}
-        GROUP BY digest
-        """
-
+        pb = ParamBuilder()
         if req.include_storage_size:
-            # Use an advanced query builder to get the storage size
-            pb = ParamBuilder()
             query = make_table_stats_query_with_storage_size(
                 project_id=req.project_id,
                 table_digests=cast(list[str], req.digests),
                 pb=pb,
             )
-            parameters = pb.get_params()
+        else:
+            query = make_table_stats_basic_query(
+                project_id=req.project_id,
+                table_digests=cast(list[str], req.digests),
+                pb=pb,
+            )
 
-        query_result = self.ch_client.query(query, parameters=parameters)
+        query_result = self.ch_client.query(query, parameters=pb.get_params())
 
         tables = [
             ch_table_stats_to_table_stats_schema(row)
@@ -3189,26 +3151,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not annotator_id:
             raise ValueError("wb_user_id is required")
 
-        pb = ParamBuilder()
-        project_id_param = pb.add(req.project_id)
-        queue_id_param = pb.add(req.queue_id)
-        item_id_param = pb.add(req.item_id)
-        annotator_id_param = pb.add(annotator_id)
-
         # First, check current state and validate the queue item exists
-        check_query = f"""
-        SELECT
-            annotation_state,
-            COUNT(*) as record_exists
-        FROM annotator_queue_items_progress
-        WHERE project_id = {project_id_param}
-          AND queue_item_id = {item_id_param}
-          AND annotator_id = {annotator_id_param}
-          AND deleted_at IS NULL
-        GROUP BY annotation_state
-        """
-
-        check_result = self.ch_client.query(check_query, parameters=pb.get_params())
+        check_pb = ParamBuilder()
+        check_query = make_annotator_progress_state_check_query(
+            project_id=req.project_id,
+            queue_item_id=req.item_id,
+            annotator_id=annotator_id,
+            pb=check_pb,
+        )
+        check_result = self.ch_client.query(
+            check_query, parameters=check_pb.get_params()
+        )
         current_state = None
         has_record = False
 
@@ -3243,18 +3196,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         # Also verify the queue item exists in annotation_queue_items
-        item_check_query = f"""
-        SELECT id
-        FROM annotation_queue_items
-        WHERE id = {item_id_param}
-          AND project_id = {project_id_param}
-          AND queue_id = {queue_id_param}
-          AND deleted_at IS NULL
-        LIMIT 1
-        """
-
+        existence_pb = ParamBuilder()
+        item_check_query = make_queue_item_existence_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            queue_item_id=req.item_id,
+            pb=existence_pb,
+        )
         item_check_result = self.ch_client.query(
-            item_check_query, parameters=pb.get_params()
+            item_check_query, parameters=existence_pb.get_params()
         )
         if not list(item_check_result.named_results()):
             raise ValueError(
@@ -3263,37 +3213,34 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if has_record:
             # Use ClickHouse lightweight UPDATE for existing record
+            update_pb = ParamBuilder()
             update_query = make_annotator_progress_update_query(
                 project_id=req.project_id,
                 queue_item_id=req.item_id,
                 annotator_id=annotator_id,
                 annotation_state=req.annotation_state,
-                pb=pb,
+                pb=update_pb,
                 cluster_name=self.clickhouse_cluster_name,
             )
             self._command(
                 update_query,
-                parameters=pb.get_params(),
+                parameters=update_pb.get_params(),
                 settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
             )
         else:
             # Create new record
-            progress_id = generate_id()
-            progress_id_param = pb.add(progress_id)
-            new_state_param = pb.add(req.annotation_state)
-            now = datetime.datetime.now(datetime.timezone.utc)
-            now_param = pb.add(now)
-
-            insert_query = f"""
-            INSERT INTO annotator_queue_items_progress
-                (id, project_id, queue_item_id, queue_id, annotator_id,
-                 annotation_state, created_at, updated_at, deleted_at)
-            VALUES
-                ({progress_id_param}, {project_id_param}, {item_id_param},
-                 {queue_id_param}, {annotator_id_param}, {new_state_param},
-                 {now_param}, {now_param}, NULL)
-            """
-            self._command(insert_query, parameters=pb.get_params())
+            insert_pb = ParamBuilder()
+            insert_query = make_annotator_progress_insert_query(
+                project_id=req.project_id,
+                queue_id=req.queue_id,
+                queue_item_id=req.item_id,
+                annotator_id=annotator_id,
+                progress_id=generate_id(),
+                annotation_state=req.annotation_state,
+                now=datetime.datetime.now(datetime.timezone.utc),
+                pb=insert_pb,
+            )
+            self._command(insert_query, parameters=insert_pb.get_params())
 
         return self._fetch_queue_item_for_progress_update(
             req.project_id, req.queue_id, req.item_id
@@ -5161,20 +5108,163 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         """Return grouped prediction/trial/score data for evaluation results."""
+        eval_helpers.validate_eval_results_request(req)
         eval_root_ids = eval_helpers.resolve_eval_root_ids(req)
         if not eval_root_ids:
             empty_summary = tsi.EvalResultsSummaryRes() if req.include_summary else None
             return tsi.EvalResultsQueryRes(
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
-        all_calls = list(
-            self._calls_query_stream_for_eval_subtree(
-                req.project_id,
-                eval_root_ids,
-                req.include_predict_and_score_children,
-            )
+        return self._eval_results_via_cte(req, eval_root_ids)
+
+    def _eval_results_via_cte(
+        self,
+        req: tsi.EvalResultsQueryReq,
+        eval_root_ids: list[str],
+    ) -> tsi.EvalResultsQueryRes:
+        """Sort/filter/paginate eval results with a single ClickHouse query."""
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self._mint_client
         )
-        return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
+
+        # when summary is requested, fetch all rows
+        ch_limit = None if req.include_summary else req.limit
+        ch_offset = 0 if req.include_summary else req.offset
+
+        pb = ParamBuilder()
+
+        page_query = eval_results_query_builder.build_eval_results_query(
+            req.project_id,
+            eval_root_ids,
+            req.sort_by,
+            req.filters,
+            req.require_intersection,
+            ch_limit,
+            ch_offset,
+            pb,
+            read_table,
+        )
+
+        result = self._query(page_query, pb.get_params())
+
+        digest_by_call: dict[str, str] = {}
+        resolved_by_call_id: dict[str, Any] = {}
+        total_rows = 0
+        page_calls: list[tsi.CallSchema] = []
+
+        for row in result.result_rows:
+            row_data = dict(zip(result.column_names, row, strict=True))
+            total_rows = int(row_data.get("__total_rows", 0))
+            row_digest = row_data.get("__row_digest")
+            resolved_raw = row_data.get("__resolved_inputs")
+
+            call_id = row_data.get("id")
+            if row_digest and call_id:
+                digest_by_call[call_id] = row_digest
+            if resolved_raw and call_id and req.resolve_row_refs:
+                parsed = try_parse_json(resolved_raw)
+                if parsed is not None:
+                    resolved_by_call_id[call_id] = parsed
+
+            page_calls.append(
+                tsi.CallSchema.model_validate(
+                    ch_call_dict_to_call_schema_dict(row_data)
+                )
+            )
+
+        for call in page_calls:
+            if call.id in resolved_by_call_id and isinstance(call.inputs, dict):
+                call.inputs["example"] = resolved_by_call_id[call.id]
+
+        if req.include_predict_and_score_children and len(page_calls) > 0:
+            predict_and_score_ids = [c.id for c in page_calls]
+            child_columns = [
+                *REQUIRED_CALL_COLUMNS,
+                *ALL_CALL_JSON_COLUMNS,
+                "parent_id",
+                "ended_at",
+            ]
+            for i in range(0, len(predict_and_score_ids), MAX_FILTER_LENGTH):
+                batch = predict_and_score_ids[i : i + MAX_FILTER_LENGTH]
+                child_req = tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=tsi.CallsFilter(parent_ids=batch),
+                    columns=child_columns,
+                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                )
+                page_calls.extend(self.calls_query_stream(child_req))
+
+        all_rows = eval_helpers.build_eval_rows(
+            page_calls,
+            eval_root_ids,
+            digest_by_call,
+            req.include_raw_data_rows if req.include_rows else False,
+            req.include_predict_and_score_children,
+        )
+
+        summary: tsi.EvalResultsSummaryRes | None = None
+        if req.include_summary:
+            summary_intersection = (
+                req.summary_require_intersection
+                if req.summary_require_intersection is not None
+                else req.require_intersection
+            )
+            summary_rows, _ = eval_helpers.apply_row_selection(
+                all_rows, eval_root_ids, summary_intersection, 0, None
+            )
+            eval_call_metadata = eval_helpers.fetch_eval_root_metadata(
+                self, req.project_id, eval_root_ids
+            )
+            summary = eval_helpers.compute_summary_from_rows(
+                summary_rows, eval_call_metadata
+            )
+
+        # apply pagination in python if include_summary is True; otherwise, we already applied pagination in the CH query
+        rows: list[tsi.EvalResultsRow] = []
+        warnings: list[str] = []
+        if req.include_rows:
+            if req.include_summary:
+                # all_rows has everything; apply pagination in Python
+                rows, total_rows = eval_helpers.apply_row_selection(
+                    all_rows,
+                    eval_root_ids,
+                    req.require_intersection,
+                    req.offset,
+                    req.limit,
+                )
+            else:
+                rows = all_rows
+
+            if rows and req.include_raw_data_rows and req.resolve_row_refs:
+                unresolved = [
+                    r.row_digest for r in rows if isinstance(r.raw_data_row, str)
+                ]
+                if unresolved:
+                    warnings.append(
+                        "Failed to resolve dataset row refs; raw_data_row may contain refs"
+                    )
+
+        return tsi.EvalResultsQueryRes(
+            rows=rows, total_rows=total_rows, summary=summary, warnings=warnings
+        )
+
+    def _table_rows_read_batch(
+        self, project_id: str, digests: list[str]
+    ) -> dict[str, Any]:
+        """Batch read table_rows by digest. Returns {digest: parsed_val}."""
+        if len(digests) == 0:
+            return {}
+
+        pb = ParamBuilder()
+        sql = make_table_rows_read_batch_query(project_id, digests, pb)
+        result = self._query(sql, pb.get_params())
+        out: dict[str, Any] = {}
+        for row in result.result_rows:
+            d, val_dump = row[0], row[1]
+            parsed = try_parse_json(val_dump)
+            if parsed is not None:
+                out[d] = parsed
+        return out
 
     @staticmethod
     def _read_with_retry(
@@ -5642,23 +5732,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return True
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        # The subquery is responsible for deduplication of file chunks by digest
+        pb = ParamBuilder()
+        query = make_file_content_read_query(
+            project_id=req.project_id,
+            digest=req.digest,
+            pb=pb,
+        )
         query_result = self.ch_client.query(
-            """
-            SELECT n_chunks, val_bytes, file_storage_uri
-            FROM (
-                SELECT *
-                FROM (
-                        SELECT *,
-                            row_number() OVER (PARTITION BY project_id, digest, chunk_index) AS rn
-                        FROM files
-                        WHERE project_id = {project_id:String} AND digest = {digest:String}
-                    )
-                WHERE rn = 1
-                ORDER BY project_id, digest, chunk_index
-            )
-            WHERE project_id = {project_id:String} AND digest = {digest:String}""",
-            parameters={"project_id": req.project_id, "digest": req.digest},
+            query,
+            parameters=pb.get_params(),
             column_formats={"val_bytes": "bytes"},
         )
 
@@ -5731,14 +5813,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         pb = ParamBuilder()
-
-        project_id_param = pb.add_param(req.project_id)
-
-        query = f"""
-        SELECT sum(size_bytes) as total_size_bytes
-        FROM files_stats
-        WHERE project_id = {{{project_id_param}: String}}
-        """
+        query = make_files_stats_query(project_id=req.project_id, pb=pb)
         result = self.ch_client.query(query, parameters=pb.get_params())
 
         if len(result.result_rows) == 0 or result.result_rows[0][0] is None:

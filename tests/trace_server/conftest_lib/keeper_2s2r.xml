@@ -1,0 +1,76 @@
+<clickhouse>
+    <!--
+      Cluster config for 2-shard × 2-replica topology.
+
+      Keeper runs embedded inside ch-s1-r1 (same pattern as 1s3r).
+      All four CH nodes point at ch-s1-r1:9181 for coordination.
+
+      Per-node <macros> (shard/replica) live in separate files mounted at
+      /etc/clickhouse-server/config.d/macros.xml on each container — see
+      topologies/macros_s{1,2}_r{1,2}.xml.
+
+      Design decision: 1 Keeper, not 3. See topologies/2s2r.yaml header
+      comment for rationale.
+    -->
+
+    <!-- Embedded Keeper. Only ch-s1-r1 runs the keeper_server;
+         the other replicas ignore this block but still need the
+         <zookeeper> entry below to find the leader. -->
+    <keeper_server>
+        <tcp_port>9181</tcp_port>
+        <server_id>1</server_id>
+        <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
+        <coordination_settings>
+            <operation_timeout_ms>10000</operation_timeout_ms>
+            <session_timeout_ms>30000</session_timeout_ms>
+            <raft_logs_level>warning</raft_logs_level>
+        </coordination_settings>
+        <raft_configuration>
+            <server>
+                <id>1</id>
+                <hostname>ch-s1-r1</hostname>
+                <port>9234</port>
+            </server>
+        </raft_configuration>
+    </keeper_server>
+
+    <!-- All four CH nodes point at ch-s1-r1 as the keeper coordinator. -->
+    <zookeeper>
+        <node>
+            <host>ch-s1-r1</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+
+    <!-- Cluster definition: 2 shards, 2 replicas per shard.
+         internal_replication=true means writes to ReplicatedMergeTree
+         tables deduplicate via Keeper rather than being sent to every
+         replica by the Distributed engine. -->
+    <remote_servers>
+        <weave_cluster>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>ch-s1-r1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>ch-s1-r2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>ch-s2-r1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>ch-s2-r2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </weave_cluster>
+    </remote_servers>
+</clickhouse>

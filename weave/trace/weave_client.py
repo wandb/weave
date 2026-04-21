@@ -158,6 +158,7 @@ from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     ROW_COUNT_CHUNKING_THRESHOLD,
     check_endpoint_exists,
+    retry_on_not_found,
 )
 from weave.trace_server_bindings.models import StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
@@ -458,8 +459,11 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
         project_id = to_project_id(ref.entity, ref.project)
+        # Always retry on 404: the `publish(); ref.get()` pattern races against
+        # server-side eventual consistency, and the 250ms cost on a genuinely
+        # missing ref is not user-visible.
         try:
-            read_res = self.server.obj_read(
+            read_res = retry_on_not_found(self.server.obj_read)(
                 ObjReadReq(
                     project_id=project_id,
                     object_id=ref.name,

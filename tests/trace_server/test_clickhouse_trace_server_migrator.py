@@ -25,7 +25,7 @@ DEFAULT_MIGRATION_DIR = os.path.abspath(
 def _make_ch_client(database_engine: str = "Atomic") -> Mock:
     """Create a mock CH client that returns *database_engine* for system.databases queries.
 
-    Only ``system.databases`` queries are stubbed; all other ``query()`` calls
+    Only `system.databases` queries are stubbed; all other `query()` calls
     fall through to the default Mock behaviour so they don't silently return
     engine data for unrelated code paths.
     """
@@ -305,8 +305,13 @@ def test_create_db_sql(mock_costs):
     with pytest.raises(MigrationError, match="Invalid database name"):
         cloud_migrator._create_db_sql("test;db")
 
-    # Test replicated mode — should use ENGINE = Replicated(...) so DDL is
-    # auto-replicated via ZooKeeper without needing ON CLUSTER per-statement.
+    # Test replicated mode — uses ENGINE = Atomic + ON CLUSTER. Atomic does
+    # not self-replicate DDL, so ON CLUSTER is the sole fan-out mechanism and
+    # reaches every replica. Tables inside are rewritten to
+    # ReplicatedMergeTree by _format_replicated_sql so data still replicates
+    # via ZooKeeper. This avoids the ON CLUSTER + ENGINE = Replicated
+    # collision (deadlock on CH 25.10, silent plain-MergeTree on CH 25.3,
+    # split-brain when ON CLUSTER is stripped from a Replicated CREATE DATABASE).
     replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
         _make_ch_client(),
         replicated_cluster="test_cluster",
@@ -314,8 +319,7 @@ def test_create_db_sql(mock_costs):
     )
     sql = replicated_migrator._create_db_sql("test_db")
     assert sql.strip() == (
-        "CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster"
-        " ENGINE = Replicated('/clickhouse/tables/test_db', '{shard}', '{replica}')"
+        "CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster ENGINE = Atomic"
     )
 
     # Test invalid cluster name
@@ -325,6 +329,26 @@ def test_create_db_sql(mock_costs):
             replicated_cluster="test;cluster",
             migration_dir=DEFAULT_MIGRATION_DIR,
         )
+
+    # Test distributed mode — uses ENGINE = Atomic + ON CLUSTER for both the
+    # management DB and data DBs. Atomic doesn't self-replicate DDL, so
+    # ON CLUSTER is the sole fan-out mechanism (no collision like Replicated
+    # + ON CLUSTER) and it reaches every shard in the cluster, which is
+    # required for multi-shard deployments.
+    distributed_migrator = DistributedClickHouseTraceServerMigrator(
+        _make_ch_client(),
+        replicated_cluster="test_cluster",
+        migration_dir=DEFAULT_MIGRATION_DIR,
+    )
+    mgmt_sql = distributed_migrator._create_db_sql(distributed_migrator.management_db)
+    assert mgmt_sql.strip() == (
+        f"CREATE DATABASE IF NOT EXISTS {distributed_migrator.management_db}"
+        " ON CLUSTER test_cluster ENGINE = Atomic"
+    )
+    data_sql = distributed_migrator._create_db_sql("test_db")
+    assert data_sql.strip() == (
+        "CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster ENGINE = Atomic"
+    )
 
 
 def test_engine_discovery_init_behavior():
@@ -410,10 +434,12 @@ def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
 
     assert migrator._replicated_db_engine_cache[migrator.management_db] is True
     assert mock_sleep.call_count == 2
-    # Management table DDL should use ReplicatedMergeTree without ON CLUSTER.
+    # Management table DDL for a Replicated DB: ReplicatedMergeTree (no ON CLUSTER).
+    # The Replicated DB engine auto-replicates DDL via Keeper and rejects
+    # ON CLUSTER on CH 25.8+, so the shape of this statement is fully pinned
+    # by test_replicated_management_table_follows_database_engine.
     create_table_sql = ch_client.command.call_args_list[1][0][0]
     assert "ENGINE = ReplicatedMergeTree()" in create_table_sql
-    assert "ON CLUSTER" not in create_table_sql
 
     # Times out: engine never becomes visible, error includes the SQL context
     timeout_client = Mock()
@@ -773,8 +799,6 @@ def test_non_replicated_preserves_table_names(migrator):
     assert migrator.ch_client.command.call_count == 1
     call_sql = migrator.ch_client.command.call_args_list[0][0][0]
     assert call_sql == "CREATE TABLE test (id Int32) ENGINE = MergeTree"
-    assert "test_local" not in call_sql
-    assert "Distributed" not in call_sql
 
 
 @pytest.mark.parametrize(
@@ -1176,22 +1200,21 @@ def test_ddl_adapts_to_database_engine(replicated_migrator, distributed_migrator
     )
     replicated_migrator.ch_client.command.reset_mock()
 
-    # Distributed migrator also skips ON CLUSTER for Replicated DBs, while
-    # still creating ReplicatedMergeTree local tables plus a distributed table.
+    # Distributed migrator on a legacy Replicated DB: the local table keeps
+    # its MergeTree rewrite but skips ON CLUSTER (the Replicated DB engine
+    # handles fan-out); the distributed overlay also skips ON CLUSTER.
     distributed_migrator._replicated_db_engine_cache["test_db"] = True
     distributed_migrator._execute_migration_command("test_db", create_sql)
     local_sql, dist_sql = [
         call.args[0] for call in distributed_migrator.ch_client.command.call_args_list
     ]
-    assert "ON CLUSTER" not in local_sql
     assert (
         local_sql
         == "CREATE TABLE test_local (id Int32) ENGINE = ReplicatedMergeTree() ORDER BY id"
     )
-    assert "ON CLUSTER" not in dist_sql
-    assert (
+    assert " ".join(dist_sql.split()) == (
+        "CREATE TABLE IF NOT EXISTS test AS test_local "
         "ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
-        in dist_sql
     )
 
 

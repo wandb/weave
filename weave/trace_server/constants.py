@@ -10,6 +10,14 @@ MAX_OBJECT_NAME_LENGTH = 128
 # Evaluation Run V2 API Constants
 EVALUATION_RUN_OP_NAME = "Evaluation.evaluate"
 EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME = "Evaluation.predict_and_score"
+# TS SDK's Evaluation class (non-imperative) derives op names from method names,
+# yielding camelCase. The imperative TS EvaluationLogger and Python SDK both use
+# the snake_case form above.
+EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS = "Evaluation.predictAndScore"
+EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES = (
+    EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+    EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+)
 EVALUATION_SUMMARIZE_OP_NAME = "Evaluation.summarize"
 MODEL_PREDICT_OP_NAME = "Model.predict"
 SCORER_SCORE_OP_NAME = "Scorer.score"
