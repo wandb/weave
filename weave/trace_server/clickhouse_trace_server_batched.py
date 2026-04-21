@@ -5467,6 +5467,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 objs = self._select_objs_query(object_query_builder)
                 found_digests = {obj.digest for obj in objs}
                 if len(ref_digests) != len(found_digests):
+                    # DO NOT MERGE: diagnostic probe for flake investigation.
+                    missing = ref_digests - found_digests
+                    try:
+                        probe_rows = self.ch_client.query(
+                            "SELECT "
+                            "countIf(project_id = {project_id: String}) AS in_project, "
+                            "countIf(digest IN {digests: Array(String)}) AS digest_any_project, "
+                            "countIf(project_id = {project_id: String} AND digest IN {digests: Array(String)}) AS in_project_and_digest, "
+                            "groupArray((project_id, object_id, digest))[1:20] AS sample "
+                            "FROM object_versions "
+                            "WHERE project_id = {project_id: String} OR digest IN {digests: Array(String)}",
+                            parameters={
+                                "project_id": project_id_scope,
+                                "digests": list(missing),
+                            },
+                        ).result_rows
+                        if probe_rows:
+                            (
+                                in_project,
+                                digest_any_project,
+                                in_project_and_digest,
+                                sample,
+                            ) = probe_rows[0]
+                            logger.warning(
+                                "FLAKE_PROBE refs_read_batch NotFound: "
+                                "project_id=%r missing_digests=%s database=%r "
+                                "in_project=%s digest_any_project=%s "
+                                "in_project_and_digest=%s sample=%s",
+                                project_id_scope,
+                                missing,
+                                self._database,
+                                in_project,
+                                digest_any_project,
+                                in_project_and_digest,
+                                sample,
+                            )
+                    except Exception as probe_exc:
+                        logger.warning(
+                            "FLAKE_PROBE refs_read_batch query failed: %s",
+                            probe_exc,
+                        )
                     raise NotFoundError(
                         f"Ref read contains {len(ref_digests)} digests, but found {len(found_digests)} objects. Diff digests: {ref_digests - found_digests}"
                     )
