@@ -302,114 +302,147 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         )
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        req.obj.project_id = self._idc.ext_to_int_project_id(req.obj.project_id)
+        obj_updates: dict[str, Any] = {
+            "project_id": self._idc.ext_to_int_project_id(req.obj.project_id)
+        }
         if req.obj.wb_user_id is not None:
-            req.obj.wb_user_id = self._idc.ext_to_int_user_id(req.obj.wb_user_id)
+            obj_updates["wb_user_id"] = self._idc.ext_to_int_user_id(req.obj.wb_user_id)
+        new_req = req.model_copy(update={"obj": req.obj.model_copy(update=obj_updates)})
         return self._ref_apply(
-            self._internal_trace_server.obj_create, req, req.obj.project_id
+            self._internal_trace_server.obj_create, new_req, new_req.obj.project_id
         )
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        original_project_id = req.project_id
-        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.obj_read, req, req.project_id)
-        if res.obj.project_id != req.project_id:
+        int_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(update={"project_id": int_project_id})
+        res = self._ref_apply(
+            self._internal_trace_server.obj_read, new_req, int_project_id
+        )
+        if res.obj.project_id != int_project_id:
             raise ValueError("Internal Error - Project Mismatch")
-        res.obj.project_id = original_project_id
+        res.obj.project_id = req.project_id
         return res
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        original_project_id = req.project_id
-        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        int_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(update={"project_id": int_project_id})
         res = self._ref_apply(
-            self._internal_trace_server.objs_query, req, req.project_id
+            self._internal_trace_server.objs_query, new_req, int_project_id
         )
         for obj in res.objs:
-            if obj.project_id != req.project_id:
+            if obj.project_id != int_project_id:
                 raise ValueError("Internal Error - Project Mismatch")
-            obj.project_id = original_project_id
+            obj.project_id = req.project_id
         return res
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        int_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(update={"project_id": int_project_id})
         return self._ref_apply(
-            self._internal_trace_server.obj_delete, req, req.project_id
+            self._internal_trace_server.obj_delete, new_req, int_project_id
         )
 
     # Tag/alias requests contain only plain identifiers (no refs to convert)
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.obj_add_tags(req)
+        new_req = req.model_copy(
+            update={"project_id": self._idc.ext_to_int_project_id(req.project_id)}
+        )
+        return self._internal_trace_server.obj_add_tags(new_req)
 
     def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.obj_remove_tags(req)
+        new_req = req.model_copy(
+            update={"project_id": self._idc.ext_to_int_project_id(req.project_id)}
+        )
+        return self._internal_trace_server.obj_remove_tags(new_req)
 
     def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.obj_set_aliases(req)
+        new_req = req.model_copy(
+            update={"project_id": self._idc.ext_to_int_project_id(req.project_id)}
+        )
+        return self._internal_trace_server.obj_set_aliases(new_req)
 
     def obj_remove_aliases(
         self, req: tsi.ObjRemoveAliasesReq
     ) -> tsi.ObjRemoveAliasesRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.obj_remove_aliases(req)
+        new_req = req.model_copy(
+            update={"project_id": self._idc.ext_to_int_project_id(req.project_id)}
+        )
+        return self._internal_trace_server.obj_remove_aliases(new_req)
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.tags_list(req)
+        new_req = req.model_copy(
+            update={"project_id": self._idc.ext_to_int_project_id(req.project_id)}
+        )
+        return self._internal_trace_server.tags_list(new_req)
 
     def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.aliases_list(req)
+        new_req = req.model_copy(
+            update={"project_id": self._idc.ext_to_int_project_id(req.project_id)}
+        )
+        return self._internal_trace_server.aliases_list(new_req)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
+        int_project_id = self._idc.ext_to_int_project_id(req.table.project_id)
+        new_req = req.model_copy(
+            update={
+                "table": req.table.model_copy(update={"project_id": int_project_id})
+            }
+        )
         return self._ref_apply(
-            self._internal_trace_server.table_create, req, req.table.project_id
+            self._internal_trace_server.table_create, new_req, int_project_id
         )
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        int_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(update={"project_id": int_project_id})
         return self._ref_apply(
-            self._internal_trace_server.table_update, req, req.project_id
+            self._internal_trace_server.table_update, new_req, int_project_id
         )
 
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        int_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(update={"project_id": int_project_id})
         return self._ref_apply(
-            self._internal_trace_server.table_create_from_digests, req, req.project_id
+            self._internal_trace_server.table_create_from_digests,
+            new_req,
+            int_project_id,
         )
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        int_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(update={"project_id": int_project_id})
         return self._ref_apply(
-            self._internal_trace_server.table_query, req, req.project_id
+            self._internal_trace_server.table_query, new_req, int_project_id
         )
 
     def table_query_stream(
         self, req: tsi.TableQueryReq
     ) -> Iterator[tsi.TableRowSchema]:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        int_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(update={"project_id": int_project_id})
         return self._stream_ref_apply(
-            self._internal_trace_server.table_query_stream, req, req.project_id
+            self._internal_trace_server.table_query_stream, new_req, int_project_id
         )
 
     # This is a legacy endpoint, it should be removed once the client is mostly updated
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        int_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(update={"project_id": int_project_id})
         return self._ref_apply(
-            self._internal_trace_server.table_query_stats, req, req.project_id
+            self._internal_trace_server.table_query_stats, new_req, int_project_id
         )
 
     def table_query_stats_batch(
         self, req: tsi.TableQueryStatsBatchReq
     ) -> tsi.TableQueryStatsBatchRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        int_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(update={"project_id": int_project_id})
         return self._ref_apply(
-            self._internal_trace_server.table_query_stats_batch, req, req.project_id
+            self._internal_trace_server.table_query_stats_batch,
+            new_req,
+            int_project_id,
         )
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
@@ -427,19 +460,24 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return universal_int_to_ext_ref_converter(res, self._idc.int_to_ext_project_id)
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(
+            update={"project_id": self._idc.ext_to_int_project_id(req.project_id)}
+        )
         # Special case where refs can never be part of the request
-        return self._internal_trace_server.file_create(req)
+        return self._internal_trace_server.file_create(new_req)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(
+            update={"project_id": self._idc.ext_to_int_project_id(req.project_id)}
+        )
         # Special case where refs can never be part of the request
-        return self._internal_trace_server.file_content_read(req)
+        return self._internal_trace_server.file_content_read(new_req)
 
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        int_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        new_req = req.model_copy(update={"project_id": int_project_id})
         return self._ref_apply(
-            self._internal_trace_server.files_stats, req, req.project_id
+            self._internal_trace_server.files_stats, new_req, int_project_id
         )
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
