@@ -5835,6 +5835,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         if len(query_result.result_rows) == 0:
+            # DO NOT MERGE: diagnostic probe for flake investigation.
+            try:
+                probe_rows = self.ch_client.query(
+                    "SELECT "
+                    "countIf(project_id = {project_id: String}) AS in_project, "
+                    "countIf(digest = {digest: String}) AS by_digest_any_project, "
+                    "countIf(project_id = {project_id: String} AND digest = {digest: String}) AS in_project_and_digest, "
+                    "count() AS total, "
+                    "groupArray((project_id, digest))[1:10] AS sample "
+                    "FROM files",
+                    parameters={
+                        "project_id": req.project_id,
+                        "digest": req.digest,
+                    },
+                ).result_rows
+                if probe_rows:
+                    (
+                        in_project,
+                        by_digest_any_project,
+                        in_project_and_digest,
+                        total,
+                        sample,
+                    ) = probe_rows[0]
+                    logger.warning(
+                        "FLAKE_PROBE file_content_read NotFound: "
+                        "project_id=%r digest=%r database=%r "
+                        "files_total=%s in_project=%s by_digest_any_project=%s "
+                        "in_project_and_digest=%s sample=%s",
+                        req.project_id,
+                        req.digest,
+                        self._database,
+                        total,
+                        in_project,
+                        by_digest_any_project,
+                        in_project_and_digest,
+                        sample,
+                    )
+            except Exception as probe_exc:
+                logger.warning(
+                    "FLAKE_PROBE file_content_read query failed: %s", probe_exc
+                )
             raise NotFoundError(f"File with digest {req.digest} not found")
 
         n_chunks = query_result.result_rows[0][0]
