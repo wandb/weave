@@ -4698,6 +4698,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         """Return grouped prediction/trial/score data for evaluation results."""
+        eval_helpers.validate_eval_results_request(req)
         eval_root_ids = eval_helpers.resolve_eval_root_ids(req)
         if not eval_root_ids:
             empty_summary = tsi.EvalResultsSummaryRes() if req.include_summary else None
@@ -4711,7 +4712,26 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 include_children=req.include_predict_and_score_children,
             )
         )
+        if req.resolve_row_refs:
+            reader = lambda digests: self._table_rows_read_batch(
+                req.project_id, digests
+            )
+            eval_helpers.resolve_eval_inputs(all_calls, eval_root_ids, reader)
         return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
+
+    def _table_rows_read_batch(
+        self, project_id: str, digests: list[str]
+    ) -> dict[str, Any]:
+        """Batch read table_rows by digest. Returns {digest: parsed_val}."""
+        if not digests:
+            return {}
+        conn, cursor = get_conn_cursor(self.db_path)
+        placeholders = ", ".join("?" for _ in digests)
+        cursor.execute(
+            f"SELECT digest, val FROM table_rows WHERE project_id = ? AND digest IN ({placeholders})",
+            [project_id, *digests],
+        )
+        return {row[0]: json.loads(row[1]) for row in cursor.fetchall()}
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)

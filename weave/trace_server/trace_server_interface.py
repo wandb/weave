@@ -2667,6 +2667,36 @@ class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
 
 
+class EvalResultsSortBy(SortBy):
+    """Sort specification for evaluation results, extending SortBy"""
+
+    evaluation_call_id: str | None = Field(
+        default=None,
+        description=("Scope the sort to a specific evaluation's scores."),
+    )
+    mode: Literal["value", "difference"] = Field(
+        default="value",
+        description=(
+            "When 'value', sort by the field value for the specified evaluation. "
+            "When 'difference', sort by max-min spread of the field across all "
+            "evaluations (evaluation_call_id is ignored)."
+        ),
+    )
+
+
+class EvalResultsFilter(BaseModelStrict):
+    """A filter scoped to an optional evaluation."""
+
+    evaluation_call_id: str | None = Field(
+        default=None,
+        description="When set, filter fields are scoped to this evaluation's data.",
+    )
+    query: Query = Field(
+        description="Filter expression. Supported field prefixes: "
+        "scores.<name>, inputs.<path>, outputs.<path>.",
+    )
+
+
 class EvalResultsQueryBody(BaseModelStrict):
     evaluation_call_ids: list[str] | None = Field(
         default=None,
@@ -2725,6 +2755,18 @@ class EvalResultsQueryBody(BaseModelStrict):
             "derived from the predict_and_score call itself (predict_call_id and "
             "scorer_call_ids will be null/empty)."
         ),
+    )
+    sort_by: list[EvalResultsSortBy] | None = Field(
+        default=None,
+        description=(
+            "Sort specification for result rows. Supported field prefixes: "
+            "scores.<name>, inputs.<path>, outputs.<path>. "
+            "When null, rows are sorted by row_digest ASC."
+        ),
+    )
+    filters: list[EvalResultsFilter] | None = Field(
+        default=None,
+        description="Filters applied to grouped rows. Multiple filters are AND'd together.",
     )
     limit: int | None = Field(
         default=None,

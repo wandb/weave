@@ -9,10 +9,24 @@ on:
         value: ${{ jobs.check.outputs.trace_server_tests }}
       weave_ts_sdk_tests:
         value: ${{ jobs.check.outputs.weave_ts_sdk_tests }}
+      # Narrower outputs used to gate the multi-node ClickHouse migrator
+      # jobs (1s3r, 2s2r). Both are strict subsets of trace_server_tests.
+      trace_server_migrator_tests:
+        value: ${{ jobs.check.outputs.trace_server_migrator_tests }}
+      trace_server_distributed_tests:
+        value: ${{ jobs.check.outputs.trace_server_distributed_tests }}
 
 env:
   TRACE_SERVER_PATHS: "weave/trace_server/"
   WEAVE_TS_SDK_PATHS: "sdks/node/"
+  # Paths that warrant running migrator tests against multi-replica
+  # topology (1s3r, 2s2r). Derived from the last 22 replication/migration
+  # fix PRs from the weave team.
+  TRACE_SERVER_MIGRATOR_PATHS: "weave/trace_server/migrations/ weave/trace_server/clickhouse_trace_server_migrator.py weave/trace_server/clickhouse_schema.py weave/trace_server/database_engine.py weave/trace_server/environment.py weave/trace_server/clickhouse_trace_server_settings.py tests/trace_server_migrator/ tests/trace_server/conftest_lib/ pyproject.toml uv.lock noxfile.py"
+  # Additional paths that warrant running 2s2r (distributed+replicated).
+  # Migrator paths also trigger 2s2r — this filter only adds the
+  # distributed-query surface that wouldn't otherwise trigger.
+  TRACE_SERVER_DISTRIBUTED_PATHS: "weave/trace_server/calls_query_builder/ weave/trace_server/clickhouse/ weave/trace_server/clickhouse_trace_server_batched.py"
   # Everything else is implicitly trace SDK
 
 jobs:
@@ -21,6 +35,8 @@ jobs:
     outputs:
       trace_server_tests: ${{ steps.trace_server.outputs.run_tests }}
       weave_ts_sdk_tests: ${{ steps.weave_ts_sdk.outputs.run_tests }}
+      trace_server_migrator_tests: ${{ steps.trace_server_migrator.outputs.run_tests }}
+      trace_server_distributed_tests: ${{ steps.trace_server_distributed.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -69,6 +85,26 @@ jobs:
         name: Weave TS SDK Checks
         run: |
           for path in ${{ env.WEAVE_TS_SDK_PATHS }}; do
+            if echo "$changed_files" | grep -q "$path"; then
+              echo "run_tests=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "run_tests=false" >> $GITHUB_OUTPUT
+      - id: trace_server_migrator
+        name: Trace Server Migrator Checks
+        run: |
+          for path in ${{ env.TRACE_SERVER_MIGRATOR_PATHS }}; do
+            if echo "$changed_files" | grep -q "$path"; then
+              echo "run_tests=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "run_tests=false" >> $GITHUB_OUTPUT
+      - id: trace_server_distributed
+        name: Trace Server Distributed Checks
+        run: |
+          for path in ${{ env.TRACE_SERVER_DISTRIBUTED_PATHS }}; do
             if echo "$changed_files" | grep -q "$path"; then
               echo "run_tests=true" >> $GITHUB_OUTPUT
               exit 0

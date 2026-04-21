@@ -29,6 +29,22 @@ from weave.trace_server.trace_server_interface import (
 )
 
 
+def assert_raw_sql(sql: str, exp_query: str, params: dict, exp_params: dict) -> None:
+    """Assert that SQL and parameters match expected values.
+
+    Formats both SQL strings via sqlparse before comparison.
+    """
+    exp_formatted = sqlparse.format(exp_query, reindent=True)
+    found_formatted = sqlparse.format(sql, reindent=True)
+
+    assert exp_formatted == found_formatted, (
+        f"\nExpected:\n{exp_formatted}\n\nGot:\n{found_formatted}"
+    )
+    assert exp_params == params, (
+        f"\nExpected params: {exp_params}\n\nGot params: {params}"
+    )
+
+
 def assert_sql(cq: CallsQuery, exp_query: str, exp_params: dict) -> None:
     """Assert that the CallsQuery generates the expected SQL and parameters.
 
@@ -39,17 +55,7 @@ def assert_sql(cq: CallsQuery, exp_query: str, exp_params: dict) -> None:
     """
     pb = ParamBuilder("pb")
     query = cq.as_sql(pb)
-    params = pb.get_params()
-
-    exp_formatted = sqlparse.format(exp_query, reindent=True)
-    found_formatted = sqlparse.format(query, reindent=True)
-
-    assert exp_formatted == found_formatted, (
-        f"\nExpected:\n{exp_formatted}\n\nGot:\n{found_formatted}"
-    )
-    assert exp_params == params, (
-        f"\nExpected params: {exp_params}\n\nGot params: {params}"
-    )
+    assert_raw_sql(query, exp_query, pb.get_params(), exp_params)
 
 
 def assert_clickhouse_sql(expected_query: str, expected_params: dict, **kwargs) -> None:

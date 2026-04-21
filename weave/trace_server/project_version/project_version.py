@@ -1,6 +1,5 @@
 import logging
 import threading
-from collections.abc import Callable
 
 import ddtrace
 from cachetools import LRUCache
@@ -16,10 +15,6 @@ from weave.trace_server.project_version.types import (
     ReadTable,
     WriteTarget,
 )
-
-# Factory callable that creates a fresh CH client. The consumer
-# (e.g. _get_residence) is responsible for closing the returned client.
-MintClient = Callable[[], CHClient]
 
 logger = logging.getLogger(__name__)
 
@@ -53,21 +48,14 @@ class TableRoutingResolver:
         self._mode = CallsStorageServerMode.from_env()
 
     def _get_residence(
-        self, project_id: str, mint_client: MintClient
+        self, project_id: str, ch_client: CHClient
     ) -> ProjectDataResidence:
         with _project_residence_cache_lock:
             cached = _project_residence_cache.get(project_id)
         if cached is not None:
             return cached
 
-        # Mint a fresh client so the residence query runs on its own CH
-        # session, preventing SESSION_IS_LOCKED when the caller subsequently
-        # performs inserts on the main thread-local session.
-        client = mint_client()
-        try:
-            residence = get_project_data_residence(project_id, client)
-        finally:
-            client.close()
+        residence = get_project_data_residence(project_id, ch_client)
 
         # Log warning if we detect dual residency - data should only ever be in
         # calls_merged OR calls_complete, not both. This is handled gracefully but
@@ -89,12 +77,12 @@ class TableRoutingResolver:
         return residence
 
     @ddtrace.tracer.wrap(name="table_routing.resolve_read_table")
-    def resolve_read_table(self, project_id: str, mint_client: MintClient) -> ReadTable:
+    def resolve_read_table(self, project_id: str, ch_client: CHClient) -> ReadTable:
         """Resolve which table to read from for a given project."""
         if self._mode == CallsStorageServerMode.OFF:
             return ReadTable.CALLS_MERGED
 
-        residence = self._get_residence(project_id, mint_client)
+        residence = self._get_residence(project_id, ch_client)
         set_current_span_dd_tags(
             {
                 "project_version.residence": residence.value,
@@ -121,7 +109,7 @@ class TableRoutingResolver:
     def resolve_v1_write_target(
         self,
         project_id: str,
-        mint_client: MintClient,
+        ch_client: CHClient,
     ) -> WriteTarget:
         """Resolve write target for V1 (legacy) API calls.
 
@@ -131,7 +119,7 @@ class TableRoutingResolver:
 
         Args:
             project_id: The internal project ID.
-            mint_client: Factory that creates a fresh CH client with its own session.
+            ch_client: ClickHouse client instance.
 
         Returns:
             WriteTarget indicating which table to write to.
@@ -139,7 +127,7 @@ class TableRoutingResolver:
         if self._mode == CallsStorageServerMode.OFF:
             return WriteTarget.CALLS_MERGED
 
-        residence = self._get_residence(project_id, mint_client)
+        residence = self._get_residence(project_id, ch_client)
         set_current_span_dd_tags(
             {
                 "project_version.residence": residence.value,
@@ -166,7 +154,7 @@ class TableRoutingResolver:
     def resolve_v2_write_target(
         self,
         project_id: str,
-        mint_client: MintClient,
+        ch_client: CHClient,
     ) -> WriteTarget:
         """Resolve write target for V2 API calls.
 
@@ -174,7 +162,7 @@ class TableRoutingResolver:
 
         Args:
             project_id: The internal project ID.
-            mint_client: Factory that creates a fresh CH client with its own session.
+            ch_client: ClickHouse client instance.
 
         Returns:
             WriteTarget indicating which table to write to.
@@ -182,7 +170,7 @@ class TableRoutingResolver:
         if self._mode == CallsStorageServerMode.OFF:
             return WriteTarget.CALLS_MERGED
 
-        residence = self._get_residence(project_id, mint_client)
+        residence = self._get_residence(project_id, ch_client)
         set_current_span_dd_tags(
             {
                 "project_version.residence": residence.value,

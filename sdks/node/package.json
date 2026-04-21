@@ -140,6 +140,9 @@
     "ext": "ts,json",
     "exec": "tsx examples/evaluate.ts"
   },
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.9.1"
+  },
   "dependencies": {
     "cli-progress": "^3.12.0",
     "cross-spawn": "^7.0.5",
@@ -152,6 +155,7 @@
     "uuidv7": "^1.0.1"
   },
   "devDependencies": {
+    "@opentelemetry/sdk-trace-base": "^1.26.0",
     "@types/cli-progress": "^3.11.6",
     "@types/ini": "^1.3.3",
     "@types/jest": "^29.5.13",
