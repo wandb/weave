@@ -32,7 +32,7 @@ def _probe_ch_state(client, ref, tag: str) -> None:
             "countIf(object_id = {object_id: String} AND digest = {digest: String}) AS by_obj_digest, "
             "countIf(digest = {digest: String}) AS by_digest, "
             "count() AS total, "
-            "groupArray((project_id, object_id, digest))[1:20] AS sample "
+            "arraySlice(groupArray((project_id, object_id, digest)), 1, 20) AS sample "
             "FROM object_versions",
             parameters={"object_id": ref.name, "digest": ref.digest},
         ).result_rows

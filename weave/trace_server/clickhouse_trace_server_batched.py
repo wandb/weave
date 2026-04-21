@@ -1860,7 +1860,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "countIf(project_id = {project_id: String} AND object_id = {object_id: String}) AS by_object, "
                     "countIf(project_id = {project_id: String} AND object_id = {object_id: String} AND digest = {digest: String}) AS by_digest, "
                     "countIf(object_id = {object_id: String} AND digest = {digest: String}) AS digest_any_project, "
-                    "groupArray((object_id, digest))[1:10] AS sample "
+                    "arraySlice(groupArray((object_id, digest)), 1, 10) AS sample "
                     "FROM object_versions "
                     "WHERE project_id = {project_id: String} OR digest = {digest: String}"
                 )
@@ -5475,7 +5475,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             "countIf(project_id = {project_id: String}) AS in_project, "
                             "countIf(digest IN {digests: Array(String)}) AS digest_any_project, "
                             "countIf(project_id = {project_id: String} AND digest IN {digests: Array(String)}) AS in_project_and_digest, "
-                            "groupArray((project_id, object_id, digest))[1:20] AS sample "
+                            "arraySlice(groupArray((project_id, object_id, digest)), 1, 20) AS sample "
                             "FROM object_versions "
                             "WHERE project_id = {project_id: String} OR digest IN {digests: Array(String)}",
                             parameters={
@@ -5843,7 +5843,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "countIf(digest = {digest: String}) AS by_digest_any_project, "
                     "countIf(project_id = {project_id: String} AND digest = {digest: String}) AS in_project_and_digest, "
                     "count() AS total, "
-                    "groupArray((project_id, digest))[1:10] AS sample "
+                    "arraySlice(groupArray((project_id, digest)), 1, 10) AS sample "
                     "FROM files",
                     parameters={
                         "project_id": req.project_id,
