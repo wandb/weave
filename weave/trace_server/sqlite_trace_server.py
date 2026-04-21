@@ -3851,7 +3851,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Finish an evaluation run by ending the underlying call.
 
         This creates a summarize call as a child of the evaluation run,
-        then ends both the summarize call and the evaluation run.
+        then ends both the summarize call and the evaluation run. When
+        ``req.exception`` is set, the run is closed as failed and no
+        summarize call is emitted.
 
         Args:
             req: EvaluationRunFinishReq containing project_id, evaluation_run_id, and optional summary
@@ -3859,6 +3861,23 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         Returns:
             EvaluationRunFinishRes with success status
         """
+        if req.exception is not None:
+            # Fail path — close the evaluation_run call with the exception,
+            # matching V1's ``finish_call(exception=...)`` semantics.
+            self.call_end(
+                tsi.CallEndReq(
+                    end=tsi.EndedCallSchemaForInsert(
+                        project_id=req.project_id,
+                        id=req.evaluation_run_id,
+                        ended_at=datetime.datetime.now(datetime.timezone.utc),
+                        output=None,
+                        summary=req.summary or {},
+                        exception=req.exception,
+                    )
+                )
+            )
+            return tsi.EvaluationRunFinishRes(success=True)
+
         summary = req.summary or {}
 
         # Read the evaluation run call to get the evaluation reference

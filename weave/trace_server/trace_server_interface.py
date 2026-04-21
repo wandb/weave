@@ -2485,6 +2485,13 @@ class EvaluationRunFinishBody(BaseModel):
     summary: dict[str, Any] | None = Field(
         None, description="Optional summary dictionary for the evaluation run"
     )
+    exception: str | None = Field(
+        None,
+        description=(
+            "Optional exception payload. When provided, the evaluation run is "
+            "closed as failed without emitting an Evaluation.summarize call."
+        ),
+    )
 
 
 class EvaluationRunFinishReq(EvaluationRunFinishBody):
