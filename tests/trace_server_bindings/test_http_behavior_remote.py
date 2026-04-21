@@ -24,11 +24,9 @@ from tests.trace_server_bindings.conftest import (
 )
 from weave.trace.display.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import ErrorCode
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
-from weave.trace_server_bindings.http_utils import (
-    ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED,
-)
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
@@ -44,7 +42,7 @@ def make_calls_complete_required_response() -> httpx.Response:
     return httpx.Response(
         400,
         json={
-            "error_code": ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED,
+            "error_code": ErrorCode.CALLS_COMPLETE_MODE_REQUIRED,
             "message": "Project requires calls_complete mode",
         },
         request=httpx.Request("POST", "http://example.com/call/upsert_batch"),

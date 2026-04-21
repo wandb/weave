@@ -22,6 +22,7 @@ class ErrorCode:
     """
 
     CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
+    OBJECT_DELETED = "OBJECT_DELETED"
 
 
 # =============================================================================
@@ -136,14 +137,23 @@ class MissingLLMApiKeyError(Error):
 
 
 class ObjectDeletedError(Error):
-    """Raised when an object has been deleted."""
+    """Raised when an object has been deleted.
+
+    `deleted_at` is optional so client-side code can still surface an
+    authoritative delete when the server emitted the `OBJECT_DELETED` error
+    code but the `deleted_at` field failed to parse (server bug or
+    unexpected format). Server-side raise sites always pass a real
+    datetime.
+    """
 
     # Surfaced in the HTTP body via `_format_error_to_json_with_extra` so
     # clients can distinguish an authoritative delete from a generic 404
     # without sniffing message fields.
-    error_code = "OBJECT_DELETED"
+    error_code: str = ErrorCode.OBJECT_DELETED
 
-    def __init__(self, message: str, deleted_at: datetime.datetime):
+    def __init__(
+        self, message: str, deleted_at: datetime.datetime | None = None
+    ):
         self.deleted_at = deleted_at
         super().__init__(message)
 
@@ -449,8 +459,8 @@ def _format_missing_llm_api_key(exc: Exception) -> dict[str, Any]:
 
 def _format_object_deleted_error(exc: Exception) -> dict[str, Any]:
     """Format ObjectDeletedError with deleted_at timestamp."""
-    extra = {}
-    if isinstance(exc, ObjectDeletedError):
+    extra: dict[str, Any] = {}
+    if isinstance(exc, ObjectDeletedError) and exc.deleted_at is not None:
         extra["deleted_at"] = exc.deleted_at.isoformat()
     return _format_error_to_json_with_extra(exc, extra)
 

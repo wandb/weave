@@ -9,7 +9,7 @@ import tenacity
 from typing_extensions import ParamSpec
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import NotFoundError, ObjectDeletedError
+from weave.trace_server.errors import ErrorCode, NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.utils.retry import _is_retryable_exception, with_retry
 
@@ -263,44 +263,54 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
         default_message = str(e)
 
     # Try to extract custom error message from JSON response
-    extracted_message = None
-    error_code = None
-    error_data: Any = None
+    extracted_message: str | None = None
+    error_code: str | None = None
+    error_data: dict[str, Any] | None = None
     try:
-        error_data = response.json()
-        if isinstance(error_data, dict):
-            error_code = error_data.get("error_code")
-            # Common error message fields
-            extracted_message = (
-                error_data.get("message")
-                or error_data.get("error")
-                or error_data.get("detail")
-                or error_data.get("reason")
-            )
+        parsed = response.json()
     except (json.JSONDecodeError, ValueError):
-        pass
+        parsed = None
+    if isinstance(parsed, dict):
+        error_data = parsed
+        raw_code = error_data.get("error_code")
+        error_code = raw_code if isinstance(raw_code, str) else None
+        # Common error message fields
+        extracted_message = (
+            error_data.get("message")
+            or error_data.get("error")
+            or error_data.get("detail")
+            or error_data.get("reason")
+        )
 
     # Handle calls_complete mode requirement for automatic SDK upgrade
-    if error_code == ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED:
+    if error_code == ErrorCode.CALLS_COMPLETE_MODE_REQUIRED:
         message = extracted_message or default_message or "Calls complete mode required"
         raise CallsCompleteModeRequired(message)
 
     # Authoritative delete: surface the typed exception so SDK callers see
     # the same error class regardless of local vs remote server, and so
-    # retry layers can tell it apart from a replica-lag 404. `error_code` is
-    # the official discriminator going forward (matches how
-    # CallsCompleteModeRequired is identified); `error_code is None` covers
-    # pre-error_code servers that only set `deleted_at`.
-    if response.status_code == 404 and error_code in {
-        ERROR_CODE_OBJECT_DELETED,
-        None,
-    }:
-        deleted_at = _parse_deleted_at(error_data)
-        if deleted_at is not None:
+    # retry layers can tell it apart from a replica-lag 404.
+    if response.status_code == 404:
+        if error_code == ErrorCode.OBJECT_DELETED:
+            # Server told us authoritatively this is a delete. Trust it even
+            # if `deleted_at` fails to parse (server bug); the discriminator
+            # is the error_code, not the timestamp.
             raise ObjectDeletedError(
                 extracted_message or default_message or "Object deleted",
-                deleted_at=deleted_at,
+                deleted_at=(
+                    _parse_deleted_at(error_data) if error_data else None
+                ),
             )
+        # TODO(#6658 follow-up): remove the legacy `deleted_at`-only branch
+        # once all server instances emit `error_code=OBJECT_DELETED` (i.e.
+        # after this PR has been deployed to all managed weave servers).
+        if error_code is None and error_data is not None:
+            deleted_at = _parse_deleted_at(error_data)
+            if deleted_at is not None:
+                raise ObjectDeletedError(
+                    extracted_message or default_message or "Object deleted",
+                    deleted_at=deleted_at,
+                )
 
     # Combine messages
     if default_message and extracted_message:
@@ -369,15 +379,13 @@ def _is_413_error(e: Exception) -> bool:
     )
 
 
-def _parse_deleted_at(body: Any) -> datetime.datetime | None:
+def _parse_deleted_at(body: dict[str, Any]) -> datetime.datetime | None:
     """Return a parsed `deleted_at` from an error response body, or None.
 
     The server emits an ISO-8601 string via `_format_object_deleted_error`.
     Anything that doesn't parse is treated as absent so callers fall back to
     the generic HTTPStatusError path.
     """
-    if not isinstance(body, dict):
-        return None
     raw = body.get("deleted_at")
     if not isinstance(raw, str):
         return None
@@ -410,7 +418,12 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
         body = exc.response.json()
     except (json.JSONDecodeError, ValueError):
         return False
-    return _parse_deleted_at(body) is None
+    if not isinstance(body, dict):
+        return False
+    # Presence check, not a parse: a malformed `deleted_at` still means the
+    # server is signaling a delete, and we shouldn't retry. The strict parse
+    # lives in `_parse_deleted_at` for extracting the timestamp.
+    return body.get("deleted_at") is None
 
 
 def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
@@ -425,14 +438,6 @@ def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
         retry_if=_is_retryable_not_found,
         wait=tenacity.wait_fixed(NOT_FOUND_RETRY_WAIT_SECONDS),
     )(func)
-
-
-# Error code from server when project requires calls_complete mode
-# This matches the ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.trace_server.errors
-ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
-
-# Matches `ObjectDeletedError.error_code` on the server.
-ERROR_CODE_OBJECT_DELETED = "OBJECT_DELETED"
 
 
 class CallsCompleteModeRequired(Exception):
@@ -464,5 +469,5 @@ def is_calls_complete_mode_error(error: Exception) -> bool:
     else:
         return (
             isinstance(error_data, dict)
-            and error_data.get("error_code") == ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED
+            and error_data.get("error_code") == ErrorCode.CALLS_COMPLETE_MODE_REQUIRED
         )

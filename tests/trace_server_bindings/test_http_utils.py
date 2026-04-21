@@ -113,67 +113,75 @@ def test_retry_on_not_found_behavior(monkeypatch):
     assert calls["deleted_local"] == 1
 
 
-def test_object_deleted_404_raises_typed_error():
-    """A 404 with `error_code=OBJECT_DELETED` (or legacy deleted_at-only body)
-    surfaces as ObjectDeletedError. Other 404s, or 404s with a different
-    error_code, fall through to HTTPStatusError.
+DELETED_AT_ISO = "2024-01-01T00:00:00+00:00"
+PARSED_DELETED_AT = datetime.datetime.fromisoformat(DELETED_AT_ISO)
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_exc", "expected_deleted_at"),
+    [
+        # New-style: explicit error_code, well-formed deleted_at.
+        (
+            {
+                "error_code": "OBJECT_DELETED",
+                "reason": "obj was deleted",
+                "deleted_at": DELETED_AT_ISO,
+            },
+            ObjectDeletedError,
+            PARSED_DELETED_AT,
+        ),
+        # error_code=OBJECT_DELETED with malformed deleted_at still raises
+        # ObjectDeletedError: error_code is the authoritative discriminator;
+        # deleted_at is a secondary field that must not downgrade the signal.
+        (
+            {
+                "error_code": "OBJECT_DELETED",
+                "reason": "deleted",
+                "deleted_at": "not-a-date",
+            },
+            ObjectDeletedError,
+            None,
+        ),
+        # Legacy server: no error_code, deleted_at present -> delete.
+        (
+            {"reason": "obj was deleted", "deleted_at": DELETED_AT_ISO},
+            ObjectDeletedError,
+            PARSED_DELETED_AT,
+        ),
+        # Legacy server with malformed deleted_at: fall through conservatively
+        # (only evidence was the timestamp, and it's unparseable).
+        (
+            {"reason": "deleted", "deleted_at": "not-a-date"},
+            httpx.HTTPStatusError,
+            None,
+        ),
+        # Plain 404: no signal.
+        ({"reason": "Obj foo:bar not found"}, httpx.HTTPStatusError, None),
+        # Unrelated error_code that happens to include deleted_at must not
+        # trip a false ObjectDeletedError.
+        (
+            {
+                "error_code": "SOMETHING_ELSE",
+                "reason": "other",
+                "deleted_at": DELETED_AT_ISO,
+            },
+            httpx.HTTPStatusError,
+            None,
+        ),
+    ],
+)
+def test_object_deleted_404_raises_typed_error(
+    body: dict, expected_exc: type, expected_deleted_at: datetime.datetime | None
+):
+    """A 404 with `error_code=OBJECT_DELETED` is authoritatively surfaced as
+    ObjectDeletedError even when the `deleted_at` secondary field is
+    malformed. Legacy servers that only emit `deleted_at` still work. Other
+    404s fall through to HTTPStatusError.
     """
-    deleted_at_iso = "2024-01-01T00:00:00+00:00"
-    parsed_deleted_at = datetime.datetime.fromisoformat(deleted_at_iso)
-
-    # New-style response: explicit error_code.
-    new_response = httpx.Response(
-        404,
-        json={
-            "error_code": "OBJECT_DELETED",
-            "reason": "obj was deleted",
-            "deleted_at": deleted_at_iso,
-        },
-        request=httpx.Request("POST", "http://example.com"),
+    response = httpx.Response(
+        404, json=body, request=httpx.Request("POST", "http://example.com")
     )
-    with pytest.raises(ObjectDeletedError) as exc_info:
-        handle_response_error(new_response, "/obj/read")
-    assert exc_info.value.deleted_at == parsed_deleted_at
-
-    # Legacy response: deleted_at but no error_code (pre-error_code server).
-    legacy_response = httpx.Response(
-        404,
-        json={"reason": "obj was deleted", "deleted_at": deleted_at_iso},
-        request=httpx.Request("POST", "http://example.com"),
-    )
-    with pytest.raises(ObjectDeletedError) as exc_info:
-        handle_response_error(legacy_response, "/obj/read")
-    assert exc_info.value.deleted_at == parsed_deleted_at
-
-    # Plain 404 falls through.
-    plain_404 = httpx.Response(
-        404,
-        json={"reason": "Obj foo:bar not found"},
-        request=httpx.Request("POST", "http://example.com"),
-    )
-    with pytest.raises(httpx.HTTPStatusError):
-        handle_response_error(plain_404, "/obj/read")
-
-    # Different error_code with an unrelated deleted_at-ish field: don't
-    # match, so an unrelated 404 that happens to include `deleted_at` can't
-    # trigger a false ObjectDeletedError.
-    wrong_code = httpx.Response(
-        404,
-        json={
-            "error_code": "SOMETHING_ELSE",
-            "reason": "other",
-            "deleted_at": deleted_at_iso,
-        },
-        request=httpx.Request("POST", "http://example.com"),
-    )
-    with pytest.raises(httpx.HTTPStatusError):
-        handle_response_error(wrong_code, "/obj/read")
-
-    # Malformed deleted_at: fall through conservatively.
-    malformed_deleted_at = httpx.Response(
-        404,
-        json={"reason": "deleted", "deleted_at": "not-a-date"},
-        request=httpx.Request("POST", "http://example.com"),
-    )
-    with pytest.raises(httpx.HTTPStatusError):
-        handle_response_error(malformed_deleted_at, "/obj/read")
+    with pytest.raises(expected_exc) as exc_info:
+        handle_response_error(response, "/obj/read")
+    if expected_exc is ObjectDeletedError:
+        assert exc_info.value.deleted_at == expected_deleted_at
