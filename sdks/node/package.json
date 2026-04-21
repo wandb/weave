@@ -140,10 +140,8 @@
     "ext": "ts,json",
     "exec": "tsx examples/evaluate.ts"
   },
-  "peerDependencies": {
-    "@opentelemetry/api": "^1.9.1"
-  },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.53.0",
     "@opentelemetry/resources": "^1.26.0",
     "@opentelemetry/sdk-trace-base": "^1.26.0",
