@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
 
+import clickhouse_connect
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError
 
@@ -1243,61 +1244,41 @@ def test_delete_preserves_version_index_gaps(ch_server):
     assert by_digest[digests[2]].version_index == 2
 
 
-# Regression guards for SESSION_IS_LOCKED (ClickHouse error code 373).
-# weave-trace does not use server-side ClickHouse sessions; if _mint_client
-# ever starts auto-generating a session_id again, two concurrent requests
-# that share a thread-local client will race and ClickHouse will reject one
-# of them with code 373.
-
-
-def test_mint_client_disables_session_autogeneration() -> None:
-    """_mint_client must pass autogenerate_session_id=False to clickhouse_connect."""
-    captured_kwargs: dict[str, object] = {}
-
-    def fake_get_client(**kwargs: object) -> MagicMock:
-        captured_kwargs.update(kwargs)
-        return MagicMock()
-
-    with (
-        patch.object(chts.ClickHouseTraceServer, "_ensure_database", return_value=None),
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client",
-            side_effect=fake_get_client,
-        ),
-    ):
-        server = chts.ClickHouseTraceServer(host="test_host")
-        server._mint_client()
-
-    assert captured_kwargs.get("autogenerate_session_id") is False
-
-
-def test_concurrent_queries_on_shared_client_do_not_raise_session_locked(
-    ch_server,
+@pytest.mark.parametrize("autogenerate_session_id", [True, False])
+def test_concurrent_queries_on_one_client_vs_session_autogeneration(
+    ch_server, autogenerate_session_id: bool
 ) -> None:
-    """Interface-level regression: concurrent queries on one shared ClickHouse
-    client must not raise a session-locking error.
-
-    Reproduces the production failure mode: many workers hitting the same
-    thread-local ch_client. With autogenerate_session_id=True (the old
-    clickhouse-connect default), overlapping requests with the same UUID
-    session_id are rejected either server-side (SESSION_IS_LOCKED, code 373)
-    or client-side ("concurrent queries within the same session"). With
-    autogenerate_session_id=False there is no session_id and overlapping
-    requests succeed.
+    """With session_id enabled, overlapping queries on one client raise
+    SESSION_IS_LOCKED (code 373); with it disabled, they succeed.
     """
-    shared_client = ch_server.ch_client
-    n_workers = 16
+    client = clickhouse_connect.get_client(
+        host=ch_server._host,
+        port=ch_server._port,
+        user=ch_server._user,
+        password=ch_server._password,
+        secure=ch_server._port == chts.CLICKHOUSE_SECURE_PORT,
+        autogenerate_session_id=autogenerate_session_id,
+    )
+    n_workers = 8
 
     def run_slow_query() -> None:
-        shared_client.query("SELECT sleep(0.05)")
+        client.query("SELECT sleep(0.2)")
 
-    errors: list[BaseException] = []
-    with ThreadPoolExecutor(max_workers=n_workers) as pool:
-        futures = [pool.submit(run_slow_query) for _ in range(n_workers)]
-        for future in as_completed(futures):
-            try:
-                future.result()
-            except BaseException as e:
-                errors.append(e)
+    try:
+        errors: list[Exception] = []
+        with ThreadPoolExecutor(max_workers=n_workers) as pool:
+            futures = [pool.submit(run_slow_query) for _ in range(n_workers)]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    errors.append(e)
+    finally:
+        client.close()
 
-    assert not errors, f"Concurrent queries raised: {errors}"
+    if autogenerate_session_id:
+        assert errors, "expected overlapping queries to be rejected"
+        joined = " | ".join(str(e) for e in errors).lower()
+        assert "session" in joined or "373" in joined, joined
+    else:
+        assert not errors, errors

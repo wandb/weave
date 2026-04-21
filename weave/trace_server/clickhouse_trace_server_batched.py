@@ -6481,8 +6481,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def ch_client(self) -> CHClient:
         """Returns a thread-local clickhouse client.
 
-        Each thread gets its own client instance to avoid session conflicts,
-        but all clients share the same underlying connection pool via _CH_POOL_MANAGER.
+        Each thread gets its own client instance; all clients share the
+        same underlying connection pool via _CH_POOL_MANAGER.
         """
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
@@ -6501,12 +6501,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _mint_client(self) -> CHClient:
         """Create a new ClickHouse client using the shared pool manager.
 
-        We disable server-side ClickHouse sessions (no temp tables, no
-        per-session settings, no transactions are used here). If left
-        enabled, clickhouse-connect auto-generates a UUID session_id per
-        client; two concurrent requests sharing a thread-local client
-        then race on that session_id and ClickHouse returns
-        SESSION_IS_LOCKED (error code 373).
+        autogenerate_session_id=False: weave-trace uses no session features,
+        and the default collides on overlapping queries with SESSION_IS_LOCKED
+        (code 373).
         """
         client = clickhouse_connect.get_client(
             host=self._host,
