@@ -81,7 +81,7 @@ sequenceDiagram
 
     rect rgba(140,180,120,0.08)
     Note over U,D: Upload audio bytes (one round-trip per file)
-    U->>S: HTTPS: audio bytes + expected digest
+    U->>S: POST /file/create (HTTPS)<br/>audio bytes + expected digest
     S->>S: Authenticate and authorize project access
     S->>S: Re-compute digest and verify<br/>it matches the client's digest
     alt bucket storage enabled
@@ -97,7 +97,7 @@ sequenceDiagram
 
     rect rgba(140,180,120,0.08)
     Note over U,D: Send op-call metadata (references audio by digest)
-    U->>S: HTTPS: op-call metadata
+    U->>S: POST /call/start, /call/end<br/>(or /call/upsert_batch) (HTTPS)<br/>op-call metadata
     S->>S: Authenticate and authorize project access
     S->>D: Record op-call row
     D-->>S: Ack
@@ -128,7 +128,7 @@ sequenceDiagram
     participant D as Database
     participant B as Cloud Blob<br/>Storage
 
-    U->>S: HTTPS: request audio by (project, digest)
+    U->>S: POST /file/content (HTTPS)<br/>request audio by (project, digest)
     S->>S: Authenticate and authorize project access
     S->>D: Look up file metadata
     D-->>S: Location (blob URI or inline bytes)
