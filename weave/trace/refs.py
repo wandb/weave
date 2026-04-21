@@ -332,7 +332,10 @@ class CallRef(RefWithExtra):
 @dataclass(frozen=True)
 class DeletedRef(Ref):
     ref: Ref
-    deleted_at: datetime
+    # Optional to mirror `ObjectDeletedError.deleted_at`: the remote HTTP path
+    # can surface an authoritative delete (`error_code=OBJECT_DELETED`) even
+    # when the server's `deleted_at` field fails to parse.
+    deleted_at: datetime | None
     error: ObjectDeletedError
 
     def __repr__(self) -> str:
