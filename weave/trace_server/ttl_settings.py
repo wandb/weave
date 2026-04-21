@@ -17,7 +17,6 @@ from __future__ import annotations
 import datetime
 import logging
 import threading
-from collections.abc import Callable
 
 import ddtrace
 import redis
@@ -28,10 +27,6 @@ from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
 from weave.trace_server.datadog import set_current_span_dd_tags
 
 logger = logging.getLogger(__name__)
-
-# Factory that mints a fresh ClickHouse client with its own session. Mirrors
-# the same pattern used by weave.trace_server.project_version.
-MintClient = Callable[[], CHClient]
 
 PROJECT_TTL_CACHE_SIZE = 10_000
 # 5 minutes; bounds staleness in multi-instance deploys
@@ -51,7 +46,7 @@ _project_ttl_cache_lock = threading.Lock()
 @ddtrace.tracer.wrap(name="ttl_settings.get_project_retention_days")
 def get_project_retention_days(
     project_id: str,
-    mint_client: MintClient,
+    ch_client: CHClient,
     redis_client: redis.Redis | None = None,
 ) -> int:
     """Return retention_days for a project (0 = no TTL / infinite). Cached.
@@ -59,10 +54,6 @@ def get_project_retention_days(
     Read path: L1 (in-process) -> L2 (Redis, optional) -> ClickHouse (argMax).
     A fall-through to ClickHouse is a full cache miss; if ClickHouse has no
     row for the project, returns 0 (no TTL configured).
-
-    On cache miss we mint a fresh ClickHouse client with its own session
-    rather than reusing the caller's thread-local client, to avoid
-    SESSION_IS_LOCKED when this lookup runs alongside an ongoing insert.
     """
     cached = _l1_get(project_id)
     if cached is not None:
@@ -76,11 +67,7 @@ def get_project_retention_days(
             set_current_span_dd_tags({"ttl.cache_hit": "L2"})
             return redis_val
 
-    ch_client = mint_client()
-    try:
-        retention_days = _query_clickhouse(ch_client, project_id)
-    finally:
-        ch_client.close()
+    retention_days = _query_clickhouse(ch_client, project_id)
     set_current_span_dd_tags(
         {"ttl.cache_hit": "clickhouse", "ttl.retention_days": retention_days}
     )

@@ -6844,9 +6844,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         anchor: datetime.datetime,
     ) -> None:
         """Add expire_at to the insertable from the project's retention policy."""
-        retention_days = get_project_retention_days(
-            ch_call.project_id, self._mint_client
-        )
+        retention_days = get_project_retention_days(ch_call.project_id, self.ch_client)
         ch_call.expire_at = compute_expire_at(retention_days, anchor)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
