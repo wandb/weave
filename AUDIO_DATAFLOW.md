@@ -147,10 +147,24 @@ All reads are proxied through the authenticated Weave service. Blob objects are 
 
 ## 5. Configuration Controls
 
-Bucket storage is enabled by the W&B operator via service configuration:
+Bucket storage is enabled by the W&B operator via environment variables on the Weave service.
 
-- A master setting specifies the **storage URI** (`s3://…`, `gs://…`, or `az://…`) and the cloud-provider credentials.
-- An **allow list** (or a percentage-based ramp keyed on project ID) determines which projects route new uploads to blob storage. Projects not enabled continue to store files inline in the database.
-- Provider-specific settings include region, optional KMS key (AWS), and service-account credentials (GCP/Azure).
+**Routing:**
+
+| Variable | Purpose |
+|---|---|
+| `WF_FILE_STORAGE_URI` | Master switch. Specifies the bucket URI, e.g. `s3://my-bucket`, `gs://my-bucket`, or `az://account/container`. If unset, all audio bytes stay inline in the database. |
+| `WF_FILE_STORAGE_PROJECT_ALLOW_LIST` | Comma-separated list of `entity/project` values that route new uploads to blob storage. The literal `*` enables all projects. |
+| `WF_FILE_STORAGE_PROJECT_RAMP_PCT` | Integer 0–100. Consistent hash of the project ID selects a deterministic percentage of projects for blob storage (used for gradual rollouts). |
+
+A project must match the allow list or the ramp hash to write to blob storage; otherwise uploads fall back to inline database storage.
+
+**Provider credentials:**
+
+| Provider | Variables |
+|---|---|
+| AWS S3 | `WF_FILE_STORAGE_AWS_REGION`, `WF_FILE_STORAGE_AWS_ACCESS_KEY_ID`, `WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY`, `WF_FILE_STORAGE_AWS_SESSION_TOKEN` (optional), `WF_FILE_STORAGE_AWS_KMS_KEY` (optional — enables SSE-KMS at rest) |
+| Google Cloud Storage | `WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64` (base64-encoded service account JSON) |
+| Azure Blob Storage | `WF_FILE_STORAGE_AZURE_CONNECTION_STRING` *or* `WF_FILE_STORAGE_AZURE_ACCESS_KEY` + `WF_FILE_STORAGE_AZURE_ACCOUNT_URL` |
 
 Existing files are unaffected by flipping the switch: each file is read from whichever location it was originally written to.
