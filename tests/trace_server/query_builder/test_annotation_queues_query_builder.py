@@ -1,8 +1,13 @@
+import datetime
+
 import sqlparse
 
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
+    make_annotator_progress_insert_query,
+    make_annotator_progress_state_check_query,
+    make_queue_item_existence_query,
     make_queue_items_query,
     make_queues_query,
 )
@@ -241,6 +246,104 @@ def test_make_queue_items_query_with_id_and_call_id_filter() -> None:
         "pb_1": "queue-id",
         "pb_2": "item-id",
         "pb_3": "call-id",
+    }
+
+    assert_sql(expected_query, expected_params, query, params)
+
+
+def test_make_annotator_progress_state_check_query() -> None:
+    pb = ParamBuilder("pb")
+    query = make_annotator_progress_state_check_query(
+        project_id="project",
+        queue_item_id="item-id",
+        annotator_id="user-id",
+        pb=pb,
+    )
+    params = pb.get_params()
+
+    expected_query = """
+    SELECT
+        annotation_state,
+        COUNT(*) as record_exists
+    FROM annotator_queue_items_progress
+    WHERE project_id = {pb_0: String}
+      AND queue_item_id = {pb_1: String}
+      AND annotator_id = {pb_2: String}
+      AND deleted_at IS NULL
+    GROUP BY annotation_state
+    """
+
+    expected_params = {
+        "pb_0": "project",
+        "pb_1": "item-id",
+        "pb_2": "user-id",
+    }
+
+    assert_sql(expected_query, expected_params, query, params)
+
+
+def test_make_queue_item_existence_query() -> None:
+    pb = ParamBuilder("pb")
+    query = make_queue_item_existence_query(
+        project_id="project",
+        queue_id="queue-id",
+        queue_item_id="item-id",
+        pb=pb,
+    )
+    params = pb.get_params()
+
+    expected_query = """
+    SELECT id
+    FROM annotation_queue_items
+    WHERE id = {pb_2: String}
+      AND project_id = {pb_0: String}
+      AND queue_id = {pb_1: String}
+      AND deleted_at IS NULL
+    LIMIT 1
+    """
+
+    expected_params = {
+        "pb_0": "project",
+        "pb_1": "queue-id",
+        "pb_2": "item-id",
+    }
+
+    assert_sql(expected_query, expected_params, query, params)
+
+
+def test_make_annotator_progress_insert_query() -> None:
+    pb = ParamBuilder("pb")
+    now = datetime.datetime(2026, 4, 20, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    query = make_annotator_progress_insert_query(
+        project_id="project",
+        queue_id="queue-id",
+        queue_item_id="item-id",
+        annotator_id="user-id",
+        progress_id="progress-id",
+        annotation_state="completed",
+        now=now,
+        pb=pb,
+    )
+    params = pb.get_params()
+
+    expected_query = """
+    INSERT INTO annotator_queue_items_progress
+        (id, project_id, queue_item_id, queue_id, annotator_id,
+         annotation_state, created_at, updated_at, deleted_at)
+    VALUES
+        ({pb_4: String}, {pb_0: String}, {pb_2: String},
+         {pb_1: String}, {pb_3: String}, {pb_5: String},
+         {pb_6: DateTime64(3)}, {pb_6: DateTime64(3)}, NULL)
+    """
+
+    expected_params = {
+        "pb_0": "project",
+        "pb_1": "queue-id",
+        "pb_2": "item-id",
+        "pb_3": "user-id",
+        "pb_4": "progress-id",
+        "pb_5": "completed",
+        "pb_6": now,
     }
 
     assert_sql(expected_query, expected_params, query, params)
