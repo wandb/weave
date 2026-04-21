@@ -89,7 +89,13 @@ def test_retry_on_not_found_behavior(monkeypatch):
     @retry_on_not_found
     def deleted_http():
         calls["deleted_http"] += 1
-        raise _make_404({"reason": "deleted", "deleted_at": "2024-01-01T00:00:00Z"})
+        raise _make_404(
+            {
+                "error_code": "OBJECT_DELETED",
+                "reason": "deleted",
+                "deleted_at": "2024-01-01T00:00:00Z",
+            }
+        )
 
     @retry_on_not_found
     def deleted_local():

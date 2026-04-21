@@ -398,10 +398,10 @@ def _parse_deleted_at(body: dict[str, Any]) -> datetime.datetime | None:
 def _is_retryable_not_found(exc: BaseException) -> bool:
     """True only for 404-like misses worth retrying.
 
-    Skips authoritative deletes (local `ObjectDeletedError` or HTTP response
-    body with `deleted_at`). Covers both local server domain exceptions
-    (`NotFoundError`) and remote HTTP 404s; anything else (including a 404
-    with a non-JSON body) is out of scope for this retry layer.
+    Skips authoritative deletes (local `ObjectDeletedError` or remote 404
+    with `error_code=OBJECT_DELETED`). Covers both local server domain
+    exceptions (`NotFoundError`) and remote HTTP 404s; anything else
+    (including a 404 with a non-JSON body) is out of scope for this layer.
     """
     # Authoritative delete -- never retry.
     if isinstance(exc, ObjectDeletedError):
@@ -409,7 +409,11 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
     # Local server raised a plain not-found -- retry.
     if isinstance(exc, NotFoundError):
         return True
-    # Remote HTTP 404 -- retry unless the body indicates a delete.
+    # Remote HTTP 404 -- retry unless the body identifies an authoritative
+    # delete via `error_code`. A pre-error_code server's delete (legacy
+    # `deleted_at`-only body) will be retried once before the final failure;
+    # that's an acceptable cost for keeping `error_code` as the single
+    # discriminator.
     if not isinstance(exc, httpx.HTTPStatusError) or exc.response is None:
         return False
     if exc.response.status_code != 404:
@@ -420,10 +424,7 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
         return False
     if not isinstance(body, dict):
         return False
-    # Presence check, not a parse: a malformed `deleted_at` still means the
-    # server is signaling a delete, and we shouldn't retry. The strict parse
-    # lives in `_parse_deleted_at` for extracting the timestamp.
-    return body.get("deleted_at") is None
+    return body.get("error_code") != ErrorCode.OBJECT_DELETED
 
 
 def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
