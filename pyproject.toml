@@ -222,6 +222,7 @@ markers = [
   "timeout: marks tests with a timeout in seconds (via pytest-timeout)",
   "remote_only: marks tests that only run with --remote-http-trace-server=remote",
   "stainless_only: marks tests that only run with --remote-http-trace-server=stainless",
+  "stress: long-running stress tests; opt-in via --run-stress or a dedicated CI job",
 ]
 
 [tool.ruff.lint]
