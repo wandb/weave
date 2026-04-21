@@ -24,6 +24,7 @@ from weave.trace_server_bindings.client_interface import TraceServerClientInterf
 from weave.trace_server_bindings.delegating_trace_server import (
     DelegatingTraceServerMixin,
 )
+from weave.trace_server_bindings.http_utils import retry_on_not_found
 
 logger = logging.getLogger(__name__)
 
@@ -288,11 +289,14 @@ class CachingMiddlewareTraceServer(
 
     # Cacheable Methods:
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        # Retry on NotFound to absorb the eventual-consistency window between
+        # a just-completed write and a subsequent read. This catches every
+        # caller uniformly — SDK APIs, test helpers that hit client.server
+        # directly, and internal workers.
+        read = retry_on_not_found(self._next_trace_server.obj_read)
         if not digest_is_cacheable(req.digest):
-            return self._next_trace_server.obj_read(req)
-        return self._with_cache_pydantic(
-            self._next_trace_server.obj_read, req, tsi.ObjReadRes
-        )
+            return read(req)
+        return self._with_cache_pydantic(read, req, tsi.ObjReadRes)
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
@@ -469,7 +473,7 @@ class CachingMiddlewareTraceServer(
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         return self._with_cache(
-            self._next_trace_server.file_content_read,
+            retry_on_not_found(self._next_trace_server.file_content_read),
             req,
             "file_content_read",
             lambda req: req.model_dump_json(),
