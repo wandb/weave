@@ -1759,6 +1759,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
         )
+        # DO NOT MERGE: flake investigation.
+        logger.warning(
+            "FLAKE_TRACE obj_create OK: project_id=%r object_id=%r digest=%r database=%r",
+            req.obj.project_id,
+            req.obj.object_id,
+            digest,
+            self._database,
+        )
 
         return tsi.ObjCreateRes(
             digest=digest,
@@ -1831,6 +1839,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return obj_results
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        # DO NOT MERGE: flake investigation.
+        logger.warning(
+            "FLAKE_TRACE obj_read IN: project_id=%r object_id=%r digest=%r database=%r",
+            req.project_id,
+            req.object_id,
+            req.digest,
+            self._database,
+        )
         # Check if digest is an alias name (not a hash, not version-like, not "latest")
         digest = req.digest
         resolved_digest = self._maybe_resolve_alias(

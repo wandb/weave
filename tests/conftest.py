@@ -20,7 +20,7 @@ from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings import http_utils, remote_http_trace_server
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
@@ -106,6 +106,17 @@ def reset_digest_settings():
     """Reset client-side digest settings after each test."""
     yield
     parse_and_apply_settings(UserSettings())
+
+
+@pytest.fixture(autouse=True)
+def force_flake_reproduction(monkeypatch):
+    """DO NOT MERGE: force replica-lag flakes to surface by disabling the
+    retry_on_not_found safety net. Any write-then-read race that is
+    currently masked by the 3-attempt/0.25s retry window will now fail
+    on first attempt.
+    """
+    monkeypatch.setattr(http_utils, "NOT_FOUND_RETRY_WAIT_SECONDS", 0.0)
+    monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "1")
 
 
 @pytest.fixture(autouse=True)
