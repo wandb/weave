@@ -1847,6 +1847,55 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         objs = self._select_objs_query(object_query_builder, metadata_only)
         if len(objs) == 0:
+            # DO NOT MERGE: diagnostic probe for flake investigation.
+            # Capture the actual object_versions state at the moment of the
+            # NotFoundError so we can tell whether the row is genuinely
+            # absent, has a different digest, or belongs to a different
+            # project_id (which would point at ref-conversion or caching
+            # issues rather than replica lag).
+            try:
+                probe_query = (
+                    "SELECT "
+                    "countIf(project_id = {project_id: String}) AS all_project, "
+                    "countIf(project_id = {project_id: String} AND object_id = {object_id: String}) AS by_object, "
+                    "countIf(project_id = {project_id: String} AND object_id = {object_id: String} AND digest = {digest: String}) AS by_digest, "
+                    "countIf(object_id = {object_id: String} AND digest = {digest: String}) AS digest_any_project, "
+                    "groupArray((object_id, digest))[1:10] AS sample "
+                    "FROM object_versions "
+                    "WHERE project_id = {project_id: String} OR digest = {digest: String}"
+                )
+                probe_rows = self.ch_client.query(
+                    probe_query,
+                    parameters={
+                        "project_id": req.project_id,
+                        "object_id": req.object_id,
+                        "digest": req.digest,
+                    },
+                ).result_rows
+                if probe_rows:
+                    (
+                        all_project,
+                        by_object,
+                        by_digest,
+                        digest_any_project,
+                        sample,
+                    ) = probe_rows[0]
+                    logger.warning(
+                        "FLAKE_PROBE obj_read NotFound: project_id=%r object_id=%r "
+                        "digest=%r database=%r all_project=%s by_object=%s "
+                        "by_digest=%s digest_any_project=%s sample=%s",
+                        req.project_id,
+                        req.object_id,
+                        req.digest,
+                        self._database,
+                        all_project,
+                        by_object,
+                        by_digest,
+                        digest_any_project,
+                        sample,
+                    )
+            except Exception as probe_exc:
+                logger.warning("FLAKE_PROBE query failed: %s", probe_exc)
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
         obj = objs[0]
