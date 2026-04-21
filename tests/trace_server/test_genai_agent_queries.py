@@ -8,13 +8,8 @@ import base64
 import datetime
 import uuid
 
-from weave.trace_server.agents.helpers import (
-    extract_search_rows,
-    genai_search_row_to_row,
-    genai_span_to_row,
-)
+from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
-    ALL_SEARCH_INSERT_COLUMNS,
     ALL_SPAN_INSERT_COLUMNS,
     AgentSpanCHInsertable,
     NormalizedMessage,
@@ -56,26 +51,14 @@ def _make_span(project_id: str, **overrides: object) -> AgentSpanCHInsertable:
 
 
 def _insert_spans(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
-    """Insert spans directly into spans."""
+    """Insert spans. The ``messages`` MV populates the search index as a
+    side effect of this insert."""
     rows = [genai_span_to_row(s) for s in spans]
     ch_client.insert(
         "spans",
         data=rows,
         column_names=ALL_SPAN_INSERT_COLUMNS,
     )
-
-
-def _insert_search_rows(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
-    """Extract and insert message search rows from spans."""
-    all_rows = []
-    for s in spans:
-        all_rows.extend(genai_search_row_to_row(sr) for sr in extract_search_rows(s))
-    if all_rows:
-        ch_client.insert(
-            "message_search",
-            data=all_rows,
-            column_names=ALL_SEARCH_INSERT_COLUMNS,
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -353,10 +336,11 @@ def test_agents_mv_aggregation(ch_server):
 
 
 def test_message_search(ch_server):
-    """End-to-end LIKE search on the message_search table returns expected rows.
+    """End-to-end search against the ``messages`` table.
 
-    Note: this does not assert the tokenbf_v1 skip index is actually used —
-    verifying index selection would require EXPLAIN output or query metrics.
+    Spans are inserted and the ClickHouse MV populates the search index
+    automatically; no Python-side extraction runs. Verifies that content
+    LIKE + span-level filters return the expected hits.
     """
     project_id = _make_project_id("search")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -388,7 +372,6 @@ def test_message_search(ch_server):
         ),
     ]
     _insert_spans(ch_server.ch_client, spans)
-    _insert_search_rows(ch_server.ch_client, spans)
 
     # Search for "quantum" — should match 1 message
     res = ch_server.agent_search(AgentSearchReq(project_id=project_id, query="quantum"))
@@ -401,6 +384,78 @@ def test_message_search(ch_server):
         AgentSearchReq(project_id=project_id, query="xyznonexistent")
     )
     assert res_empty.total_conversations == 0
+
+
+def test_message_search_shared_digest_across_spans(ch_server):
+    """Two spans carrying identical output message content should produce
+    two rows in ``messages`` that share a single content_digest — enabling
+    read-side dedup via GROUP BY content_digest when desired.
+    """
+    project_id = _make_project_id("search_dedup")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    repeated = "Identical assistant response across two different spans."
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id="dedup-conv-1",
+            output_messages=[NormalizedMessage(role="assistant", content=repeated)],
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            conversation_id="dedup-conv-2",
+            output_messages=[NormalizedMessage(role="assistant", content=repeated)],
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_search(
+        AgentSearchReq(project_id=project_id, query="Identical assistant")
+    )
+    # One row per occurrence across two conversations
+    total_matches = sum(len(r.matched_messages) for r in res.results)
+    assert total_matches == 2
+    # Both occurrences share a single content_digest
+    digests = {
+        m.content_digest for r in res.results for m in r.matched_messages
+    }
+    assert len(digests) == 1
+
+
+def test_message_search_indexes_tool_calls(ch_server):
+    """tool_call_arguments and tool_call_result should each produce a
+    searchable occurrence with role 'tool_call' / 'tool_result'.
+    """
+    project_id = _make_project_id("search_tools")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id="tool-conv-1",
+            operation_name="execute_tool",
+            tool_call_arguments='{"city":"Reykjavík"}',
+            tool_call_result='{"temperature":5,"condition":"snowy"}',
+            started_at=now,
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    # Hit on the arguments side
+    res_args = ch_server.agent_search(
+        AgentSearchReq(project_id=project_id, query="Reykjavík")
+    )
+    assert res_args.total_conversations == 1
+    assert res_args.results[0].matched_messages[0].role == "tool_call"
+
+    # Hit on the result side
+    res_result = ch_server.agent_search(
+        AgentSearchReq(project_id=project_id, query="snowy")
+    )
+    assert res_result.total_conversations == 1
+    assert res_result.results[0].matched_messages[0].role == "tool_result"
 
 
 # ---------------------------------------------------------------------------

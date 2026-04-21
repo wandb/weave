@@ -12,6 +12,12 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from weave.trace_server.agents.constants import (
+    DEFAULT_AGENT_QUERY_LIMIT,
+    DEFAULT_SEARCH_LIMIT,
+    MAX_AGENT_QUERY_LIMIT,
+    MAX_SEARCH_LIMIT,
+)
 from weave.trace_server.interface.query import Query
 
 
@@ -158,8 +164,8 @@ class AgentSpansQueryReq(BaseModel):
     query: Query | None = None
     group_by: list[AgentGroupByRef] | None = None
     sort_by: list[AgentSortBy] | None = None
-    limit: int = 100
-    offset: int = 0
+    limit: int = Field(default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT)
+    offset: int = Field(default=0, ge=0)
     start: str | None = None  # ISO timestamp — filter started_at >= start
     end: str | None = None  # ISO timestamp — filter started_at < end
 
@@ -184,8 +190,9 @@ class AgentSpansQueryRes(BaseModel):
 class AgentSearchReq(BaseModel):
     """Full-text search across message content and span metadata.
 
-    Searches the message_search index for messages matching the query
-    string, returning results grouped by conversation.
+    Scans the ``messages`` table (one row per message occurrence, populated
+    by an MV from spans) and returns matching span-level hits. The caller
+    groups by conversation for the response shape.
     """
 
     project_id: str
@@ -200,8 +207,8 @@ class AgentSearchReq(BaseModel):
     started_after: datetime.datetime | None = None
     started_before: datetime.datetime | None = None
 
-    limit: int = 20
-    offset: int = 0
+    limit: int = Field(default=DEFAULT_SEARCH_LIMIT, ge=0, le=MAX_SEARCH_LIMIT)
+    offset: int = Field(default=0, ge=0)
 
 
 class AgentSearchMatchedMessage(BaseModel):
@@ -350,8 +357,8 @@ class AgentsQueryReq(BaseModel):
     project_id: str
     filters: AgentsQueryFilters | None = None
     sort_by: list[AgentSortBy] | None = None
-    limit: int = 100
-    offset: int = 0
+    limit: int = Field(default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT)
+    offset: int = Field(default=0, ge=0)
 
 
 class AgentsQueryRes(BaseModel):
@@ -405,8 +412,8 @@ class AgentVersionsQueryReq(BaseModel):
     project_id: str
     agent_name: str
     sort_by: list[AgentSortBy] | None = None
-    limit: int = 100
-    offset: int = 0
+    limit: int = Field(default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT)
+    offset: int = Field(default=0, ge=0)
 
 
 class AgentVersionsQueryRes(BaseModel):

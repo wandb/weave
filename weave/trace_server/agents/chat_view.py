@@ -240,7 +240,18 @@ def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
             roots.append(node)
 
     def _sort(nodes: list[SpanNode]) -> None:
-        nodes.sort(key=lambda n: n.span.started_at or "")
+        # ``started_at`` is non-null from ClickHouse but can be None in
+        # in-memory callers and tests. The ``is None`` key groups nulls
+        # last without forcing a datetime.min fallback (which would force
+        # tz-aware vs naive comparison). span_id is a tiebreaker so equal
+        # timestamps produce deterministic order.
+        nodes.sort(
+            key=lambda n: (
+                n.span.started_at is None,
+                n.span.started_at,
+                n.span.span_id,
+            )
+        )
         for n in nodes:
             _sort(n.children)
 

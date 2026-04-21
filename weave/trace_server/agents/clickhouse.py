@@ -14,16 +14,11 @@ from typing import TYPE_CHECKING, Any
 from weave.trace_server.agents.chat_view import build_trace_chat
 from weave.trace_server.agents.constants import MAX_CONVERSATION_CHAT_TURNS
 from weave.trace_server.agents.helpers import (
-    extract_search_rows,
-    genai_search_row_to_row,
     genai_span_to_row,
     normalize_span_row,
     unpack_string_array,
 )
-from weave.trace_server.agents.schema import (
-    ALL_SEARCH_INSERT_COLUMNS,
-    ALL_SPAN_INSERT_COLUMNS,
-)
+from weave.trace_server.agents.schema import ALL_SPAN_INSERT_COLUMNS
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -263,9 +258,12 @@ class AgentWriteHandler:
     # ------------------------------------------------------------------
 
     def otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
-        """Ingest OTel spans into spans and message search index."""
+        """Ingest OTel spans into the spans table.
+
+        The ``messages`` search table is populated by a ClickHouse
+        materialized view off the spans table (migration 030).
+        """
         span_rows: list[list[Any]] = []
-        search_rows: list[list[Any]] = []
         accepted = 0
         rejected = 0
         errors: list[str] = []
@@ -297,19 +295,11 @@ class AgentWriteHandler:
                         continue
 
                     span_rows.append(genai_span_to_row(genai_row))
-                    for sr in extract_search_rows(genai_row):
-                        search_rows.append(genai_search_row_to_row(sr))
                     accepted += 1
 
         if span_rows:
             self._ch.insert(
                 "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
-            )
-        if search_rows:
-            self._ch.insert(
-                "message_search",
-                data=search_rows,
-                column_names=ALL_SEARCH_INSERT_COLUMNS,
             )
 
         error_msg = "; ".join(errors[:20])

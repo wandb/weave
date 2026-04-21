@@ -10,6 +10,7 @@ import datetime
 
 from weave.trace_server.agents.chat_view import (
     build_chat_messages,
+    build_span_tree,
     build_trace_chat,
 )
 from weave.trace_server.agents.types import AgentSpanSchema
@@ -158,3 +159,42 @@ def test_full_agent_turn() -> None:
     # Tool and handoff spans don't contribute tokens.
     assert by_type["agent_message"].input_tokens == 210
     assert by_type["agent_message"].output_tokens == 105
+
+
+def test_build_span_tree_handles_null_started_at() -> None:
+    """build_span_tree must not crash when a span has started_at=None.
+
+    The ClickHouse column is non-null, but in-memory callers/tests can
+    construct AgentSpanSchema with started_at=None. The sort key needs to
+    stay type-homogeneous.
+    """
+    s1 = AgentSpanSchema(
+        project_id="p1", trace_id="t1", span_id="s1",
+        span_name="a", status_code="OK", started_at=None, ended_at=None,
+    )
+    s2 = AgentSpanSchema(
+        project_id="p1", trace_id="t1", span_id="s2",
+        span_name="b", status_code="OK",
+        started_at=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+        ended_at=None,
+    )
+    roots = build_span_tree([s1, s2])
+    assert {r.span.span_id for r in roots} == {"s1", "s2"}
+    # s1 (None) sorts AFTER s2 so null timestamps don't leak to the top
+    # of the conversation view.
+    assert roots[-1].span.span_id == "s1"
+
+
+def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:
+    """Siblings with equal started_at must sort deterministically by span_id."""
+    t0 = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    spans = [
+        AgentSpanSchema(
+            project_id="p1", trace_id="t1", span_id=sid,
+            span_name="s", status_code="OK", started_at=t0, ended_at=t0,
+        )
+        # Intentionally out of order to exercise the tiebreaker.
+        for sid in ("c", "a", "b")
+    ]
+    roots = build_span_tree(spans)
+    assert [r.span.span_id for r in roots] == ["a", "b", "c"]

@@ -1,6 +1,6 @@
 """Query builder for the GenAI agent observability system.
 
-Every SELECT emitted against the spans / agents / agent_versions / message_search
+Every SELECT emitted against the spans / agents / agent_versions / messages
 tables is constructed here via ``make_*_query`` functions. Consumers build a
 ``ParamBuilder``, call the appropriate ``make_*_query(pb, req)``, then run the
 returned SQL through the server's ``_query`` method.
@@ -14,12 +14,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from weave.trace_server.agents.constants import (
-    DEFAULT_AGENT_QUERY_LIMIT,
-    DEFAULT_SEARCH_LIMIT,
-    MAX_AGENT_QUERY_LIMIT,
-    MAX_SEARCH_LIMIT,
-)
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentCustomAttrFilter,
@@ -267,13 +261,17 @@ def add_custom_attr_filters(
 
 
 def _pagination_slots(
-    pb: ParamBuilder, limit: int | None, offset: int | None
+    pb: ParamBuilder, limit: int, offset: int
 ) -> tuple[str, str, int]:
-    """Add limit/offset params and return (limit_slot, offset_slot, resolved_limit)."""
-    resolved = min(limit or DEFAULT_AGENT_QUERY_LIMIT, MAX_AGENT_QUERY_LIMIT)
-    limit_slot = pb.add(resolved, param_type="UInt64")
-    offset_slot = pb.add(offset or 0, param_type="UInt64")
-    return limit_slot, offset_slot, resolved
+    """Add limit/offset params and return (limit_slot, offset_slot, limit).
+
+    Bounds (``0 <= limit <= MAX_AGENT_QUERY_LIMIT``, ``offset >= 0``) are
+    enforced by Pydantic on the request models; this function trusts those
+    invariants rather than re-clamping.
+    """
+    limit_slot = pb.add(limit, param_type="UInt64")
+    offset_slot = pb.add(offset, param_type="UInt64")
+    return limit_slot, offset_slot, limit
 
 
 # ---------------------------------------------------------------------------
@@ -361,6 +359,7 @@ def _agent_versions_where(pb: ParamBuilder, req: AgentVersionsQueryReq) -> str:
 
 
 def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
+    """Build the WHERE clause for a search against the messages table."""
     pid_slot = pb.add(req.project_id, param_type="String")
     content_slot = pb.add(f"%{req.query}%", param_type="String")
     conditions = [
@@ -373,6 +372,12 @@ def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
     if req.agent_name:
         agent_slot = pb.add(req.agent_name, param_type="String")
         conditions.append(f"agent_name = {agent_slot}")
+    if req.provider_name:
+        provider_slot = pb.add(req.provider_name, param_type="String")
+        conditions.append(f"provider_name = {provider_slot}")
+    if req.request_model:
+        model_slot = pb.add(req.request_model, param_type="String")
+        conditions.append(f"request_model = {model_slot}")
     if req.conversation_id:
         conv_slot = pb.add(req.conversation_id, param_type="String")
         conditions.append(f"conversation_id = {conv_slot}")
@@ -552,14 +557,27 @@ def make_agent_versions_list_query(pb: ParamBuilder, req: AgentVersionsQueryReq)
 
 
 def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
+    """Search messages by content + span-level filters.
+
+    Single-table scan against the ``messages`` table populated by an MV off
+    ``spans``. Content is stored inline (ClickHouse columnar compression
+    handles repetition); ``content_digest`` is available for read-side dedup
+    via GROUP BY when the caller wants unique content rather than unique
+    occurrences.
+    """
     where = _search_where(pb, req)
-    resolved_limit = min(req.limit or DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT)
-    limit_slot = pb.add(resolved_limit, param_type="UInt64")
-    offset_slot = pb.add(req.offset or 0, param_type="UInt64")
+    # Bounds (``0 <= limit <= MAX_SEARCH_LIMIT``, ``offset >= 0``) are
+    # enforced on AgentSearchReq.
+    limit_slot = pb.add(req.limit, param_type="UInt64")
+    offset_slot = pb.add(req.offset, param_type="UInt64")
+    # content_digest is stored raw as FixedString(16); hex-encode here so
+    # the Python API surface (AgentSearchMatchedMessage.content_digest: str)
+    # keeps a portable text representation.
     return f"""
         SELECT conversation_id, conversation_name, agent_name,
-               span_id, trace_id, role, content, content_digest, started_at
-        FROM message_search FINAL
+               span_id, trace_id, role, content,
+               lower(hex(content_digest)) AS content_digest, started_at
+        FROM messages
         WHERE {where}
         ORDER BY started_at DESC
         LIMIT {limit_slot} OFFSET {offset_slot}

@@ -8,6 +8,7 @@ formatted SQL + param dict against an expected value, matching the style of
 
 import pytest
 import sqlparse
+from pydantic import ValidationError
 
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
@@ -145,10 +146,22 @@ class TestMakeSpansListQuery:
         expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
         assert_sql(expected, expected_params, query, pb.get_params())
 
-    def test_limit_capped_to_max(self) -> None:
+    def test_limit_rejected_when_above_max(self) -> None:
+        with pytest.raises(ValidationError):
+            AgentSpansQueryReq(project_id="p1", limit=99999)
+
+    def test_limit_rejected_when_negative(self) -> None:
+        with pytest.raises(ValidationError):
+            AgentSpansQueryReq(project_id="p1", limit=-1)
+
+    def test_offset_rejected_when_negative(self) -> None:
+        with pytest.raises(ValidationError):
+            AgentSpansQueryReq(project_id="p1", offset=-1)
+
+    def test_limit_zero_is_honored(self) -> None:
         pb = ParamBuilder("genai")
-        make_spans_list_query(pb, AgentSpansQueryReq(project_id="p1", limit=99999))
-        assert pb.get_params()["genai_1"] == 10000
+        make_spans_list_query(pb, AgentSpansQueryReq(project_id="p1", limit=0))
+        assert pb.get_params()["genai_1"] == 0
 
 
 # ============================================================================
@@ -567,8 +580,9 @@ class TestMakeMessageSearchQuery:
 
         expected = """
             SELECT conversation_id, conversation_name, agent_name,
-                   span_id, trace_id, role, content, content_digest, started_at
-            FROM message_search FINAL
+                   span_id, trace_id, role, content,
+                   lower(hex(content_digest)) AS content_digest, started_at
+            FROM messages
             WHERE project_id = {genai_0:String}
               AND content LIKE {genai_1:String}
             ORDER BY started_at DESC
@@ -597,8 +611,9 @@ class TestMakeMessageSearchQuery:
 
         expected = """
             SELECT conversation_id, conversation_name, agent_name,
-                   span_id, trace_id, role, content, content_digest, started_at
-            FROM message_search FINAL
+                   span_id, trace_id, role, content,
+                   lower(hex(content_digest)) AS content_digest, started_at
+            FROM messages
             WHERE project_id = {genai_0:String}
               AND content LIKE {genai_1:String}
               AND role IN {genai_2:Array(String)}
@@ -618,12 +633,17 @@ class TestMakeMessageSearchQuery:
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
-    def test_limit_capped_to_max(self) -> None:
-        pb = ParamBuilder("genai")
-        make_message_search_query(
-            pb, AgentSearchReq(project_id="p1", query="x", limit=5000)
-        )
-        assert pb.get_params()["genai_2"] == 1000
+    def test_limit_rejected_when_above_max(self) -> None:
+        with pytest.raises(ValidationError):
+            AgentSearchReq(project_id="p1", query="x", limit=5000)
+
+    def test_limit_rejected_when_negative(self) -> None:
+        with pytest.raises(ValidationError):
+            AgentSearchReq(project_id="p1", query="x", limit=-1)
+
+    def test_offset_rejected_when_negative(self) -> None:
+        with pytest.raises(ValidationError):
+            AgentSearchReq(project_id="p1", query="x", offset=-1)
 
 
 # ============================================================================

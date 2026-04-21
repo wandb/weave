@@ -32,6 +32,24 @@ NOISE_TOOL_NAMES: frozenset[str] = frozenset(
 )
 
 # ---------------------------------------------------------------------------
+# Custom attribute limits (enforced at OTel ingest time)
+# ---------------------------------------------------------------------------
+
+# Maximum total number of entries across the three custom_attrs* Maps per
+# span. Once reached, further attributes are silently dropped — keeps a single
+# misbehaving span from blowing up storage or aggregation memory.
+MAX_CUSTOM_ATTRS_PER_SPAN = 1024
+
+# Maximum serialized byte length of any single custom attribute value. String
+# values over this are truncated with a ``TRUNCATION_MARKER`` suffix; dict /
+# list values are JSON-serialized first, then truncated the same way.
+MAX_CUSTOM_ATTR_VALUE_BYTES = 256 * 1024
+
+# Suffix appended to truncated custom attribute values so downstream tools can
+# tell that truncation happened. Formatted lazily via ``.format(n=...)``.
+CUSTOM_ATTR_TRUNCATION_MARKER = "...[truncated from {n} bytes]"
+
+# ---------------------------------------------------------------------------
 # Schema / ClickHouse tuple shape
 # ---------------------------------------------------------------------------
 

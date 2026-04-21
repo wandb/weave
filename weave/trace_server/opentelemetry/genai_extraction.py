@@ -10,8 +10,14 @@ The main entry point is ``extract_genai_span()`` which takes a parsed OTel
 """
 
 import json
+import math
 from typing import Any
 
+from weave.trace_server.agents.constants import (
+    CUSTOM_ATTR_TRUNCATION_MARKER,
+    MAX_CUSTOM_ATTR_VALUE_BYTES,
+    MAX_CUSTOM_ATTRS_PER_SPAN,
+)
 from weave.trace_server.agents.schema import (
     AgentSpanCHInsertable,
     NormalizedMessage,
@@ -347,10 +353,35 @@ def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> 
 # ---------------------------------------------------------------------------
 
 
+def _truncate_if_needed(val: str) -> str:
+    """Truncate a string to MAX_CUSTOM_ATTR_VALUE_BYTES chars with a marker.
+
+    Uses character length rather than UTF-8 byte length for simplicity —
+    the cap is a cost/UX safety net, not a strict ClickHouse invariant, so
+    slight overage on multi-byte payloads is acceptable.
+    """
+    n = len(val)
+    if n <= MAX_CUSTOM_ATTR_VALUE_BYTES:
+        return val
+    marker = CUSTOM_ATTR_TRUNCATION_MARKER.format(n=n)
+    keep = max(0, MAX_CUSTOM_ATTR_VALUE_BYTES - len(marker))
+    return val[:keep] + marker
+
+
 def _extract_custom_attrs(
     attrs: dict[str, Any],
 ) -> tuple[dict[str, str], dict[str, int], dict[str, float]]:
-    """Route non-semconv attributes into the three typed Maps."""
+    """Route non-semconv attributes into the three typed Maps.
+
+    Enforces two limits to keep misbehaving spans from blowing up storage:
+    - at most ``MAX_CUSTOM_ATTRS_PER_SPAN`` entries across all three maps;
+    - each string / JSON-serialized value truncated at
+      ``MAX_CUSTOM_ATTR_VALUE_BYTES`` with a truncation marker.
+
+    Non-finite floats (``NaN``, ``+Inf``, ``-Inf``) are dropped because they
+    break JSON response serialization downstream and have no useful
+    aggregation semantics.
+    """
     string_map: dict[str, str] = {}
     int_map: dict[str, int] = {}
     float_map: dict[str, float] = {}
@@ -360,16 +391,21 @@ def _extract_custom_attrs(
             continue
         if val is None:
             continue
+        total = len(string_map) + len(int_map) + len(float_map)
+        if total >= MAX_CUSTOM_ATTRS_PER_SPAN:
+            break
         if isinstance(val, bool):
             string_map[key] = str(val).lower()
         elif isinstance(val, int):
             int_map[key] = val
         elif isinstance(val, float):
+            if not math.isfinite(val):
+                continue
             float_map[key] = val
         elif isinstance(val, str):
-            string_map[key] = val
+            string_map[key] = _truncate_if_needed(val)
         else:
-            string_map[key] = _json_str(val)
+            string_map[key] = _truncate_if_needed(_json_str(val))
 
     return string_map, int_map, float_map
 

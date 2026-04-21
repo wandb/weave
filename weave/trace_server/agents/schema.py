@@ -190,30 +190,3 @@ class AgentSpanCHInsertable(BaseModel):
 
 
 ALL_SPAN_INSERT_COLUMNS: list[str] = sorted(AgentSpanCHInsertable.model_fields.keys())
-
-
-class AgentMessageSearchRow(BaseModel):
-    """A row for the message_search table.
-
-    One row per unique (project_id, content_digest) — identical message content
-    deduplicates across spans via ReplacingMergeTree.
-    """
-
-    project_id: str
-    content_digest: str
-    conversation_id: str = ""
-    trace_id: str = ""
-    span_id: str = ""
-    role: str = ""
-    started_at: datetime.datetime = Field(default_factory=lambda: _EPOCH)
-    content: str = ""
-    agent_name: str = ""
-    agent_version: str = ""
-    conversation_name: str = ""
-    wb_user_id: str = ""
-    provider_name: str = ""
-    request_model: str = ""
-    operation_name: str = ""
-
-
-ALL_SEARCH_INSERT_COLUMNS: list[str] = sorted(AgentMessageSearchRow.model_fields.keys())

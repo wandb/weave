@@ -180,3 +180,81 @@ def test_extract_genai_span_error_status() -> None:
     assert result.status_code == "ERROR"
     assert result.status_message == "rate limited"
     assert result.error_type == "RateLimitError"
+
+
+def test_extract_custom_attrs_caps_total_entries() -> None:
+    """A span with more than MAX_CUSTOM_ATTRS_PER_SPAN attributes has the
+    excess silently dropped so a single misbehaving client can't blow up the
+    insert.
+    """
+    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTRS_PER_SPAN
+
+    attrs = {f"lorem.key_{i:05d}": f"val_{i}" for i in range(MAX_CUSTOM_ATTRS_PER_SPAN + 500)}
+    result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
+
+    total = (
+        len(result.custom_attrs)
+        + len(result.custom_attrs_int)
+        + len(result.custom_attrs_float)
+    )
+    assert total == MAX_CUSTOM_ATTRS_PER_SPAN
+
+
+def test_extract_custom_attrs_truncates_large_string_values() -> None:
+    """String values larger than MAX_CUSTOM_ATTR_VALUE_BYTES are truncated
+    with a marker suffix so downstream tools can tell truncation happened.
+    """
+    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_BYTES
+
+    huge = "x" * (MAX_CUSTOM_ATTR_VALUE_BYTES + 50_000)
+    result = extract_genai_span(
+        _make_span(attrs={"lorem.big_string": huge}),
+        project_id="p1",
+    )
+
+    stored = result.custom_attrs["lorem.big_string"]
+    assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_BYTES
+    assert stored.endswith("bytes]")
+    assert "truncated from" in stored
+
+
+def test_extract_custom_attrs_truncates_large_json_values() -> None:
+    """Non-primitive, non-dict values (e.g. lists) get JSON-encoded then
+    truncated the same way. Dicts get flattened by ``_flatten_attrs`` so
+    they never hit the JSON-encoding branch.
+    """
+    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_BYTES
+
+    huge_list = ["x" * 100] * 5000  # JSON encoding ~500KB
+    result = extract_genai_span(
+        _make_span(attrs={"lorem.big_list": huge_list}),
+        project_id="p1",
+    )
+
+    stored = result.custom_attrs["lorem.big_list"]
+    assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_BYTES
+    assert "truncated from" in stored
+
+
+def test_extract_custom_attrs_skips_non_finite_floats() -> None:
+    """NaN and +/-Inf must not reach custom_attrs_float — they break JSON
+    serialization and have no aggregation semantics.
+    """
+    result = extract_genai_span(
+        _make_span(
+            attrs={
+                "lorem.nan": float("nan"),
+                "lorem.pos_inf": float("inf"),
+                "lorem.neg_inf": float("-inf"),
+                "lorem.finite": 3.14,
+            }
+        ),
+        project_id="p1",
+    )
+
+    assert "lorem.finite" in result.custom_attrs_float
+    assert result.custom_attrs_float["lorem.finite"] == 3.14
+    for key in ("lorem.nan", "lorem.pos_inf", "lorem.neg_inf"):
+        assert key not in result.custom_attrs_float
+        assert key not in result.custom_attrs
+        assert key not in result.custom_attrs_int
