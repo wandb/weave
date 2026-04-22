@@ -25,11 +25,6 @@ from weave.trace_server.kafka import KafkaProducer
 
 logger = logging.getLogger(__name__)
 
-# Per-map cap for the typed attribute maps populated by extract_typed_attrs.
-# Applied independently to each of the four maps, so a single call can
-# contribute up to 4 * MAX_TYPED_ATTR_ENTRIES_PER_MAP entries across all maps.
-MAX_TYPED_ATTR_ENTRIES_PER_MAP = 100
-
 
 # ---------------------------------------------------------------------------
 # JSON serialization helpers
@@ -131,10 +126,14 @@ def extract_typed_attrs(
 ) -> tuple[dict[str, str], dict[str, int], dict[str, float], dict[str, bool]]:
     """Route a Python attributes dict into four typed maps for fast filtering.
 
-    Each map is independently capped at MAX_TYPED_ATTR_ENTRIES_PER_MAP entries;
-    once a map is full, additional values of that type are dropped. Non-finite
-    floats (NaN, +/-Inf) are dropped because they break JSON/CH round-trips.
-    Non-scalar leaf values (lists, etc.) are JSON-encoded into the string map.
+    No per-map entry cap: ``attributes_dump`` already admits arbitrarily large
+    payloads, the typed maps mirror it, and ``_strip_large_values`` clears the
+    maps together with the dump when a row exceeds the insert byte limit. A
+    dedicated cap would only hide truncation from callers.
+
+    Non-finite floats (NaN, +/-Inf) are dropped because they break
+    JSON/CH round-trips. Non-scalar leaf values (lists, etc.) are
+    JSON-encoded into the string map.
 
     The ``bool`` branch must come before the ``int`` branch: Python's ``bool``
     is a subclass of ``int``, so ``isinstance(True, int)`` is True, and an
@@ -154,20 +153,16 @@ def extract_typed_attrs(
         if val is None:
             continue
         if isinstance(val, bool):
-            if len(bool_map) < MAX_TYPED_ATTR_ENTRIES_PER_MAP:
-                bool_map[key] = val
+            bool_map[key] = val
         elif isinstance(val, int):
-            if len(int_map) < MAX_TYPED_ATTR_ENTRIES_PER_MAP:
-                int_map[key] = val
+            int_map[key] = val
         elif isinstance(val, float):
             if not math.isfinite(val):
                 continue
-            if len(float_map) < MAX_TYPED_ATTR_ENTRIES_PER_MAP:
-                float_map[key] = val
+            float_map[key] = val
         elif isinstance(val, str):
-            if len(str_map) < MAX_TYPED_ATTR_ENTRIES_PER_MAP:
-                str_map[key] = val
-        elif len(str_map) < MAX_TYPED_ATTR_ENTRIES_PER_MAP:
+            str_map[key] = val
+        else:
             str_map[key] = json.dumps(val)
 
     return str_map, int_map, float_map, bool_map

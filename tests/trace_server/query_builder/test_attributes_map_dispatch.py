@@ -16,10 +16,7 @@ fuzzy match would miss regressions at the punctuation level.
 from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server.calls_query_builder.calls_query_builder import CallsQuery
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
-from weave.trace_server.clickhouse.utilities import (
-    MAX_TYPED_ATTR_ENTRIES_PER_MAP,
-    extract_typed_attrs,
-)
+from weave.trace_server.clickhouse.utilities import extract_typed_attrs
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
@@ -394,16 +391,17 @@ def test_fallback_convert_exists_uses_json_value_only() -> None:
 
 
 def test_extract_typed_attrs_dispatch_and_edge_cases() -> None:
-    """One dense assertion block covering type dispatch, flattening, drops, and cap.
+    """One dense assertion block covering type dispatch, flattening, and drops.
 
     - bool branch must precede int branch (Python bool is a subclass of int);
     - dicts flatten to dot-joined keys so read-side ``attributes.a.b`` matches;
     - None values are dropped (not written as empty strings);
     - non-finite floats (NaN/+inf/-inf) are dropped;
     - non-scalars (list/tuple/etc.) land in the string map as JSON;
-    - each map independently caps at MAX_TYPED_ATTR_ENTRIES_PER_MAP.
+    - no entry cap: oversized rows are handled downstream by
+      ``_strip_large_values``, not by truncating the extractor output.
     """
-    cap = MAX_TYPED_ATTR_ENTRIES_PER_MAP
+    big_batch = 250  # well above the removed 100-entry cap.
     attrs: dict = {
         "s": "hello",
         "i": 42,
@@ -417,7 +415,7 @@ def test_extract_typed_attrs_dispatch_and_edge_cases() -> None:
         "nested": {"a": 1, "b": {"c": "deep"}},
         "list": [1, 2, 3],
     }
-    for i in range(cap + 5):
+    for i in range(big_batch):
         attrs[f"str_{i:05d}"] = f"v{i}"
 
     s, i, f, b = extract_typed_attrs(attrs)
@@ -435,7 +433,8 @@ def test_extract_typed_attrs_dispatch_and_edge_cases() -> None:
     assert "nan" not in f
     assert "pinf" not in f
     assert "ninf" not in f
-    assert len(s) == cap
+    # All big_batch str_NNNNN entries survive + s/nested.b.c/list = big_batch + 3.
+    assert len(s) == big_batch + 3
     assert len(b) == 2
     assert len(i) == 2
     assert len(f) == 1

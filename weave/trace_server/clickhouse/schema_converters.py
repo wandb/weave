@@ -101,7 +101,7 @@ def ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
 # call_parts columns for the typed attribute Maps. End/delete/update
 # insertables don't populate them, so ch_call_to_row must substitute an
 # empty dict — ClickHouse rejects None for non-Nullable Map columns.
-EMPTY_ATTRIBUTES_MAP_COLUMNS = frozenset(
+ATTRIBUTES_MAP_COLUMNS = frozenset(
     {
         "attributes_map_str",
         "attributes_map_int",
@@ -117,7 +117,7 @@ def ch_call_to_row(ch_call: CallCHInsertable) -> list[Any]:
     row: list[Any] = []
     for col in ALL_CALL_INSERT_COLUMNS:
         val = call_dict.get(col)
-        if val is None and col in EMPTY_ATTRIBUTES_MAP_COLUMNS:
+        if val is None and col in ATTRIBUTES_MAP_COLUMNS:
             val = {}
         row.append(val)
     return row
