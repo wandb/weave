@@ -18,7 +18,7 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.display.term import configure_logger, update_logger_level
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, Ref
-from weave.trace.registry_links import RegistryLinkable
+from weave.trace.registry_links import LinkablePrompt
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
@@ -383,15 +383,15 @@ def ref(location: str) -> ObjectRef:
 
 
 def link_prompt_to_registry(
-    prompt: RegistryLinkable,
+    prompt: LinkablePrompt,
     *,
     target_path: str,
     aliases: Sequence[str] | None = None,
 ) -> LinkAssetToRegistryRes:
-    """Link a published prompt or object version into the registry.
+    """Link a published prompt version into the registry.
 
     Args:
-        prompt: A published prompt or object, an `ObjectRef`, or a fully qualified
+        prompt: A published prompt, an `ObjectRef`, or a fully qualified
             `weave:///...` URI string.
         target_path: Registry destination path in the format
             `<registry_project>/<portfolio_name>`, for example

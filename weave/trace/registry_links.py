@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from typing import Protocol, TypeAlias
+from typing import TYPE_CHECKING, Protocol, TypeAlias
 
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import ObjectRef
+
+if TYPE_CHECKING:
+    from weave.prompt.prompt import Prompt
 
 
 class SupportsRegistryLinkRef(Protocol):
@@ -15,6 +18,7 @@ class SupportsRegistryLinkRef(Protocol):
 
 
 RegistryLinkable: TypeAlias = SupportsRegistryLinkRef | ObjectRef | str
+LinkablePrompt: TypeAlias = "Prompt | ObjectRef | str"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -35,6 +39,24 @@ def resolve_linkable_ref(linkable: RegistryLinkable) -> ObjectRef:
         return ref
     raise ValueError(
         "Expected a published object, ObjectRef, or weave:/// URI. "
+        "Call weave.publish() first."
+    )
+
+
+def resolve_prompt_ref(prompt: LinkablePrompt) -> ObjectRef:
+    """Resolve a published prompt, ObjectRef, or weave:/// URI to an ObjectRef."""
+    if isinstance(prompt, ObjectRef):
+        return prompt
+    if isinstance(prompt, str):
+        return ObjectRef.parse_uri(prompt)
+
+    # Imported lazily to avoid a registry_links -> prompt -> api cycle.
+    from weave.prompt.prompt import Prompt
+
+    if isinstance(prompt, Prompt) and prompt.ref is not None:
+        return prompt.ref
+    raise ValueError(
+        "Expected a published prompt, ObjectRef, or weave:/// URI. "
         "Call weave.publish() first."
     )
 

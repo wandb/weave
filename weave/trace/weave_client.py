@@ -75,9 +75,10 @@ from weave.trace.refs import (
     TableRef,
 )
 from weave.trace.registry_links import (
-    RegistryLinkable,
+    LinkablePrompt,
     parse_registry_target_path,
     resolve_linkable_ref,
+    resolve_prompt_ref,
 )
 from weave.trace.serialization.serialize import (
     from_json,
@@ -1278,15 +1279,15 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def link_prompt_to_registry(
         self,
-        prompt: RegistryLinkable,
+        prompt: LinkablePrompt,
         *,
         target_path: str,
         aliases: Sequence[str] | None = None,
     ) -> LinkAssetToRegistryRes:
-        """Link a published prompt or object version into the registry.
+        """Link a published prompt version into the registry.
 
         Args:
-            prompt: A published prompt or object, an `ObjectRef`, or a fully qualified
+            prompt: A published prompt, an `ObjectRef`, or a fully qualified
                 `weave:///...` URI string.
             target_path: Registry destination path in the format
                 `<registry_project>/<portfolio_name>`, for example
@@ -1296,7 +1297,7 @@ class WeaveClient:
         Returns:
             LinkAssetToRegistryRes: Parsed response from the registry-link endpoint.
         """
-        prompt_ref = resolve_linkable_ref(prompt)
+        prompt_ref = resolve_prompt_ref(prompt)
         target = parse_registry_target_path(target_path)
 
         return link_asset_to_registry(

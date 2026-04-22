@@ -137,9 +137,24 @@ def test_resolves_input_and_builds_request(
 def test_rejects_unpublished_prompt(client):
     """Raise before making the transport call when the prompt has no ref."""
     with patch(MOCK_TARGET) as transport:
-        with pytest.raises(ValueError, match="published object"):
+        with pytest.raises(ValueError, match="published prompt"):
             client.link_prompt_to_registry(
                 StringPrompt("Hello {name}"),
+                target_path="wandb-registry-prompts/my-prompt-collection",
+            )
+
+    transport.assert_not_called()
+
+
+def test_rejects_published_non_prompt_object(client):
+    """Reject published non-prompt objects before making the transport call."""
+    obj = weave.Object(name="not-a-prompt")
+    obj.ref = PROMPT_REF
+
+    with patch(MOCK_TARGET) as transport:
+        with pytest.raises(ValueError, match="published prompt"):
+            client.link_prompt_to_registry(
+                obj,
                 target_path="wandb-registry-prompts/my-prompt-collection",
             )
 
