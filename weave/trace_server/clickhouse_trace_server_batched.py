@@ -269,6 +269,7 @@ from weave.trace_server.trace_server_common import (
     set_nested_key,
     try_parse_json,
 )
+from weave.trace_server.ttl_settings import get_project_retention_days
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
     EvaluateModelDispatcher,
@@ -684,11 +685,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for _, end_call in calls
         ]
 
-        # Convert and insert based on write target
+        # Convert and insert based on write target. All calls in the batch
+        # share req.project_id, so we resolve retention once.
+        retention_days = get_project_retention_days(req.project_id, self.ch_client)
         if write_target == WriteTarget.CALLS_COMPLETE:
             rows = [
                 ch_complete_call_to_row(
-                    start_end_calls_to_ch_complete_insertable(start, end)
+                    start_end_calls_to_ch_complete_insertable(
+                        start, end, retention_days
+                    )
                 )
                 for start, end in calls
             ]
@@ -697,9 +702,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             rows = []
             for start, end in calls:
                 rows.append(
-                    ch_call_to_row(start_call_for_insert_to_ch_insertable(start))
+                    ch_call_to_row(
+                        start_call_for_insert_to_ch_insertable(start, retention_days)
+                    )
                 )
-                rows.append(ch_call_to_row(end_call_for_insert_to_ch_insertable(end)))
+                rows.append(
+                    ch_call_to_row(
+                        end_call_for_insert_to_ch_insertable(end, retention_days)
+                    )
+                )
             self._insert_call_batch(rows)
 
         # Run callbacks and flush
@@ -793,7 +804,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
 
         req = process_call_req_to_content(req, self)
-        ch_call = start_call_for_insert_to_ch_insertable(req.start)
+        retention_days = get_project_retention_days(
+            req.start.project_id, self.ch_client
+        )
+        ch_call = start_call_for_insert_to_ch_insertable(req.start, retention_days)
 
         # Check write target - v1 call_start cannot write to calls_complete
         write_target = self.table_routing_resolver.resolve_v1_write_target(
@@ -822,7 +836,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
         req = process_call_req_to_content(req, self)
-        ch_call = end_call_for_insert_to_ch_insertable(req.end)
+        retention_days = get_project_retention_days(req.end.project_id, self.ch_client)
+        ch_call = end_call_for_insert_to_ch_insertable(req.end, retention_days)
 
         # Check write target - v1 call_end cannot write to calls_complete
         write_target = self.table_routing_resolver.resolve_v1_write_target(
@@ -886,7 +901,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     self.ch_client,
                 )
 
-                ch_call = complete_call_to_ch_insertable(processed_complete_call)
+                retention_days = get_project_retention_days(
+                    processed_complete_call.project_id, self.ch_client
+                )
+                ch_call = complete_call_to_ch_insertable(
+                    processed_complete_call, retention_days
+                )
                 if write_target == WriteTarget.CALLS_COMPLETE:
                     self._insert_call_complete(ch_call)
                 else:
@@ -908,7 +928,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         their start to be visible immediately in the UI.
         """
         start_req = process_call_req_to_content(tsi.CallStartReq(start=req.start), self)
-        ch_start = start_call_for_insert_to_ch_insertable(start_req.start)
+        retention_days = get_project_retention_days(
+            start_req.start.project_id, self.ch_client
+        )
+        ch_start = start_call_for_insert_to_ch_insertable(
+            start_req.start, retention_days
+        )
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             ch_start.project_id,
@@ -946,7 +971,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if write_target == WriteTarget.CALLS_COMPLETE:
             self._update_call_end_in_calls_complete(req.end)
         elif write_target == WriteTarget.CALLS_MERGED:
-            ch_end = end_call_for_insert_to_ch_insertable(req.end)
+            retention_days = get_project_retention_days(
+                req.end.project_id, self.ch_client
+            )
+            ch_end = end_call_for_insert_to_ch_insertable(req.end, retention_days)
             self._insert_call(ch_end)
             if self._flush_immediately:
                 self._flush_calls()
@@ -6105,6 +6133,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id,
             self.ch_client,
         )
+        retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
         req.inputs.messages = initial_messages
         call_id = generate_id()
@@ -6140,7 +6169,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 exception=exception,
                 wb_user_id=req.wb_user_id,
             )
-            ch_call = complete_call_to_ch_insertable(completed)
+            ch_call = complete_call_to_ch_insertable(completed, retention_days)
             self._insert_call_complete(ch_call)
         else:
             # Write to call_parts/calls_merged via start/end pattern
@@ -6159,7 +6188,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 },
                 attributes={},
             )
-            start_call = start_call_for_insert_to_ch_insertable(start)
+            start_call = start_call_for_insert_to_ch_insertable(start, retention_days)
             end = tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=start_call.id,
@@ -6169,7 +6198,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             if exception:
                 end.exception = exception
-            end_call = end_call_for_insert_to_ch_insertable(end)
+            end_call = end_call_for_insert_to_ch_insertable(end, retention_days)
             calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
                 start_call,
                 end_call,
@@ -6245,11 +6274,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
         write_target: WriteTarget | None = None
+        retention_days: int | None = None
         if req.track_llm_call:
             write_target = self.table_routing_resolver.resolve_v2_write_target(
                 req.project_id,
                 self.ch_client,
             )
+            retention_days = get_project_retention_days(req.project_id, self.ch_client)
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
             tracked_inputs = req.inputs.model_dump(
@@ -6272,7 +6303,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 inputs=tracked_inputs,
                 attributes={},
             )
-            start_call = start_call_for_insert_to_ch_insertable(start)
+            start_call = start_call_for_insert_to_ch_insertable(start, retention_days)
             # Insert immediately so that callers can see the call in progress
             if write_target == WriteTarget.CALLS_COMPLETE:
                 ch_complete_start = start_call_insertable_to_complete_start(start_call)
@@ -6314,12 +6345,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     started_at=start_call.started_at,
                 )
             )
+
+        assert retention_days is not None  # narrowed by track_llm_call guard above
         return _create_tracked_stream_wrapper(
             self._insert_call,
             chunk_iter,
             start_call,
             model_name,
             req.project_id,
+            retention_days,
             end_call_handler=end_call_handler,
         )
 
@@ -6394,6 +6428,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Capture all input fields for call tracking
         input_data = req.inputs.model_dump(exclude_none=False)
+        retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
@@ -6403,7 +6438,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             inputs=input_data,
             attributes={},
         )
-        start_call = start_call_for_insert_to_ch_insertable(start)
+        start_call = start_call_for_insert_to_ch_insertable(start, retention_days)
 
         end = tsi.EndedCallSchemaForInsert(
             project_id=req.project_id,
@@ -6419,7 +6454,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if "error" in res.response:
             end.exception = res.response["error"]
 
-        end_call = end_call_for_insert_to_ch_insertable(end)
+        end_call = end_call_for_insert_to_ch_insertable(end, retention_days)
         calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
             start_call,
             end_call,
@@ -7040,6 +7075,7 @@ def _create_tracked_stream_wrapper(
     start_call: CallStartCHInsertable,
     model_name: str,
     project_id: str,
+    retention_days: int,
     end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Create a wrapper that tracks streaming completion and emits call records."""
@@ -7144,7 +7180,7 @@ def _create_tracked_stream_wrapper(
             if end_call_handler is not None:
                 end_call_handler(end)
             else:
-                end_call_ch = end_call_for_insert_to_ch_insertable(end)
+                end_call_ch = end_call_for_insert_to_ch_insertable(end, retention_days)
                 insert_call(end_call_ch)
 
     return _stream_wrapper()

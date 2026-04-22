@@ -13,6 +13,7 @@ from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_schema import ALL_CALL_INSERT_COLUMNS
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
@@ -1112,6 +1113,30 @@ def test_call_end_v2_flushes_kafka_immediately(server_with_mock_kafka):
 
     mock_producer.produce_call_end.assert_called_once()
     assert mock_producer.produce_call_end.call_args[0][1] is True
+
+
+def test_call_end_adds_expire_at_from_ended_at(server_with_mock_kafka):
+    """call_end adds expire_at = ended_at + retention_days on the end row."""
+    server, _ = server_with_mock_kafka
+    ended_at = dt.datetime(2026, 3, 1, tzinfo=dt.timezone.utc)
+    req = tsi.CallEndReq(
+        end=tsi.EndedCallSchemaForInsert(
+            project_id=base64.b64encode(b"test_entity/test_project").decode("utf-8"),
+            id=str(uuid.uuid4()),
+            ended_at=ended_at,
+            output={},
+            summary={},
+            exception=None,
+        )
+    )
+
+    expire_index = ALL_CALL_INSERT_COLUMNS.index("expire_at")
+    with (
+        patch.object(chts, "get_project_retention_days", return_value=30),
+        server.call_batch(),
+    ):
+        server.call_end(req)
+        assert server._call_batch[-1][expire_index] == ended_at + dt.timedelta(days=30)
 
 
 def test_call_batch_flushes_kafka_once_not_per_call_end(server_with_mock_kafka):

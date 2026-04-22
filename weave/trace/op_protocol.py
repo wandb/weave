@@ -115,7 +115,7 @@ class Op(Protocol[P, R]):
     eager_call_start: bool
 
 
-@dataclass
+@dataclass(slots=True)
 class ProcessedInputs:
     # What the user passed to the function
     original_args: tuple
