@@ -64,18 +64,21 @@ _ALL_QUERYABLE_COLUMNS: frozenset[str] = DIRECT_COLUMNS | frozenset(
 )
 
 #: Field-name prefix -> Map column on the spans table.
+#: Longer prefixes must come before shorter ones — ``custom_attrs_int.``
+#: has to be tried before ``custom_attrs.`` or every int field resolves
+#: to the string map.
 _CUSTOM_ATTR_PREFIXES: dict[str, str] = {
     "custom_attrs_int.": "custom_attrs_int",
     "custom_attrs_float.": "custom_attrs_float",
+    "custom_attrs_bool.": "custom_attrs_bool",
     "custom_attrs.": "custom_attrs",
 }
 
 #: Python literal type -> custom_attrs* map when no explicit prefix is given.
-#: ``bool`` deliberately falls to ``custom_attrs`` (String) — ClickHouse has
-#: no ``Map(String, Bool)``; users who store booleans live in the String map
-#: as ``"true"`` / ``"false"``.
+#: ``bool`` is a subclass of ``int`` in Python, but ``dict.get(type(val))``
+#: uses exact-type lookup (not MRO), so ``type(True)`` finds ``bool`` first.
 _LITERAL_TYPE_TO_MAP: dict[type, str] = {
-    bool: "custom_attrs",
+    bool: "custom_attrs_bool",
     int: "custom_attrs_int",
     float: "custom_attrs_float",
     str: "custom_attrs",
@@ -283,7 +286,8 @@ def _resolve_field(
             f"cannot resolve field {name!r}: not a known column and no sibling "
             "literal to infer the custom_attrs* map from. Either add the column "
             "to semconv / DIRECT_COLUMNS or use an explicit prefix like "
-            "'custom_attrs.<key>' / 'custom_attrs_int.<key>' / 'custom_attrs_float.<key>'."
+            "'custom_attrs.<key>' / 'custom_attrs_int.<key>' / "
+            "'custom_attrs_float.<key>' / 'custom_attrs_bool.<key>'."
         )
     inferred_map = _LITERAL_TYPE_TO_MAP.get(sibling_hint)
     if inferred_map is None:

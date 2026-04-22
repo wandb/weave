@@ -159,6 +159,7 @@ Any span attribute not in the known set is preserved in typed custom attribute f
 | `custom_attrs` | string | String-valued custom attributes |
 | `custom_attrs_int` | int | Integer-valued custom attributes |
 | `custom_attrs_float` | float | Float-valued custom attributes |
+| `custom_attrs_bool` | bool | Boolean-valued custom attributes |
 
 These support sorting, filtering, and aggregation on arbitrary user or vendor attributes.
 

@@ -166,6 +166,7 @@ class AgentSpanCHInsertable(BaseModel):
     custom_attrs: dict[str, str] = Field(default_factory=dict)
     custom_attrs_int: dict[str, int] = Field(default_factory=dict)
     custom_attrs_float: dict[str, float] = Field(default_factory=dict)
+    custom_attrs_bool: dict[str, bool] = Field(default_factory=dict)
 
     # [OTel Core] server info — server.address, server.port
     server_address: str = ""

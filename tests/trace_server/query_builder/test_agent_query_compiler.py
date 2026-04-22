@@ -99,6 +99,24 @@ class TestFieldResolution:
         sql, _ = _compile({"$eq": [{"$getField": "env"}, {"$literal": "prod"}]})
         assert "s.custom_attrs[" in sql
 
+    def test_custom_attr_explicit_prefix_bool(self) -> None:
+        sql, params = _compile(
+            {
+                "$eq": [
+                    {"$getField": "custom_attrs_bool.is_streaming"},
+                    {"$literal": True},
+                ]
+            }
+        )
+        assert "s.custom_attrs_bool[{genai_0:String}] = {genai_1:Bool}" in sql
+        assert params == {"genai_0": "is_streaming", "genai_1": True}
+
+    def test_custom_attr_unprefixed_sibling_bool(self) -> None:
+        # Bool sibling -> custom_attrs_bool (not custom_attrs_int, which
+        # Python's isinstance(True, int) would suggest if ordering were wrong).
+        sql, _ = _compile({"$eq": [{"$getField": "is_cached"}, {"$literal": False}]})
+        assert "s.custom_attrs_bool[" in sql
+
     def test_custom_attr_rejected_field_vs_field(self) -> None:
         # No literal operand => no sibling hint => rejection.
         with pytest.raises(InvalidAgentFilterFieldError, match="cannot resolve"):

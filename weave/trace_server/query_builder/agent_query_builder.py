@@ -117,7 +117,7 @@ _IDENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 #: Sources that read from a Map(...) column on spans, keyed by user-supplied key
 _CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(
-    {"custom_attrs", "custom_attrs_int", "custom_attrs_float"}
+    {"custom_attrs", "custom_attrs_int", "custom_attrs_float", "custom_attrs_bool"}
 )
 
 # ---------------------------------------------------------------------------

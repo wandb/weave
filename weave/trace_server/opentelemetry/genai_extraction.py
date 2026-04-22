@@ -370,32 +370,38 @@ def _truncate_if_needed(val: str) -> str:
 
 def _extract_custom_attrs(
     attrs: dict[str, Any],
-) -> tuple[dict[str, str], dict[str, int], dict[str, float]]:
-    """Route non-semconv attributes into the three typed Maps.
+) -> tuple[dict[str, str], dict[str, int], dict[str, float], dict[str, bool]]:
+    """Route non-semconv attributes into the four typed Maps.
 
     Enforces two limits to keep misbehaving spans from blowing up storage:
-    - at most ``MAX_CUSTOM_ATTRS_PER_SPAN`` entries across all three maps;
+    - at most ``MAX_CUSTOM_ATTRS_PER_SPAN`` entries across all four maps;
     - each string / JSON-serialized value truncated at
       ``MAX_CUSTOM_ATTR_VALUE_BYTES`` with a truncation marker.
 
     Non-finite floats (``NaN``, ``+Inf``, ``-Inf``) are dropped because they
     break JSON response serialization downstream and have no useful
     aggregation semantics.
+
+    Note: the bool branch must come before the int branch. Python's
+    ``bool`` is a subclass of ``int``, so ``isinstance(True, int)`` is
+    True — if the int branch runs first, True and False land in
+    ``custom_attrs_int`` instead of ``custom_attrs_bool``.
     """
     string_map: dict[str, str] = {}
     int_map: dict[str, int] = {}
     float_map: dict[str, float] = {}
+    bool_map: dict[str, bool] = {}
 
     for key, val in _flatten_attrs(attrs):
         if key in KNOWN_KEYS:
             continue
         if val is None:
             continue
-        total = len(string_map) + len(int_map) + len(float_map)
+        total = len(string_map) + len(int_map) + len(float_map) + len(bool_map)
         if total >= MAX_CUSTOM_ATTRS_PER_SPAN:
             break
         if isinstance(val, bool):
-            string_map[key] = str(val).lower()
+            bool_map[key] = val
         elif isinstance(val, int):
             int_map[key] = val
         elif isinstance(val, float):
@@ -407,7 +413,7 @@ def _extract_custom_attrs(
         else:
             string_map[key] = _truncate_if_needed(_json_str(val))
 
-    return string_map, int_map, float_map
+    return string_map, int_map, float_map, bool_map
 
 
 def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, Any]]:
@@ -455,7 +461,7 @@ def extract_genai_span(
     output_msgs = _normalize_raw_messages(raw_output)
     reasoning_content = extract_reasoning_content(raw_output)
 
-    custom_str, custom_int, custom_float = _extract_custom_attrs(attrs)
+    custom_str, custom_int, custom_float, custom_bool = _extract_custom_attrs(attrs)
 
     return AgentSpanCHInsertable(
         project_id=project_id,
@@ -532,6 +538,7 @@ def extract_genai_span(
         custom_attrs=custom_str,
         custom_attrs_int=custom_int,
         custom_attrs_float=custom_float,
+        custom_attrs_bool=custom_bool,
         server_address=str(_get(attrs, *K["weave.server.address"]) or ""),
         server_port=safe_int(_get(attrs, *K["weave.server.port"])),
         raw_span_dump=_json_str(span.as_dict()),

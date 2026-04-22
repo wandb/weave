@@ -116,6 +116,7 @@ class AgentGroupByRef(BaseModel):
         "custom_attrs",
         "custom_attrs_int",
         "custom_attrs_float",
+        "custom_attrs_bool",
     ] = "column"
     key: str
     alias: str | None = (

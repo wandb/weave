@@ -238,6 +238,36 @@ def test_extract_custom_attrs_truncates_large_json_values() -> None:
     assert "truncated from" in stored
 
 
+def test_extract_custom_attrs_routes_bool_to_bool_map() -> None:
+    """Bool values land in custom_attrs_bool, not custom_attrs or
+    custom_attrs_int.
+
+    Ordering matters: Python ``bool`` is a subclass of ``int``, so the
+    extractor's bool check must come before the int check (otherwise
+    ``isinstance(True, int)`` matches first and the value ends up in
+    custom_attrs_int).
+    """
+    result = extract_genai_span(
+        _make_span(
+            attrs={
+                "lorem.is_active": True,
+                "lorem.is_cached": False,
+                "lorem.int_looks_like_bool": 1,
+            }
+        ),
+        project_id="p1",
+    )
+
+    assert result.custom_attrs_bool["lorem.is_active"] is True
+    assert result.custom_attrs_bool["lorem.is_cached"] is False
+    # A plain int stays in custom_attrs_int even though 0/1 look bool-ish.
+    assert result.custom_attrs_int["lorem.int_looks_like_bool"] == 1
+    # Bools don't leak into the other maps.
+    assert "lorem.is_active" not in result.custom_attrs
+    assert "lorem.is_active" not in result.custom_attrs_int
+    assert "lorem.is_active" not in result.custom_attrs_float
+
+
 def test_extract_custom_attrs_skips_non_finite_floats() -> None:
     """NaN and +/-Inf must not reach custom_attrs_float — they break JSON
     serialization and have no aggregation semantics.
