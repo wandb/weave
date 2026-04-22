@@ -6,6 +6,7 @@ import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
+from weave.trace_server.clickhouse.utilities import split_migration_sql
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _MAX_RETRIES,
     BaseClickHouseTraceServerMigrator,
@@ -15,7 +16,6 @@ from weave.trace_server.clickhouse_trace_server_migrator import (
     ReplicatedClickHouseTraceServerMigrator,
     SQLPatterns,
     _is_transient_ch_error,
-    split_migration_sql,
 )
 
 DEFAULT_MIGRATION_DIR = os.path.abspath(
