@@ -77,7 +77,7 @@ class StatusCode(Enum):
         return cls(proto_code)
 
 
-@dataclass
+@dataclass(slots=True)
 class Status:
     """Represents the status of a span."""
 
