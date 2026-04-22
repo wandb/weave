@@ -5,12 +5,13 @@ cast, the query builder emits a hybrid
 ``if(mapContains(map, key), map[key], clickhouse_cast(JSON_VALUE(...)))``
 expression: the typed Map column wins on rows where migration 030 populated
 it at ingest, and the old JSON_VALUE path takes over on legacy rows whose
-maps are still empty. This file exercises the dispatch SQL shape end-to-end
-on both read tables plus the fall-through cases (missing cast, ``exists``
-cast, empty extra_path).
-"""
+maps are still empty. This file asserts the full SQL shape end-to-end on
+both read tables plus the fall-through cases (no cast, ``exists`` cast).
 
-import pytest
+Each test is intentionally un-parametrized and pins the complete query
+shape — the SQL layer is load-bearing enough that a shared template or
+fuzzy match would miss regressions at the punctuation level.
+"""
 
 from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server.calls_query_builder.calls_query_builder import CallsQuery
@@ -20,35 +21,18 @@ from weave.trace_server.clickhouse.utilities import (
     extract_typed_attrs,
 )
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
 
 # ---------------------------------------------------------------------------
-# Query-builder dispatch
+# calls_merged dispatch (one test per supported cast)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("cast", "expected_column", "expected_param_type", "fallback_cast", "literal"),
-    [
-        ("int", "attributes_map_int", "Int64", "toInt64OrNull", 1),
-        ("double", "attributes_map_float", "Float64", "toFloat64OrNull", 1.5),
-        ("bool", "attributes_map_bool", "Bool", "toUInt8OrNull", True),
-        ("string", "attributes_map_str", "String", "toString", "prod"),
-    ],
-)
-def test_typed_map_dispatch_on_calls_merged(
-    cast: str,
-    expected_column: str,
-    expected_param_type: str,
-    fallback_cast: str,
-    literal: object,
-) -> None:
-    """Each supported cast emits an if(mapContains, map-read, cast(JSON_VALUE)) gate.
+def test_typed_map_dispatch_on_calls_merged_int() -> None:
+    """``$convert(attributes.env, int)`` on calls_merged.
 
-    The fast branch reads the agg-wrapped typed column, and the else branch is
-    the existing JSON_VALUE-over-attributes_dump path preserved for legacy rows
-    whose maps haven't been backfilled.
+    Fast branch: ``any(attributes_map_int)[key]``.
+    Fallback: ``toInt64OrNull(coalesce(nullIf(JSON_VALUE(...), 'null'), ''))``.
     """
     cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
     cq.add_field("id")
@@ -59,10 +43,10 @@ def test_typed_map_dispatch_on_calls_merged(
                     {
                         "$convert": {
                             "input": {"$getField": "attributes.env"},
-                            "to": cast,
+                            "to": "int",
                         }
                     },
-                    {"$literal": literal},
+                    {"$literal": 1},
                 ]
             }
         )
@@ -70,22 +54,163 @@ def test_typed_map_dispatch_on_calls_merged(
 
     assert_sql(
         cq,
-        f"""
+        """
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {{pb_3:String}}
+        PREWHERE calls_merged.project_id = {pb_3:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((if(mapContains(any(calls_merged.{expected_column}), {{pb_0:String}}),
-                 any(calls_merged.{expected_column})[{{pb_0:String}}],
-                 {fallback_cast}(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {{pb_1:String}}), 'null'), '')))
-             = {{pb_2:{expected_param_type}}}))
+            ((if(mapContains(any(calls_merged.attributes_map_int), {pb_0:String}),
+                 any(calls_merged.attributes_map_int)[{pb_0:String}],
+                 toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), '')))
+             = {pb_2:Int64}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
-        {"pb_0": "env", "pb_1": '$."env"', "pb_2": literal, "pb_3": "p"},
+        {"pb_0": "env", "pb_1": '$."env"', "pb_2": 1, "pb_3": "p"},
     )
+
+
+def test_typed_map_dispatch_on_calls_merged_double() -> None:
+    """``$convert(attributes.env, double)`` on calls_merged.
+
+    Fast branch: ``any(attributes_map_float)[key]``.
+    Fallback: ``toFloat64OrNull(coalesce(nullIf(JSON_VALUE(...), 'null'), ''))``.
+    """
+    cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "attributes.env"},
+                            "to": "double",
+                        }
+                    },
+                    {"$literal": 1.5},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((if(mapContains(any(calls_merged.attributes_map_float), {pb_0:String}),
+                 any(calls_merged.attributes_map_float)[{pb_0:String}],
+                 toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), '')))
+             = {pb_2:Float64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": "env", "pb_1": '$."env"', "pb_2": 1.5, "pb_3": "p"},
+    )
+
+
+def test_typed_map_dispatch_on_calls_merged_bool() -> None:
+    """``$convert(attributes.env, bool)`` on calls_merged.
+
+    Fast branch: ``any(attributes_map_bool)[key]``.
+    Fallback: ``(JSON_VALUE(...) = 'true')`` — bool is special-cased because
+    ``JSON_VALUE`` emits the literal string ``"true"``/``"false"`` for JSON
+    booleans and the generic ``toUInt8OrNull`` cast returns NULL on those
+    strings, which would silently drop legacy bool rows. Comparing the raw
+    JSON_VALUE to ``'true'`` yields a Bool directly.
+    """
+    cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "attributes.env"},
+                            "to": "bool",
+                        }
+                    },
+                    {"$literal": True},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((if(mapContains(any(calls_merged.attributes_map_bool), {pb_0:String}),
+                 any(calls_merged.attributes_map_bool)[{pb_0:String}],
+                 (JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}) = 'true'))
+             = {pb_2:Bool}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": "env", "pb_1": '$."env"', "pb_2": True, "pb_3": "p"},
+    )
+
+
+def test_typed_map_dispatch_on_calls_merged_string() -> None:
+    """``$convert(attributes.env, string)`` on calls_merged.
+
+    Fast branch: ``any(attributes_map_str)[key]``.
+    Fallback: ``toString(coalesce(nullIf(JSON_VALUE(...), 'null'), ''))``.
+    """
+    cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "attributes.env"},
+                            "to": "string",
+                        }
+                    },
+                    {"$literal": "prod"},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((if(mapContains(any(calls_merged.attributes_map_str), {pb_0:String}),
+                 any(calls_merged.attributes_map_str)[{pb_0:String}],
+                 toString(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), '')))
+             = {pb_2:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": "env", "pb_1": '$."env"', "pb_2": "prod", "pb_3": "p"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# calls_complete dispatch + nested attribute paths
+# ---------------------------------------------------------------------------
 
 
 def test_typed_map_dispatch_on_calls_complete() -> None:
@@ -160,6 +285,7 @@ def test_nested_attribute_path_joins_with_dot() -> None:
             }
         )
     )
+
     assert_sql(
         cq,
         """
@@ -180,47 +306,85 @@ def test_nested_attribute_path_joins_with_dot() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "condition",
-    [
-        # No $convert at all -> falls through to JSON_VALUE.
-        {
-            "$eq": [
-                {"$getField": "attributes.env"},
-                {"$literal": "prod"},
-            ]
-        },
-        # $convert with "exists" -> no typed map for existence checks, falls through.
-        {
-            "$eq": [
-                {
-                    "$convert": {
-                        "input": {"$getField": "attributes.env"},
-                        "to": "exists",
-                    }
-                },
-                {"$literal": True},
-            ]
-        },
-    ],
-)
-def test_fallback_to_json_value_when_no_typed_cast(condition: dict) -> None:
-    """Filters without a typed cast keep using the JSON_VALUE path.
+# ---------------------------------------------------------------------------
+# Fall-through (no typed cast → JSON_VALUE path only, no map read)
+# ---------------------------------------------------------------------------
 
-    This preserves read-path compatibility for clients that haven't adopted
-    typed dispatch — they keep working against the existing attributes_dump
-    column without needing a migration or filter rewrite.
+
+def test_fallback_no_convert_uses_json_value_only() -> None:
+    """A plain ``$getField`` on attributes.* — no ``$convert`` — stays on the
+    JSON_VALUE path with no map read. This preserves read-path compatibility
+    for clients that never adopted typed dispatch, and the LIKE prefilter on
+    attributes_dump is the existing optimization for equality-on-string.
     """
     cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
     cq.add_field("id")
-    cq.add_condition(tsi_query.EqOperation.model_validate(condition))
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "attributes.env"},
+                    {"$literal": "prod"},
+                ]
+            }
+        )
+    )
 
-    sql = cq.as_sql(ParamBuilder("pb"))
-    assert "attributes_map_" not in sql
-    # Either the plain JSON_VALUE path (no cast / non-exists casts) or the
-    # JSONType existence-check path (cast=exists) must be present.
-    assert "JSON_VALUE(any(calls_merged.attributes_dump)" in sql or (
-        "JSONType(any(calls_merged.attributes_dump)" in sql
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE ((calls_merged.attributes_dump LIKE {pb_2:String} OR calls_merged.attributes_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": '$."env"', "pb_1": "prod", "pb_2": '%"prod"%', "pb_3": "p"},
+    )
+
+
+def test_fallback_convert_exists_uses_json_value_only() -> None:
+    """``$convert(..., "exists")`` has no typed Map analogue, so it stays on
+    the JSON_VALUE existence-check path (``... IS NOT NULL``) and does not
+    touch any ``attributes_map_*`` column.
+    """
+    cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {
+                        "$convert": {
+                            "input": {"$getField": "attributes.env"},
+                            "to": "exists",
+                        }
+                    },
+                    {"$literal": True},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            (((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_0:String}), 'null'), '') IS NOT NULL) = {pb_1:Bool}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": '$."env"', "pb_1": True, "pb_2": "p"},
     )
 
 

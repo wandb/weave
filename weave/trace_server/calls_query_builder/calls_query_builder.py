@@ -2085,6 +2085,44 @@ def _get_multi_value_feedback_field(
     return None
 
 
+def _attributes_dump_json_path(field_name: str, pb: ParamBuilder) -> str:
+    """Return the ``$."a"."b"..."`` JSONPath param slot for an ``attributes.<path>`` key.
+
+    Mirrors the JSONPath shape that ``CallsMergedDynamicField.as_sql`` uses so
+    the fallback branch of the typed-map hybrid reads the same JSON location
+    the non-hybrid JSON_VALUE path would. Centralized here to keep the bool
+    fallback (which uses raw JSON_VALUE compared to the string ``'true'``) in
+    sync with the int/double/string fallback (which wraps the same JSON_VALUE
+    in ``clickhouse_cast``).
+    """
+    parts = field_name[len("attributes.") :].split(".")
+    json_path = "$" + "".join(f'."{p}"' for p in parts)
+    return param_slot(pb.add_param(json_path), "String")
+
+
+def _attributes_map_fallback_sql(
+    cast: tsi_query.CastTo, json_path_slot: str, attributes_dump_sql: str
+) -> str:
+    """Typed-map fallback SQL for a single ``$convert`` cast.
+
+    Reads from ``attributes_dump`` via JSON_VALUE and returns a value of the
+    same ClickHouse type as the Map column, so the surrounding ``if(...)`` can
+    hand either branch to the outer comparison without a second cast.
+
+    ``bool`` is special-cased: JSON_VALUE on a JSON bool emits the literal
+    string ``"true"`` or ``"false"``, and ``toUInt8OrNull("true")`` is NULL —
+    the generic ``clickhouse_cast`` fallback would drop legacy bool rows on
+    the floor. We compare the raw JSON_VALUE against ``'true'`` instead, which
+    yields a Bool directly. int/double/string reuse ``clickhouse_cast`` because
+    the generic numeric/string casts already handle the JSON_VALUE string output.
+    """
+    json_value_expr = f"JSON_VALUE({attributes_dump_sql}, {json_path_slot})"
+    if cast == "bool":
+        return f"({json_value_expr} = 'true')"
+    coalesced = f"coalesce(nullIf({json_value_expr}, 'null'), '')"
+    return clickhouse_cast(coalesced, cast)
+
+
 def _maybe_attributes_map_filter_sql(
     operand: tsi_query.ConvertOperation,
     pb: ParamBuilder,
@@ -2108,7 +2146,7 @@ def _maybe_attributes_map_filter_sql(
     tables: CH returns the value-type default (``0``/``0.0``/``false``/``''``)
     for a missing key, which silently produces wrong filter results on
     legacy rows whose attributes live only in ``attributes_dump``. We emit
-    ``if(mapContains(map, key), map[key], clickhouse_cast(JSON_VALUE(...)))``
+    ``if(mapContains(map, key), map[key], <type-aware JSON_VALUE fallback>)``
     so each row picks the typed read when the map was populated for that row
     and falls back to the JSON_VALUE path otherwise. Per-row means no
     cutoff timestamp, no backfill-completion gate, and mixed tables Just
@@ -2121,7 +2159,8 @@ def _maybe_attributes_map_filter_sql(
     field_name = inner.get_field_
     if not field_name.startswith("attributes."):
         return None
-    column = ATTRIBUTES_MAP_COLUMN_BY_CAST.get(operand.convert_.to)
+    cast = operand.convert_.to
+    column = ATTRIBUTES_MAP_COLUMN_BY_CAST.get(cast)
     if column is None:
         return None
     key = field_name[len("attributes.") :]
@@ -2129,14 +2168,17 @@ def _maybe_attributes_map_filter_sql(
         return None
     structured_field = get_field_by_name(field_name)
     raw_fields_used[structured_field.field] = structured_field
+
     key_slot = param_slot(pb.add_param(key), "String")
     column_sql = f"{table_alias}.{column}"
+    attributes_dump_sql = f"{table_alias}.attributes_dump"
     if use_agg_fn:
         column_sql = f"any({column_sql})"
+        attributes_dump_sql = f"any({attributes_dump_sql})"
+
     fast_expr = f"{column_sql}[{key_slot}]"
-    fallback_expr = clickhouse_cast(
-        structured_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn),
-        operand.convert_.to,
+    fallback_expr = _attributes_map_fallback_sql(
+        cast, _attributes_dump_json_path(field_name, pb), attributes_dump_sql
     )
     return f"if(mapContains({column_sql}, {key_slot}), {fast_expr}, {fallback_expr})"
 

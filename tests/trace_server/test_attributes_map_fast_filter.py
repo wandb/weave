@@ -34,24 +34,26 @@ from weave.trace_server.project_version.project_version import (
     reset_project_residence_cache,
 )
 from weave.trace_server.project_version.types import CallsStorageServerMode
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 TEST_ENTITY = "attrs_fast_filter_entity"
 
 
 @pytest.fixture
-def clickhouse_trace_server(trace_server: object) -> ClickHouseTraceServer:
-    """Return the internal CH server; skip on SQLite.
+def ch_server_force_legacy(
+    clickhouse_trace_server: ClickHouseTraceServer,
+) -> ClickHouseTraceServer:
+    """Reuse the global ``clickhouse_trace_server`` fixture but pin FORCE_LEGACY.
 
-    Force FORCE_LEGACY routing so reads hit calls_merged — this test inserts
-    directly into call_parts, not calls_complete, so we want the merged view.
+    This test inserts directly into ``call_parts`` (bypassing the v2 write
+    path) so reads must go through ``calls_merged``. The shared fixture
+    defaults to AUTO, which would route reads to ``calls_complete`` and
+    miss the raw-inserted rows.
     """
-    internal = trace_server._internal_trace_server  # type: ignore[attr-defined]
-    if isinstance(internal, SqliteTraceServer):
-        pytest.skip("ClickHouse-only test")
-    internal.table_routing_resolver._mode = CallsStorageServerMode.FORCE_LEGACY
+    clickhouse_trace_server.table_routing_resolver._mode = (
+        CallsStorageServerMode.FORCE_LEGACY
+    )
     reset_project_residence_cache()
-    return internal
+    return clickhouse_trace_server
 
 
 # Columns populated on a call_parts start row. Kept as a list so ch_client.insert
@@ -142,81 +144,85 @@ def _query_ids(trace_server: object, project_id: str, filter_query: dict) -> set
     return {c.id for c in calls}
 
 
-@pytest.mark.parametrize(
-    ("cast", "attr_key", "filter_literal", "matching_value", "other_value"),
-    [
-        ("string", "env", "prod", "prod", "staging"),
-        ("int", "retries", 5, 5, 2),
-        ("double", "score", 0.9, 0.9, 0.1),
-        # bool is intentionally excluded: the JSON_VALUE fallback cast is
-        # ``toUInt8OrNull``, which returns NULL for the string ``"true"``
-        # that JSON_VALUE emits for a JSON bool. That preexisting fallback
-        # limitation means legacy bool rows can't be recovered via the dump,
-        # independent of this hybrid path.
-    ],
-)
-def test_fast_filter_mixed_backfill_returns_correct_rows(
-    trace_server: object,
-    clickhouse_trace_server: ClickHouseTraceServer,
-    cast: str,
+def _populate_two_by_two(
+    ch_client: object,
+    internal_project_id: str,
     attr_key: str,
-    filter_literal: object,
     matching_value: object,
     other_value: object,
-) -> None:
-    """``$convert`` filter must return both populated and legacy rows that match.
+    now: datetime.datetime,
+) -> tuple[str, str, str, str]:
+    """Insert the four-row fixture: populated+match, legacy+match, populated+other, legacy+other.
 
-    Four rows per type go into one project: two match the filter (populated
-    + legacy), two don't (populated + legacy with a different value). The
-    hybrid ``if(mapContains(...))`` path is the only thing that can return
-    the legacy-matching row — a pure Map read would miss it because the
-    map is empty and the CH default for the value type is used instead.
+    Returns the call ids in that order so tests can assert membership. All
+    rows share a project; the assertion is that only the two "match" rows
+    come back regardless of backfill state.
     """
-    external_project_id = f"{TEST_ENTITY}/{cast}_{uuid.uuid4().hex[:8]}"
-    internal_project_id = b64(external_project_id)
-    reset_project_residence_cache()
-
-    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
     call_populated_match = str(uuid.uuid4())
     call_legacy_match = str(uuid.uuid4())
     call_populated_other = str(uuid.uuid4())
     call_legacy_other = str(uuid.uuid4())
-
-    # Populated row that matches the filter.
     _insert_start_row(
-        clickhouse_trace_server.ch_client,
+        ch_client,
         internal_project_id,
         call_populated_match,
         now,
         {attr_key: matching_value},
         populate_typed_maps=True,
     )
-    # Legacy row that matches the filter (typed maps empty, dump has the key).
     _insert_start_row(
-        clickhouse_trace_server.ch_client,
+        ch_client,
         internal_project_id,
         call_legacy_match,
         now + datetime.timedelta(seconds=1),
         {attr_key: matching_value},
         populate_typed_maps=False,
     )
-    # Populated row that doesn't match.
     _insert_start_row(
-        clickhouse_trace_server.ch_client,
+        ch_client,
         internal_project_id,
         call_populated_other,
         now + datetime.timedelta(seconds=2),
         {attr_key: other_value},
         populate_typed_maps=True,
     )
-    # Legacy row that doesn't match.
     _insert_start_row(
-        clickhouse_trace_server.ch_client,
+        ch_client,
         internal_project_id,
         call_legacy_other,
         now + datetime.timedelta(seconds=3),
         {attr_key: other_value},
         populate_typed_maps=False,
+    )
+    return (
+        call_populated_match,
+        call_legacy_match,
+        call_populated_other,
+        call_legacy_other,
+    )
+
+
+def test_fast_filter_mixed_backfill_string_cast(
+    trace_server: object,
+    ch_server_force_legacy: ClickHouseTraceServer,
+) -> None:
+    """``$convert(attributes.env, string)`` returns populated *and* legacy matches.
+
+    The hybrid ``if(mapContains(...))`` wins on the populated row and falls
+    back to ``toString(coalesce(nullIf(JSON_VALUE, 'null'), ''))`` on the
+    legacy row whose typed maps are empty. Both ``env=prod`` rows come back;
+    the ``env=staging`` rows don't.
+    """
+    external_project_id = f"{TEST_ENTITY}/string_{uuid.uuid4().hex[:8]}"
+    internal_project_id = b64(external_project_id)
+    reset_project_residence_cache()
+    populated_match, legacy_match, *_ = _populate_two_by_two(
+        ch_server_force_legacy.ch_client,
+        internal_project_id,
+        attr_key="env",
+        matching_value="prod",
+        other_value="staging",
+        now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),
     )
 
     matching_ids = _query_ids(
@@ -226,24 +232,132 @@ def test_fast_filter_mixed_backfill_returns_correct_rows(
             "$eq": [
                 {
                     "$convert": {
-                        "input": {"$getField": f"attributes.{attr_key}"},
-                        "to": cast,
+                        "input": {"$getField": "attributes.env"},
+                        "to": "string",
                     }
                 },
-                {"$literal": filter_literal},
+                {"$literal": "prod"},
             ]
         },
     )
+    assert matching_ids == {populated_match, legacy_match}
 
-    assert matching_ids == {call_populated_match, call_legacy_match}, (
-        f"cast={cast}: expected both populated and legacy matching rows; "
-        f"got {matching_ids}"
+
+def test_fast_filter_mixed_backfill_int_cast(
+    trace_server: object,
+    ch_server_force_legacy: ClickHouseTraceServer,
+) -> None:
+    """``$convert(attributes.retries, int)`` returns populated *and* legacy matches."""
+    external_project_id = f"{TEST_ENTITY}/int_{uuid.uuid4().hex[:8]}"
+    internal_project_id = b64(external_project_id)
+    reset_project_residence_cache()
+    populated_match, legacy_match, *_ = _populate_two_by_two(
+        ch_server_force_legacy.ch_client,
+        internal_project_id,
+        attr_key="retries",
+        matching_value=5,
+        other_value=2,
+        now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),
     )
+
+    matching_ids = _query_ids(
+        trace_server,
+        external_project_id,
+        {
+            "$eq": [
+                {
+                    "$convert": {
+                        "input": {"$getField": "attributes.retries"},
+                        "to": "int",
+                    }
+                },
+                {"$literal": 5},
+            ]
+        },
+    )
+    assert matching_ids == {populated_match, legacy_match}
+
+
+def test_fast_filter_mixed_backfill_double_cast(
+    trace_server: object,
+    ch_server_force_legacy: ClickHouseTraceServer,
+) -> None:
+    """``$convert(attributes.score, double)`` returns populated *and* legacy matches."""
+    external_project_id = f"{TEST_ENTITY}/double_{uuid.uuid4().hex[:8]}"
+    internal_project_id = b64(external_project_id)
+    reset_project_residence_cache()
+    populated_match, legacy_match, *_ = _populate_two_by_two(
+        ch_server_force_legacy.ch_client,
+        internal_project_id,
+        attr_key="score",
+        matching_value=0.9,
+        other_value=0.1,
+        now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),
+    )
+
+    matching_ids = _query_ids(
+        trace_server,
+        external_project_id,
+        {
+            "$eq": [
+                {
+                    "$convert": {
+                        "input": {"$getField": "attributes.score"},
+                        "to": "double",
+                    }
+                },
+                {"$literal": 0.9},
+            ]
+        },
+    )
+    assert matching_ids == {populated_match, legacy_match}
+
+
+def test_fast_filter_mixed_backfill_bool_cast(
+    trace_server: object,
+    ch_server_force_legacy: ClickHouseTraceServer,
+) -> None:
+    """``$convert(attributes.enabled, bool)`` returns populated *and* legacy matches.
+
+    The bool fallback compares the raw JSON_VALUE to the literal string
+    ``'true'`` (rather than the generic ``toUInt8OrNull`` cast that returns
+    NULL on JSON bool strings). This is the test that would have failed
+    before we special-cased bool — legacy rows with ``enabled: true`` in
+    the dump would have been dropped.
+    """
+    external_project_id = f"{TEST_ENTITY}/bool_{uuid.uuid4().hex[:8]}"
+    internal_project_id = b64(external_project_id)
+    reset_project_residence_cache()
+    populated_match, legacy_match, *_ = _populate_two_by_two(
+        ch_server_force_legacy.ch_client,
+        internal_project_id,
+        attr_key="enabled",
+        matching_value=True,
+        other_value=False,
+        now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),
+    )
+
+    matching_ids = _query_ids(
+        trace_server,
+        external_project_id,
+        {
+            "$eq": [
+                {
+                    "$convert": {
+                        "input": {"$getField": "attributes.enabled"},
+                        "to": "bool",
+                    }
+                },
+                {"$literal": True},
+            ]
+        },
+    )
+    assert matching_ids == {populated_match, legacy_match}
 
 
 def test_fast_filter_missing_int_key_does_not_match_map_default(
     trace_server: object,
-    clickhouse_trace_server: ClickHouseTraceServer,
+    ch_server_force_legacy: ClickHouseTraceServer,
 ) -> None:
     """Without the mapContains gate, ``attributes.missing = 0`` would match every
     populated row — ClickHouse returns ``0`` for a missing Int64 Map key. The
@@ -266,7 +380,7 @@ def test_fast_filter_missing_int_key_does_not_match_map_default(
     # cannot leak into the comparison.
     call_populated_missing_key = str(uuid.uuid4())
     _insert_start_row(
-        clickhouse_trace_server.ch_client,
+        ch_server_force_legacy.ch_client,
         internal_project_id,
         call_populated_missing_key,
         now,
@@ -277,7 +391,7 @@ def test_fast_filter_missing_int_key_does_not_match_map_default(
     # not match, because the JSON path for a missing key is NULL.
     call_legacy_missing_key = str(uuid.uuid4())
     _insert_start_row(
-        clickhouse_trace_server.ch_client,
+        ch_server_force_legacy.ch_client,
         internal_project_id,
         call_legacy_missing_key,
         now + datetime.timedelta(seconds=1),
@@ -288,7 +402,7 @@ def test_fast_filter_missing_int_key_does_not_match_map_default(
     # This one *should* match, proving the filter itself is wired up.
     call_populated_zero = str(uuid.uuid4())
     _insert_start_row(
-        clickhouse_trace_server.ch_client,
+        ch_server_force_legacy.ch_client,
         internal_project_id,
         call_populated_zero,
         now + datetime.timedelta(seconds=2),
