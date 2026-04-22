@@ -155,7 +155,9 @@ class CallSchema(BaseModel):
 
     deleted_at: datetime.datetime | None = None
 
-    # Expiration timestamp for this call (sentinel 2100-01-01 = no expiry)
+    # Expiration timestamp for this call. The server always writes a value
+    # (sentinel 2100-01-01 for projects with no TTL configured); `None` only
+    # occurs when the field is unset by a client constructing the model.
     expire_at: datetime.datetime | None = None
 
     # Size of metadata storage for this call

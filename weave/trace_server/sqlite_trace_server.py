@@ -378,7 +378,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             CREATE TABLE IF NOT EXISTS project_ttl_settings (
                 project_id TEXT NOT NULL,
                 retention_days INTEGER NOT NULL,
-                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_by TEXT NOT NULL DEFAULT ''
             )
             """
         )
@@ -2838,16 +2839,32 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReq
     ) -> tsi.ProjectTTLSettingsRes:
-        raise NotImplementedError(
-            "project_ttl_settings_read is not implemented for SQLite trace server"
+        return tsi.ProjectTTLSettingsRes(
+            retention_days=self._get_project_retention_days(req.project_id)
         )
 
     def project_ttl_settings_set(
         self, req: tsi.SetProjectTTLSettingsReq
     ) -> tsi.SetProjectTTLSettingsRes:
-        raise NotImplementedError(
-            "project_ttl_settings_set is not implemented for SQLite trace server"
+        if req.retention_days < 0:
+            raise InvalidRequest(
+                "retention_days must be 0 (no TTL) or >= 1 (days of retention)"
+            )
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        cursor.execute(
+            "INSERT INTO project_ttl_settings "
+            "(project_id, retention_days, updated_at, updated_by) "
+            "VALUES (?, ?, ?, ?)",
+            (
+                req.project_id,
+                req.retention_days,
+                datetime.datetime.now(datetime.UTC).isoformat(),
+                req.wb_user_id or "",
+            ),
         )
+        conn.commit()
+        return tsi.SetProjectTTLSettingsRes(retention_days=req.retention_days)
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq

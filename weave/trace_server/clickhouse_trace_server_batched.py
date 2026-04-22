@@ -250,6 +250,7 @@ from weave.trace_server.query_builder.table_query_builder import (
     make_table_stats_basic_query,
     make_table_stats_query_with_storage_size,
 )
+from weave.trace_server.redis_client import get_redis_client
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
@@ -2612,7 +2613,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReq
     ) -> tsi.ProjectTTLSettingsRes:
-        retention_days = get_project_retention_days(req.project_id, self.ch_client)
+        retention_days = get_project_retention_days(
+            req.project_id, self.ch_client, redis_client=get_redis_client()
+        )
         return tsi.ProjectTTLSettingsRes(retention_days=retention_days)
 
     @ddtrace.tracer.wrap(
@@ -2621,10 +2624,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def project_ttl_settings_set(
         self, req: tsi.SetProjectTTLSettingsReq
     ) -> tsi.SetProjectTTLSettingsRes:
-        # Negative values encode minutes-based retention (e.g. -5 = 5 minutes) for testing
-        if req.retention_days < -1440:
+        if req.retention_days < 0:
             raise InvalidRequest(
-                "retention_days must be 0 (no TTL), >= 1, or negative for minutes-based retention (min -1440)"
+                "retention_days must be 0 (no TTL) or >= 1 (days of retention)"
             )
 
         self.ch_client.insert(
@@ -2639,7 +2641,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ],
             column_names=["project_id", "retention_days", "updated_at", "updated_by"],
         )
-        invalidate_ttl_cache(req.project_id)
+        invalidate_ttl_cache(req.project_id, redis_client=get_redis_client())
         return tsi.SetProjectTTLSettingsRes(retention_days=req.retention_days)
 
     def threads_query_stream(
