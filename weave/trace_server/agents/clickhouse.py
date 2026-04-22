@@ -73,6 +73,15 @@ from weave.trace_server.query_builder.agent_query_builder import (
 from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
 )
+from weave.trace_server.trace_server_common import (
+    AgentFeedbackByTarget,
+    group_agent_feedback_by_target,
+    make_agent_feedback_query_req,
+)
+from weave.trace_server.trace_server_interface import (
+    FeedbackQueryReq,
+    FeedbackQueryRes,
+)
 
 if TYPE_CHECKING:
     from clickhouse_connect.driver.client import Client as CHClient
@@ -84,6 +93,10 @@ logger = logging.getLogger(__name__)
 QueryParams: TypeAlias = dict[str, Any]
 ClickHouseRow: TypeAlias = dict[str, Any]
 QueryFn = Callable[[str, QueryParams], "QueryResult"]
+
+#: Signature of the server's `feedback_query` method.
+FeedbackQueryFn = Callable[[FeedbackQueryReq], FeedbackQueryRes]
+
 PaginatedReqT = TypeVar(
     "PaginatedReqT",
     AgentSpansQueryReq,
@@ -100,10 +113,13 @@ class AgentQueryHandler:
 
     Takes a `query_fn` (typically the server's `_query` method) so queries
     participate in the same logging / ddtrace / error-handling wrapper as the
-    rest of the trace server.
+    rest of the trace server. Also takes a `feedback_query_fn` (the server's
+    `feedback_query` method), invoked only when ``include_feedback=True`` to
+    fold agent-target feedback into the chat response.
     """
 
     _query: QueryFn
+    _feedback_query: FeedbackQueryFn
 
     # ------------------------------------------------------------------
     # Spans query (ungrouped + grouped)
@@ -238,7 +254,18 @@ class AgentQueryHandler:
     def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
         spans = self.trace_detail_spans(req.project_id, req.trace_id)
-        return build_trace_chat(spans, req.trace_id)
+        res = build_trace_chat(spans, req.trace_id)
+
+        if req.include_feedback:
+            span_ids = [m.span_id for m in res.messages if m.span_id]
+            groups = self._fetch_agent_feedback(
+                project_id=req.project_id,
+                trace_ids=[req.trace_id],
+                span_ids=span_ids,
+            )
+            _fold_feedback_into_trace_chat(res, groups)
+
+        return res
 
     def conversation_chat(
         self, req: AgentConversationChatReq
@@ -251,7 +278,7 @@ class AgentQueryHandler:
         )
 
         if not rows:
-            return AgentConversationChatRes(
+            res = AgentConversationChatRes(
                 conversation_id=req.conversation_id,
                 turns=[],
                 total_turns=total_turns,
@@ -259,6 +286,15 @@ class AgentQueryHandler:
                 limit=req.limit,
                 offset=req.offset,
             )
+            if req.include_feedback:
+                groups = self._fetch_agent_feedback(
+                    project_id=req.project_id,
+                    conversation_ids=[req.conversation_id],
+                )
+                res.conversation_feedback = groups.by_conversation_id.get(
+                    req.conversation_id, []
+                )
+            return res
 
         # Group spans by trace_id, preserving insertion order. Weave treats
         # one trace_id as one conversation turn as a product convention based
@@ -275,7 +311,7 @@ class AgentQueryHandler:
             if trace_spans
         ]
 
-        return AgentConversationChatRes(
+        res = AgentConversationChatRes(
             conversation_id=req.conversation_id,
             turns=turns,
             total_turns=total_turns,
@@ -283,6 +319,39 @@ class AgentQueryHandler:
             limit=req.limit,
             offset=req.offset,
         )
+
+        if req.include_feedback:
+            span_ids = [m.span_id for turn in turns for m in turn.messages if m.span_id]
+            groups = self._fetch_agent_feedback(
+                project_id=req.project_id,
+                conversation_ids=[req.conversation_id],
+                trace_ids=[t.trace_id for t in turns],
+                span_ids=span_ids,
+            )
+            res.conversation_feedback = groups.by_conversation_id.get(
+                req.conversation_id, []
+            )
+            for turn in res.turns:
+                _fold_feedback_into_trace_chat(turn, groups)
+
+        return res
+
+    def _fetch_agent_feedback(
+        self,
+        project_id: str,
+        trace_ids: list[str] | None = None,
+        conversation_ids: list[str] | None = None,
+        span_ids: list[str] | None = None,
+    ) -> AgentFeedbackByTarget:
+        """Run one feedback query for a batch of agent targets."""
+        req = make_agent_feedback_query_req(
+            project_id=project_id,
+            trace_ids=trace_ids,
+            conversation_ids=conversation_ids,
+            span_ids=span_ids,
+        )
+        feedback = self._feedback_query(req)
+        return group_agent_feedback_by_target(feedback)
 
     # ------------------------------------------------------------------
     # Query plumbing
@@ -448,6 +517,17 @@ def _rows_to_dicts(
 ) -> list[dict[str, AgentSpanStatsCell]]:
     """Zip explicit column names with rows returned by a stats query."""
     return [dict(zip(columns, row, strict=True)) for row in rows]
+
+
+def _fold_feedback_into_trace_chat(
+    trace_chat: AgentTraceChatRes,
+    groups: AgentFeedbackByTarget,
+) -> None:
+    """Fold turn-level and step-level feedback into a trace chat response."""
+    trace_chat.turn_feedback = groups.by_trace_id.get(trace_chat.trace_id, [])
+    for message in trace_chat.messages:
+        if message.span_id and message.span_id in groups.by_span_id:
+            message.feedback = groups.by_span_id[message.span_id]
 
 
 def _first_cell_int(result: QueryResult) -> int:
