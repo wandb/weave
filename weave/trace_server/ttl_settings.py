@@ -25,6 +25,7 @@ from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
 from weave.trace_server.datadog import set_current_span_dd_tags
+from weave.trace_server.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -47,19 +48,23 @@ _project_ttl_cache_lock = threading.Lock()
 def get_project_retention_days(
     project_id: str,
     ch_client: CHClient,
-    redis_client: redis.Redis | None = None,
 ) -> int:
     """Return retention_days for a project (0 = no TTL / infinite). Cached.
 
-    Read path: L1 (in-process) -> L2 (Redis, optional) -> ClickHouse (argMax).
-    A fall-through to ClickHouse is a full cache miss; if ClickHouse has no
-    row for the project, returns 0 (no TTL configured).
+    Read path: L1 (in-process) -> L2 (Redis, if REDIS_URL is set) -> ClickHouse
+    (argMax). A fall-through to ClickHouse is a full cache miss; if ClickHouse
+    has no row for the project, returns 0 (no TTL configured).
+
+    Redis client is resolved lazily via get_redis_client() (lru_cached
+    process singleton). ch_client must come from the calling thread — it is
+    a thread-local resource in ClickHouseTraceServer.
     """
     cached = _l1_get(project_id)
     if cached is not None:
         set_current_span_dd_tags({"ttl.cache_hit": "L1"})
         return cached
 
+    redis_client = get_redis_client()
     if redis_client is not None:
         redis_val = _l2_get(redis_client, project_id)
         if redis_val is not None:
@@ -101,16 +106,17 @@ def compute_expire_at(
     return anchor + datetime.timedelta(minutes=-retention_days)
 
 
-def invalidate_ttl_cache(
-    project_id: str, redis_client: redis.Redis | None = None
-) -> None:
+def invalidate_ttl_cache(project_id: str) -> None:
     """Remove a project from the TTL cache (both L1 and L2).
 
-    Call this after updating a project's TTL settings so the next
-    insert picks up the new value.
+    Call this after updating a project's TTL settings so the next insert
+    picks up the new value. Note: only invalidates L1 in the *current*
+    process — other replicas will still see stale L1 entries until their
+    own L1 TTL expires. Multi-replica invalidation would need pub/sub.
     """
     with _project_ttl_cache_lock:
         _project_ttl_cache.pop(project_id, None)
+    redis_client = get_redis_client()
     if redis_client is not None:
         _l2_delete(redis_client, project_id)
 

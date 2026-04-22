@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from weave.trace_server import ttl_settings
 from weave.trace_server.ttl_settings import (
     EXPIRE_AT_NEVER,
     REDIS_TTL_EXPIRY_SECS,
@@ -22,6 +23,17 @@ def clear_cache():
     reset_ttl_cache()
     yield
     reset_ttl_cache()
+
+
+@pytest.fixture
+def no_redis(monkeypatch):
+    """Pin get_redis_client() to None so L2 is skipped."""
+    monkeypatch.setattr(ttl_settings, "get_redis_client", lambda: None)
+
+
+def _patch_redis(monkeypatch, redis_obj):
+    """Pin get_redis_client() to return the given redis-like object."""
+    monkeypatch.setattr(ttl_settings, "get_redis_client", lambda: redis_obj)
 
 
 class _FakeRedis:
@@ -91,7 +103,7 @@ EXPECTED_L3_QUERY = (
 )
 
 
-def test_get_project_retention_days_l1_cache():
+def test_get_project_retention_days_l1_cache(no_redis):
     """L1 caching: single CH query for repeated lookups, zero on CH miss."""
     ch_client = _make_ch_client([[90]])
 
@@ -111,30 +123,26 @@ def test_get_project_retention_days_l1_cache():
 
 
 @pytest.mark.disable_logging_error_check
-def test_get_project_retention_days_redis_l2_cache():
+def test_get_project_retention_days_redis_l2_cache(monkeypatch):
     """L2 read, L2 populate after CH hit, and graceful Redis failure fallback."""
     redis = _FakeRedis()
+    _patch_redis(monkeypatch, redis)
 
     # Pre-populated Redis → serves from L2, no CH query, then L1 on repeat
     ch_not_reached = _make_ch_client([[999]])
     redis.set(_ttl_cache_key("entity/proj"), "45", ex=300)
 
-    first = get_project_retention_days(
-        "entity/proj", ch_not_reached, redis_client=redis
-    )
-    second = get_project_retention_days(
-        "entity/proj", ch_not_reached, redis_client=redis
-    )
+    first = get_project_retention_days("entity/proj", ch_not_reached)
+    second = get_project_retention_days("entity/proj", ch_not_reached)
     assert first == 45
     assert second == 45
     assert ch_not_reached.query.call_count == 0
 
     # Cold Redis → CH query populates both L2 and L1
     redis_cold = _FakeRedis()
+    _patch_redis(monkeypatch, redis_cold)
     ch_client = _make_ch_client([[60]])
-    result = get_project_retention_days(
-        "entity/other", ch_client, redis_client=redis_cold
-    )
+    result = get_project_retention_days("entity/other", ch_client)
     assert result == 60
     assert ch_client.query.call_count == 1
     ch_client.query.assert_called_once_with(
@@ -148,26 +156,23 @@ def test_get_project_retention_days_redis_l2_cache():
     broken_redis = MagicMock()
     broken_redis.get.side_effect = ConnectionError("Redis down")
     broken_redis.set.side_effect = ConnectionError("Redis down")
+    _patch_redis(monkeypatch, broken_redis)
     ch_fallback = _make_ch_client([[77]])
-    assert (
-        get_project_retention_days(
-            "entity/broken-redis", ch_fallback, redis_client=broken_redis
-        )
-        == 77
-    )
+    assert get_project_retention_days("entity/broken-redis", ch_fallback) == 77
     assert ch_fallback.query.call_count == 1
 
 
 @pytest.mark.disable_logging_error_check
-def test_invalidate_ttl_cache():
+def test_invalidate_ttl_cache(monkeypatch):
     """Invalidation clears L1+L2, forces refetch, and swallows Redis errors."""
     ch_client = _make_ch_client([[90]])
     redis = _FakeRedis()
+    _patch_redis(monkeypatch, redis)
     key = _ttl_cache_key("entity/proj")
 
     # Populate both cache layers
-    original = get_project_retention_days("entity/proj", ch_client, redis_client=redis)
-    cached = get_project_retention_days("entity/proj", ch_client, redis_client=redis)
+    original = get_project_retention_days("entity/proj", ch_client)
+    cached = get_project_retention_days("entity/proj", ch_client)
     assert original == 90
     assert cached == 90
     assert redis.get(key) == "90"
@@ -175,14 +180,15 @@ def test_invalidate_ttl_cache():
 
     # Invalidate and verify refetch picks up new value
     ch_client.query.return_value.first_row = [30]
-    invalidate_ttl_cache("entity/proj", redis_client=redis)
+    invalidate_ttl_cache("entity/proj")
     assert redis.get(key) is None
 
-    refreshed = get_project_retention_days("entity/proj", ch_client, redis_client=redis)
+    refreshed = get_project_retention_days("entity/proj", ch_client)
     assert refreshed == 30
     assert ch_client.query.call_count == 2
 
     # Broken Redis on delete → no exception raised
     broken_redis = MagicMock()
     broken_redis.delete.side_effect = ConnectionError("Redis down")
-    invalidate_ttl_cache("entity/proj", redis_client=broken_redis)
+    _patch_redis(monkeypatch, broken_redis)
+    invalidate_ttl_cache("entity/proj")
