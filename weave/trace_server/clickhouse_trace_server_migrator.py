@@ -124,6 +124,98 @@ def _is_transient_ch_error(exc: BaseException) -> bool:
     return int(match.group(1)) in _TRANSIENT_CH_ERROR_CODES
 
 
+def split_migration_sql(sql: str) -> list[str]:
+    """Split a ClickHouse migration SQL script into individual statements.
+
+    A naive `sql.split(";")` breaks when `;` appears inside a `-- line comment`
+    (e.g. ``-- attributes_dump is preserved; typed maps are a dup index.``) or
+    inside a single-quoted string literal (e.g. ``DEFAULT 'a;b'``). ClickHouse
+    then receives a mid-comment fragment and raises ``DB::Exception: Empty query.
+    (SYNTAX_ERROR)``.
+
+    This tokenizer walks the SQL character-by-character tracking two pieces of
+    state: whether we are currently inside a single-quoted string literal, and
+    whether we are currently inside a ``--`` line comment or ``/* ... */`` block
+    comment. Only top-level, non-string, non-comment ``;`` characters act as
+    statement terminators. Single quotes are escaped via doubling (``''``),
+    matching ClickHouse's SQL dialect.
+
+    Empty statements (after stripping whitespace) are dropped from the result.
+    """
+    statements: list[str] = []
+    buf: list[str] = []
+    i = 0
+    n = len(sql)
+    in_string = False
+    in_line_comment = False
+    in_block_comment = False
+
+    while i < n:
+        ch = sql[i]
+        nxt = sql[i + 1] if i + 1 < n else ""
+
+        if in_line_comment:
+            # Line comments end at newline; consume the newline into the buffer
+            # so whitespace/line structure is preserved for readability.
+            if ch == "\n":
+                in_line_comment = False
+                buf.append(ch)
+            i += 1
+            continue
+
+        if in_block_comment:
+            if ch == "*" and nxt == "/":
+                in_block_comment = False
+                i += 2
+                continue
+            i += 1
+            continue
+
+        if in_string:
+            buf.append(ch)
+            if ch == "'":
+                # Doubled single-quote is an escaped quote, not a terminator.
+                if nxt == "'":
+                    buf.append(nxt)
+                    i += 2
+                    continue
+                in_string = False
+            i += 1
+            continue
+
+        # Not in string / not in comment — check for comment starts.
+        if ch == "-" and nxt == "-":
+            in_line_comment = True
+            i += 2
+            continue
+        if ch == "/" and nxt == "*":
+            in_block_comment = True
+            i += 2
+            continue
+
+        if ch == "'":
+            in_string = True
+            buf.append(ch)
+            i += 1
+            continue
+
+        if ch == ";":
+            statement = "".join(buf).strip()
+            if statement:
+                statements.append(statement)
+            buf = []
+            i += 1
+            continue
+
+        buf.append(ch)
+        i += 1
+
+    tail = "".join(buf).strip()
+    if tail:
+        statements.append(tail)
+    return statements
+
+
 # These settings are only used when `replicated` mode is enabled for
 # self managed clickhouse instances.
 DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
@@ -427,9 +519,11 @@ class BaseClickHouseTraceServerMigrator(ABC):
         # Mark migration as partially applied
         self._update_migration_status(target_db, target_version, is_start=True)
 
-        # Execute each command in the migration
-        migration_sub_commands = migration_sql.split(";")
-        for command in migration_sub_commands:
+        # Execute each command in the migration. Use a comment- and
+        # string-literal-aware tokenizer instead of a naive ``split(";")`` so
+        # that ``;`` inside ``-- line comments`` or ``'quoted strings'`` does
+        # not fragment statements mid-way and produce empty/invalid SQL.
+        for command in split_migration_sql(migration_sql):
             self._execute_migration_command(target_db, command)
 
         # Mark migration as fully applied

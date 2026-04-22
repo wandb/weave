@@ -15,6 +15,7 @@ from weave.trace_server.clickhouse_trace_server_migrator import (
     ReplicatedClickHouseTraceServerMigrator,
     SQLPatterns,
     _is_transient_ch_error,
+    split_migration_sql,
 )
 
 DEFAULT_MIGRATION_DIR = os.path.abspath(
@@ -1331,4 +1332,74 @@ def test_is_transient_ch_error():
     assert not _is_transient_ch_error(DatabaseError("Code: 62. DB::Exception: ..."))
     assert not _is_transient_ch_error(DatabaseError("some other error"))
     assert not _is_transient_ch_error(DatabaseError(""))
+
+
+@pytest.mark.parametrize(
+    ("sql", "expected"),
+    [
+        # Line comment containing a `;` must not split the surrounding statement.
+        (
+            "-- attributes_dump is preserved; typed maps are a duplicated index.\n"
+            "ALTER TABLE calls ADD COLUMN foo String",
+            ["ALTER TABLE calls ADD COLUMN foo String"],
+        ),
+        # Single-quoted string containing `;` must stay in one statement.
+        (
+            "ALTER TABLE t ADD COLUMN c String DEFAULT 'a;b'",
+            ["ALTER TABLE t ADD COLUMN c String DEFAULT 'a;b'"],
+        ),
+        # Doubled single quote is an escaped quote inside a literal.
+        (
+            "ALTER TABLE t ADD COLUMN c String DEFAULT 'it''s; fine'",
+            ["ALTER TABLE t ADD COLUMN c String DEFAULT 'it''s; fine'"],
+        ),
+        # Trailing whitespace/newlines after the final `;` must not produce an empty statement.
+        ("SELECT 1;\n\n   \n", ["SELECT 1"]),
+        # A pure-comment file returns an empty list.
+        ("-- just a comment;\n-- another; one\n", []),
+        # Block comments are stripped but don't split statements.
+        ("/* note; with ; inside */ SELECT 1; SELECT 2", ["SELECT 1", "SELECT 2"]),
+    ],
+)
+def test_split_migration_sql_edge_cases(sql: str, expected: list[str]) -> None:
+    assert split_migration_sql(sql) == expected
+
+
+def test_split_migration_sql_combined() -> None:
+    """Dense end-to-end case: comments + string literals + blank lines + multiple stmts."""
+    sql = """
+    -- migration: widen config; also tweak defaults
+    ALTER TABLE runs
+        ADD COLUMN config String DEFAULT 'k=v;other=1';
+
+    /* block comment
+       spanning lines; with semicolons */
+
+    -- another; line comment
+    ALTER TABLE runs
+        ADD COLUMN note String DEFAULT 'it''s; ok';
+
+
+    CREATE INDEX idx_runs_config ON runs (config) TYPE minmax;
+    """
+    statements = split_migration_sql(sql)
+    assert len(statements) == 3
+    assert statements[0] == (
+        "ALTER TABLE runs\n        ADD COLUMN config String DEFAULT 'k=v;other=1'"
+    )
+    assert statements[1] == (
+        "ALTER TABLE runs\n        ADD COLUMN note String DEFAULT 'it''s; ok'"
+    )
+    assert statements[2] == "CREATE INDEX idx_runs_config ON runs (config) TYPE minmax"
+    # No statement should leak a trailing `;` or contain comment text.
+    for s in statements:
+        assert not s.endswith(";")
+        assert "--" not in s
+        assert "/*" not in s
+
+
+def test_split_migration_sql_multiple_statement_count() -> None:
+    """Baseline: three simple statements produce three entries."""
+    sql = "CREATE TABLE a (id UInt64) ENGINE=Memory; INSERT INTO a VALUES (1); DROP TABLE a;"
+    assert len(split_migration_sql(sql)) == 3
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
