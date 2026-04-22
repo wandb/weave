@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+
+import packaging.version
+from packaging.version import parse as parse_version
 
 import weave
 from weave.trace import urls
 from weave.utils.pypi_version_check import check_available
-
-if TYPE_CHECKING:
-    import packaging.version  # type: ignore[import-not-found]
 
 try:
     import wandb
@@ -23,17 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_version(version: str) -> packaging.version.Version:
-    """Parse a version string into a version object.
-
-    This function is a wrapper around the `packaging.version.parse` function, which
-    is used to parse version strings into version objects. If the `packaging` library
-    is not installed, it falls back to the `pkg_resources` library.
-    """
-    try:
-        from packaging.version import parse as parse_version  # type: ignore
-    except ImportError:
-        from pkg_resources import parse_version
-
+    """Parse a version string into a version object."""
     return parse_version(version)
 
 
