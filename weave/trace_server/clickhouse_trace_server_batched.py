@@ -4373,7 +4373,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         self.call_end(summarize_end_req)
 
-        # End the evaluation run call
+        # End the evaluation run call. If the caller indicated the run failed
+        # (via the optional `exception` field), pass that through to the
+        # underlying call so the evaluation run's status becomes "error".
         call_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
@@ -4381,6 +4383,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 ended_at=datetime.datetime.now(datetime.timezone.utc),
                 output=eval_output,
                 summary=summary,
+                exception=req.exception,
             )
         )
         self.call_end(call_end_req)
@@ -4711,13 +4714,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         prediction_res = self.call_read(prediction_read_req)
 
+        # If the caller supplied a new `output` on finish (e.g. EvaluationLogger
+        # V2's deferred `pred.output = ...` flow), use it; otherwise preserve
+        # the output that was set at prediction_create time.
+        existing_output = (
+            prediction_res.call.output if prediction_res.call is not None else None
+        )
+        finish_output = req.output if req.output is not None else existing_output
+
         # Finish the prediction call
         call_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=req.prediction_id,
                 ended_at=datetime.datetime.now(datetime.timezone.utc),
-                output=None,
+                output=finish_output,
                 summary={},
             )
         )
@@ -4802,14 +4813,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ).total_seconds()
             model_latency = {"mean": latency_seconds}
 
-        # Finish the predict_and_score parent call with proper output
+        # Finish the predict_and_score parent call with proper output. Use the
+        # finish-time output (potentially overridden via `req.output`) rather
+        # than the one captured at prediction_create time.
         parent_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=parent_id,
                 ended_at=datetime.datetime.now(datetime.timezone.utc),
                 output={
-                    "output": prediction_call.output,
+                    "output": finish_output,
                     "scores": scores_dict,
                     "model_latency": model_latency,
                 },
@@ -4987,7 +5000,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Extract score value from output
         # The output is stored directly as the numeric value
-        value = call.output if call.output is not None else 0.0
+        # The score value is stored directly as the call's output. None is a
+        # valid score per V1 contract (see `ScoreValue` union), so preserve
+        # it rather than coercing to 0.0.
+        value = call.output
 
         # Get evaluation_run_id from attributes (preferred), fallback to parent traversal for backwards compatibility
         evaluation_run_id = attributes.get(constants.SCORE_EVALUATION_RUN_ID_ATTR_KEY)
@@ -5066,7 +5082,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Yield scores
         for call in self.calls_query_stream(calls_query_req):
             attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
-            value = call.output if call.output is not None else 0.0
+            # The score value is stored directly as the call's output. None is
+            # a valid score per V1 contract (see `ScoreValue` union), so
+            # preserve it rather than coercing to 0.0.
+            value = call.output
 
             # Get evaluation_run_id from attributes (preferred), fallback to parent traversal for backwards compatibility
             evaluation_run_id = attributes.get(

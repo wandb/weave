@@ -2478,6 +2478,18 @@ class EvaluationRunFinishBody(BaseModel):
     summary: dict[str, Any] | None = Field(
         None, description="Optional summary dictionary for the evaluation run"
     )
+    # The EvaluationLogger V1 `fail(exception)` method needs to be able to mark
+    # an evaluation run as errored when the caller encountered a failure. The V2
+    # server tracks evaluation runs as calls with a `status` field that can be
+    # "error", so we accept an optional exception string here and wire it into
+    # the underlying call's exception + status on finish.
+    exception: str | None = Field(
+        None,
+        description=(
+            "If provided, the evaluation run is marked as failed with this "
+            "exception message. The run's status becomes 'error'."
+        ),
+    )
 
 
 class EvaluationRunFinishReq(EvaluationRunFinishBody):
@@ -2582,6 +2594,19 @@ class PredictionFinishReq(BaseModel):
         ..., description="The `entity/project` where this prediction is saved"
     )
     prediction_id: str = Field(..., description="The prediction ID to finish")
+    # EvaluationLogger V1 lets callers set `pred.output` after the prediction
+    # is created and still honors it at finish time. Prediction creation in V2
+    # happens lazily on the first score, so the output at finish can differ
+    # from what was sent at create. This optional field updates the prediction
+    # call's output before closing when provided.
+    output: Any | None = Field(
+        None,
+        description=(
+            "If provided, the prediction call's output is updated to this "
+            "value before the call is closed. Used by EvaluationLogger V2 to "
+            "honor late output mutations."
+        ),
+    )
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
@@ -2589,6 +2614,14 @@ class PredictionFinishRes(BaseModel):
     success: bool = Field(
         ..., description="Whether the prediction was finished successfully"
     )
+
+
+# Matches the V1 EvaluationLogger `ScoreType` union (`float | bool | dict`)
+# plus `None` (which is a valid score value per V1 contract tests — e.g. used
+# to record an "N/A" result). Dict scores carry structured metrics such as
+# `{"value": 0.9, "reason": "..."}`. Kept as an explicit union rather than
+# `Any` so the API documents what callers may send.
+ScoreValue = float | bool | dict | None
 
 
 class ScoreCreateBody(BaseModel):
@@ -2599,7 +2632,7 @@ class ScoreCreateBody(BaseModel):
 
     prediction_id: str = Field(..., description="The prediction ID")
     scorer: str = Field(..., description="The scorer reference (weave:// URI)")
-    value: float = Field(..., description="The value of the score")
+    value: ScoreValue = Field(..., description="The value of the score")
     evaluation_run_id: str | None = Field(
         None,
         description="Optional evaluation run ID to link this score as a child call",
@@ -2633,7 +2666,9 @@ class ScoreReadReq(BaseModel):
 class ScoreReadRes(BaseModel):
     score_id: str = Field(..., description="The score ID")
     scorer: str = Field(..., description="The scorer reference (weave:// URI)")
-    value: float = Field(..., description="The value of the score")
+    # Same justification as `ScoreCreateBody.value`: V1 supports
+    # `float | bool | dict | None`, so the read side must also surface them.
+    value: ScoreValue = Field(..., description="The value of the score")
     evaluation_run_id: str | None = Field(
         None, description="Evaluation run ID if this score is linked to one"
     )
