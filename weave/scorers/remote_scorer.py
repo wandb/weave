@@ -16,7 +16,7 @@ def _validate_remote_scorer_endpoint_url(v: str) -> str:
         parsed = urlparse(v)
     except Exception as exc:
         raise ValueError("endpoint_url must be a valid URL string") from exc
-    if parsed.scheme not in ("http", "https"):
+    if parsed.scheme not in {"http", "https"}:
         raise ValueError("endpoint_url must use the http or https scheme")
     host = (parsed.hostname or "").strip()
     if not host:

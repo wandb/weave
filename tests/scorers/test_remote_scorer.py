@@ -31,7 +31,7 @@ def test_remote_scorer_endpoint_url_strips_whitespace() -> None:
 
 
 @pytest.mark.parametrize(
-    "bad_url,match_substr",
+    ("bad_url", "match_substr"),
     [
         ("ftp://example.com/score", "http or https"),
         ("https://", "host"),
