@@ -1334,39 +1334,65 @@ def test_is_transient_ch_error():
     assert not _is_transient_ch_error(DatabaseError(""))
 
 
-@pytest.mark.parametrize(
-    ("sql", "expected"),
-    [
-        # Line comment containing a `;` must not split the surrounding statement.
-        (
-            "-- attributes_dump is preserved; typed maps are a duplicated index.\n"
-            "ALTER TABLE calls ADD COLUMN foo String",
-            ["ALTER TABLE calls ADD COLUMN foo String"],
-        ),
-        # Single-quoted string containing `;` must stay in one statement.
-        (
-            "ALTER TABLE t ADD COLUMN c String DEFAULT 'a;b'",
-            ["ALTER TABLE t ADD COLUMN c String DEFAULT 'a;b'"],
-        ),
-        # Doubled single quote is an escaped quote inside a literal.
-        (
-            "ALTER TABLE t ADD COLUMN c String DEFAULT 'it''s; fine'",
-            ["ALTER TABLE t ADD COLUMN c String DEFAULT 'it''s; fine'"],
-        ),
-        # Trailing whitespace/newlines after the final `;` must not produce an empty statement.
-        ("SELECT 1;\n\n   \n", ["SELECT 1"]),
-        # A pure-comment file returns an empty list.
-        ("-- just a comment;\n-- another; one\n", []),
-        # Block comments are stripped but don't split statements.
-        ("/* note; with ; inside */ SELECT 1; SELECT 2", ["SELECT 1", "SELECT 2"]),
-    ],
-)
-def test_split_migration_sql_edge_cases(sql: str, expected: list[str]) -> None:
-    assert split_migration_sql(sql) == expected
+def test_split_migration_sql() -> None:
+    """One dense case exercising every rule the splitter cares about.
 
+    Rules verified (one assertion cluster per rule):
+    - ``;`` inside ``--`` line comments does not split a statement;
+    - ``;`` inside ``/* ... */`` block comments does not split a statement,
+      and block comments spanning lines are handled;
+    - ``;`` inside a single-quoted string stays in the statement, including
+      SQL-style ``''`` escaped quotes;
+    - trailing whitespace/newlines after the final ``;`` do not emit an
+      empty statement;
+    - a file containing only comments (line or block) yields no statements;
+    - a file with N non-empty statements yields exactly N entries, each
+      with no trailing ``;`` and no leaked comment markers;
+    - a mixed end-to-end migration (comments + block comments + string
+      literals with semicolons + blank lines) round-trips to the exact
+      statement bodies we expect.
+    """
+    # 1. Line comment with a `;` inside it does not split the statement.
+    assert split_migration_sql(
+        "-- attributes_dump is preserved; typed maps are a duplicated index.\n"
+        "ALTER TABLE calls ADD COLUMN foo String"
+    ) == ["ALTER TABLE calls ADD COLUMN foo String"]
 
-def test_split_migration_sql_combined() -> None:
-    """Dense end-to-end case: comments + string literals + blank lines + multiple stmts."""
+    # 2. String literal with a `;` stays in one statement; doubled-quote
+    #    escapes are preserved (no spurious termination of the string).
+    assert split_migration_sql("ALTER TABLE t ADD COLUMN c String DEFAULT 'a;b'") == [
+        "ALTER TABLE t ADD COLUMN c String DEFAULT 'a;b'"
+    ]
+    assert split_migration_sql(
+        "ALTER TABLE t ADD COLUMN c String DEFAULT 'it''s; fine'"
+    ) == ["ALTER TABLE t ADD COLUMN c String DEFAULT 'it''s; fine'"]
+
+    # 3. Trailing whitespace after the final `;` produces no empty statement.
+    assert split_migration_sql("SELECT 1;\n\n   \n") == ["SELECT 1"]
+
+    # 4. Comment-only files (line or block) yield zero statements.
+    assert split_migration_sql("-- just a comment;\n-- another; one\n") == []
+    assert split_migration_sql("/* header;\n only; */\n") == []
+
+    # 5. Block comments — even those spanning lines with `;` inside — do not
+    #    split the surrounding statements, and the count matches exactly.
+    assert split_migration_sql("/* note; with ; inside */ SELECT 1; SELECT 2") == [
+        "SELECT 1",
+        "SELECT 2",
+    ]
+    assert (
+        len(
+            split_migration_sql(
+                "CREATE TABLE a (id UInt64) ENGINE=Memory;"
+                " INSERT INTO a VALUES (1);"
+                " DROP TABLE a;"
+            )
+        )
+        == 3
+    )
+
+    # 6. End-to-end migration: comments, block comments, string literals with
+    #    semicolons, and blank lines all compose without corrupting bodies.
     sql = """
     -- migration: widen config; also tweak defaults
     ALTER TABLE runs
@@ -1383,23 +1409,13 @@ def test_split_migration_sql_combined() -> None:
     CREATE INDEX idx_runs_config ON runs (config) TYPE minmax;
     """
     statements = split_migration_sql(sql)
-    assert len(statements) == 3
-    assert statements[0] == (
-        "ALTER TABLE runs\n        ADD COLUMN config String DEFAULT 'k=v;other=1'"
-    )
-    assert statements[1] == (
-        "ALTER TABLE runs\n        ADD COLUMN note String DEFAULT 'it''s; ok'"
-    )
-    assert statements[2] == "CREATE INDEX idx_runs_config ON runs (config) TYPE minmax"
-    # No statement should leak a trailing `;` or contain comment text.
+    assert statements == [
+        "ALTER TABLE runs\n        ADD COLUMN config String DEFAULT 'k=v;other=1'",
+        "ALTER TABLE runs\n        ADD COLUMN note String DEFAULT 'it''s; ok'",
+        "CREATE INDEX idx_runs_config ON runs (config) TYPE minmax",
+    ]
     for s in statements:
         assert not s.endswith(";")
         assert "--" not in s
         assert "/*" not in s
-
-
-def test_split_migration_sql_multiple_statement_count() -> None:
-    """Baseline: three simple statements produce three entries."""
-    sql = "CREATE TABLE a (id UInt64) ENGINE=Memory; INSERT INTO a VALUES (1); DROP TABLE a;"
-    assert len(split_migration_sql(sql)) == 3
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
