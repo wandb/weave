@@ -4,10 +4,13 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 import httpx
+import tenacity
+from typing_extensions import ParamSpec
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.utils.retry import _is_retryable_exception
+from weave.utils.retry import _is_retryable_exception, with_retry
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
@@ -21,8 +24,15 @@ _ENDPOINT_CACHE: set[str] = set()
 REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
 ROW_COUNT_CHUNKING_THRESHOLD = 1000
 
+# Fixed wait between 404 retries. Short, because eventual-consistency windows
+# on reads-after-write are typically sub-second; longer waits just pad latency
+# when the object is genuinely missing.
+NOT_FOUND_RETRY_WAIT_SECONDS = 0.25
+
 # Type variable for batch items
 T = TypeVar("T")
+P = ParamSpec("P")
+R = TypeVar("R")
 
 # Use AsyncBatchProcessor as the batch processor type
 BatchProcessor = AsyncBatchProcessor
@@ -338,6 +348,48 @@ def _is_413_error(e: Exception) -> bool:
         and e.response is not None
         and e.response.status_code == 413
     )
+
+
+def _is_retryable_not_found(exc: BaseException) -> bool:
+    """True only for 404-like misses worth retrying.
+
+    Skips authoritative deletes (local `ObjectDeletedError` or HTTP response
+    body with `deleted_at`). Covers both local server domain exceptions
+    (`NotFoundError`) and remote HTTP 404s; anything else (including a 404
+    with a non-JSON body) is out of scope for this retry layer.
+    """
+    # Authoritative delete -- never retry.
+    if isinstance(exc, ObjectDeletedError):
+        return False
+    # Local server raised a plain not-found -- retry.
+    if isinstance(exc, NotFoundError):
+        return True
+    # Remote HTTP 404 -- retry unless the body indicates a delete.
+    if not isinstance(exc, httpx.HTTPStatusError) or exc.response is None:
+        return False
+    if exc.response.status_code != 404:
+        return False
+    try:
+        body = exc.response.json()
+    except (json.JSONDecodeError, ValueError):
+        return False
+    if not isinstance(body, dict):
+        return False
+    return body.get("deleted_at") is None
+
+
+def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
+    """Retry a callable once on an eventual-consistency 404.
+
+    Intended for explicit opt-in at write-then-read call sites. Skips
+    authoritative deletes (`ObjectDeletedError` or body with `deleted_at`).
+    Uses a short fixed wait since eventual-consistency windows are typically
+    sub-second.
+    """
+    return with_retry(
+        retry_if=_is_retryable_not_found,
+        wait=tenacity.wait_fixed(NOT_FOUND_RETRY_WAIT_SECONDS),
+    )(func)
 
 
 # Error code from server when project requires calls_complete mode

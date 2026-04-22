@@ -235,8 +235,8 @@ jobs:
           name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
-  trace-server-migrator-tests:
-    name: Trace server migrator tests
+  trace-server-migrator-1s1r:
+    name: Trace server migrator tests (1s1r)
     timeout-minutes: 10
     runs-on: ubuntu-latest
     strategy:
@@ -282,8 +282,141 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
-          flags: trace-server-migrator
-          name: trace-server-migrator-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          flags: trace-server-migrator-1s1r
+          name: trace-server-migrator-1s1r-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  trace-server-migrator-1s3r:
+    name: Trace server migrator tests (1s3r)
+    needs:
+      - check-which-tests-to-run
+    if: needs.check-which-tests-to-run.outputs.trace_server_migrator_tests == 'true' || github.ref == 'refs/heads/master'
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: ["12"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Start 1s3r ClickHouse cluster
+        working-directory: tests/trace_server/conftest_lib/topologies
+        run: |
+          docker compose -f 1s3r.yaml up -d --wait
+          # Extra belt-and-suspenders health probe from host perspective.
+          for i in $(seq 1 60); do
+            wget -q -O- 'http://localhost:8130/ping' && break || sleep 2
+          done
+          # Show cluster membership so failures are diagnosable from log.
+          docker compose -f 1s3r.yaml exec -T ch-s1-r1 \
+            clickhouse-client -q "SELECT host_name, shard_num, replica_num, errors_count FROM system.clusters WHERE cluster='weave_cluster' FORMAT PrettyCompact"
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run migrator functional tests
+        env:
+          CI: 1
+          # Existing fixture reads WF_CLICKHOUSE_KEEPER_PORT and connects
+          # to localhost at that port — we map the 1s3r entrypoint to 8130.
+          # Other WF_CLICKHOUSE_* vars are intentionally NOT set: the
+          # existing migrator tests pass replicated/distributed flags
+          # explicitly to the migrator factory, so env vars would be
+          # unread documentation.
+          WF_CLICKHOUSE_KEEPER_PORT: 8130
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server_migrator')"
+      - name: Capture ClickHouse logs on failure
+        if: failure()
+        working-directory: tests/trace_server/conftest_lib/topologies
+        run: |
+          docker compose -f 1s3r.yaml logs --no-color --tail=1000 > ch-logs-1s3r.txt || true
+      - name: Upload ClickHouse logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ch-logs-1s3r-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/trace_server/conftest_lib/topologies/ch-logs-1s3r.txt
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          flags: trace-server-migrator-1s3r
+          name: trace-server-migrator-1s3r-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  trace-server-migrator-2s2r:
+    name: Trace server migrator tests (2s2r)
+    needs:
+      - check-which-tests-to-run
+    if: needs.check-which-tests-to-run.outputs.trace_server_migrator_tests == 'true' || needs.check-which-tests-to-run.outputs.trace_server_distributed_tests == 'true' || github.ref == 'refs/heads/master'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: ["12"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Start 2s2r ClickHouse cluster
+        working-directory: tests/trace_server/conftest_lib/topologies
+        run: |
+          docker compose -f 2s2r.yaml up -d --wait
+          # Extra belt-and-suspenders health probe. 2s2r entrypoint is on 8131.
+          for i in $(seq 1 60); do
+            wget -q -O- 'http://localhost:8131/ping' && break || sleep 2
+          done
+          docker compose -f 2s2r.yaml exec -T ch-s1-r1 \
+            clickhouse-client -q "SELECT host_name, shard_num, replica_num, errors_count FROM system.clusters WHERE cluster='weave_cluster' FORMAT PrettyCompact"
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run migrator functional tests
+        env:
+          CI: 1
+          # 2s2r entrypoint is on host port 8131 (1s3r uses 8130).
+          # See 1s3r job for why only KEEPER_PORT is set.
+          WF_CLICKHOUSE_KEEPER_PORT: 8131
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server_migrator')"
+      - name: Capture ClickHouse logs on failure
+        if: failure()
+        working-directory: tests/trace_server/conftest_lib/topologies
+        run: |
+          docker compose -f 2s2r.yaml logs --no-color --tail=1000 > ch-logs-2s2r.txt || true
+      - name: Upload ClickHouse logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ch-logs-2s2r-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/trace_server/conftest_lib/topologies/ch-logs-2s2r.txt
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          flags: trace-server-migrator-2s2r
+          name: trace-server-migrator-2s2r-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -293,7 +426,9 @@ jobs:
     needs:
       - trace-tests
       - trace_no_server
-      - trace-server-migrator-tests
+      - trace-server-migrator-1s1r
+      - trace-server-migrator-1s3r
+      - trace-server-migrator-2s2r
 
     runs-on: ubuntu-latest
 
@@ -302,6 +437,11 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
+          # The 1s3r and 2s2r jobs are path-filtered and will be "skipped"
+          # on PRs that don't touch migrator or distributed surfaces.
+          # alls-green treats skipped as failing by default; whitelist
+          # them here so a skipped-because-gated job doesn't wedge merge.
+          allowed-skips: trace-server-migrator-1s3r,trace-server-migrator-2s2r
 
   # ==== Windows Jobs ====
   windows_trace_no_server:

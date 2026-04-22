@@ -4,6 +4,8 @@ This module provides query building functions for the queue-based call annotatio
 following the same patterns as threads_query_builder.py and other query builders in the codebase.
 """
 
+import datetime
+
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     ReadTable,
     _format_table_name_with_cluster,
@@ -686,3 +688,79 @@ def make_annotator_progress_update_query(
     """
 
     return query
+
+
+def make_annotator_progress_state_check_query(
+    project_id: str,
+    queue_item_id: str,
+    annotator_id: str,
+    pb: ParamBuilder,
+) -> str:
+    """Generate a SELECT query to fetch current annotation state for a queue item."""
+    project_id_param = pb.add_param(project_id)
+    queue_item_id_param = pb.add_param(queue_item_id)
+    annotator_id_param = pb.add_param(annotator_id)
+
+    return f"""
+    SELECT
+        annotation_state,
+        COUNT(*) as record_exists
+    FROM annotator_queue_items_progress
+    WHERE project_id = {{{project_id_param}: String}}
+      AND queue_item_id = {{{queue_item_id_param}: String}}
+      AND annotator_id = {{{annotator_id_param}: String}}
+      AND deleted_at IS NULL
+    GROUP BY annotation_state
+    """
+
+
+def make_queue_item_existence_query(
+    project_id: str,
+    queue_id: str,
+    queue_item_id: str,
+    pb: ParamBuilder,
+) -> str:
+    """Generate a SELECT query to verify a queue item exists."""
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+    queue_item_id_param = pb.add_param(queue_item_id)
+
+    return f"""
+    SELECT id
+    FROM annotation_queue_items
+    WHERE id = {{{queue_item_id_param}: String}}
+      AND project_id = {{{project_id_param}: String}}
+      AND queue_id = {{{queue_id_param}: String}}
+      AND deleted_at IS NULL
+    LIMIT 1
+    """
+
+
+def make_annotator_progress_insert_query(
+    project_id: str,
+    queue_id: str,
+    queue_item_id: str,
+    annotator_id: str,
+    progress_id: str,
+    annotation_state: str,
+    now: datetime.datetime,
+    pb: ParamBuilder,
+) -> str:
+    """Generate an INSERT query to create a new annotator progress record."""
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+    queue_item_id_param = pb.add_param(queue_item_id)
+    annotator_id_param = pb.add_param(annotator_id)
+    progress_id_param = pb.add_param(progress_id)
+    annotation_state_param = pb.add_param(annotation_state)
+    now_param = pb.add_param(now)
+
+    return f"""
+    INSERT INTO annotator_queue_items_progress
+        (id, project_id, queue_item_id, queue_id, annotator_id,
+         annotation_state, created_at, updated_at, deleted_at)
+    VALUES
+        ({{{progress_id_param}: String}}, {{{project_id_param}: String}}, {{{queue_item_id_param}: String}},
+         {{{queue_id_param}: String}}, {{{annotator_id_param}: String}}, {{{annotation_state_param}: String}},
+         {{{now_param}: DateTime64(3)}}, {{{now_param}: DateTime64(3)}}, NULL)
+    """

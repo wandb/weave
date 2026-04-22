@@ -66,7 +66,7 @@ async def test_predict_can_receive_other_params(client):
         "output": {"mean": 18.5},
         "score": {"true_count": 0, "true_fraction": 0.0},
         "model_latency": {
-            "mean": pytest.approx(0, abs=1),
+            "mean": pytest.approx(0, abs=LATENCY_TOL),
         },
     }
 
@@ -134,7 +134,7 @@ async def test_score_as_class(client):
         "output": {"mean": 9.5},
         "MyScorer": {"true_count": 1, "true_fraction": 0.5},
         "model_latency": {
-            "mean": pytest.approx(0, abs=1),
+            "mean": pytest.approx(0, abs=LATENCY_TOL),
         },
     }
 
@@ -161,7 +161,7 @@ async def test_score_with_custom_summarize(client):
         "output": {"mean": 9.5},
         "MyScorer": {"awesome": 3},
         "model_latency": {
-            "mean": pytest.approx(0, abs=1),
+            "mean": pytest.approx(0, abs=LATENCY_TOL),
         },
     }
 

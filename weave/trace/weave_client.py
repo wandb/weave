@@ -164,6 +164,7 @@ from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     ROW_COUNT_CHUNKING_THRESHOLD,
     check_endpoint_exists,
+    retry_on_not_found,
 )
 from weave.trace_server_bindings.link_asset_to_registry import (
     LinkAssetToRegistryReq,
@@ -470,8 +471,11 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
         project_id = to_project_id(ref.entity, ref.project)
+        # Always retry on 404: the `publish(); ref.get()` pattern races against
+        # server-side eventual consistency, and the 250ms cost on a genuinely
+        # missing ref is not user-visible.
         try:
-            read_res = self.server.obj_read(
+            read_res = retry_on_not_found(self.server.obj_read)(
                 ObjReadReq(
                     project_id=project_id,
                     object_id=ref.name,
@@ -1363,7 +1367,7 @@ class WeaveClient:
             has no tags.
         """
         obj_ref = resolve_linkable_ref(obj_ref)
-        res = self.server.obj_read(
+        res = retry_on_not_found(self.server.obj_read)(
             ObjReadReq(
                 project_id=self.project_id,
                 object_id=obj_ref.name,
@@ -1388,7 +1392,7 @@ class WeaveClient:
             Returns empty lists if the object version has no tags or aliases.
         """
         obj_ref = resolve_linkable_ref(obj_ref)
-        res = self.server.obj_read(
+        res = retry_on_not_found(self.server.obj_read)(
             ObjReadReq(
                 project_id=self.project_id,
                 object_id=obj_ref.name,
@@ -1454,7 +1458,7 @@ class WeaveClient:
             if the object version is the latest.
         """
         obj_ref = resolve_linkable_ref(obj_ref)
-        res = self.server.obj_read(
+        res = retry_on_not_found(self.server.obj_read)(
             ObjReadReq(
                 project_id=self.project_id,
                 object_id=obj_ref.name,

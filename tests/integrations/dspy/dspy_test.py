@@ -316,7 +316,9 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
 def test_dspy_evaluate(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
     module = dspy.ChainOfThought("question -> answer: str, explanation: str")
-    evaluate = dspy.Evaluate(devset=SAMPLE_EVAL_DATASET, metric=accuracy_metric)
+    evaluate = dspy.Evaluate(
+        devset=SAMPLE_EVAL_DATASET, metric=accuracy_metric, num_threads=1
+    )
     accuracy = evaluate(module)
     assert accuracy.score > 30
 
