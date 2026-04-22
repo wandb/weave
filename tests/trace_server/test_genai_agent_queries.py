@@ -331,6 +331,55 @@ def test_agents_mv_aggregation(ch_server):
     assert agent.total_output_tokens == 190
 
 
+def test_agents_mv_zero_duration_when_ended_at_unset(ch_server):
+    """A span inserted without ended_at (defaults to epoch) must contribute
+    0 to total_duration_ms rather than wrapping via UInt64 cast to ~2^64.
+
+    Before the fix, ``toUInt64(toUnixTimestamp64Milli(ended_at) -
+    toUnixTimestamp64Milli(started_at))`` on an epoch ended_at produced
+    18446742296979951616 and permanently poisoned the aggregate.
+    """
+    project_id = _make_project_id("dur_guard")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    # ended_at omitted — schema default is epoch. started_at is real.
+    unset = AgentSpanCHInsertable(
+        project_id=project_id,
+        trace_id=uuid.uuid4().hex,
+        span_id=uuid.uuid4().hex,
+        span_name="unset-end",
+        started_at=now,
+        status_code="OK",
+        operation_name="invoke_agent",
+        agent_name="dur-guard-agent",
+        input_tokens=10,
+        output_tokens=5,
+    )
+    # A well-formed span that should contribute real duration to the rollup.
+    finished = _make_span(
+        project_id,
+        agent_name="dur-guard-agent",
+        operation_name="invoke_agent",
+        input_tokens=20,
+        output_tokens=10,
+        started_at=now,
+        ended_at=now + datetime.timedelta(milliseconds=150),
+    )
+    _insert_spans(ch_server.ch_client, [unset, finished])
+
+    res = ch_server.agent_agents_query(AgentsQueryReq(project_id=project_id))
+    assert len(res.agents) == 1
+    agent = res.agents[0]
+    # Only the well-formed span contributes; unset span contributes 0.
+    # The exact ms depends on clock granularity, but must be within a
+    # human-reasonable range — crucially NOT the 2^64 wrap value.
+    assert 0 < agent.total_duration_ms < 10_000
+    # Tokens are still summed across both spans (30 + 0-token unset span had 10
+    # inputs / 5 outputs).
+    assert agent.total_input_tokens == 30
+    assert agent.total_output_tokens == 15
+
+
 # ---------------------------------------------------------------------------
 # Test: Message search
 # ---------------------------------------------------------------------------

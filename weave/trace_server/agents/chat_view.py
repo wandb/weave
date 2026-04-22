@@ -349,7 +349,13 @@ def _find_user_prompt(spans: list[AgentSpanSchema]) -> UserPrompt:
 
     Prefers invoke_agent spans, falls back to any span with input_messages.
     """
-    sorted_spans = sorted(spans, key=lambda s: s.started_at or "")
+    # ``started_at`` is non-null from ClickHouse but can be None in
+    # in-memory callers and tests. Use the same tuple-key shape as
+    # build_span_tree so the sort key stays type-homogeneous and equal
+    # timestamps tiebreak deterministically on span_id.
+    sorted_spans = sorted(
+        spans, key=lambda s: (s.started_at is None, s.started_at, s.span_id)
+    )
 
     for prefer_invoke_agent in (True, False):
         for s in sorted_spans:

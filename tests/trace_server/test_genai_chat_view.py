@@ -193,6 +193,49 @@ def test_build_span_tree_handles_null_started_at() -> None:
     assert roots[-1].span.span_id == "s1"
 
 
+def test_build_trace_chat_handles_null_started_at() -> None:
+    """build_trace_chat must not crash when a span has started_at=None.
+
+    _find_user_prompt previously sorted by ``s.started_at or ""`` which
+    mixed datetime with str and raised TypeError for any span missing
+    started_at. The fix uses a tuple key with a None-last sentinel.
+    """
+    spans = [
+        AgentSpanSchema(
+            project_id="p1",
+            trace_id="t1",
+            span_id="null-start",
+            span_name="invoke_agent",
+            operation_name="invoke_agent",
+            status_code="OK",
+            started_at=None,
+            ended_at=None,
+            input_messages=[{"role": "user", "content": "hello from the void"}],
+        ),
+        AgentSpanSchema(
+            project_id="p1",
+            trace_id="t1",
+            span_id="real-start",
+            span_name="chat",
+            operation_name="chat",
+            status_code="OK",
+            started_at=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+            ended_at=datetime.datetime(
+                2026, 1, 1, 0, 0, 1, tzinfo=datetime.timezone.utc
+            ),
+            input_messages=[{"role": "user", "content": "hello from now"}],
+        ),
+    ]
+    # Must not raise. _find_user_prompt prefers invoke_agent spans, so the
+    # null-start invoke_agent's prompt wins over the chat span's prompt.
+    # The important thing is that the sort doesn't crash on the mixed key.
+    res = build_trace_chat(spans, "trace-with-null")
+    assert res.trace_id == "trace-with-null"
+    user_msgs = [m for m in res.messages if m.type == "user_message"]
+    assert len(user_msgs) == 1
+    assert user_msgs[0].text == "hello from the void"
+
+
 def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:
     """Siblings with equal started_at must sort deterministically by span_id."""
     t0 = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
