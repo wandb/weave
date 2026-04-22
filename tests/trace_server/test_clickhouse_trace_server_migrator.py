@@ -3,6 +3,7 @@ import types
 from unittest.mock import Mock, call, patch
 
 import pytest
+import sqlparse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
@@ -1418,4 +1419,54 @@ def test_split_migration_sql() -> None:
         assert not s.endswith(";")
         assert "--" not in s
         assert "/*" not in s
-    assert not _is_transient_ch_error(ConnectionError("not a db error"))
+
+
+def test_split_migration_sql_equivalent_on_all_shipped_migrations() -> None:
+    """Every shipped migration file produces the same statement sequence
+    under the new splitter as under the old naive ``split(";")``.
+
+    This is the drop-in-replacement guarantee: for migrations that existed
+    before the splitter change, ClickHouse must receive exactly the same
+    stream of statements, modulo comment stripping (which CH was already
+    ignoring server-side). If the two splitters diverge for any existing
+    migration, that migration either (a) depended on the old bug (``;``
+    inside a comment/string that was landing as garbage in CH), or (b)
+    uncovers a sqlparse quirk we did not anticipate — both worth failing
+    the test over.
+
+    Both outputs are normalized by stripping comments and collapsing
+    internal whitespace, then comparing as lists of normalized statements.
+    Comments are a no-op to ClickHouse's parser, and whitespace inside a
+    statement body never affects execution, so this normalization is the
+    right semantic identity to compare on.
+    """
+
+    # Old splitter, pre-change behavior: naive split on every ``;``, strip
+    # each chunk, drop empties (matches ``_execute_migration_command``'s
+    # ``if len(command) == 0: return`` guard).
+    def old_split(sql: str) -> list[str]:
+        return [chunk.strip() for chunk in sql.split(";") if chunk.strip()]
+
+    def normalize(stmt: str) -> str:
+        # Strip comments (CH ignores them anyway) and collapse whitespace to
+        # a canonical single-space form, so layout differences don't mask a
+        # true-positive semantic match.
+        no_comments = sqlparse.format(stmt, strip_comments=True)
+        return " ".join(no_comments.split())
+
+    migration_files = sorted(
+        f for f in os.listdir(DEFAULT_MIGRATION_DIR) if f.endswith(".up.sql")
+    )
+    assert migration_files, "no .up.sql migrations discovered — wrong path?"
+
+    for name in migration_files:
+        with open(os.path.join(DEFAULT_MIGRATION_DIR, name), encoding="utf-8") as f:
+            sql = f.read()
+        old_norm = [normalize(s) for s in old_split(sql)]
+        old_norm = [s for s in old_norm if s]  # drop comment-only chunks
+        new_norm = [normalize(s) for s in split_migration_sql(sql)]
+        assert old_norm == new_norm, (
+            f"splitter divergence in {name}:\n"
+            f"  old ({len(old_norm)}): {old_norm}\n"
+            f"  new ({len(new_norm)}): {new_norm}"
+        )
