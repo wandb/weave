@@ -1,46 +1,24 @@
 from __future__ import annotations
 
-import dataclasses
 import re
-from typing import TYPE_CHECKING, Protocol, TypeAlias
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, TypeAlias
 
-from weave.trace.ref_util import get_ref
 from weave.trace.refs import ObjectRef
 
 if TYPE_CHECKING:
     from weave.prompt.prompt import Prompt
 
 
-class SupportsRegistryLinkRef(Protocol):
-    """Structural type for published objects that expose an attached ref."""
-
-    ref: ObjectRef | None
-
-
-RegistryLinkable: TypeAlias = SupportsRegistryLinkRef | ObjectRef | str
 LinkablePrompt: TypeAlias = "Prompt | ObjectRef | str"
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class RegistryTargetPathParts:
     """Named parts of a registry target path."""
 
     registry_project: str
     portfolio_name: str
-
-
-def resolve_linkable_ref(linkable: RegistryLinkable) -> ObjectRef:
-    """Resolve a published Object, ObjectRef, or weave:/// URI to an ObjectRef."""
-    if isinstance(linkable, ObjectRef):
-        return linkable
-    if isinstance(linkable, str):
-        return ObjectRef.parse_uri(linkable)
-    if (ref := get_ref(linkable)) is not None:
-        return ref
-    raise ValueError(
-        "Expected a published object, ObjectRef, or weave:/// URI. "
-        "Call weave.publish() first."
-    )
 
 
 def resolve_prompt_ref(prompt: LinkablePrompt) -> ObjectRef:
@@ -69,8 +47,4 @@ def parse_registry_target_path(target_path: str) -> RegistryTargetPathParts:
             "target_path must match '<registry_project>/<portfolio_name>' "
             "where registry_project starts with 'wandb-registry-'"
         )
-    registry_project, portfolio_name = match.groups()
-    return RegistryTargetPathParts(
-        registry_project=registry_project,
-        portfolio_name=portfolio_name,
-    )
+    return RegistryTargetPathParts(*match.groups())
