@@ -52,7 +52,8 @@ def _make_span(project_id: str, **overrides: object) -> AgentSpanCHInsertable:
 
 def _insert_spans(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
     """Insert spans. The ``messages`` MV populates the search index as a
-    side effect of this insert."""
+    side effect of this insert.
+    """
     rows = [genai_span_to_row(s) for s in spans]
     ch_client.insert(
         "spans",
@@ -418,9 +419,7 @@ def test_message_search_shared_digest_across_spans(ch_server):
     total_matches = sum(len(r.matched_messages) for r in res.results)
     assert total_matches == 2
     # Both occurrences share a single content_digest
-    digests = {
-        m.content_digest for r in res.results for m in r.matched_messages
-    }
+    digests = {m.content_digest for r in res.results for m in r.matched_messages}
     assert len(digests) == 1
 
 

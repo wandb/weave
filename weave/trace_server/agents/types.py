@@ -164,7 +164,9 @@ class AgentSpansQueryReq(BaseModel):
     query: Query | None = None
     group_by: list[AgentGroupByRef] | None = None
     sort_by: list[AgentSortBy] | None = None
-    limit: int = Field(default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT)
+    limit: int = Field(
+        default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
+    )
     offset: int = Field(default=0, ge=0)
     start: str | None = None  # ISO timestamp — filter started_at >= start
     end: str | None = None  # ISO timestamp — filter started_at < end
@@ -357,7 +359,9 @@ class AgentsQueryReq(BaseModel):
     project_id: str
     filters: AgentsQueryFilters | None = None
     sort_by: list[AgentSortBy] | None = None
-    limit: int = Field(default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT)
+    limit: int = Field(
+        default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
+    )
     offset: int = Field(default=0, ge=0)
 
 
@@ -412,7 +416,9 @@ class AgentVersionsQueryReq(BaseModel):
     project_id: str
     agent_name: str
     sort_by: list[AgentSortBy] | None = None
-    limit: int = Field(default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT)
+    limit: int = Field(
+        default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
+    )
     offset: int = Field(default=0, ge=0)
 
 

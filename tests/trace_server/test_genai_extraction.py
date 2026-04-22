@@ -189,7 +189,9 @@ def test_extract_custom_attrs_caps_total_entries() -> None:
     """
     from weave.trace_server.agents.constants import MAX_CUSTOM_ATTRS_PER_SPAN
 
-    attrs = {f"lorem.key_{i:05d}": f"val_{i}" for i in range(MAX_CUSTOM_ATTRS_PER_SPAN + 500)}
+    attrs = {
+        f"lorem.key_{i:05d}": f"val_{i}" for i in range(MAX_CUSTOM_ATTRS_PER_SPAN + 500)
+    }
     result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
 
     total = (

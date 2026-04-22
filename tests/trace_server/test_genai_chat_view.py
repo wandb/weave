@@ -169,12 +169,20 @@ def test_build_span_tree_handles_null_started_at() -> None:
     stay type-homogeneous.
     """
     s1 = AgentSpanSchema(
-        project_id="p1", trace_id="t1", span_id="s1",
-        span_name="a", status_code="OK", started_at=None, ended_at=None,
+        project_id="p1",
+        trace_id="t1",
+        span_id="s1",
+        span_name="a",
+        status_code="OK",
+        started_at=None,
+        ended_at=None,
     )
     s2 = AgentSpanSchema(
-        project_id="p1", trace_id="t1", span_id="s2",
-        span_name="b", status_code="OK",
+        project_id="p1",
+        trace_id="t1",
+        span_id="s2",
+        span_name="b",
+        status_code="OK",
         started_at=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
         ended_at=None,
     )
@@ -190,8 +198,13 @@ def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:
     t0 = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
     spans = [
         AgentSpanSchema(
-            project_id="p1", trace_id="t1", span_id=sid,
-            span_name="s", status_code="OK", started_at=t0, ended_at=t0,
+            project_id="p1",
+            trace_id="t1",
+            span_id=sid,
+            span_name="s",
+            status_code="OK",
+            started_at=t0,
+            ended_at=t0,
         )
         # Intentionally out of order to exercise the tiebreaker.
         for sid in ("c", "a", "b")
