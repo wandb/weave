@@ -70,9 +70,9 @@ def test_empty() -> None:
 
 def test_full_agent_turn() -> None:
     """A realistic agent trace exercising every message type the projection
-    emits (user_message, agent_start, tool_call, agent_handoff,
-    context_compacted, agent_message), plus token aggregation from child
-    spans and build_trace_chat wrapper metadata.
+    emits (user_message, agent_start, tool_call, context_compacted,
+    agent_message), plus token aggregation from child spans and
+    build_trace_chat wrapper metadata.
     """
 
     def at(seconds: int) -> datetime.datetime:
@@ -105,19 +105,12 @@ def test_full_agent_turn() -> None:
             started_at=at(1),
         ),
         _span(
-            span_id="handoff",
-            parent_span_id="agent",
-            operation_name="execute_tool",
-            tool_name="transfer_to_sales_agent",
-            started_at=at(2),
-        ),
-        _span(
             span_id="llm",
             parent_span_id="agent",
             operation_name="chat",
             input_tokens=200,
             output_tokens=100,
-            started_at=at(3),
+            started_at=at(2),
         ),
     ]
 
@@ -138,7 +131,6 @@ def test_full_agent_turn() -> None:
         "user_message",
         "agent_start",
         "tool_call",
-        "agent_handoff",
         "context_compacted",
         "agent_message",
     }
@@ -149,14 +141,13 @@ def test_full_agent_turn() -> None:
     assert by_type["tool_call"].tool_name == "get_weather"
     assert by_type["tool_call"].tool_arguments == '{"city":"NYC"}'
     assert by_type["tool_call"].tool_result == '{"temp":72}'
-    assert "sales_agent" in by_type["agent_handoff"].text
     assert by_type["context_compacted"].compaction_summary == "Summarized 10 messages"
     assert by_type["context_compacted"].compaction_items_before == 10
     assert by_type["context_compacted"].compaction_items_after == 3
     assert by_type["agent_message"].text == "It's 72°F."
 
     # Token aggregation: root 10 + llm 200 = 210 in, 5 + 100 = 105 out.
-    # Tool and handoff spans don't contribute tokens.
+    # Tool spans don't contribute tokens.
     assert by_type["agent_message"].input_tokens == 210
     assert by_type["agent_message"].output_tokens == 105
 

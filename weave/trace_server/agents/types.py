@@ -247,15 +247,14 @@ class AgentChatMessage(BaseModel):
     """A single element in the structured agent trajectory / chat view.
 
     Produced by the backend normalization of agent spans into a linear
-    sequence of user messages, agent responses, tool calls, handoffs,
-    and agent boundaries.
+    sequence of user messages, agent responses, tool calls, and agent
+    lifecycle boundaries.
 
     Message types derived from OTel GenAI semconv operations:
     - ``user_message``, ``agent_message``, ``tool_call``
 
     Weave-specific product extensions (no semconv equivalent):
     - ``agent_start``: agent lifecycle boundary marker
-    - ``agent_handoff``: agent-to-agent delegation
     - ``context_compacted``: context window compaction event
     """
 
@@ -263,7 +262,6 @@ class AgentChatMessage(BaseModel):
         "user_message",
         "agent_message",
         "tool_call",
-        "agent_handoff",
         "agent_start",
         "context_compacted",
     ]

@@ -7,7 +7,7 @@ rendering an agent conversation UI.
 This is a **Weave product feature**, not a semconv concern.  The message types
 include Weave-specific concepts that have no OTel GenAI semconv equivalent:
 
-- ``agent_start`` / ``agent_handoff``: agent lifecycle boundaries
+- ``agent_start``: agent lifecycle boundary
 - ``context_compacted``: Weave context compaction events
 
 The normalization handles provider-specific span formats (OpenAI Agents SDK,
@@ -155,49 +155,18 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
         # ---- execute_tool ----
         if op == "execute_tool":
             tool_name = span.tool_name or span.span_name.removeprefix("execute_tool ")
-
-            if tool_name.startswith("transfer_to_"):
-                messages.append(
-                    AgentChatMessage(
-                        type="agent_handoff",
-                        span_id=span.span_id,
-                        text=tool_name.removeprefix("transfer_to_"),
-                        status=span.status_code,
-                        started_at=_dt_to_iso(span.started_at),
-                    )
-                )
-            else:
-                messages.append(
-                    AgentChatMessage(
-                        type="tool_call",
-                        span_id=span.span_id,
-                        agent_name=span.agent_name or nearest_agent,
-                        tool_name=tool_name,
-                        tool_arguments=span.tool_call_arguments,
-                        tool_result=span.tool_call_result,
-                        duration_ms=_compute_duration_ms(
-                            span.started_at, span.ended_at
-                        ),
-                        started_at=_dt_to_iso(span.started_at),
-                        status=span.status_code,
-                        content_refs=_content_refs(span),
-                    )
-                )
-
-            for child in node.children:
-                _walk(child, nearest_agent, _depth + 1)
-            return
-
-        # ---- handoff ----
-        if op in {"handoff", "agent_handoff"}:
             messages.append(
                 AgentChatMessage(
-                    type="agent_handoff",
+                    type="tool_call",
                     span_id=span.span_id,
-                    agent_name=span.agent_name,
-                    text=span.span_name.removeprefix("agent_handoff "),
-                    status=span.status_code,
+                    agent_name=span.agent_name or nearest_agent,
+                    tool_name=tool_name,
+                    tool_arguments=span.tool_call_arguments,
+                    tool_result=span.tool_call_result,
+                    duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
                     started_at=_dt_to_iso(span.started_at),
+                    status=span.status_code,
+                    content_refs=_content_refs(span),
                 )
             )
             for child in node.children:
