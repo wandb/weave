@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import types
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -68,8 +69,6 @@ class DSPyPatcher(MultiPatcher):
                 display_table: bool | int | None = None,
                 callback_metadata: dict[str, Any] | None = None,
             ) -> EvaluationResult:
-                import types
-
                 # Create model metadata for EvaluationLogger
                 metric = metric if metric is not None else self.metric
                 devset = devset if devset is not None else self.devset

@@ -8,6 +8,7 @@ its own libmagic cookie — no cross-thread contention, no per-call overhead.
 from __future__ import annotations
 
 import logging
+import mimetypes
 import threading
 from typing import Any
 
@@ -92,8 +93,6 @@ def _normalize_magic_extension(raw_ext: str | None) -> str | None:
 
 def _resolve_extension(raw_ext: str | None, mimetype: str) -> str | None:
     """Normalize a libmagic extension, falling back to stdlib mimetypes."""
-    import mimetypes
-
     extension = _normalize_magic_extension(raw_ext)
     if extension is None:
         extension = mimetypes.guess_extension(mimetype)
