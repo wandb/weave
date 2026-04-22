@@ -28,7 +28,7 @@ def _parse_version(version: str) -> packaging.version.Version:
     return parse_version(version)
 
 
-def _print_weave_version_check() -> None:
+def _print_version_check() -> None:
     weave_messages = check_available(weave.__version__, "weave")
     if not weave_messages:
         return
@@ -40,10 +40,6 @@ def _print_weave_version_check() -> None:
     )
     if use_message:
         logger.info(use_message)
-
-
-def _print_version_check() -> None:
-    _print_weave_version_check()
 
 
 def check_min_weave_version(
