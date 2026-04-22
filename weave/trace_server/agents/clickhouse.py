@@ -386,8 +386,7 @@ def _hydrate_group_row(
     return AgentSpanGroupRow(
         group_keys=group_keys,
         span_count=safe_int(row.get("span_count")),
-        turn_count=safe_int(row.get("turn_count")),
-        trace_count=safe_int(row.get("trace_count")),
+        invocation_count=safe_int(row.get("invocation_count")),
         conversation_count=safe_int(row.get("conversation_count")),
         total_input_tokens=safe_int(row.get("total_input_tokens")),
         total_output_tokens=safe_int(row.get("total_output_tokens")),

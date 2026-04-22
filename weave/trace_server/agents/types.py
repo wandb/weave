@@ -133,8 +133,7 @@ class AgentSpanGroupRow(BaseModel):
 
     group_keys: dict[str, str | int | float | None] = Field(default_factory=dict)
     span_count: int = 0
-    turn_count: int = 0  # countIf(operation_name = 'invoke_agent')
-    trace_count: int = 0
+    invocation_count: int = 0  # countIf(operation_name = 'invoke_agent')
     conversation_count: int = 0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
