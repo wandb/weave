@@ -10,18 +10,18 @@ from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id
 
 
-@dataclass
+@dataclass(slots=True, frozen=True)
 class LeaderboardModelEvaluationResult:
     evaluate_call_ref: str
     value: Any
 
 
-@dataclass
+@dataclass(slots=True, frozen=True)
 class ModelScoresForColumn:
     scores: list[LeaderboardModelEvaluationResult]
 
 
-@dataclass
+@dataclass(slots=True, frozen=True)
 class LeaderboardModelResult:
     model_ref: str
     column_scores: list[ModelScoresForColumn]

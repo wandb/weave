@@ -107,7 +107,7 @@ def _normalize_metrics(metrics: list[FeedbackMetricSpec]) -> list[FeedbackMetric
     return [m for m in metrics if m.aggregations or m.percentiles]
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class _FeedbackQueryContext:
     """Shared SQL building context used by both bucket and window queries."""
 

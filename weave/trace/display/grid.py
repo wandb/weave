@@ -32,7 +32,7 @@ ColumnValues = list[Any]
 RowValues = list[Any]
 
 
-@dataclass
+@dataclass(slots=True)
 class ColumnDefinition:
     id: str
     label: str | None = None
