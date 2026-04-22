@@ -1333,6 +1333,7 @@ def test_is_transient_ch_error():
     assert not _is_transient_ch_error(DatabaseError("Code: 62. DB::Exception: ..."))
     assert not _is_transient_ch_error(DatabaseError("some other error"))
     assert not _is_transient_ch_error(DatabaseError(""))
+    assert not _is_transient_ch_error(ConnectionError("not a db error"))
 
 
 def test_split_migration_sql() -> None:
