@@ -6,7 +6,7 @@
 -- Read-path filters with a known type (via $convert) hit the typed map
 -- directly instead of JSON_VALUE over attributes_dump.
 --
--- attributes_dump is preserved; typed maps are a duplicated read-path index.
+-- attributes_dump is preserved — typed maps are a duplicated read-path index.
 -- Existing rows get empty maps by default and continue to work via the
 -- JSON_VALUE fallback.
 
