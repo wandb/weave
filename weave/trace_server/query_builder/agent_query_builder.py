@@ -1,12 +1,12 @@
 """Query builder for the GenAI agent observability system.
 
 Every SELECT emitted against the spans / agents / agent_versions / messages
-tables is constructed here via ``make_*_query`` functions. Consumers build a
-``ParamBuilder``, call the appropriate ``make_*_query(pb, req)``, then run the
-returned SQL through the server's ``_query`` method.
+tables is constructed here via `make_*_query` functions. Consumers build a
+`ParamBuilder`, call the appropriate `make_*_query(pb, req)`, then run the
+returned SQL through the server's `_query` method.
 
 Keeping the SQL in this module makes it unit-testable without a live ClickHouse:
-see ``tests/trace_server/query_builder/test_agent_query_builder.py``.
+see `tests/trace_server/query_builder/test_agent_query_builder.py`.
 """
 
 from __future__ import annotations
@@ -123,9 +123,9 @@ _CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(
 # Column projections
 # ---------------------------------------------------------------------------
 
-#: Every column we ever SELECT into an ``AgentSpanSchema`` response. Driving
+#: Every column we ever SELECT into an `AgentSpanSchema` response. Driving
 #: this off the response schema (instead of the storage-side
-#: ``AgentSpanCHInsertable``) guarantees we never SELECT a column with no home
+#: `AgentSpanCHInsertable`) guarantees we never SELECT a column with no home
 #: in the response, and adding a response field is enough to make it flow
 #: through — no separate "include this column" list to maintain.
 _ALL_SPAN_FIELDS: list[str] = list(AgentSpanSchema.model_fields.keys())
@@ -264,7 +264,7 @@ def _pagination_slots(
 ) -> tuple[str, str, int]:
     """Add limit/offset params and return (limit_slot, offset_slot, limit).
 
-    Bounds (``0 <= limit <= MAX_AGENT_QUERY_LIMIT``, ``offset >= 0``) are
+    Bounds (`0 <= limit <= MAX_AGENT_QUERY_LIMIT`, `offset >= 0`) are
     enforced by Pydantic on the request models; this function trusts those
     invariants rather than re-clamping.
     """
@@ -287,7 +287,7 @@ def resolve_group_by(
     """Resolve group_by refs to [(sql_expr, alias), ...].
 
     Validates that:
-      - column refs target an allowlisted span column (``SPAN_GROUP_BY_COLS``)
+      - column refs target an allowlisted span column (`SPAN_GROUP_BY_COLS`)
       - custom_attrs refs target one of the three Map columns
       - the resulting alias is a valid SQL identifier
       - aliases are unique within the request
@@ -469,7 +469,7 @@ def make_trace_detail_spans_query(
     """Fetch all spans for a single trace with chat-view projection.
 
     Internal helper for the chat view; not exposed as a public endpoint.
-    Use ``make_spans_list_query`` with a ``trace_id`` filter for general
+    Use `make_spans_list_query` with a `trace_id` filter for general
     span listings.
     """
     pid = pb.add(project_id, param_type="String")
@@ -558,14 +558,14 @@ def make_agent_versions_list_query(pb: ParamBuilder, req: AgentVersionsQueryReq)
 def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
     """Search messages by content + span-level filters.
 
-    Single-table scan against the ``messages`` table populated by an MV off
-    ``spans``. Content is stored inline (ClickHouse columnar compression
-    handles repetition); ``content_digest`` is available for read-side dedup
+    Single-table scan against the `messages` table populated by an MV off
+    `spans`. Content is stored inline (ClickHouse columnar compression
+    handles repetition); `content_digest` is available for read-side dedup
     via GROUP BY when the caller wants unique content rather than unique
     occurrences.
     """
     where = _search_where(pb, req)
-    # Bounds (``0 <= limit <= MAX_SEARCH_LIMIT``, ``offset >= 0``) are
+    # Bounds (`0 <= limit <= MAX_SEARCH_LIMIT`, `offset >= 0`) are
     # enforced on AgentSearchReq.
     limit_slot = pb.add(req.limit, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")

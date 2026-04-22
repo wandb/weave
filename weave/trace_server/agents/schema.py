@@ -1,13 +1,13 @@
 """ClickHouse schema and column definitions for the spans table.
 
-Columns use neutral names (e.g. ``input_tokens``, not ``gen_ai_usage_input_tokens``)
+Columns use neutral names (e.g. `input_tokens`, not `gen_ai_usage_input_tokens`)
 and are populated from OTel attributes during ingest.
 
 For the canonical catalog of which attributes feed which columns — and for the
-``weave.*`` / ``gen_ai.*`` alias resolution — see ``semconv.py``. That module
+`weave.*` / `gen_ai.*` alias resolution — see `semconv.py`. That module
 is the source of truth; this module is just the ClickHouse row shape. The
 extraction logic that applies those conventions lives in
-``opentelemetry/genai_extraction.py``.
+`opentelemetry/genai_extraction.py`.
 """
 
 import datetime
@@ -15,21 +15,28 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from weave.trace_server.agents.constants import MSG_TUPLE_FIELDS
+from weave.trace_server.agents.constants import (
+    MSG_TUPLE_FIELDS,
+    SPAN_KIND_UNSPECIFIED,
+)
+from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
 
+# Python mirror of the ClickHouse `DEFAULT toDateTime64(0, 6)` on `ended_at`.
+# Used when a span was never closed (e.g. the agent crashed mid-turn). The
+# query-side MV guards against negative durations from this sentinel.
 _EPOCH = datetime.datetime(1970, 1, 1)
 
 
 class NormalizedMessage(BaseModel):
     """A single message normalized from any provider format.
 
-    Maps to ClickHouse ``Tuple(role String, content String, finish_reason String)``.
+    Maps to ClickHouse `Tuple(role String, content String, finish_reason String)`.
 
     - role: message role (user, assistant, tool, system)
     - content: concatenated text for search/display
     - finish_reason: per-message finish reason (output messages only)
 
-    Lossless original data is preserved in ``raw_span_dump`` on the span.
+    Lossless original data is preserved in `raw_span_dump` on the span.
     """
 
     role: str = ""
@@ -61,11 +68,11 @@ class AgentSpanCHInsertable(BaseModel):
 
     Fields are annotated with their convention source:
 
-    - ``[OTel Core]``   — standard OTel span identity / status
-    - ``[OTel GenAI]``  — OTel GenAI semantic conventions (gen_ai.*)
-    - ``[Weave]``       — Weave-specific product extensions (weave.*)
-    - ``[W&B]``         — Weights & Biases infrastructure
-    - ``[Infra]``       — archival / retention plumbing
+    - `[OTel Core]`   — standard OTel span identity / status
+    - `[OTel GenAI]`  — OTel GenAI semantic conventions (gen_ai.*)
+    - `[Weave]`       — Weave-specific product extensions (weave.*)
+    - `[W&B]`         — Weights & Biases infrastructure
+    - `[Infra]`       — archival / retention plumbing
     """
 
     # [OTel Core] span identity
@@ -74,7 +81,7 @@ class AgentSpanCHInsertable(BaseModel):
     span_id: str
     parent_span_id: str = ""
     span_name: str
-    span_kind: str = "UNSPECIFIED"
+    span_kind: str = SPAN_KIND_UNSPECIFIED
 
     # [OTel Core] timestamps
     started_at: datetime.datetime
@@ -185,9 +192,7 @@ class AgentSpanCHInsertable(BaseModel):
     wb_run_step_end: int = 0
 
     # [Infra] retention
-    expire_at: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime(2100, 1, 1)
-    )
+    expire_at: datetime.datetime = Field(default_factory=lambda: EXPIRE_AT_NEVER)
 
 
 ALL_SPAN_INSERT_COLUMNS: list[str] = sorted(AgentSpanCHInsertable.model_fields.keys())

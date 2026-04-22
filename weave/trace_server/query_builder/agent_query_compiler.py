@@ -1,31 +1,29 @@
-"""Compile a ``tsi.Query`` expression into WHERE conditions for agent spans.
+"""Compile a `tsi.Query` expression into WHERE conditions for agent spans.
 
-This is a lean port of the Query→SQL compiler from ``calls_query_builder`` —
+This is a lean port of the Query→SQL compiler from `calls_query_builder` —
 the calls version is tightly coupled to feedback arrays, calls_complete
 sentinels, and datetime-field coercions we don't want here. The Query AST
-itself (``weave.trace_server.interface.query``) is reused verbatim.
+itself (`weave.trace_server.interface.query`) is reused verbatim.
 
 Field-name resolution understands three sources, checked in order:
 
-1. **Semconv keys.** Canonical ``weave.*``, ``gen_ai.*`` alias, or prefix-
-   stripped short form (``agent.name``) — all resolve to a span column via
+1. **Semconv keys.** Canonical `weave.*`, `gen_ai.*` alias, or prefix-
+   stripped short form (`agent.name`) — all resolve to a span column via
    :data:`semconv.FILTERABLE_KEY_TO_COLUMN`.
 2. **Direct span columns.** A small allowlist of column names not covered
-   by semconv (``trace_id``, ``started_at``, etc.).
+   by semconv (`trace_id`, `started_at`, etc.).
 3. **Custom attributes.** Everything else is treated as a custom attribute
    key. Three forms are accepted:
 
-   - Explicit prefix: ``custom_attrs.env`` / ``custom_attrs_int.retries`` /
-     ``custom_attrs_float.latency_ms`` force a specific map.
+   - Explicit prefix: `custom_attrs.env` / `custom_attrs_int.retries` /
+     `custom_attrs_float.latency_ms` force a specific map.
    - Unprefixed: the map is picked from the *sibling literal's Python type*
-     in the enclosing comparison — ``$eq(foo, 5)`` reads ``custom_attrs_int['foo']``,
-     ``$eq(foo, "x")`` reads ``custom_attrs['foo']``. Field-compared-to-field
+     in the enclosing comparison — `$eq(foo, 5)` reads `custom_attrs_int['foo']`,
+     `$eq(foo, "x")` reads `custom_attrs['foo']`. Field-compared-to-field
      without a literal is rejected because there's no type signal.
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 from weave.trace_server.agents.semconv import FILTERABLE_KEY_TO_COLUMN
 from weave.trace_server.interface import query as tsi_query
@@ -37,8 +35,8 @@ from weave.trace_server.orm import (
 
 #: Span columns queryable by their literal column name without a
 #: corresponding semconv key — OTel-core span identity and W&B plumbing.
-#: Columns that are the target of a semconv key (``agent_name``,
-#: ``input_tokens``, etc.) are also accepted by column name; see
+#: Columns that are the target of a semconv key (`agent_name`,
+#: `input_tokens`, etc.) are also accepted by column name; see
 #: :data:`_ALL_QUERYABLE_COLUMNS`.
 DIRECT_COLUMNS: frozenset[str] = frozenset(
     {
@@ -64,8 +62,8 @@ _ALL_QUERYABLE_COLUMNS: frozenset[str] = DIRECT_COLUMNS | frozenset(
 )
 
 #: Field-name prefix -> Map column on the spans table.
-#: Longer prefixes must come before shorter ones — ``custom_attrs_int.``
-#: has to be tried before ``custom_attrs.`` or every int field resolves
+#: Longer prefixes must come before shorter ones — `custom_attrs_int.`
+#: has to be tried before `custom_attrs.` or every int field resolves
 #: to the string map.
 _CUSTOM_ATTR_PREFIXES: dict[str, str] = {
     "custom_attrs_int.": "custom_attrs_int",
@@ -75,8 +73,8 @@ _CUSTOM_ATTR_PREFIXES: dict[str, str] = {
 }
 
 #: Python literal type -> custom_attrs* map when no explicit prefix is given.
-#: ``bool`` is a subclass of ``int`` in Python, but ``dict.get(type(val))``
-#: uses exact-type lookup (not MRO), so ``type(True)`` finds ``bool`` first.
+#: `bool` is a subclass of `int` in Python, but `dict.get(type(val))`
+#: uses exact-type lookup (not MRO), so `type(True)` finds `bool` first.
 _LITERAL_TYPE_TO_MAP: dict[type, str] = {
     bool: "custom_attrs_bool",
     int: "custom_attrs_int",
@@ -100,11 +98,11 @@ def compile_agent_query(
     *,
     table_alias: str = "s",
 ) -> list[str]:
-    """Compile a ``Query`` into a list of WHERE conditions.
+    """Compile a `Query` into a list of WHERE conditions.
 
     Callers AND the returned conditions with their other filter clauses.
-    A non-empty ``Query`` compiles to exactly one entry in the list, which
-    may contain internal ``AND`` / ``OR`` / ``NOT``.
+    A non-empty `Query` compiles to exactly one entry in the list, which
+    may contain internal `AND` / `OR` / `NOT`.
     """
     return [_compile_operation(query.expr_, pb, table_alias)]
 
@@ -208,8 +206,8 @@ def _compile_operand(
 
     if isinstance(operand, tsi_query.ConvertOperation):
         # The inner field resolution needs a sibling hint that matches the
-        # cast target — ``to: "int"`` means pull from custom_attrs_int;
-        # ``to: "double"`` means custom_attrs_float; otherwise String.
+        # cast target — `to: "int"` means pull from custom_attrs_int;
+        # `to: "double"` means custom_attrs_float; otherwise String.
         cast_hint = _CAST_TO_TYPE.get(operand.convert_.to, str)
         inner_sql = _compile_operand(
             operand.convert_.input, pb, alias, sibling_hint=cast_hint
@@ -237,7 +235,7 @@ def _compile_operand(
 
 
 #: `$convert` target type -> sibling hint for the inner field operand so
-#: ``$convert(field=foo, to=int)`` picks custom_attrs_int.
+#: `$convert(field=foo, to=int)` picks custom_attrs_int.
 _CAST_TO_TYPE: dict[str, type] = {
     "int": int,
     "double": float,
@@ -312,7 +310,7 @@ def _compile_comparison_operands(
 ) -> tuple[str, str]:
     """Compile (lhs, rhs) with custom-attr sibling-type dispatch.
 
-    Peeks at the operands so a ``GetFieldOperator`` on one side is resolved
+    Peeks at the operands so a `GetFieldOperator` on one side is resolved
     using the other side's literal type as the custom_attrs-map hint.
     """
     lhs_hint = _literal_python_type(rhs)
@@ -334,12 +332,12 @@ def _compile_field_operand(
 
 
 def _literal_python_type(operand: tsi_query.Operand) -> type | None:
-    """If ``operand`` is a literal with a usable Python type, return that type."""
+    """If `operand` is a literal with a usable Python type, return that type."""
     if isinstance(operand, tsi_query.LiteralOperation):
         val = operand.literal_
         if val is None:
             return None
-        # ``bool`` is a subclass of ``int`` in Python — check it first.
+        # `bool` is a subclass of `int` in Python — check it first.
         if isinstance(val, bool):
             return bool
         if isinstance(val, int):
@@ -371,7 +369,3 @@ __all__ = [
     "InvalidAgentFilterFieldError",
     "compile_agent_query",
 ]
-
-
-# Silence "unused" for Any — reserved for future operand-type extensions.
-_: Any = None

@@ -1,7 +1,7 @@
 """Shared constants for the GenAI agent observability system.
 
 Centralizes numeric limits, tuple field orders, and filter sets used across
-``agents/`` modules and the agent query builder. Keeping them here avoids
+`agents/` modules and the agent query builder. Keeping them here avoids
 duplication and makes it easy to see all tunable values at a glance.
 """
 
@@ -36,12 +36,12 @@ MAX_WALK_DEPTH = 200
 MAX_CUSTOM_ATTRS_PER_SPAN = 1024
 
 # Maximum serialized byte length of any single custom attribute value. String
-# values over this are truncated with a ``TRUNCATION_MARKER`` suffix; dict /
+# values over this are truncated with a `TRUNCATION_MARKER` suffix; dict /
 # list values are JSON-serialized first, then truncated the same way.
 MAX_CUSTOM_ATTR_VALUE_BYTES = 256 * 1024
 
 # Suffix appended to truncated custom attribute values so downstream tools can
-# tell that truncation happened. Formatted lazily via ``.format(n=...)``.
+# tell that truncation happened. Formatted lazily via `.format(n=...)`.
 CUSTOM_ATTR_TRUNCATION_MARKER = "...[truncated from {n} bytes]"
 
 # ---------------------------------------------------------------------------
@@ -50,3 +50,15 @@ CUSTOM_ATTR_TRUNCATION_MARKER = "...[truncated from {n} bytes]"
 
 # Named tuple field order — must match the ClickHouse Tuple definition exactly.
 MSG_TUPLE_FIELDS: tuple[str, ...] = ("role", "content", "finish_reason")
+
+# OTel span.kind default when the ingested span omits it. Matches the
+# ClickHouse Enum8 default in migration 030.
+SPAN_KIND_UNSPECIFIED = "UNSPECIFIED"
+
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
+
+# Character cap on the content preview returned by message search matches.
+# Keeps payload size bounded when a hit includes a very long message body.
+SEARCH_CONTENT_PREVIEW_CHARS = 500

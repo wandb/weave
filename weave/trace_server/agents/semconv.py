@@ -1,8 +1,8 @@
 """Weave GenAI Semantic Conventions — structured source of truth.
 
 Defines every attribute the GenAI observability system extracts into dedicated
-columns.  Each attribute has a canonical ``weave.*`` key and an optional
-``gen_ai.*`` alias (recognized on ingest as equivalent).
+columns.  Each attribute has a canonical `weave.*` key and an optional
+`gen_ai.*` alias (recognized on ingest as equivalent).
 
 Usage::
 
@@ -259,7 +259,7 @@ _DEFS: list[Attribute] = [
 ATTRIBUTES: dict[str, Attribute] = {a.key: a for a in _DEFS}
 
 #: Shortcut: maps canonical key -> lookup_keys tuple for extraction.
-#: Usage: ``_get(attrs, *K["weave.agent.name"])``
+#: Usage: `_get(attrs, *K["weave.agent.name"])`
 K: dict[str, tuple[str, ...]] = {a.key: a.lookup_keys for a in _DEFS}
 
 #: Map from any recognized key (weave.* or gen_ai.*) to canonical weave.* key.
@@ -292,7 +292,7 @@ KNOWN_KEYS: frozenset[str] = frozenset(_ALIAS_TO_CANONICAL.keys())
 #:
 #: Only attributes that land in dedicated span columns with a meaningful
 #: scalar equality / comparison surface are listed. Array and JSON columns
-#: (``finish_reasons``, ``content_refs``, ``input_messages``, etc.) are
+#: (`finish_reasons`, `content_refs`, `input_messages`, etc.) are
 #: intentionally omitted — filtering those needs different operators.
 CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     # string scalars
@@ -340,7 +340,7 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
 
 def _build_filterable_lookup() -> dict[str, str]:
     """Flatten CANONICAL_KEY_TO_COLUMN to also accept gen_ai.* aliases and
-    prefix-stripped short-forms (``agent.name`` alongside ``weave.agent.name``).
+    prefix-stripped short-forms (`agent.name` alongside `weave.agent.name`).
     """
     out: dict[str, str] = {}
     for canonical, col in CANONICAL_KEY_TO_COLUMN.items():
@@ -356,6 +356,6 @@ def _build_filterable_lookup() -> dict[str, str]:
 
 
 #: Lookup: any attribute name a caller types in the query DSL -> span column.
-#: Covers canonical ``weave.*``, ``gen_ai.*`` alias, and the short-form
-#: with the prefix stripped (e.g. ``agent.name``).
+#: Covers canonical `weave.*`, `gen_ai.*` alias, and the short-form
+#: with the prefix stripped (e.g. `agent.name`).
 FILTERABLE_KEY_TO_COLUMN: dict[str, str] = _build_filterable_lookup()

@@ -1,7 +1,7 @@
 """ClickHouse query and write handlers for the agent observability system.
 
-The SQL construction lives in ``query_builder.agent_query_builder``; this module
-wires the builders to the server's ``_query`` method (for logging/tracing/error
+The SQL construction lives in `query_builder.agent_query_builder`; this module
+wires the builders to the server's `_query` method (for logging/tracing/error
 handling) and hydrates result rows into agent schemas.
 """
 
@@ -12,7 +12,10 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.agents.chat_view import build_trace_chat
-from weave.trace_server.agents.constants import MAX_CONVERSATION_CHAT_TURNS
+from weave.trace_server.agents.constants import (
+    MAX_CONVERSATION_CHAT_TURNS,
+    SEARCH_CONTENT_PREVIEW_CHARS,
+)
 from weave.trace_server.agents.helpers import (
     genai_span_to_row,
     normalize_span_row,
@@ -65,14 +68,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-#: Signature of the server's ``_query`` method — takes (sql, params), returns QueryResult.
+#: Signature of the server's `_query` method — takes (sql, params), returns QueryResult.
 QueryFn = Callable[[str, dict[str, Any]], "QueryResult"]
 
 
 class AgentQueryHandler:
     """Read-side query operations for the agent observability system.
 
-    Takes a ``query_fn`` (typically the server's ``_query`` method) so queries
+    Takes a `query_fn` (typically the server's `_query` method) so queries
     participate in the same logging / ddtrace / error-handling wrapper as the
     rest of the trace server.
     """
@@ -87,9 +90,9 @@ class AgentQueryHandler:
     def spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
         """Query spans with filters, sort, and pagination.
 
-        If ``req.group_by`` is empty, returns raw span rows in ``spans``.
+        If `req.group_by` is empty, returns raw span rows in `spans`.
         Otherwise, groups by the supplied refs and returns aggregate rows
-        in ``groups`` (with the same fixed aggregate bundle regardless of
+        in `groups` (with the same fixed aggregate bundle regardless of
         which columns / custom_attrs are grouped on).
         """
         total, rows = self._run_paginated(
@@ -178,7 +181,9 @@ class AgentQueryHandler:
                     span_id=safe_str(r.get("span_id")),
                     trace_id=safe_str(r.get("trace_id")),
                     role=safe_str(r.get("role")),
-                    content_preview=safe_str(r.get("content"))[:500],
+                    content_preview=safe_str(r.get("content"))[
+                        :SEARCH_CONTENT_PREVIEW_CHARS
+                    ],
                     content_digest=safe_str(r.get("content_digest")),
                     started_at=r.get("started_at"),
                 )
@@ -197,7 +202,7 @@ class AgentQueryHandler:
     ) -> list[AgentSpanSchema]:
         """Fetch all spans for a trace using the chat-view projection.
 
-        Used by the chat view handler to build ``AgentTraceChatRes``; not a
+        Used by the chat view handler to build `AgentTraceChatRes`; not a
         public query endpoint.
         """
         rows = self._run_query(make_trace_detail_spans_query, project_id, trace_id)
@@ -213,10 +218,10 @@ class AgentQueryHandler:
         list_builder: Callable[[ParamBuilder, Any], str],
         req: Any,
     ) -> tuple[int, list[dict[str, Any]]]:
-        """Run a (count, list) SQL pair with a shared ``ParamBuilder``.
+        """Run a (count, list) SQL pair with a shared `ParamBuilder`.
 
-        Returns ``(total_count, list_rows_as_dicts)``. Both queries reuse the
-        same ``pb`` so the ``WHERE`` parameters aren't added twice.
+        Returns `(total_count, list_rows_as_dicts)`. Both queries reuse the
+        same `pb` so the `WHERE` parameters aren't added twice.
         """
         pb = ParamBuilder("genai")
         count_sql = count_builder(pb, req)
@@ -231,7 +236,7 @@ class AgentQueryHandler:
         builder: Callable[..., str],
         *args: Any,
     ) -> list[dict[str, Any]]:
-        """Build a single SQL statement via ``builder(pb, *args)`` and return rows as dicts."""
+        """Build a single SQL statement via `builder(pb, *args)` and return rows as dicts."""
         pb = ParamBuilder("genai")
         sql = builder(pb, *args)
         return _rows_as_dicts(self._query(sql, pb.get_params()))
@@ -245,12 +250,12 @@ class AgentQueryHandler:
 class AgentWriteHandler:
     """Write-side operations for agent data (inserts + chat projection).
 
-    Takes both a ``ch_client`` (for ``insert`` calls, which have no wrapper)
-    and a ``query_fn`` (for read queries that feed the chat projection).
+    Takes both a `ch_client` (for `insert` calls, which have no wrapper)
+    and a `query_fn` (for read queries that feed the chat projection).
     """
 
     def __init__(self, ch_client: CHClient, query_fn: QueryFn) -> None:
-        self._ch = ch_client
+        self.ch_client = ch_client
         self._query = query_fn
 
     # ------------------------------------------------------------------
@@ -260,7 +265,7 @@ class AgentWriteHandler:
     def otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
         """Ingest OTel spans into the spans table.
 
-        The ``messages`` search table is populated by a ClickHouse
+        The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
         """
         span_rows: list[list[Any]] = []
@@ -298,7 +303,7 @@ class AgentWriteHandler:
                     accepted += 1
 
         if span_rows:
-            self._ch.insert(
+            self.ch_client.insert(
                 "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
             )
 
@@ -369,9 +374,13 @@ class AgentWriteHandler:
 
 
 def _rows_as_dicts(result: Any) -> list[dict[str, Any]]:
-    """Zip result_rows with column_names into row dicts."""
+    """Zip result_rows with column_names into row dicts.
+
+    `strict=True` so a shape mismatch between ClickHouse's `column_names`
+    and row payload surfaces immediately instead of silently truncating.
+    """
     col_names = list(result.column_names) if result.column_names else []
-    return [dict(zip(col_names, row, strict=False)) for row in result.result_rows]
+    return [dict(zip(col_names, row, strict=True)) for row in result.result_rows]
 
 
 def _first_cell_int(result: Any) -> int:

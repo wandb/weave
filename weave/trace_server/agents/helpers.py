@@ -1,7 +1,7 @@
 """Pure-Python helpers for the agent observability system.
 
 Row conversion for the spans table, plus result coercion helpers. No
-ClickHouse client dependency. The ``messages`` search table is populated by
+ClickHouse client dependency. The `messages` search table is populated by
 a ClickHouse materialized view in migration 030, not by Python code.
 """
 

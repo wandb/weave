@@ -106,8 +106,8 @@ class AgentSpansQueryFilters(BaseModel):
 class AgentGroupByRef(BaseModel):
     """Reference to a column or map-key that spans should be grouped by.
 
-    ``source="column"`` targets a named span column (allowlisted server-side).
-    The other sources target keys inside the ``custom_attrs*`` Map columns,
+    `source="column"` targets a named span column (allowlisted server-side).
+    The other sources target keys inside the `custom_attrs*` Map columns,
     which accept arbitrary user-defined keys.
     """
 
@@ -127,7 +127,7 @@ class AgentGroupByRef(BaseModel):
 class AgentSpanGroupRow(BaseModel):
     """A single row in a grouped spans query response.
 
-    ``group_keys`` maps each group_by ref's alias to its value for this row.
+    `group_keys` maps each group_by ref's alias to its value for this row.
     The remaining fields are a fixed aggregate bundle computed per group.
     """
 
@@ -151,16 +151,16 @@ class AgentSpanGroupRow(BaseModel):
 class AgentSpansQueryReq(BaseModel):
     """Request to query agent spans for a project.
 
-    When ``group_by`` is empty (or omitted), returns raw span rows in the
-    response's ``spans`` field. When ``group_by`` is non-empty, returns
-    aggregate group rows in the response's ``groups`` field.
+    When `group_by` is empty (or omitted), returns raw span rows in the
+    response's `spans` field. When `group_by` is non-empty, returns
+    aggregate group rows in the response's `groups` field.
     """
 
     project_id: str
     filters: AgentSpansQueryFilters | None = None
-    #: Mongo-style filter expression applied alongside ``filters``. Both are
+    #: Mongo-style filter expression applied alongside `filters`. Both are
     #: AND-ed. Field names resolve via semconv, direct span columns, or the
-    #: ``custom_attrs*`` Map columns — see :mod:`agent_query_compiler`.
+    #: `custom_attrs*` Map columns — see :mod:`agent_query_compiler`.
     query: Query | None = None
     group_by: list[AgentGroupByRef] | None = None
     sort_by: list[AgentSortBy] | None = None
@@ -175,8 +175,8 @@ class AgentSpansQueryReq(BaseModel):
 class AgentSpansQueryRes(BaseModel):
     """Response from a spans query.
 
-    Exactly one of ``spans`` or ``groups`` will be populated, based on
-    whether the request specified ``group_by``.
+    Exactly one of `spans` or `groups` will be populated, based on
+    whether the request specified `group_by`.
     """
 
     spans: list[AgentSpanSchema] = Field(default_factory=list)
@@ -192,7 +192,7 @@ class AgentSpansQueryRes(BaseModel):
 class AgentSearchReq(BaseModel):
     """Full-text search across message content and span metadata.
 
-    Scans the ``messages`` table (one row per message occurrence, populated
+    Scans the `messages` table (one row per message occurrence, populated
     by an MV from spans) and returns matching span-level hits. The caller
     groups by conversation for the response shape.
     """
@@ -250,11 +250,11 @@ class AgentChatMessage(BaseModel):
     lifecycle boundaries.
 
     Message types derived from OTel GenAI semconv operations:
-    - ``user_message``, ``agent_message``, ``tool_call``
+    - `user_message`, `agent_message`, `tool_call`
 
     Weave-specific product extensions (no semconv equivalent):
-    - ``agent_start``: agent lifecycle boundary marker
-    - ``context_compacted``: context window compaction event
+    - `agent_start`: agent lifecycle boundary marker
+    - `context_compacted`: context window compaction event
     """
 
     type: Literal[
@@ -315,9 +315,9 @@ class AgentConversationChatReq(BaseModel):
 class AgentConversationChatRes(BaseModel):
     """Multi-turn chat view: an ordered list of per-turn chat responses.
 
-    Each entry in ``turns`` corresponds to one OTel trace (one agent
+    Each entry in `turns` corresponds to one OTel trace (one agent
     invocation / one user turn).  The frontend can render turn-number
-    dividers between them and still reuse ``AgentTraceChatRes`` rendering
+    dividers between them and still reuse `AgentTraceChatRes` rendering
     for each individual turn.
     """
 
@@ -376,7 +376,7 @@ class AgentsQueryRes(BaseModel):
 
 
 class AgentCustomAttrFilter(BaseModel):
-    """Filter on a custom attribute stored in ``custom_attrs`` Map column."""
+    """Filter on a custom attribute stored in `custom_attrs` Map column."""
 
     attr_key: str
     operator: str = "eq"

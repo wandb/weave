@@ -1,14 +1,14 @@
 """Normalize agent spans into a structured chat / agent trajectory view.
 
-Converts a flat list of ``AgentSpanSchema`` rows (from the ``spans``
-table) into a linear sequence of ``AgentChatMessage`` objects suitable for
+Converts a flat list of `AgentSpanSchema` rows (from the `spans`
+table) into a linear sequence of `AgentChatMessage` objects suitable for
 rendering an agent conversation UI.
 
 This is a **Weave product feature**, not a semconv concern.  The message types
 include Weave-specific concepts that have no OTel GenAI semconv equivalent:
 
-- ``agent_start``: agent lifecycle boundary
-- ``context_compacted``: Weave context compaction events
+- `agent_start`: agent lifecycle boundary
+- `context_compacted`: Weave context compaction events
 
 The normalization handles provider-specific span formats (OpenAI Agents SDK,
 Google ADK) and produces a unified output.
@@ -48,6 +48,17 @@ class SpanNode:
 
     span: AgentSpanSchema
     children: list[SpanNode] = field(default_factory=list)
+
+
+def _span_sort_key(span: AgentSpanSchema) -> tuple[bool, datetime | None, str]:
+    """Ordering key for deterministic chronological span sorts.
+
+    `started_at` is non-null from ClickHouse but can be None in in-memory
+    callers and tests. The `is None` first element groups nulls last
+    without forcing a datetime.min fallback (which would mix tz-aware
+    and naive values). span_id tiebreaks equal timestamps.
+    """
+    return (span.started_at is None, span.started_at, span.span_id)
 
 
 # ---------------------------------------------------------------------------
@@ -209,18 +220,7 @@ def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
             roots.append(node)
 
     def _sort(nodes: list[SpanNode]) -> None:
-        # ``started_at`` is non-null from ClickHouse but can be None in
-        # in-memory callers and tests. The ``is None`` key groups nulls
-        # last without forcing a datetime.min fallback (which would force
-        # tz-aware vs naive comparison). span_id is a tiebreaker so equal
-        # timestamps produce deterministic order.
-        nodes.sort(
-            key=lambda n: (
-                n.span.started_at is None,
-                n.span.started_at,
-                n.span.span_id,
-            )
-        )
+        nodes.sort(key=lambda n: _span_sort_key(n.span))
         for n in nodes:
             _sort(n.children)
 
@@ -318,13 +318,7 @@ def _find_user_prompt(spans: list[AgentSpanSchema]) -> UserPrompt:
 
     Prefers invoke_agent spans, falls back to any span with input_messages.
     """
-    # ``started_at`` is non-null from ClickHouse but can be None in
-    # in-memory callers and tests. Use the same tuple-key shape as
-    # build_span_tree so the sort key stays type-homogeneous and equal
-    # timestamps tiebreak deterministically on span_id.
-    sorted_spans = sorted(
-        spans, key=lambda s: (s.started_at is None, s.started_at, s.span_id)
-    )
+    sorted_spans = sorted(spans, key=_span_sort_key)
 
     for prefer_invoke_agent in (True, False):
         for s in sorted_spans:
