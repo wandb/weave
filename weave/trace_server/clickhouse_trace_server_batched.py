@@ -6199,15 +6199,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if exception:
                 end.exception = exception
             end_call = end_call_for_insert_to_ch_insertable(end, retention_days)
-            calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
-                start_call,
-                end_call,
-            ]
-            batch_data = []
-            for call in calls:
-                call_dict = call.model_dump()
-                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-                batch_data.append(values)
+            batch_data = [ch_call_to_row(start_call), ch_call_to_row(end_call)]
 
             self._insert_call_batch(batch_data)
 
@@ -6455,15 +6447,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             end.exception = res.response["error"]
 
         end_call = end_call_for_insert_to_ch_insertable(end, retention_days)
-        calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
-            start_call,
-            end_call,
-        ]
-        batch_data = []
-        for call in calls:
-            call_dict = call.model_dump()
-            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_data.append(values)
+        batch_data = [ch_call_to_row(start_call), ch_call_to_row(end_call)]
 
         try:
             self._insert_call_batch(batch_data)
@@ -6845,11 +6829,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+        self._call_batch.append(ch_call_to_row(ch_call))
         if self._flush_immediately:
             self._flush_calls()
 

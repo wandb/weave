@@ -1,10 +1,13 @@
 """Tests for the typed attributes-map fast-filter dispatch.
 
 When a caller filters on ``attributes.<path>`` with an explicit ``$convert``
-cast, the query builder should route through the typed Map column populated
-at ingest instead of falling through to ``JSON_VALUE(attributes_dump, ...)``.
-This file exercises that routing end-to-end on both read tables plus the
-fallback paths (missing cast, ``exists`` cast, empty extra_path).
+cast, the query builder emits a hybrid
+``if(mapContains(map, key), map[key], clickhouse_cast(JSON_VALUE(...)))``
+expression: the typed Map column wins on rows where migration 030 populated
+it at ingest, and the old JSON_VALUE path takes over on legacy rows whose
+maps are still empty. This file exercises the dispatch SQL shape end-to-end
+on both read tables plus the fall-through cases (missing cast, ``exists``
+cast, empty extra_path).
 """
 
 import pytest
@@ -26,18 +29,27 @@ from weave.trace_server.project_version.types import ReadTable
 
 
 @pytest.mark.parametrize(
-    ("cast", "expected_column", "expected_param_type", "literal"),
+    ("cast", "expected_column", "expected_param_type", "fallback_cast", "literal"),
     [
-        ("int", "attributes_map_int", "Int64", 1),
-        ("double", "attributes_map_float", "Float64", 1.5),
-        ("bool", "attributes_map_bool", "Bool", True),
-        ("string", "attributes_map_str", "String", "prod"),
+        ("int", "attributes_map_int", "Int64", "toInt64OrNull", 1),
+        ("double", "attributes_map_float", "Float64", "toFloat64OrNull", 1.5),
+        ("bool", "attributes_map_bool", "Bool", "toUInt8OrNull", True),
+        ("string", "attributes_map_str", "String", "toString", "prod"),
     ],
 )
 def test_typed_map_dispatch_on_calls_merged(
-    cast: str, expected_column: str, expected_param_type: str, literal: object
+    cast: str,
+    expected_column: str,
+    expected_param_type: str,
+    fallback_cast: str,
+    literal: object,
 ) -> None:
-    """Each supported cast routes to its typed Map column with agg-wrapped access."""
+    """Each supported cast emits an if(mapContains, map-read, cast(JSON_VALUE)) gate.
+
+    The fast branch reads the agg-wrapped typed column, and the else branch is
+    the existing JSON_VALUE-over-attributes_dump path preserved for legacy rows
+    whose maps haven't been backfilled.
+    """
     cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
     cq.add_field("id")
     cq.add_condition(
@@ -61,20 +73,28 @@ def test_typed_map_dispatch_on_calls_merged(
         f"""
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {{pb_2:String}}
+        PREWHERE calls_merged.project_id = {{pb_3:String}}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((any(calls_merged.{expected_column})[{{pb_0:String}}] = {{pb_1:{expected_param_type}}}))
+            ((if(mapContains(any(calls_merged.{expected_column}), {{pb_0:String}}),
+                 any(calls_merged.{expected_column})[{{pb_0:String}}],
+                 {fallback_cast}(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {{pb_1:String}}), 'null'), '')))
+             = {{pb_2:{expected_param_type}}}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
-        {"pb_0": "env", "pb_1": literal, "pb_2": "p"},
+        {"pb_0": "env", "pb_1": '$."env"', "pb_2": literal, "pb_3": "p"},
     )
 
 
 def test_typed_map_dispatch_on_calls_complete() -> None:
-    """calls_complete uses the unwrapped typed column (no any() aggregation)."""
+    """calls_complete uses the unwrapped typed column (no any() aggregation).
+
+    The mapContains gate still emits around each lookup so a not-yet-backfilled
+    row in calls_complete (e.g. migrated from call_parts before 030) reads the
+    attributes_dump fallback rather than the Map default.
+    """
     cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_COMPLETE)
     cq.add_field("id")
     cq.add_condition(
@@ -98,16 +118,20 @@ def test_typed_map_dispatch_on_calls_complete() -> None:
         """
         SELECT calls_complete.id AS id
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_3:String}
+        PREWHERE calls_complete.project_id = {pb_4:String}
         WHERE 1
-          AND (((calls_complete.attributes_map_int[{pb_0:String}] > {pb_1:Int64}))
-               AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
+          AND (((if(mapContains(calls_complete.attributes_map_int, {pb_0:String}),
+                    calls_complete.attributes_map_int[{pb_0:String}],
+                    toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.attributes_dump, {pb_1:String}), 'null'), '')))
+                 > {pb_2:Int64}))
+               AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)})))
         """,
         {
             "pb_0": "retries",
-            "pb_1": 3,
-            "pb_2": SENTINEL_DATETIME,
-            "pb_3": "p",
+            "pb_1": '$."retries"',
+            "pb_2": 3,
+            "pb_3": SENTINEL_DATETIME,
+            "pb_4": "p",
         },
     )
 
@@ -115,8 +139,9 @@ def test_typed_map_dispatch_on_calls_complete() -> None:
 def test_nested_attribute_path_joins_with_dot() -> None:
     """``attributes.a.b.c`` uses ``a.b.c`` as the typed-map key.
 
-    The extractor flattens nested dicts with dot-joined keys, so the read
-    path must use the same joiner to hit the stored key.
+    The extractor flattens nested dicts with dot-joined keys, so the Map
+    read-side uses the same joiner to hit the stored key. The JSON_VALUE
+    fallback keeps its own JSONPath (``$."a"."b"."c"``) for legacy rows.
     """
     cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
     cq.add_field("id")
@@ -140,15 +165,18 @@ def test_nested_attribute_path_joins_with_dot() -> None:
         """
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
+        PREWHERE calls_merged.project_id = {pb_3:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((any(calls_merged.attributes_map_int)[{pb_0:String}] = {pb_1:Int64}))
+            ((if(mapContains(any(calls_merged.attributes_map_int), {pb_0:String}),
+                 any(calls_merged.attributes_map_int)[{pb_0:String}],
+                 toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), '')))
+             = {pb_2:Int64}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
-        {"pb_0": "a.b.c", "pb_1": 5, "pb_2": "p"},
+        {"pb_0": "a.b.c", "pb_1": '$."a"."b"."c"', "pb_2": 5, "pb_3": "p"},
     )
 
 

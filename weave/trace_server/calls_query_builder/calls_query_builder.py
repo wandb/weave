@@ -2092,7 +2092,7 @@ def _maybe_attributes_map_filter_sql(
     use_agg_fn: bool,
     raw_fields_used: dict[str, "CallsMergedField"],
 ) -> str | None:
-    """Return typed-Map column SQL for ``$convert`` over ``attributes.<path>``.
+    """Return hybrid fast/fallback SQL for ``$convert`` over ``attributes.<path>``.
 
     Only fires when:
     - the converted operand is a plain ``$getField`` on ``attributes.*``,
@@ -2101,10 +2101,19 @@ def _maybe_attributes_map_filter_sql(
       falls through to the JSON_VALUE path).
 
     The Map key is the dot-joined path after ``attributes.`` to mirror the
-    flattening done by ``extract_typed_attrs`` at write time. Returns None for
-    anything outside that narrow pattern so the caller can fall back to the
-    JSON_VALUE implementation — this keeps ORDER BY and non-filter call sites
-    on the compatible path without special-casing context through the API.
+    flattening done by ``extract_typed_attrs`` at write time.
+
+    Because migration 030 only populates the typed maps for rows inserted
+    after it runs, a pure ``map[key]`` read is unsafe on mixed-backfill
+    tables: CH returns the value-type default (``0``/``0.0``/``false``/``''``)
+    for a missing key, which silently produces wrong filter results on
+    legacy rows whose attributes live only in ``attributes_dump``. We emit
+    ``if(mapContains(map, key), map[key], clickhouse_cast(JSON_VALUE(...)))``
+    so each row picks the typed read when the map was populated for that row
+    and falls back to the JSON_VALUE path otherwise. Per-row means no
+    cutoff timestamp, no backfill-completion gate, and mixed tables Just
+    Work — the fast read is the fast path when it's safe, and the old
+    path stays correct when it isn't.
     """
     inner = operand.convert_.input
     if not isinstance(inner, tsi_query.GetFieldOperator):
@@ -2124,7 +2133,12 @@ def _maybe_attributes_map_filter_sql(
     column_sql = f"{table_alias}.{column}"
     if use_agg_fn:
         column_sql = f"any({column_sql})"
-    return f"{column_sql}[{key_slot}]"
+    fast_expr = f"{column_sql}[{key_slot}]"
+    fallback_expr = clickhouse_cast(
+        structured_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn),
+        operand.convert_.to,
+    )
+    return f"if(mapContains({column_sql}, {key_slot}), {fast_expr}, {fallback_expr})"
 
 
 def process_query_to_conditions(
