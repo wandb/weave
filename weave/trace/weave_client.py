@@ -77,7 +77,6 @@ from weave.trace.refs import (
 from weave.trace.registry_links import (
     LinkablePrompt,
     parse_registry_target_path,
-    resolve_linkable_ref,
     resolve_prompt_ref,
 )
 from weave.trace.serialization.serialize import (
@@ -1280,6 +1279,13 @@ class WeaveClient:
         )
         return result.num_deleted
 
+    @staticmethod
+    def _resolve_obj_ref(obj_ref: ObjectRef | str) -> ObjectRef:
+        """Resolve an ObjectRef or weave:/// URI string to an ObjectRef."""
+        if isinstance(obj_ref, str):
+            return ObjectRef.parse_uri(obj_ref)
+        return obj_ref
+
     @trace_sentry.global_trace_sentry.watch()
     def link_prompt_to_registry(
         self,
@@ -1325,7 +1331,7 @@ class WeaveClient:
                 or a weave:/// URI string.
             tags: List of tag strings to add.
         """
-        obj_ref = resolve_linkable_ref(obj_ref)
+        obj_ref = self._resolve_obj_ref(obj_ref)
         self.server.obj_add_tags(
             ObjAddTagsReq(
                 project_id=self.project_id,
@@ -1344,7 +1350,7 @@ class WeaveClient:
                 or a weave:/// URI string.
             tags: List of tag strings to remove.
         """
-        obj_ref = resolve_linkable_ref(obj_ref)
+        obj_ref = self._resolve_obj_ref(obj_ref)
         self.server.obj_remove_tags(
             ObjRemoveTagsReq(
                 project_id=self.project_id,
@@ -1366,7 +1372,7 @@ class WeaveClient:
             List of tag strings. Returns empty list if the object version
             has no tags.
         """
-        obj_ref = resolve_linkable_ref(obj_ref)
+        obj_ref = self._resolve_obj_ref(obj_ref)
         res = retry_on_not_found(self.server.obj_read)(
             ObjReadReq(
                 project_id=self.project_id,
@@ -1391,7 +1397,7 @@ class WeaveClient:
             A tuple of (tags, aliases). Each is a list of strings.
             Returns empty lists if the object version has no tags or aliases.
         """
-        obj_ref = resolve_linkable_ref(obj_ref)
+        obj_ref = self._resolve_obj_ref(obj_ref)
         res = retry_on_not_found(self.server.obj_read)(
             ObjReadReq(
                 project_id=self.project_id,
@@ -1411,7 +1417,7 @@ class WeaveClient:
                 or a weave:/// URI string.
             alias: An alias name or list of alias names to set (e.g., "production").
         """
-        obj_ref = resolve_linkable_ref(obj_ref)
+        obj_ref = self._resolve_obj_ref(obj_ref)
         aliases = [alias] if isinstance(alias, str) else alias
         if not aliases:
             return
@@ -1433,7 +1439,7 @@ class WeaveClient:
                 or a weave:/// URI string (digest is not used since aliases are object-scoped).
             alias: An alias name or list of alias names to remove.
         """
-        obj_ref = resolve_linkable_ref(obj_ref)
+        obj_ref = self._resolve_obj_ref(obj_ref)
         aliases = [alias] if isinstance(alias, str) else alias
         if not aliases:
             return
@@ -1457,7 +1463,7 @@ class WeaveClient:
             List of alias strings. Includes the virtual "latest" alias
             if the object version is the latest.
         """
-        obj_ref = resolve_linkable_ref(obj_ref)
+        obj_ref = self._resolve_obj_ref(obj_ref)
         res = retry_on_not_found(self.server.obj_read)(
             ObjReadReq(
                 project_id=self.project_id,
