@@ -6274,7 +6274,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
         write_target: WriteTarget | None = None
-        retention_days = 0
+        retention_days: int | None = None
         if req.track_llm_call:
             write_target = self.table_routing_resolver.resolve_v2_write_target(
                 req.project_id,
@@ -6346,6 +6346,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
             )
 
+        assert retention_days is not None  # narrowed by track_llm_call guard above
         return _create_tracked_stream_wrapper(
             self._insert_call,
             chunk_iter,
