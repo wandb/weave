@@ -1030,6 +1030,74 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
         )
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._update_call_output")
+    def _update_call_output(
+        self,
+        project_id: str,
+        call_id: str,
+        output: Any,
+    ) -> None:
+        """Overwrite a call's output in both `call_parts` and `calls_merged`.
+
+        Used when a late mutation (e.g. `prediction_finish(output=...)`) needs
+        to replace an output that was already written via `call_end`. The
+        `calls_merged` table uses `SimpleAggregateFunction(any, ...)` for
+        `output_dump`, so inserting another `call_end` row does not reliably
+        override the earlier value — `any` picks whichever value was merged
+        first. This issues a synchronous `ALTER TABLE ... UPDATE` on both the
+        raw source table (`call_parts`) and the aggregate (`calls_merged`) so
+        subsequent reads return the new output regardless of part-merge timing.
+        """
+        output_dump = any_value_to_dump(output)
+        output_refs = extract_refs_from_values(output)
+
+        cluster_suffix = (
+            f" ON CLUSTER {self.clickhouse_cluster_name}"
+            if self.clickhouse_cluster_name
+            else ""
+        )
+        local_suffix = (
+            ch_settings.LOCAL_TABLE_SUFFIX if self.use_distributed_mode else ""
+        )
+
+        # mutations_sync=1 makes the ALTER UPDATE wait for mutation to apply
+        # on the current node, which is what the tests rely on. Mutations on
+        # AggregatingMergeTree columns rewrite part files; they are heavier
+        # than lightweight updates but are the only correct way to override
+        # an `any()` aggregation after the fact.
+        settings: dict[str, int | str] = {"mutations_sync": 1}
+
+        pb_parts = ParamBuilder()
+        project_id_param_parts = pb_parts.add_param(project_id)
+        id_param_parts = pb_parts.add_param(call_id)
+        output_dump_param_parts = pb_parts.add_param(output_dump)
+        output_refs_param_parts = pb_parts.add_param(output_refs)
+        call_parts_query = f"""
+            ALTER TABLE call_parts{local_suffix}{cluster_suffix}
+            UPDATE
+                output_dump = {{{output_dump_param_parts}:String}},
+                output_refs = {{{output_refs_param_parts}:Array(String)}}
+            WHERE project_id = {{{project_id_param_parts}:String}}
+              AND id = {{{id_param_parts}:String}}
+              AND ended_at IS NOT NULL
+        """
+        self._command(call_parts_query, parameters=pb_parts.get_params(), settings=settings)
+
+        pb_merged = ParamBuilder()
+        project_id_param_merged = pb_merged.add_param(project_id)
+        id_param_merged = pb_merged.add_param(call_id)
+        output_dump_param_merged = pb_merged.add_param(output_dump)
+        output_refs_param_merged = pb_merged.add_param(output_refs)
+        calls_merged_query = f"""
+            ALTER TABLE calls_merged{local_suffix}{cluster_suffix}
+            UPDATE
+                output_dump = {{{output_dump_param_merged}:String}},
+                output_refs = {{{output_refs_param_merged}:Array(String)}}
+            WHERE project_id = {{{project_id_param_merged}:String}}
+              AND id = {{{id_param_merged}:String}}
+        """
+        self._command(calls_merged_query, parameters=pb_merged.get_params(), settings=settings)
+
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
             tsi.CallsQueryReq(
@@ -4733,6 +4801,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         )
         self.call_end(call_end_req)
+
+        # If a new `output` was supplied on finish, overwrite the aggregated
+        # output for this call. `prediction_create` already emitted a
+        # `call_end` row with the create-time output, and `calls_merged` uses
+        # `SimpleAggregateFunction(any, ...)` for `output_dump` — so a second
+        # `call_end` row alone cannot win against the first one. We issue an
+        # `ALTER TABLE ... UPDATE` mutation on both `call_parts` (source) and
+        # `calls_merged` (aggregate) so reads return the latest output
+        # regardless of merge timing.
+        if req.output is not None:
+            self._update_call_output(
+                project_id=req.project_id,
+                call_id=req.prediction_id,
+                output=req.output,
+            )
 
         # If this prediction has a parent (predict_and_score call), finish that too
         prediction_call = prediction_res.call
