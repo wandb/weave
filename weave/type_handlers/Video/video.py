@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import shutil
+import sys
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -20,11 +21,7 @@ _registered = False
 
 
 def _dependencies_met() -> bool:
-    """Check if the dependencies are met.  This import is deferred to avoid
-    an expensive module import at the top level.
-    """
-    import sys
-
+    """Check if moviepy is available without forcing its import."""
     # First check if already imported
     if "moviepy" in sys.modules:
         return True
