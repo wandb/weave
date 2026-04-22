@@ -84,3 +84,80 @@ def test_ref_parsing_internal_sanitized():
 
     parsed = refs_internal.parse_internal_uri(ref_str)
     assert parsed == ref_start
+
+
+def test_agent_turn_ref_roundtrip():
+    ref_start = refs.AgentTurnRef(
+        entity="entity",
+        project="project",
+        trace_id="0123456789abcdef0123456789abcdef",
+    )
+    assert (
+        ref_start.uri
+        == "weave:///entity/project/agent_turn/0123456789abcdef0123456789abcdef"
+    )
+    assert refs.Ref.parse_uri(ref_start.uri) == ref_start
+
+
+def test_agent_span_ref_roundtrip():
+    ref_start = refs.AgentSpanRef(
+        entity="entity",
+        project="project",
+        span_id="0123456789abcdef",
+    )
+    assert ref_start.uri == "weave:///entity/project/agent_span/0123456789abcdef"
+    assert refs.Ref.parse_uri(ref_start.uri) == ref_start
+
+
+def test_agent_conversation_ref_roundtrip():
+    ref_start = refs.AgentConversationRef(
+        entity="entity",
+        project="project",
+        conversation_id=string_with_every_char(),
+    )
+    parsed = refs.Ref.parse_uri(ref_start.uri)
+    assert parsed == ref_start
+
+
+def test_internal_agent_turn_ref_roundtrip():
+    ref_start = refs_internal.InternalAgentTurnRef(
+        project_id="project",
+        trace_id="0123456789abcdef0123456789abcdef",
+    )
+    assert (
+        ref_start.uri
+        == f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///project/agent_turn/0123456789abcdef0123456789abcdef"
+    )
+    assert refs_internal.parse_internal_uri(ref_start.uri) == ref_start
+
+
+def test_internal_agent_span_ref_roundtrip():
+    ref_start = refs_internal.InternalAgentSpanRef(
+        project_id="project",
+        span_id="0123456789abcdef",
+    )
+    assert (
+        ref_start.uri
+        == f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///project/agent_span/0123456789abcdef"
+    )
+    assert refs_internal.parse_internal_uri(ref_start.uri) == ref_start
+
+
+def test_internal_agent_conversation_ref_roundtrip():
+    raw_cid = "user/42:session ?name=hi"
+    ref_start = refs_internal.InternalAgentConversationRef(
+        project_id="project",
+        conversation_id=raw_cid,
+    )
+    assert (
+        ref_start.uri
+        == f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///project/agent_conversation/{quote(raw_cid)}"
+    )
+    assert refs_internal.parse_internal_uri(ref_start.uri) == ref_start
+
+
+def test_internal_agent_ref_rejects_slash():
+    with pytest.raises(refs_internal.InvalidInternalRef):
+        refs_internal.InternalAgentTurnRef(project_id="project", trace_id="bad/value")
+    with pytest.raises(refs_internal.InvalidInternalRef):
+        refs_internal.InternalAgentSpanRef(project_id="project", span_id="bad/value")
