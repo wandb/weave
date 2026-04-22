@@ -20,7 +20,9 @@ def _validate_remote_scorer_endpoint_url(v: str) -> str:
         raise ValueError("endpoint_url must use the http or https scheme")
     host = (parsed.hostname or "").strip()
     if not host:
-        raise ValueError("endpoint_url must include a host, e.g. https://scoring.example.com/v1")
+        raise ValueError(
+            "endpoint_url must include a host, e.g. https://scoring.example.com/v1"
+        )
     return v
 
 

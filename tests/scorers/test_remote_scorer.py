@@ -38,7 +38,9 @@ def test_remote_scorer_endpoint_url_strips_whitespace() -> None:
         ("not-a-url", "http or https"),
     ],
 )
-def test_remote_scorer_endpoint_url_rejects_malformed(bad_url: str, match_substr: str) -> None:
+def test_remote_scorer_endpoint_url_rejects_malformed(
+    bad_url: str, match_substr: str
+) -> None:
     with pytest.raises(ValidationError, match=match_substr):
         RemoteScorer(endpoint_url=bad_url)
 
