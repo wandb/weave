@@ -16,6 +16,7 @@ from weave.trace_server.clickhouse.utilities import (
     dict_dump_to_dict,
     dict_value_to_dump,
     ensure_datetimes_have_tz,
+    extract_typed_attrs,
     nullable_any_dump_to_any,
 )
 from weave.trace_server.clickhouse_schema import (
@@ -97,10 +98,29 @@ def ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     }
 
 
+# call_parts columns for the typed attribute Maps. End/delete/update
+# insertables don't populate them, so ch_call_to_row must substitute an
+# empty dict — ClickHouse rejects None for non-Nullable Map columns.
+EMPTY_ATTRIBUTES_MAP_COLUMNS = frozenset(
+    {
+        "attributes_map_str",
+        "attributes_map_int",
+        "attributes_map_float",
+        "attributes_map_bool",
+    }
+)
+
+
 def ch_call_to_row(ch_call: CallCHInsertable) -> list[Any]:
     """Convert a CH insertable call to a row for batch insertion with the correct defaults."""
     call_dict = ch_call.model_dump()
-    return [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+    row: list[Any] = []
+    for col in ALL_CALL_INSERT_COLUMNS:
+        val = call_dict.get(col)
+        if val is None and col in EMPTY_ATTRIBUTES_MAP_COLUMNS:
+            val = {}
+        row.append(val)
+    return row
 
 
 def start_call_for_insert_to_ch_insertable(
@@ -119,6 +139,10 @@ def start_call_for_insert_to_ch_insertable(
     if start_call.otel_dump is not None:
         otel_dump_str = dict_value_to_dump(start_call.otel_dump)
 
+    attrs_str, attrs_int, attrs_float, attrs_bool = extract_typed_attrs(
+        start_call.attributes
+    )
+
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -129,6 +153,10 @@ def start_call_for_insert_to_ch_insertable(
         op_name=start_call.op_name,
         started_at=start_call.started_at,
         attributes_dump=dict_value_to_dump(start_call.attributes),
+        attributes_map_str=attrs_str,
+        attributes_map_int=attrs_int,
+        attributes_map_float=attrs_float,
+        attributes_map_bool=attrs_bool,
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         otel_dump=otel_dump_str,
@@ -164,6 +192,10 @@ def start_call_insertable_to_complete_start(
         ended_at=None,
         exception=None,
         attributes_dump=ch_start.attributes_dump,
+        attributes_map_str=ch_start.attributes_map_str,
+        attributes_map_int=ch_start.attributes_map_int,
+        attributes_map_float=ch_start.attributes_map_float,
+        attributes_map_bool=ch_start.attributes_map_bool,
         inputs_dump=ch_start.inputs_dump,
         input_refs=ch_start.input_refs,
         output_dump=any_value_to_dump(None),
@@ -230,6 +262,10 @@ def start_end_calls_to_ch_complete_insertable(
     if start_call.otel_dump is not None:
         otel_dump_str = dict_value_to_dump(start_call.otel_dump)
 
+    attrs_str, attrs_int, attrs_float, attrs_bool = extract_typed_attrs(
+        start_call.attributes
+    )
+
     return CallCompleteCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -243,6 +279,10 @@ def start_end_calls_to_ch_complete_insertable(
         ended_at=end_call.ended_at,
         exception=end_call.exception,
         attributes_dump=dict_value_to_dump(start_call.attributes),
+        attributes_map_str=attrs_str,
+        attributes_map_int=attrs_int,
+        attributes_map_float=attrs_float,
+        attributes_map_bool=attrs_bool,
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         output_dump=any_value_to_dump(output),
@@ -289,6 +329,10 @@ def complete_call_to_ch_insertable(
     if complete_call.otel_dump is not None:
         otel_dump_str = dict_value_to_dump(complete_call.otel_dump)
 
+    attrs_str, attrs_int, attrs_float, attrs_bool = extract_typed_attrs(
+        complete_call.attributes
+    )
+
     return CallCompleteCHInsertable(
         project_id=complete_call.project_id,
         id=complete_call.id,
@@ -302,6 +346,10 @@ def complete_call_to_ch_insertable(
         ended_at=complete_call.ended_at,
         exception=complete_call.exception,
         attributes_dump=dict_value_to_dump(complete_call.attributes),
+        attributes_map_str=attrs_str,
+        attributes_map_int=attrs_int,
+        attributes_map_float=attrs_float,
+        attributes_map_bool=attrs_bool,
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         output_dump=any_value_to_dump(output),

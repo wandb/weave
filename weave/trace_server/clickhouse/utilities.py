@@ -8,6 +8,7 @@ import datetime
 import hashlib
 import json
 import logging
+import math
 from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any
@@ -23,6 +24,11 @@ from weave.trace_server.errors import InsertTooLarge
 from weave.trace_server.kafka import KafkaProducer
 
 logger = logging.getLogger(__name__)
+
+# Per-map cap for the typed attribute maps populated by extract_typed_attrs.
+# Applied independently to each of the four maps, so a single call can
+# contribute up to 4 * MAX_TYPED_ATTR_ENTRIES_PER_MAP entries across all maps.
+MAX_TYPED_ATTR_ENTRIES_PER_MAP = 100
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +102,75 @@ def split_migration_sql(sql: str) -> list[str]:
         if stripped:
             statements.append(stripped)
     return statements
+
+
+# ---------------------------------------------------------------------------
+# Typed attribute map extraction (fast-filter path)
+# ---------------------------------------------------------------------------
+
+
+def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, Any]]:
+    """Flatten a nested dict into dot-joined (key, leaf-value) pairs.
+
+    Matches the dot-path convention already used by read-side filters
+    (`attributes.nested.leaf`), so a caller filtering on "attributes.foo.bar"
+    hits the same key the extractor writes.
+    """
+    result: list[tuple[str, Any]] = []
+    for key, val in attrs.items():
+        full_key = key if not prefix else f"{prefix}.{key}"
+        if isinstance(val, dict):
+            result.extend(_flatten_attrs(val, full_key))
+        else:
+            result.append((full_key, val))
+    return result
+
+
+def extract_typed_attrs(
+    attrs: dict[str, Any],
+) -> tuple[dict[str, str], dict[str, int], dict[str, float], dict[str, bool]]:
+    """Route a Python attributes dict into four typed maps for fast filtering.
+
+    Each map is independently capped at MAX_TYPED_ATTR_ENTRIES_PER_MAP entries;
+    once a map is full, additional values of that type are dropped. Non-finite
+    floats (NaN, +/-Inf) are dropped because they break JSON/CH round-trips.
+    Non-scalar leaf values (lists, etc.) are JSON-encoded into the string map.
+
+    The ``bool`` branch must come before the ``int`` branch: Python's ``bool``
+    is a subclass of ``int``, so ``isinstance(True, int)`` is True, and an
+    int-first dispatch would land True/False in the int map.
+
+    Returns (str_map, int_map, float_map, bool_map) in insert-column order.
+    """
+    if not isinstance(attrs, dict):
+        return {}, {}, {}, {}
+
+    str_map: dict[str, str] = {}
+    int_map: dict[str, int] = {}
+    float_map: dict[str, float] = {}
+    bool_map: dict[str, bool] = {}
+
+    for key, val in _flatten_attrs(attrs):
+        if val is None:
+            continue
+        if isinstance(val, bool):
+            if len(bool_map) < MAX_TYPED_ATTR_ENTRIES_PER_MAP:
+                bool_map[key] = val
+        elif isinstance(val, int):
+            if len(int_map) < MAX_TYPED_ATTR_ENTRIES_PER_MAP:
+                int_map[key] = val
+        elif isinstance(val, float):
+            if not math.isfinite(val):
+                continue
+            if len(float_map) < MAX_TYPED_ATTR_ENTRIES_PER_MAP:
+                float_map[key] = val
+        elif isinstance(val, str):
+            if len(str_map) < MAX_TYPED_ATTR_ENTRIES_PER_MAP:
+                str_map[key] = val
+        elif len(str_map) < MAX_TYPED_ATTR_ENTRIES_PER_MAP:
+            str_map[key] = json.dumps(val)
+
+    return str_map, int_map, float_map, bool_map
 
 
 # ---------------------------------------------------------------------------

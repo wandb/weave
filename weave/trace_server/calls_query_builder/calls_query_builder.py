@@ -82,6 +82,17 @@ logger = logging.getLogger(__name__)
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
 
+# Maps a DSL cast-to type onto the typed Map column that stores attribute
+# values of that type. Used by CallsMergedDynamicField to route attribute
+# filters through the typed Map columns instead of JSON_VALUE over
+# attributes_dump when the caller declares the field's type via $convert.
+ATTRIBUTES_MAP_COLUMN_BY_CAST: dict[str, str] = {
+    "int": "attributes_map_int",
+    "double": "attributes_map_float",
+    "bool": "attributes_map_bool",
+    "string": "attributes_map_str",
+}
+
 
 class FilterConditionsResult(NamedTuple):
     """Result from building filter conditions.
@@ -2074,6 +2085,48 @@ def _get_multi_value_feedback_field(
     return None
 
 
+def _maybe_attributes_map_filter_sql(
+    operand: tsi_query.ConvertOperation,
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Return typed-Map column SQL for ``$convert`` over ``attributes.<path>``.
+
+    Only fires when:
+    - the converted operand is a plain ``$getField`` on ``attributes.*``,
+    - the target cast maps to one of the typed Map columns populated at ingest
+      (``int``/``double``/``bool``/``string`` — ``exists`` has no typed Map and
+      falls through to the JSON_VALUE path).
+
+    The Map key is the dot-joined path after ``attributes.`` to mirror the
+    flattening done by ``extract_typed_attrs`` at write time. Returns None for
+    anything outside that narrow pattern so the caller can fall back to the
+    JSON_VALUE implementation — this keeps ORDER BY and non-filter call sites
+    on the compatible path without special-casing context through the API.
+    """
+    inner = operand.convert_.input
+    if not isinstance(inner, tsi_query.GetFieldOperator):
+        return None
+    field_name = inner.get_field_
+    if not field_name.startswith("attributes."):
+        return None
+    column = ATTRIBUTES_MAP_COLUMN_BY_CAST.get(operand.convert_.to)
+    if column is None:
+        return None
+    key = field_name[len("attributes.") :]
+    if not key:
+        return None
+    structured_field = get_field_by_name(field_name)
+    raw_fields_used[structured_field.field] = structured_field
+    key_slot = param_slot(pb.add_param(key), "String")
+    column_sql = f"{table_alias}.{column}"
+    if use_agg_fn:
+        column_sql = f"any({column_sql})"
+    return f"{column_sql}[{key_slot}]"
+
+
 def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
@@ -2233,6 +2286,11 @@ def process_query_to_conditions(
             raw_fields_used[structured_field.field] = structured_field
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):
+            fast_sql = _maybe_attributes_map_filter_sql(
+                operand, param_builder, table_alias, use_agg_fn, raw_fields_used
+            )
+            if fast_sql is not None:
+                return fast_sql
             field = process_operand(operand.convert_.input)
             return clickhouse_cast(field, operand.convert_.to)
         elif isinstance(
