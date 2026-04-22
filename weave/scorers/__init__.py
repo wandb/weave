@@ -21,6 +21,7 @@ try:
     from weave.scorers.presidio_guardrail import PresidioScorer
     from weave.scorers.prompt_injection_guardrail import PromptInjectionLLMGuardrail
     from weave.scorers.pydantic_scorer import PydanticScorer
+    from weave.scorers.remote_scorer import RemoteScorer
     from weave.scorers.ragas_scorer import (
         ContextEntityRecallScorer,
         ContextRelevancyScorer,
@@ -49,6 +50,7 @@ __all__ = [
     "PresidioScorer",
     "PromptInjectionLLMGuardrail",
     "PydanticScorer",
+    "RemoteScorer",
     "StringMatchScorer",
     "SummarizationScorer",
     "ValidJSONScorer",

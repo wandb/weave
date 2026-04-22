@@ -134,6 +134,28 @@ def wf_scoring_worker_debounced_scoring_max_call_history() -> int:
     return max(0, value)
 
 
+def wf_scoring_worker_remote_scorer_bearer_token() -> str | None:
+    """Optional bearer credential for outbound remote scorer HTTP requests.
+
+    The wire format is ``Authorization: Bearer <token>``; this environment
+    variable supplies one possible ``<token>`` (alongside other mechanisms such
+    as per-scorer configuration or OAuth client-credentials token exchange).
+    When set, the scoring worker's remote scorer path may prefer this value
+    over those other sources; exact precedence is defined by that
+    implementation. When unset, the worker resolves credentials from other
+    configuration only.
+
+    Returns:
+        The token string, or None if unset. Whitespace-only values are treated as
+        None.
+    """
+    raw = os.environ.get("WF_SCORING_WORKER_REMOTE_SCORER_BEARER_TOKEN")
+    if raw is None:
+        return None
+    stripped = raw.strip()
+    return stripped if stripped else None
+
+
 # Clickhouse Settings
 
 

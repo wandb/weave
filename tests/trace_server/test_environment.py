@@ -10,6 +10,7 @@ from weave.trace_server.environment import (
     wf_scoring_worker_debounced_scoring_max_call_history,
     wf_scoring_worker_debounced_scoring_max_sampling_rate,
     wf_scoring_worker_kafka_consumer_group_id_override,
+    wf_scoring_worker_remote_scorer_bearer_token,
 )
 
 
@@ -132,3 +133,23 @@ def test_wf_clickhouse_calls_shard_key(env_value, expected, raises, monkeypatch)
     else:
         with pytest.raises(raises, match="Invalid WF_CLICKHOUSE_CALLS_SHARD_KEY"):
             wf_clickhouse_calls_shard_key()
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_bearer_token(monkeypatch):
+    """Unset, empty, and whitespace-only env values yield None; non-empty values are stripped."""
+    key = "WF_SCORING_WORKER_REMOTE_SCORER_BEARER_TOKEN"
+    monkeypatch.delenv(key, raising=False)
+    assert wf_scoring_worker_remote_scorer_bearer_token() is None
+
+    monkeypatch.setenv(key, "")
+    assert wf_scoring_worker_remote_scorer_bearer_token() is None
+
+    monkeypatch.setenv(key, "   \t  ")
+    assert wf_scoring_worker_remote_scorer_bearer_token() is None
+
+    monkeypatch.setenv(key, "static-api-key")
+    assert wf_scoring_worker_remote_scorer_bearer_token() == "static-api-key"
+
+    monkeypatch.setenv(key, "  padded-token  ")
+    assert wf_scoring_worker_remote_scorer_bearer_token() == "padded-token"
