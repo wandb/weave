@@ -9,8 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from weave.trace.init_message import WANDB_AVAILABLE
-
 if TYPE_CHECKING:
     import wandb
 
@@ -32,13 +30,13 @@ def _get_global_wandb_run() -> wandb.sdk.wandb_run.Run | None:
     """Get the global wandb.run if available.
 
     Returns:
-        The global wandb.run object, or None if wandb is not available or no run is active.
+        The global wandb.run object, or None if wandb is not installed or no run is active.
     """
-    if WANDB_AVAILABLE:
+    try:
         import wandb
-
-        return wandb.run
-    return None
+    except ImportError:
+        return None
+    return wandb.run
 
 
 def get_global_wb_run_context() -> WandbRunContext | None:

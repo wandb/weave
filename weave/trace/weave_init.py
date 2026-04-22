@@ -52,7 +52,11 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
             entity_name = api.default_entity_name()
             if entity_name is None:
                 raise WeaveWandbAuthenticationException(
-                    'weave init requires wandb. Run "wandb login"'
+                    "Could not determine a W&B entity for this project. Fix with one of:\n"
+                    "  1. Pass the project as 'entity/project' to weave.init(...)\n"
+                    "  2. Set the WANDB_ENTITY environment variable\n"
+                    "  3. Set a default entity on your W&B account and re-run "
+                    "weave.init(...) to re-authenticate"
                 )
         project_name = fields[0]
     elif len(fields) == 2:
