@@ -92,19 +92,7 @@ export const openAIStreamReducer = {
 };
 
 export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
-  function wrapped(...args: Parameters<typeof originalCreate>) {
-    const [originalParams]: any[] = args;
-    if (originalParams.stream) {
-      return originalCreate({
-        ...originalParams,
-        stream_options: {...originalParams.stream_options, include_usage: true},
-      });
-    }
-
-    return originalCreate(originalParams);
-  }
-
-  const options: OpOptions<typeof wrapped> = {
+  const options: OpOptions<typeof originalCreate> = {
     name: name,
     opKind: 'llm',
     parameterNames: 'useParam0Object',
@@ -116,11 +104,39 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
     streamReducer: openAIStreamReducer,
   };
 
-  const weaveOp = op(wrapped, options);
+  return function wrappedWithAgents(
+    ...args: Parameters<typeof originalCreate>
+  ) {
+    const [originalParams]: any[] = args;
+    // Rewrite streaming params outside the op callback so the trace
+    // records the caller's original args[0], not our mutated copy
+    // (include_usage lets the reducer see token counts).
+    const callArgs: Parameters<typeof originalCreate> = originalParams?.stream
+      ? ([
+          {
+            ...originalParams,
+            stream_options: {
+              ...originalParams.stream_options,
+              include_usage: true,
+            },
+          },
+        ] as Parameters<typeof originalCreate>)
+      : args;
 
-  // Wrap with OpenAI Agents context if available
-  return function wrappedWithAgents(...args: Parameters<typeof wrapped>) {
-    return runWithOpenAIAgentsContext(() => weaveOp(...args));
+    // Capture the APIPromise so wrapAsAPIPromiseLike can forward its
+    // helpers (see that function for the full rationale).
+    let apiPromise: any;
+    const weaveOp = op(() => {
+      apiPromise = originalCreate(...callArgs);
+      return apiPromise;
+    }, options);
+
+    const tracedPromise = runWithOpenAIAgentsContext(() => weaveOp(...args));
+    // If the caller awaits only a forwarded helper, tracedPromise has
+    // no handler — silence its rejection (weave already records it).
+    tracedPromise.catch(() => {});
+
+    return wrapAsAPIPromiseLike(tracedPromise, apiPromise);
   };
 }
 
@@ -444,29 +460,68 @@ export function summarizer(result: any) {
   return {};
 }
 
-export function makeOpenAIResponsesCreateProxy(originalCreate: any) {
-  return new Proxy(originalCreate, {
-    apply: (target, thisArg, args) => {
-      const [inputOptions] = args;
-      const isStream = inputOptions.stream;
-      const weaveOpOptions: OpOptions<typeof originalCreate> = {
-        name: 'create',
-        opKind: 'llm',
-        shouldAdoptThis: true,
-        originalFunction: originalCreate,
-        summarize: summarizer,
-        ...(isStream ? {streamReducer: openAIStreamAPIstreamReducer} : null),
-        parameterNames: 'useParam0Object',
-      };
+export function makeOpenAIResponsesCreateOp(originalCreate: any) {
+  return function wrappedWithAgents(
+    this: any,
+    ...args: Parameters<typeof originalCreate>
+  ) {
+    const [inputOptions]: any[] = args;
+    const isStream = inputOptions?.stream;
+    const weaveOpOptions: OpOptions<typeof originalCreate> = {
+      name: 'create',
+      opKind: 'llm',
+      shouldAdoptThis: true,
+      originalFunction: originalCreate,
+      summarize: summarizer,
+      ...(isStream ? {streamReducer: openAIStreamAPIstreamReducer} : null),
+      parameterNames: 'useParam0Object',
+    };
 
-      const weaveOp = op(() => {
-        return originalCreate.apply(thisArg, args);
-      }, weaveOpOptions);
+    // Capture the APIPromise so wrapAsAPIPromiseLike can forward its
+    // helpers (see that function). Forward `this` for shouldAdoptThis;
+    // originalCreate is pre-bound at the wrapOpenAI call site.
+    const thisArg = this;
+    let apiPromise: any;
+    const weaveOp = op(() => {
+      apiPromise = originalCreate(...args);
+      return apiPromise;
+    }, weaveOpOptions);
 
-      // Run with OpenAI Agents context if available
-      return runWithOpenAIAgentsContext(() => {
-        return weaveOp.apply(thisArg, args);
-      });
+    const tracedPromise = runWithOpenAIAgentsContext(() =>
+      weaveOp.apply(thisArg, args)
+    );
+    // If the caller awaits only a forwarded helper, tracedPromise has
+    // no handler — silence its rejection (weave already records it).
+    tracedPromise.catch(() => {});
+
+    // weaveOp runs the callback synchronously (via
+    // AsyncLocalStorage.run), so apiPromise is already assigned here.
+    return wrapAsAPIPromiseLike(tracedPromise, apiPromise);
+  };
+}
+
+// Returns a Promise-like proxy that preserves the OpenAI SDK's
+// APIPromise helpers (.withResponse(), .asResponse(), .parse(),
+// ._thenUnwrap(), and any future additions).
+//
+// Why this is needed: weave's op() awaits the inner callback and
+// returns a fresh Promise of the parsed value — the original
+// APIPromise (and its helpers) is gone by the time the caller sees
+// the result. The factory captures the APIPromise in a closure and
+// hands it here; this proxy keeps then/catch/finally on the traced
+// promise so tracing still runs on await, and forwards every other
+// property access to the original APIPromise.
+function wrapAsAPIPromiseLike(tracedPromise: Promise<any>, apiPromise: any) {
+  return new Proxy(tracedPromise, {
+    get(target, p) {
+      if (p === 'then' || p === 'catch' || p === 'finally') {
+        // Rely on internal Promise slots — must be bound to the
+        // underlying Promise rather than the Proxy.
+        const val = Reflect.get(target, p);
+        return val.bind(target);
+      }
+      const val = Reflect.get(apiPromise, p);
+      return typeof val === 'function' ? val.bind(apiPromise) : val;
     },
   });
 }
@@ -578,7 +633,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
           const targetVal = Reflect.get(target, p, receiver);
 
           if (p === 'create') {
-            return makeOpenAIResponsesCreateProxy(targetVal);
+            return makeOpenAIResponsesCreateOp(targetVal.bind(target));
           }
           return targetVal;
         },

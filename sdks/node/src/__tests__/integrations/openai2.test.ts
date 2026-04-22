@@ -207,6 +207,57 @@ describe('OpenAI Integration', () => {
       // Verify wrapped matches unwrapped
       expect(wrappedResult).toEqual(unwrappedResult);
     });
+
+    it('should forward APIPromise.withResponse() through the chat completions wrapper', async () => {
+      const mockResponse = {
+        headers: new Map([['x-request-id', 'req_chat_id']]),
+      };
+      const parsedData = {
+        id: 'chat_test_id',
+        choices: [{message: {role: 'assistant', content: 'Hello'}}],
+        model: 'gpt-4',
+        usage: {prompt_tokens: 1, completion_tokens: 1, total_tokens: 2},
+      };
+
+      class MockAPIPromise {
+        then(onFulfilled: any, onRejected: any) {
+          return Promise.resolve(parsedData).then(onFulfilled, onRejected);
+        }
+        catch(onRejected: any) {
+          return Promise.resolve(parsedData).catch(onRejected);
+        }
+        finally(onFinally: any) {
+          return Promise.resolve(parsedData).finally(onFinally);
+        }
+        asResponse() {
+          return Promise.resolve(mockResponse);
+        }
+        async withResponse() {
+          return {
+            data: parsedData,
+            response: mockResponse,
+            request_id: mockResponse.headers.get('x-request-id'),
+          };
+        }
+      }
+
+      mockOpenAI.chat.completions.create = jest
+        .fn()
+        .mockImplementation(() => new MockAPIPromise());
+      wrappedOpenAI = wrapOpenAI(mockOpenAI);
+
+      const pending = wrappedOpenAI.chat.completions.create({
+        model: 'gpt-4',
+        messages: [{role: 'user', content: 'Hi'}],
+      });
+
+      expect(typeof pending.withResponse).toBe('function');
+      const {data, response, request_id} = await pending.withResponse();
+
+      expect(data).toEqual(parsedData);
+      expect(response).toBe(mockResponse);
+      expect(request_id).toBe('req_chat_id');
+    });
   });
 });
 
@@ -411,6 +462,74 @@ describe('OpenAI responses.create Integration', () => {
       });
 
       expect(mockOpenAI.responses.create).toHaveBeenCalledWith(options);
+    });
+
+    it('should forward APIPromise.withResponse() through the weave wrapper', async () => {
+      const mockResponse = {
+        headers: new Map([['x-request-id', 'req_test_id']]),
+      };
+      const parsedData = {
+        id: 'resp_test_id',
+        object: 'response',
+        status: 'completed',
+        model: 'gpt-4o-2024-08-06',
+        output: [
+          {
+            id: 'msg_test_id',
+            type: 'message',
+            status: 'completed',
+            content: [
+              {
+                type: 'output_text',
+                annotations: [],
+                text: 'Hello! How can I help you today?',
+              },
+            ],
+            role: 'assistant',
+          },
+        ],
+        usage: {input_tokens: 1, output_tokens: 1, total_tokens: 2},
+      };
+
+      // Simulate APIPromise: thenable with .withResponse()/.asResponse().
+      class MockAPIPromise {
+        then(onFulfilled: any, onRejected: any) {
+          return Promise.resolve(parsedData).then(onFulfilled, onRejected);
+        }
+        catch(onRejected: any) {
+          return Promise.resolve(parsedData).catch(onRejected);
+        }
+        finally(onFinally: any) {
+          return Promise.resolve(parsedData).finally(onFinally);
+        }
+        asResponse() {
+          return Promise.resolve(mockResponse);
+        }
+        async withResponse() {
+          return {
+            data: parsedData,
+            response: mockResponse,
+            request_id: mockResponse.headers.get('x-request-id'),
+          };
+        }
+      }
+
+      mockOpenAI.responses.create = jest
+        .fn()
+        .mockImplementation(() => new MockAPIPromise());
+      wrappedOpenAI = wrapOpenAI(mockOpenAI);
+
+      const pending = wrappedOpenAI.responses.create({
+        model: 'gpt-4o-2024-08-06',
+        messages: [{role: 'user', content: 'Hello!'}],
+      });
+
+      expect(typeof pending.withResponse).toBe('function');
+      const {data, response, request_id} = await pending.withResponse();
+
+      expect(data).toEqual(parsedData);
+      expect(response).toBe(mockResponse);
+      expect(request_id).toBe('req_test_id');
     });
 
     it('should handle streaming responses and skip deltas', async () => {
