@@ -11,6 +11,7 @@ import clickhouse_connect
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
+from tests.trace_server.project_id_util import make_project_id as _make_project_id
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
@@ -1362,11 +1363,6 @@ def test_file_batch_clears_on_insert_failure():
 
 
 # ── version_index ordering with MV-backed _first_created_at ─────────
-
-
-def _make_project_id(prefix: str) -> str:
-    raw = f"test/{prefix}_{uuid.uuid4().hex[:8]}"
-    return base64.b64encode(raw.encode()).decode()
 
 
 def _obj_create(server, project_id, obj_id, val):

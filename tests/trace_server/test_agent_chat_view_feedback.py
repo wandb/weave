@@ -3,10 +3,10 @@
 Requires ClickHouse backend (auto-skips on SQLite via ch_server fixture).
 """
 
-import base64
 import datetime
 import uuid
 
+from tests.trace_server.project_id_util import make_project_id as _make_project_id
 from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.helpers import genai_span_to_row
@@ -18,11 +18,6 @@ from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentTraceChatReq,
 )
-
-
-def _make_project_id(prefix: str) -> str:
-    raw = f"test/{prefix}_{uuid.uuid4().hex[:8]}"
-    return base64.b64encode(raw.encode()).decode()
 
 
 def _make_span(
