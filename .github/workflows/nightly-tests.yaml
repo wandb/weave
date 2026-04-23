@@ -48,6 +48,7 @@ jobs:
             "mistral",
             "notdiamond",
             "openai",
+            "scorers_wandb",
             "verifiers_test",
             "vertexai",
             "pandas_test",

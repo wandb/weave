@@ -139,6 +139,7 @@ jobs:
             "notdiamond",
             "openai",
             "openai_agents",
+            "scorers_wandb",
             "verifiers_test",
             "vertexai",
             "pandas_test",
