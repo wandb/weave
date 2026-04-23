@@ -301,7 +301,13 @@ class AgentTraceChatRes(BaseModel):
     trace_id: str
     root_span_name: str = ""
     provider: str = ""
-    total_duration_ms: int = 0
+    total_duration_ms: int = Field(
+        default=0,
+        description=(
+            "Wall-clock duration of the trace root span in milliseconds. "
+            "This is not a sum of child span durations."
+        ),
+    )
     messages: list[AgentChatMessage] = Field(default_factory=list)
 
 
@@ -323,7 +329,13 @@ class AgentConversationChatRes(BaseModel):
 
     conversation_id: str
     provider: str = ""
-    total_duration_ms: int = 0
+    total_duration_ms: int = Field(
+        default=0,
+        description=(
+            "Sum of per-turn trace root span durations in milliseconds. "
+            "This is not a sum of all child span durations."
+        ),
+    )
     turns: list[AgentTraceChatRes] = Field(default_factory=list)
 
 
