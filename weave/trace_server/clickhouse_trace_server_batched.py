@@ -2613,10 +2613,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReadReq
     ) -> tsi.ProjectTTLSettingsReadRes:
-        retention_days = get_project_retention_days(
+        stored_days = get_project_retention_days(
             req.project_id, self.ch_client, redis_client=get_redis_client()
         )
-        return tsi.ProjectTTLSettingsReadRes(retention_days=retention_days)
+        return tsi.ProjectTTLSettingsReadRes(
+            retention_days=stored_days if stored_days > 0 else None
+        )
 
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched.project_ttl_settings_update"
@@ -2624,18 +2626,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def project_ttl_settings_update(
         self, req: tsi.ProjectTTLSettingsUpdateReq
     ) -> tsi.ProjectTTLSettingsUpdateRes:
-        if req.retention_days < 0:
+        if req.retention_days is not None and req.retention_days < 1:
             raise InvalidRequest(
-                "retention_days must be 0 (no TTL) or >= 1 (days of retention)"
+                "retention_days must be None (no TTL) or >= 1 (days of retention)"
             )
         assert req.wb_user_id, "wb_user_id is required for audit trail"
 
+        stored_days = req.retention_days if req.retention_days is not None else 0
         self.ch_client.insert(
             "project_ttl_settings",
             data=[
                 [
                     req.project_id,
-                    req.retention_days,
+                    stored_days,
                     datetime.datetime.now(datetime.timezone.utc),
                     req.wb_user_id,
                 ]

@@ -1404,6 +1404,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 exception=call_dict.get("exception"),
                 display_name=call_dict.get("display_name"),
             )
+            # Normalize expire_at: the 2100-01-01 sentinel means "no TTL".
+            raw_expire_at = call_dict.get("expire_at")
+            if raw_expire_at:
+                expire_at_dt = datetime.datetime.fromisoformat(raw_expire_at)
+                if expire_at_dt.tzinfo is None:
+                    expire_at_dt = expire_at_dt.replace(tzinfo=datetime.timezone.utc)
+                call_dict["expire_at"] = (
+                    None if expire_at_dt == EXPIRE_AT_NEVER else expire_at_dt
+                )
+
             # fill in missing required fields with defaults
             for col, mfield in tsi.CallSchema.model_fields.items():
                 if mfield.is_required() and col not in call_dict:
@@ -2839,19 +2849,21 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReadReq
     ) -> tsi.ProjectTTLSettingsReadRes:
+        stored_days = self._get_project_retention_days(req.project_id)
         return tsi.ProjectTTLSettingsReadRes(
-            retention_days=self._get_project_retention_days(req.project_id)
+            retention_days=stored_days if stored_days > 0 else None
         )
 
     def project_ttl_settings_update(
         self, req: tsi.ProjectTTLSettingsUpdateReq
     ) -> tsi.ProjectTTLSettingsUpdateRes:
-        if req.retention_days < 0:
+        if req.retention_days is not None and req.retention_days < 1:
             raise InvalidRequest(
-                "retention_days must be 0 (no TTL) or >= 1 (days of retention)"
+                "retention_days must be None (no TTL) or >= 1 (days of retention)"
             )
         assert req.wb_user_id, "wb_user_id is required for audit trail"
 
+        stored_days = req.retention_days if req.retention_days is not None else 0
         conn, cursor = get_conn_cursor(self.db_path)
         cursor.execute(
             "INSERT INTO project_ttl_settings "
@@ -2859,7 +2871,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             "VALUES (?, ?, ?, ?)",
             (
                 req.project_id,
-                req.retention_days,
+                stored_days,
                 datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 req.wb_user_id,
             ),

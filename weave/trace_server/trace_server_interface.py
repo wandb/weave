@@ -155,9 +155,8 @@ class CallSchema(BaseModel):
 
     deleted_at: datetime.datetime | None = None
 
-    # Expiration timestamp for this call. The server always writes a value
-    # (sentinel 2100-01-01 for projects with no TTL configured); `None` only
-    # occurs when the field is unset by a client constructing the model.
+    # Expiration timestamp for this call. None = no TTL configured for the
+    # project (the row will not be expired).
     expire_at: datetime.datetime | None = None
 
     # Size of metadata storage for this call
@@ -1569,17 +1568,17 @@ class ProjectTTLSettingsReadReq(BaseModelStrict):
 
 
 class ProjectTTLSettingsReadRes(BaseModel):
-    retention_days: int  # 0 = no TTL (infinite retention)
+    retention_days: int | None  # None = no TTL (infinite retention)
 
 
 class ProjectTTLSettingsUpdateReq(BaseModelStrict):
     project_id: str
-    retention_days: int  # 0 = disable TTL; must be 0 or >= 1
+    retention_days: int | None  # None disables TTL; must be None or >= 1
     wb_user_id: str | None = None
 
 
 class ProjectTTLSettingsUpdateRes(BaseModel):
-    retention_days: int
+    retention_days: int | None
 
 
 # Annotation Queue API
