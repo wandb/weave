@@ -82,8 +82,9 @@ trace_server = [
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
   "openinference-semantic-conventions>=0.1.17",
-  # OTEL metrics API. No-op until the host service registers a MeterProvider.
-  "opentelemetry-api>=1.24.0",
+  # Note: opentelemetry-api (used by trace_server.clickhouse.metrics) is
+  # pulled in transitively by ddtrace + opentelemetry-proto. Declaring it
+  # explicitly would force a lockfile bump across every consumer.
   # For emoji shortcode support in Feedback
   "emoji>=2.12.1",
   # Redis for optional task tracking and caching
@@ -428,8 +429,7 @@ trace_server = [
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
   "openinference-semantic-conventions>=0.1.17",
-  # OTEL metrics API. No-op until the host service registers a MeterProvider.
-  "opentelemetry-api>=1.24.0",
+  # opentelemetry-api pulled in transitively. See trace_server extra above.
   # For emoji shortcode support in Feedback
   "emoji>=2.12.1",
 ]
