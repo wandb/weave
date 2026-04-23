@@ -451,8 +451,14 @@ def _create_like_condition(
     table_alias: str,
     case_insensitive: bool = False,
 ) -> str:
-    """Creates a LIKE condition for a JSON field."""
-    field_name = f"{table_alias}.{field}"
+    """Creates a LIKE condition for a JSON field.
+
+    The dump column is wrapped in ``ifNull(..., '')`` so that the expression
+    matches the ``idx_inputs_dump_ngram`` ngram bloom filter index on
+    calls_merged (see migration 031), and so that LIKE never returns NULL
+    over Nullable(String) columns.
+    """
+    field_name = f"ifNull({table_alias}.{field}, '')"
 
     if case_insensitive:
         param_name = pb.add_param(like_pattern.lower())

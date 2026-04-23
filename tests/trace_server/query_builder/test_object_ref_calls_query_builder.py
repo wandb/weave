@@ -512,7 +512,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
            FROM calls_merged
            PREWHERE calls_merged.project_id = {pb_0:String}
            WHERE (calls_merged.parent_id IS NULL)
-             AND ((lower(calls_merged.inputs_dump) LIKE {pb_10:String}
+             AND ((lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_10:String}
                   OR calls_merged.inputs_dump IS NULL))
              AND (length(calls_merged.input_refs) > 0
                   OR calls_merged.started_at IS NULL)
