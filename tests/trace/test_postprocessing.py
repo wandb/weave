@@ -1,7 +1,6 @@
 import pytest
 
 import weave
-from weave.trace import api
 
 
 def redact_keys(d: dict) -> dict:
@@ -17,16 +16,15 @@ def redact_output(s: str) -> str:
     return s
 
 
-# These globals are directly set here because we don't have a great way to test weave.init
 @pytest.fixture
-def apply_postprocessing():
-    original_postprocess_inputs = api._global_postprocess_inputs
-    original_postprocess_output = api._global_postprocess_output
-    api._global_postprocess_inputs = redact_keys
-    api._global_postprocess_output = redact_output
+def apply_postprocessing(client):
+    original_postprocess_inputs = client.postprocess_inputs
+    original_postprocess_output = client.postprocess_output
+    client.postprocess_inputs = redact_keys
+    client.postprocess_output = redact_output
     yield
-    api._global_postprocess_inputs = original_postprocess_inputs
-    api._global_postprocess_output = original_postprocess_output
+    client.postprocess_inputs = original_postprocess_inputs
+    client.postprocess_output = original_postprocess_output
 
 
 def test_global_postprocessing(client, apply_postprocessing) -> None:
