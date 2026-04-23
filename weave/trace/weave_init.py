@@ -5,6 +5,11 @@ import os
 from json import JSONDecodeError
 
 from weave.compat import wandb
+from weave.integrations.patch import (
+    implicit_patch,
+    register_import_hook,
+    unregister_import_hook,
+)
 from weave.telemetry import trace_sentry
 from weave.trace import env, init_message, weave_client
 from weave.trace.context import weave_client_context
@@ -23,6 +28,7 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
+from weave.wandb_interface.context import get_wandb_api_context
 
 logger = logging.getLogger(__name__)
 
@@ -112,8 +118,6 @@ def init_weave(
             current_client.finish()
             weave_client_context.set_weave_client_global(None)
 
-    from weave.wandb_interface.context import get_wandb_api_context
-
     api_key = get_wandb_api_context()
     if api_key is None:
         url = wandb.app_url(env.wandb_base_url())
@@ -149,8 +153,6 @@ def init_weave(
     # Implicit patching:
     # 1. Check sys.modules and automatically patch any already-imported integrations
     # 2. Register import hook to patch integrations imported after weave.init()
-    from weave.integrations.patch import implicit_patch, register_import_hook
-
     implicit_patch()
     register_import_hook()
 
@@ -248,8 +250,6 @@ def finish() -> None:
         weave_client_context.set_weave_client_global(None)
 
     # Unregister the import hook
-    from weave.integrations.patch import unregister_import_hook
-
     unregister_import_hook()
 
     trace_sentry.global_trace_sentry.end_session()

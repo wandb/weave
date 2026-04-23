@@ -93,6 +93,7 @@ from tenacity import (
 )
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+from weave.trace_server.clickhouse.utilities import split_migration_sql
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
 from weave.trace_server.database_engine import (
     ENGINE_DISCOVERY_MAX_WAIT_SECONDS,
@@ -427,9 +428,11 @@ class BaseClickHouseTraceServerMigrator(ABC):
         # Mark migration as partially applied
         self._update_migration_status(target_db, target_version, is_start=True)
 
-        # Execute each command in the migration
-        migration_sub_commands = migration_sql.split(";")
-        for command in migration_sub_commands:
+        # Execute each command in the migration. Use a comment- and
+        # string-literal-aware tokenizer instead of a naive ``split(";")`` so
+        # that ``;`` inside ``-- line comments`` or ``'quoted strings'`` does
+        # not fragment statements mid-way and produce empty/invalid SQL.
+        for command in split_migration_sql(migration_sql):
             self._execute_migration_command(target_db, command)
 
         # Mark migration as fully applied

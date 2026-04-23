@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import sys
 import types
 from typing import Any
@@ -29,8 +30,6 @@ class CaptureContext:
         self._capture_buffer: Any = None
 
     def __enter__(self) -> Self:
-        import io
-
         self._original_stdout = sys.stdout
         self._capture_buffer = io.StringIO()
         sys.stdout = self._capture_buffer
