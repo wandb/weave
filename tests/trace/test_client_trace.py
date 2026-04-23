@@ -49,6 +49,7 @@ from weave.trace.refs import TableRef
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
@@ -208,6 +209,7 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_step_end": None,
         "deleted_at": None,
         "display_name": None,
+        "expire_at": EXPIRE_AT_NEVER,
         "storage_size_bytes": None,
         "total_storage_size_bytes": None,
         "thread_id": None,
@@ -260,6 +262,7 @@ def test_trace_server_call_start_and_end(client):
         "wb_run_step_end": None,
         "deleted_at": None,
         "display_name": None,
+        "expire_at": EXPIRE_AT_NEVER,
         "storage_size_bytes": None,
         "total_storage_size_bytes": None,
         "thread_id": None,

@@ -2859,7 +2859,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             (
                 req.project_id,
                 req.retention_days,
-                datetime.datetime.now(datetime.UTC).isoformat(),
+                datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 req.wb_user_id or "",
             ),
         )

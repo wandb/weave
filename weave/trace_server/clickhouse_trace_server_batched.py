@@ -2635,7 +2635,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 [
                     req.project_id,
                     req.retention_days,
-                    datetime.datetime.now(datetime.UTC),
+                    datetime.datetime.now(datetime.timezone.utc),
                     req.wb_user_id or "",
                 ]
             ],
