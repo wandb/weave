@@ -44,13 +44,6 @@ MAX_CUSTOM_ATTR_VALUE_BYTES = 256 * 1024
 # tell that truncation happened. Formatted lazily via `.format(n=...)`.
 CUSTOM_ATTR_TRUNCATION_MARKER = "...[truncated from {n} bytes]"
 
-# ---------------------------------------------------------------------------
-# Schema / ClickHouse tuple shape
-# ---------------------------------------------------------------------------
-
-# Named tuple field order — must match the ClickHouse Tuple definition exactly.
-MSG_TUPLE_FIELDS: tuple[str, ...] = ("role", "content", "finish_reason")
-
 # OTel span.kind default when the ingested span omits it. Matches the
 # ClickHouse Enum8 default in migration 030.
 SPAN_KIND_UNSPECIFIED = "UNSPECIFIED"

@@ -198,7 +198,6 @@ class AgentSearchReq(BaseModel):
     """
 
     project_id: str
-    # queries: list[str] | None = None
     query: str
 
     roles: list[str] | None = None
@@ -327,7 +326,6 @@ class AgentConversationChatRes(BaseModel):
     """
 
     conversation_id: str
-    provider: str = ""
     turns: list[AgentTraceChatRes] = Field(default_factory=list)
 
 
@@ -344,14 +342,12 @@ class AgentSchema(BaseModel):
     error_count: int = 0
     first_seen: datetime.datetime | None = None
     last_seen: datetime.datetime | None = None
-    llm_summary: str = ""
 
 
 class AgentsQueryFilters(BaseModel):
     """Optional filters for querying agents."""
 
     agent_name: str | None = None
-    provider_name: str | None = None
 
 
 class AgentsQueryReq(BaseModel):
@@ -403,10 +399,6 @@ class AgentVersionSchema(BaseModel):
     total_output_tokens: int = 0
     total_duration_ms: int = 0
     error_count: int = 0
-    agent_description: str = ""
-    agent_id: str = ""
-    provider_names: list[str] = Field(default_factory=list)
-    request_models: list[str] = Field(default_factory=list)
     first_seen: datetime.datetime | None = None
     last_seen: datetime.datetime | None = None
 

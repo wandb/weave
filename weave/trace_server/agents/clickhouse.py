@@ -11,7 +11,7 @@ import datetime
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
 
 from weave.trace_server.agents.chat_view import build_trace_chat
 from weave.trace_server.agents.constants import (
@@ -73,7 +73,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 #: Signature of the server's `_query` method — takes (sql, params), returns QueryResult.
-QueryFn = Callable[[str, dict[str, Any]], "QueryResult"]
+QueryParams: TypeAlias = dict[str, object]
+ClickHouseRow: TypeAlias = dict[str, object]
+QueryFn = Callable[[str, QueryParams], "QueryResult"]
+PaginatedReqT = TypeVar(
+    "PaginatedReqT",
+    AgentSpansQueryReq,
+    AgentsQueryReq,
+    AgentVersionsQueryReq,
+)
 PARAM_NAMESPACE = "genai"
 
 
@@ -131,8 +139,8 @@ class AgentQueryHandler:
                 total_output_tokens=safe_int(r.get("total_output_tokens")),
                 total_duration_ms=safe_int(r.get("total_duration_ms")),
                 error_count=safe_int(r.get("error_count")),
-                first_seen=r.get("first_seen"),
-                last_seen=r.get("last_seen"),
+                first_seen=_datetime_or_none(r.get("first_seen")),
+                last_seen=_datetime_or_none(r.get("last_seen")),
             )
             for r in rows
         ]
@@ -154,8 +162,8 @@ class AgentQueryHandler:
                 total_output_tokens=safe_int(r.get("total_output_tokens")),
                 total_duration_ms=safe_int(r.get("total_duration_ms")),
                 error_count=safe_int(r.get("error_count")),
-                first_seen=r.get("first_seen"),
-                last_seen=r.get("last_seen"),
+                first_seen=_datetime_or_none(r.get("first_seen")),
+                last_seen=_datetime_or_none(r.get("last_seen")),
             )
             for r in rows
         ]
@@ -167,19 +175,19 @@ class AgentQueryHandler:
 
     def search_messages(self, req: AgentSearchReq) -> AgentSearchRes:
         """Full-text search across message content."""
-        rows = self._run_query(make_message_search_query, req)
+        rows = self._run_message_search_query(req)
 
         convs: dict[str, AgentSearchConversationResult] = {}
         for r in rows:
             cid = safe_str(r.get("conversation_id")) or NO_CONVERSATION_LABEL
-            started = r.get("started_at")
+            started_at = _datetime_or_min(r.get("started_at"))
             if cid not in convs:
                 convs[cid] = AgentSearchConversationResult(
                     conversation_id=cid,
                     conversation_name=safe_str(r.get("conversation_name")),
                     agent_name=safe_str(r.get("agent_name")),
                     matched_messages=[],
-                    last_activity=started,
+                    last_activity=started_at,
                 )
             convs[cid].matched_messages.append(
                 AgentSearchMatchedMessage(
@@ -190,22 +198,18 @@ class AgentQueryHandler:
                         :SEARCH_CONTENT_PREVIEW_CHARS
                     ],
                     content_digest=safe_str(r.get("content_digest")),
-                    started_at=started,
+                    started_at=started_at,
                 )
             )
             # Track the most recent match across all rows for this
             # conversation so the sidebar sort order is stable regardless
             # of row arrival order.
-            if started is not None and (
-                convs[cid].last_activity is None or started > convs[cid].last_activity
-            ):
-                convs[cid].last_activity = started
+            if started_at > convs[cid].last_activity:
+                convs[cid].last_activity = started_at
 
-        # `last_activity` should always be a real datetime (CH's `started_at`
-        # is non-null), but guard against None to avoid TypeError during sort.
         results = sorted(
             convs.values(),
-            key=lambda c: c.last_activity or datetime.datetime.min,
+            key=lambda c: c.last_activity,
             reverse=True,
         )
         return AgentSearchRes(results=results)
@@ -222,7 +226,7 @@ class AgentQueryHandler:
         Used by the chat view handler to build `AgentTraceChatRes`; not a
         public query endpoint.
         """
-        rows = self._run_query(make_trace_detail_spans_query, project_id, trace_id)
+        rows = self._run_trace_detail_query(project_id, trace_id)
         return [AgentSpanSchema.model_validate(normalize_span_row(r)) for r in rows]
 
     # ------------------------------------------------------------------
@@ -231,10 +235,10 @@ class AgentQueryHandler:
 
     def _run_paginated(
         self,
-        count_builder: Callable[[ParamBuilder, Any], str],
-        list_builder: Callable[[ParamBuilder, Any], str],
-        req: Any,
-    ) -> tuple[int, list[dict[str, Any]]]:
+        count_builder: Callable[[ParamBuilder, PaginatedReqT], str],
+        list_builder: Callable[[ParamBuilder, PaginatedReqT], str],
+        req: PaginatedReqT,
+    ) -> tuple[int, list[ClickHouseRow]]:
         """Run a (count, list) SQL pair with a shared `ParamBuilder`.
 
         Returns `(total_count, list_rows_as_dicts)`. Both queries reuse the
@@ -248,14 +252,18 @@ class AgentQueryHandler:
         rows = _rows_as_dicts(self._query(list_sql, params))
         return total, rows
 
-    def _run_query(
-        self,
-        builder: Callable[..., str],
-        *args: Any,
-    ) -> list[dict[str, Any]]:
-        """Build a single SQL statement via `builder(pb, *args)` and return rows as dicts."""
+    def _run_message_search_query(self, req: AgentSearchReq) -> list[ClickHouseRow]:
+        """Build and run the message search SQL, returning rows as dicts."""
         pb = ParamBuilder(PARAM_NAMESPACE)
-        sql = builder(pb, *args)
+        sql = make_message_search_query(pb, req)
+        return _rows_as_dicts(self._query(sql, pb.get_params()))
+
+    def _run_trace_detail_query(
+        self, project_id: str, trace_id: str
+    ) -> list[ClickHouseRow]:
+        """Build and run the trace detail SQL, returning rows as dicts."""
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        sql = make_trace_detail_spans_query(pb, project_id, trace_id)
         return _rows_as_dicts(self._query(sql, pb.get_params()))
 
 
@@ -285,7 +293,7 @@ class AgentWriteHandler:
         The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
         """
-        span_rows: list[list[Any]] = []
+        span_rows: list[list[object]] = []
         accepted = 0
         rejected = 0
         errors: list[str] = []
@@ -369,7 +377,7 @@ class AgentWriteHandler:
         # one trace_id as one conversation turn as a product convention based
         # on current agent SDK behavior; OTel GenAI semconv does not define a
         # formal turn id today.
-        spans_by_trace: dict[str, list[Any]] = {}
+        spans_by_trace: dict[str, list[AgentSpanSchema]] = {}
         for r in _rows_as_dicts(result):
             span = AgentSpanSchema.model_validate(normalize_span_row(r))
             spans_by_trace.setdefault(span.trace_id, []).append(span)
@@ -400,23 +408,26 @@ class AgentWriteHandler:
 # ---------------------------------------------------------------------------
 
 
-def _rows_as_dicts(result: Any) -> list[dict[str, Any]]:
+def _rows_as_dicts(result: "QueryResult") -> list[ClickHouseRow]:
     """Zip result_rows with column_names into row dicts.
 
     `strict=True` so a shape mismatch between ClickHouse's `column_names`
     and row payload surfaces immediately instead of silently truncating.
     """
     col_names = list(result.column_names) if result.column_names else []
-    return [dict(zip(col_names, row, strict=True)) for row in result.result_rows]
+    return cast(
+        list[ClickHouseRow],
+        [dict(zip(col_names, row, strict=True)) for row in result.result_rows],
+    )
 
 
-def _first_cell_int(result: Any) -> int:
+def _first_cell_int(result: "QueryResult") -> int:
     """Read a scalar count-style query result as an int, defaulting to 0."""
     return safe_int(result.result_rows[0][0]) if result.result_rows else 0
 
 
 def _hydrate_group_row(
-    row: dict[str, Any], group_aliases: list[str]
+    row: ClickHouseRow, group_aliases: list[str]
 ) -> AgentSpanGroupRow:
     """Hydrate one aggregate-query result row into an `AgentSpanGroupRow`.
 
@@ -425,7 +436,7 @@ def _hydrate_group_row(
     fixed aggregate bundle from `_GROUPED_SPAN_AGGREGATES` — keeping the
     group dimensions separate from aggregates so callers can iterate either.
     """
-    group_keys = {alias: row.get(alias) for alias in group_aliases}
+    group_keys = {alias: _group_key_value(row.get(alias)) for alias in group_aliases}
     return AgentSpanGroupRow(
         group_keys=group_keys,
         span_count=safe_int(row.get("span_count")),
@@ -440,6 +451,27 @@ def _hydrate_group_row(
         provider_names=unpack_string_array(row.get("provider_names")),
         request_models=unpack_string_array(row.get("request_models")),
         conversation_names=unpack_string_array(row.get("conversation_names")),
-        first_seen=row.get("first_seen"),
-        last_seen=row.get("last_seen"),
+        first_seen=_datetime_or_none(row.get("first_seen")),
+        last_seen=_datetime_or_none(row.get("last_seen")),
     )
+
+
+def _datetime_or_none(val: object) -> datetime.datetime | None:
+    if isinstance(val, datetime.datetime):
+        return val
+    if isinstance(val, str):
+        try:
+            return datetime.datetime.fromisoformat(val.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _datetime_or_min(val: object) -> datetime.datetime:
+    return _datetime_or_none(val) or datetime.datetime.min
+
+
+def _group_key_value(val: object) -> str | int | float | None:
+    if isinstance(val, str | int | float):
+        return val
+    return None

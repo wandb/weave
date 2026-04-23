@@ -14,10 +14,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from weave.trace_server.agents.constants import (
-    MSG_TUPLE_FIELDS,
-    SPAN_KIND_UNSPECIFIED,
-)
+from weave.trace_server.agents.constants import SPAN_KIND_UNSPECIFIED
 from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
 
 # Python mirror of the ClickHouse `DEFAULT toDateTime64(0, 6)` on `ended_at`.
@@ -41,21 +38,6 @@ class NormalizedMessage(BaseModel):
     role: str = ""
     content: str = ""
     finish_reason: str = ""
-
-    def to_ch_tuple(self) -> tuple[str, str, str]:
-        """Convert to a positional tuple matching the ClickHouse column order."""
-        return (self.role, self.content, self.finish_reason)
-
-    @classmethod
-    def from_ch_tuple(cls, t: tuple[str, ...] | dict[str, Any]) -> "NormalizedMessage":
-        """Construct from a ClickHouse tuple (positional or named)."""
-        if isinstance(t, dict):
-            return cls(**{k: t.get(k, "") for k in MSG_TUPLE_FIELDS})
-        return cls(
-            role=t[0] if len(t) > 0 else "",
-            content=t[1] if len(t) > 1 else "",
-            finish_reason=t[2] if len(t) > 2 else "",
-        )
 
 
 class AgentSpanCHInsertable(BaseModel):
