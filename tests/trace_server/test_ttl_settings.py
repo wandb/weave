@@ -1,7 +1,7 @@
 """Scenario-focused tests for weave.trace_server.ttl_settings."""
 
 import datetime
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -42,7 +42,7 @@ class _FakeRedis:
 
 
 def _make_ch_client(rows):
-    """Build a mock ClickHouse client that returns given rows."""
+    """Build a mock ClickHouse client that returns the given rows on query."""
     mock_result = MagicMock()
     mock_result.row_count = len(rows)
     mock_result.first_row = rows[0] if rows else None
@@ -84,6 +84,13 @@ def test_compute_expire_at():
     )
 
 
+EXPECTED_L3_QUERY = (
+    "SELECT argMax(retention_days, updated_at) "
+    "FROM project_ttl_settings "
+    "WHERE project_id = {project_id:String}"
+)
+
+
 def test_get_project_retention_days_l1_cache():
     """L1 caching: single CH query for repeated lookups, zero on CH miss."""
     ch_client = _make_ch_client([[90]])
@@ -94,11 +101,8 @@ def test_get_project_retention_days_l1_cache():
     assert first == 90
     assert second == 90
     assert ch_client.query.call_count == 1
-    assert ch_client.query.call_args == call(
-        "SELECT argMax(retention_days, updated_at) "
-        "FROM project_ttl_settings "
-        "WHERE project_id = {project_id:String}",
-        parameters={"project_id": "entity/project"},
+    ch_client.query.assert_called_once_with(
+        EXPECTED_L3_QUERY, parameters={"project_id": "entity/project"}
     )
 
     # Different project with no rows → 0 (no TTL configured)
@@ -133,6 +137,9 @@ def test_get_project_retention_days_redis_l2_cache():
     )
     assert result == 60
     assert ch_client.query.call_count == 1
+    ch_client.query.assert_called_once_with(
+        EXPECTED_L3_QUERY, parameters={"project_id": "entity/other"}
+    )
     key = _ttl_cache_key("entity/other")
     assert redis_cold.get(key) == "60"
     assert redis_cold._store[key][1] == REDIS_TTL_EXPIRY_SECS

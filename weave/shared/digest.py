@@ -36,7 +36,7 @@ def str_digest(json_val: str) -> str:
     return bytes_digest(json_val.encode())
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class ObjectDigestResult:
     """Deterministic digest data for object-create style payloads."""
 

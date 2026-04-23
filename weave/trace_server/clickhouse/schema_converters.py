@@ -29,6 +29,7 @@ from weave.trace_server.clickhouse_schema import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_common import make_derived_summary_fields
+from weave.trace_server.ttl_settings import compute_expire_at
 
 # ---------------------------------------------------------------------------
 # Call schema converters
@@ -104,6 +105,7 @@ def ch_call_to_row(ch_call: CallCHInsertable) -> list[Any]:
 
 def start_call_for_insert_to_ch_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
+    retention_days: int,
 ) -> CallStartCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
@@ -134,6 +136,7 @@ def start_call_for_insert_to_ch_insertable(
         wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,
         display_name=start_call.display_name,
+        expire_at=compute_expire_at(retention_days, start_call.started_at),
     )
 
 
@@ -171,11 +174,13 @@ def start_call_insertable_to_complete_start(
         wb_run_id=ch_start.wb_run_id,
         wb_run_step=ch_start.wb_run_step,
         wb_run_step_end=None,
+        expire_at=ch_start.expire_at,
     )
 
 
 def end_call_for_insert_to_ch_insertable(
     end_call: tsi.EndedCallSchemaForInsert,
+    retention_days: int,
 ) -> CallEndCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
@@ -191,12 +196,14 @@ def end_call_for_insert_to_ch_insertable(
         output_dump=any_value_to_dump(output),
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
+        expire_at=compute_expire_at(retention_days, end_call.ended_at),
     )
 
 
 def start_end_calls_to_ch_complete_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
     end_call: tsi.EndedCallSchemaForInsert,
+    retention_days: int,
 ) -> CallCompleteCHInsertable:
     """Combine start and end call data into a CallCompleteCHInsertable.
 
@@ -205,6 +212,7 @@ def start_end_calls_to_ch_complete_insertable(
     Args:
         start_call: The start call data.
         end_call: The end call data.
+        retention_days: The project's retention policy in days (0 = no TTL).
 
     Returns:
         CallCompleteCHInsertable: A complete call ready for insertion.
@@ -245,6 +253,7 @@ def start_end_calls_to_ch_complete_insertable(
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
         wb_run_step_end=end_call.wb_run_step_end,
+        expire_at=compute_expire_at(retention_days, start_call.started_at),
     )
 
 
@@ -259,11 +268,13 @@ def ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
 
 def complete_call_to_ch_insertable(
     complete_call: tsi.CompletedCallSchemaForInsert,
+    retention_days: int,
 ) -> CallCompleteCHInsertable:
     """Convert a completed call schema to a ClickHouse insertable format.
 
     Args:
         complete_call: The completed call schema from the API.
+        retention_days: The project's retention policy in days (0 = no TTL).
 
     Returns:
         CallCompleteCHInsertable: The ClickHouse insertable representation.
@@ -301,6 +312,7 @@ def complete_call_to_ch_insertable(
         wb_run_id=complete_call.wb_run_id,
         wb_run_step=complete_call.wb_run_step,
         wb_run_step_end=complete_call.wb_run_step_end,
+        expire_at=compute_expire_at(retention_days, complete_call.started_at),
     )
 
 

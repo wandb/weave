@@ -50,8 +50,6 @@ def apply_threadsafe_patch_to_moviepy_video() -> None:
         return
 
     # Check if MoviePy is already imported
-    import sys
-
     if "moviepy" in sys.modules:
         try:
             _apply_threadsafe_patch()
