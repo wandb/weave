@@ -4814,10 +4814,32 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # `ALTER TABLE ... UPDATE` mutation on both `call_parts` (source) and
         # `calls_merged` (aggregate) so reads return the latest output
         # regardless of merge timing.
-        # Skip the mutation when the new output matches what's already stored.
-        # `ALTER TABLE ... UPDATE` rewrites part files and is expensive
-        # (~20k blocking mutations for a 10k-prediction eval if every
-        # finish touches output); the diff check keeps the fast path cheap.
+        # Handle a late output change (EvaluationLogger V2's deferred
+        # `pred.output = ...` flow) on ClickHouse.
+        #
+        # Context: `prediction_create` already emits a call_end row with its
+        # create-time output, and `calls_merged` uses
+        # `SimpleAggregateFunction(any, ...)` for `output_dump`. `any`
+        # non-deterministically keeps one value per key during merge, so a
+        # second call_end with a new output does NOT reliably overwrite the
+        # earlier one. The only way to force the new value without a schema
+        # migration is `ALTER TABLE ... UPDATE`, which rewrites affected
+        # part files — expensive per row.
+        #
+        # We mitigate the cost by:
+        #   (a) only calling this when the new output actually differs from
+        #       what's already stored (diff check below), and
+        #   (b) the V2 logger's common flow (output provided upfront OR
+        #       assigned before any log_score) never triggers this because
+        #       create-time output already matches the final output.
+        # In practice the mutation only fires when a caller mutates
+        # `pred.output` AFTER logging a score, or overrides via
+        # `pred.finish(output=...)`. For high-frequency eval workloads that
+        # rely on that pattern, the right long-term fix is to change
+        # `prediction_create` to emit only `call_start` and let
+        # `prediction_finish` own the `call_end`, so `output_dump` is
+        # written exactly once per prediction. That restructuring is a
+        # larger change than this PR's scope.
         if req.output is not None and req.output != existing_output:
             self._update_call_output(
                 project_id=req.project_id,
