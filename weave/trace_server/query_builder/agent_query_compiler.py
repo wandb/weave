@@ -49,7 +49,6 @@ DIRECT_COLUMNS: frozenset[str] = frozenset(
         "ended_at",
         "status_code",
         "status_message",
-        "total_tokens",
         "wb_user_id",
         "wb_run_id",
     }

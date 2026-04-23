@@ -85,7 +85,6 @@ SPAN_SORTABLE_COLS: frozenset[str] = SPAN_FILTERABLE_COLS | frozenset(
         "ended_at",
         "input_tokens",
         "output_tokens",
-        "total_tokens",
         "reasoning_tokens",
     }
 )

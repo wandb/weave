@@ -125,10 +125,9 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.response_model == "gpt-4o-2024-05-13"
     assert result.request_temperature == 0.7
 
-    # Tokens: total is computed from input + output
+    # Token usage
     assert result.input_tokens == 100
     assert result.output_tokens == 50
-    assert result.total_tokens == 150
     assert result.reasoning_tokens == 30
 
     assert result.finish_reasons == ["stop"]

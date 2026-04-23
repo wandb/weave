@@ -100,7 +100,6 @@ OTel-derived or a Weave extension.
 |---|---|---|---|
 | `input_tokens` | int | `gen_ai.usage.input_tokens` / `weave.usage.input_tokens` | OTel |
 | `output_tokens` | int | `gen_ai.usage.output_tokens` / `weave.usage.output_tokens` | OTel |
-| `total_tokens` | int | derived from `input_tokens + output_tokens` at ingest | OTel |
 | `reasoning_tokens` | int | `gen_ai.usage.reasoning_tokens` / `weave.usage.reasoning_tokens` | **[Weave]** (proposed for OTel in PR #3383, not yet stable) |
 | `cache_creation_input_tokens` | int | `gen_ai.usage.cache_creation.input_tokens` / `weave.usage.cache_creation.input_tokens` | OTel |
 | `cache_read_input_tokens` | int | `gen_ai.usage.cache_read.input_tokens` / `weave.usage.cache_read.input_tokens` | OTel |

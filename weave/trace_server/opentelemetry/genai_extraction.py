@@ -137,10 +137,6 @@ def extract_output_tokens(attrs: dict[str, Any]) -> int:
     return safe_int(_get(attrs, *K["weave.usage.output_tokens"]))
 
 
-def extract_total_tokens(attrs: dict[str, Any], input_t: int, output_t: int) -> int:
-    return input_t + output_t
-
-
 def extract_reasoning_tokens(attrs: dict[str, Any]) -> int:
     return safe_int(_get(attrs, *K["weave.usage.reasoning_tokens"]))
 
@@ -450,7 +446,6 @@ def extract_genai_span(
 
     input_t = extract_input_tokens(attrs)
     output_t = extract_output_tokens(attrs)
-    total_t = extract_total_tokens(attrs, input_t, output_t)
     reasoning_t = extract_reasoning_tokens(attrs)
 
     status_code = span.status.code.name
@@ -485,7 +480,6 @@ def extract_genai_span(
         response_id=str(_get(attrs, *K["weave.response.id"]) or ""),
         input_tokens=input_t,
         output_tokens=output_t,
-        total_tokens=total_t,
         reasoning_tokens=reasoning_t,
         cache_creation_input_tokens=safe_int(
             _get(attrs, *K["weave.usage.cache_creation.input_tokens"])

@@ -46,7 +46,6 @@ class AgentSpanSchema(BaseModel):
     response_id: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
-    total_tokens: int = 0
     reasoning_tokens: int = 0
     reasoning_content: str = ""
     conversation_id: str = ""
