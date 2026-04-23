@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Sequence
 from types import CoroutineType
-from typing import TYPE_CHECKING, Any, Literal, Protocol, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, TypedDict
 
 from pydantic import BaseModel
 
@@ -35,8 +35,30 @@ def is_pydantic_model_class(obj: Any) -> bool:
         return False
 
 
+# A JSON-safe value — the target shape every encoder produces on match. The
+# leaf types line up with what json.dumps accepts; the recursion covers nested
+# containers. Some encoder outputs are typed ``Any`` in practice (e.g. dictify,
+# or registry-produced CustomWeaveType payloads), but they still conform
+# structurally via the ``Any``-inside-``dict``/``list`` branches.
+JsonValue: TypeAlias = (
+    bool | int | float | str | list[Any] | dict[str, Any] | None
+)
+
+
+class _MissType:
+    """Type of the ``_MISS`` sentinel — a distinct class so encoders can
+    declare "I might decline" in their return type without collapsing to
+    ``Any``. Exactly one instance exists (``_MISS``).
+    """
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "<_MISS>"
+
+
 # Sentinel returned by an encoder when the input is not its responsibility.
-_MISS: Any = object()
+_MISS: _MissType = _MissType()
 
 
 class Encoder(Protocol):
@@ -60,12 +82,12 @@ class Encoder(Protocol):
         project_id: str,
         client: WeaveClient,
         use_dictify: bool,
-    ) -> Any: ...
+    ) -> JsonValue | _MissType: ...
 
 
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
-) -> Any:
+) -> JsonValue:
     """Encode an arbitrary Python value to a JSON-safe payload.
 
     Dispatch is a priority ladder. Each encoder below is asked in order;
