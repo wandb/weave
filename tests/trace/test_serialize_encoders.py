@@ -39,16 +39,27 @@ from weave.trace.serialization.serialize import (
 PROJECT_ID = "entity/project"
 
 
+class _ExampleModel(BaseModel):
+    """Concrete pydantic subclass. Only used to get an INSTANCE for miss
+    tests — the class itself needs to live at module scope so ``_ExampleModel(x=1)``
+    can appear inside a parametrize decorator (evaluated at import time).
+    """
+
+    x: int
+
+
 # ---------- _encode_ref ----------
 
 
-def test_encode_ref_table_ref_returns_uri() -> None:
-    ref = TableRef(entity="e", project="p", _digest="abc123")
-    assert _encode_ref(ref, PROJECT_ID, None, False) == ref.uri
-
-
-def test_encode_ref_object_ref_returns_uri() -> None:
-    ref = ObjectRef(entity="e", project="p", name="obj", _digest="abc123")
+@pytest.mark.parametrize(
+    "ref",
+    [
+        TableRef(entity="e", project="p", _digest="abc123"),
+        ObjectRef(entity="e", project="p", name="obj", _digest="abc123"),
+    ],
+    ids=["TableRef", "ObjectRef"],
+)
+def test_encode_ref_returns_uri(ref: Any) -> None:
     assert _encode_ref(ref, PROJECT_ID, None, False) == ref.uri
 
 
@@ -123,57 +134,31 @@ def test_encode_object_record_non_record_returns_miss(value: Any) -> None:
 # ---------- _encode_container ----------
 
 
-def test_encode_container_list() -> None:
-    assert _encode_container([1, 2, 3], PROJECT_ID, None, False) == [1, 2, 3]
-
-
-def test_encode_container_tuple_returns_list() -> None:
-    # Tuples are encoded as JSON arrays (lists) — JSON has no tuple concept.
-    assert _encode_container((1, 2, 3), PROJECT_ID, None, False) == [1, 2, 3]
-
-
-def test_encode_container_dict() -> None:
-    assert _encode_container({"a": 1, "b": 2}, PROJECT_ID, None, False) == {
-        "a": 1,
-        "b": 2,
-    }
+@pytest.mark.parametrize(
+    ("obj", "expected"),
+    [
+        ([1, 2, 3], [1, 2, 3]),
+        # Tuples encode as JSON arrays (lists) — JSON has no tuple concept.
+        ((1, 2, 3), [1, 2, 3]),
+        ({"a": 1, "b": 2}, {"a": 1, "b": 2}),
+        ([], []),
+        ({}, {}),
+        ([{"a": [1, 2]}, {"b": (3, 4)}], [{"a": [1, 2]}, {"b": [3, 4]}]),
+    ],
+    ids=["list", "tuple", "dict", "empty-list", "empty-dict", "nested"],
+)
+def test_encode_container_match(obj: Any, expected: Any) -> None:
+    assert _encode_container(obj, PROJECT_ID, None, False) == expected
 
 
 def test_encode_container_namedtuple_returns_dict() -> None:
+    # Namedtuples dispatch BEFORE the plain-tuple branch — result is a dict,
+    # not a list. This also pins the dispatch priority.
     class Point(NamedTuple):
         x: int
         y: int
 
     assert _encode_container(Point(1, 2), PROJECT_ID, None, False) == {"x": 1, "y": 2}
-
-
-def test_encode_container_namedtuple_takes_priority_over_tuple() -> None:
-    # Namedtuples are tuples — the encoder must dispatch on namedtuple first,
-    # not fall into the (list, tuple) branch which would emit a plain list.
-    class Point(NamedTuple):
-        x: int
-        y: int
-
-    result = _encode_container(Point(1, 2), PROJECT_ID, None, False)
-    assert isinstance(result, dict)
-
-
-def test_encode_container_empty_list() -> None:
-    assert _encode_container([], PROJECT_ID, None, False) == []
-
-
-def test_encode_container_empty_dict() -> None:
-    assert _encode_container({}, PROJECT_ID, None, False) == {}
-
-
-def test_encode_container_nested_structures() -> None:
-    result = _encode_container(
-        [{"a": [1, 2]}, {"b": (3, 4)}],
-        PROJECT_ID,
-        None,
-        False,
-    )
-    assert result == [{"a": [1, 2]}, {"b": [3, 4]}]
 
 
 @pytest.mark.parametrize("value", [1, 1.5, "hi", None, True, object()])
@@ -197,23 +182,27 @@ def test_encode_pydantic_class_returns_schema() -> None:
     assert "y" in schema["properties"]
 
 
-def test_encode_pydantic_instance_returns_miss() -> None:
-    # Instances must NOT match — this encoder is for the class itself.
-    class Foo(BaseModel):
-        x: int
-
-    assert _encode_pydantic_schema(Foo(x=1), PROJECT_ID, None, False) is _MISS
-
-
-def test_encode_pydantic_base_model_itself_returns_miss() -> None:
-    # BaseModel is the abstract base; encoding its schema is meaningless.
-    assert _encode_pydantic_schema(BaseModel, PROJECT_ID, None, False) is _MISS
-
-
 @pytest.mark.parametrize(
-    "value", [int, str, list, dict, type(None), 1, "hi", None, [1], {"a": 1}]
+    "value",
+    [
+        # Pydantic INSTANCES miss — only concrete subclasses (types) match.
+        _ExampleModel(x=1),
+        # BaseModel itself misses — it's the abstract base.
+        BaseModel,
+        # Non-pydantic types and values.
+        int,
+        str,
+        list,
+        dict,
+        type(None),
+        1,
+        "hi",
+        None,
+        [1],
+        {"a": 1},
+    ],
 )
-def test_encode_pydantic_non_pydantic_returns_miss(value: Any) -> None:
+def test_encode_pydantic_schema_returns_miss(value: Any) -> None:
     assert _encode_pydantic_schema(value, PROJECT_ID, None, False) is _MISS
 
 
@@ -226,12 +215,6 @@ def test_encode_pydantic_non_pydantic_returns_miss(value: Any) -> None:
 )
 def test_encode_primitive_identity(value: Any) -> None:
     assert _encode_primitive(value, PROJECT_ID, None, False) == value
-
-
-def test_encode_primitive_long_string_passes_through() -> None:
-    # Strings of any length are primitives; no truncation at this layer.
-    long_str = "a" * 1000
-    assert _encode_primitive(long_str, PROJECT_ID, None, False) == long_str
 
 
 @pytest.mark.parametrize(
@@ -361,22 +344,20 @@ def test_encode_dictify_custom_repr_returns_miss() -> None:
 # ---------- _encode_try_to_dict ----------
 
 
-def test_encode_try_to_dict_with_to_dict_method() -> None:
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"x": 1, "y": 2},
+        # Nested values recurse back through to_json.
+        {"nested": [1, 2, 3]},
+    ],
+)
+def test_encode_try_to_dict_match(payload: dict[str, Any]) -> None:
     class Foo:
         def to_dict(self) -> dict:
-            return {"x": 1, "y": 2}
+            return payload
 
-    result = _encode_try_to_dict(Foo(), PROJECT_ID, None, False)
-    assert result == {"x": 1, "y": 2}
-
-
-def test_encode_try_to_dict_recurses_into_values() -> None:
-    class Foo:
-        def to_dict(self) -> dict:
-            return {"nested": [1, 2, 3]}
-
-    result = _encode_try_to_dict(Foo(), PROJECT_ID, None, False)
-    assert result == {"nested": [1, 2, 3]}
+    assert _encode_try_to_dict(Foo(), PROJECT_ID, None, False) == payload
 
 
 def test_encode_try_to_dict_empty_dict_returns_miss() -> None:

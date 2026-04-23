@@ -40,9 +40,7 @@ def is_pydantic_model_class(obj: Any) -> bool:
 # containers. Some encoder outputs are typed ``Any`` in practice (e.g. dictify,
 # or registry-produced CustomWeaveType payloads), but they still conform
 # structurally via the ``Any``-inside-``dict``/``list`` branches.
-JsonValue: TypeAlias = (
-    bool | int | float | str | list[Any] | dict[str, Any] | None
-)
+JsonValue: TypeAlias = bool | int | float | str | list[Any] | dict[str, Any] | None
 
 
 class _MissType:
@@ -87,7 +85,7 @@ class Encoder(Protocol):
 
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
-) -> JsonValue:
+) -> Any:
     """Encode an arbitrary Python value to a JSON-safe payload.
 
     Dispatch is a priority ladder. Each encoder below is asked in order;
@@ -108,7 +106,7 @@ def to_json(
     """
     for encoder in _ENCODERS:
         result = encoder(obj, project_id, client, use_dictify)
-        if result is not _MISS:
+        if not isinstance(result, _MissType):
             return result
     return stringify(obj)
 
