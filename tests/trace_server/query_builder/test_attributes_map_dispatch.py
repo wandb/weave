@@ -308,11 +308,16 @@ def test_nested_attribute_path_joins_with_dot() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_fallback_no_convert_uses_json_value_only() -> None:
-    """A plain ``$getField`` on attributes.* — no ``$convert`` — stays on the
-    JSON_VALUE path with no map read. This preserves read-path compatibility
-    for clients that never adopted typed dispatch, and the LIKE prefilter on
-    attributes_dump is the existing optimization for equality-on-string.
+def test_implicit_string_literal_eq_uses_fast_path() -> None:
+    """``attributes.env = 'prod'`` (no ``$convert``) hits the typed Map.
+
+    The fast path infers the string type from the ``$literal`` peer so
+    callers don't have to wrap in ``$convert(..., "string")`` to get the
+    typed-map read. Emits the same ``if(mapContains(...), map[key],
+    JSON_VALUE fallback)`` hybrid as the ``$convert`` path, pinned to
+    ``attributes_map_str``. The ``attributes_dump LIKE`` prefilter added by
+    the optimization pass is independent of the HAVING shape and still
+    fires alongside the fast path.
     """
     cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
     cq.add_field("id")
@@ -332,16 +337,63 @@ def test_fallback_no_convert_uses_json_value_only() -> None:
         """
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE ((calls_merged.attributes_dump LIKE {pb_2:String} OR calls_merged.attributes_dump IS NULL))
+        PREWHERE calls_merged.project_id = {pb_4:String}
+        WHERE ((calls_merged.attributes_dump LIKE {pb_3:String} OR calls_merged.attributes_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+            ((if(mapContains(any(calls_merged.attributes_map_str), {pb_0:String}),
+                 any(calls_merged.attributes_map_str)[{pb_0:String}],
+                 coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_1:String}), 'null'), ''))
+             = {pb_2:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
-        {"pb_0": '$."env"', "pb_1": "prod", "pb_2": '%"prod"%', "pb_3": "p"},
+        {
+            "pb_0": "env",
+            "pb_1": '$."env"',
+            "pb_2": "prod",
+            "pb_3": '%"prod"%',
+            "pb_4": "p",
+        },
+    )
+
+
+def test_implicit_non_string_literal_eq_stays_on_json_value() -> None:
+    """``attributes.retries = 3`` (no ``$convert``, non-string peer) stays on
+    the JSON_VALUE path — the implicit fast path only fires for string
+    literals because JSON_VALUE returns a string and the Map columns for
+    non-string types would require a cast on both branches to match. Users
+    who want the int/float/bool fast path must wrap in ``$convert``.
+    """
+    cq = CallsQuery(project_id="p", read_table=ReadTable.CALLS_MERGED)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "attributes.retries"},
+                    {"$literal": 3},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE ((calls_merged.attributes_dump LIKE {pb_2:String} OR calls_merged.attributes_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_0:String}), 'null'), '') = {pb_1:Int64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {"pb_0": '$."retries"', "pb_1": 3, "pb_2": "%3%", "pb_3": "p"},
     )
 
 
@@ -444,3 +496,27 @@ def test_extract_typed_attrs_non_dict_input() -> None:
     """Non-dict input returns four empty maps rather than raising."""
     assert extract_typed_attrs(None) == ({}, {}, {}, {})  # type: ignore[arg-type]
     assert extract_typed_attrs("not a dict") == ({}, {}, {}, {})  # type: ignore[arg-type]
+
+
+def test_extract_typed_attrs_dot_key_collision_is_documented() -> None:
+    """``{"a": {"b": 1}}`` and ``{"a.b": 2}`` both flatten to key ``"a.b"``.
+
+    The second write wins in the typed Map because Python dicts are
+    insertion-ordered and ``extract_typed_attrs`` iterates once per leaf.
+    The JSON_VALUE fallback can still distinguish them (``$."a"."b"`` vs
+    ``$."a.b"``) — so a row with a literal-dot key would read different
+    values from the fast and fallback branches. We accept this divergence
+    because nested dicts are the common shape and literal-dot keys
+    already break the JSONPath-based filter convention.
+
+    This test pins the current behavior so it doesn't drift silently.
+    """
+    _, int_map, _, _ = extract_typed_attrs({"a": {"b": 1}, "a.b": 2})
+    assert int_map == {"a.b": 2}, (
+        "Literal-dot key must overwrite the nested flattening (insertion order)."
+    )
+
+    _, int_map_reverse, _, _ = extract_typed_attrs({"a.b": 2, "a": {"b": 1}})
+    assert int_map_reverse == {"a.b": 1}, (
+        "Nested flattening must overwrite the literal-dot key when inserted later."
+    )

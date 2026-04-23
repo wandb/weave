@@ -355,6 +355,43 @@ def test_fast_filter_mixed_backfill_bool_cast(
     assert matching_ids == {populated_match, legacy_match}
 
 
+def test_fast_filter_mixed_backfill_implicit_string_no_convert(
+    trace_server: object,
+    ch_server_force_legacy: ClickHouseTraceServer,
+) -> None:
+    """``attributes.env = 'prod'`` (no ``$convert``) matches populated + legacy.
+
+    Covers the implicit-string fast path: when the peer is a string
+    ``$literal``, the query builder routes through ``attributes_map_str``
+    without requiring the caller to wrap in ``$convert(..., "string")``.
+    The row-level ``mapContains`` guard still gates the fast read so the
+    legacy row falls back to the JSON_VALUE branch and matches.
+    """
+    external_project_id = f"{TEST_ENTITY}/implicit_string_{uuid.uuid4().hex[:8]}"
+    internal_project_id = b64(external_project_id)
+    reset_project_residence_cache()
+    populated_match, legacy_match, *_ = _populate_two_by_two(
+        ch_server_force_legacy.ch_client,
+        internal_project_id,
+        attr_key="env",
+        matching_value="prod",
+        other_value="staging",
+        now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0),
+    )
+
+    matching_ids = _query_ids(
+        trace_server,
+        external_project_id,
+        {
+            "$eq": [
+                {"$getField": "attributes.env"},
+                {"$literal": "prod"},
+            ]
+        },
+    )
+    assert matching_ids == {populated_match, legacy_match}
+
+
 def test_fast_filter_missing_int_key_does_not_match_map_default(
     trace_server: object,
     ch_server_force_legacy: ClickHouseTraceServer,

@@ -110,6 +110,14 @@ def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, A
     Matches the dot-path convention already used by read-side filters
     (`attributes.nested.leaf`), so a caller filtering on "attributes.foo.bar"
     hits the same key the extractor writes.
+
+    Collision caveat: ``{"a": {"b": 1}}`` and ``{"a.b": 1}`` both flatten to
+    key ``"a.b"``; the second write wins in the typed map. The ``JSON_VALUE``
+    fallback can still distinguish them (``$."a"."b"`` vs ``$."a.b"``), so a
+    row with a literal-dot key can legitimately read different values from
+    the fast and fallback branches. We accept this divergence because nested
+    dicts are the common shape; literal-dot keys are pathological and already
+    break the existing JSONPath-based filter convention.
     """
     result: list[tuple[str, Any]] = []
     for key, val in attrs.items():

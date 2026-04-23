@@ -2123,6 +2123,60 @@ def _attributes_map_fallback_sql(
     return clickhouse_cast(coalesced, cast)
 
 
+def _maybe_attributes_map_str_field_sql(
+    operand: "tsi_query.Operand",
+    peer: "tsi_query.Operand",
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool,
+    raw_fields_used: dict[str, "CallsMergedField"],
+) -> str | None:
+    """Implicit-string fast path for ``attributes.<path>`` compared against a
+    string ``$literal`` (no ``$convert`` wrapping).
+
+    Fires when ``operand`` is ``$getField(attributes.<path>)`` and ``peer`` is
+    a string literal, covering the common ``attributes.model = 'gpt-4'``
+    query shape that would otherwise require a ``$convert(..., "string")``
+    wrap to hit the typed map. Returns the same ``if(mapContains(...), fast,
+    JSON_VALUE fallback)`` hybrid as the ``$convert`` path, pinned to
+    ``attributes_map_str`` with a plain ``coalesce/nullIf`` fallback (no
+    cast wrapping — the Map value and the fallback both evaluate to
+    ``String``).
+
+    Returns None when the operand/peer shape doesn't match so callers fall
+    back to ``process_operand`` and preserve existing behavior (including
+    the ``IS NULL`` peer path and the ``$convert(..., "exists")`` case).
+    """
+    if not isinstance(operand, tsi_query.GetFieldOperator):
+        return None
+    if not isinstance(peer, tsi_query.LiteralOperation):
+        return None
+    if not isinstance(peer.literal_, str):
+        return None
+    field_name = operand.get_field_
+    if not field_name.startswith("attributes."):
+        return None
+    key = field_name[len("attributes.") :]
+    if not key:
+        return None
+
+    structured_field = get_field_by_name(field_name)
+    raw_fields_used[structured_field.field] = structured_field
+
+    key_slot = param_slot(pb.add_param(key), "String")
+    column_sql = f"{table_alias}.attributes_map_str"
+    attributes_dump_sql = f"{table_alias}.attributes_dump"
+    if use_agg_fn:
+        column_sql = f"any({column_sql})"
+        attributes_dump_sql = f"any({attributes_dump_sql})"
+
+    fast_expr = f"{column_sql}[{key_slot}]"
+    json_path_slot = _attributes_dump_json_path(field_name, pb)
+    json_value_expr = f"JSON_VALUE({attributes_dump_sql}, {json_path_slot})"
+    fallback_expr = f"coalesce(nullIf({json_value_expr}, 'null'), '')"
+    return f"if(mapContains({column_sql}, {key_slot}), {fast_expr}, {fallback_expr})"
+
+
 def _maybe_attributes_map_filter_sql(
     operand: tsi_query.ConvertOperation,
     pb: ParamBuilder,
@@ -2231,7 +2285,22 @@ def process_query_to_conditions(
                     rhs_part = process_operand(ops[1])
                     cond = f"has({array_expr}, {rhs_part})"
             else:
-                lhs_part = process_operand(ops[0])
+                # Implicit-string fast path: route $getField(attributes.x) vs
+                # a string literal through the typed Map column instead of
+                # JSON_VALUE, without requiring the caller to wrap the field
+                # in $convert(..., "string"). Falls through to the plain
+                # JSON_VALUE path for any other operand/peer shape (nested
+                # ops, typed-literal peers, attributes.* with no key, etc.),
+                # and is skipped entirely for the IS NULL peer case below.
+                lhs_fast = _maybe_attributes_map_str_field_sql(
+                    ops[0],
+                    ops[1],
+                    param_builder,
+                    table_alias,
+                    use_agg_fn,
+                    raw_fields_used,
+                )
+                lhs_part = lhs_fast if lhs_fast is not None else process_operand(ops[0])
                 if (
                     isinstance(ops[1], tsi_query.LiteralOperation)
                     and ops[1].literal_ is None
