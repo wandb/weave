@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Sequence
 from types import CoroutineType
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypedDict
 
 from pydantic import BaseModel
 
@@ -37,6 +37,30 @@ def is_pydantic_model_class(obj: Any) -> bool:
 
 # Sentinel returned by an encoder when the input is not its responsibility.
 _MISS: Any = object()
+
+
+class Encoder(Protocol):
+    """A single step in the ``to_json`` priority ladder.
+
+    Called once per candidate value. The encoder either claims the value and
+    returns its JSON-safe encoded form, or declines by returning the ``_MISS``
+    sentinel — in which case ``to_json`` tries the next encoder in order.
+
+    Contract:
+        - Never mutate ``obj``.
+        - Never raise for "not my type" — return ``_MISS``. Exceptions should
+          be reserved for genuine encoding failures (bad state, I/O errors).
+        - Recurse through ``to_json`` for nested values rather than calling
+          other encoders directly, so the full ladder applies uniformly.
+    """
+
+    def __call__(
+        self,
+        obj: Any,
+        project_id: str,
+        client: WeaveClient,
+        use_dictify: bool,
+    ) -> Any: ...
 
 
 def to_json(
@@ -168,13 +192,12 @@ def _encode_try_to_dict(
 ) -> Any:
     if as_dict := try_to_dict(obj):
         return {
-            k: to_json(v, project_id, client, use_dictify)
-            for k, v in as_dict.items()
+            k: to_json(v, project_id, client, use_dictify) for k, v in as_dict.items()
         }
     return _MISS
 
 
-_ENCODERS = [
+_ENCODERS: list[Encoder] = [
     _encode_ref,
     _encode_object_record,
     _encode_container,
