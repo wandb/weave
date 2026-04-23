@@ -437,8 +437,6 @@ trace_server_tests = [
   # BYOB - S3
   "moto[s3]>=5.0.0",
   "openai<1.100.0",
-  # OTEL SDK for metrics tests (InMemoryMetricReader). Not required at runtime.
-  "opentelemetry-sdk>=1.24.0",
 ]
 autogen_tests = [
   "autogen-agentchat>=0.5.7; python_version >= '3.10'",
