@@ -50,11 +50,11 @@ wandb_init_hook()
 from weave.agent.agent import Agent as Agent
 from weave.agent.agent import AgentState as AgentState
 from weave.dataset.dataset import Dataset
-from weave.evaluation.eval import Evaluation
 from weave.evaluation._imperative_shared import (
     EvaluationLoggerProtocol,
     ScoreLoggerProtocol,
 )
+from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2
 from weave.flow.annotation_spec import AnnotationSpec
@@ -97,8 +97,8 @@ __all__ = [
     "ObjectRef",
     "Prompt",
     "SavedView",
-    "Scorer",
     "ScoreLoggerProtocol",
+    "Scorer",
     "StringPrompt",
     "Table",
     "ThreadContext",

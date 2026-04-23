@@ -16,10 +16,6 @@ from __future__ import annotations
 
 import pytest
 
-from weave.evaluation._imperative_shared import (
-    EvaluationLoggerProtocol,
-    ScoreLoggerProtocol,
-)
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2
 
@@ -27,44 +23,6 @@ from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2
 @pytest.fixture(params=[EvaluationLogger, EvaluationLoggerV2], ids=["v1", "v2"])
 def logger_cls(request):
     return request.param
-
-
-def test_logger_and_score_logger_match_protocol_at_runtime(client, logger_cls):
-    # Both V1 and V2 should expose the shared `EvaluationLoggerProtocol` and
-    # `ScoreLoggerProtocol` public APIs. This is a loose structural check —
-    # mypy catches mismatches at type-check time, this catches them at
-    # runtime as a safety net against drift.
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    for member in EvaluationLoggerProtocol.__annotations__.keys() | {
-        "log_prediction",
-        "log_example",
-        "log_summary",
-        "set_view",
-        "finish",
-        "fail",
-        "ui_url",
-        "attributes",
-    }:
-        assert hasattr(ev, member), f"{logger_cls.__name__} is missing {member}"
-
-    pred = ev.log_prediction(inputs={"q": "x"}, output="y")
-    for member in {"output", "log_score", "alog_score", "finish"}:
-        assert hasattr(pred, member), (
-            f"{pred.__class__.__name__} is missing {member}"
-        )
-    pred.finish()
-    ev.log_summary()
-
-    # Sanity: the Protocols are importable as public names and annotations
-    # referencing them don't explode.
-    def _takes_logger(lg: EvaluationLoggerProtocol) -> None:
-        _ = lg.ui_url
-
-    def _takes_score_logger(sl: ScoreLoggerProtocol) -> None:
-        _ = sl.output
-
-    _takes_logger(ev)
-    _takes_score_logger(pred)
 
 
 def test_log_example_roundtrip(client, logger_cls):

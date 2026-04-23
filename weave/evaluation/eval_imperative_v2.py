@@ -18,7 +18,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import types
-from typing import TYPE_CHECKING, Any, cast, overload
+from dataclasses import dataclass
+from typing import Any, cast, overload
 
 from typing_extensions import Self
 
@@ -37,12 +38,10 @@ from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import is_tracing_setting_disabled
+from weave.trace.refs import ObjectRef
 from weave.trace_server import trace_server_interface as tsi
 from weave.utils.project_id import from_project_id
 from weave.utils.sentinel import NOT_SET, _NotSetType
-
-if TYPE_CHECKING:
-    from weave.trace_server.trace_server_interface import TraceServerInterface
 
 logger = logging.getLogger(__name__)
 
@@ -68,25 +67,36 @@ def _synthesize_scorer_source(scorer: Scorer) -> str:
     )
 
 
-def _build_object_ref(entity: str, project: str, object_id: str, digest: str) -> str:
-    return f"weave:///{entity}/{project}/object/{object_id}:{digest}"
+def _object_ref_uri(entity: str, project: str, object_id: str, digest: str) -> str:
+    """Build a canonical `weave:///...` object ref URI via `ObjectRef`."""
+    return ObjectRef(
+        entity=entity, project=project, name=object_id, _digest=digest
+    ).uri
+
+
+@dataclass(frozen=True)
+class _DatasetSpec:
+    """Normalized dataset input: name + raw rows for the V2 dataset_create API."""
+
+    name: str
+    rows: list[dict]
 
 
 def _resolve_dataset_spec(
     value: Dataset | list[dict] | str | None,
-) -> tuple[str, list[dict]]:
-    """Normalize a V1-style dataset input into (name, rows) for V2."""
+) -> _DatasetSpec:
+    """Normalize a V1-style dataset input for V2."""
     if value is None:
         name = _default_dataset_name()
-        return name, [{"dataset_id": name}]
+        return _DatasetSpec(name=name, rows=[{"dataset_id": name}])
     if isinstance(value, str):
-        return value, [{"dataset_id": value}]
+        return _DatasetSpec(name=value, rows=[{"dataset_id": value}])
     if isinstance(value, list):
-        return _default_dataset_name(), value
+        return _DatasetSpec(name=_default_dataset_name(), rows=value)
     ds = _cast_to_imperative_dataset(value)
     rows = list(ds.rows)
     name = ds.name if getattr(ds, "name", None) else _default_dataset_name()
-    return name, rows
+    return _DatasetSpec(name=name, rows=rows)
 
 
 class _LogScoreContextV2:
@@ -336,7 +346,7 @@ class EvaluationLoggerV2:
 
         # Normalize the dataset to (name, rows). V1 wraps into Dataset+Table
         # internally; V2 sends rows to the server directly.
-        self._dataset_name, self._dataset_rows = _resolve_dataset_spec(dataset)
+        self._dataset_spec = _resolve_dataset_spec(dataset)
 
         # Lifecycle state.
         self._is_finalized: bool = False
@@ -347,7 +357,7 @@ class EvaluationLoggerV2:
         # scores locally when WEAVE_DISABLED=true or no client exists; V2
         # mirrors that by skipping all server calls in this mode.
         self._disabled: bool = False
-        self._server: TraceServerInterface | None = None
+        self._server: tsi.TraceServerInterface | None = None
         self._project_id: str = ""
         self._entity: str = ""
         self._project: str = ""
@@ -410,12 +420,12 @@ class EvaluationLoggerV2:
         dataset_res = self._server.dataset_create(
             tsi.DatasetCreateReq(
                 project_id=self._project_id,
-                name=self._dataset_name,
+                name=self._dataset_spec.name,
                 description=None,
-                rows=self._dataset_rows,
+                rows=self._dataset_spec.rows,
             )
         )
-        self._dataset_ref = _build_object_ref(
+        self._dataset_ref = _object_ref_uri(
             self._entity, self._project, dataset_res.object_id, dataset_res.digest
         )
 
@@ -445,7 +455,7 @@ class EvaluationLoggerV2:
                 attributes=model_attrs or None,
             )
         )
-        self._model_ref = _build_object_ref(
+        self._model_ref = _object_ref_uri(
             self._entity, self._project, model_res.object_id, model_res.digest
         )
 
@@ -453,7 +463,7 @@ class EvaluationLoggerV2:
         eval_res = self._server.evaluation_create(
             tsi.EvaluationCreateReq(
                 project_id=self._project_id,
-                name=self.name or self._dataset_name,
+                name=self.name or self._dataset_spec.name,
                 description=None,
                 dataset=self._dataset_ref,
                 scorers=scorer_refs or None,
@@ -486,7 +496,7 @@ class EvaluationLoggerV2:
                 op_source_code=_synthesize_scorer_source(scorer),
             )
         )
-        return _build_object_ref(
+        return _object_ref_uri(
             self._entity, self._project, res.object_id, res.digest
         )
 

@@ -127,9 +127,10 @@ class EvaluationLoggerProtocol(Protocol):
     def fail(self, exception: BaseException) -> None: ...
 
 
-# Accepts any logger duck-typed with `_is_finalized: bool` and `.finish()`.
-# V1 (EvaluationLogger) and V2 (EvaluationLoggerV2) both satisfy this.
-_active_evaluation_loggers: list[Any] = []
+# Registry of unfinalized loggers for atexit cleanup. V1's EvaluationLogger
+# and V2's EvaluationLoggerV2 both satisfy the public protocol; `finish()`
+# is idempotent on both, so the cleanup path can simply invoke it.
+_active_evaluation_loggers: list[EvaluationLoggerProtocol] = []
 
 
 def _cleanup_all_evaluations() -> None:
@@ -137,10 +138,9 @@ def _cleanup_all_evaluations() -> None:
         _cleanup_evaluation(eval_logger)
 
 
-def _cleanup_evaluation(eval_logger: Any) -> None:
+def _cleanup_evaluation(eval_logger: EvaluationLoggerProtocol) -> None:
     try:
-        if not eval_logger._is_finalized:
-            eval_logger.finish()
+        eval_logger.finish()
     except Exception:
         logger.exception("Error during cleanup of evaluation logger")
 
