@@ -3,7 +3,6 @@ import json
 import logging
 import traceback
 from collections.abc import Callable
-from datetime import datetime
 from itertools import chain, repeat
 from typing import Any, Literal
 
@@ -11,6 +10,8 @@ from pydantic import PrivateAttr
 from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
+from weave.evaluation._display import default_evaluation_display_name
+from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.flow import util
 from weave.flow.casting import DatasetLike, ScorerLike
 from weave.flow.model import (
@@ -25,9 +26,10 @@ from weave.flow.scorer import (
     auto_summarize,
     get_scorer_attributes,
 )
-from weave.flow.util import make_memorable_name, transpose
+from weave.flow.util import transpose
 from weave.object.obj import Object
 from weave.trace.call import Call, CallsIter
+from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
@@ -40,18 +42,20 @@ from weave.trace.weave_client import get_ref
 from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id
 
+__all__ = [
+    "Evaluation",
+    "EvaluationResults",
+    "default_evaluation_display_name",
+    "evaluate",
+    "is_valid_model",
+]
+
 logger = logging.getLogger(__name__)
 
 INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
     + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
 )
-
-
-def default_evaluation_display_name(call: Call) -> str:
-    date = datetime.now().strftime("%Y-%m-%d")
-    unique_name = make_memorable_name()
-    return f"eval-{date}-{unique_name}"
 
 
 class EvaluationResults(Object):
@@ -294,7 +298,105 @@ class Evaluation(Object):
 
     @op(call_display_name=default_evaluation_display_name, eager_call_start=True)
     async def evaluate(self, model: Op | Model) -> dict:
-        eval_results = await self.get_eval_results(model)
+        if not is_valid_model(model):
+            raise ValueError(INVALID_MODEL_ERROR)
+
+        evaluate_call = call_context.get_current_call()
+        if evaluate_call is None:
+            # Tracing disabled or otherwise missing — fall back to the old path
+            # which doesn't require a live evaluate_call.
+            eval_results = await self.get_eval_results(model)
+            summary = await self.summarize(eval_results)
+            summary_str = _safe_summarize_to_str(summary)
+            if summary_str:
+                logger.info("Evaluation summary %s", summary_str)
+            return summary
+
+        scorer_names = [
+            get_scorer_attributes(s).scorer_name for s in (self.scorers or [])
+        ]
+
+        eval_logger = EvaluationLogger._for_declarative_evaluation(
+            evaluate_call=evaluate_call,
+            model=model,  # type: ignore[arg-type]
+            dataset=self.dataset,  # type: ignore[arg-type]
+            scorer_names=scorer_names,
+            predict_and_score_op=as_op(type(self).predict_and_score),
+            name=self.name,
+        )
+
+        eval_rows: list[tuple[int, dict]] = []
+        n_complete = 0
+        rows = self.dataset.rows
+        num_rows = len(rows) * self.trials
+
+        async def run_one(example: dict) -> dict:
+            try:
+                async with eval_logger.start_prediction_scope(example) as scope:
+                    applied = await apply_model_async(
+                        model, example, self.preprocess_model_input
+                    )
+                    if isinstance(applied, ApplyModelError):
+                        scope.set_model_latency(applied.model_latency)
+                        return {
+                            self._output_key: None,
+                            "scores": {},
+                            "model_latency": applied.model_latency,
+                        }
+
+                    scope.set_output(applied.model_output)
+                    scope.set_model_latency(applied.model_latency)
+
+                    scores: dict[str, Any] = {}
+                    if self.scorers:
+                        scorer_tasks = [
+                            applied.model_call.apply_scorer(scorer, example)
+                            for scorer in self.scorers
+                        ]
+                        scorer_results = await asyncio.gather(*scorer_tasks)
+                        for scorer, r in zip(
+                            self.scorers, scorer_results, strict=False
+                        ):
+                            name = get_scorer_attributes(scorer).scorer_name
+                            scope.add_score(name, r.result)
+                            scores[name] = r.result
+
+                    return {
+                        self._output_key: applied.model_output,
+                        "scores": scores,
+                        "model_latency": applied.model_latency,
+                    }
+            except OpCallError:
+                raise
+            except Exception:
+                logger.info("Predict and score failed")
+                traceback.print_exc()
+                return {self._output_key: None, "scores": {}}
+
+        trial_rows = chain.from_iterable(repeat(rows, self.trials))
+        async for index, _example, result in util.async_foreach(
+            trial_rows, run_one, get_weave_parallelism()
+        ):
+            n_complete += 1
+            logger.info("Evaluated %s of %s examples", n_complete, num_rows)
+            if result is None:
+                normalized = {self._output_key: None, "scores": {}}
+            else:
+                normalized = dict(result)
+            raw_scores = normalized.get("scores")
+            scores_dict = raw_scores if isinstance(raw_scores, dict) else {}
+            normalized["scores"] = scores_dict
+            if self.scorers:
+                for scorer in self.scorers:
+                    sn = get_scorer_attributes(scorer).scorer_name
+                    if sn not in scores_dict:
+                        scores_dict[sn] = {}
+            eval_rows.append((index, normalized))
+
+        eval_rows.sort(key=lambda x: x[0])
+        table_rows = [row for _, row in eval_rows]
+        eval_results = EvaluationResults(rows=Table(table_rows))
+
         summary = await self.summarize(eval_results)
 
         summary_str = _safe_summarize_to_str(summary)

@@ -9,7 +9,7 @@ import keyword
 import logging
 import re
 import types
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock
@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
-from weave.evaluation.eval import Evaluation, default_evaluation_display_name
+from weave.evaluation._display import default_evaluation_display_name
 from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
@@ -232,6 +232,78 @@ class ScorerCache:
 
 
 global_scorer_cache = ScorerCache()
+
+
+class _EvaluationShim(Object):
+    """Internal stand-in that the imperative logger uses as the `self` input of its
+    placeholder `Evaluation.*` ops.
+
+    Exists only so `eval_imperative.py` does not depend on `Evaluation` from
+    `eval.py` — inverting the old dependency direction. The class name is
+    overridden below to `"Evaluation"` so serialized `_class_name` matches
+    what the UI / tests expect.
+    """
+
+    dataset: Dataset
+    scorers: list[str] | None = None
+    metadata: dict[str, Any] | None = None
+
+
+_EvaluationShim.__name__ = "Evaluation"
+_EvaluationShim.__qualname__ = "Evaluation"
+
+
+class _PredictionScope:
+    """Per-row state yielded by `EvaluationLogger.start_prediction_scope`.
+
+    The scope records the model output, per-scorer values, and the model latency
+    the caller wants written onto the `predict_and_score` call. The call is
+    finalized when the surrounding async context manager exits.
+    """
+
+    def __init__(self, predict_and_score_call: Call) -> None:
+        self._call = predict_and_score_call
+        self._output: Any = None
+        self._scores: dict[str, ScoreType] = {}
+        self._model_latency: float | None = None
+        self._exception: BaseException | None = None
+
+    @property
+    def predict_and_score_call(self) -> Call:
+        return self._call
+
+    @property
+    def output(self) -> Any:
+        return self._output
+
+    @property
+    def scores(self) -> dict[str, ScoreType]:
+        return dict(self._scores)
+
+    @property
+    def model_latency(self) -> float | None:
+        return self._model_latency
+
+    def set_output(self, output: Any) -> None:
+        self._output = output
+
+    def add_score(self, scorer_name: str, value: ScoreType) -> None:
+        self._scores[scorer_name] = value
+
+    def set_model_latency(self, latency: float) -> None:
+        self._model_latency = latency
+
+    def _finalize(self) -> None:
+        wc = require_weave_client()
+        wc.finish_call(
+            self._call,
+            output={
+                "output": self._output,
+                "scores": self._scores,
+                "model_latency": self._model_latency,
+            },
+            exception=self._exception,
+        )
 
 
 class _LogScoreContext:
@@ -688,9 +760,9 @@ class EvaluationLogger:
         _active_evaluation_loggers.append(self)
 
         # At this point dataset has been processed and converted to a Dataset object
-        self._pseudo_evaluation = Evaluation(
+        self._pseudo_evaluation = _EvaluationShim(
             dataset=self.dataset,
-            scorers=[],
+            scorers=None,
             metadata={"scorers": self.scorers, **self.eval_attributes},
         )
 
@@ -721,10 +793,12 @@ class EvaluationLogger:
 
         # --- Setup the evaluation object ---
         @op(name="Evaluation.evaluate", enable_code_capture=False)
-        def evaluate(self: Evaluation, model: Model) -> None: ...
+        def evaluate(self: _EvaluationShim, model: Model) -> None: ...
 
         @op(name="Evaluation.predict_and_score", enable_code_capture=False)
-        def predict_and_score(self: Evaluation, model: Model, example: dict) -> dict:
+        def predict_and_score(
+            self: _EvaluationShim, model: Model, example: dict
+        ) -> dict:
             predict_method = cast(Op, model.get_infer_method())
             with attributes(IMPERATIVE_EVAL_MARKER):
                 output, predict_call = predict_method.call(
@@ -741,7 +815,7 @@ class EvaluationLogger:
             }
 
         @op(name="Evaluation.summarize", enable_code_capture=False)
-        def summarize(self: Evaluation) -> dict:
+        def summarize(self: _EvaluationShim) -> dict:
             return cast(dict, current_summary.get())
 
         self._pseudo_evaluation.__dict__.update(
@@ -753,6 +827,9 @@ class EvaluationLogger:
                 "summarize": MethodType(summarize, self._pseudo_evaluation),
             }
         )
+
+        self._declarative = False
+        self._predict_and_score_op = as_op(self._pseudo_evaluation.predict_and_score)
 
         # Create the evaluation call
         wc = require_weave_client()
@@ -807,6 +884,89 @@ class EvaluationLogger:
             logger.exception("Failed to finish evaluation call during finalization.")
 
         self._is_finalized = True
+
+    @classmethod
+    def _for_declarative_evaluation(
+        cls,
+        *,
+        evaluate_call: Call,
+        model: Model,
+        dataset: Dataset,
+        scorer_names: list[str] | None,
+        predict_and_score_op: Op,
+        eval_attributes: dict[str, Any] | None = None,
+        name: str | None = None,
+    ) -> Self:
+        """Build an EvaluationLogger bound to an already-open evaluate call.
+
+        Used by `Evaluation.evaluate` to delegate per-row call management to
+        this class while still running real `Model`/scorer ops (no placeholders,
+        no `IMPERATIVE_EVAL_MARKER`). The returned logger exposes
+        `start_prediction_scope`; it does not create or finalize the top-level
+        evaluate call — the `@op` wrapper on `Evaluation.evaluate` owns that
+        lifecycle — and is not registered for atexit cleanup.
+        """
+        self = cls.__new__(cls)
+        self.name = name
+        self.scorers = scorer_names
+        self.eval_attributes = dict(eval_attributes) if eval_attributes else {}
+        self.model = model
+        self.dataset = dataset
+        self._is_finalized = False
+        self._accumulated_predictions = []
+        self._declarative = True
+        self._pseudo_evaluation = _EvaluationShim(
+            dataset=dataset,
+            scorers=scorer_names,
+            metadata=dict(self.eval_attributes) or None,
+        )
+        self._context_predict_method = None
+        self._predict_and_score_op = predict_and_score_op
+        self._evaluate_call = evaluate_call
+        return self
+
+    @contextlib.asynccontextmanager
+    async def start_prediction_scope(
+        self, example: dict
+    ) -> AsyncIterator[_PredictionScope]:
+        """Open a `predict_and_score` call and yield a `_PredictionScope`.
+
+        Inside the scope, the call stack is `[evaluate_call, predict_and_score_call]`
+        so any ops the caller invokes (model, scorers) nest as children of the
+        `predict_and_score` call. The call is finalized when the scope exits.
+
+        This is the low-level primitive that both imperative `log_prediction`
+        and declarative `Evaluation.evaluate` can build on.
+        """
+        wc = require_weave_client()
+
+        marker_cm: contextlib.AbstractContextManager[Any] = (
+            contextlib.nullcontext()
+            if self._declarative
+            else attributes(IMPERATIVE_EVAL_MARKER)
+        )
+        with marker_cm:
+            pas_call = wc.create_call(
+                op=self._predict_and_score_op,
+                inputs={
+                    "self": self._pseudo_evaluation,
+                    "model": self.model,
+                    "example": example,
+                },
+                parent=self._evaluate_call,
+                use_stack=False,
+            )
+
+        scope = _PredictionScope(pas_call)
+
+        try:
+            with call_context.set_call_stack([self._evaluate_call, pas_call]):
+                yield scope
+        except BaseException as e:
+            scope._exception = e
+            raise
+        finally:
+            scope._finalize()
 
     def log_prediction(self, inputs: dict[str, Any], output: Any = None) -> ScoreLogger:
         """Log a prediction to the Evaluation.
