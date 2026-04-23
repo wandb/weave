@@ -227,6 +227,80 @@ def test_build_trace_chat_handles_null_started_at() -> None:
     assert user_msgs[0].text == "hello from the void"
 
 
+def test_invoke_agent_mirrors_child_llm_output_messages() -> None:
+    """When an invoke_agent span and its inner LLM span both carry the same
+    final `output_messages` (OpenAI Agents SDK / Google ADK single-call
+    turn), we should emit exactly one `agent_message`, not two.
+
+    The inner LLM span is the canonical content source; the parent
+    invoke_agent only emits if no descendant did.
+    """
+
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    final_text = [{"role": "assistant", "content": "It's 72°F."}]
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="my-bot",
+            input_messages=[{"role": "user", "content": "What's the weather?"}],
+            output_messages=final_text,  # mirrored onto the parent
+            input_tokens=10,
+            output_tokens=5,
+            started_at=at(0),
+        ),
+        _span(
+            span_id="llm",
+            parent_span_id="agent",
+            operation_name="chat",
+            output_messages=final_text,  # same text on the inner LLM call
+            input_tokens=200,
+            output_tokens=100,
+            started_at=at(1),
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    agent_messages = [m for m in messages if m.type == "agent_message"]
+
+    # Exactly one agent_message, sourced from the child chat span (not
+    # duplicated from the parent invoke_agent).
+    assert len(agent_messages) == 1
+    assert agent_messages[0].text == "It's 72°F."
+
+
+def test_invoke_agent_emits_when_no_descendant_llm_span() -> None:
+    """If an invoke_agent has output_messages but no descendant LLM span
+    carries them, the parent still emits — the guard is "child emitted
+    already?", not a blanket "never emit from invoke_agent".
+    """
+
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="solo-bot",
+            output_messages=[{"role": "assistant", "content": "hi there"}],
+            started_at=at(0),
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    agent_messages = [m for m in messages if m.type == "agent_message"]
+    assert len(agent_messages) == 1
+    assert agent_messages[0].text == "hi there"
+
+
 def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:
     """Siblings with equal started_at must sort deterministically by span_id."""
     t0 = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)

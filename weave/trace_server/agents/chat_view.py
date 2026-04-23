@@ -115,21 +115,20 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
 
     - `agent_start` when we enter an `invoke_agent` span that names an agent.
     - `tool_call` for each `execute_tool` span.
-    - `agent_message` for any span whose `output_messages` has assistant text,
-       at most once per span (tracked via `emitted_span_ids`).
+    - `agent_message` for the final assistant text in each subtree — either
+      from a descendant LLM span (`chat` / `generate_content`), or from the
+      `invoke_agent` span itself if no descendant emitted one. This avoids
+      double-rendering when SDKs (e.g. OpenAI Agents SDK, Google ADK) mirror
+      the final response onto both the parent `invoke_agent` and its inner
+      LLM call.
     - `context_compacted` when a compaction event rides on an `invoke_agent`
-       span.
-
-    Spans with operation names we don't special-case (`chat`,
-    `generate_content`, or anything else) just contribute their text via
-    `agent_message` if present; their children are walked normally.
+      span.
     """
     if not spans:
         return []
 
     tree = build_span_tree(spans)
     messages: list[AgentChatMessage] = []
-    emitted_span_ids: set[str] = set()
 
     user_prompt, user_started_at, user_refs = _find_user_prompt(spans)
     if user_prompt:
@@ -143,13 +142,13 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
             )
         )
 
-    def _walk(node: SpanNode, nearest_agent: str = "", _depth: int = 0) -> None:
+    def _walk(node: SpanNode, nearest_agent: str = "", _depth: int = 0) -> bool:
         """Preorder-walk one subtree, appending to the enclosing `messages`.
 
-        Mutates the enclosing `messages` and `emitted_span_ids` — the
-        `emitted_span_ids` set deduplicates `agent_message` emission so a
-        span that's reached both via a parent `invoke_agent`'s
-        `aggregate_node` hook and directly isn't emitted twice.
+        Returns True iff this subtree emitted at least one `agent_message`.
+        An enclosing `invoke_agent` uses that signal to decide whether to
+        emit its own mirrored response: if any descendant already did, the
+        parent stays quiet to avoid showing the same text twice.
 
         `nearest_agent` carries the name of the closest enclosing
         `invoke_agent` so descendants inherit it when they have no
@@ -162,7 +161,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                 node.span.trace_id,
                 node.span.span_id,
             )
-            return
+            return False
         span = node.span
         op = span.operation_name
         agent_name = span.agent_name or nearest_agent
@@ -198,14 +197,19 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                     span.span_id,
                 )
 
+            emitted_in_subtree = False
             for child in node.children:
-                _walk(child, name, _depth + 1)
+                if _walk(child, name, _depth + 1):
+                    emitted_in_subtree = True
 
-            if span.span_id not in emitted_span_ids:
+            # Only emit from the invoke_agent itself if no descendant LLM
+            # span already produced an `agent_message`. This is the
+            # mirroring guard described in the function docstring.
+            if not emitted_in_subtree:
                 msg = _emit_agent_message(span, name, aggregate_node=node)
                 if msg:
-                    emitted_span_ids.add(span.span_id)
                     messages.append(msg)
+                    emitted_in_subtree = True
 
             if span.compaction_summary or span.compaction_items_before > 0:
                 messages.append(
@@ -219,7 +223,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                         started_at=_dt_to_iso(span.started_at),
                     )
                 )
-            return
+            return emitted_in_subtree
 
         # ---- execute_tool ----
         if op == "execute_tool":
@@ -238,19 +242,23 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                     content_refs=_content_refs(span),
                 )
             )
+            emitted_in_subtree = False
             for child in node.children:
-                _walk(child, nearest_agent, _depth + 1)
-            return
+                if _walk(child, nearest_agent, _depth + 1):
+                    emitted_in_subtree = True
+            return emitted_in_subtree
 
         # ---- chat / generate_content / unknown: walk children, maybe emit ----
+        emitted_in_subtree = False
         for child in node.children:
-            _walk(child, agent_name, _depth + 1)
+            if _walk(child, agent_name, _depth + 1):
+                emitted_in_subtree = True
 
-        if span.span_id not in emitted_span_ids:
-            msg = _emit_agent_message(span, agent_name)
-            if msg:
-                emitted_span_ids.add(span.span_id)
-                messages.append(msg)
+        msg = _emit_agent_message(span, agent_name)
+        if msg:
+            messages.append(msg)
+            emitted_in_subtree = True
+        return emitted_in_subtree
 
     for root in tree:
         _walk(root)
@@ -397,21 +405,21 @@ def _sum_descendant_tokens(node: SpanNode) -> tuple[int, int, int, str]:
 def _find_user_prompt(spans: list[AgentSpanSchema]) -> UserPrompt:
     """Find the user prompt for this trace.
 
-    Prefers invoke_agent spans, falls back to any span with input_messages.
+    Priority order: invoke_agent spans first, then anything else, with
+    started_at tiebreaking inside each group. Returns the first span whose
+    `input_messages` yields user text.
     """
-    sorted_spans = sorted(spans, key=_span_sort_key)
-
-    for prefer_invoke_agent in (True, False):
-        for s in sorted_spans:
-            if prefer_invoke_agent and s.operation_name != OP_INVOKE_AGENT:
-                continue
-            msgs = s.input_messages or []
-            if not msgs:
-                continue
-            text = _extract_user_text(msgs, last_only=True)
-            if text:
-                return UserPrompt(text, _dt_to_iso(s.started_at), _content_refs(s))
-
+    prioritized = sorted(
+        spans,
+        key=lambda s: (s.operation_name != OP_INVOKE_AGENT, _span_sort_key(s)),
+    )
+    for s in prioritized:
+        msgs = s.input_messages or []
+        if not msgs:
+            continue
+        text = _extract_user_text(msgs, last_only=True)
+        if text:
+            return UserPrompt(text, _dt_to_iso(s.started_at), _content_refs(s))
     return UserPrompt("", "", [])
 
 
