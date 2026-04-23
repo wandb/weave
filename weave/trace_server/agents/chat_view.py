@@ -81,6 +81,11 @@ def build_trace_chat(
         root = next((s for s in spans if not s.parent_span_id), spans[0])
         root_span_name = root.agent_name or root.span_name
         provider = root.provider_name
+        # `total_duration_ms` == root span wall-clock duration
+        # (`root.ended_at - root.started_at`). Under OTel convention the
+        # root encloses its children, so this is the elapsed time for the
+        # whole turn — not a sum of child durations (which would double
+        # count overlapping subagents / parallel tool calls).
         total_duration_ms = _compute_duration_ms(root.started_at, root.ended_at)
 
     return AgentTraceChatRes(
@@ -93,7 +98,32 @@ def build_trace_chat(
 
 
 def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
-    """Convert a list of agent spans into a structured chat trajectory."""
+    """Convert a list of agent spans into a linear chat trajectory.
+
+    Build steps:
+
+    1. Build a parent-child tree from the flat span list (`build_span_tree`).
+    2. Emit a single `user_message` at the front, sourced from the first
+       `invoke_agent` span's `input_messages` (falling back to any span with
+       a usable user prompt; see `_find_user_prompt`).
+    3. Walk each root in `started_at` order. The walk is a preorder
+       traversal: emit lifecycle markers as we descend, recurse into
+       children, then emit trailing messages (agent response, compaction)
+       on the way back up.
+
+    The walk emits, in order:
+
+    - `agent_start` when we enter an `invoke_agent` span that names an agent.
+    - `tool_call` for each `execute_tool` span.
+    - `agent_message` for any span whose `output_messages` has assistant text,
+       at most once per span (tracked via `emitted_span_ids`).
+    - `context_compacted` when a compaction event rides on an `invoke_agent`
+       span.
+
+    Spans with operation names we don't special-case (`chat`,
+    `generate_content`, or anything else) just contribute their text via
+    `agent_message` if present; their children are walked normally.
+    """
     if not spans:
         return []
 
@@ -114,6 +144,17 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
         )
 
     def _walk(node: SpanNode, nearest_agent: str = "", _depth: int = 0) -> None:
+        """Preorder-walk one subtree, appending to the enclosing `messages`.
+
+        Mutates the enclosing `messages` and `emitted_span_ids` — the
+        `emitted_span_ids` set deduplicates `agent_message` emission so a
+        span that's reached both via a parent `invoke_agent`'s
+        `aggregate_node` hook and directly isn't emitted twice.
+
+        `nearest_agent` carries the name of the closest enclosing
+        `invoke_agent` so descendants inherit it when they have no
+        `agent_name` of their own.
+        """
         if _depth > MAX_WALK_DEPTH:
             logger.warning(
                 "span tree walk truncated at depth %d (trace_id=%s, span_id=%s)",
@@ -146,6 +187,15 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                         tool_definitions=span.tool_definitions or "",
                         started_at=_dt_to_iso(span.started_at),
                     )
+                )
+            else:
+                # `gen_ai.agent.name` is a recommended (not required)
+                # attribute, so some producers omit it. We still walk the
+                # subtree but don't emit an `agent_start` divider because
+                # there's nothing meaningful to label it with.
+                logger.debug(
+                    "invoke_agent span without agent_name (span_id=%s)",
+                    span.span_id,
                 )
 
             for child in node.children:
@@ -223,6 +273,10 @@ def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
             if parent:
                 parent.children.append(node)
             else:
+                # Orphan: parent is referenced but not in the input set
+                # (filtered out, dropped, or in a different ingest batch).
+                # Promote to a synthetic root so the subtree still renders
+                # rather than getting silently dropped.
                 roots.append(node)
         else:
             roots.append(node)
@@ -244,7 +298,16 @@ def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
 def _extract_user_text(
     messages: list[dict[str, Any]], *, last_only: bool = False
 ) -> str:
-    """Extract user text from normalized input_messages."""
+    """Extract user text from normalized input_messages.
+
+    First pass: entries tagged `role == "user"`. Fallback pass: entries
+    that could plausibly be the user prompt — anything that isn't
+    explicitly an `assistant` or `tool` message. Some SDKs (notably
+    Google ADK) store the user prompt with an empty or provider-specific
+    role, so a strict `role == "user"` filter misses them; but we still
+    want to exclude model replies and tool results to avoid surfacing
+    one of those as "the user prompt".
+    """
     if not messages:
         return ""
     texts = [
@@ -253,7 +316,11 @@ def _extract_user_text(
         if m.get("role") == "user" and m.get("content")
     ]
     if not texts:
-        texts = [m.get("content", "") for m in messages if m.get("content")]
+        texts = [
+            m.get("content", "")
+            for m in messages
+            if m.get("content") and m.get("role") not in {"assistant", "tool"}
+        ]
     if last_only and texts:
         return texts[-1]
     return "\n".join(texts)
