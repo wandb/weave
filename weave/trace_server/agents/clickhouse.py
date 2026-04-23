@@ -7,6 +7,7 @@ handling) and hydrates result rows into agent schemas.
 
 from __future__ import annotations
 
+import datetime
 import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -14,6 +15,8 @@ from typing import TYPE_CHECKING, Any
 from weave.trace_server.agents.chat_view import build_trace_chat
 from weave.trace_server.agents.constants import (
     MAX_CONVERSATION_CHAT_TURNS,
+    MAX_INGEST_ERRORS_REPORTED,
+    NO_CONVERSATION_LABEL,
     SEARCH_CONTENT_PREVIEW_CHARS,
 )
 from weave.trace_server.agents.helpers import (
@@ -166,7 +169,7 @@ class AgentQueryHandler:
 
         convs: dict[str, AgentSearchConversationResult] = {}
         for r in rows:
-            cid = safe_str(r.get("conversation_id")) or "(no conversation)"
+            cid = safe_str(r.get("conversation_id")) or NO_CONVERSATION_LABEL
             if cid not in convs:
                 convs[cid] = AgentSearchConversationResult(
                     conversation_id=cid,
@@ -190,7 +193,13 @@ class AgentQueryHandler:
             )
             convs[cid].total_matches += 1
 
-        results = sorted(convs.values(), key=lambda c: c.last_activity, reverse=True)
+        # `last_activity` should always be a real datetime (CH's `started_at`
+        # is non-null), but guard against None to avoid TypeError during sort.
+        results = sorted(
+            convs.values(),
+            key=lambda c: c.last_activity or datetime.datetime.min,
+            reverse=True,
+        )
         return AgentSearchRes(results=results, total_conversations=len(results))
 
     # ------------------------------------------------------------------
@@ -293,9 +302,17 @@ class AgentWriteHandler:
                             wb_run_id=processed_span.run_id or "",
                         )
                     except Exception as e:
+                        logger.exception(
+                            "GenAI span extraction failed for span_id=%s",
+                            span.span_id,
+                        )
                         rejected += 1
+                        # Don't leak raw `str(e)` to the client — it can
+                        # contain server-side state. Exception type is
+                        # safe and enough for a caller to triage.
                         errors.append(
-                            f"Extraction failed for span {span.span_id}: {e!s}"
+                            f"Extraction failed for span {span.span_id}: "
+                            f"{type(e).__name__}"
                         )
                         continue
 
@@ -307,8 +324,8 @@ class AgentWriteHandler:
                 "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
             )
 
-        error_msg = "; ".join(errors[:20])
-        if len(errors) > 20:
+        error_msg = "; ".join(errors[:MAX_INGEST_ERRORS_REPORTED])
+        if len(errors) > MAX_INGEST_ERRORS_REPORTED:
             error_msg += "; ..."
         return GenAIOTelExportRes(
             accepted_spans=accepted,
@@ -340,12 +357,18 @@ class AgentWriteHandler:
                 turns=[],
             )
 
-        # Group spans by trace_id, preserving insertion order
+        # Group spans by trace_id, preserving insertion order. One trace_id is
+        # treated as one turn — an informal convention followed by all
+        # mainstream agent SDKs (OpenAI Agents SDK, Anthropic Claude Agent
+        # SDK, Google ADK, LangChain/LangGraph). See DATA_MODEL.md.
         spans_by_trace: dict[str, list[Any]] = {}
         for r in _rows_as_dicts(result):
             span = AgentSpanSchema.model_construct(**normalize_span_row(r))
             spans_by_trace.setdefault(span.trace_id, []).append(span)
 
+        # The -N:] tail relies on `make_conversation_chat_spans_query`
+        # ordering rows ASC by started_at; flipping that sort would make
+        # this keep the N *oldest* turns instead of the N newest.
         trace_ids = list(spans_by_trace.keys())
         if len(trace_ids) > MAX_CONVERSATION_CHAT_TURNS:
             trace_ids = trace_ids[-MAX_CONVERSATION_CHAT_TURNS:]
@@ -390,7 +413,13 @@ def _first_cell_int(result: Any) -> int:
 def _hydrate_group_row(
     row: dict[str, Any], group_aliases: list[str]
 ) -> AgentSpanGroupRow:
-    """Split a result row into (group_keys, aggregates) and build the response row."""
+    """Hydrate one aggregate-query result row into an `AgentSpanGroupRow`.
+
+    Splits the flat result dict into two halves: the group-by columns keyed by
+    `group_aliases` (exposed as `group_keys` on the response row) and the
+    fixed aggregate bundle from `_GROUPED_SPAN_AGGREGATES` — keeping the
+    group dimensions separate from aggregates so callers can iterate either.
+    """
     group_keys = {alias: row.get(alias) for alias in group_aliases}
     return AgentSpanGroupRow(
         group_keys=group_keys,

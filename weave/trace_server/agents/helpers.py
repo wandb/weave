@@ -43,7 +43,7 @@ def unpack_string_array(val: Any) -> list[str]:
     """Unpack a ClickHouse Array(String) value, filtering empty strings."""
     if not val:
         return []
-    return [x for x in list(val) if x]
+    return [str(x) for x in list(val) if x]
 
 
 def normalize_span_row(d: dict[str, Any]) -> dict[str, Any]:
@@ -53,15 +53,15 @@ def normalize_span_row(d: dict[str, Any]) -> dict[str, Any]:
     """
     for key in ("input_messages", "output_messages"):
         msgs = d.get(key)
-        if msgs and isinstance(msgs, list):
-            d[key] = [
-                {
-                    "role": m[0],
-                    "content": m[1],
-                    "finish_reason": m[2],
-                }
-                if isinstance(m, tuple)
-                else m
-                for m in msgs
-            ]
+        if not msgs or not isinstance(msgs, list):
+            continue
+        normalized: list[Any] = []
+        for m in msgs:
+            if isinstance(m, tuple):
+                normalized.append(
+                    {"role": m[0], "content": m[1], "finish_reason": m[2]}
+                )
+            else:
+                normalized.append(m)
+        d[key] = normalized
     return d

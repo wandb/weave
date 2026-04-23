@@ -1,7 +1,6 @@
 """ClickHouse schema and column definitions for the spans table.
 
-Columns use neutral names (e.g. `input_tokens`, not `gen_ai_usage_input_tokens`)
-and are populated from OTel attributes during ingest.
+Columns use neutral names and are populated from OTel attributes during ingest.
 
 For the canonical catalog of which attributes feed which columns — and for the
 `weave.*` / `gen_ai.*` alias resolution — see `semconv.py`. That module
@@ -11,7 +10,7 @@ extraction logic that applies those conventions lives in
 """
 
 import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -88,8 +87,8 @@ class AgentSpanCHInsertable(BaseModel):
     ended_at: datetime.datetime = Field(default_factory=lambda: _EPOCH)
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
-    # [OTel Core] status
-    status_code: str = "UNSET"
+    # [OTel Core] status — matches the ClickHouse Enum8 exactly.
+    status_code: Literal["UNSET", "OK", "ERROR"] = "UNSET"
     status_message: str = ""
 
     # [OTel GenAI] classification — gen_ai.operation.name, gen_ai.provider.name
@@ -120,6 +119,8 @@ class AgentSpanCHInsertable(BaseModel):
 
     # [OTel GenAI] conversation / session — gen_ai.conversation.*
     conversation_id: str = ""
+    # [Weave] conversation_name is Weave-specific; not part of the OTel GenAI
+    # conventions, populated from a producer-side label when available.
     conversation_name: str = ""
 
     # [OTel GenAI] tool info — gen_ai.tool.*
@@ -130,7 +131,7 @@ class AgentSpanCHInsertable(BaseModel):
     tool_definitions: str = ""
 
     # [OTel GenAI] response — gen_ai.response.finish_reasons
-    finish_reasons: list[str] = []
+    finish_reasons: list[str] = Field(default_factory=list)
 
     # [OTel Core] error type — error.type (conditionally required on failure)
     error_type: str = ""
@@ -142,18 +143,18 @@ class AgentSpanCHInsertable(BaseModel):
     request_frequency_penalty: float = 0.0
     request_presence_penalty: float = 0.0
     request_seed: int = 0
-    request_stop_sequences: list[str] = []
+    request_stop_sequences: list[str] = Field(default_factory=list)
     request_choice_count: int = 0
 
     # [OTel GenAI] output type — gen_ai.output.type (text, json, image, speech)
     output_type: str = ""
 
     # [OTel GenAI] messages — gen_ai.input.messages, gen_ai.output.messages
-    input_messages: list[NormalizedMessage] = []
-    output_messages: list[NormalizedMessage] = []
+    input_messages: list[NormalizedMessage] = Field(default_factory=list)
+    output_messages: list[NormalizedMessage] = Field(default_factory=list)
 
     # [OTel GenAI] system instructions — gen_ai.system_instructions
-    system_instructions: list[str] = []
+    system_instructions: list[str] = Field(default_factory=list)
 
     # [OTel GenAI] tool call data — gen_ai.tool.call.arguments/result
     tool_call_arguments: str = ""
@@ -165,9 +166,9 @@ class AgentSpanCHInsertable(BaseModel):
     compaction_items_after: int = 0
 
     # [Weave] content refs — weave.content_refs, weave.artifact_refs, weave.object_refs
-    content_refs: list[str] = []
-    artifact_refs: list[str] = []
-    object_refs: list[str] = []
+    content_refs: list[str] = Field(default_factory=list)
+    artifact_refs: list[str] = Field(default_factory=list)
+    object_refs: list[str] = Field(default_factory=list)
 
     # [Weave] custom attributes — typed Maps for vendor/user attrs not in schema
     custom_attrs: dict[str, str] = Field(default_factory=dict)

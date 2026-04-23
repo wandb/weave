@@ -62,3 +62,21 @@ SPAN_KIND_UNSPECIFIED = "UNSPECIFIED"
 # Character cap on the content preview returned by message search matches.
 # Keeps payload size bounded when a hit includes a very long message body.
 SEARCH_CONTENT_PREVIEW_CHARS = 500
+
+# Displayed conversation_id bucket for spans with no `gen_ai.conversation.id`.
+NO_CONVERSATION_LABEL = "(no conversation)"
+
+# ---------------------------------------------------------------------------
+# Ingest
+# ---------------------------------------------------------------------------
+
+# Cap on the number of per-span error strings folded into the
+# `GenAIOTelExportRes.error_message`. Beyond this, the tail is summarised
+# as `; ...`.
+MAX_INGEST_ERRORS_REPORTED = 20
+
+# ---------------------------------------------------------------------------
+# Operation names (`gen_ai.operation.name`)
+# ---------------------------------------------------------------------------
+
+OP_INVOKE_AGENT = "invoke_agent"

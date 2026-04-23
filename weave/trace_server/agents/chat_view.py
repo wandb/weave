@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, NamedTuple
 
-from weave.trace_server.agents.constants import MAX_WALK_DEPTH
+from weave.trace_server.agents.constants import MAX_WALK_DEPTH, OP_INVOKE_AGENT
 from weave.trace_server.agents.types import (
     AgentChatMessage,
     AgentSpanSchema,
@@ -115,14 +115,22 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
 
     def _walk(node: SpanNode, nearest_agent: str = "", _depth: int = 0) -> None:
         if _depth > MAX_WALK_DEPTH:
+            logger.warning(
+                "span tree walk truncated at depth %d (trace_id=%s, span_id=%s)",
+                _depth,
+                node.span.trace_id,
+                node.span.span_id,
+            )
             return
         span = node.span
         op = span.operation_name
         agent_name = span.agent_name or nearest_agent
 
         # ---- invoke_agent ----
-        if op == "invoke_agent":
-            name = span.agent_name or span.span_name.removeprefix("invoke_agent ")
+        if op == OP_INVOKE_AGENT:
+            name = span.agent_name or span.span_name.removeprefix(
+                f"{OP_INVOKE_AGENT} "
+            )
 
             if span.agent_name:
                 messages.append(
@@ -271,6 +279,7 @@ def _dt_to_iso(dt: Any) -> str:
     try:
         return dt.isoformat()
     except AttributeError:
+        logger.exception("unexpected non-datetime value %r in _dt_to_iso", dt)
         return str(dt)
 
 
@@ -285,6 +294,11 @@ def _compute_duration_ms(started_at: Any, ended_at: Any) -> int:
         delta = ended_at - started_at
         return max(0, int(delta.total_seconds() * 1000))
     except Exception:
+        logger.exception(
+            "failed to compute duration from started_at=%r ended_at=%r",
+            started_at,
+            ended_at,
+        )
         return 0
 
 
@@ -322,7 +336,7 @@ def _find_user_prompt(spans: list[AgentSpanSchema]) -> UserPrompt:
 
     for prefer_invoke_agent in (True, False):
         for s in sorted_spans:
-            if prefer_invoke_agent and s.operation_name != "invoke_agent":
+            if prefer_invoke_agent and s.operation_name != OP_INVOKE_AGENT:
                 continue
             msgs = s.input_messages or []
             if not msgs:
