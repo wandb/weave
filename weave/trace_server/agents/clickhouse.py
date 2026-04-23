@@ -163,13 +163,14 @@ class AgentQueryHandler:
     # Message search
     # ------------------------------------------------------------------
 
-    def search(self, req: AgentSearchReq) -> AgentSearchRes:
+    def search_messages(self, req: AgentSearchReq) -> AgentSearchRes:
         """Full-text search across message content."""
         rows = self._run_query(make_message_search_query, req)
 
         convs: dict[str, AgentSearchConversationResult] = {}
         for r in rows:
             cid = safe_str(r.get("conversation_id")) or NO_CONVERSATION_LABEL
+            started = r.get("started_at")
             if cid not in convs:
                 convs[cid] = AgentSearchConversationResult(
                     conversation_id=cid,
@@ -177,7 +178,7 @@ class AgentQueryHandler:
                     agent_name=safe_str(r.get("agent_name")),
                     matched_messages=[],
                     total_matches=0,
-                    last_activity=r.get("started_at"),
+                    last_activity=started,
                 )
             convs[cid].matched_messages.append(
                 AgentSearchMatchedMessage(
@@ -188,10 +189,18 @@ class AgentQueryHandler:
                         :SEARCH_CONTENT_PREVIEW_CHARS
                     ],
                     content_digest=safe_str(r.get("content_digest")),
-                    started_at=r.get("started_at"),
+                    started_at=started,
                 )
             )
             convs[cid].total_matches += 1
+            # Track the most recent match across all rows for this
+            # conversation so the sidebar sort order is stable regardless
+            # of row arrival order.
+            if started is not None and (
+                convs[cid].last_activity is None
+                or started > convs[cid].last_activity
+            ):
+                convs[cid].last_activity = started
 
         # `last_activity` should always be a real datetime (CH's `started_at`
         # is non-null), but guard against None to avoid TypeError during sort.
@@ -206,7 +215,7 @@ class AgentQueryHandler:
     # Internal: spans-for-one-trace with chat projection
     # ------------------------------------------------------------------
 
-    def _trace_detail_spans(
+    def trace_detail_spans(
         self, project_id: str, trace_id: str
     ) -> list[AgentSpanSchema]:
         """Fetch all spans for a trace using the chat-view projection.
@@ -215,7 +224,7 @@ class AgentQueryHandler:
         public query endpoint.
         """
         rows = self._run_query(make_trace_detail_spans_query, project_id, trace_id)
-        return [AgentSpanSchema.model_construct(**normalize_span_row(r)) for r in rows]
+        return [AgentSpanSchema.model_validate(normalize_span_row(r)) for r in rows]
 
     # ------------------------------------------------------------------
     # Query plumbing
@@ -271,7 +280,7 @@ class AgentWriteHandler:
     # OTel ingest
     # ------------------------------------------------------------------
 
-    def otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
+    def insert_otel_spans(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
         """Ingest OTel spans into the spans table.
 
         The `messages` search table is populated by a ClickHouse
@@ -340,7 +349,7 @@ class AgentWriteHandler:
     def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
         reader = AgentQueryHandler(self._query)
-        spans = reader._trace_detail_spans(req.project_id, req.trace_id)
+        spans = reader.trace_detail_spans(req.project_id, req.trace_id)
         return build_trace_chat(spans, req.trace_id)
 
     def conversation_chat(
@@ -363,7 +372,7 @@ class AgentWriteHandler:
         # SDK, Google ADK, LangChain/LangGraph). See DATA_MODEL.md.
         spans_by_trace: dict[str, list[Any]] = {}
         for r in _rows_as_dicts(result):
-            span = AgentSpanSchema.model_construct(**normalize_span_row(r))
+            span = AgentSpanSchema.model_validate(normalize_span_row(r))
             spans_by_trace.setdefault(span.trace_id, []).append(span)
 
         # The -N:] tail relies on `make_conversation_chat_spans_query`
@@ -385,7 +394,6 @@ class AgentWriteHandler:
 
         return AgentConversationChatRes(
             conversation_id=req.conversation_id,
-            turn_count=len(turns),
             total_duration_ms=total_duration,
             turns=turns,
         )

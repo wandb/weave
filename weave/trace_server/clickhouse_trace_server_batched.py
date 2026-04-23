@@ -6542,7 +6542,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return AgentQueryHandler(self._query).agent_versions_query(req)
 
     def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
-        return AgentQueryHandler(self._query).search(req)
+        return AgentQueryHandler(self._query).search_messages(req)
 
     def agent_traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         return AgentWriteHandler(self.ch_client, self._query).traces_chat(req)
@@ -6553,7 +6553,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return AgentWriteHandler(self.ch_client, self._query).conversation_chat(req)
 
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
-        return AgentWriteHandler(self.ch_client, self._query).otel_export(req)
+        return AgentWriteHandler(self.ch_client, self._query).insert_otel_spans(req)
 
     # Private Methods
     @property

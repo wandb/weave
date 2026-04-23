@@ -323,7 +323,6 @@ class AgentConversationChatRes(BaseModel):
 
     conversation_id: str
     provider: str = ""
-    turn_count: int = 0
     total_duration_ms: int = 0
     turns: list[AgentTraceChatRes] = Field(default_factory=list)
 

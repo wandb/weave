@@ -51,7 +51,7 @@ def _make_span(project_id: str, **overrides: object) -> AgentSpanCHInsertable:
 
 
 def _insert_spans(ch_client, spans: list[AgentSpanCHInsertable]) -> None:
-    """Insert spans. The ``messages`` MV populates the search index as a
+    """Insert spans. The `messages` MV populates the search index as a
     side effect of this insert.
     """
     rows = [genai_span_to_row(s) for s in spans]
@@ -335,8 +335,8 @@ def test_agents_mv_zero_duration_when_ended_at_unset(ch_server):
     """A span inserted without ended_at (defaults to epoch) must contribute
     0 to total_duration_ms rather than wrapping via UInt64 cast to ~2^64.
 
-    Before the fix, ``toUInt64(toUnixTimestamp64Milli(ended_at) -
-    toUnixTimestamp64Milli(started_at))`` on an epoch ended_at produced
+    Before the fix, `toUInt64(toUnixTimestamp64Milli(ended_at) -
+    toUnixTimestamp64Milli(started_at))` on an epoch ended_at produced
     18446742296979951616 and permanently poisoned the aggregate.
     """
     project_id = _make_project_id("dur_guard")
@@ -386,7 +386,7 @@ def test_agents_mv_zero_duration_when_ended_at_unset(ch_server):
 
 
 def test_message_search(ch_server):
-    """End-to-end search against the ``messages`` table.
+    """End-to-end search against the `messages` table.
 
     Spans are inserted and the ClickHouse MV populates the search index
     automatically; no Python-side extraction runs. Verifies that content
@@ -438,7 +438,7 @@ def test_message_search(ch_server):
 
 def test_message_search_shared_digest_across_spans(ch_server):
     """Two spans carrying identical output message content should produce
-    two rows in ``messages`` that share a single content_digest — enabling
+    two rows in `messages` that share a single content_digest — enabling
     read-side dedup via GROUP BY content_digest when desired.
     """
     project_id = _make_project_id("search_dedup")
@@ -569,7 +569,7 @@ def test_query_dsl_combines_semconv_column_and_custom_attr(ch_server):
 
 
 def test_query_dsl_typed_custom_attr_comparison(ch_server):
-    """Int-typed custom attributes route to ``custom_attrs_int`` via the
+    """Int-typed custom attributes route to `custom_attrs_int` via the
     sibling-literal type and compare numerically.
     """
     project_id = _make_project_id("dsl_int")

@@ -187,7 +187,7 @@ def test_build_span_tree_handles_null_started_at() -> None:
 def test_build_trace_chat_handles_null_started_at() -> None:
     """build_trace_chat must not crash when a span has started_at=None.
 
-    _find_user_prompt previously sorted by ``s.started_at or ""`` which
+    _find_user_prompt previously sorted by `s.started_at or ""` which
     mixed datetime with str and raised TypeError for any span missing
     started_at. The fix uses a tuple key with a None-last sentinel.
     """

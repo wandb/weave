@@ -329,6 +329,11 @@ def _extract_user_text(
             for m in messages
             if m.get("content") and m.get("role") not in {"assistant", "tool"}
         ]
+        if texts:
+            logger.debug(
+                "no role=user input messages; falling back to non-assistant/tool entries (roles=%r)",
+                [m.get("role") for m in messages],
+            )
     if last_only and texts:
         return texts[-1]
     return "\n".join(texts)

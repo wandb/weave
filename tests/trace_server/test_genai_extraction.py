@@ -2,7 +2,7 @@
 
 Per griffin's review: the per-helper tests (TestExtractProvider,
 TestExtractOperationName, etc.) duplicated what one comprehensive
-``extract_genai_span`` test already covers. Collapsed into a single
+`extract_genai_span` test already covers. Collapsed into a single
 success-path test that exercises every extractor plus one error-status
 test since that's a separate code path (Status object vs attributes).
 """
@@ -222,7 +222,7 @@ def test_extract_custom_attrs_truncates_large_string_values() -> None:
 
 def test_extract_custom_attrs_truncates_large_json_values() -> None:
     """Non-primitive, non-dict values (e.g. lists) get JSON-encoded then
-    truncated the same way. Dicts get flattened by ``_flatten_attrs`` so
+    truncated the same way. Dicts get flattened by `_flatten_attrs` so
     they never hit the JSON-encoding branch.
     """
     from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_BYTES
@@ -242,9 +242,9 @@ def test_extract_custom_attrs_routes_bool_to_bool_map() -> None:
     """Bool values land in custom_attrs_bool, not custom_attrs or
     custom_attrs_int.
 
-    Ordering matters: Python ``bool`` is a subclass of ``int``, so the
+    Ordering matters: Python `bool` is a subclass of `int`, so the
     extractor's bool check must come before the int check (otherwise
-    ``isinstance(True, int)`` matches first and the value ends up in
+    `isinstance(True, int)` matches first and the value ends up in
     custom_attrs_int).
     """
     result = extract_genai_span(
