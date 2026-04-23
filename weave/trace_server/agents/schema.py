@@ -15,12 +15,8 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from weave.trace_server.agents.constants import SPAN_KIND_UNSPECIFIED
+from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
-
-# Python mirror of the ClickHouse `DEFAULT toDateTime64(0, 6)` on `ended_at`.
-# Used when a span was never closed (e.g. the agent crashed mid-turn). The
-# query-side MV guards against negative durations from this sentinel.
-_EPOCH = datetime.datetime(1970, 1, 1)
 
 
 class NormalizedMessage(BaseModel):
@@ -35,8 +31,8 @@ class NormalizedMessage(BaseModel):
     Lossless original data is preserved in `raw_span_dump` on the span.
     """
 
-    role: str = ""
-    content: str = ""
+    role: str
+    content: str
     finish_reason: str = ""
 
 
@@ -66,7 +62,8 @@ class AgentSpanCHInsertable(BaseModel):
 
     # [OTel Core] timestamps
     started_at: datetime.datetime
-    ended_at: datetime.datetime = Field(default_factory=lambda: _EPOCH)
+    # Mirrors the ClickHouse `DEFAULT toDateTime64(0, 6)` sentinel for open spans.
+    ended_at: datetime.datetime = SENTINEL_DATETIME
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
     # [OTel Core] status — matches the ClickHouse Enum8 exactly.
