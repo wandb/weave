@@ -119,7 +119,6 @@ def test_generate_context_and_output():
     assert len(context_words) > len(output_words)
 
 
-@pytest.mark.wandb
 def test_download_model_default_env_var():
     pytest.importorskip(
         "wandb",
@@ -129,7 +128,6 @@ def test_download_model_default_env_var():
     assert tiny_model_path.exists()
 
 
-@pytest.mark.wandb
 def test_download_model_custom_env_var():
     pytest.importorskip(
         "wandb",
@@ -159,7 +157,6 @@ def test_load_hf_model_weights_with_default():
     assert os.path.isdir(result_path)
 
 
-@pytest.mark.wandb
 def test_load_hf_model_weights_with_wandb_artifact():
     """Test load_local_model_weights function with W&B artifact path (backward compatibility)."""
     pytest.importorskip(

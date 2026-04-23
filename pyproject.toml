@@ -221,7 +221,6 @@ markers = [
   "timeout: marks tests with a timeout in seconds (via pytest-timeout)",
   "remote_only: marks tests that only run with --remote-http-trace-server=remote",
   "stainless_only: marks tests that only run with --remote-http-trace-server=stainless",
-  "wandb: marks tests that require the `wandb` package to be installed (run via the scorers_wandb nox shard)",
 ]
 
 [tool.ruff.lint]

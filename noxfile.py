@@ -68,7 +68,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "autogen_tests",
     "verifiers_test",
     "pandas_test",
-    "scorers_wandb",
+    "scorers",
 }
 
 
@@ -106,7 +106,6 @@ SHARDS_WITHOUT_EXTRAS = {
         "vertexai",
         "bedrock",
         "scorers",
-        "scorers_wandb",
         "pandas_test",
         "huggingface",
         "smolagents",
@@ -141,8 +140,9 @@ def tests(session: nox.Session, shard: str):
     elif shard in {"trace_server", "trace_server_migrator"}:
         # trace_server shards need both trace_server dependency group and trace_server_tests
         sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
-    elif shard == "scorers_wandb":
-        # scorers_wandb runs the wandb-gated scorer tests that need both extras installed
+    elif shard == "scorers":
+        # scorer tests include a few that hit W&B Artifacts directly, so install
+        # both extras to cover the full suite.
         sync_args.extend(["--extra", "scorers", "--extra", "wandb"])
 
     session.run(*sync_args)
@@ -174,13 +174,11 @@ def tests(session: nox.Session, shard: str):
         env["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY", "MISSING")
         env["MISTRAL_API_KEY"] = os.getenv("MISTRAL_API_KEY", "MISSING")
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
+        # A few scorer tests download tiny models from W&B Artifacts.
+        env["WANDB_API_KEY"] = os.getenv("WANDB_API_KEY", "MISSING")
 
     if shard == "openai_agents":
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
-
-    if shard == "scorers_wandb":
-        # Downloading W&B Artifacts in the scorers tests requires authentication.
-        env["WANDB_API_KEY"] = os.getenv("WANDB_API_KEY", "MISSING")
 
     default_test_dirs = [f"tests/integrations/{shard}/"]
     test_dirs_dict = {
@@ -191,7 +189,6 @@ def tests(session: nox.Session, shard: str):
         "trace_server_migrator": ["tests/trace_server_migrator/"],
         "stainless": ["tests/trace_server_bindings/"],
         "scorers": ["tests/scorers/"],
-        "scorers_wandb": ["tests/scorers/"],
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
         "trace": [
@@ -240,13 +237,6 @@ def tests(session: nox.Session, shard: str):
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
-
-    if shard == "scorers":
-        # wandb-gated tests move to the `scorers_wandb` shard.
-        pytest_args.extend(["-m", "not wandb"])
-
-    if shard == "scorers_wandb":
-        pytest_args.extend(["-m", "wandb"])
 
     if shard == "trace_calls_complete_only":
         env["WEAVE_USE_CALLS_COMPLETE"] = "true"
