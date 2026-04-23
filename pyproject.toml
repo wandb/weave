@@ -35,7 +35,6 @@ classifiers = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-  "wandb>=0.17.1",
   "sentry-sdk>=2.0.0,<3.0.0",
   "pydantic>=2.0.0",
   "packaging>=21.0",                      # For version parsing in integrations
@@ -358,7 +357,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.37-dev0"
+current_version = "0.52.38-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

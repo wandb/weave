@@ -81,7 +81,9 @@ class FlakyAdapter:
             if capture_traces
             else None
         )
-        return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
+        return EvaluationBatch(
+            outputs=outputs, scores=scores, trajectories=trajectories
+        )
 
     def make_reflective_dataset(
         self,
@@ -114,7 +116,9 @@ def main() -> None:
     project = os.getenv("WEAVE_PROJECT", "gepa-errors-smoketest")
     budget = int(os.getenv("GEPA_BUDGET", "20"))
     error_iters = {
-        int(x.strip()) for x in os.getenv("GEPA_ERROR_ITERS", "1,3").split(",") if x.strip()
+        int(x.strip())
+        for x in os.getenv("GEPA_ERROR_ITERS", "1,3").split(",")
+        if x.strip()
     }
     # The adapter counts `evaluate()` calls 1-indexed; call 1 is the seed
     # full-valset eval which we must let succeed. Map the requested

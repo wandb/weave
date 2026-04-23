@@ -33,30 +33,16 @@ def insert_call(ch_client, table: str, project_id: str):
 
 @contextmanager
 def count_queries(ch_client):
-    """Count CH queries made through the given client.
-
-    Returns a (get_count, mint_client) tuple. mint_client is a factory that
-    returns the counted client (with close() suppressed so the resolver
-    doesn't tear it down).
-    """
     call_count = 0
     original_query = ch_client.query
-    original_close = ch_client.close
 
     def counting_query(*args, **kwargs):
         nonlocal call_count
         call_count += 1
         return original_query(*args, **kwargs)
 
-    with (
-        patch.object(ch_client, "query", side_effect=counting_query),
-        patch.object(ch_client, "close"),
-    ):
-
-        def _mint() -> type(ch_client):
-            return ch_client
-
-        yield lambda: call_count, _mint
+    with patch.object(ch_client, "query", side_effect=counting_query):
+        yield lambda: call_count
 
 
 @pytest.mark.parametrize(
@@ -129,15 +115,15 @@ def test_version_resolution_by_table_contents(
         insert_call(ch_server.ch_client, table, project_id)
 
     assert (
-        resolver.resolve_read_table(project_id, ch_server._mint_client)
+        resolver.resolve_read_table(project_id, ch_server.ch_client)
         == expected_read_table
     )
     assert (
-        resolver.resolve_v1_write_target(project_id, ch_server._mint_client)
+        resolver.resolve_v1_write_target(project_id, ch_server.ch_client)
         == expected_v1_write_target
     )
     assert (
-        resolver.resolve_v2_write_target(project_id, ch_server._mint_client)
+        resolver.resolve_v2_write_target(project_id, ch_server.ch_client)
         == expected_v2_write_target
     )
 
@@ -167,22 +153,22 @@ def test_caching_behavior(client, trace_server):
     cached_proj = make_project_id("cached_project")
     insert_call(ch_server.ch_client, "calls_complete", cached_proj)
 
-    with count_queries(ch_server.ch_client) as (get_count, mint):
-        table1 = resolver.resolve_read_table(cached_proj, mint)
+    with count_queries(ch_server.ch_client) as get_count:
+        table1 = resolver.resolve_read_table(cached_proj, ch_server.ch_client)
         assert table1 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
-        table2 = resolver.resolve_read_table(cached_proj, mint)
+        table2 = resolver.resolve_read_table(cached_proj, ch_server.ch_client)
         assert table2 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
     empty_proj = make_project_id("empty_not_cached")
-    with count_queries(ch_server.ch_client) as (get_count, mint):
-        table1 = resolver.resolve_read_table(empty_proj, mint)
+    with count_queries(ch_server.ch_client) as get_count:
+        table1 = resolver.resolve_read_table(empty_proj, ch_server.ch_client)
         assert table1 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
-        table2 = resolver.resolve_read_table(empty_proj, mint)
+        table2 = resolver.resolve_read_table(empty_proj, ch_server.ch_client)
         assert table2 == ReadTable.CALLS_COMPLETE
         assert get_count() == 2
 
@@ -198,20 +184,20 @@ def test_mode_off_and_force_legacy(client, trace_server):
     insert_call(ch_server.ch_client, "calls_complete", project_id)
 
     resolver._mode = CallsStorageServerMode.OFF
-    with count_queries(ch_server.ch_client) as (get_count, mint):
-        table = resolver.resolve_read_table(project_id, mint)
+    with count_queries(ch_server.ch_client) as get_count:
+        table = resolver.resolve_read_table(project_id, ch_server.ch_client)
         assert table == ReadTable.CALLS_MERGED
         assert get_count() == 0
 
     resolver._mode = CallsStorageServerMode.FORCE_LEGACY
     # FORCE_LEGACY performs the query but returns MERGED
-    with count_queries(ch_server.ch_client) as (get_count, mint):
-        table = resolver.resolve_read_table(project_id, mint)
+    with count_queries(ch_server.ch_client) as get_count:
+        table = resolver.resolve_read_table(project_id, ch_server.ch_client)
         assert table == ReadTable.CALLS_MERGED
         assert get_count() == 1
 
     resolver._mode = CallsStorageServerMode.AUTO
-    table = resolver.resolve_read_table(project_id, ch_server._mint_client)
+    table = resolver.resolve_read_table(project_id, ch_server.ch_client)
     assert table == ReadTable.CALLS_COMPLETE
 
 
@@ -246,18 +232,18 @@ def test_resolver_as_trace_server_member(client, trace_server):
     project_id = make_project_id("trace_server_member")
     insert_call(ch_server.ch_client, "calls_complete", project_id)
 
-    with count_queries(ch_server.ch_client) as (get_count, mint):
+    with count_queries(ch_server.ch_client) as get_count:
         resolver1._mode = CallsStorageServerMode.AUTO
-        table = resolver1.resolve_read_table(project_id, mint)
+        table = resolver1.resolve_read_table(project_id, ch_server.ch_client)
         assert table == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
         # Subsequent requests hit the cache
-        table2 = resolver1.resolve_read_table(project_id, mint)
+        table2 = resolver1.resolve_read_table(project_id, ch_server.ch_client)
         assert table2 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
-        table3 = resolver2.resolve_read_table(project_id, mint)
+        table3 = resolver2.resolve_read_table(project_id, ch_server.ch_client)
         assert table3 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 

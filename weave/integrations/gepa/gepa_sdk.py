@@ -49,7 +49,9 @@ def _optimize_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     """Drop heavy/unserializable fields from the top-level optimize span."""
     safe = dict(inputs)
     for key in ("adapter", "evaluator", "reflection_lm", "task_lm", "logger"):
-        if key in safe and not isinstance(safe[key], (str, int, float, bool, type(None))):
+        if key in safe and not isinstance(
+            safe[key], (str, int, float, bool, type(None))
+        ):
             safe[key] = repr(safe[key])
     if "callbacks" in safe:
         safe["callbacks"] = [repr(cb) for cb in (safe["callbacks"] or [])]
@@ -71,7 +73,13 @@ def _optimize_postprocess_output(output: Any) -> Any:
         if hasattr(output, attr):
             value = getattr(output, attr)
             try:
-                summary[attr] = value if isinstance(value, (dict, list, str, int, float, bool, type(None))) else repr(value)
+                summary[attr] = (
+                    value
+                    if isinstance(
+                        value, (dict, list, str, int, float, bool, type(None))
+                    )
+                    else repr(value)
+                )
             except Exception:
                 summary[attr] = repr(value)
     return summary

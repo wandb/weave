@@ -80,7 +80,9 @@ class ConcisenessAdapter:
             if capture_traces
             else None
         )
-        return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
+        return EvaluationBatch(
+            outputs=outputs, scores=scores, trajectories=trajectories
+        )
 
     def make_reflective_dataset(
         self,
@@ -96,7 +98,9 @@ class ConcisenessAdapter:
                     "Score": score,
                     "Feedback": "Shorter is better.",
                 }
-                for out, score in zip(eval_batch.outputs, eval_batch.scores, strict=True)
+                for out, score in zip(
+                    eval_batch.outputs, eval_batch.scores, strict=True
+                )
             ]
             for component in components_to_update
         }
@@ -126,7 +130,9 @@ def _build_reflection_lm() -> Any:
     @weave.op(name=f"litellm.{model.replace('/', '.')}")
     def _lm(prompt: str | list[dict[str, Any]]) -> str:
         messages = (
-            prompt if isinstance(prompt, list) else [{"role": "user", "content": prompt}]
+            prompt
+            if isinstance(prompt, list)
+            else [{"role": "user", "content": prompt}]
         )
         resp = litellm.completion(model=model, messages=messages)
         return resp.choices[0].message.content or ""

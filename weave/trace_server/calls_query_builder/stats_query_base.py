@@ -43,7 +43,7 @@ GRANULARITY_12H = 12 * 3600
 GRANULARITY_1D = 86400
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class StatsQueryTimeBounds:
     granularity_seconds: int
     start: datetime.datetime
@@ -51,7 +51,7 @@ class StatsQueryTimeBounds:
     bucket_expr: str
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class SqlQueryResult:
     """Base result for parameterized SQL queries."""
 
@@ -60,7 +60,7 @@ class SqlQueryResult:
     parameters: dict[str, str | float | int | bool | None]
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class StatsQueryBuildResult(SqlQueryResult):
     """Query result with time-bucketed granularity metadata."""
 

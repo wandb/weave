@@ -344,7 +344,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 def create_client(
     request,
     trace_server,
-    global_attributes: dict[str, Any] | None = None,
+    attributes: dict[str, Any] | None = None,
 ) -> weave_client.WeaveClient:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "prod":
@@ -367,10 +367,9 @@ def create_client(
         "test-project",
         make_server_recorder(caching_server),
         ensure_project_exists=False,
+        attributes=attributes,
     )
     weave_client_context.set_weave_client_global(client)
-    if global_attributes is not None:
-        weave.trace.api._global_attributes = global_attributes
 
     return client
 
@@ -423,17 +422,16 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
 
     @contextlib.contextmanager
     def client(
-        global_attributes: dict[str, Any] | None = None,
+        attributes: dict[str, Any] | None = None,
         settings: weave.trace.settings.UserSettings | None = None,
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        client = create_client(request, trace_server, global_attributes)
+        client = create_client(request, trace_server, attributes)
         try:
             yield client
         finally:
             weave_client_context.set_weave_client_global(None)
-            weave.trace.api._global_attributes = {}
             weave.trace.settings.parse_and_apply_settings(
                 weave.trace.settings.UserSettings()
             )

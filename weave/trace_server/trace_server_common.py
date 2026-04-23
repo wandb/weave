@@ -1,5 +1,6 @@
 import copy
 import datetime
+import json
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterator
 from typing import Any, Literal, cast
@@ -326,3 +327,10 @@ def scorer_read_res_from_obj(obj: tsi.ObjSchema) -> tsi.ScorerReadRes:
 def get_prediction_inputs(call_inputs: dict[str, Any] | None) -> dict[str, Any]:
     """Extract prediction inputs from a call's inputs dict, defaulting to {} if missing or None."""
     return (call_inputs or {}).get("inputs") or {}
+
+
+def try_parse_json(val: Any, default: Any = None) -> Any:
+    try:
+        return json.loads(val)
+    except (json.JSONDecodeError, TypeError):
+        return default

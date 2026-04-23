@@ -48,8 +48,12 @@ class _StubAdapter:
         component = candidate.get("instructions", "")
         scores = [float(len(component)) / 100.0 for _ in batch]
         outputs = [component for _ in batch]
-        trajectories = [{"len": len(component)} for _ in batch] if capture_traces else None
-        return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
+        trajectories = (
+            [{"len": len(component)} for _ in batch] if capture_traces else None
+        )
+        return EvaluationBatch(
+            outputs=outputs, scores=scores, trajectories=trajectories
+        )
 
     def make_reflective_dataset(
         self,
@@ -170,7 +174,9 @@ def test_reflection_lm_call_nests_under_propose(client: WeaveClient) -> None:
     )
 
     roots = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
-    optimize_roots = [r for r in roots if op_name_from_ref(r.op_name) == "gepa.optimize"]
+    optimize_roots = [
+        r for r in roots if op_name_from_ref(r.op_name) == "gepa.optimize"
+    ]
     assert len(optimize_roots) == 1
 
     flat = flatten_calls(optimize_roots)
@@ -244,9 +250,7 @@ def test_gepa_optimize_records_errors(client: WeaveClient) -> None:
         for c in all_calls
         if op_name_from_ref(c.op_name) == "gepa.evaluate" and c.exception
     ]
-    assert errored_evals, (
-        "expected the failing gepa.evaluate span to be marked errored"
-    )
+    assert errored_evals, "expected the failing gepa.evaluate span to be marked errored"
     errored = errored_evals[0]
     assert "simulated evaluation failure" in (errored.exception or "")
     # GEPA engine metadata (iteration / will_continue / exception_type) should

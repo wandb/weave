@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import ddtrace
+import sqlparse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
@@ -70,6 +71,31 @@ def nullable_any_dump_to_any(
     val: str | None,
 ) -> Any | None:
     return any_dump_to_any(val) if val else None
+
+
+# ---------------------------------------------------------------------------
+# Migration SQL helpers
+# ---------------------------------------------------------------------------
+
+
+def split_migration_sql(sql: str) -> list[str]:
+    """Split a ClickHouse migration SQL script into individual statements.
+
+    A naive ``sql.split(";")`` breaks on ``;`` inside ``--`` line comments,
+    ``/* ... */`` block comments, or single-quoted string literals — the
+    migrator then sends a mid-comment fragment to ClickHouse and gets
+    ``DB::Exception: Empty query. (SYNTAX_ERROR)``.
+
+    Delegates to ``sqlparse`` (already a project dependency) for
+    string/comment-aware splitting, then strips comments and empty
+    statements from the result.
+    """
+    statements: list[str] = []
+    for raw in sqlparse.split(sql, strip_semicolon=True):
+        stripped = sqlparse.format(raw, strip_comments=True).strip()
+        if stripped:
+            statements.append(stripped)
+    return statements
 
 
 # ---------------------------------------------------------------------------

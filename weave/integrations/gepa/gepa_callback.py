@@ -282,7 +282,9 @@ class WeaveGEPACallback:
         exc_for_finish = exception if isinstance(exception, BaseException) else None
         error_output = {
             "iteration": event.get("iteration"),
-            "exception_type": type(exception).__name__ if exception is not None else None,
+            "exception_type": type(exception).__name__
+            if exception is not None
+            else None,
             "exception_message": str(exception) if exception is not None else None,
             "will_continue": event.get("will_continue"),
         }

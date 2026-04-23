@@ -1,15 +1,19 @@
 import base64
 import datetime as dt
 import json
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
 
+import clickhouse_connect
 import pytest
-from clickhouse_connect.driver.exceptions import DatabaseError
+from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_schema import ALL_CALL_INSERT_COLUMNS
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
@@ -1111,6 +1115,30 @@ def test_call_end_v2_flushes_kafka_immediately(server_with_mock_kafka):
     assert mock_producer.produce_call_end.call_args[0][1] is True
 
 
+def test_call_end_adds_expire_at_from_ended_at(server_with_mock_kafka):
+    """call_end adds expire_at = ended_at + retention_days on the end row."""
+    server, _ = server_with_mock_kafka
+    ended_at = dt.datetime(2026, 3, 1, tzinfo=dt.timezone.utc)
+    req = tsi.CallEndReq(
+        end=tsi.EndedCallSchemaForInsert(
+            project_id=base64.b64encode(b"test_entity/test_project").decode("utf-8"),
+            id=str(uuid.uuid4()),
+            ended_at=ended_at,
+            output={},
+            summary={},
+            exception=None,
+        )
+    )
+
+    expire_index = ALL_CALL_INSERT_COLUMNS.index("expire_at")
+    with (
+        patch.object(chts, "get_project_retention_days", return_value=30),
+        server.call_batch(),
+    ):
+        server.call_end(req)
+        assert server._call_batch[-1][expire_index] == ended_at + dt.timedelta(days=30)
+
+
 def test_call_batch_flushes_kafka_once_not_per_call_end(server_with_mock_kafka):
     """Batched call_end should NOT flush per-call. Flush happens once at batch exit."""
     server, mock_producer = server_with_mock_kafka
@@ -1240,3 +1268,52 @@ def test_delete_preserves_version_index_gaps(ch_server):
     by_digest = {o.digest: o for o in non_deleted}
     assert by_digest[digests[0]].version_index == 0
     assert by_digest[digests[2]].version_index == 2
+
+
+@pytest.mark.parametrize("autogenerate_session_id", [True, False])
+def test_concurrent_queries_on_one_client_vs_session_autogeneration(
+    ch_server, autogenerate_session_id: bool
+) -> None:
+    """Session-id guard: clickhouse-connect rejects overlapping queries on one
+    client with ProgrammingError when a session_id is present; with it
+    disabled, overlapping queries succeed. See fix PR #6655.
+    """
+    client = clickhouse_connect.get_client(
+        host=ch_server._host,
+        port=ch_server._port,
+        user=ch_server._user,
+        password=ch_server._password,
+        secure=ch_server._port == chts.CLICKHOUSE_SECURE_PORT,
+        autogenerate_session_id=autogenerate_session_id,
+    )
+    n_workers = 8
+    # Barrier makes all workers fire their query in the same instant; without
+    # it the 8 queries can serialize on a cold container and the True branch
+    # never produces an overlap.
+    barrier = threading.Barrier(n_workers)
+
+    def run_slow_query() -> None:
+        barrier.wait()
+        client.query("SELECT sleep(1.0)")
+
+    try:
+        errors: list[Exception] = []
+        with ThreadPoolExecutor(max_workers=n_workers) as pool:
+            futures = [pool.submit(run_slow_query) for _ in range(n_workers)]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    errors.append(e)
+    finally:
+        client.close()
+
+    if autogenerate_session_id:
+        # Exactly one query wins the session mutex; the remaining n-1 are
+        # rejected client-side by clickhouse-connect.
+        assert len(errors) == n_workers - 1, errors
+        for e in errors:
+            assert isinstance(e, ProgrammingError), (type(e), e)
+            assert "concurrent queries within the same session" in str(e), e
+    else:
+        assert not errors, errors
