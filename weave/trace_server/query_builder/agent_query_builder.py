@@ -183,6 +183,9 @@ _CHAT_VIEW_EXCLUDE = frozenset(
 CHAT_VIEW_COLS: str = ", ".join(
     c for c in _ALL_SPAN_FIELDS if c not in _CHAT_VIEW_EXCLUDE
 )
+QUALIFIED_CHAT_VIEW_COLS: str = ", ".join(
+    f"s.{c} AS {c}" for c in _ALL_SPAN_FIELDS if c not in _CHAT_VIEW_EXCLUDE
+)
 
 # ---------------------------------------------------------------------------
 # Clause helpers (mutate pb in-place, append to conditions)
@@ -588,11 +591,40 @@ def make_conversation_chat_spans_query(
 ) -> str:
     pid = pb.add(req.project_id, param_type="String")
     cid = pb.add(req.conversation_id, param_type="String")
+    limit_slot = pb.add(req.limit, param_type="UInt64")
+    offset_slot = pb.add(req.offset, param_type="UInt64")
     return f"""
-        SELECT {CHAT_VIEW_COLS} FROM spans s
+        SELECT {QUALIFIED_CHAT_VIEW_COLS}
+        FROM spans s
+        INNER JOIN (
+            SELECT trace_id, min(started_at) AS turn_started_at
+            FROM spans
+            WHERE project_id = {pid}
+              AND conversation_id = {cid}
+            GROUP BY trace_id
+            ORDER BY turn_started_at DESC, trace_id DESC
+            LIMIT {limit_slot} OFFSET {offset_slot}
+        ) t ON s.trace_id = t.trace_id
         WHERE s.project_id = {pid}
           AND s.conversation_id = {cid}
-        ORDER BY s.started_at ASC
+        ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
+    """
+
+
+def make_conversation_chat_turns_count_query(
+    pb: ParamBuilder, req: AgentConversationChatReq
+) -> str:
+    """Count distinct trace_id turns in a conversation."""
+    pid = pb.add(req.project_id, param_type="String")
+    cid = pb.add(req.conversation_id, param_type="String")
+    return f"""
+        SELECT count() FROM (
+            SELECT trace_id
+            FROM spans s
+            WHERE s.project_id = {pid}
+              AND s.conversation_id = {cid}
+            GROUP BY trace_id
+        )
     """
 
 

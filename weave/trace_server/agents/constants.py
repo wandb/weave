@@ -1,8 +1,8 @@
 """Shared constants for the GenAI agent observability system.
 
-Centralizes numeric limits, tuple field orders, and filter sets used across
-`agents/` modules and the agent query builder. Keeping them here avoids
-duplication and makes it easy to see all tunable values at a glance.
+Centralizes numeric limits and filter sets used across `agents/` modules and
+the agent query builder. Keeping them here avoids duplication and makes it
+easy to see all tunable values at a glance.
 """
 
 from __future__ import annotations

@@ -15,6 +15,7 @@ from weave.trace_server.agents.schema import (
     NormalizedMessage,
 )
 from weave.trace_server.agents.types import (
+    AgentConversationChatReq,
     AgentGroupByRef,
     AgentSearchReq,
     AgentSpansQueryFilters,
@@ -378,6 +379,65 @@ def test_agents_mv_zero_duration_when_ended_at_unset(ch_server):
     # inputs / 5 outputs).
     assert agent.total_input_tokens == 30
     assert agent.total_output_tokens == 15
+
+
+# ---------------------------------------------------------------------------
+# Test: Conversation chat pagination
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_chat_paginates_turns(ch_server):
+    """Conversation chat returns the latest turn page plus pagination metadata."""
+    project_id = _make_project_id("conv_chat")
+    conversation_id = f"conv-{uuid.uuid4().hex[:8]}"
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    trace_ids = [uuid.uuid4().hex for _ in range(3)]
+
+    spans = []
+    for i, trace_id in enumerate(trace_ids):
+        started_at = now + datetime.timedelta(minutes=i)
+        spans.append(
+            _make_span(
+                project_id,
+                trace_id=trace_id,
+                conversation_id=conversation_id,
+                operation_name="invoke_agent",
+                agent_name="chat-agent",
+                input_messages=[NormalizedMessage(role="user", content=f"turn {i}")],
+                started_at=started_at,
+                ended_at=started_at + datetime.timedelta(seconds=1),
+            )
+        )
+    _insert_spans(ch_server.ch_client, spans)
+
+    first_page = ch_server.agent_conversation_chat(
+        AgentConversationChatReq(
+            project_id=project_id,
+            conversation_id=conversation_id,
+            limit=2,
+        )
+    )
+    assert first_page.total_turns == 3
+    assert first_page.has_more is True
+    assert first_page.limit == 2
+    assert first_page.offset == 0
+    # Page zero preserves the old default: latest turns, returned
+    # chronologically within the selected page.
+    assert [turn.trace_id for turn in first_page.turns] == trace_ids[1:]
+
+    second_page = ch_server.agent_conversation_chat(
+        AgentConversationChatReq(
+            project_id=project_id,
+            conversation_id=conversation_id,
+            limit=2,
+            offset=2,
+        )
+    )
+    assert second_page.total_turns == 3
+    assert second_page.has_more is False
+    assert second_page.limit == 2
+    assert second_page.offset == 2
+    assert [turn.trace_id for turn in second_page.turns] == [trace_ids[0]]
 
 
 # ---------------------------------------------------------------------------

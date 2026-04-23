@@ -33,6 +33,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_agents_count_query,
     make_agents_list_query,
     make_conversation_chat_spans_query,
+    make_conversation_chat_turns_count_query,
     make_message_search_query,
     make_spans_count_query,
     make_spans_list_query,
@@ -659,10 +660,70 @@ class TestMakeConversationChatSpansQuery:
         )
 
         expected = f"""
-            SELECT {CHAT_VIEW_COLS} FROM spans s
+            SELECT {", ".join(f"s.{c} AS {c}" for c in CHAT_VIEW_COLS.split(", "))}
+            FROM spans s
+            INNER JOIN (
+                SELECT trace_id, min(started_at) AS turn_started_at
+                FROM spans
+                WHERE project_id = {{genai_0:String}}
+                  AND conversation_id = {{genai_1:String}}
+                GROUP BY trace_id
+                ORDER BY turn_started_at DESC, trace_id DESC
+                LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
+            ) t ON s.trace_id = t.trace_id
             WHERE s.project_id = {{genai_0:String}}
               AND s.conversation_id = {{genai_1:String}}
-            ORDER BY s.started_at ASC
+            ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
+        """
+        assert_sql(
+            expected,
+            {"genai_0": "p1", "genai_1": "c1", "genai_2": 50, "genai_3": 0},
+            query,
+            pb.get_params(),
+        )
+
+    def test_with_pagination(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_conversation_chat_spans_query(
+            pb,
+            AgentConversationChatReq(
+                project_id="p1", conversation_id="c1", limit=10, offset=20
+            ),
+        )
+
+        assert "LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}" in query
+        assert pb.get_params() == {
+            "genai_0": "p1",
+            "genai_1": "c1",
+            "genai_2": 10,
+            "genai_3": 20,
+        }
+
+    def test_limit_rejected_above_max_turns(self) -> None:
+        with pytest.raises(ValidationError):
+            AgentConversationChatReq(project_id="p1", conversation_id="c1", limit=51)
+
+    def test_offset_rejected_when_negative(self) -> None:
+        with pytest.raises(ValidationError):
+            AgentConversationChatReq(project_id="p1", conversation_id="c1", offset=-1)
+
+
+class TestMakeConversationChatTurnsCountQuery:
+    def test_basic(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_conversation_chat_turns_count_query(
+            pb,
+            AgentConversationChatReq(project_id="p1", conversation_id="c1"),
+        )
+
+        expected = """
+            SELECT count() FROM (
+                SELECT trace_id
+                FROM spans s
+                WHERE s.project_id = {genai_0:String}
+                  AND s.conversation_id = {genai_1:String}
+                GROUP BY trace_id
+            )
         """
         assert_sql(
             expected,

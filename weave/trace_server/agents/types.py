@@ -16,6 +16,7 @@ from weave.trace_server.agents.constants import (
     DEFAULT_AGENT_QUERY_LIMIT,
     DEFAULT_SEARCH_LIMIT,
     MAX_AGENT_QUERY_LIMIT,
+    MAX_CONVERSATION_CHAT_TURNS,
     MAX_SEARCH_LIMIT,
 )
 from weave.trace_server.interface.query import Query
@@ -313,6 +314,20 @@ class AgentConversationChatReq(BaseModel):
 
     project_id: str
     conversation_id: str
+    limit: int = Field(
+        default=MAX_CONVERSATION_CHAT_TURNS,
+        ge=0,
+        le=MAX_CONVERSATION_CHAT_TURNS,
+        description="Maximum number of conversation turns to return.",
+    )
+    offset: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Number of most-recent turns to skip. Results are returned in "
+            "chronological order within the selected page."
+        ),
+    )
 
 
 class AgentConversationChatRes(BaseModel):
@@ -327,6 +342,10 @@ class AgentConversationChatRes(BaseModel):
 
     conversation_id: str
     turns: list[AgentTraceChatRes] = Field(default_factory=list)
+    total_turns: int = 0
+    has_more: bool = False
+    limit: int = MAX_CONVERSATION_CHAT_TURNS
+    offset: int = 0
 
 
 class AgentSchema(BaseModel):

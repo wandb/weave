@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
 
 from weave.trace_server.agents.chat_view import build_trace_chat
 from weave.trace_server.agents.constants import (
-    MAX_CONVERSATION_CHAT_TURNS,
     MAX_INGEST_ERRORS_REPORTED,
     NO_CONVERSATION_LABEL,
     SEARCH_CONTENT_PREVIEW_CHARS,
@@ -58,6 +57,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_agents_count_query,
     make_agents_list_query,
     make_conversation_chat_spans_query,
+    make_conversation_chat_turns_count_query,
     make_message_search_query,
     make_spans_count_query,
     make_spans_list_query,
@@ -204,8 +204,7 @@ class AgentQueryHandler:
             # Track the most recent match across all rows for this
             # conversation so the sidebar sort order is stable regardless
             # of row arrival order.
-            if started_at > convs[cid].last_activity:
-                convs[cid].last_activity = started_at
+            convs[cid].last_activity = max(convs[cid].last_activity, started_at)
 
         results = sorted(
             convs.values(),
@@ -364,13 +363,20 @@ class AgentWriteHandler:
     ) -> AgentConversationChatRes:
         """Build multi-turn chat view for a conversation."""
         pb = ParamBuilder(PARAM_NAMESPACE)
+        count_sql = make_conversation_chat_turns_count_query(pb, req)
         sql = make_conversation_chat_spans_query(pb, req)
-        result = self._query(sql, pb.get_params())
+        params = pb.get_params()
+        total_turns = _first_cell_int(self._query(count_sql, params))
+        result = self._query(sql, params)
 
         if not result.result_rows:
             return AgentConversationChatRes(
                 conversation_id=req.conversation_id,
                 turns=[],
+                total_turns=total_turns,
+                has_more=req.offset < total_turns,
+                limit=req.limit,
+                offset=req.offset,
             )
 
         # Group spans by trace_id, preserving insertion order. Weave treats
@@ -382,12 +388,7 @@ class AgentWriteHandler:
             span = AgentSpanSchema.model_validate(normalize_span_row(r))
             spans_by_trace.setdefault(span.trace_id, []).append(span)
 
-        # The -N:] tail relies on `make_conversation_chat_spans_query`
-        # ordering rows ASC by started_at; flipping that sort would make
-        # this keep the N *oldest* turns instead of the N newest.
         trace_ids = list(spans_by_trace.keys())
-        if len(trace_ids) > MAX_CONVERSATION_CHAT_TURNS:
-            trace_ids = trace_ids[-MAX_CONVERSATION_CHAT_TURNS:]
 
         # Build chat for each trace (turn)
         turns = []
@@ -400,6 +401,10 @@ class AgentWriteHandler:
         return AgentConversationChatRes(
             conversation_id=req.conversation_id,
             turns=turns,
+            total_turns=total_turns,
+            has_more=req.offset + len(turns) < total_turns,
+            limit=req.limit,
+            offset=req.offset,
         )
 
 
@@ -408,7 +413,7 @@ class AgentWriteHandler:
 # ---------------------------------------------------------------------------
 
 
-def _rows_as_dicts(result: "QueryResult") -> list[ClickHouseRow]:
+def _rows_as_dicts(result: QueryResult) -> list[ClickHouseRow]:
     """Zip result_rows with column_names into row dicts.
 
     `strict=True` so a shape mismatch between ClickHouse's `column_names`
@@ -421,7 +426,7 @@ def _rows_as_dicts(result: "QueryResult") -> list[ClickHouseRow]:
     )
 
 
-def _first_cell_int(result: "QueryResult") -> int:
+def _first_cell_int(result: QueryResult) -> int:
     """Read a scalar count-style query result as an int, defaulting to 0."""
     return safe_int(result.result_rows[0][0]) if result.result_rows else 0
 
