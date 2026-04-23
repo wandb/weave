@@ -3,9 +3,11 @@ import types
 from unittest.mock import Mock, call, patch
 
 import pytest
+import sqlparse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
+from weave.trace_server.clickhouse.utilities import split_migration_sql
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _MAX_RETRIES,
     BaseClickHouseTraceServerMigrator,
@@ -1332,3 +1334,140 @@ def test_is_transient_ch_error():
     assert not _is_transient_ch_error(DatabaseError("some other error"))
     assert not _is_transient_ch_error(DatabaseError(""))
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
+
+
+def test_split_migration_sql() -> None:
+    """One dense case exercising every rule the splitter cares about.
+
+    Rules verified (one assertion cluster per rule):
+    - ``;`` inside ``--`` line comments does not split a statement;
+    - ``;`` inside ``/* ... */`` block comments does not split a statement,
+      and block comments spanning lines are handled;
+    - ``;`` inside a single-quoted string stays in the statement, including
+      SQL-style ``''`` escaped quotes;
+    - trailing whitespace/newlines after the final ``;`` do not emit an
+      empty statement;
+    - a file containing only comments (line or block) yields no statements;
+    - a file with N non-empty statements yields exactly N entries, each
+      with no trailing ``;`` and no leaked comment markers;
+    - a mixed end-to-end migration (comments + block comments + string
+      literals with semicolons + blank lines) round-trips to the exact
+      statement bodies we expect.
+    """
+    # 1. Line comment with a `;` inside it does not split the statement.
+    assert split_migration_sql(
+        "-- attributes_dump is preserved; typed maps are a duplicated index.\n"
+        "ALTER TABLE calls ADD COLUMN foo String"
+    ) == ["ALTER TABLE calls ADD COLUMN foo String"]
+
+    # 2. String literal with a `;` stays in one statement; doubled-quote
+    #    escapes are preserved (no spurious termination of the string).
+    assert split_migration_sql("ALTER TABLE t ADD COLUMN c String DEFAULT 'a;b'") == [
+        "ALTER TABLE t ADD COLUMN c String DEFAULT 'a;b'"
+    ]
+    assert split_migration_sql(
+        "ALTER TABLE t ADD COLUMN c String DEFAULT 'it''s; fine'"
+    ) == ["ALTER TABLE t ADD COLUMN c String DEFAULT 'it''s; fine'"]
+
+    # 3. Trailing whitespace after the final `;` produces no empty statement.
+    assert split_migration_sql("SELECT 1;\n\n   \n") == ["SELECT 1"]
+
+    # 4. Comment-only files (line or block) yield zero statements.
+    assert split_migration_sql("-- just a comment;\n-- another; one\n") == []
+    assert split_migration_sql("/* header;\n only; */\n") == []
+
+    # 5. Block comments — even those spanning lines with `;` inside — do not
+    #    split the surrounding statements, and the count matches exactly.
+    assert split_migration_sql("/* note; with ; inside */ SELECT 1; SELECT 2") == [
+        "SELECT 1",
+        "SELECT 2",
+    ]
+    assert (
+        len(
+            split_migration_sql(
+                "CREATE TABLE a (id UInt64) ENGINE=Memory;"
+                " INSERT INTO a VALUES (1);"
+                " DROP TABLE a;"
+            )
+        )
+        == 3
+    )
+
+    # 6. End-to-end migration: comments, block comments, string literals with
+    #    semicolons, and blank lines all compose without corrupting bodies.
+    sql = """
+    -- migration: widen config; also tweak defaults
+    ALTER TABLE runs
+        ADD COLUMN config String DEFAULT 'k=v;other=1';
+
+    /* block comment
+       spanning lines; with semicolons */
+
+    -- another; line comment
+    ALTER TABLE runs
+        ADD COLUMN note String DEFAULT 'it''s; ok';
+
+
+    CREATE INDEX idx_runs_config ON runs (config) TYPE minmax;
+    """
+    statements = split_migration_sql(sql)
+    assert statements == [
+        "ALTER TABLE runs\n        ADD COLUMN config String DEFAULT 'k=v;other=1'",
+        "ALTER TABLE runs\n        ADD COLUMN note String DEFAULT 'it''s; ok'",
+        "CREATE INDEX idx_runs_config ON runs (config) TYPE minmax",
+    ]
+    for s in statements:
+        assert not s.endswith(";")
+        assert "--" not in s
+        assert "/*" not in s
+
+
+def test_split_migration_sql_equivalent_on_all_shipped_migrations() -> None:
+    """Every shipped migration file produces the same statement sequence
+    under the new splitter as under the old naive ``split(";")``.
+
+    This is the drop-in-replacement guarantee: for migrations that existed
+    before the splitter change, ClickHouse must receive exactly the same
+    stream of statements, modulo comment stripping (which CH was already
+    ignoring server-side). If the two splitters diverge for any existing
+    migration, that migration either (a) depended on the old bug (``;``
+    inside a comment/string that was landing as garbage in CH), or (b)
+    uncovers a sqlparse quirk we did not anticipate — both worth failing
+    the test over.
+
+    Both outputs are normalized by stripping comments and collapsing
+    internal whitespace, then comparing as lists of normalized statements.
+    Comments are a no-op to ClickHouse's parser, and whitespace inside a
+    statement body never affects execution, so this normalization is the
+    right semantic identity to compare on.
+    """
+
+    # Old splitter, pre-change behavior: naive split on every ``;``, strip
+    # each chunk, drop empties (matches ``_execute_migration_command``'s
+    # ``if len(command) == 0: return`` guard).
+    def old_split(sql: str) -> list[str]:
+        return [chunk.strip() for chunk in sql.split(";") if chunk.strip()]
+
+    def normalize(stmt: str) -> str:
+        # Strip comments (CH ignores them anyway) and collapse whitespace to
+        # a canonical single-space form, so layout differences don't mask a
+        # true-positive semantic match.
+        no_comments = sqlparse.format(stmt, strip_comments=True)
+        return " ".join(no_comments.split())
+
+    migration_files = sorted(
+        f for f in os.listdir(DEFAULT_MIGRATION_DIR) if f.endswith(".up.sql")
+    )
+    assert migration_files, "no .up.sql migrations discovered — wrong path?"
+
+    for name in migration_files:
+        with open(os.path.join(DEFAULT_MIGRATION_DIR, name), encoding="utf-8") as f:
+            sql = f.read()
+        old_norm = [normalize(s) for s in old_split(sql)]
+        old_norm = [s for s in old_norm if s]  # drop comment-only chunks
+        new_norm = [normalize(s) for s in split_migration_sql(sql)]
+        assert old_norm == new_norm, (
+            f"splitter divergence in {name}:\n"
+            f"  old ({len(old_norm)}): {old_norm}\n"
+            f"  new ({len(new_norm)}): {new_norm}"
+        )

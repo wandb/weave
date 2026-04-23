@@ -154,76 +154,97 @@ def do_task(args: dict):
 
 
 @pytest.mark.asyncio
-async def test_hello_world(client):
-    exp_obj_count = 1
+async def test_executor_basic_lifecycle(client):
+    """Happy-path lifecycle on a single runner: execute + pid isolation, reuse,
+    multi-arg, exception propagation, sys.exit propagation, post-crash recovery,
+    explicit stop(), and that a child-published @weave.op ref does not leak back
+    to the parent. Consolidates 8 tests that each paid ~5s of fixture setup.
+    """
     inner_project = client.project + "_inner"
-    # this is the basic example worth showing
-    # you do a task in an isolated executor and it does not leak refs to the parent process
-    # it is expected to publish objects, but not leave refs around
-    factory_config, cleanup = create_test_client_factory_and_cleanup(
+    assert get_ref(get_keys) is None
+
+    async with runner_with_cleanup(
         client.server, entity=client.entity, project=inner_project
-    )
-    runner = IsolatedClientExecutor(
-        client_factory=weave_client_factory, client_factory_config=factory_config
-    )
+    ) as runner:
+        # @weave.op publishes from child; ref does NOT leak back to parent
+        res, error = await runner.execute(do_task, {"a": {"b": "c"}})
+        assert error is None
+        assert res == ["a"]
+        assert get_ref(get_keys) is None
 
-    assert get_ref(get_keys) is None
-    res, err = await runner.execute(do_task, {"a": {"b": "c"}})
-    assert get_ref(get_keys) is None
-    assert err is None
-    assert res == ["a"]
+        # happy path + pid isolation
+        res1, error = await runner.execute(
+            successful_function, TestRequest(value="first")
+        )
+        assert error is None
+        assert res1.result == "Success: first"
+        assert res1.process_id is not None
+        first_pid = res1.process_id
+        assert first_pid != os.getpid()
 
-    runner.stop()
-    cleanup()
+        # reuse: next execute() hits the same child process
+        res2, error = await runner.execute(
+            successful_function, TestRequest(value="second")
+        )
+        assert error is None
+        assert res2.result == "Success: second"
+        assert res2.process_id == first_pid
 
-    objs = client.server.objs_query(
+        # multi-arg request serialization
+        multi, error = await runner.execute(
+            multi_arg_function,
+            TestRequest(value="unused", arg_a="hello", arg_b=42, arg_c="custom"),
+        )
+        assert error is None
+        assert multi.result == "a=hello, b=42, c=custom"
+
+        # exception propagation
+        _, error = await runner.execute(failing_function, TestRequest(value="boom"))
+        assert isinstance(error, ValueError)
+        assert "Intentional test failure" in str(error)
+
+        # sys.exit(code) surfaces as IsolatedClientExecutorError with code in message
+        _, error = await runner.execute(
+            exit_code_function, TestRequest(value="exit", exit_code=42)
+        )
+        assert isinstance(error, IsolatedClientExecutorError)
+        assert "exit code: 42" in str(error)
+
+        # post-crash: next execute spins a fresh process
+        res3, error = await runner.execute(
+            successful_function, TestRequest(value="recovered")
+        )
+        assert error is None
+        assert res3.result == "Success: recovered"
+        assert res3.process_id != first_pid
+
+        # explicit stop() kills the process
+        process = runner._process
+        assert process is not None
+        assert process.is_alive()
+        runner.stop()
+        assert not process.is_alive()
+        assert runner._process is None
+
+    # child's @weave.op publishes made it to the trace server
+    inner_objs = client.server.objs_query(
         ObjQueryReq(project_id=client.entity + "/" + inner_project)
     ).objs
-    assert len(objs) == exp_obj_count
+    assert len(inner_objs) == 1
 
-    # now the performing the task in the main process
-    # it is expected to leave refs around and publish objects
-    res = do_task({"a": {"b": "c"}})
+    # running the same @weave.op in the main process DOES leak a ref
+    do_task({"a": {"b": "c"}})
     assert get_ref(get_keys) is not None
-    assert err is None
-    assert res == ["a"]
 
-    objs = client.server.objs_query(
+    main_objs = client.server.objs_query(
         ObjQueryReq(project_id=client.entity + "/" + client.project)
     ).objs
-    assert len(objs) == exp_obj_count
-
-
-@pytest.mark.asyncio
-async def test_successful_execution(client):
-    """Test successful function execution in isolated process."""
-    async with runner_with_cleanup(client.server, entity=client.entity) as runner:
-        req = TestRequest(value="test_value")
-        result, error = await runner.execute(successful_function, req)
-        assert error is None
-
-        assert result.result == "Success: test_value"
-        assert result.process_id is not None
-        # Verify it ran in a different process
-        import os
-
-        assert result.process_id != os.getpid()
+    assert len(main_objs) == 1
 
 
 async def failing_function(req: TestRequest) -> TestResponse:
     """A function that raises an exception."""
     raise ValueError(f"Intentional test failure: {req.value}")
-
-
-@pytest.mark.asyncio
-async def test_exception_in_child_process(client):
-    """Test handling of exceptions thrown in child process."""
-    async with runner_with_cleanup(client.server, entity=client.entity) as runner:
-        req = TestRequest(value="test_error")
-        result, error = await runner.execute(failing_function, req)
-        assert error is not None
-        assert isinstance(error, ValueError)
-        assert "Intentional test failure" in str(error)
 
 
 async def timeout_function(req: TestRequest) -> TestResponse:
@@ -252,17 +273,6 @@ async def exit_code_function(req: TestRequest) -> TestResponse:
     import sys
 
     sys.exit(req.exit_code or 1)
-
-
-@pytest.mark.asyncio
-async def test_process_exit_code(client):
-    """Test handling of process that exits with specific code."""
-    async with runner_with_cleanup(client.server, entity=client.entity) as runner:
-        req = TestRequest(value="exit_test", exit_code=42)
-        result, error = await runner.execute(exit_code_function, req)
-        assert error is not None
-        assert isinstance(error, IsolatedClientExecutorError)
-        assert "exit code: 42" in str(error)
 
 
 async def check_isolation_function(req: TestRequest) -> TestResponse:
@@ -295,31 +305,48 @@ async def check_isolation_function(req: TestRequest) -> TestResponse:
 
 
 @pytest.mark.asyncio
-async def test_project_isolation(client):
-    """Test that different projects are properly isolated."""
-    # Use two separate context managers for different projects
+async def test_isolation_across_contexts(client):
+    """Two runners with distinct (entity, project) pairs each see their own
+    context in their child processes; parent's global weave client is untouched.
+    Consolidates test_project_isolation + test_global_client_isolation.
+    """
+    parent_client = get_weave_client()
+    assert parent_client is not None
+    assert parent_client.entity == client.entity
+
     async with (
         runner_with_cleanup(
             client.server, entity=client.entity, project="project1"
         ) as runner1,
         runner_with_cleanup(
-            client.server, entity=client.entity, project="project2"
+            client.server, entity="different_entity", project="different_project"
         ) as runner2,
     ):
-        # Each runner should see its own project context
-        req1 = TestRequest(
-            value="test", expected_project="project1", expected_entity=client.entity
+        res1, error = await runner1.execute(
+            check_isolation_function,
+            TestRequest(
+                value="test",
+                expected_project="project1",
+                expected_entity=client.entity,
+            ),
         )
-        result1, error = await runner1.execute(check_isolation_function, req1)
         assert error is None
-        assert "Isolation verified" in result1.result
+        assert "Isolation verified" in res1.result
 
-        req2 = TestRequest(
-            value="test", expected_project="project2", expected_entity=client.entity
+        res2, error = await runner2.execute(
+            check_isolation_function,
+            TestRequest(
+                value="test",
+                expected_project="different_project",
+                expected_entity="different_entity",
+            ),
         )
-        result2, error = await runner2.execute(check_isolation_function, req2)
         assert error is None
-        assert "Isolation verified" in result2.result
+        assert "Isolation verified" in res2.result
+
+    # parent's global client is untouched by either child
+    assert get_weave_client() == parent_client
+    assert get_weave_client().entity == client.entity
 
 
 async def multi_arg_function(req: TestRequest) -> TestResponse:
@@ -327,94 +354,9 @@ async def multi_arg_function(req: TestRequest) -> TestResponse:
     return TestResponse(result=f"a={req.arg_a}, b={req.arg_b}, c={req.arg_c}")
 
 
-@pytest.mark.asyncio
-async def test_multiple_args(client):
-    """Test passing multiple arguments via request object."""
-    async with runner_with_cleanup(client.server, entity=client.entity) as runner:
-        req = TestRequest(
-            value="unused",
-            arg_a="hello",
-            arg_b=42,
-            arg_c="custom",
-        )
-        result, error = await runner.execute(multi_arg_function, req)
-        assert error is None
-        assert result.result == "a=hello, b=42, c=custom"
-
-
-@pytest.mark.asyncio
-async def test_reuse_runner(client):
-    """Test that a runner can be reused for multiple executions."""
-    async with runner_with_cleanup(client.server, entity=client.entity) as runner:
-        # First execution
-        req1 = TestRequest(value="first")
-        result1, error = await runner.execute(successful_function, req1)
-        assert error is None
-        assert result1.result == "Success: first"
-
-        # Second execution
-        req2 = TestRequest(value="second")
-        result2, error = await runner.execute(successful_function, req2)
-        assert error is None
-        assert result2.result == "Success: second"
-
-        # Both should have run in the same process
-        assert result1.process_id == result2.process_id
-
-
-@pytest.mark.asyncio
-async def test_process_restart_after_crash(client):
-    """Test that the process is restarted after a crash."""
-    async with runner_with_cleanup(client.server, entity=client.entity) as runner:
-        # First execution should succeed
-        req1 = TestRequest(value="success")
-        result1, error = await runner.execute(successful_function, req1)
-        assert error is None
-        assert result1.result == "Success: success"
-        first_pid = result1.process_id
-
-        # Second execution should crash the process
-        req2 = TestRequest(value="crash", exit_code=1)
-        result2, error = await runner.execute(exit_code_function, req2)
-        assert error is not None
-        assert isinstance(error, IsolatedClientExecutorError)
-        assert "exit code: 1" in str(error)
-
-        # Third execution should succeed with a new process
-        req3 = TestRequest(value="after_crash")
-        result3, error = await runner.execute(successful_function, req3)
-        assert error is None
-        assert result3.result == "Success: after_crash"
-        # Should be a different process
-        assert result3.process_id != first_pid
-
-
 async def successful_function(req: TestRequest) -> TestResponse:
     """A function that executes successfully."""
     return TestResponse(result=f"Success: {req.value}", process_id=os.getpid())
-
-
-@pytest.mark.asyncio
-async def test_context_manager_cleanup(client):
-    """Test that resources are properly cleaned up."""
-    async with runner_with_cleanup(client.server, entity=client.entity) as runner:
-        # Execute a function to start the process
-        req = TestRequest(value="test")
-        result, error = await runner.execute(successful_function, req)
-        assert error is None
-        assert result.result == "Success: test"
-
-        # Get the process reference
-        process = runner._process
-        assert process is not None
-        assert process.is_alive()
-
-        # Stop the runner
-        runner.stop()
-
-        # Process should be stopped
-        assert not process.is_alive()
-        assert runner._process is None
 
 
 class SimpleRequest(BaseModel):
@@ -488,39 +430,3 @@ async def test_correct_isolation(client):
     assert len(calls) == 6
 
     assert get_ref(log_to_weave_op) is None
-
-
-async def check_client_isolation_function(req: SimpleRequest) -> SimpleResponse:
-    """Module-level function to check client isolation (required for spawn)."""
-    child_client = get_weave_client()
-    if child_client is None:
-        return SimpleResponse(result="No client found")
-
-    # The child should have a different client instance
-    # even though it may have the same entity/project
-    return SimpleResponse(
-        result=f"Client entity: {child_client.entity}, Client id: {id(child_client)}"
-    )
-
-
-@pytest.mark.asyncio
-async def test_global_client_isolation(client):
-    """Test that global client from parent process doesn't leak into child."""
-    # Ensure we have a client in the parent process
-    parent_client = get_weave_client()
-    assert parent_client is not None
-    assert parent_client.entity == client.entity
-
-    async with runner_with_cleanup(
-        client.server, entity="different_entity", project="different_project"
-    ) as runner:
-        req = SimpleRequest(value="test")
-        result, error = await runner.execute(check_client_isolation_function, req)
-        assert error is None
-
-        # Child should have its own client with different entity
-        assert "different_entity" in result.result
-
-        # Parent client should remain unchanged
-        assert get_weave_client() == parent_client
-        assert get_weave_client().entity == client.entity
