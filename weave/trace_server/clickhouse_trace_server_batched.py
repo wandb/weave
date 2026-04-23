@@ -82,6 +82,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
+from weave.trace_server.clickhouse.metrics import install_metrics
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_dict_to_call_schema_dict,
     ch_call_to_row,
@@ -6551,7 +6552,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         self._ensure_database(client)
         client.database = self._database
-        return client
+        return install_metrics(client)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(

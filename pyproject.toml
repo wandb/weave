@@ -82,6 +82,8 @@ trace_server = [
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
   "openinference-semantic-conventions>=0.1.17",
+  # OTEL metrics API. No-op until the host service registers a MeterProvider.
+  "opentelemetry-api>=1.24.0",
   # For emoji shortcode support in Feedback
   "emoji>=2.12.1",
   # Redis for optional task tracking and caching
@@ -426,6 +428,8 @@ trace_server = [
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
   "openinference-semantic-conventions>=0.1.17",
+  # OTEL metrics API. No-op until the host service registers a MeterProvider.
+  "opentelemetry-api>=1.24.0",
   # For emoji shortcode support in Feedback
   "emoji>=2.12.1",
 ]
@@ -433,6 +437,8 @@ trace_server_tests = [
   # BYOB - S3
   "moto[s3]>=5.0.0",
   "openai<1.100.0",
+  # OTEL SDK for metrics tests (InMemoryMetricReader). Not required at runtime.
+  "opentelemetry-sdk>=1.24.0",
 ]
 autogen_tests = [
   "autogen-agentchat>=0.5.7; python_version >= '3.10'",
