@@ -3,6 +3,8 @@ import {op} from '../op';
 import {OpOptions} from '../opType';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {getGlobalClient} from '../clientApi';
+import {InternalCall} from '../call';
+import {WeaveClient} from '../weaveClient';
 import {getCallStackFromOpenAIAgents} from './openai.agent';
 
 /**
@@ -91,26 +93,25 @@ export const openAIStreamReducer = {
   },
 };
 
-export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
-  const options: OpOptions<typeof originalCreate> = {
-    name: name,
-    opKind: 'llm',
-    parameterNames: 'useParam0Object',
-    summarize: result => ({
-      usage: {
-        [result.model]: result.usage,
-      },
-    }),
-    streamReducer: openAIStreamReducer,
+export function wrapOpenAIChatCompletionsCreate(
+  originalCreate: any,
+  name: string
+) {
+  const opRef = {
+    __isOp: true as const,
+    __name: name,
+    __wrappedFunction: originalCreate,
   };
+  const summarize = (result: any) => ({
+    usage: {[result.model]: result.usage},
+  });
 
-  // Side channel for the APIPromise the callback receives from the
-  // SDK. wrappedWithAgents resets it before invoking weaveOp and reads
-  // it right after — safe because the callback runs synchronously
-  // (AsyncLocalStorage.run in op.ts).
-  let pendingApiPromise: any;
+  return function wrappedWithAgents(
+    ...args: Parameters<typeof originalCreate>
+  ) {
+    const client = getGlobalClient();
+    if (!client) return originalCreate(...args);
 
-  const weaveOp = op((...args: Parameters<typeof originalCreate>) => {
     const [originalParams]: any[] = args;
     // Streaming needs include_usage so the reducer sees token counts.
     // Spread into a new object so paramsToCallInputs still records
@@ -126,21 +127,18 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
           },
         ] as Parameters<typeof originalCreate>)
       : args;
-    pendingApiPromise = originalCreate(...callArgs);
-    return pendingApiPromise;
-  }, options);
 
-  return function wrappedWithAgents(
-    ...args: Parameters<typeof originalCreate>
-  ) {
-    pendingApiPromise = undefined;
-    const tracedPromise = runWithOpenAIAgentsContext(() => weaveOp(...args));
-    const apiPromise = pendingApiPromise;
-    pendingApiPromise = undefined;
-    // If the caller awaits only a forwarded helper, tracedPromise has
-    // no handler — silence its rejection (weave already records it).
-    tracedPromise.catch(() => {});
-    return wrapAsAPIPromiseLike(tracedPromise, apiPromise);
+    return runWithOpenAIAgentsContext(() =>
+      traceOpenAICall({
+        client,
+        opRef,
+        userArgs: args,
+        callArgs,
+        originalCreate,
+        summarize,
+        streamReducer: openAIStreamReducer,
+      })
+    );
   };
 }
 
@@ -464,76 +462,176 @@ export function summarizer(result: any) {
   return {};
 }
 
-export function makeOpenAIResponsesCreateOp(originalCreate: any) {
-  const weaveOpOptions: OpOptions<typeof originalCreate> = {
-    name: 'create',
-    opKind: 'llm',
-    shouldAdoptThis: true,
-    originalFunction: originalCreate,
-    summarize: summarizer,
-    streamReducer: openAIStreamAPIstreamReducer,
-    parameterNames: 'useParam0Object',
+export function wrapOpenAIResponsesCreate(originalCreate: any) {
+  const opRef = {
+    __isOp: true as const,
+    __name: 'create',
+    __wrappedFunction: originalCreate,
   };
-
-  // Side channel — see makeOpenAIChatCompletionsOp.
-  let pendingApiPromise: any;
-
-  const weaveOp = op(function (...args: Parameters<typeof originalCreate>) {
-    pendingApiPromise = originalCreate(...args);
-    return pendingApiPromise;
-  }, weaveOpOptions);
 
   return function wrappedWithAgents(
     this: any,
     ...args: Parameters<typeof originalCreate>
   ) {
-    pendingApiPromise = undefined;
-    // Forward `this` so shouldAdoptThis can capture it as `self`.
-    // originalCreate is pre-bound at the wrapOpenAI call site.
-    const tracedPromise = runWithOpenAIAgentsContext(() =>
-      weaveOp.apply(this, args)
+    const client = getGlobalClient();
+    if (!client) return originalCreate(...args);
+
+    return runWithOpenAIAgentsContext(() =>
+      traceOpenAICall({
+        client,
+        opRef,
+        userArgs: args,
+        callArgs: args,
+        originalCreate,
+        summarize: summarizer,
+        streamReducer: openAIStreamAPIstreamReducer,
+        // Forward `this` so paramsToCallInputs records it as `self`,
+        // matching the old shouldAdoptThis behavior.
+        thisArg: this,
+      })
     );
-    const apiPromise = pendingApiPromise;
-    pendingApiPromise = undefined;
-    // If the caller awaits only a forwarded helper, tracedPromise has
-    // no handler — silence its rejection (weave already records it).
-    tracedPromise.catch(() => {});
-    return wrapAsAPIPromiseLike(tracedPromise, apiPromise);
   };
 }
 
-// Returns a Promise-like proxy that preserves the OpenAI SDK's
-// APIPromise helpers (.withResponse(), .asResponse(), .parse(),
-// ._thenUnwrap(), and any future additions).
-//
-// Why this is needed: weave's op() awaits the inner callback and
-// returns a fresh Promise of the parsed value — the original
-// APIPromise (and its helpers) is gone by the time the caller sees
-// the result. The factory captures the APIPromise in a closure and
-// hands it here; this proxy keeps then/catch/finally on the traced
-// promise so tracing still runs on await, and forwards every other
-// property access to the original APIPromise.
-function wrapAsAPIPromiseLike(tracedPromise: Promise<any>, apiPromise: any) {
-  const isPromiseMethod = (p: string | symbol) =>
-    p === 'then' || p === 'catch' || p === 'finally';
-  return new Proxy(tracedPromise, {
-    get(target, p) {
-      if (isPromiseMethod(p)) {
-        // Rely on internal Promise slots — must be bound to the
-        // underlying Promise rather than the Proxy.
-        const val = Reflect.get(target, p);
-        return val.bind(target);
+// Drives weave tracing directly using WeaveClient primitives, returning
+// the SDK's native APIPromise (built via _thenUnwrap) so all helpers —
+// .withResponse(), .asResponse(), .parse(), ._thenUnwrap(), and any
+// future additions — flow through the SDK unchanged. For streaming,
+// the parsed value is replaced with a Proxy whose Symbol.asyncIterator
+// runs a reducer-tapping generator that fires finishCall in `finally`.
+function traceOpenAICall(args: {
+  client: WeaveClient;
+  opRef: any;
+  userArgs: any[];
+  callArgs: any[];
+  originalCreate: any;
+  summarize: (result: any) => any;
+  streamReducer: any;
+  thisArg?: any;
+}) {
+  const {
+    client,
+    opRef,
+    userArgs,
+    callArgs,
+    originalCreate,
+    summarize,
+    streamReducer,
+    thisArg,
+  } = args;
+
+  const {currentCall, parentCall, newStack} = client.pushNewCall();
+  const call = new InternalCall();
+  const startTime = new Date();
+  const startCallPromise = client.createCall(
+    call,
+    opRef,
+    userArgs,
+    'useParam0Object',
+    thisArg,
+    currentCall,
+    parentCall,
+    startTime,
+    undefined,
+    {kind: 'llm'}
+  );
+
+  const apiPromise = client.runWithCallStack(newStack, () =>
+    originalCreate(...callArgs)
+  );
+
+  const traced = apiPromise._thenUnwrap((value: any) => {
+    if (value && typeof value === 'object' && Symbol.asyncIterator in value) {
+      return wrapStreamForTracing({
+        stream: value,
+        streamReducer,
+        client,
+        call,
+        currentCall,
+        parentCall,
+        summarize,
+        startCallPromise,
+      });
+    }
+    // Non-streaming: fire-and-forget finishCall so the returned promise
+    // resolves without waiting on trace upload (matches batching).
+    void client
+      .finishCall(
+        call,
+        value,
+        currentCall,
+        parentCall,
+        summarize,
+        new Date(),
+        startCallPromise
+      )
+      .catch(() => {});
+    return value;
+  });
+
+  // Record SDK errors on the trace. Attaching this side handler also
+  // marks the rejection as handled, so the caller's own await still
+  // throws but Node doesn't additionally log an unhandled rejection.
+  traced.catch(async (error: any) => {
+    await client.finishCallWithException(
+      call,
+      error,
+      currentCall,
+      parentCall,
+      new Date(),
+      startCallPromise
+    );
+    await client.waitForBatchProcessing();
+  });
+
+  return traced;
+}
+
+function wrapStreamForTracing(args: {
+  stream: AsyncIterable<any>;
+  streamReducer: any;
+  client: WeaveClient;
+  call: InternalCall;
+  currentCall: any;
+  parentCall: any;
+  summarize: (result: any) => any;
+  startCallPromise: Promise<any>;
+}) {
+  const {
+    stream,
+    streamReducer,
+    client,
+    call,
+    currentCall,
+    parentCall,
+    summarize,
+    startCallPromise,
+  } = args;
+  const {initialStateFn, reduceFn, finalizeFn} = streamReducer;
+  let state = initialStateFn();
+  async function* WeaveIterator() {
+    try {
+      for await (const chunk of stream) {
+        state = reduceFn(state, chunk);
+        yield chunk;
       }
-      const val = Reflect.get(apiPromise, p);
-      return typeof val === 'function' ? val.bind(apiPromise) : val;
-    },
-    has(target, p) {
-      // Keep `'withResponse' in result` and friends consistent with
-      // get: Promise-level methods come from the traced promise,
-      // everything else from the APIPromise.
-      return isPromiseMethod(p)
-        ? Reflect.has(target, p)
-        : Reflect.has(apiPromise, p);
+    } finally {
+      finalizeFn(state);
+      await client.finishCall(
+        call,
+        state,
+        currentCall,
+        parentCall,
+        summarize,
+        new Date(),
+        startCallPromise
+      );
+    }
+  }
+  return new Proxy(stream, {
+    get(target, prop) {
+      if (prop === Symbol.asyncIterator) return WeaveIterator;
+      return Reflect.get(target, prop);
     },
   });
 }
@@ -574,7 +672,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
       if (p === 'create') {
-        return makeOpenAIChatCompletionsOp(
+        return wrapOpenAIChatCompletionsCreate(
           targetVal.bind(target),
           'openai.chat.completions.create'
         );
@@ -610,7 +708,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
       get(target, p, receiver) {
         const targetVal = Reflect.get(target, p, receiver);
         if (p === 'parse') {
-          return makeOpenAIChatCompletionsOp(
+          return wrapOpenAIChatCompletionsCreate(
             targetVal.bind(target),
             'openai.beta.chat.completions.parse'
           );
@@ -645,7 +743,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
           const targetVal = Reflect.get(target, p, receiver);
 
           if (p === 'create') {
-            return makeOpenAIResponsesCreateOp(targetVal.bind(target));
+            return wrapOpenAIResponsesCreate(targetVal.bind(target));
           }
           return targetVal;
         },

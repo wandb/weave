@@ -1,7 +1,7 @@
 import {InMemoryTraceServer} from '../../inMemoryTraceServer';
 import {wrapOpenAI} from '../../integrations/openai';
 import {initWithCustomTraceServer} from '../clientMock';
-import {makeMockOpenAIChat} from '../openaiMock';
+import {makeAPIPromiseShim, makeMockOpenAIChat} from '../openaiMock';
 
 // Helper function to get calls
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
@@ -175,6 +175,40 @@ describe('OpenAI Integration', () => {
     });
   });
 
+  // Regression: libraries like @mariozechner/pi-ai consume streaming
+  // responses via `await client.chat.completions.create(...).withResponse()`.
+  // Without the wrapAsAPIPromiseLike special case for .withResponse(), the
+  // iterated stream bypasses weave's WeaveIterator proxy, so finishCall
+  // never fires and the trace stays pending forever.
+  test('streaming chat completion via .withResponse() finishes the trace', async () => {
+    const messages = [{role: 'user', content: 'Hello, streaming AI!'}];
+
+    const {data, response} = await patchedOpenAI.chat.completions
+      .create({messages, stream: true})
+      .withResponse();
+
+    expect(response.status).toBe(200);
+
+    let content = '';
+    for await (const chunk of data as AsyncIterable<any>) {
+      if (chunk.choices?.[0]?.delta?.content) {
+        content += chunk.choices[0].delta.content;
+      }
+    }
+    expect(content).toBe('HELLO, STREAMING AI!');
+
+    await wait(300);
+
+    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    expect(calls).toHaveLength(1);
+    // The key assertion: output is populated, which means finishCall
+    // fired. Without the .withResponse() → traced-data substitution,
+    // iteration would bypass WeaveIterator and this would be empty.
+    expect(calls[0].output).toMatchObject({
+      choices: [{message: {content: 'HELLO, STREAMING AI!'}}],
+    });
+  });
+
   // Add a new test for streaming with explicit usage request
   test('streaming chat completion with explicit usage request', async () => {
     const messages = [
@@ -329,13 +363,15 @@ describe('OpenAI Integration', () => {
     ];
 
     // Override mock for this test
-    mockOpenAI.responses.create = jest.fn().mockResolvedValue({
-      async *[Symbol.asyncIterator]() {
-        for (const chunk of pirateChunks) {
-          yield chunk;
-        }
-      },
-    });
+    mockOpenAI.responses.create = jest.fn(() =>
+      makeAPIPromiseShim({
+        async *[Symbol.asyncIterator]() {
+          for (const chunk of pirateChunks) {
+            yield chunk;
+          }
+        },
+      })
+    );
 
     const options = {
       model: 'gpt-4o-2024-08-06',
