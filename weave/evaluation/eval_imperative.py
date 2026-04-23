@@ -67,7 +67,7 @@ def _set_current_output(output: Any) -> Iterator[None]:
 
 
 @contextmanager
-def _set_current_score(score: ScoreType) -> Iterator[None]:
+def _set_current_score(score: ScoreType | None) -> Iterator[None]:
     token = current_score.set(score)
     try:
         yield
@@ -210,7 +210,7 @@ class ScoreLogger:
         self.predict_call = predict_call
         self.predefined_scorers = predefined_scorers
 
-        self._captured_scores: dict[str, ScoreType] = {}
+        self._captured_scores: dict[str, ScoreType | None] = {}
         self._has_finished: bool = False
         self._predict_output: Any = None
         self._call_stack_context: (
@@ -319,7 +319,7 @@ class ScoreLogger:
     def log_score(
         self,
         scorer: Scorer | dict | str,
-        score: ScoreType,
+        score: ScoreType | None,
     ) -> None: ...
 
     @overload
@@ -332,7 +332,7 @@ class ScoreLogger:
     def log_score(
         self,
         scorer: Scorer | dict | str,
-        score: ScoreType | _NotSetType = NOT_SET,
+        score: ScoreType | _NotSetType | None = NOT_SET,
     ) -> _LogScoreContext | None:
         """Log a score synchronously or return a context manager for deferred scoring.
 
@@ -356,9 +356,9 @@ class ScoreLogger:
             score_call, prepared_scorer = self._create_score_call(scorer)
             return _LogScoreContext(self, prepared_scorer, score_call)
 
-        # Type narrowing: score is now guaranteed to be ScoreType
+        # Type narrowing: score is now guaranteed to be ScoreType | None
         assert not isinstance(score, _NotSetType), "score should not be NOT_SET here"
-        score_value: ScoreType = score
+        score_value: ScoreType | None = score
 
         # Otherwise, log the score immediately
         # When in an active asyncio test environment (like pytest.mark.asyncio),
@@ -403,7 +403,7 @@ class ScoreLogger:
     async def alog_score(
         self,
         scorer: Scorer | dict | str,
-        score: ScoreType,
+        score: ScoreType | None,
     ) -> None:
         if self._has_finished:
             raise ValueError("Cannot log score after finish has been called")
@@ -731,7 +731,10 @@ class EvaluationLogger:
         return pred
 
     def log_example(
-        self, inputs: dict[str, Any], output: Any, scores: dict[str, ScoreType]
+        self,
+        inputs: dict[str, Any],
+        output: Any,
+        scores: dict[str, ScoreType | None],
     ) -> None:
         """Log a complete example with inputs, output, and scores.
 

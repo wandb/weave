@@ -97,7 +97,7 @@ def _resolve_dataset_spec(
         return _DatasetSpec(name=_default_dataset_name(), rows=value)
     ds = _cast_to_imperative_dataset(value)
     rows = list(ds.rows)
-    name = ds.name if getattr(ds, "name", None) else _default_dataset_name()
+    name = ds.name or _default_dataset_name()
     return _DatasetSpec(name=name, rows=rows)
 
 
@@ -194,6 +194,8 @@ class ScoreLoggerV2:
         if self._prediction_id is not None or self._eval_logger._disabled:
             return
         self._eval_logger._ensure_initialized()
+        assert self._eval_logger._server is not None  # _ensure_initialized populates it
+        assert self._eval_logger._model_ref is not None
         res = self._eval_logger._server.prediction_create(
             tsi.PredictionCreateReq(
                 project_id=self._eval_logger._project_id,
@@ -201,6 +203,7 @@ class ScoreLoggerV2:
                 inputs=self._inputs,
                 output=self._output_buffer,
                 evaluation_run_id=self._eval_logger._evaluation_run_id,
+                wb_user_id=None,
             )
         )
         self._prediction_id = res.prediction_id
@@ -258,6 +261,7 @@ class ScoreLoggerV2:
 
         self._ensure_prediction_created()
         scorer_ref = self._eval_logger._get_or_create_scorer_ref(scorer)
+        assert self._eval_logger._server is not None
 
         self._eval_logger._server.score_create(
             tsi.ScoreCreateReq(
@@ -266,6 +270,7 @@ class ScoreLoggerV2:
                 scorer=scorer_ref,
                 value=score,
                 evaluation_run_id=self._eval_logger._evaluation_run_id,
+                wb_user_id=None,
             )
         )
 
@@ -282,6 +287,7 @@ class ScoreLoggerV2:
             return
 
         self._ensure_prediction_created()
+        assert self._eval_logger._server is not None
 
         # If the buffered output changed between prediction_create and now
         # (the V1 `pred.output = ...` + `finish()` flow), pass the new value
@@ -296,6 +302,7 @@ class ScoreLoggerV2:
                 project_id=self._eval_logger._project_id,
                 prediction_id=cast(str, self._prediction_id),
                 output=finish_output,
+                wb_user_id=None,
             )
         )
         self._has_finished = True
@@ -359,7 +366,11 @@ class EvaluationLoggerV2:
         # scores locally when WEAVE_DISABLED=true or no client exists; V2
         # mirrors that by skipping all server calls in this mode.
         self._disabled: bool = False
-        self._server: tsi.TraceServerInterface | None = None
+        # Use `FullTraceServerInterface` so mypy sees the V2 endpoints
+        # (dataset_create, evaluation_run_create, etc.) that live on
+        # `ObjectInterface` — those methods aren't on `TraceServerInterface`
+        # but are present at runtime on every concrete backend.
+        self._server: tsi.FullTraceServerInterface | None = None
         self._project_id: str = ""
         self._entity: str = ""
         self._project: str = ""
@@ -371,7 +382,9 @@ class EvaluationLoggerV2:
             if is_tracing_setting_disabled():
                 self._disabled = True
             else:
-                self._server = wc.server
+                # All concrete backends satisfy FullTraceServerInterface; the
+                # cast lets us call V2 endpoints that live on ObjectInterface.
+                self._server = cast("tsi.FullTraceServerInterface", wc.server)
                 self._project_id = wc.project_id
                 self._entity, self._project = from_project_id(wc.project_id)
 
@@ -426,6 +439,7 @@ class EvaluationLoggerV2:
                 name=self._dataset_spec.name,
                 description=None,
                 rows=self._dataset_spec.rows,
+                wb_user_id=None,
             )
         )
         self._dataset_ref = _object_ref_uri(
@@ -455,6 +469,7 @@ class EvaluationLoggerV2:
                 description=None,
                 source_code=model_source,
                 attributes=model_attrs or None,
+                wb_user_id=None,
             )
         )
         self._model_ref = _object_ref_uri(
@@ -472,6 +487,7 @@ class EvaluationLoggerV2:
                 trials=1,
                 evaluation_name=self.name,
                 eval_attributes=self.eval_attributes or None,
+                wb_user_id=None,
             )
         )
         self._evaluation_ref = eval_res.evaluation_ref
@@ -482,6 +498,7 @@ class EvaluationLoggerV2:
                 project_id=self._project_id,
                 evaluation=self._evaluation_ref,
                 model=self._model_ref,
+                wb_user_id=None,
             )
         )
         self._evaluation_run_id = run_res.evaluation_run_id
@@ -496,6 +513,7 @@ class EvaluationLoggerV2:
                 name=cast(str, scorer.name),
                 description=None,
                 op_source_code=_synthesize_scorer_source(scorer),
+                wb_user_id=None,
             )
         )
         return _object_ref_uri(self._entity, self._project, res.object_id, res.digest)
@@ -605,6 +623,8 @@ class EvaluationLoggerV2:
                         project_id=self._project_id,
                         evaluation_run_id=cast(str, self._evaluation_run_id),
                         summary=final_summary,
+                        exception=None,
+                        wb_user_id=None,
                     )
                 )
             except Exception:
@@ -660,6 +680,7 @@ class EvaluationLoggerV2:
                         evaluation_run_id=cast(str, self._evaluation_run_id),
                         summary=None,
                         exception=str(exception) if exception else None,
+                        wb_user_id=None,
                     )
                 )
             except Exception:
