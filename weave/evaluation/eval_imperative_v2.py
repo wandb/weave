@@ -171,7 +171,6 @@ class ScoreLoggerV2:
         self._eval_logger = eval_logger
         self._inputs = inputs
         self._output_buffer: Any = output
-        self._output_sent: Any = NOT_SET  # what we sent to prediction_create
         self._prediction_id: str | None = None
         self._has_finished: bool = False
         self._captured_scores: dict[str, ScoreType | None] = {}
@@ -207,7 +206,6 @@ class ScoreLoggerV2:
             )
         )
         self._prediction_id = res.prediction_id
-        self._output_sent = self._output_buffer
 
     @overload
     def log_score(
@@ -289,19 +287,17 @@ class ScoreLoggerV2:
         self._ensure_prediction_created()
         assert self._eval_logger._server is not None
 
-        # If the buffered output changed between prediction_create and now
-        # (the V1 `pred.output = ...` + `finish()` flow), pass the new value
-        # so the backend updates the call before closing. Otherwise pass None
-        # and let the backend preserve what it already has.
-        finish_output = (
-            self._output_buffer if self._output_buffer != self._output_sent else None
-        )
-
+        # `prediction_create` no longer writes the output to the backend (it
+        # only emits `call_start`). `prediction_finish` is now the sole owner
+        # of the output write via `call_end`, so we always send the current
+        # buffered output here — not a diff against what `prediction_create`
+        # saw. If the caller never assigned an output, `self._output_buffer`
+        # will be whatever was passed to `log_prediction` (possibly None).
         self._eval_logger._server.prediction_finish(
             tsi.PredictionFinishReq(
                 project_id=self._eval_logger._project_id,
                 prediction_id=cast(str, self._prediction_id),
-                output=finish_output,
+                output=self._output_buffer,
                 wb_user_id=None,
             )
         )

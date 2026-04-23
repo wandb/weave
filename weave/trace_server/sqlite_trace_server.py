@@ -4110,18 +4110,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         self.call_start(call_start_req)
 
-        # End the call immediately with the output
-        call_end_req = tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=req.project_id,
-                id=prediction_id,
-                ended_at=datetime.datetime.now(datetime.timezone.utc),
-                output=req.output,
-                summary={},
-            )
-        )
-        self.call_end(call_end_req)
-
+        # NOTE: We intentionally do NOT emit `call_end` here. The prediction
+        # remains "in progress" until `prediction_finish` owns the `call_end`
+        # with the final output. This mirrors the ClickHouse backend and
+        # keeps the contract consistent.
         return tsi.PredictionCreateRes(prediction_id=prediction_id)
 
     def prediction_read(self, req: tsi.PredictionReadReq) -> tsi.PredictionReadRes:
@@ -4298,21 +4290,16 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         prediction_res = self.call_read(prediction_read_req)
 
-        # If the caller supplied a new `output` on finish (e.g. EvaluationLogger
-        # V2's deferred `pred.output = ...` flow), use it; otherwise preserve
-        # the output that was set at prediction_create time.
-        existing_output = (
-            prediction_res.call.output if prediction_res.call is not None else None
-        )
-        finish_output = req.output if req.output is not None else existing_output
-
-        # Finish the prediction call
+        # `prediction_create` no longer emits a `call_end`, so this is the
+        # one and only place the prediction's output gets written.
+        # Use `req.output` directly (may be None, which is allowed).
+        prediction_ended_at = datetime.datetime.now(datetime.timezone.utc)
         call_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=req.prediction_id,
-                ended_at=datetime.datetime.now(datetime.timezone.utc),
-                output=finish_output,
+                ended_at=prediction_ended_at,
+                output=req.output,
                 summary={},
             )
         )
@@ -4387,24 +4374,25 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
             scores_dict[scorer_name] = score_call.output
 
-        # Calculate model latency from the prediction call's timestamps
+        # Calculate model latency from the prediction call's timestamps.
+        # `prediction_call` was read BEFORE we emitted `call_end`, so its
+        # `ended_at` is None — use the `prediction_ended_at` we just wrote.
         model_latency = None
-        if prediction_call.started_at and prediction_call.ended_at:
+        if prediction_call.started_at:
             latency_seconds = (
-                prediction_call.ended_at - prediction_call.started_at
+                prediction_ended_at - prediction_call.started_at
             ).total_seconds()
             model_latency = {"mean": latency_seconds}
 
-        # Finish the predict_and_score parent call with proper output. Use the
-        # finish-time output (potentially overridden via `req.output`) rather
-        # than the one captured at prediction_create time.
+        # Finish the predict_and_score parent call with proper output. Use
+        # `req.output` directly — it is the authoritative final output.
         parent_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=parent_id,
                 ended_at=datetime.datetime.now(datetime.timezone.utc),
                 output={
-                    "output": finish_output,
+                    "output": req.output,
                     "scores": scores_dict,
                     "model_latency": model_latency,
                 },

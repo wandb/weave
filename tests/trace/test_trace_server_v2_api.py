@@ -1223,6 +1223,16 @@ class ReadPredictionModel(weave.Model):
         )
         pred_res = client.server.prediction_create(pred_req)
 
+        # Finish the prediction — `prediction_create` no longer writes the
+        # output on its own. The final output is owned by `prediction_finish`.
+        client.server.prediction_finish(
+            tsi.PredictionFinishReq(
+                project_id=project_id,
+                prediction_id=pred_res.prediction_id,
+                output="4",
+            )
+        )
+
         # Read the prediction
         read_req = tsi.PredictionReadReq(
             project_id=project_id,
@@ -1316,6 +1326,15 @@ class ListPredictionModel(weave.Model):
                 output=f"result_{i}",
             )
             pred_res = client.server.prediction_create(pred_req)
+            # `prediction_create` no longer writes the output; the final output
+            # is owned by `prediction_finish` (single-write contract).
+            client.server.prediction_finish(
+                tsi.PredictionFinishReq(
+                    project_id=project_id,
+                    prediction_id=pred_res.prediction_id,
+                    output=f"result_{i}",
+                )
+            )
             pred_ids.append(pred_res.prediction_id)
 
         # List predictions
@@ -1433,10 +1452,12 @@ class PredEvalRunModel(weave.Model):
 
         assert read_res.evaluation_run_id == run_res.evaluation_run_id
 
-        # Finish the prediction (which should end the predict_and_score call with model_latency)
+        # Finish the prediction (which should end the predict_and_score call with model_latency).
+        # `prediction_create` no longer writes the output, so we pass it here.
         finish_req = tsi.PredictionFinishReq(
             project_id=project_id,
             prediction_id=pred_res.prediction_id,
+            output="result",
         )
         finish_res = client.server.prediction_finish(finish_req)
         assert finish_res.success is True

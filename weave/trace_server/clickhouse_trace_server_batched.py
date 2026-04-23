@@ -1030,78 +1030,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
         )
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._update_call_output")
-    def _update_call_output(
-        self,
-        project_id: str,
-        call_id: str,
-        output: Any,
-    ) -> None:
-        """Overwrite a call's output in both `call_parts` and `calls_merged`.
-
-        Used when a late mutation (e.g. `prediction_finish(output=...)`) needs
-        to replace an output that was already written via `call_end`. The
-        `calls_merged` table uses `SimpleAggregateFunction(any, ...)` for
-        `output_dump`, so inserting another `call_end` row does not reliably
-        override the earlier value — `any` picks whichever value was merged
-        first. This issues a synchronous `ALTER TABLE ... UPDATE` on both the
-        raw source table (`call_parts`) and the aggregate (`calls_merged`) so
-        subsequent reads return the new output regardless of part-merge timing.
-        """
-        output_dump = any_value_to_dump(output)
-        output_refs = extract_refs_from_values(output)
-
-        cluster_suffix = (
-            f" ON CLUSTER {self.clickhouse_cluster_name}"
-            if self.clickhouse_cluster_name
-            else ""
-        )
-        local_suffix = (
-            ch_settings.LOCAL_TABLE_SUFFIX if self.use_distributed_mode else ""
-        )
-
-        # mutations_sync=1 makes the ALTER UPDATE wait for mutation to apply
-        # on the current node, which is what the tests rely on. Mutations on
-        # AggregatingMergeTree columns rewrite part files; they are heavier
-        # than lightweight updates but are the only correct way to override
-        # an `any()` aggregation after the fact.
-        settings: dict[str, int | str] = {"mutations_sync": 1}
-
-        pb_parts = ParamBuilder()
-        project_id_param_parts = pb_parts.add_param(project_id)
-        id_param_parts = pb_parts.add_param(call_id)
-        output_dump_param_parts = pb_parts.add_param(output_dump)
-        output_refs_param_parts = pb_parts.add_param(output_refs)
-        call_parts_query = f"""
-            ALTER TABLE call_parts{local_suffix}{cluster_suffix}
-            UPDATE
-                output_dump = {{{output_dump_param_parts}:String}},
-                output_refs = {{{output_refs_param_parts}:Array(String)}}
-            WHERE project_id = {{{project_id_param_parts}:String}}
-              AND id = {{{id_param_parts}:String}}
-              AND ended_at IS NOT NULL
-        """
-        self._command(
-            call_parts_query, parameters=pb_parts.get_params(), settings=settings
-        )
-
-        pb_merged = ParamBuilder()
-        project_id_param_merged = pb_merged.add_param(project_id)
-        id_param_merged = pb_merged.add_param(call_id)
-        output_dump_param_merged = pb_merged.add_param(output_dump)
-        output_refs_param_merged = pb_merged.add_param(output_refs)
-        calls_merged_query = f"""
-            ALTER TABLE calls_merged{local_suffix}{cluster_suffix}
-            UPDATE
-                output_dump = {{{output_dump_param_merged}:String}},
-                output_refs = {{{output_refs_param_merged}:Array(String)}}
-            WHERE project_id = {{{project_id_param_merged}:String}}
-              AND id = {{{id_param_merged}:String}}
-        """
-        self._command(
-            calls_merged_query, parameters=pb_merged.get_params(), settings=settings
-        )
-
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
             tsi.CallsQueryReq(
@@ -4599,18 +4527,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         self.call_start(call_start_req)
 
-        # End the call immediately with the output
-        call_end_req = tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=req.project_id,
-                id=prediction_id,
-                ended_at=datetime.datetime.now(datetime.timezone.utc),
-                output=req.output,
-                summary={},
-            )
-        )
-        self.call_end(call_end_req)
-
+        # NOTE: We intentionally do NOT emit `call_end` here. The prediction
+        # remains "in progress" until `prediction_finish` owns the `call_end`
+        # with the final output. Writing `output_dump` exactly once per
+        # prediction avoids the need for `ALTER TABLE ... UPDATE` mutations
+        # on ClickHouse's `calls_merged` aggregate (which uses
+        # `SimpleAggregateFunction(any, ...)` for `output_dump` and cannot be
+        # reliably overwritten by a later `call_end` row).
         return tsi.PredictionCreateRes(prediction_id=prediction_id)
 
     def prediction_read(self, req: tsi.PredictionReadReq) -> tsi.PredictionReadRes:
@@ -4786,66 +4709,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         prediction_res = self.call_read(prediction_read_req)
 
-        # If the caller supplied a new `output` on finish (e.g. EvaluationLogger
-        # V2's deferred `pred.output = ...` flow), use it; otherwise preserve
-        # the output that was set at prediction_create time.
-        existing_output = (
-            prediction_res.call.output if prediction_res.call is not None else None
-        )
-        finish_output = req.output if req.output is not None else existing_output
-
-        # Finish the prediction call
+        # `prediction_create` no longer emits a `call_end`, so this is the
+        # one and only place `output_dump` gets written for this prediction.
+        # Use `req.output` directly (may be None, which is allowed).
+        prediction_ended_at = datetime.datetime.now(datetime.timezone.utc)
         call_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=req.prediction_id,
-                ended_at=datetime.datetime.now(datetime.timezone.utc),
-                output=finish_output,
+                ended_at=prediction_ended_at,
+                output=req.output,
                 summary={},
             )
         )
         self.call_end(call_end_req)
-
-        # If a new `output` was supplied on finish, overwrite the aggregated
-        # output for this call. `prediction_create` already emitted a
-        # `call_end` row with the create-time output, and `calls_merged` uses
-        # `SimpleAggregateFunction(any, ...)` for `output_dump` — so a second
-        # `call_end` row alone cannot win against the first one. We issue an
-        # `ALTER TABLE ... UPDATE` mutation on both `call_parts` (source) and
-        # `calls_merged` (aggregate) so reads return the latest output
-        # regardless of merge timing.
-        # Handle a late output change (EvaluationLogger V2's deferred
-        # `pred.output = ...` flow) on ClickHouse.
-        #
-        # Context: `prediction_create` already emits a call_end row with its
-        # create-time output, and `calls_merged` uses
-        # `SimpleAggregateFunction(any, ...)` for `output_dump`. `any`
-        # non-deterministically keeps one value per key during merge, so a
-        # second call_end with a new output does NOT reliably overwrite the
-        # earlier one. The only way to force the new value without a schema
-        # migration is `ALTER TABLE ... UPDATE`, which rewrites affected
-        # part files — expensive per row.
-        #
-        # We mitigate the cost by:
-        #   (a) only calling this when the new output actually differs from
-        #       what's already stored (diff check below), and
-        #   (b) the V2 logger's common flow (output provided upfront OR
-        #       assigned before any log_score) never triggers this because
-        #       create-time output already matches the final output.
-        # In practice the mutation only fires when a caller mutates
-        # `pred.output` AFTER logging a score, or overrides via
-        # `pred.finish(output=...)`. For high-frequency eval workloads that
-        # rely on that pattern, the right long-term fix is to change
-        # `prediction_create` to emit only `call_start` and let
-        # `prediction_finish` own the `call_end`, so `output_dump` is
-        # written exactly once per prediction. That restructuring is a
-        # larger change than this PR's scope.
-        if req.output is not None and req.output != existing_output:
-            self._update_call_output(
-                project_id=req.project_id,
-                call_id=req.prediction_id,
-                output=req.output,
-            )
 
         # If this prediction has a parent (predict_and_score call), finish that too
         prediction_call = prediction_res.call
@@ -4918,24 +4795,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             scores_dict[scorer_name] = score_call.output
 
-        # Calculate model latency from the prediction call's timestamps
+        # Calculate model latency from the prediction call's timestamps.
+        # `prediction_call` was read BEFORE we emitted `call_end`, so its
+        # `ended_at` is None — use the `prediction_ended_at` we just wrote.
         model_latency = None
-        if prediction_call.started_at and prediction_call.ended_at:
+        if prediction_call.started_at:
             latency_seconds = (
-                prediction_call.ended_at - prediction_call.started_at
+                prediction_ended_at - prediction_call.started_at
             ).total_seconds()
             model_latency = {"mean": latency_seconds}
 
-        # Finish the predict_and_score parent call with proper output. Use the
-        # finish-time output (potentially overridden via `req.output`) rather
-        # than the one captured at prediction_create time.
+        # Finish the predict_and_score parent call with proper output. Use
+        # `req.output` directly — it is the authoritative final output for
+        # this prediction.
         parent_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=parent_id,
                 ended_at=datetime.datetime.now(datetime.timezone.utc),
                 output={
-                    "output": finish_output,
+                    "output": req.output,
                     "scores": scores_dict,
                     "model_latency": model_latency,
                 },
