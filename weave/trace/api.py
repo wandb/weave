@@ -50,75 +50,154 @@ def init(
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
 ) -> weave_client.WeaveClient:
-    """Initialize weave tracking, logging to a wandb project.
+    """Initializes Weave tracing for a Weights & Biases project and returns the active client.
 
-    Logging is initialized globally, so you do not need to keep a reference
-    to the return value of init.
+    Call this once, early in your program. After it returns, any function decorated
+    with `weave.op` is traced to the specified project, and many supported LLM and
+    agent libraries are automatically patched so their calls appear as traces too.
+    The client is registered globally, so you don't need to hold on to the return
+    value unless you want to use it directly.
 
-    Following init, calls of weave.op decorated functions will be logged
-    to the specified project.
+    Calling `weave.init` again with the same project is a no-op and returns the
+    existing client. Calling it with a different project flushes any pending calls
+    on the previous client and replaces it.
+
+    If `project_name` doesn't include a team, Weave resolves your default W&B
+    entity. If you're not yet authenticated, Weave runs `wandb login` to prompt
+    for an API key.
 
     Args:
-        project_name: The name of the Weights & Biases team and project to log to. If you don't
-            specify a team, your default entity is used.
-            To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/platform/app/settings-page/user-settings#default-team) in the W&B Models documentation.
-        settings: Configuration for the Weave client generally. Can be a UserSettings instance or a dict
-            with any of the following keys (all optional). All settings can also be configured
-            via environment variables using the prefix WEAVE_ (e.g., WEAVE_DISABLED=true).
-            Available settings:
-                - `disabled` (bool): Disables traces on all functions. Default: `False`
-                - `print_call_link` (bool): Prints links in terminal to Weave UI for ops. Default: `True`
-                - `log_level` (str): Sets what type of information to log (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). Default: `INFO`
-                - `display_viewer` (str): Controls how Weave displays objects in the console (`auto`, `rich`, `print`). Default: `auto`
-                - `capture_code` (bool): Captures code of traced ops to your Weave project. Default: `True`
-                - `implicitly_patch_integrations` (bool): Auto-patches supported libraries. Default: `True`
-                - `redact_pii` (bool): Scans all trace data for sensitive information,
-                    like emails, phone numbers, and credit cards, and replaces them with placeholder values
-                    before sending to the server. Requires presidio-analyzer and presidio-anonymizer packages.
-                    Default: `False`
-                - `redact_pii_fields` (list[str]): Specifies which PII entity types to redact when `redact_pii`
-                    is `True`. If empty, uses Presidio's default set. Examples: ['EMAIL','PHONE_NUMBER','CREDIT_CARD','US_SSN'].
-                    See full list at: https://microsoft.github.io/presidio/supported_entities/
-                    Default: `[]`
-                - `redact_pii_exclude_fields` (list[str]): PII entity types to exclude. Default: `[]`
-                - `capture_client_info` (bool): Captures Python/SDK version info. Default: `True`
-                - `capture_system_info` (bool): Captures OS information. Default: `True`
-                - `client_parallelism` (int): Number of workers for background ops. Default: `auto`
-                - `use_server_cache` (bool): Enables local disk caching of server responses.
-                - `server_cache_size_limit` (int): Cache size limit in bytes. Default: `1_000_000_000`
-                - `server_cache_dir` (str): Directory for server cache. Default: `temporary`
-                - `scorers_dir` (str): Directory for scorer model checkpoints. Default: `~/.cache/wandb/weave-scorers`
-                - `max_calls_queue_size` (int): Maximum queue size (0 = unbounded). Default: `100_000`
-                - `retry_max_interval` (float): Maximum retry interval in seconds. Default: `300`
-                - `retry_max_attempts` (int): Maximum number of retries. Default: `3`
-                - `enable_disk_fallback` (bool): Writes dropped items to disk. Default: `True`
-                - `use_parallel_table_upload` (bool): Enables parallel chunked upload for large tables. If False,
-                    tables are uploaded sequentially in smaller chunks.
-                    Default: `True`
-                - `http_timeout` (float): Maximum time in seconds to wait for HTTP requests to complete.
-                    This includes connection time, data transfer, and server processing. Increase for
-                    slow networks or when working with large payloads.
-                    Default: `30.0`
-                - `use_stainless_server` (bool): Uses the Stainless-generated HTTP client which
-                    provides better type safety, automatic retries, and improved error handling. This is
-                    experimental and may become the default in future versions.
-                    Default: `False`
-                - `use_calls_complete` (bool): Uses an optimized write path that batches complete
-                    call data (start and end) into a single request instead of separate start/end requests.
-                    This reduces server load and improves performance, especially for short-lived ops.
-                    Default: `False`
-        autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
-        global_postprocess_inputs: A function that will be applied to all inputs of all ops.
-        global_postprocess_output: A function that will be applied to all outputs of all ops.
-        global_attributes: A dictionary of attributes that will be applied to all traces.
+        project_name (str): The Weights & Biases project to log to, as
+            `"your-team/your-project"` or `"your-project"`. When the team is
+            omitted, Weave uses the `WANDB_ENTITY` environment variable, or
+            your default entity from wandb. See
+            [User Settings](https://docs.wandb.ai/platform/app/settings-page/user-settings#default-team)
+            for how to find or change your default entity.
+        settings (UserSettings | dict[str, Any] | None): Configuration for the
+            Weave client. Pass a `UserSettings` instance, a dict of field names
+            to values, or `None` to use defaults. Any field can also be set via
+            an environment variable by uppercasing the name and adding the
+            `WEAVE_` prefix (for example, `WEAVE_DISABLED=true`). Environment
+            variables take precedence over values passed here. The most commonly
+            used fields are:
 
-    NOTE: Global postprocessing settings are applied to all ops after each op's own
-    postprocessing.  The order is always:
-    1. Op-specific postprocessing
-    2. Global postprocessing
+                - `disabled` (bool): Turns tracing off. All `weave.op` functions
+                    run as plain Python and no network calls are made.
+                    Default: `False`.
+                - `print_call_link` (bool): Prints a link to the Weave UI when
+                    a traced op runs. Default: `True`.
+                - `log_level` (str): Logger level for the `weave` logger. One of
+                    `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. Default: `INFO`.
+                - `display_viewer` (str): Console renderer for Weave output. One
+                    of `auto`, `rich`, `print`. Default: `auto`.
+                - `capture_code` (bool): Saves op source code alongside each
+                    version so ops can be reloaded later. Default: `True`.
+                - `implicitly_patch_integrations` (bool): Auto-patches supported
+                    libraries (for example, OpenAI, Anthropic) when they're
+                    imported. When `False`, call `weave.integrations.patch_openai()`
+                    or similar explicitly. Default: `True`.
+                - `redact_pii` (bool): Scans trace data for PII (emails, phone
+                    numbers, credit cards, etc.) and replaces matches with
+                    placeholders before sending to the server. Requires the
+                    `presidio-analyzer` and `presidio-anonymizer` packages.
+                    Default: `False`.
+                - `redact_pii_fields` (list[str]): PII entity types to redact
+                    when `redact_pii` is `True`. When empty, Presidio's default
+                    set is used. See the
+                    [supported entities](https://microsoft.github.io/presidio/supported_entities/)
+                    for the full list. Default: `[]`.
+                - `redact_pii_exclude_fields` (list[str]): PII entity types to
+                    exclude from redaction. Default: `[]`.
+                - `capture_client_info` (bool): Includes Python and SDK version
+                    information with each trace. Default: `True`.
+                - `capture_system_info` (bool): Includes operating system
+                    information with each trace. Default: `True`.
+                - `client_parallelism` (int | None): Number of background
+                    workers for trace uploads. `None` lets Weave choose based
+                    on the host. Default: `None`.
+                - `use_server_cache` (bool): Caches server responses on local
+                    disk to speed up repeated reads. Default: `False`.
+                - `server_cache_size_limit` (int): Size limit of the local
+                    server cache, in bytes. Default: `1_000_000_000` (1 GB).
+                - `server_cache_dir` (str): Directory used for the local server
+                    cache. Default: a system temporary directory.
+                - `scorers_dir` (str): Directory that holds downloaded scorer
+                    model checkpoints. Default: `~/.cache/wandb/weave-scorers`.
+                - `max_calls_queue_size` (int): Maximum number of pending
+                    calls buffered in memory before upload. Set to `0` for no
+                    limit. Default: `100_000`.
+                - `retry_max_interval` (float): Maximum backoff interval
+                    between retries, in seconds. Default: `300.0` (5 minutes).
+                - `retry_max_attempts` (int): Number of times Weave re-attempts
+                    a failed request before giving up. Default: `3`.
+                - `enable_disk_fallback` (bool): Writes dropped queue items to
+                    disk so they can be recovered later. Default: `True`.
+                - `use_parallel_table_upload` (bool): Uploads large tables in
+                    parallel chunks instead of sequentially. Default: `True`.
+                - `http_timeout` (float): Per-request HTTP timeout in seconds,
+                    covering connect, transfer, and server processing. Increase
+                    for slow networks or large payloads. Default: `30.0`.
+                - `use_stainless_server` (bool): Uses the Stainless-generated
+                    HTTP client for trace server communication. Experimental.
+                    Default: `False`.
+                - `use_calls_complete` (bool): Sends start and end data for a
+                    call in a single request, which reduces server load for
+                    short-lived ops. Default: `False`.
+
+            For the authoritative list of every supported field, see
+            `UserSettings` in `weave.trace.settings`. For the full list of
+            environment variables, see
+            [Configure Weave environment variables](https://docs.wandb.ai/weave/guides/core-types/env-vars).
+        autopatch_settings (AutopatchSettings | None): Deprecated. Per-integration
+            autopatch configuration. Use explicit patching instead, for example
+            `weave.integrations.patch_openai()`. Passing a non-`None` value logs
+            a deprecation warning and has no effect on new integrations.
+        global_postprocess_inputs (PostprocessInputsFunc | None): A function
+            applied to the input dict of every traced op before the inputs are
+            sent to the server. Runs after any op-specific `postprocess_inputs`.
+            Use this to drop or mask fields globally.
+        global_postprocess_output (PostprocessOutputFunc | None): A function
+            applied to the return value of every traced op before the output is
+            sent to the server. Runs after any op-specific `postprocess_output`.
+        global_attributes (dict[str, Any] | None): Attributes merged into every
+            trace produced by this process, for example `{"env": "production"}`.
+            Keys set here are overridden by attributes set via
+            `weave.attributes()` inside a call.
 
     Returns:
-        A Weave client.
+        weave_client.WeaveClient: The active Weave client, bound to the given
+        project. When Weave is disabled through settings or the `WEAVE_DISABLED`
+        environment variable, a dummy client that skips all network calls is
+        returned instead.
+
+    Raises:
+        ValueError: When `project_name` is empty, is only whitespace, or
+            contains more than one `/` separator.
+        WeaveWandbAuthenticationException: When the team isn't specified and
+            wandb can't resolve a default entity (usually because the user
+            isn't logged in).
+        RuntimeError: When the Weave service isn't reachable on the configured
+            trace server.
+
+    Example:
+        ```python
+        import weave
+
+        weave.init("your-team/your-project")
+
+        @weave.op
+        def greet(name: str) -> str:
+            return f"Hello, {name}!"
+
+        greet("Ada")
+        ```
+
+    See Also:
+        - `weave.op`: Decorator that marks a function as traceable.
+        - `weave.publish`: Saves and versions an object under the active project.
+        - `weave.get_client`: Returns the active client without initializing.
+        - `weave.finish`: Flushes pending work and tears down the active client.
+        - `UserSettings`: The full schema for the `settings` argument.
     """
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
