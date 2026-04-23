@@ -80,6 +80,15 @@ class UserSettings(BaseModel):
     patch functions like `weave.integrations.patch_openai()` to enable tracing for integrations.
     Can be overridden with the environment variable `WEAVE_IMPLICITLY_PATCH_INTEGRATIONS`"""
 
+    use_evaluation_logger_v2: bool = False
+    """Toggles use of EvaluationLoggerV2 (the server-side-native imperative logger).
+
+    If True, `weave.EvaluationLogger(...)` returns `EvaluationLoggerV2`, which
+    is built on the V2 evaluation endpoints (evaluation_run, prediction, score)
+    instead of V1's pseudo-Evaluation call graph. Defaults to False while V2
+    rolls out; will become the default in a future release.
+    Can be overridden with the environment variable `WEAVE_USE_EVALUATION_LOGGER_V2`"""
+
     redact_pii: bool = False
     """Toggles PII redaction using Microsoft Presidio.
 
@@ -386,6 +395,11 @@ def should_use_parallel_table_upload() -> bool:
 def should_implicitly_patch_integrations() -> bool:
     """Returns whether implicit patching of integrations is enabled."""
     return _should("implicitly_patch_integrations")
+
+
+def should_use_evaluation_logger_v2() -> bool:
+    """Returns whether the imperative logger factory should dispatch to V2."""
+    return _should("use_evaluation_logger_v2")
 
 
 def http_timeout() -> float:

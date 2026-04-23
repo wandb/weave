@@ -5,6 +5,9 @@ must support identically. They intentionally avoid peeking at implementation
 details (specific op names, call-tree shapes, internal trace structure) so
 the same test body can run against V1 and V2.
 
+Each test simulates a realistic user flow and bundles related assertions
+rather than testing one behavior at a time.
+
 Anything that checks V1-specific trace structure (op names like
 "Evaluation.evaluate", specific parent_id relationships, V1 summary shape)
 belongs in ``test_evaluation_imperative.py``. Anything that checks V2-only
@@ -28,190 +31,149 @@ def logger_cls(request):
     return request.param
 
 
-def test_log_example_roundtrip(client, logger_cls):
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    ev.log_example(
-        inputs={"q": "x"},
-        output="y",
-        scores={"correct": 1.0, "fluent": 0.8},
+def test_full_evaluation_flow_with_log_example(client, logger_cls):
+    """End-to-end eval: multiple predictions via log_example, mixed scorer
+    forms (string / dict / Scorer subclass), ``None`` score, eval attributes,
+    auto-summarize.
+    """
+
+    class MyScorer(Scorer):
+        name: str = "my_scorer"
+
+    ev = logger_cls(
+        model="m",
+        dataset=[{"q": "a"}, {"q": "b"}],
+        eval_attributes={"environment": "test", "custom_attribute": "hello"},
     )
-    ev.log_summary()
 
-    pred = ev._accumulated_predictions[0]
-    assert pred._captured_scores == {"correct": 1.0, "fluent": 0.8}
-    assert pred._has_finished
+    # Two log_example calls covering the all-in-one convenience path, mixed
+    # scorer types, and a None score ("N/A" in practice).
+    ev.log_example(
+        inputs={"q": "a"},
+        output="A",
+        scores={"string_scorer": 1.0, "maybe_scorer": None},
+    )
+    ev.log_example(
+        inputs={"q": "b"},
+        output="B",
+        scores={"string_scorer": 0.5, "maybe_scorer": 0.8},
+    )
 
-
-def test_log_example_multiple_examples(client, logger_cls):
-    ev = logger_cls(model="m", dataset=[{"q": "a"}, {"q": "b"}])
-    ev.log_example(inputs={"q": "a"}, output="A", scores={"s": 1.0})
-    ev.log_example(inputs={"q": "b"}, output="B", scores={"s": 0.5})
-    ev.log_summary()
-
-    assert len(ev._accumulated_predictions) == 2
-    assert ev._accumulated_predictions[0]._captured_scores == {"s": 1.0}
-    assert ev._accumulated_predictions[1]._captured_scores == {"s": 0.5}
-
-
-def test_log_example_after_finalization_raises(client, logger_cls):
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    ev.log_example(inputs={"q": "x"}, output="y", scores={"s": 1.0})
-    ev.log_summary()
-    with pytest.raises(ValueError, match="finalized"):
-        ev.log_example(inputs={"q": "z"}, output="w", scores={"s": 0.0})
-
-
-def test_none_as_valid_score_value(client, logger_cls):
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    pred = ev.log_prediction(inputs={"q": "x"}, output="y")
-    pred.log_score("maybe_scorer", None)
+    # One prediction constructed imperatively that exercises dict- and
+    # class-based scorer inputs, plus the default auto_summarize=True path.
+    pred = ev.log_prediction(inputs={"q": "c"}, output="C")
+    pred.log_score({"name": "dict_scorer"}, 0.5)
+    pred.log_score(MyScorer(), 0.25)
     pred.finish()
-    ev.log_summary()
-    assert pred._captured_scores == {"maybe_scorer": None}
+
+    ev.log_summary(summary={"user_key": 42})
+
+    assert ev._is_finalized
+    assert ev.attributes.get("custom_attribute") == "hello"
+
+    assert len(ev._accumulated_predictions) == 3
+    p1, p2, p3 = ev._accumulated_predictions
+    assert p1._captured_scores == {"string_scorer": 1.0, "maybe_scorer": None}
+    assert p2._captured_scores == {"string_scorer": 0.5, "maybe_scorer": 0.8}
+    assert p3._captured_scores == {"dict_scorer": 0.5, "my_scorer": 0.25}
+    assert all(p._has_finished for p in ev._accumulated_predictions)
 
 
-def test_passing_dict_scorer_without_name_raises(client, logger_cls):
+def test_streaming_prediction_with_context_managers(client, logger_cls):
+    """Dynamic user flow: output assigned inside the prediction context,
+    scores both direct and deferred (``with pred.log_score(...) as s:``),
+    plus an async score.
+    """
     ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    pred = ev.log_prediction(inputs={"q": "x"}, output="y")
-    with pytest.raises(ValueError, match="name"):
-        pred.log_score({"not_name": "x"}, 1.0)
 
-
-def test_log_prediction_context_manager_sets_output(client, logger_cls):
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
     with ev.log_prediction(inputs={"q": "x"}) as pred:
         pred.output = "dynamic_output"
-        pred.log_score("s", 0.9)
+        pred.log_score("direct", 0.9)
+        with pred.log_score("deferred") as score_ctx:
+            score_ctx.value = 0.75
+        # Mix in an explicitly None score to lock that in end-to-end.
+        pred.log_score("na", None)
+
+    # An async score on a fresh prediction — log_prediction's context manager
+    # is the "happy" finalize path; this exercises `alog_score` separately.
+    async def _async_score() -> None:
+        p = ev.log_prediction(inputs={"q": "y"}, output="Y")
+        await p.alog_score("async_s", 0.33)
+        p.finish()
+
+    asyncio.run(_async_score())
     ev.log_summary()
 
-    assert pred._has_finished
-    assert pred._captured_scores == {"s": 0.9}
+    first, second = ev._accumulated_predictions
+    assert first._has_finished
+    assert first._captured_scores == {
+        "direct": 0.9,
+        "deferred": 0.75,
+        "na": None,
+    }
+    assert second._captured_scores == {"async_s": 0.33}
+    assert ev._is_finalized
 
 
-def test_log_score_context_manager_submits_value(client, logger_cls):
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    pred = ev.log_prediction(inputs={"q": "x"}, output="y")
-    with pred.log_score("reasoning") as score_ctx:
-        score_ctx.value = 0.75
-    pred.finish()
-    ev.log_summary()
-
-    assert pred._captured_scores == {"reasoning": 0.75}
-
-
-def test_log_score_context_manager_without_value_raises(client, logger_cls):
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    pred = ev.log_prediction(inputs={"q": "x"}, output="y")
-    with pytest.raises(ValueError, match="Score value was not set"):
-        with pred.log_score("reasoning"):
-            pass
-    pred.finish()
-    ev.log_summary()
-
-
-def test_predefined_scorer_warning_on_ad_hoc_use(client, logger_cls, caplog):
+def test_validation_and_error_paths(client, logger_cls, caplog):
+    """Error-path contract: dict-scorer-missing-name raises, unset deferred
+    score value raises, log_example-after-finalization raises, and using an
+    ad-hoc scorer outside the predefined list logs a warning.
+    """
     ev = logger_cls(
         model="m",
         dataset=[{"q": "x"}],
         scorers=["expected_scorer"],
     )
     pred = ev.log_prediction(inputs={"q": "x"}, output="y")
+
+    with pytest.raises(ValueError, match="name"):
+        pred.log_score({"not_name": "x"}, 1.0)
+
+    with pytest.raises(ValueError, match="Score value was not set"):
+        with pred.log_score("expected_scorer"):
+            pass  # user forgot to assign score_ctx.value
+
     with caplog.at_level("WARNING"):
         pred.log_score("unexpected_scorer", 0.5)
-    pred.finish()
-    ev.log_summary()
-
-    # Both V1 and V2 log a WARNING when a scorer outside the predefined list
-    # is used.
     assert any(
         "unexpected_scorer" in r.message and "predefined" in r.message
         for r in caplog.records
     )
 
-
-def test_custom_eval_attributes_accepted(client, logger_cls):
-    # Accepting `eval_attributes=` without raising is part of the contract.
-    # V1 stores them on the evaluate call's attributes; V2 stores them via
-    # EvaluationCreateReq.eval_attributes. The observable contract here is
-    # simply that construction + a full flow succeed.
-    ev = logger_cls(
-        model="m",
-        dataset=[{"q": "x"}],
-        eval_attributes={"environment": "test", "custom_attribute": "hello"},
-    )
-    pred = ev.log_prediction(inputs={"q": "x"}, output="y")
-    pred.log_score("s", 1.0)
-    pred.finish()
-    ev.log_summary()
-    assert ev.attributes.get("custom_attribute") == "hello"
-
-
-def test_scorers_accept_string_dict_and_instance(client, logger_cls):
-    class MyScorer(Scorer):
-        name: str = "my_scorer"
-
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    pred = ev.log_prediction(inputs={"q": "x"}, output="y")
-    pred.log_score("string_scorer", 1.0)
-    pred.log_score({"name": "dict_scorer"}, 0.5)
-    pred.log_score(MyScorer(), 0.25)
     pred.finish()
     ev.log_summary()
 
-    assert set(pred._captured_scores.keys()) == {
-        "string_scorer",
-        "dict_scorer",
-        "my_scorer",
-    }
+    with pytest.raises(ValueError, match="finalized"):
+        ev.log_example(inputs={"q": "z"}, output="w", scores={"s": 0.0})
 
 
-def test_log_summary_no_auto_summarize(client, logger_cls):
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    pred = ev.log_prediction(inputs={"q": "x"}, output="y")
-    pred.log_score("s", 1.0)
-    pred.finish()
-    ev.log_summary(summary={"user_key": 42}, auto_summarize=False)
-
-    # Contract: the evaluation is finalized and doesn't raise.
-    assert ev._is_finalized
-
-
-def test_weave_disabled_captures_scores_without_failing(
+def test_logger_survives_disabled_failure_and_double_finish(
     client, logger_cls, monkeypatch
 ):
+    """Robustness contract: the logger is a no-op but still captures scores
+    locally when ``WEAVE_DISABLED=true``; ``fail(exception)`` finalizes; and
+    a second ``finish()`` is a silent no-op (not an error).
+    """
+    # Disabled-mode logger: scores still captured client-side, no raise.
     monkeypatch.setenv("WEAVE_DISABLED", "true")
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    pred = ev.log_prediction(inputs={"q": "x"}, output="y")
+    disabled = logger_cls(model="m", dataset=[{"q": "x"}])
+    pred = disabled.log_prediction(inputs={"q": "x"}, output="y")
     pred.log_score("s", 0.5)
     pred.finish()
-    ev.log_summary()
-
-    # Contract: the logger tolerates disabled tracing, keeps user-visible
-    # state internally, and does not raise.
+    disabled.log_summary(summary={"k": 1}, auto_summarize=False)
     assert pred._captured_scores == {"s": 0.5}
+    assert disabled._is_finalized
+    monkeypatch.delenv("WEAVE_DISABLED")
 
+    # fail(exception) finalizes the run without raising.
+    failed = logger_cls(model="m", dataset=[{"q": "x"}])
+    failed.log_prediction(inputs={"q": "x"}, output="y")
+    failed.fail(RuntimeError("synthetic failure"))
+    assert failed._is_finalized
 
-def test_fail_finalizes_without_raising(client, logger_cls):
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    ev.log_prediction(inputs={"q": "x"}, output="y")
-    ev.fail(RuntimeError("synthetic failure"))
-    assert ev._is_finalized
-
-
-def test_finish_without_predictions_is_idempotent(client, logger_cls):
-    ev = logger_cls(model="m", dataset=[{"q": "x"}])
-    ev.finish()
-    ev.finish()  # Second finish should no-op, not raise.
-    assert ev._is_finalized
-
-
-def test_async_alog_score(client, logger_cls):
-    async def run() -> None:
-        ev = logger_cls(model="m", dataset=[{"q": "x"}])
-        pred = ev.log_prediction(inputs={"q": "x"}, output="y")
-        await pred.alog_score("async_s", 0.33)
-        pred.finish()
-        ev.log_summary()
-        assert pred._captured_scores == {"async_s": 0.33}
-
-    asyncio.run(run())
+    # Calling finish() twice is safe: the second call is a no-op.
+    idempotent = logger_cls(model="m", dataset=[{"q": "x"}])
+    idempotent.finish()
+    idempotent.finish()
+    assert idempotent._is_finalized

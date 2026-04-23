@@ -55,8 +55,9 @@ from weave.evaluation._imperative_shared import (
     ScoreLoggerProtocol,
 )
 from weave.evaluation.eval import Evaluation
-from weave.evaluation.eval_imperative import EvaluationLogger
+from weave.evaluation.eval_imperative import EvaluationLogger as EvaluationLoggerV1
 from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2
+from weave.evaluation.eval_logger import EvaluationLogger
 from weave.flow.annotation_spec import AnnotationSpec
 from weave.flow.model import Model
 from weave.flow.monitor import ClassifierMonitor, Monitor
@@ -87,6 +88,7 @@ __all__ = [
     "Evaluation",
     "EvaluationLogger",
     "EvaluationLoggerProtocol",
+    "EvaluationLoggerV1",
     "EvaluationLoggerV2",
     "File",
     "Markdown",

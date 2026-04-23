@@ -11,6 +11,8 @@ import asyncio
 
 import pytest
 
+import weave
+from weave.evaluation.eval_imperative import EvaluationLogger as EvaluationLoggerV1
 from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2
 from weave.trace_server import trace_server_interface as tsi
 
@@ -220,6 +222,33 @@ def test_log_score_context_manager_without_value_raises(client):
             pass
     pred.finish()
     ev.log_summary()
+
+
+def test_factory_defaults_to_v1(client):
+    # `weave.EvaluationLogger` is the factory; without opting in, it must
+    # keep returning V1 so existing users don't see a behavior change.
+    ev = weave.EvaluationLogger(model="m", dataset=[{"q": "x"}])
+    assert isinstance(ev, EvaluationLoggerV1)
+    ev.finish()
+
+
+def test_factory_dispatches_to_v2_via_env(client, monkeypatch):
+    monkeypatch.setenv("WEAVE_USE_EVALUATION_LOGGER_V2", "true")
+    ev = weave.EvaluationLogger(model="m", dataset=[{"q": "x"}])
+    assert isinstance(ev, EvaluationLoggerV2)
+    ev.finish()
+
+
+def test_factory_dispatches_to_v2_via_settings(client):
+    from weave.trace.settings import UserSettings, parse_and_apply_settings
+
+    parse_and_apply_settings(UserSettings(use_evaluation_logger_v2=True))
+    try:
+        ev = weave.EvaluationLogger(model="m", dataset=[{"q": "x"}])
+        assert isinstance(ev, EvaluationLoggerV2)
+        ev.finish()
+    finally:
+        parse_and_apply_settings(UserSettings())
 
 
 def test_ui_url_format(client):
