@@ -251,6 +251,66 @@ def test_factory_dispatches_to_v2_via_settings(client):
         parse_and_apply_settings(UserSettings())
 
 
+def test_log_calls_are_non_blocking(client, monkeypatch):
+    """User-facing log_prediction/log_score/finish enqueue work on the
+    background executor and return before the server round-trips complete.
+    """
+    import time
+
+    from weave.evaluation import eval_imperative_v2
+
+    real_server_module = eval_imperative_v2.tsi
+
+    class _SlowServer:
+        """Wrap the real server and inject a delay into each V2 write so
+        we can prove the wall-clock cost is paid in the background, not in
+        the user's call.
+        """
+
+        def __init__(self, inner):
+            self._inner = inner
+
+        def __getattr__(self, name):
+            attr = getattr(self._inner, name)
+            if name in {
+                "prediction_create",
+                "prediction_finish",
+                "score_create",
+            }:
+
+                def slow(*args, **kwargs):
+                    time.sleep(0.05)
+                    return attr(*args, **kwargs)
+
+                return slow
+            return attr
+
+    ev = EvaluationLoggerV2(model="m", dataset=[{"q": "x"}])
+    # Swap in the slow shim after construction so `_ensure_initialized`
+    # (the one-time sync setup) stays fast; only per-prediction writes pay
+    # the 50ms tax.
+    ev._ensure_initialized()
+    assert ev._server is not None
+    ev._server = _SlowServer(ev._server)  # type: ignore[assignment]
+
+    # Six scores × 50ms would be ~300ms if each call blocked the user.
+    t0 = time.perf_counter()
+    for i in range(3):
+        pred = ev.log_prediction(inputs={"i": i}, output=i)
+        pred.log_score("s1", 1.0)
+        pred.log_score("s2", 0.5)
+        pred.finish()
+    user_code_elapsed = time.perf_counter() - t0
+
+    assert user_code_elapsed < 0.15, (
+        f"log_* calls should enqueue in the background; "
+        f"user-visible elapsed was {user_code_elapsed:.3f}s"
+    )
+
+    ev.log_summary()
+    assert real_server_module is not None  # keep import alive
+
+
 def test_ui_url_format(client):
     ev = EvaluationLoggerV2(model="m", dataset=[{"q": "x"}])
     assert ev.ui_url is None  # not initialized yet (lazy init)

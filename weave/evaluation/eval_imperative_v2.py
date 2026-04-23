@@ -17,11 +17,21 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import types
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from typing import Any, cast, overload
 
 from typing_extensions import Self
+
+# Number of concurrent in-flight V2 server calls per logger. One worker
+# matches V1's `AsyncBatchProcessor` model: user code never blocks on the
+# network, but writes serialize through a single background thread. This
+# is also what in-process SQLite requires (it errors on concurrent writes
+# with "database is locked"). Users on a remote HTTP backend who want more
+# parallelism can bump this via the `max_workers` constructor arg.
+_DEFAULT_MAX_WORKERS = 1
 
 from weave.dataset.dataset import Dataset
 from weave.evaluation._imperative_shared import (
@@ -174,6 +184,15 @@ class ScoreLoggerV2:
         self._prediction_id: str | None = None
         self._has_finished: bool = False
         self._captured_scores: dict[str, ScoreType | None] = {}
+        # Future that resolves to `prediction_id` once `prediction_create`
+        # returns. Set lazily the first time a score or finish is submitted.
+        # Score and finish tasks chain off this so they never call the server
+        # until the prediction exists, while still unblocking the caller.
+        self._prediction_future: Future[str] | None = None
+        # Futures for every score/finish task owned by this prediction; we
+        # wait on these in `finish` to order `prediction_finish` after all
+        # its scores, and at eval-level drain time.
+        self._pending_futures: list[Future[Any]] = []
 
     @property
     def output(self) -> Any:
@@ -189,23 +208,46 @@ class ScoreLoggerV2:
     def predefined_scorers(self) -> list[str] | None:
         return self._eval_logger.scorers
 
-    def _ensure_prediction_created(self) -> None:
-        if self._prediction_id is not None or self._eval_logger._disabled:
-            return
+    def _ensure_prediction_future(self) -> Future[str]:
+        """Submit ``prediction_create`` in the background (if not started).
+
+        Returns a Future that will resolve to the new prediction_id. Safe to
+        call from user code; does not block.
+        """
+        if self._prediction_future is not None:
+            return self._prediction_future
+
+        # One-time server init (dataset / scorers / model / evaluation /
+        # evaluation_run) is kept synchronous: it runs a handful of serial
+        # round-trips once per logger and it populates state that every
+        # background task depends on (model_ref, evaluation_run_id, ...).
         self._eval_logger._ensure_initialized()
-        assert self._eval_logger._server is not None  # _ensure_initialized populates it
+        assert self._eval_logger._server is not None
         assert self._eval_logger._model_ref is not None
-        res = self._eval_logger._server.prediction_create(
-            tsi.PredictionCreateReq(
-                project_id=self._eval_logger._project_id,
-                model=self._eval_logger._model_ref,
-                inputs=self._inputs,
-                output=self._output_buffer,
-                evaluation_run_id=self._eval_logger._evaluation_run_id,
-                wb_user_id=None,
+
+        project_id = self._eval_logger._project_id
+        model_ref = self._eval_logger._model_ref
+        inputs = self._inputs
+        output = self._output_buffer
+        evaluation_run_id = self._eval_logger._evaluation_run_id
+        server = self._eval_logger._server
+
+        def _create() -> str:
+            res = server.prediction_create(
+                tsi.PredictionCreateReq(
+                    project_id=project_id,
+                    model=model_ref,
+                    inputs=inputs,
+                    output=output,
+                    evaluation_run_id=evaluation_run_id,
+                    wb_user_id=None,
+                )
             )
-        )
-        self._prediction_id = res.prediction_id
+            self._prediction_id = res.prediction_id
+            return res.prediction_id
+
+        self._prediction_future = self._eval_logger._submit(_create)
+        return self._prediction_future
 
     @overload
     def log_score(
@@ -257,20 +299,28 @@ class ScoreLoggerV2:
         if self._eval_logger._disabled:
             return
 
-        self._ensure_prediction_created()
-        scorer_ref = self._eval_logger._get_or_create_scorer_ref(scorer)
-        assert self._eval_logger._server is not None
+        prediction_future = self._ensure_prediction_future()
+        server = self._eval_logger._server
+        assert server is not None
+        project_id = self._eval_logger._project_id
+        evaluation_run_id = self._eval_logger._evaluation_run_id
 
-        self._eval_logger._server.score_create(
-            tsi.ScoreCreateReq(
-                project_id=self._eval_logger._project_id,
-                prediction_id=cast(str, self._prediction_id),
-                scorer=scorer_ref,
-                value=score,
-                evaluation_run_id=self._eval_logger._evaluation_run_id,
-                wb_user_id=None,
+        def _create_score() -> None:
+            prediction_id = prediction_future.result()
+            scorer_ref = self._eval_logger._get_or_create_scorer_ref(scorer)
+            server.score_create(
+                tsi.ScoreCreateReq(
+                    project_id=project_id,
+                    prediction_id=prediction_id,
+                    scorer=scorer_ref,
+                    value=score,
+                    evaluation_run_id=evaluation_run_id,
+                    wb_user_id=None,
+                )
             )
-        )
+
+        fut = self._eval_logger._submit(_create_score)
+        self._pending_futures.append(fut)
 
     def finish(self, output: Any | None = None) -> None:
         if self._has_finished:
@@ -284,23 +334,37 @@ class ScoreLoggerV2:
             self._has_finished = True
             return
 
-        self._ensure_prediction_created()
-        assert self._eval_logger._server is not None
+        prediction_future = self._ensure_prediction_future()
+        # Snapshot scores + pending score futures now so that later user
+        # mutations to `self._output_buffer` or `self._pending_futures` do
+        # not affect what we send.
+        scores_pending = list(self._pending_futures)
+        output_to_send = self._output_buffer
+        server = self._eval_logger._server
+        assert server is not None
+        project_id = self._eval_logger._project_id
 
-        # `prediction_create` no longer writes the output to the backend (it
-        # only emits `call_start`). `prediction_finish` is now the sole owner
-        # of the output write via `call_end`, so we always send the current
-        # buffered output here — not a diff against what `prediction_create`
-        # saw. If the caller never assigned an output, `self._output_buffer`
-        # will be whatever was passed to `log_prediction` (possibly None).
-        self._eval_logger._server.prediction_finish(
-            tsi.PredictionFinishReq(
-                project_id=self._eval_logger._project_id,
-                prediction_id=cast(str, self._prediction_id),
-                output=self._output_buffer,
-                wb_user_id=None,
+        def _finish_prediction() -> None:
+            prediction_id = prediction_future.result()
+            # Make sure every score for this prediction has landed before we
+            # close out the parent `predict_and_score` call (whose output
+            # payload includes `scores_dict`, computed from score-child
+            # queries at finish time).
+            if scores_pending:
+                wait(scores_pending)
+            # `prediction_create` only emits `call_start` in the restructure;
+            # `prediction_finish` owns the `call_end` with the final output.
+            server.prediction_finish(
+                tsi.PredictionFinishReq(
+                    project_id=project_id,
+                    prediction_id=prediction_id,
+                    output=output_to_send,
+                    wb_user_id=None,
+                )
             )
-        )
+
+        fut = self._eval_logger._submit(_finish_prediction)
+        self._pending_futures.append(fut)
         self._has_finished = True
 
     def __enter__(self) -> Self:
@@ -340,10 +404,13 @@ class EvaluationLoggerV2:
         dataset: Dataset | list[dict] | str | None = None,
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
+        *,
+        max_workers: int = _DEFAULT_MAX_WORKERS,
     ) -> None:
         self.name = name
         self.scorers = scorers
         self.eval_attributes = eval_attributes if eval_attributes is not None else {}
+        self._max_workers = max_workers
 
         if model is None:
             model = Model()
@@ -391,7 +458,50 @@ class EvaluationLoggerV2:
         self._evaluation_run_id: str | None = None
         self._scorer_refs_by_name: dict[str, str] = {}
 
+        # Background submission machinery. User-facing ``log_prediction`` /
+        # ``log_score`` / ``finish`` calls enqueue work here and return
+        # instantly; real server round-trips happen on the executor threads.
+        # The executor is lazy so constructing a logger without using it
+        # (e.g. in a disabled-mode or validation path) doesn't spin threads.
+        self._executor: ThreadPoolExecutor | None = None
+        # Protects `_scorer_refs_by_name` during concurrent
+        # `_get_or_create_scorer_ref` calls across worker threads.
+        self._scorer_lock = threading.Lock()
+        # Every submitted future, for draining at log_summary/finish time.
+        self._pending_futures: list[Future[Any]] = []
+
         _active_evaluation_loggers.append(self)
+
+    def _get_executor(self) -> ThreadPoolExecutor:
+        if self._executor is None:
+            self._executor = ThreadPoolExecutor(
+                max_workers=self._max_workers,
+                thread_name_prefix="eval-logger-v2",
+            )
+        return self._executor
+
+    def _submit(self, fn: Any) -> Future[Any]:
+        """Submit a no-arg callable to the background executor."""
+        executor = self._get_executor()
+        fut = executor.submit(fn)
+        self._pending_futures.append(fut)
+        return fut
+
+    def _drain_pending(self) -> None:
+        """Wait for every in-flight background task to finish.
+
+        Background failures are logged (matching V1's batch-processor
+        behavior) but not re-raised — we want ``finish`` / ``log_summary``
+        to succeed even if a transient server error dropped a score.
+        """
+        if not self._pending_futures:
+            return
+        wait(self._pending_futures)
+        for fut in self._pending_futures:
+            exc = fut.exception()
+            if exc is not None:
+                logger.exception("Background V2 server call failed", exc_info=exc)
+        self._pending_futures.clear()
 
     @property
     def ui_url(self) -> str | None:
@@ -541,13 +651,21 @@ class EvaluationLoggerV2:
         return prepared
 
     def _get_or_create_scorer_ref(self, scorer: Scorer) -> str:
-        """Look up (or lazily create) a scorer ref by name."""
+        """Look up (or lazily create) a scorer ref by name.
+
+        Called from background worker threads during score submission, so
+        we guard the cache with a lock and double-check after paying the
+        server round-trip to avoid two threads creating the same scorer.
+        """
         name = cast(str, scorer.name)
-        if name in self._scorer_refs_by_name:
-            return self._scorer_refs_by_name[name]
+        with self._scorer_lock:
+            existing = self._scorer_refs_by_name.get(name)
+        if existing is not None:
+            return existing
         ref = self._create_scorer_on_server(scorer)
-        self._scorer_refs_by_name[name] = ref
-        return ref
+        with self._scorer_lock:
+            # Another thread may have raced us; its ref is just as valid.
+            return self._scorer_refs_by_name.setdefault(name, ref)
 
     # ------------------------------------------------------------------
     # Public API
@@ -609,6 +727,10 @@ class EvaluationLoggerV2:
         final_summary["output"] = summary
 
         self._cleanup_predictions()
+        # Wait for all in-flight prediction/score/finish tasks before we
+        # close the run — summary aggregation on the server expects every
+        # score and prediction_finish to have landed.
+        self._drain_pending()
 
         if not self._disabled:
             self._ensure_initialized()
@@ -662,6 +784,9 @@ class EvaluationLoggerV2:
             return
 
         self._cleanup_predictions()
+        # Wait for any in-flight background work to settle before we close
+        # the run (or shut down the executor below).
+        self._drain_pending()
 
         # Only emit evaluation_run_finish if tracing is active AND we have a
         # run to finish. `exception is not None` forces a lazy-init so the
@@ -705,6 +830,12 @@ class EvaluationLoggerV2:
                 )
 
     def _unregister(self) -> None:
+        # Shut the executor down after the run is closed so any lingering
+        # scheduled work runs to completion. Done here (not in `finish`)
+        # because both `finish` and `log_summary` funnel into `_unregister`.
+        if self._executor is not None:
+            self._executor.shutdown(wait=True)
+            self._executor = None
         try:
             _active_evaluation_loggers.remove(self)
         except ValueError:
