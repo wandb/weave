@@ -2611,23 +2611,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         name="clickhouse_trace_server_batched.project_ttl_settings_read"
     )
     def project_ttl_settings_read(
-        self, req: tsi.ProjectTTLSettingsReq
-    ) -> tsi.ProjectTTLSettingsRes:
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
         retention_days = get_project_retention_days(
             req.project_id, self.ch_client, redis_client=get_redis_client()
         )
-        return tsi.ProjectTTLSettingsRes(retention_days=retention_days)
+        return tsi.ProjectTTLSettingsReadRes(retention_days=retention_days)
 
     @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.project_ttl_settings_set"
+        name="clickhouse_trace_server_batched.project_ttl_settings_update"
     )
-    def project_ttl_settings_set(
-        self, req: tsi.SetProjectTTLSettingsReq
-    ) -> tsi.SetProjectTTLSettingsRes:
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
         if req.retention_days < 0:
             raise InvalidRequest(
                 "retention_days must be 0 (no TTL) or >= 1 (days of retention)"
             )
+        assert req.wb_user_id, "wb_user_id is required for audit trail"
 
         self.ch_client.insert(
             "project_ttl_settings",
@@ -2636,13 +2637,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     req.project_id,
                     req.retention_days,
                     datetime.datetime.now(datetime.timezone.utc),
-                    req.wb_user_id or "",
+                    req.wb_user_id,
                 ]
             ],
             column_names=["project_id", "retention_days", "updated_at", "updated_by"],
         )
         invalidate_ttl_cache(req.project_id, redis_client=get_redis_client())
-        return tsi.SetProjectTTLSettingsRes(retention_days=req.retention_days)
+        return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq

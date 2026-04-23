@@ -1255,18 +1255,18 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def project_ttl_settings_read(
-        self, req: tsi.ProjectTTLSettingsReq
-    ) -> tsi.ProjectTTLSettingsRes:
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
         raise NotImplementedError(
             "project_ttl_settings_read is not yet implemented in stainless client"
         )
 
     @validate_call
-    def project_ttl_settings_set(
-        self, req: tsi.SetProjectTTLSettingsReq
-    ) -> tsi.SetProjectTTLSettingsRes:
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
         raise NotImplementedError(
-            "project_ttl_settings_set is not yet implemented in stainless client"
+            "project_ttl_settings_update is not yet implemented in stainless client"
         )
 
     @validate_call

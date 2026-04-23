@@ -1564,21 +1564,21 @@ class ProjectStatsRes(BaseModel):
 # ================
 
 
-class ProjectTTLSettingsReq(BaseModelStrict):
+class ProjectTTLSettingsReadReq(BaseModelStrict):
     project_id: str
 
 
-class ProjectTTLSettingsRes(BaseModel):
+class ProjectTTLSettingsReadRes(BaseModel):
     retention_days: int  # 0 = no TTL (infinite retention)
 
 
-class SetProjectTTLSettingsReq(BaseModelStrict):
+class ProjectTTLSettingsUpdateReq(BaseModelStrict):
     project_id: str
     retention_days: int  # 0 = disable TTL; must be 0 or >= 1
     wb_user_id: str | None = None
 
 
-class SetProjectTTLSettingsRes(BaseModel):
+class ProjectTTLSettingsUpdateRes(BaseModel):
     retention_days: int
 
 
@@ -2990,12 +2990,12 @@ class TraceServerInterface(Protocol):
 
     # TTL settings API
     def project_ttl_settings_read(
-        self, req: ProjectTTLSettingsReq
-    ) -> ProjectTTLSettingsRes: ...
+        self, req: ProjectTTLSettingsReadReq
+    ) -> ProjectTTLSettingsReadRes: ...
 
-    def project_ttl_settings_set(
-        self, req: SetProjectTTLSettingsReq
-    ) -> SetProjectTTLSettingsRes: ...
+    def project_ttl_settings_update(
+        self, req: ProjectTTLSettingsUpdateReq
+    ) -> ProjectTTLSettingsUpdateRes: ...
 
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...

@@ -402,16 +402,16 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         return self._send_request("project_stats", req)
 
     def project_ttl_settings_read(
-        self, req: tsi.ProjectTTLSettingsReq
-    ) -> tsi.ProjectTTLSettingsRes:
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
         """Get project TTL settings."""
         return self._send_request("project_ttl_settings_read", req)
 
-    def project_ttl_settings_set(
-        self, req: tsi.SetProjectTTLSettingsReq
-    ) -> tsi.SetProjectTTLSettingsRes:
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
         """Set project TTL settings."""
-        return self._send_request("project_ttl_settings_set", req)
+        return self._send_request("project_ttl_settings_update", req)
 
     # Streaming method implementations
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:

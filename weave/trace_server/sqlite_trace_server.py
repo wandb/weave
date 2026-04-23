@@ -2837,19 +2837,20 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
 
     def project_ttl_settings_read(
-        self, req: tsi.ProjectTTLSettingsReq
-    ) -> tsi.ProjectTTLSettingsRes:
-        return tsi.ProjectTTLSettingsRes(
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
+        return tsi.ProjectTTLSettingsReadRes(
             retention_days=self._get_project_retention_days(req.project_id)
         )
 
-    def project_ttl_settings_set(
-        self, req: tsi.SetProjectTTLSettingsReq
-    ) -> tsi.SetProjectTTLSettingsRes:
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
         if req.retention_days < 0:
             raise InvalidRequest(
                 "retention_days must be 0 (no TTL) or >= 1 (days of retention)"
             )
+        assert req.wb_user_id, "wb_user_id is required for audit trail"
 
         conn, cursor = get_conn_cursor(self.db_path)
         cursor.execute(
@@ -2860,11 +2861,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 req.project_id,
                 req.retention_days,
                 datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                req.wb_user_id or "",
+                req.wb_user_id,
             ),
         )
         conn.commit()
-        return tsi.SetProjectTTLSettingsRes(retention_days=req.retention_days)
+        return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq

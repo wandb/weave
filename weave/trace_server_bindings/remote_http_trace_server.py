@@ -1009,23 +1009,23 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def project_ttl_settings_read(
-        self, req: tsi.ProjectTTLSettingsReq
-    ) -> tsi.ProjectTTLSettingsRes:
+        self, req: tsi.ProjectTTLSettingsReadReq
+    ) -> tsi.ProjectTTLSettingsReadRes:
         return self._generic_request(
             "/project/ttl_settings",
             req,
-            tsi.ProjectTTLSettingsReq,
-            tsi.ProjectTTLSettingsRes,
+            tsi.ProjectTTLSettingsReadReq,
+            tsi.ProjectTTLSettingsReadRes,
         )
 
-    def project_ttl_settings_set(
-        self, req: tsi.SetProjectTTLSettingsReq
-    ) -> tsi.SetProjectTTLSettingsRes:
+    def project_ttl_settings_update(
+        self, req: tsi.ProjectTTLSettingsUpdateReq
+    ) -> tsi.ProjectTTLSettingsUpdateRes:
         return self._generic_request(
-            "/project/ttl_settings/set",
+            "/project/ttl_settings/update",
             req,
-            tsi.SetProjectTTLSettingsReq,
-            tsi.SetProjectTTLSettingsRes,
+            tsi.ProjectTTLSettingsUpdateReq,
+            tsi.ProjectTTLSettingsUpdateRes,
         )
 
     def threads_query_stream(
