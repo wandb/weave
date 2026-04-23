@@ -1,3 +1,5 @@
+"""Helpers for converting trace refs with copy-on-write traversal."""
+
 import dataclasses
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
@@ -151,6 +153,7 @@ F = TypeVar("F")
 
 
 def _map_values(obj: E, func: Callable[[E], E]) -> E:
+    """Recursively apply ``func`` while preserving untouched object identity."""
     new_obj, _, _ = _map_values_copy_on_write(obj, func)
     return cast(E, new_obj)
 
@@ -159,9 +162,16 @@ def _map_values_copy_on_write(
     obj: E,
     func: Callable[[E], E],
 ) -> tuple[E, bool, bool]:
+    """Apply ``func`` recursively with copy-on-write traversal.
+
+    Returns ``(value, changed, fully_supported)``. ``changed`` means this
+    branch was rewritten. ``fully_supported`` is ``False`` when a nested
+    dataclass forces the model path to fall back to dump/validate.
+    """
     if isinstance(obj, BaseModel):
         return _map_model_values(obj, func)
     if isinstance(obj, dict):
+        # Clone only after the first changed child.
         updated_dict: dict[Any, Any] | None = None
         fully_supported = True
         for key, value in obj.items():
@@ -175,6 +185,7 @@ def _map_values_copy_on_write(
             return obj, False, fully_supported
         return cast(E, updated_dict), True, fully_supported
     if isinstance(obj, list):
+        # Same copy-on-write rule for lists.
         updated_list: list[Any] | None = None
         fully_supported = True
         for index, value in enumerate(obj):
@@ -188,6 +199,7 @@ def _map_values_copy_on_write(
             return obj, False, fully_supported
         return cast(E, updated_list), True, fully_supported
     if isinstance(obj, tuple):
+        # Buffer tuple updates and rebuild only if something changed.
         updated_items: list[Any] | None = None
         fully_supported = True
         for index, value in enumerate(obj):
@@ -201,6 +213,7 @@ def _map_values_copy_on_write(
             return obj, False, fully_supported
         return cast(E, tuple(updated_items)), True, fully_supported
     if isinstance(obj, set):
+        # Sets rebuild on change, but still skip allocation on no-op paths.
         values = []
         changed = False
         fully_supported = True
@@ -223,6 +236,11 @@ def _map_model_values(
     obj: BaseModel,
     func: Callable[[Any], Any],
 ) -> tuple[BaseModel, bool, bool]:
+    """Rewrite model fields in place when possible.
+
+    Frozen models use ``model_copy``. Nested dataclasses fall back to
+    dump/validate.
+    """
     updates: dict[str, Any] = {}
     fully_supported = True
     for field_name, field_info in obj.__class__.model_fields.items():
@@ -235,6 +253,7 @@ def _map_model_values(
         fully_supported = fully_supported and supported
 
     if not fully_supported:
+        # Nested dataclasses force the old dump/validate fallback.
         return _map_model_values_with_roundtrip(obj, func), True, True
 
     if not updates:
@@ -256,6 +275,7 @@ def _map_model_values_with_roundtrip(
     obj: BaseModel,
     func: Callable[[Any], Any],
 ) -> BaseModel:
+    """Fallback path for models that contain unsupported nested dataclasses."""
     # `by_alias` is required since we have Mongo-style properties in the
     # query models that are aliased to conform to start with `$`. Without
     # this, the model_dump will use the internal property names which are
