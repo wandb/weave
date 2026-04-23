@@ -8,17 +8,6 @@ nox.options.stop_on_first_error = True
 
 
 SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
-INCOMPATIBLE_SHARDS = {
-    "3.10": [
-        "notdiamond",
-        "verifiers_test",
-    ],
-    "3.13": [
-        "cohere",
-        "notdiamond",
-        "verifiers_test",
-    ],
-}
 NUM_TRACE_SERVER_SHARDS = 4
 
 
@@ -120,13 +109,6 @@ SHARDS_WITHOUT_EXTRAS = {
     ],
 )
 def tests(session: nox.Session, shard: str):
-    python_version = session.python[:4]  # e.g., "3.10"
-    if shard in INCOMPATIBLE_SHARDS.get(python_version, []):
-        session.skip(
-            f"Skipping {shard=} as it is not compatible with Python {python_version}"
-        )
-        return
-
     # Only add --extra shard if the shard has a corresponding optional dependency
     # Use --active to sync to the active nox virtual environment
     # Test-related shards (ending in _test/_tests) are dependency groups, not extras

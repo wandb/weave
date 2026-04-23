@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any, cast
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
@@ -18,6 +18,7 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.display.term import configure_logger, update_logger_level
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, Ref
+from weave.trace.registry_links import LinkablePrompt
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
@@ -27,6 +28,7 @@ from weave.trace.table import Table
 from weave.trace.view_utils import set_call_view
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
+from weave.trace_server_bindings.link_asset_to_registry import LinkAssetToRegistryRes
 from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
@@ -380,6 +382,33 @@ def ref(location: str) -> ObjectRef:
     return ref
 
 
+def link_prompt_to_registry(
+    prompt: LinkablePrompt,
+    *,
+    target_path: str,
+    aliases: Sequence[str] | None = None,
+) -> LinkAssetToRegistryRes:
+    """Link a published prompt version into the registry.
+
+    Args:
+        prompt: A published prompt, an `ObjectRef`, or a fully qualified
+            `weave:///...` URI string.
+        target_path: Registry destination path in the format
+            `<registry_project>/<portfolio_name>`, for example
+            `wandb-registry-prompts/my-prompt-collection`.
+        aliases: Optional aliases to attach to the created registry version.
+
+    Returns:
+        LinkAssetToRegistryRes: Parsed response from the registry-link endpoint.
+    """
+    client = weave_client_context.require_weave_client()
+    return client.link_prompt_to_registry(
+        prompt,
+        target_path=target_path,
+        aliases=aliases,
+    )
+
+
 def get(uri: str | ObjectRef) -> Any:
     """A convenience function for getting an object from a URI.
 
@@ -586,6 +615,7 @@ __all__ = [
     "get_tags",
     "get_tags_and_aliases",
     "init",
+    "link_prompt_to_registry",
     "list_aliases",
     "list_tags",
     "op",
