@@ -147,6 +147,20 @@ jobs:
             # "stainless",
             "autogen_tests",
           ]
+        # Shards that don't support certain Python versions. Excluding here
+        # (vs. skipping inside noxfile) avoids spinning up a runner just to
+        # emit an empty coverage.xml that Codecov then rejects.
+        exclude:
+          - python-version-minor: "10"
+            nox-shard: "notdiamond"
+          - python-version-minor: "10"
+            nox-shard: "verifiers_test"
+          - python-version-minor: "13"
+            nox-shard: "cohere"
+          - python-version-minor: "13"
+            nox-shard: "notdiamond"
+          - python-version-minor: "13"
+            nox-shard: "verifiers_test"
       fail-fast: false
     services:
       wandbservice:
@@ -439,7 +453,7 @@ jobs:
           jobs: ${{ toJSON(needs) }}
           # The 1s3r and 2s2r jobs are path-filtered and will be "skipped"
           # on PRs that don't touch migrator or distributed surfaces.
-          # alls-green treats skipped as failing by default; whitelist
+          # This action treats skipped as failing by default; whitelist
           # them here so a skipped-because-gated job doesn't wedge merge.
           allowed-skips: trace-server-migrator-1s3r,trace-server-migrator-2s2r
 
@@ -525,6 +539,20 @@ jobs:
             # "stainless",
             "autogen_tests",
           ]
+        # Shards that don't support certain Python versions. Excluding here
+        # (vs. skipping inside noxfile) avoids spinning up a runner just to
+        # emit an empty coverage.xml that Codecov then rejects.
+        exclude:
+          - python-version-minor: "10"
+            nox-shard: "notdiamond"
+          - python-version-minor: "10"
+            nox-shard: "verifiers_test"
+          - python-version-minor: "13"
+            nox-shard: "cohere"
+          - python-version-minor: "13"
+            nox-shard: "notdiamond"
+          - python-version-minor: "13"
+            nox-shard: "verifiers_test"
       fail-fast: false
     steps:
       - name: Checkout
