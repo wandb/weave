@@ -74,6 +74,11 @@ from weave.trace.refs import (
     Ref,
     TableRef,
 )
+from weave.trace.registry_links import (
+    LinkablePrompt,
+    parse_registry_target_path,
+    resolve_prompt_ref,
+)
 from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
@@ -159,6 +164,12 @@ from weave.trace_server_bindings.http_utils import (
     ROW_COUNT_CHUNKING_THRESHOLD,
     check_endpoint_exists,
     retry_on_not_found,
+)
+from weave.trace_server_bindings.link_asset_to_registry import (
+    LinkAssetToRegistryReq,
+    LinkAssetToRegistryRes,
+    LinkAssetToRegistryTarget,
+    link_asset_to_registry,
 )
 from weave.trace_server_bindings.models import StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
@@ -1272,6 +1283,42 @@ class WeaveClient:
         if isinstance(obj_ref, str):
             return ObjectRef.parse_uri(obj_ref)
         return obj_ref
+
+    @trace_sentry.global_trace_sentry.watch()
+    def link_prompt_to_registry(
+        self,
+        prompt: LinkablePrompt,
+        *,
+        target_path: str,
+        aliases: Sequence[str] | None = None,
+    ) -> LinkAssetToRegistryRes:
+        """Link a published prompt version into the registry.
+
+        Args:
+            prompt: A published prompt, an `ObjectRef`, or a fully qualified
+                `weave:///...` URI string.
+            target_path: Registry destination path in the format
+                `<registry_project>/<portfolio_name>`, for example
+                `wandb-registry-prompts/my-prompt-collection`.
+            aliases: Optional aliases to attach to the created registry version.
+
+        Returns:
+            LinkAssetToRegistryRes: Parsed response from the registry-link endpoint.
+        """
+        prompt_ref = resolve_prompt_ref(prompt)
+        target = parse_registry_target_path(target_path)
+
+        return link_asset_to_registry(
+            LinkAssetToRegistryReq(
+                ref=prompt_ref.uri,
+                target=LinkAssetToRegistryTarget(
+                    portfolio_name=target.portfolio_name,
+                    entity_name=self.entity,
+                    project_name=target.registry_project,
+                ),
+                aliases=list(aliases or []),
+            )
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def add_tags(self, obj_ref: ObjectRef | str, tags: list[str]) -> None:
