@@ -1081,7 +1081,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
               AND id = {{{id_param_parts}:String}}
               AND ended_at IS NOT NULL
         """
-        self._command(call_parts_query, parameters=pb_parts.get_params(), settings=settings)
+        self._command(
+            call_parts_query, parameters=pb_parts.get_params(), settings=settings
+        )
 
         pb_merged = ParamBuilder()
         project_id_param_merged = pb_merged.add_param(project_id)
@@ -1096,7 +1098,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             WHERE project_id = {{{project_id_param_merged}:String}}
               AND id = {{{id_param_merged}:String}}
         """
-        self._command(calls_merged_query, parameters=pb_merged.get_params(), settings=settings)
+        self._command(
+            calls_merged_query, parameters=pb_merged.get_params(), settings=settings
+        )
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(

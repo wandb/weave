@@ -73,9 +73,7 @@ def _synthesize_scorer_source(scorer: Scorer) -> str:
 
 def _object_ref_uri(entity: str, project: str, object_id: str, digest: str) -> str:
     """Build a canonical `weave:///...` object ref URI via `ObjectRef`."""
-    return ObjectRef(
-        entity=entity, project=project, name=object_id, _digest=digest
-    ).uri
+    return ObjectRef(entity=entity, project=project, name=object_id, _digest=digest).uri
 
 
 @dataclass(frozen=True)
@@ -152,7 +150,9 @@ class _LogScoreContextV2:
                 f"Score value was not set for scorer '{self._scorer.name}'. "
                 "Please set score_ctx.value within the context manager."
             )
-        self._score_logger._submit_score(self._scorer, cast("ScoreType | None", self._value))
+        self._score_logger._submit_score(
+            self._scorer, cast("ScoreType | None", self._value)
+        )
 
 
 class ScoreLoggerV2:
@@ -288,9 +288,7 @@ class ScoreLoggerV2:
         # so the backend updates the call before closing. Otherwise pass None
         # and let the backend preserve what it already has.
         finish_output = (
-            self._output_buffer
-            if self._output_buffer != self._output_sent
-            else None
+            self._output_buffer if self._output_buffer != self._output_sent else None
         )
 
         self._eval_logger._server.prediction_finish(
@@ -453,8 +451,7 @@ class EvaluationLoggerV2:
         model_res = self._server.model_create(
             tsi.ModelCreateReq(
                 project_id=self._project_id,
-                name=cast(str, self.model.name)
-                or self.model.__class__.__name__,
+                name=cast(str, self.model.name) or self.model.__class__.__name__,
                 description=None,
                 source_code=model_source,
                 attributes=model_attrs or None,
@@ -501,9 +498,7 @@ class EvaluationLoggerV2:
                 op_source_code=_synthesize_scorer_source(scorer),
             )
         )
-        return _object_ref_uri(
-            self._entity, self._project, res.object_id, res.digest
-        )
+        return _object_ref_uri(self._entity, self._project, res.object_id, res.digest)
 
     # ------------------------------------------------------------------
     # Scorer coercion + ref resolution
@@ -668,9 +663,7 @@ class EvaluationLoggerV2:
                     )
                 )
             except Exception:
-                logger.exception(
-                    "Error finishing evaluation run during finish()."
-                )
+                logger.exception("Error finishing evaluation run during finish().")
 
         self._is_finalized = True
         self._unregister()
