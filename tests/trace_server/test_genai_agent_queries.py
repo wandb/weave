@@ -425,7 +425,7 @@ def test_message_search(ch_server):
 
     # Search for "quantum" — should match 1 message
     res = ch_server.agent_search(AgentSearchReq(project_id=project_id, query="quantum"))
-    assert res.total_conversations >= 1
+    assert len(res.results) >= 1
     matched = res.results[0]
     assert "quantum" in matched.matched_messages[0].content_preview.lower()
 
@@ -433,7 +433,7 @@ def test_message_search(ch_server):
     res_empty = ch_server.agent_search(
         AgentSearchReq(project_id=project_id, query="xyznonexistent")
     )
-    assert res_empty.total_conversations == 0
+    assert res_empty.results == []
 
 
 def test_message_search_shared_digest_across_spans(ch_server):
@@ -495,14 +495,14 @@ def test_message_search_indexes_tool_calls(ch_server):
     res_args = ch_server.agent_search(
         AgentSearchReq(project_id=project_id, query="Reykjavík")
     )
-    assert res_args.total_conversations == 1
+    assert len(res_args.results) == 1
     assert res_args.results[0].matched_messages[0].role == "tool_call"
 
     # Hit on the result side
     res_result = ch_server.agent_search(
         AgentSearchReq(project_id=project_id, query="snowy")
     )
-    assert res_result.total_conversations == 1
+    assert len(res_result.results) == 1
     assert res_result.results[0].matched_messages[0].role == "tool_result"
 
 

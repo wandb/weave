@@ -168,9 +168,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
 
         # ---- invoke_agent ----
         if op == OP_INVOKE_AGENT:
-            name = span.agent_name or span.span_name.removeprefix(
-                f"{OP_INVOKE_AGENT} "
-            )
+            name = span.agent_name or span.span_name.removeprefix(f"{OP_INVOKE_AGENT} ")
 
             if span.agent_name:
                 messages.append(

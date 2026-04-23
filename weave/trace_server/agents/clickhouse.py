@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.agents.chat_view import build_trace_chat
@@ -73,8 +74,10 @@ logger = logging.getLogger(__name__)
 
 #: Signature of the server's `_query` method — takes (sql, params), returns QueryResult.
 QueryFn = Callable[[str, dict[str, Any]], "QueryResult"]
+PARAM_NAMESPACE = "genai"
 
 
+@dataclass(frozen=True)
 class AgentQueryHandler:
     """Read-side query operations for the agent observability system.
 
@@ -83,8 +86,7 @@ class AgentQueryHandler:
     rest of the trace server.
     """
 
-    def __init__(self, query_fn: QueryFn) -> None:
-        self._query = query_fn
+    _query: QueryFn
 
     # ------------------------------------------------------------------
     # Spans query (ungrouped + grouped)
@@ -177,7 +179,6 @@ class AgentQueryHandler:
                     conversation_name=safe_str(r.get("conversation_name")),
                     agent_name=safe_str(r.get("agent_name")),
                     matched_messages=[],
-                    total_matches=0,
                     last_activity=started,
                 )
             convs[cid].matched_messages.append(
@@ -192,13 +193,11 @@ class AgentQueryHandler:
                     started_at=started,
                 )
             )
-            convs[cid].total_matches += 1
             # Track the most recent match across all rows for this
             # conversation so the sidebar sort order is stable regardless
             # of row arrival order.
             if started is not None and (
-                convs[cid].last_activity is None
-                or started > convs[cid].last_activity
+                convs[cid].last_activity is None or started > convs[cid].last_activity
             ):
                 convs[cid].last_activity = started
 
@@ -209,7 +208,7 @@ class AgentQueryHandler:
             key=lambda c: c.last_activity or datetime.datetime.min,
             reverse=True,
         )
-        return AgentSearchRes(results=results, total_conversations=len(results))
+        return AgentSearchRes(results=results)
 
     # ------------------------------------------------------------------
     # Internal: spans-for-one-trace with chat projection
@@ -241,7 +240,7 @@ class AgentQueryHandler:
         Returns `(total_count, list_rows_as_dicts)`. Both queries reuse the
         same `pb` so the `WHERE` parameters aren't added twice.
         """
-        pb = ParamBuilder("genai")
+        pb = ParamBuilder(PARAM_NAMESPACE)
         count_sql = count_builder(pb, req)
         list_sql = list_builder(pb, req)
         params = pb.get_params()
@@ -255,7 +254,7 @@ class AgentQueryHandler:
         *args: Any,
     ) -> list[dict[str, Any]]:
         """Build a single SQL statement via `builder(pb, *args)` and return rows as dicts."""
-        pb = ParamBuilder("genai")
+        pb = ParamBuilder(PARAM_NAMESPACE)
         sql = builder(pb, *args)
         return _rows_as_dicts(self._query(sql, pb.get_params()))
 
@@ -265,6 +264,7 @@ class AgentQueryHandler:
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
 class AgentWriteHandler:
     """Write-side operations for agent data (inserts + chat projection).
 
@@ -272,9 +272,8 @@ class AgentWriteHandler:
     and a `query_fn` (for read queries that feed the chat projection).
     """
 
-    def __init__(self, ch_client: CHClient, query_fn: QueryFn) -> None:
-        self.ch_client = ch_client
-        self._query = query_fn
+    _ch_client: CHClient
+    _query: QueryFn
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -294,10 +293,10 @@ class AgentWriteHandler:
         for processed_span in req.processed_spans:
             resource = Resource.from_proto(processed_span.resource_spans.resource)
 
-            for proto_scope_spans in processed_span.resource_spans.scope_spans:
-                for proto_span in proto_scope_spans.spans:
+            for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
+                for protobuf_span in protobuf_scope_spans.spans:
                     try:
-                        span = Span.from_proto(proto_span, resource)
+                        span = Span.from_proto(protobuf_span, resource)
                     except AttributePathConflictError as e:
                         rejected += 1
                         errors.append(str(e))
@@ -329,7 +328,7 @@ class AgentWriteHandler:
                     accepted += 1
 
         if span_rows:
-            self.ch_client.insert(
+            self._ch_client.insert(
                 "spans", data=span_rows, column_names=ALL_SPAN_INSERT_COLUMNS
             )
 
@@ -356,7 +355,7 @@ class AgentWriteHandler:
         self, req: AgentConversationChatReq
     ) -> AgentConversationChatRes:
         """Build multi-turn chat view for a conversation."""
-        pb = ParamBuilder("genai")
+        pb = ParamBuilder(PARAM_NAMESPACE)
         sql = make_conversation_chat_spans_query(pb, req)
         result = self._query(sql, pb.get_params())
 
@@ -366,10 +365,10 @@ class AgentWriteHandler:
                 turns=[],
             )
 
-        # Group spans by trace_id, preserving insertion order. One trace_id is
-        # treated as one turn — an informal convention followed by all
-        # mainstream agent SDKs (OpenAI Agents SDK, Anthropic Claude Agent
-        # SDK, Google ADK, LangChain/LangGraph). See DATA_MODEL.md.
+        # Group spans by trace_id, preserving insertion order. Weave treats
+        # one trace_id as one conversation turn as a product convention based
+        # on current agent SDK behavior; OTel GenAI semconv does not define a
+        # formal turn id today.
         spans_by_trace: dict[str, list[Any]] = {}
         for r in _rows_as_dicts(result):
             span = AgentSpanSchema.model_validate(normalize_span_row(r))
@@ -390,11 +389,8 @@ class AgentWriteHandler:
                 turn = build_trace_chat(trace_spans, tid)
                 turns.append(turn)
 
-        total_duration = sum(t.total_duration_ms for t in turns)
-
         return AgentConversationChatRes(
             conversation_id=req.conversation_id,
-            total_duration_ms=total_duration,
             turns=turns,
         )
 
@@ -415,6 +411,7 @@ def _rows_as_dicts(result: Any) -> list[dict[str, Any]]:
 
 
 def _first_cell_int(result: Any) -> int:
+    """Read a scalar count-style query result as an int, defaulting to 0."""
     return safe_int(result.result_rows[0][0]) if result.result_rows else 0
 
 

@@ -231,7 +231,6 @@ class AgentSearchConversationResult(BaseModel):
     conversation_name: str
     agent_name: str
     matched_messages: list[AgentSearchMatchedMessage]
-    total_matches: int
     last_activity: datetime.datetime
 
 
@@ -239,7 +238,6 @@ class AgentSearchRes(BaseModel):
     """Response from a full-text search across agent messages."""
 
     results: list[AgentSearchConversationResult]
-    total_conversations: int
 
 
 class AgentChatMessage(BaseModel):
@@ -321,21 +319,15 @@ class AgentConversationChatReq(BaseModel):
 class AgentConversationChatRes(BaseModel):
     """Multi-turn chat view: an ordered list of per-turn chat responses.
 
-    Each entry in `turns` corresponds to one OTel trace (one agent
-    invocation / one user turn).  The frontend can render turn-number
-    dividers between them and still reuse `AgentTraceChatRes` rendering
-    for each individual turn.
+    Each entry in `turns` corresponds to one trace_id, which Weave treats as
+    one conversation turn. This is not necessarily one `invoke_agent` span:
+    a turn can contain zero, one, or many agent invocations. The frontend can
+    render turn-number dividers between entries and still reuse
+    `AgentTraceChatRes` rendering for each individual turn.
     """
 
     conversation_id: str
     provider: str = ""
-    total_duration_ms: int = Field(
-        default=0,
-        description=(
-            "Sum of per-turn trace root span durations in milliseconds. "
-            "This is not a sum of all child span durations."
-        ),
-    )
     turns: list[AgentTraceChatRes] = Field(default_factory=list)
 
 
