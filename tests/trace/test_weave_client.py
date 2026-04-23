@@ -2197,9 +2197,7 @@ def test_client_attributes_with_call_attributes(client_creator):
     def my_op(a: int) -> int:
         return a
 
-    with client_creator(
-        attributes={"client_attr": "client", "env": "test"}
-    ) as client:
+    with client_creator(attributes={"client_attr": "client", "env": "test"}) as client:
         with weave.attributes({"local_attr": "local", "env": "override"}):
             my_op(1)
 
