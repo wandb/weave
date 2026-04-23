@@ -6,9 +6,12 @@ import json
 import keyword
 import logging
 import re
+import types
 from collections.abc import Callable
 from threading import Lock
-from typing import Any, TypeVar, cast
+from typing import Any, Protocol, TypeVar, cast, overload
+
+from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
 from weave.flow.scorer import Scorer
@@ -28,6 +31,100 @@ VALID_CLASS_NAME_REGEX = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 IMPERATIVE_EVAL_MARKER = {"_weave_eval_meta": {"imperative": True}}
 IMPERATIVE_SCORE_MARKER = {"_weave_eval_meta": {"imperative": True, "score": True}}
+
+
+class ScoreLoggerProtocol(Protocol):
+    """Public interface of per-prediction score loggers.
+
+    Both V1 (`weave.evaluation.eval_imperative.ScoreLogger`) and V2
+    (`weave.evaluation.eval_imperative_v2.ScoreLoggerV2`) conform to this
+    Protocol. Users typing code against this Protocol (rather than either
+    concrete class) will work unchanged across both implementations.
+    """
+
+    output: Any
+
+    @overload
+    def log_score(
+        self,
+        scorer: Scorer | dict | str,
+        score: ScoreType | None,
+    ) -> None: ...
+
+    @overload
+    def log_score(self, scorer: Scorer | dict | str) -> Any: ...
+
+    def log_score(
+        self,
+        scorer: Scorer | dict | str,
+        score: Any = ...,
+    ) -> Any: ...
+
+    async def alog_score(
+        self,
+        scorer: Scorer | dict | str,
+        score: ScoreType | None,
+    ) -> None: ...
+
+    def finish(self, output: Any | None = None) -> None: ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None: ...
+
+
+class EvaluationLoggerProtocol(Protocol):
+    """Public interface of imperative evaluation loggers.
+
+    Both V1 (`weave.EvaluationLogger`) and V2 (`weave.EvaluationLoggerV2`)
+    conform to this Protocol. Code that programs against the Protocol
+    rather than a concrete class is portable across implementations.
+    """
+
+    @property
+    def ui_url(self) -> str | None: ...
+
+    @property
+    def attributes(self) -> dict[str, Any]: ...
+
+    def log_prediction(
+        self,
+        inputs: dict[str, Any],
+        output: Any = None,
+    ) -> ScoreLoggerProtocol: ...
+
+    def log_example(
+        self,
+        inputs: dict[str, Any],
+        output: Any,
+        scores: dict[str, ScoreType | None],
+    ) -> None: ...
+
+    def log_summary(
+        self,
+        summary: dict | None = None,
+        auto_summarize: bool = True,
+    ) -> None: ...
+
+    def set_view(
+        self,
+        name: str,
+        content: Any,
+        *,
+        extension: str | None = None,
+        mimetype: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        encoding: str = "utf-8",
+    ) -> None: ...
+
+    def finish(self, exception: BaseException | None = None) -> None: ...
+
+    def fail(self, exception: BaseException) -> None: ...
 
 
 # Accepts any logger duck-typed with `_is_finalized: bool` and `.finish()`.
