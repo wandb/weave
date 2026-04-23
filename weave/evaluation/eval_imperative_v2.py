@@ -32,11 +32,15 @@ from weave.evaluation._imperative_shared import (
     _default_dataset_name,
     _sanitize_class_name,
     global_scorer_cache,
+    scorer_to_cache_key,
 )
 from weave.flow.model import Model
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
-from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.context.weave_client_context import (
+    WeaveInitError,
+    require_weave_client,
+)
 from weave.trace.op import is_tracing_setting_disabled
 from weave.trace.refs import ObjectRef
 from weave.trace_server import trace_server_interface as tsi
@@ -363,14 +367,15 @@ class EvaluationLoggerV2:
         self._project: str = ""
         try:
             wc = require_weave_client()
+        except WeaveInitError:
+            self._disabled = True
+        else:
             if is_tracing_setting_disabled():
                 self._disabled = True
             else:
                 self._server = wc.server
                 self._project_id = wc.project_id
                 self._entity, self._project = from_project_id(wc.project_id)
-        except Exception:
-            self._disabled = True
 
         # Server-side references populated on lazy init.
         self._dataset_ref: str | None = None
@@ -509,11 +514,9 @@ class EvaluationLoggerV2:
         if isinstance(scorer, Scorer):
             prepared: Scorer = scorer
         else:
-            import json
-
-            cache_key = json.dumps(scorer)
             prepared = global_scorer_cache.get_scorer(
-                cache_key, lambda: _cast_to_cls(Scorer)(scorer)
+                scorer_to_cache_key(scorer),
+                lambda: _cast_to_cls(Scorer)(scorer),
             )
 
         if self.scorers:
@@ -692,15 +695,7 @@ class EvaluationLoggerV2:
                 )
 
     def _unregister(self) -> None:
-        if self in _active_evaluation_loggers:
-            try:
-                _active_evaluation_loggers.remove(self)
-            except ValueError:
-                pass
-
-    def __del__(self) -> None:
         try:
-            if not self._is_finalized:
-                self.finish()
-        except Exception:
+            _active_evaluation_loggers.remove(self)
+        except ValueError:
             pass

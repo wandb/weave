@@ -14,10 +14,13 @@ belongs in ``test_evaluation_imperative_v2.py``.
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2
+from weave.flow.scorer import Scorer
 
 
 @pytest.fixture(params=[EvaluationLogger, EvaluationLoggerV2], ids=["v1", "v2"])
@@ -144,8 +147,6 @@ def test_custom_eval_attributes_accepted(client, logger_cls):
 
 
 def test_scorers_accept_string_dict_and_instance(client, logger_cls):
-    from weave.flow.scorer import Scorer
-
     class MyScorer(Scorer):
         name: str = "my_scorer"
 
@@ -205,8 +206,6 @@ def test_finish_without_predictions_is_idempotent(client, logger_cls):
 
 
 def test_async_alog_score(client, logger_cls):
-    import asyncio
-
     async def run() -> None:
         ev = logger_cls(model="m", dataset=[{"q": "x"}])
         pred = ev.log_prediction(inputs={"q": "x"}, output="y")

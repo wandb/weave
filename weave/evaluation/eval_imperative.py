@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
 import types
 from collections.abc import Iterator
@@ -24,6 +23,7 @@ from weave.evaluation._imperative_shared import (
     _cleanup_evaluation,
     _default_dataset_name,
     global_scorer_cache,
+    scorer_to_cache_key,
 )
 from weave.evaluation.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import MissingInferenceMethodError, Model
@@ -256,9 +256,9 @@ class ScoreLogger:
     def _prepare_scorer(self, scorer: Scorer | dict | str) -> Scorer:
         """Prepare and validate a scorer."""
         if not isinstance(scorer, Scorer):
-            scorer_id = json.dumps(scorer)
             scorer = global_scorer_cache.get_scorer(
-                scorer_id, lambda: _cast_to_cls(Scorer)(scorer)
+                scorer_to_cache_key(scorer),
+                lambda: _cast_to_cls(Scorer)(scorer),
             )
         scorer = cast(Scorer, scorer)
 

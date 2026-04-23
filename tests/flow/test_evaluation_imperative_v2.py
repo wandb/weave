@@ -7,6 +7,8 @@ behavior is exercised in ``test_evaluation_imperative_contract.py``.
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2
@@ -220,6 +222,28 @@ def test_log_score_context_manager_without_value_raises(client):
     ev.log_summary()
 
 
+def test_ui_url_format(client):
+    ev = EvaluationLoggerV2(model="m", dataset=[{"q": "x"}])
+    assert ev.ui_url is None  # not initialized yet (lazy init)
+
+    pred = ev.log_prediction(inputs={"q": "x"}, output="y")
+    pred.log_score("s", 1.0)  # forces lazy init + evaluation_run_id allocation
+    url = ev.ui_url
+    assert url is not None
+    # Format: <host>/<entity>/<project>/r/call/<evaluation_run_id>
+    assert url.endswith(f"/r/call/{ev._evaluation_run_id}")
+    assert f"/{ev._entity}/{ev._project}/" in url
+    pred.finish()
+    ev.log_summary()
+
+
+def test_ui_url_none_when_disabled(monkeypatch):
+    monkeypatch.setenv("WEAVE_DISABLED", "true")
+    ev = EvaluationLoggerV2(model="m", dataset=[{"q": "x"}])
+    assert ev.ui_url is None
+    ev.finish()
+
+
 def test_set_view_not_implemented():
     ev = EvaluationLoggerV2(model="m", dataset=[{"q": "x"}])
     with pytest.raises(NotImplementedError, match="set_view"):
@@ -282,8 +306,6 @@ def test_weave_disabled_captures_scores_without_server_calls(monkeypatch):
 
 
 def test_alog_score_async(client):
-    import asyncio
-
     async def run() -> None:
         ev = EvaluationLoggerV2(model="m", dataset=[{"q": "x"}])
         pred = ev.log_prediction(inputs={"q": "x"}, output="y")

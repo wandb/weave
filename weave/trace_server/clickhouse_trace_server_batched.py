@@ -4810,7 +4810,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # `ALTER TABLE ... UPDATE` mutation on both `call_parts` (source) and
         # `calls_merged` (aggregate) so reads return the latest output
         # regardless of merge timing.
-        if req.output is not None:
+        # Skip the mutation when the new output matches what's already stored.
+        # `ALTER TABLE ... UPDATE` rewrites part files and is expensive
+        # (~20k blocking mutations for a 10k-prediction eval if every
+        # finish touches output); the diff check keeps the fast path cheap.
+        if req.output is not None and req.output != existing_output:
             self._update_call_output(
                 project_id=req.project_id,
                 call_id=req.prediction_id,
