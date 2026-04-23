@@ -11,13 +11,14 @@ locally.
 
 from __future__ import annotations
 
+import types
 import uuid
 from contextvars import ContextVar, Token
 from datetime import datetime, timezone
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, PrivateAttr
-
+from typing_extensions import Self
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -110,7 +111,7 @@ class Tool(BaseModel):
             elapsed = datetime.now(timezone.utc) - self._started_at
             self.duration_ms = int(elapsed.total_seconds() * 1000)
 
-    def __enter__(self) -> Tool:
+    def __enter__(self) -> Self:
         self._started_at = datetime.now(timezone.utc)
         return self
 
@@ -118,7 +119,7 @@ class Tool(BaseModel):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> bool:
         self.end()
         return False
@@ -181,7 +182,7 @@ class Chat(BaseModel):
             _current_chat.reset(self._token)
             self._token = None
 
-    def __enter__(self) -> Chat:
+    def __enter__(self) -> Self:
         self.started_at = datetime.now(timezone.utc)
         if self._token is None:
             self._token = _current_chat.set(self)
@@ -191,7 +192,7 @@ class Chat(BaseModel):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> bool:
         self.end()
         return False
@@ -236,7 +237,7 @@ class SubAgent(BaseModel):
         self._ended = True
         self.ended_at = datetime.now(timezone.utc)
 
-    def __enter__(self) -> SubAgent:
+    def __enter__(self) -> Self:
         self.started_at = datetime.now(timezone.utc)
         return self
 
@@ -244,7 +245,7 @@ class SubAgent(BaseModel):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> bool:
         self.end()
         return False
@@ -305,7 +306,7 @@ class Turn(BaseModel):
             _current_turn.reset(self._token)
             self._token = None
 
-    def __enter__(self) -> Turn:
+    def __enter__(self) -> Self:
         self.started_at = datetime.now(timezone.utc)
         if self._token is None:
             self._token = _current_turn.set(self)
@@ -315,7 +316,7 @@ class Turn(BaseModel):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> bool:
         self.end()
         return False
@@ -334,7 +335,7 @@ class Session(BaseModel):
     _token: Token[Session | None] | None = PrivateAttr(default=None)
     _current_turn: Turn | None = PrivateAttr(default=None)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         if not self.session_id:
             self.session_id = str(uuid.uuid4())
 
@@ -367,7 +368,7 @@ class Session(BaseModel):
             _current_session.reset(self._token)
             self._token = None
 
-    def __enter__(self) -> Session:
+    def __enter__(self) -> Self:
         if self._token is None:
             self._token = _current_session.set(self)
         return self
@@ -376,7 +377,7 @@ class Session(BaseModel):
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any,
+        exc_tb: types.TracebackType | None,
     ) -> bool:
         self.end()
         return False
