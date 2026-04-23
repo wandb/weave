@@ -12,6 +12,35 @@ import {WeaveClient} from '../../weaveClient';
 jest.mock('../../generated/traceServerApi');
 jest.mock('../../wandb/wandbServerApi');
 
+// Stands in for the OpenAI SDK's APIPromise: thenable with the helpers
+// (.withResponse(), .asResponse()) the wrapper must preserve.
+function createMockAPIPromise<T>(
+  parsedData: T,
+  mockResponse: {headers: {get(key: string): string | null | undefined}}
+) {
+  return {
+    then(onFulfilled: any, onRejected: any) {
+      return Promise.resolve(parsedData).then(onFulfilled, onRejected);
+    },
+    catch(onRejected: any) {
+      return Promise.resolve(parsedData).catch(onRejected);
+    },
+    finally(onFinally: any) {
+      return Promise.resolve(parsedData).finally(onFinally);
+    },
+    asResponse() {
+      return Promise.resolve(mockResponse);
+    },
+    async withResponse() {
+      return {
+        data: parsedData,
+        response: mockResponse,
+        request_id: mockResponse.headers.get('x-request-id'),
+      };
+    },
+  };
+}
+
 describe('OpenAI Integration', () => {
   let mockOpenAI: any;
   let wrappedOpenAI: any;
@@ -219,31 +248,11 @@ describe('OpenAI Integration', () => {
         usage: {prompt_tokens: 1, completion_tokens: 1, total_tokens: 2},
       };
 
-      class MockAPIPromise {
-        then(onFulfilled: any, onRejected: any) {
-          return Promise.resolve(parsedData).then(onFulfilled, onRejected);
-        }
-        catch(onRejected: any) {
-          return Promise.resolve(parsedData).catch(onRejected);
-        }
-        finally(onFinally: any) {
-          return Promise.resolve(parsedData).finally(onFinally);
-        }
-        asResponse() {
-          return Promise.resolve(mockResponse);
-        }
-        async withResponse() {
-          return {
-            data: parsedData,
-            response: mockResponse,
-            request_id: mockResponse.headers.get('x-request-id'),
-          };
-        }
-      }
-
       mockOpenAI.chat.completions.create = jest
         .fn()
-        .mockImplementation(() => new MockAPIPromise());
+        .mockImplementation(() =>
+          createMockAPIPromise(parsedData, mockResponse)
+        );
       wrappedOpenAI = wrapOpenAI(mockOpenAI);
 
       const pending = wrappedOpenAI.chat.completions.create({
@@ -491,32 +500,11 @@ describe('OpenAI responses.create Integration', () => {
         usage: {input_tokens: 1, output_tokens: 1, total_tokens: 2},
       };
 
-      // Simulate APIPromise: thenable with .withResponse()/.asResponse().
-      class MockAPIPromise {
-        then(onFulfilled: any, onRejected: any) {
-          return Promise.resolve(parsedData).then(onFulfilled, onRejected);
-        }
-        catch(onRejected: any) {
-          return Promise.resolve(parsedData).catch(onRejected);
-        }
-        finally(onFinally: any) {
-          return Promise.resolve(parsedData).finally(onFinally);
-        }
-        asResponse() {
-          return Promise.resolve(mockResponse);
-        }
-        async withResponse() {
-          return {
-            data: parsedData,
-            response: mockResponse,
-            request_id: mockResponse.headers.get('x-request-id'),
-          };
-        }
-      }
-
       mockOpenAI.responses.create = jest
         .fn()
-        .mockImplementation(() => new MockAPIPromise());
+        .mockImplementation(() =>
+          createMockAPIPromise(parsedData, mockResponse)
+        );
       wrappedOpenAI = wrapOpenAI(mockOpenAI);
 
       const pending = wrappedOpenAI.responses.create({
@@ -532,7 +520,44 @@ describe('OpenAI responses.create Integration', () => {
       expect(request_id).toBe('req_test_id');
     });
 
-    it('should handle streaming responses and skip deltas', async () => {
+    it('should handle streaming responses via .withResponse() and skip deltas', async () => {
+      const mockResponse = {
+        headers: new Map([['x-request-id', 'req_stream_id']]),
+      };
+      const streamChunks = [
+        {
+          type: 'response.created',
+          sequence_number: 0,
+          response: {id: 'resp_test_id', status: 'in_progress'},
+        },
+        {
+          type: 'response.output_text.delta',
+          sequence_number: 1,
+          delta: 'Hello!',
+        },
+        {
+          type: 'response.output_text.delta',
+          sequence_number: 2,
+          delta: ' How can I help you today?',
+        },
+        {
+          type: 'response.output_text.done',
+          sequence_number: 3,
+          text: 'Hello! How can I help you today?',
+        },
+        {type: 'response.completed', sequence_number: 4},
+      ];
+      const stream = {
+        async *[Symbol.asyncIterator]() {
+          for (const chunk of streamChunks) yield chunk;
+        },
+      };
+
+      mockOpenAI.responses.create = jest
+        .fn()
+        .mockImplementation(() => createMockAPIPromise(stream, mockResponse));
+      wrappedOpenAI = wrapOpenAI(mockOpenAI);
+
       const options = {
         model: 'gpt-4o-2024-08-06',
         instructions: 'You are a helpful assistant',
@@ -540,21 +565,21 @@ describe('OpenAI responses.create Integration', () => {
         stream: true,
       };
 
-      const stream = await wrappedOpenAI.responses.create(options);
+      const {data, response, request_id} = await wrappedOpenAI.responses
+        .create(options)
+        .withResponse();
+
+      expect(response).toBe(mockResponse);
+      expect(request_id).toBe('req_stream_id');
 
       let deltaCount = 0;
       let finalText = '';
-      for await (const chunk of stream) {
-        if (chunk.type === 'response.output_text.delta') {
-          deltaCount++;
-        }
-        if (chunk.type === 'response.output_text.done') {
-          finalText = chunk.text;
-        }
+      for await (const chunk of data as AsyncIterable<any>) {
+        if (chunk.type === 'response.output_text.delta') deltaCount++;
+        if (chunk.type === 'response.output_text.done') finalText = chunk.text;
       }
 
-      // Verify deltas were received but final text comes from done event
-      expect(deltaCount).toBe(2); // Two delta chunks
+      expect(deltaCount).toBe(2);
       expect(finalText).toBe('Hello! How can I help you today?');
       expect(mockOpenAI.responses.create).toHaveBeenCalledWith(options);
     });
