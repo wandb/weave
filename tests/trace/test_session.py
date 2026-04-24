@@ -393,9 +393,7 @@ class TestContextVars:
 
     def test_full_context_manager_pattern(self) -> None:
         with start_session(agent_name="weather-bot") as s:
-            with s.start_turn(
-                user_message="What's the weather?"
-            ) as turn:
+            with s.start_turn(user_message="What's the weather?") as turn:
                 with turn.llm(model="gpt-4o") as llm:
                     llm.output("Let me check.")
                     llm.usage = Usage(input_tokens=100, output_tokens=50)
@@ -421,9 +419,7 @@ class TestBatchLogging:
             spans=[
                 LLM(
                     model="gpt-4o",
-                    output_messages=[
-                        Message(role="assistant", content="hello")
-                    ],
+                    output_messages=[Message(role="assistant", content="hello")],
                 ),
                 Tool(name="search", result="found"),
             ],

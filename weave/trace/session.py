@@ -90,7 +90,7 @@ class Tool(BaseModel):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
-    ) -> bool:
+    ) -> Literal[False]:
         self.end()
         return False
 
@@ -158,7 +158,7 @@ class LLM(BaseModel):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
-    ) -> bool:
+    ) -> Literal[False]:
         self.end()
         return False
 
@@ -190,9 +190,7 @@ class SubAgent(BaseModel):
             system_instructions=system_instructions or [],
         )
 
-    def tool(
-        self, *, name: str, arguments: str = "", tool_call_id: str = ""
-    ) -> Tool:
+    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
         """Start a tool execution within this sub-agent."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
@@ -211,7 +209,7 @@ class SubAgent(BaseModel):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
-    ) -> bool:
+    ) -> Literal[False]:
         self.end()
         return False
 
@@ -252,9 +250,7 @@ class Turn(BaseModel):
             system_instructions=system_instructions or [],
         )
 
-    def tool(
-        self, *, name: str, arguments: str = "", tool_call_id: str = ""
-    ) -> Tool:
+    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
         """Start a tool execution (execute_tool span, child of this turn)."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
@@ -283,7 +279,7 @@ class Turn(BaseModel):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
-    ) -> bool:
+    ) -> Literal[False]:
         self.end()
         return False
 
@@ -344,7 +340,7 @@ class Session(BaseModel):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
-    ) -> bool:
+    ) -> Literal[False]:
         self.end()
         return False
 
@@ -356,12 +352,8 @@ class Session(BaseModel):
 _current_session: ContextVar[Session | None] = ContextVar(
     "_current_session", default=None
 )
-_current_turn: ContextVar[Turn | None] = ContextVar(
-    "_current_turn", default=None
-)
-_current_llm: ContextVar[LLM | None] = ContextVar(
-    "_current_llm", default=None
-)
+_current_turn: ContextVar[Turn | None] = ContextVar("_current_turn", default=None)
+_current_llm: ContextVar[LLM | None] = ContextVar("_current_llm", default=None)
 
 
 # ---------------------------------------------------------------------------
