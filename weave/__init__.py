@@ -60,7 +60,6 @@ from weave.flow.saved_view import SavedView
 from weave.flow.scorer import Scorer
 from weave.object.obj import Object
 from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
-from weave.trace.log_call import log_call
 from weave.session.session import (
     LLM,
     LogResult,
@@ -83,6 +82,7 @@ from weave.session.session import (
     start_session,
     start_turn,
 )
+from weave.trace.log_call import log_call
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 from weave.type_handlers.Audio.audio import Audio

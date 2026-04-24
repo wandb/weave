@@ -27,6 +27,7 @@ from weave.session.session import (
     start_turn,
 )
 
+
 @pytest.fixture(autouse=True)
 def _reset_contextvars():
     """Reset contextvar state after each test to prevent leakage."""
