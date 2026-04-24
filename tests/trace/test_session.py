@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from weave.trace.session import (
     LLM,
-    LLMSpan,
     LogResult,
     Message,
     Reasoning,
     Session,
     SubAgent,
     Tool,
-    ToolSpan,
     Turn,
     Usage,
     end_llm,
@@ -84,51 +82,6 @@ class TestLogResult:
         assert lr.trace_ids == []
         assert lr.root_span_ids == []
         assert lr.span_count == 0
-
-
-class TestLLMSpan:
-    def test_defaults(self) -> None:
-        ls = LLMSpan()
-        assert ls.model == ""
-        assert ls.input_tokens == 0
-        assert ls.output_tokens == 0
-
-    def test_all_fields(self) -> None:
-        ls = LLMSpan(
-            model="gpt-4o",
-            provider_name="openai",
-            input_messages=[{"role": "user", "content": "hi"}],
-            output_messages=[{"role": "assistant", "content": "hello"}],
-            system_instructions=["Be helpful"],
-            input_tokens=100,
-            output_tokens=50,
-            reasoning_tokens=20,
-            reasoning_content="let me think",
-            finish_reasons=["stop"],
-        )
-        assert ls.model == "gpt-4o"
-        assert ls.provider_name == "openai"
-        assert len(ls.input_messages) == 1
-        assert ls.finish_reasons == ["stop"]
-
-
-class TestToolSpan:
-    def test_defaults(self) -> None:
-        ts = ToolSpan()
-        assert ts.name == ""
-        assert ts.arguments == ""
-        assert ts.result == ""
-        assert ts.tool_call_id == ""
-
-    def test_all_fields(self) -> None:
-        ts = ToolSpan(
-            name="get_weather",
-            arguments='{"city":"Tokyo"}',
-            result="75F",
-            tool_call_id="tc_1",
-        )
-        assert ts.name == "get_weather"
-        assert ts.tool_call_id == "tc_1"
 
 
 # ---------------------------------------------------------------------------
@@ -465,11 +418,13 @@ class TestBatchLogging:
             session_id="sess-123",
             messages=[{"role": "user", "content": "hi"}],
             spans=[
-                LLMSpan(
+                LLM(
                     model="gpt-4o",
-                    output_messages=[{"role": "assistant", "content": "hello"}],
+                    output_messages=[
+                        Message(role="assistant", content="hello")
+                    ],
                 ),
-                ToolSpan(name="search", result="found"),
+                Tool(name="search", result="found"),
             ],
             agent_name="bot",
             model="gpt-4o",

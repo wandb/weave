@@ -58,35 +58,6 @@ class LogResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Batch types
-# ---------------------------------------------------------------------------
-
-
-class LLMSpan(BaseModel):
-    """Batch helper for describing an LLM call span."""
-
-    model: str = ""
-    provider_name: str = ""
-    input_messages: list[dict[str, str]] = Field(default_factory=list)
-    output_messages: list[dict[str, str]] = Field(default_factory=list)
-    system_instructions: list[str] = Field(default_factory=list)
-    input_tokens: int = 0
-    output_tokens: int = 0
-    reasoning_tokens: int = 0
-    reasoning_content: str = ""
-    finish_reasons: list[str] = Field(default_factory=list)
-
-
-class ToolSpan(BaseModel):
-    """Batch helper for describing a tool execution span."""
-
-    name: str = ""
-    arguments: str = ""
-    result: str = ""
-    tool_call_id: str = ""
-
-
-# ---------------------------------------------------------------------------
 # Core span classes
 # ---------------------------------------------------------------------------
 
@@ -513,7 +484,7 @@ def log_turn(
     *,
     session_id: str,
     messages: list[dict[str, str]] | None = None,
-    spans: list[LLMSpan | ToolSpan] | None = None,
+    spans: list[LLM | Tool] | None = None,
     agent_name: str = "",
     model: str = "",
     session_name: str = "",
