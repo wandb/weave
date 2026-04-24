@@ -6,6 +6,7 @@ import logging
 import re
 import sqlite3
 import threading
+import time
 from collections.abc import Iterator
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -128,6 +129,62 @@ def _apply_aggregations(
             bucket[f"p{int(p)}_{metric}"] = sorted_vals[idx]
 
 
+# Ceiling for our Python-level retry on SQLITE_LOCKED / SQLITE_BUSY errors
+# that `PRAGMA busy_timeout` doesn't cover (notably SQLITE_LOCKED on
+# shared-cache databases — which is what the test fixture uses).
+_LOCK_RETRY_TIMEOUT_S = 5.0
+_LOCK_RETRY_BACKOFF_INITIAL_S = 0.001
+_LOCK_RETRY_BACKOFF_CAP_S = 0.05
+
+
+class _RetryingCursor:
+    """Thin wrapper around ``sqlite3.Cursor`` that retries on lock errors.
+
+    SQLite's ``PRAGMA busy_timeout`` waits out SQLITE_BUSY but does NOT
+    retry on SQLITE_LOCKED, which is the error you get on a shared-cache
+    connection when another connection holds a write lock. Without the
+    retry, bumping the V2 logger from 1 to N worker threads surfaces
+    ``sqlite3.OperationalError: database table is locked`` on both
+    readers and writers. Retrying transparently here preserves the
+    single-threaded contract for all callers of ``cursor.execute``.
+    """
+
+    __slots__ = ("_cursor",)
+
+    def __init__(self, cursor: sqlite3.Cursor) -> None:
+        self._cursor = cursor
+
+    def _run_with_retry(self, op: Any, *args: Any, **kwargs: Any) -> Any:
+        deadline = time.monotonic() + _LOCK_RETRY_TIMEOUT_S
+        backoff = _LOCK_RETRY_BACKOFF_INITIAL_S
+        while True:
+            try:
+                return op(*args, **kwargs)
+            except sqlite3.OperationalError as e:
+                msg = str(e).lower()
+                if "locked" not in msg and "busy" not in msg:
+                    raise
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(backoff)
+                backoff = min(backoff * 2, _LOCK_RETRY_BACKOFF_CAP_S)
+
+    def execute(self, *args: Any, **kwargs: Any) -> Any:
+        return self._run_with_retry(self._cursor.execute, *args, **kwargs)
+
+    def executemany(self, *args: Any, **kwargs: Any) -> Any:
+        return self._run_with_retry(self._cursor.executemany, *args, **kwargs)
+
+    def executescript(self, *args: Any, **kwargs: Any) -> Any:
+        return self._run_with_retry(self._cursor.executescript, *args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._cursor, name)
+
+    def __iter__(self) -> Any:
+        return iter(self._cursor)
+
+
 @dataclass(frozen=True)
 class ConnCursor:
     conn: sqlite3.Connection
@@ -161,10 +218,31 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
         # Use uri=True for URIs like "file::memory:?cache=shared"
         # This is required on Windows to properly handle URI paths
         is_uri = db_path.startswith("file:")
-        conn = sqlite3.connect(db_path, uri=is_uri)
+        # `check_same_thread=False` lets a connection created on one thread
+        # be used from worker threads — required now that client-side
+        # parallelism (e.g. `EvaluationLoggerV2`) dispatches writes from a
+        # ThreadPoolExecutor. We pair it with `busy_timeout` and WAL to keep
+        # concurrent writers from racing on the DB lock.
+        conn = sqlite3.connect(db_path, uri=is_uri, check_same_thread=False)
         # Create an array reverse function.
         conn.create_function("reverse", 1, lambda x: x[::-1])
-        cursor = conn.cursor()
+        raw_cursor = conn.cursor()
+        # Wait up to 5s for a held lock instead of immediately raising
+        # "database is locked". Combined with WAL, this is enough to absorb
+        # bursts from a small (~32) worker pool on a real file path.
+        raw_cursor.execute("PRAGMA busy_timeout = 5000;")
+        # WAL journaling allows readers and a writer to coexist, and
+        # tolerates far more concurrency than the default rollback journal.
+        # It can fail on exotic paths (e.g. some :memory: URIs, where it
+        # silently degrades to `memory`); fall back to the default
+        # journal_mode silently in that case.
+        try:
+            raw_cursor.execute("PRAGMA journal_mode = WAL;")
+        except sqlite3.DatabaseError:
+            pass
+        # Wrap in our retrying cursor so shared-cache SQLITE_LOCKED errors
+        # (which `busy_timeout` doesn't retry) get transparently retried.
+        cursor = cast("sqlite3.Cursor", _RetryingCursor(raw_cursor))
         conn_cursor = ConnCursor(conn, cursor)
         conn_map[db_path] = conn_cursor
     return conn_cursor.conn, conn_cursor.cursor

@@ -25,13 +25,14 @@ from typing import Any, cast, overload
 
 from typing_extensions import Self
 
-# Number of concurrent in-flight V2 server calls per logger. One worker
-# matches V1's `AsyncBatchProcessor` model: user code never blocks on the
-# network, but writes serialize through a single background thread. This
-# is also what in-process SQLite requires (it errors on concurrent writes
-# with "database is locked"). Users on a remote HTTP backend who want more
-# parallelism can bump this via the `max_workers` constructor arg.
-_DEFAULT_MAX_WORKERS = 1
+# Number of concurrent in-flight V2 server calls per logger. Tuned for
+# remote HTTP backends where latency dominates — a 100-prediction eval at
+# 50 ms RTT is bottlenecked by serial round-trips, so we parallelize them.
+# SQLite now tolerates concurrent writes thanks to `PRAGMA busy_timeout`
+# + WAL journaling configured in `get_conn_cursor`, so this default is
+# safe for in-process SQLite too. Users can override via the
+# `max_workers` constructor arg.
+_DEFAULT_MAX_WORKERS = 32
 
 from weave.dataset.dataset import Dataset
 from weave.evaluation._imperative_shared import (
@@ -538,51 +539,39 @@ class EvaluationLoggerV2:
             return
         assert self._server is not None
 
-        # 1. Dataset
-        dataset_res = self._server.dataset_create(
-            tsi.DatasetCreateReq(
-                project_id=self._project_id,
-                name=self._dataset_spec.name,
-                description=None,
-                rows=self._dataset_spec.rows,
-                wb_user_id=None,
-            )
-        )
-        self._dataset_ref = _object_ref_uri(
-            self._entity, self._project, dataset_res.object_id, dataset_res.digest
-        )
+        # Walk the init DAG:
+        #   phase 1 (parallel): dataset_create, scorer_create × N, model_create
+        #   phase 2            : evaluation_create (needs dataset + scorers)
+        #   phase 3            : evaluation_run_create (needs evaluation + model)
+        # Phase 1 items are independent of each other; firing them on the
+        # executor drops init wall-time from ~7 RTTs to ~3 (for a typical
+        # 3-scorer eval). Evaluation + run stay sequential because they
+        # depend on phase-1 outputs.
+        executor = self._get_executor()
 
-        # 2. Pre-declared scorers
-        scorer_refs: list[str] = []
+        dataset_future = executor.submit(self._do_dataset_create)
+        model_future = executor.submit(self._do_model_create)
+        scorer_futures: list[tuple[Scorer, Future[str]]] = []
         if self.scorers:
             for scorer_name in self.scorers:
                 scorer_obj = _cast_to_cls(Scorer)(scorer_name)
-                ref = self._create_scorer_on_server(scorer_obj)
-                self._scorer_refs_by_name[cast(str, scorer_obj.name)] = ref
-                scorer_refs.append(ref)
+                scorer_futures.append(
+                    (
+                        scorer_obj,
+                        executor.submit(self._create_scorer_on_server, scorer_obj),
+                    )
+                )
 
-        # 3. Model
-        model_source = _synthesize_model_source(self.model)
-        model_attrs = {
-            k: v
-            for k, v in self.model.model_dump().items()
-            if k not in {"name", "description"}
-        }
-        model_res = self._server.model_create(
-            tsi.ModelCreateReq(
-                project_id=self._project_id,
-                name=cast(str, self.model.name) or self.model.__class__.__name__,
-                description=None,
-                source_code=model_source,
-                attributes=model_attrs or None,
-                wb_user_id=None,
-            )
-        )
-        self._model_ref = _object_ref_uri(
-            self._entity, self._project, model_res.object_id, model_res.digest
-        )
+        # Join phase 1.
+        self._dataset_ref = dataset_future.result()
+        self._model_ref = model_future.result()
+        scorer_refs: list[str] = []
+        for scorer_obj, fut in scorer_futures:
+            ref = fut.result()
+            self._scorer_refs_by_name[cast(str, scorer_obj.name)] = ref
+            scorer_refs.append(ref)
 
-        # 4. Evaluation
+        # Phase 2: evaluation_create.
         eval_res = self._server.evaluation_create(
             tsi.EvaluationCreateReq(
                 project_id=self._project_id,
@@ -598,7 +587,7 @@ class EvaluationLoggerV2:
         )
         self._evaluation_ref = eval_res.evaluation_ref
 
-        # 5. Evaluation Run
+        # Phase 3: evaluation_run_create.
         run_res = self._server.evaluation_run_create(
             tsi.EvaluationRunCreateReq(
                 project_id=self._project_id,
@@ -610,6 +599,41 @@ class EvaluationLoggerV2:
         self._evaluation_run_id = run_res.evaluation_run_id
 
         self._initialized = True
+
+    def _do_dataset_create(self) -> str:
+        """Phase-1 helper: create the Dataset on the server, return its URI."""
+        assert self._server is not None
+        res = self._server.dataset_create(
+            tsi.DatasetCreateReq(
+                project_id=self._project_id,
+                name=self._dataset_spec.name,
+                description=None,
+                rows=self._dataset_spec.rows,
+                wb_user_id=None,
+            )
+        )
+        return _object_ref_uri(self._entity, self._project, res.object_id, res.digest)
+
+    def _do_model_create(self) -> str:
+        """Phase-1 helper: create the Model on the server, return its URI."""
+        assert self._server is not None
+        source = _synthesize_model_source(self.model)
+        attrs = {
+            k: v
+            for k, v in self.model.model_dump().items()
+            if k not in {"name", "description"}
+        }
+        res = self._server.model_create(
+            tsi.ModelCreateReq(
+                project_id=self._project_id,
+                name=cast(str, self.model.name) or self.model.__class__.__name__,
+                description=None,
+                source_code=source,
+                attributes=attrs or None,
+                wb_user_id=None,
+            )
+        )
+        return _object_ref_uri(self._entity, self._project, res.object_id, res.digest)
 
     def _create_scorer_on_server(self, scorer: Scorer) -> str:
         assert self._server is not None
