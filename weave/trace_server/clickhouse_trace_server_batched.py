@@ -422,6 +422,37 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _calls_complete_batch(self, value: list[list[Any]]) -> None:
         self._thread_local.calls_complete_batch = value
 
+    def _resolve_v1_write_target(self, project_id: str) -> WriteTarget:
+        """Resolve v1 write target, memoizing per-batch when inside `call_batch()`.
+
+        The global LRU in TableRoutingResolver does not cache EMPTY projects
+        (on purpose: residence could change between requests), so within a
+        single batch on a fresh project every item would otherwise re-query
+        ClickHouse. Residence cannot change inside a single request, so a
+        per-batch dict is safe.
+        """
+        cache = getattr(self._thread_local, "batch_resolved_targets", None)
+        if cache is not None and project_id in cache:
+            return cache[project_id]
+        target = self.table_routing_resolver.resolve_v1_write_target(
+            project_id, self.ch_client
+        )
+        if cache is not None:
+            cache[project_id] = target
+        return target
+
+    def _resolve_v2_write_target(self, project_id: str) -> WriteTarget:
+        """Resolve v2 write target, memoizing per-batch (see `_resolve_v1_write_target`)."""
+        cache = getattr(self._thread_local, "batch_resolved_targets", None)
+        if cache is not None and project_id in cache:
+            return cache[project_id]
+        target = self.table_routing_resolver.resolve_v2_write_target(
+            project_id, self.ch_client
+        )
+        if cache is not None:
+            cache[project_id] = target
+        return target
+
     @classmethod
     def from_env(cls, use_async_insert: bool = False, **kwargs: Any) -> Self:
         return cls(
@@ -743,6 +774,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Batch call operations and flush them all at the end."""
         # Not thread safe - do not use across threads
         self._flush_immediately = False
+        self._thread_local.batch_resolved_targets = {}
         try:
             yield
             self._flush_immediately = True
@@ -752,6 +784,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._call_batch = []
             self._calls_complete_batch = []
             self._flush_immediately = True
+            self._thread_local.batch_resolved_targets = None
 
     def _flush_all_batches_in_order(self) -> None:
         """Flush all batches in order of dependency.
@@ -810,10 +843,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ch_call = start_call_for_insert_to_ch_insertable(req.start, retention_days)
 
         # Check write target - v1 call_start cannot write to calls_complete
-        write_target = self.table_routing_resolver.resolve_v1_write_target(
-            ch_call.project_id,
-            self.ch_client,
-        )
+        write_target = self._resolve_v1_write_target(ch_call.project_id)
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
 
@@ -840,10 +870,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ch_call = end_call_for_insert_to_ch_insertable(req.end, retention_days)
 
         # Check write target - v1 call_end cannot write to calls_complete
-        write_target = self.table_routing_resolver.resolve_v1_write_target(
-            ch_call.project_id,
-            self.ch_client,
-        )
+        write_target = self._resolve_v1_write_target(ch_call.project_id)
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
 
@@ -892,13 +919,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     complete_call, self
                 )
 
-                # Determine write target based on project, this should be the same for all
-                # calls in the batch, subsequent calls just hit the in-memory cache. This
-                # is here for technical correctness, in case we relax project_id target
-                # constraints intra-batch
-                write_target = self.table_routing_resolver.resolve_v2_write_target(
-                    processed_complete_call.project_id,
-                    self.ch_client,
+                # Determine write target based on project. Memoized per-batch
+                # in `_resolve_v2_write_target`, so subsequent same-project
+                # items in this batch don't re-query ClickHouse.
+                write_target = self._resolve_v2_write_target(
+                    processed_complete_call.project_id
                 )
 
                 retention_days = get_project_retention_days(
