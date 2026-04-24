@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from weave.trace.session import (
-    Chat,
-    ChatSpan,
+    LLM,
+    LLMSpan,
     LogResult,
     Message,
     Reasoning,
@@ -14,15 +14,15 @@ from weave.trace.session import (
     ToolSpan,
     Turn,
     Usage,
-    end_chat,
+    end_llm,
     end_session,
     end_turn,
-    get_current_chat,
+    get_current_llm,
     get_current_session,
     get_current_turn,
     log_session,
     log_turn,
-    start_chat,
+    start_llm,
     start_session,
     start_turn,
 )
@@ -86,15 +86,15 @@ class TestLogResult:
         assert lr.span_count == 0
 
 
-class TestChatSpan:
+class TestLLMSpan:
     def test_defaults(self) -> None:
-        cs = ChatSpan()
-        assert cs.model == ""
-        assert cs.input_tokens == 0
-        assert cs.output_tokens == 0
+        ls = LLMSpan()
+        assert ls.model == ""
+        assert ls.input_tokens == 0
+        assert ls.output_tokens == 0
 
     def test_all_fields(self) -> None:
-        cs = ChatSpan(
+        ls = LLMSpan(
             model="gpt-4o",
             provider_name="openai",
             input_messages=[{"role": "user", "content": "hi"}],
@@ -106,10 +106,10 @@ class TestChatSpan:
             reasoning_content="let me think",
             finish_reasons=["stop"],
         )
-        assert cs.model == "gpt-4o"
-        assert cs.provider_name == "openai"
-        assert len(cs.input_messages) == 1
-        assert cs.finish_reasons == ["stop"]
+        assert ls.model == "gpt-4o"
+        assert ls.provider_name == "openai"
+        assert len(ls.input_messages) == 1
+        assert ls.finish_reasons == ["stop"]
 
 
 class TestToolSpan:
@@ -157,9 +157,9 @@ class TestTool:
         t.end()  # second call is a no-op
 
 
-class TestChat:
+class TestLLM:
     def test_defaults(self) -> None:
-        c = Chat(model="gpt-4o")
+        c = LLM(model="gpt-4o")
         assert c.model == "gpt-4o"
         assert c.provider_name == ""
         assert c.response_id == ""
@@ -171,7 +171,7 @@ class TestChat:
         assert c.output_messages == []
 
     def test_output_appends_assistant_message(self) -> None:
-        c = Chat(model="gpt-4o")
+        c = LLM(model="gpt-4o")
         result = c.output("Hello!")
         assert result is c  # chainable
         assert len(c.output_messages) == 1
@@ -179,31 +179,31 @@ class TestChat:
         assert c.output_messages[0].content == "Hello!"
 
     def test_think_sets_reasoning(self) -> None:
-        c = Chat(model="gpt-4o")
+        c = LLM(model="gpt-4o")
         result = c.think("Let me consider...")
         assert result is c
         assert c.reasoning.content == "Let me consider..."
 
     def test_attach_methods_return_self(self) -> None:
-        c = Chat(model="gpt-4o")
+        c = LLM(model="gpt-4o")
         assert c.attach_file("file_123") is c
         assert c.attach_image(b"png_bytes") is c
         assert c.attach_uri("https://example.com/img.png") is c
 
     def test_nested_tool(self) -> None:
-        c = Chat(model="gpt-4o")
+        c = LLM(model="gpt-4o")
         t = c.tool(name="search", arguments='{"q":"x"}', tool_call_id="tc_1")
         assert isinstance(t, Tool)
         assert t.name == "search"
         assert t.tool_call_id == "tc_1"
 
     def test_context_manager_sets_timestamps(self) -> None:
-        with Chat(model="gpt-4o") as c:
+        with LLM(model="gpt-4o") as c:
             assert c.started_at is not None
         assert c.ended_at is not None
 
     def test_usage_assignment(self) -> None:
-        c = Chat(model="gpt-4o")
+        c = LLM(model="gpt-4o")
         c.usage = Usage(input_tokens=100, output_tokens=50, reasoning_tokens=20)
         assert c.usage.input_tokens == 100
 
@@ -214,15 +214,15 @@ class TestSubAgent:
         assert sa.name == "research-bot"
         assert sa.model == ""
 
-    def test_chat_returns_chat(self) -> None:
+    def test_llm_returns_llm(self) -> None:
         sa = SubAgent(name="research-bot", model="gpt-4o-mini")
-        c = sa.chat(model="gpt-4o-mini")
-        assert isinstance(c, Chat)
+        c = sa.llm(model="gpt-4o-mini")
+        assert isinstance(c, LLM)
         assert c.model == "gpt-4o-mini"
 
-    def test_chat_inherits_model(self) -> None:
+    def test_llm_inherits_model(self) -> None:
         sa = SubAgent(name="bot", model="gpt-4o-mini")
-        c = sa.chat()
+        c = sa.llm()
         assert c.model == "gpt-4o-mini"
 
     def test_tool_returns_tool(self) -> None:
@@ -257,21 +257,21 @@ class TestTurn:
         assert t.messages[0].role == "user"
         assert t.messages[0].content == "Hello"
 
-    def test_chat_returns_chat(self) -> None:
+    def test_llm_returns_llm(self) -> None:
         t = Turn(model="gpt-4o")
-        c = t.chat(
+        c = t.llm(
             model="gpt-4o",
             provider_name="openai",
             system_instructions=["Be helpful"],
         )
-        assert isinstance(c, Chat)
+        assert isinstance(c, LLM)
         assert c.model == "gpt-4o"
         assert c.provider_name == "openai"
         assert c.system_instructions == ["Be helpful"]
 
-    def test_chat_inherits_model(self) -> None:
+    def test_llm_inherits_model(self) -> None:
         t = Turn(model="gpt-4o")
-        c = t.chat()
+        c = t.llm()
         assert c.model == "gpt-4o"
 
     def test_tool_returns_tool(self) -> None:
@@ -398,34 +398,34 @@ class TestContextVars:
         finally:
             t.end()
 
-    def test_start_chat_sets_contextvar(self) -> None:
+    def test_start_llm_sets_contextvar(self) -> None:
         s = start_session(agent_name="bot")
         try:
             t = start_turn()
             try:
-                c = start_chat(model="gpt-4o")
-                assert get_current_chat() is c
+                c = start_llm(model="gpt-4o")
+                assert get_current_llm() is c
                 assert c.model == "gpt-4o"
                 c.end()
-                assert get_current_chat() is None
+                assert get_current_llm() is None
             finally:
                 t.end()
         finally:
             s.end()
 
-    def test_start_chat_without_turn(self) -> None:
-        c = start_chat(model="gpt-4o")
+    def test_start_llm_without_turn(self) -> None:
+        c = start_llm(model="gpt-4o")
         try:
-            assert get_current_chat() is c
+            assert get_current_llm() is c
         finally:
             c.end()
 
     def test_end_convenience_functions(self) -> None:
         s = start_session()
         start_turn()
-        start_chat(model="gpt-4o")
-        end_chat()
-        assert get_current_chat() is None
+        start_llm(model="gpt-4o")
+        end_llm()
+        assert get_current_llm() is None
         end_turn()
         assert get_current_turn() is None
         end_session()
@@ -433,7 +433,7 @@ class TestContextVars:
 
     def test_end_when_nothing_active(self) -> None:
         # Should not raise
-        end_chat()
+        end_llm()
         end_turn()
         end_session()
 
@@ -442,21 +442,21 @@ class TestContextVars:
             with s.start_turn(
                 user_message="What's the weather?"
             ) as turn:
-                with turn.chat(model="gpt-4o") as chat:
-                    chat.output("Let me check.")
-                    chat.usage = Usage(input_tokens=100, output_tokens=50)
+                with turn.llm(model="gpt-4o") as llm:
+                    llm.output("Let me check.")
+                    llm.usage = Usage(input_tokens=100, output_tokens=50)
                 with turn.tool(
                     name="get_weather",
                     arguments='{"city":"Tokyo"}',
                     tool_call_id="tc_1",
                 ) as tool:
                     tool.result = "75F"
-                with turn.chat(model="gpt-4o") as chat:
-                    chat.output("It's 75F in Tokyo!")
+                with turn.llm(model="gpt-4o") as llm:
+                    llm.output("It's 75F in Tokyo!")
 
         assert get_current_session() is None
         assert get_current_turn() is None
-        assert get_current_chat() is None
+        assert get_current_llm() is None
 
 
 class TestBatchLogging:
@@ -465,7 +465,7 @@ class TestBatchLogging:
             session_id="sess-123",
             messages=[{"role": "user", "content": "hi"}],
             spans=[
-                ChatSpan(
+                LLMSpan(
                     model="gpt-4o",
                     output_messages=[{"role": "assistant", "content": "hello"}],
                 ),

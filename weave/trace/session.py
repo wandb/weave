@@ -62,8 +62,8 @@ class LogResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class ChatSpan(BaseModel):
-    """Batch helper for describing a chat (LLM call) span."""
+class LLMSpan(BaseModel):
+    """Batch helper for describing an LLM call span."""
 
     model: str = ""
     provider_name: str = ""
@@ -125,7 +125,7 @@ class Tool(BaseModel):
         return False
 
 
-class Chat(BaseModel):
+class LLM(BaseModel):
     """One LLM API call. Maps to a chat OTel span."""
 
     model: str = ""
@@ -141,36 +141,36 @@ class Chat(BaseModel):
     ended_at: datetime | None = None
 
     _ended: bool = PrivateAttr(default=False)
-    _token: Token[Chat | None] | None = PrivateAttr(default=None)
+    _token: Token[LLM | None] | None = PrivateAttr(default=None)
 
-    def output(self, content: str) -> Chat:
+    def output(self, content: str) -> LLM:
         """Append an assistant message to output_messages."""
         self.output_messages.append(Message(role="assistant", content=content))
         return self
 
-    def think(self, content: str) -> Chat:
+    def think(self, content: str) -> LLM:
         """Set reasoning/chain-of-thought content."""
         self.reasoning = Reasoning(content=content)
         return self
 
-    def attach_file(self, file_id: str, *, modality: str = "document") -> Chat:
-        """Attach a file reference to this chat. Stub — stores nothing yet."""
+    def attach_file(self, file_id: str, *, modality: str = "document") -> LLM:
+        """Attach a file reference. Stub — stores nothing yet."""
         return self
 
     def attach_image(
         self, content: bytes | str, *, mime_type: str = "image/png"
-    ) -> Chat:
-        """Attach an image to this chat. Stub — stores nothing yet."""
+    ) -> LLM:
+        """Attach an image. Stub — stores nothing yet."""
         return self
 
-    def attach_uri(self, uri: str, *, modality: str = "image") -> Chat:
-        """Attach a URI reference to this chat. Stub — stores nothing yet."""
+    def attach_uri(self, uri: str, *, modality: str = "image") -> LLM:
+        """Attach a URI reference. Stub — stores nothing yet."""
         return self
 
     def tool(
         self, *, name: str, arguments: str = "", tool_call_id: str = ""
     ) -> Tool:
-        """Start a tool execution as child of this chat (nested/v2 model)."""
+        """Start a tool execution as child of this LLM call (nested/v2 model)."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
     def end(self) -> None:
@@ -179,13 +179,13 @@ class Chat(BaseModel):
         self._ended = True
         self.ended_at = datetime.now(timezone.utc)
         if self._token is not None:
-            _current_chat.reset(self._token)
+            _current_llm.reset(self._token)
             self._token = None
 
     def __enter__(self) -> Self:
         self.started_at = datetime.now(timezone.utc)
         if self._token is None:
-            self._token = _current_chat.set(self)
+            self._token = _current_llm.set(self)
         return self
 
     def __exit__(
@@ -211,15 +211,15 @@ class SubAgent(BaseModel):
 
     _ended: bool = PrivateAttr(default=False)
 
-    def chat(
+    def llm(
         self,
         *,
         model: str = "",
         provider_name: str = "",
         system_instructions: list[str] | None = None,
-    ) -> Chat:
+    ) -> LLM:
         """Start an LLM call within this sub-agent."""
-        return Chat(
+        return LLM(
             model=model or self.model,
             provider_name=provider_name,
             system_instructions=system_instructions or [],
@@ -273,15 +273,15 @@ class Turn(BaseModel):
         self.messages.append(Message(role="user", content=content))
         return self
 
-    def chat(
+    def llm(
         self,
         *,
         model: str = "",
         provider_name: str = "",
         system_instructions: list[str] | None = None,
-    ) -> Chat:
+    ) -> LLM:
         """Start an LLM call (chat span, child of this turn)."""
-        return Chat(
+        return LLM(
             model=model or self.model,
             provider_name=provider_name,
             system_instructions=system_instructions or [],
@@ -393,8 +393,8 @@ _current_session: ContextVar[Session | None] = ContextVar(
 _current_turn: ContextVar[Turn | None] = ContextVar(
     "_current_turn", default=None
 )
-_current_chat: ContextVar[Chat | None] = ContextVar(
-    "_current_chat", default=None
+_current_llm: ContextVar[LLM | None] = ContextVar(
+    "_current_llm", default=None
 )
 
 
@@ -448,29 +448,29 @@ def start_turn(
     return turn
 
 
-def start_chat(
+def start_llm(
     *,
     model: str = "",
     provider_name: str = "",
     system_instructions: list[str] | None = None,
-) -> Chat:
-    """Create and activate a chat. Uses the current turn if available."""
+) -> LLM:
+    """Create and activate an LLM call. Uses the current turn if available."""
     turn = get_current_turn()
     if turn is not None:
-        chat = turn.chat(
+        llm = turn.llm(
             model=model,
             provider_name=provider_name,
             system_instructions=system_instructions,
         )
     else:
-        chat = Chat(
+        llm = LLM(
             model=model,
             provider_name=provider_name,
             system_instructions=system_instructions or [],
         )
-    chat._token = _current_chat.set(chat)
-    chat.started_at = datetime.now(timezone.utc)
-    return chat
+    llm._token = _current_llm.set(llm)
+    llm.started_at = datetime.now(timezone.utc)
+    return llm
 
 
 def end_session() -> None:
@@ -487,11 +487,11 @@ def end_turn() -> None:
         turn.end()
 
 
-def end_chat() -> None:
-    """End the current chat (from contextvar)."""
-    chat = get_current_chat()
-    if chat is not None:
-        chat.end()
+def end_llm() -> None:
+    """End the current LLM call (from contextvar)."""
+    llm = get_current_llm()
+    if llm is not None:
+        llm.end()
 
 
 def get_current_session() -> Session | None:
@@ -504,16 +504,16 @@ def get_current_turn() -> Turn | None:
     return _current_turn.get()
 
 
-def get_current_chat() -> Chat | None:
-    """Return the active chat from contextvar, or None."""
-    return _current_chat.get()
+def get_current_llm() -> LLM | None:
+    """Return the active LLM call from contextvar, or None."""
+    return _current_llm.get()
 
 
 def log_turn(
     *,
     session_id: str,
     messages: list[dict[str, str]] | None = None,
-    spans: list[ChatSpan | ToolSpan] | None = None,
+    spans: list[LLMSpan | ToolSpan] | None = None,
     agent_name: str = "",
     model: str = "",
     session_name: str = "",

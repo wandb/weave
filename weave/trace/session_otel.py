@@ -26,7 +26,7 @@ def invoke_agent_attributes(
     return {}
 
 
-def chat_attributes(
+def llm_attributes(
     *,
     model: str,
     provider_name: str = "",
@@ -38,7 +38,7 @@ def chat_attributes(
     finish_reasons: list[str] | None = None,
     response_id: str = "",
 ) -> dict[str, Any]:
-    """Build OTel attributes for a chat span. Stub."""
+    """Build OTel attributes for an LLM call (chat operation) span. Stub."""
     return {}
 
 
