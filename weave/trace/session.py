@@ -1,12 +1,11 @@
-"""Weave Session SDK v3 — structured logging for agent conversations.
+"""Weave Session SDK — structured logging for agent conversations.
 
 Provides Python classes and functions for logging agent conversations
 to Weave's Agents tab. All data flows through OpenTelemetry — the SDK
 creates OTel spans with GenAI semantic convention attributes.
 
-This module contains the complete v3 API surface. OTel span emission
-is not yet implemented — classes are functional stubs that track state
-locally.
+OTel span emission is not yet implemented — classes are functional
+stubs that track state locally.
 """
 
 from __future__ import annotations
@@ -137,12 +136,6 @@ class LLM(BaseModel):
     def attach_uri(self, uri: str, *, modality: str = "image") -> LLM:
         """Attach a URI reference. Stub — stores nothing yet."""
         return self
-
-    def tool(
-        self, *, name: str, arguments: str = "", tool_call_id: str = ""
-    ) -> Tool:
-        """Start a tool execution as child of this LLM call (nested/v2 model)."""
-        return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
     def end(self) -> None:
         if self._ended:

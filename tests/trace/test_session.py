@@ -1,4 +1,4 @@
-"""Tests for the v3 Session SDK API surface."""
+"""Tests for the Session SDK API surface."""
 
 from __future__ import annotations
 
@@ -142,13 +142,6 @@ class TestLLM:
         assert c.attach_file("file_123") is c
         assert c.attach_image(b"png_bytes") is c
         assert c.attach_uri("https://example.com/img.png") is c
-
-    def test_nested_tool(self) -> None:
-        c = LLM(model="gpt-4o")
-        t = c.tool(name="search", arguments='{"q":"x"}', tool_call_id="tc_1")
-        assert isinstance(t, Tool)
-        assert t.name == "search"
-        assert t.tool_call_id == "tc_1"
 
     def test_context_manager_sets_timestamps(self) -> None:
         with LLM(model="gpt-4o") as c:
