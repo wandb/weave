@@ -189,6 +189,18 @@ class TestSubAgent:
             assert sa.started_at is not None
         assert sa.ended_at is not None
 
+    def test_subagent_with_nested_tools(self) -> None:
+        with Turn(agent_name="bot") as turn:
+            with turn.subagent(name="sub") as sa:
+                with sa.tool(name="tool1", arguments='{"x":1}') as t1:
+                    t1.result = "result1"
+                with sa.tool(name="tool2", arguments='{"x":2}') as t2:
+                    t2.result = "result2"
+        assert t1.result == "result1"
+        assert t1.duration_ms >= 0
+        assert t2.result == "result2"
+        assert sa.ended_at is not None
+
 
 # ---------------------------------------------------------------------------
 # Turn and Session
