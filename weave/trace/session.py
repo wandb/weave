@@ -154,7 +154,8 @@ class LLM(BaseModel):
             self._token = None
 
     def __enter__(self) -> Self:
-        self.started_at = datetime.now(timezone.utc)
+        if self.started_at is None:
+            self.started_at = datetime.now(timezone.utc)
         if self._token is None:
             self._token = _current_llm.set(self)
         return self
@@ -278,7 +279,8 @@ class Turn(BaseModel):
             self._token = None
 
     def __enter__(self) -> Self:
-        self.started_at = datetime.now(timezone.utc)
+        if self.started_at is None:
+            self.started_at = datetime.now(timezone.utc)
         if self._token is None:
             self._token = _current_turn.set(self)
         return self
