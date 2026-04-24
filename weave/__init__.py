@@ -61,7 +61,7 @@ from weave.flow.scorer import Scorer
 from weave.object.obj import Object
 from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
 from weave.trace.log_call import log_call
-from weave.trace.session import (
+from weave.session.session import (
     LLM,
     LogResult,
     Message,

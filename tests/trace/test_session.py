@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from weave.trace.session import (
+from weave.session.session import (
     LLM,
     LogResult,
     Message,

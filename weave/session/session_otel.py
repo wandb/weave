@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from weave.trace.session import Message, Reasoning, Usage
+from weave.session.session import Message, Reasoning, Usage
 
 
 def invoke_agent_attributes(
