@@ -5,6 +5,7 @@ import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {getGlobalClient} from '../clientApi';
 import {InternalCall} from '../call';
 import {WeaveClient} from '../weaveClient';
+import {warnOnce} from '../utils/warnOnce';
 import {getCallStackFromOpenAIAgents} from './openai.agent';
 
 /**
@@ -520,7 +521,24 @@ function traceOpenAICall(args: {
     thisArg,
   } = args;
 
-  const {currentCall, parentCall, newStack} = client.pushNewCall();
+  const apiPromise = originalCreate(...callArgs);
+
+  // Fail fast if the SDK's APIPromise shape is unfamiliar. We rely on
+  // _thenUnwrap to install tracing in the parse chain; without it we
+  // can't guarantee a stream is tapped or a non-streaming result is
+  // finished. Rather than create a server-side call we can't close
+  // cleanly, skip tracing for this invocation and hand the caller the
+  // SDK's native APIPromise unchanged. Warn once so the cause is
+  // discoverable (SDK version mismatch, non-OpenAI object, etc.).
+  if (typeof apiPromise?._thenUnwrap !== 'function') {
+    warnOnce(
+      'weave-openai-no-thenUnwrap',
+      '[weave] OpenAI SDK APIPromise._thenUnwrap is unavailable — tracing disabled for this call. Try upgrading weave to the latest version; if the issue persists, please file a bug report.'
+    );
+    return apiPromise;
+  }
+
+  const {currentCall, parentCall} = client.pushNewCall();
   const call = new InternalCall();
   const startTime = new Date();
   const startCallPromise = client.createCall(
@@ -534,10 +552,6 @@ function traceOpenAICall(args: {
     startTime,
     undefined,
     {kind: 'llm'}
-  );
-
-  const apiPromise = client.runWithCallStack(newStack, () =>
-    originalCreate(...callArgs)
   );
 
   const traced = apiPromise._thenUnwrap((value: any) => {
@@ -610,22 +624,41 @@ function wrapStreamForTracing(args: {
   const {initialStateFn, reduceFn, finalizeFn} = streamReducer;
   let state = initialStateFn();
   async function* WeaveIterator() {
+    let iterationError: unknown;
     try {
       for await (const chunk of stream) {
         state = reduceFn(state, chunk);
         yield chunk;
       }
+    } catch (e) {
+      iterationError = e;
+      throw e;
     } finally {
-      finalizeFn(state);
-      await client.finishCall(
-        call,
-        state,
-        currentCall,
-        parentCall,
-        summarize,
-        new Date(),
-        startCallPromise
-      );
+      // Route a mid-iteration failure (network error, server-sent
+      // error event, caller throws inside the loop) to
+      // finishCallWithException — recording it as a successful
+      // completion with partial output would be a lie.
+      if (iterationError !== undefined) {
+        await client.finishCallWithException(
+          call,
+          iterationError,
+          currentCall,
+          parentCall,
+          new Date(),
+          startCallPromise
+        );
+      } else {
+        finalizeFn(state);
+        await client.finishCall(
+          call,
+          state,
+          currentCall,
+          parentCall,
+          summarize,
+          new Date(),
+          startCallPromise
+        );
+      }
     }
   }
   return new Proxy(stream, {
