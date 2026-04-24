@@ -144,7 +144,7 @@ def init_weave(
         wandb_run_id = f"{entity_name}/{project_name}/{wb_run_context.run_id}"
         check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
-    remote_server = init_weave_get_server(api_key)
+    remote_server = init_weave_get_server(api_key, entity=entity_name)
     if not _weave_is_available(remote_server):
         raise RuntimeError(
             "Weave is not available on the server.  Please contact support."
@@ -255,6 +255,8 @@ def init_weave_disabled(
 def init_weave_get_server(
     api_key: str | None = None,
     should_batch: bool = True,
+    *,
+    entity: str | None = None,
 ) -> TraceServerClientInterface:
     res: TraceServerClientInterface
     if should_use_stainless_server():
@@ -264,7 +266,9 @@ def init_weave_get_server(
 
         res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
     else:
-        res = RemoteHTTPTraceServer.from_env(should_batch)
+        # `entity` enables the wandb/* dogfood gate for the calls_complete
+        # write path; StainlessRemoteHTTPTraceServer does not use it.
+        res = RemoteHTTPTraceServer.from_env(should_batch, entity=entity)
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res
