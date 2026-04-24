@@ -383,10 +383,6 @@ def start_session(
     session_id: str = "",
     session_name: str = "",
     include_content: bool = True,
-    base_url: str = "",
-    api_key: str = "",
-    entity: str = "",
-    project: str = "",
 ) -> Session:
     """Create and activate a session. Sets the contextvar for cross-module access."""
     session = Session(
