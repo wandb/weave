@@ -355,13 +355,11 @@ class TestContextVars:
         finally:
             s.end()
 
-    def test_start_turn_without_session(self) -> None:
+    def test_start_turn_without_session_returns_disconnected(self) -> None:
         t = start_turn(user_message="hi", agent_name="standalone")
-        try:
-            assert get_current_turn() is t
-            assert t.agent_name == "standalone"
-        finally:
-            t.end()
+        assert t.agent_name == "standalone"
+        assert t.messages[0].content == "hi"
+        assert get_current_turn() is None  # not set in contextvar
 
     def test_start_llm_sets_contextvar(self) -> None:
         s = start_session(agent_name="bot")
@@ -378,12 +376,10 @@ class TestContextVars:
         finally:
             s.end()
 
-    def test_start_llm_without_turn(self) -> None:
+    def test_start_llm_without_turn_returns_disconnected(self) -> None:
         c = start_llm(model="gpt-4o")
-        try:
-            assert get_current_llm() is c
-        finally:
-            c.end()
+        assert c.model == "gpt-4o"
+        assert get_current_llm() is None  # not set in contextvar
 
     def test_end_convenience_functions(self) -> None:
         s = start_session()

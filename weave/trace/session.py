@@ -402,7 +402,10 @@ def start_turn(
     model: str = "",
     agent_name: str = "",
 ) -> Turn:
-    """Create and activate a turn. Uses the current session if available."""
+    """Create and activate a turn. Uses the current session if available.
+
+    If no session is active, returns a disconnected Turn (no contextvar set).
+    """
     session = get_current_session()
     if session is not None:
         turn = session.start_turn(
@@ -412,6 +415,7 @@ def start_turn(
         turn = Turn(agent_name=agent_name, model=model)
         if user_message:
             turn.messages.append(Message(role="user", content=user_message))
+        return turn
     turn._token = _current_turn.set(turn)
     turn.started_at = datetime.now(timezone.utc)
     return turn
@@ -423,7 +427,10 @@ def start_llm(
     provider_name: str = "",
     system_instructions: list[str] | None = None,
 ) -> LLM:
-    """Create and activate an LLM call. Uses the current turn if available."""
+    """Create and activate an LLM call. Uses the current turn if available.
+
+    If no turn is active, returns a disconnected LLM (no contextvar set).
+    """
     turn = get_current_turn()
     if turn is not None:
         llm = turn.llm(
@@ -432,7 +439,7 @@ def start_llm(
             system_instructions=system_instructions,
         )
     else:
-        llm = LLM(
+        return LLM(
             model=model,
             provider_name=provider_name,
             system_instructions=system_instructions or [],
