@@ -1,6 +1,6 @@
-import {InMemoryTraceServer} from '../../inMemoryTraceServer';
-import {commonPatchGoogleGenAI} from '../../integrations/googleGenAI';
-import {initWithCustomTraceServer} from '../clientMock';
+import {InMemoryTraceServer} from '../../inMemoryTraceServer.js';
+import {commonPatchGoogleGenAI} from '../../integrations/googleGenAI.js';
+import {initWithCustomTraceServer} from '../clientMock.js';
 
 function createMockGoogleGenAI() {
   const mockGenerateContent = jest

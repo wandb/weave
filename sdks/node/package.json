@@ -56,7 +56,8 @@
         },
         "moduleNameMapper": {
           "^weave$": "<rootDir>/src/index.ts",
-          "^weave/(.+)$": "<rootDir>/src/$1"
+          "^weave/(.+)$": "<rootDir>/src/$1",
+          "^(\\.{1,2}/.*)\\.js$": "$1"
         }
       },
       {
@@ -74,7 +75,8 @@
         },
         "moduleNameMapper": {
           "^weave$": "<rootDir>/src/index.ts",
-          "^weave/(.+)$": "<rootDir>/src/$1"
+          "^weave/(.+)$": "<rootDir>/src/$1",
+          "^(\\.{1,2}/.*)\\.js$": "$1"
         }
       },
       {
@@ -97,7 +99,8 @@
         },
         "moduleNameMapper": {
           "^weave$": "<rootDir>/src/index.ts",
-          "^weave/(.*)$": "<rootDir>/src/$1"
+          "^weave/(.*)$": "<rootDir>/src/$1",
+          "^(\\.{1,2}/.*)\\.js$": "$1"
         }
       }
     ],

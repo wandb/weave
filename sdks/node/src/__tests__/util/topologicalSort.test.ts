@@ -1,4 +1,4 @@
-import {topologicalSortChildrenFirst} from '../../utils/topologicalSort';
+import {topologicalSortChildrenFirst} from '../../utils/topologicalSort.js';
 
 // Helper: assert that every parent appears after all its children in the result.
 function assertChildrenBeforeParents(

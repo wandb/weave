@@ -1,8 +1,8 @@
 import {withAttributes, op} from 'weave';
 
-import {initWithCustomTraceServer} from './clientMock';
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
-import {Settings} from '../settings';
+import {initWithCustomTraceServer} from './clientMock.js';
+import {InMemoryTraceServer} from '../inMemoryTraceServer.js';
+import {Settings} from '../settings.js';
 
 describe('attributes context', () => {
   const projectId = 'test-project';

@@ -2,11 +2,11 @@
  * Tests for Dataset and Table lazy loading
  */
 
-import {Dataset} from '../dataset';
-import {ObjectRef} from '../weaveObject';
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
-import {initWithCustomTraceServer} from './clientMock';
-import {requireGlobalClient} from '../clientApi';
+import {Dataset} from '../dataset.js';
+import {ObjectRef} from '../weaveObject.js';
+import {InMemoryTraceServer} from '../inMemoryTraceServer.js';
+import {initWithCustomTraceServer} from './clientMock.js';
+import {requireGlobalClient} from '../clientApi.js';
 
 describe('Dataset', () => {
   let traceServer: InMemoryTraceServer;

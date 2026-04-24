@@ -1,5 +1,5 @@
-import {Netrc} from '../../utils/netrc';
-import {getApiKey, getWandbConfigs} from '../../wandb/settings';
+import {Netrc} from '../../utils/netrc.js';
+import {getApiKey, getWandbConfigs} from '../../wandb/settings.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';

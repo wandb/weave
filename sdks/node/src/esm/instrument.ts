@@ -18,14 +18,14 @@ import {
   symESMInstrumentations,
   ESMInstrumentation,
   symESMCache,
-} from '../integrations/instrumentations';
-import {requirePackageJson} from '../utils/npmModuleUtils';
+} from '../integrations/instrumentations.js';
+import {requirePackageJson} from '../utils/npmModuleUtils.js';
 import semifies from 'semifies';
 
 // Side-effect import — populates the instrumentation registry that
 // `instrumentations.ts` exposes on `globalThis`. Must evaluate before the
 // loader hook below starts consulting that registry for matching modules.
-import '../integrations/hooks';
+import '../integrations/hooks.js';
 
 const {registerOptions, waitForAllMessagesAcknowledged} =
   createAddHookMessageChannel();

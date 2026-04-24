@@ -5,8 +5,8 @@ import semifies from 'semifies';
 import instrumentations, {
   CacheEntry,
   CJSInstrumentation,
-} from '../integrations/instrumentations';
-import {requirePackageJson} from './npmModuleUtils';
+} from '../integrations/instrumentations.js';
+import {requirePackageJson} from './npmModuleUtils.js';
 
 const parse: (filePath: string) => {
   name: string;

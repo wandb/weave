@@ -1,9 +1,9 @@
-import {Call, InternalCall} from './call';
-import {getGlobalClient} from './clientApi';
-import {TRACE_CALL_EMOJI} from './constants';
-import {Op, OpOptions, OpRef, CallMethod} from './opType';
-import {getGlobalDomain} from './urls';
-import {warnOnce} from './utils/warnOnce';
+import {Call, InternalCall} from './call.js';
+import {getGlobalClient} from './clientApi.js';
+import {TRACE_CALL_EMOJI} from './constants.js';
+import {Op, OpOptions, OpRef, CallMethod} from './opType.js';
+import {getGlobalDomain} from './urls.js';
+import {warnOnce} from './utils/warnOnce.js';
 
 export interface MethodDecoratorContext {
   kind: 'method';

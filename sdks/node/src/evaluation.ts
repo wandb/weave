@@ -1,10 +1,10 @@
 import cliProgress from 'cli-progress';
-import {Dataset, DatasetRow} from './dataset';
-import {ColumnMapping, mapArgs} from './fn';
-import {isMedia} from './media';
-import {op} from './op';
-import {Op, getOpName} from './opType';
-import {WeaveObject, WeaveObjectParameters} from './weaveObject';
+import {Dataset, DatasetRow} from './dataset.js';
+import {ColumnMapping, mapArgs} from './fn.js';
+import {isMedia} from './media.js';
+import {op} from './op.js';
+import {Op, getOpName} from './opType.js';
+import {WeaveObject, WeaveObjectParameters} from './weaveObject.js';
 
 const PROGRESS_BAR = false;
 

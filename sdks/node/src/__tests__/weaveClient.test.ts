@@ -1,10 +1,10 @@
 import {ReadableStream} from 'stream/web';
-import {Api as TraceServerApi} from '../generated/traceServerApi';
-import {StringPrompt} from '../prompt';
-import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry';
-import {WandbServerApi} from '../wandb/wandbServerApi';
-import {WeaveClient} from '../weaveClient';
-import {ObjectRef} from '../weaveObject';
+import {Api as TraceServerApi} from '../generated/traceServerApi.js';
+import {StringPrompt} from '../prompt.js';
+import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry.js';
+import {WandbServerApi} from '../wandb/wandbServerApi.js';
+import {WeaveClient} from '../weaveClient.js';
+import {ObjectRef} from '../weaveObject.js';
 
 // Mock the TraceServerApi and WandbServerApi
 jest.mock('../generated/traceServerApi');

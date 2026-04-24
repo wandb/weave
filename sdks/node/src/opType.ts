@@ -1,6 +1,6 @@
-import {Call} from './call';
-import {getGlobalDomain} from './urls';
-import {WeaveObject} from './weaveObject';
+import {Call} from './call.js';
+import {getGlobalDomain} from './urls.js';
+import {WeaveObject} from './weaveObject.js';
 
 export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
 

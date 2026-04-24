@@ -16,13 +16,13 @@
  * await ev.logSummary();
  */
 
-import {WeaveObject, WeaveObjectParameters} from './weaveObject';
-import {Dataset, DatasetRow} from './dataset';
-import {op} from './op';
-import {requireGlobalClient} from './clientApi';
-import {InternalCall} from './call';
-import {CallStackEntry, WeaveClient} from './weaveClient';
-import {Op, OpRef, ParameterNamesOption} from './opType';
+import {WeaveObject, WeaveObjectParameters} from './weaveObject.js';
+import {Dataset, DatasetRow} from './dataset.js';
+import {op} from './op.js';
+import {requireGlobalClient} from './clientApi.js';
+import {InternalCall} from './call.js';
+import {CallStackEntry, WeaveClient} from './weaveClient.js';
+import {Op, OpRef, ParameterNamesOption} from './opType.js';
 import {uuidv7} from 'uuidv7';
 
 // ============================================================================

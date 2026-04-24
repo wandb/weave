@@ -2,8 +2,8 @@ import {AsyncLocalStorage} from 'async_hooks';
 import * as fs from 'fs';
 import {uuidv7} from 'uuidv7';
 
-import {MAX_OBJECT_NAME_LENGTH} from './constants';
-import {computeDigest} from './digest';
+import {MAX_OBJECT_NAME_LENGTH} from './constants.js';
+import {computeDigest} from './digest.js';
 import {
   CallSchema,
   CallsQueryReq,
@@ -13,7 +13,7 @@ import {
   SortBy,
   StartedCallSchemaForInsert,
   Api as TraceServerApi,
-} from './generated/traceServerApi';
+} from './generated/traceServerApi.js';
 import {
   AudioType,
   DEFAULT_AUDIO_TYPE,
@@ -21,7 +21,7 @@ import {
   ImageType,
   isWeaveAudio,
   isWeaveImage,
-} from './media';
+} from './media.js';
 import {
   Op,
   OpRef,
@@ -29,20 +29,20 @@ import {
   getOpName,
   getOpWrappedFunction,
   isOp,
-} from './opType';
-import {Settings} from './settings';
-import {Table, TableRef, TableRowRef} from './table';
-import {linkAssetToRegistry} from './traceServerBindings/linkAssetToRegistry';
+} from './opType.js';
+import {Settings} from './settings.js';
+import {Table, TableRef, TableRowRef} from './table.js';
+import {linkAssetToRegistry} from './traceServerBindings/linkAssetToRegistry.js';
 import type {
   LinkAssetToRegistryReq,
   LinkAssetToRegistryRes,
-} from './traceServerBindings/linkAssetToRegistry';
-import {packageVersion} from './utils/userAgent';
-import {WandbServerApi} from './wandb/wandbServerApi';
-import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
-import {Call, CallState, InternalCall} from './call';
-import {CallRef} from './refs';
-import type {Prompt} from './prompt';
+} from './traceServerBindings/linkAssetToRegistry.js';
+import {packageVersion} from './utils/userAgent.js';
+import {WandbServerApi} from './wandb/wandbServerApi.js';
+import {ObjectRef, WeaveObject, getClassChain} from './weaveObject.js';
+import {Call, CallState, InternalCall} from './call.js';
+import {CallRef} from './refs.js';
+import type {Prompt} from './prompt.js';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 const DEFAULT_GET_CALLS_LIMIT = 1000;
@@ -440,7 +440,7 @@ export class WeaveClient {
     const t = val?._type;
 
     if (t == 'StringPrompt') {
-      const {StringPrompt} = await import('./prompt');
+      const {StringPrompt} = await import('./prompt.js');
 
       const {content, description, name} = val;
 
@@ -456,7 +456,7 @@ export class WeaveClient {
     }
 
     if (t == 'MessagesPrompt') {
-      const {MessagesPrompt} = await import('./prompt');
+      const {MessagesPrompt} = await import('./prompt.js');
 
       const {description, messages, name} = val;
 
@@ -473,7 +473,7 @@ export class WeaveClient {
 
     if (t == 'Dataset') {
       // Avoid circular dependency
-      const {Dataset} = await import('./dataset');
+      const {Dataset} = await import('./dataset.js');
 
       const {description, rows, name} = val;
 

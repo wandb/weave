@@ -1,5 +1,5 @@
-import {init, login} from '../../clientApi';
-import {Table} from '../../table';
+import {init, login} from '../../clientApi.js';
+import {Table} from '../../table.js';
 
 describe.skip('Table', () => {
   beforeEach(async () => {

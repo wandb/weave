@@ -1,5 +1,5 @@
-import {init, login} from '../../clientApi';
-import {Dataset} from '../../dataset';
+import {init, login} from '../../clientApi.js';
+import {Dataset} from '../../dataset.js';
 
 describe.skip('Dataset', () => {
   beforeEach(async () => {

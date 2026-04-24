@@ -1,4 +1,4 @@
-import {parseTableRefUri} from './uriParser';
+import {parseTableRefUri} from './uriParser.js';
 
 export class TableRef {
   constructor(
@@ -73,7 +73,7 @@ export class Table<R extends TableRow = TableRow> {
 
     const tableRef = await this.__savedRef;
 
-    const {requireGlobalClient} = await import('./clientApi');
+    const {requireGlobalClient} = await import('./clientApi.js');
     const client = requireGlobalClient();
 
     // Fetch table data from server

@@ -1,4 +1,4 @@
-import {globalSingleton} from './globalSingleton';
+import {globalSingleton} from './globalSingleton.js';
 
 // Deduped across CJS/ESM module copies so a dual-loaded SDK does not emit the
 // same warning twice.

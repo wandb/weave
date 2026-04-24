@@ -1,4 +1,4 @@
-import {globalSingleton} from './utils/globalSingleton';
+import {globalSingleton} from './utils/globalSingleton.js';
 
 export const defaultHost = 'api.wandb.ai';
 export const defaultDomain = 'wandb.ai';

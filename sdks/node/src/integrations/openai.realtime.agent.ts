@@ -28,11 +28,14 @@
  * ```
  */
 
-import {getGlobalClient} from '../clientApi';
+import {getGlobalClient} from '../clientApi.js';
 import {uuidv7} from 'uuidv7';
-import type {RealtimeSessionLike} from './openai.realtime.agent.types';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {globalSingleton} from '../utils/globalSingleton';
+import type {RealtimeSessionLike} from './openai.realtime.agent.types.js';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+} from './instrumentations.js';
+import {globalSingleton} from '../utils/globalSingleton.js';
 
 // ============================================================================
 // Helpers

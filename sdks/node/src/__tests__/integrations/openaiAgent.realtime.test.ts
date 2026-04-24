@@ -1,7 +1,7 @@
 import {EventEmitter} from 'events';
-import {WeaveRealtimeTracingAdapter} from '../../integrations/openai.realtime.agent';
-import {InMemoryTraceServer} from '../../inMemoryTraceServer';
-import {initWithCustomTraceServer} from '../clientMock';
+import {WeaveRealtimeTracingAdapter} from '../../integrations/openai.realtime.agent.js';
+import {InMemoryTraceServer} from '../../inMemoryTraceServer.js';
+import {initWithCustomTraceServer} from '../clientMock.js';
 
 function makeMockSession() {
   const session = new EventEmitter() as any;

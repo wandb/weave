@@ -1,4 +1,4 @@
-import {packageVersion} from './packageVersion';
+import {packageVersion} from './packageVersion.js';
 
 export {packageVersion};
 

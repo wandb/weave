@@ -1,8 +1,8 @@
-import {init, requireGlobalClient, login} from '../clientApi';
-import {getWandbConfigs} from '../wandb/settings';
-import {WandbServerApi} from '../wandb/wandbServerApi';
-import {Api as TraceServerApi} from '../generated/traceServerApi';
-import {Netrc} from '../utils/netrc';
+import {init, requireGlobalClient, login} from '../clientApi.js';
+import {getWandbConfigs} from '../wandb/settings.js';
+import {WandbServerApi} from '../wandb/wandbServerApi.js';
+import {Api as TraceServerApi} from '../generated/traceServerApi.js';
+import {Netrc} from '../utils/netrc.js';
 
 jest.mock('../wandb/wandbServerApi');
 jest.mock('../wandb/settings');

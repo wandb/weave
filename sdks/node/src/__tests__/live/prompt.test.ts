@@ -1,7 +1,7 @@
-import {MessagesPrompt, StringPrompt} from '../../prompt';
-import {init} from '../../clientApi';
+import {MessagesPrompt, StringPrompt} from '../../prompt.js';
+import {init} from '../../clientApi.js';
 import {WandbServerApi} from 'weave/wandb/wandbServerApi';
-import {Api as TraceServerApi} from '../../generated/traceServerApi';
+import {Api as TraceServerApi} from '../../generated/traceServerApi.js';
 
 jest.mock('../../wandb/wandbServerApi');
 

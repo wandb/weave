@@ -1,5 +1,5 @@
-import {defaultHost, getUrls} from '../urls';
-import {Netrc} from '../utils/netrc';
+import {defaultHost, getUrls} from '../urls.js';
+import {Netrc} from '../utils/netrc.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';

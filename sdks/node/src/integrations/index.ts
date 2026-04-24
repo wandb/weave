@@ -1,9 +1,12 @@
-export {wrapOpenAI} from './openai';
-export {wrapGoogleGenAI} from './googleGenAI';
+export {wrapOpenAI} from './openai.js';
+export {wrapGoogleGenAI} from './googleGenAI.js';
 export {
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
-} from './openai.agent';
-export {patchRealtimeSession} from './openai.realtime.agent';
-export {createOtelExtension, PiCodingAgentOtelAdapter} from './piCodingAgent';
-export type {OtelExtensionOptions} from './piCodingAgent';
+} from './openai.agent.js';
+export {patchRealtimeSession} from './openai.realtime.agent.js';
+export {
+  createOtelExtension,
+  PiCodingAgentOtelAdapter,
+} from './piCodingAgent.js';
+export type {OtelExtensionOptions} from './piCodingAgent.js';

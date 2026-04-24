@@ -1,6 +1,9 @@
-import {op} from '../op';
-import {OpOptions, StreamReducer} from '../opType';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {op} from '../op.js';
+import {OpOptions, StreamReducer} from '../opType.js';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+} from './instrumentations.js';
 
 const weaveGeminiModelHint = Symbol.for('_weave_gemini_model_hint');
 const weaveGeminiModelsWrapped = Symbol.for('_weave_gemini_models_wrapped');

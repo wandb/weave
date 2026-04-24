@@ -1,5 +1,5 @@
-import {WeaveClient} from './weaveClient';
-import {ObjectRef, WeaveObject, WeaveObjectParameters} from './weaveObject';
+import {WeaveClient} from './weaveClient.js';
+import {ObjectRef, WeaveObject, WeaveObjectParameters} from './weaveObject.js';
 
 export class Prompt extends WeaveObject {
   constructor(parameters: WeaveObjectParameters) {

@@ -1,5 +1,5 @@
-import {ContentType} from '../generated/traceServerApi';
-import type {Api as TraceServerApi} from '../generated/traceServerApi';
+import {ContentType} from '../generated/traceServerApi.js';
+import type {Api as TraceServerApi} from '../generated/traceServerApi.js';
 
 export const LINK_TO_REGISTRY_PATH = '/link_to_registry';
 

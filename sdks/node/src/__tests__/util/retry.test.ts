@@ -1,4 +1,4 @@
-import {createFetchWithRetry} from '../../utils/retry';
+import {createFetchWithRetry} from '../../utils/retry.js';
 
 describe('retry', () => {
   let originalFetch: typeof global.fetch;

@@ -1,5 +1,5 @@
-import {init, login} from '../../clientApi';
-import {Dataset, op, weaveAudio, weaveImage} from '../../index';
+import {init, login} from '../../clientApi.js';
+import {Dataset, op, weaveAudio, weaveImage} from '../../index.js';
 
 describe.skip('Publishing Various Data Types', () => {
   beforeEach(async () => {

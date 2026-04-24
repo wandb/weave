@@ -5,11 +5,11 @@ import {
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
 
-import {PiCodingAgentOtelAdapter} from '../../integrations/piCodingAgent';
+import {PiCodingAgentOtelAdapter} from '../../integrations/piCodingAgent.js';
 import type {
   PiExtensionApi,
   PiExtensionContext,
-} from '../../integrations/piCodingAgent.types';
+} from '../../integrations/piCodingAgent.types.js';
 
 // ---------------------------------------------------------------------------
 // Test helpers

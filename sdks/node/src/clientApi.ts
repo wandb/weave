@@ -1,13 +1,13 @@
-import {Api as TraceServerApi} from './generated/traceServerApi';
-import {makeSettings, SettingsInit} from './settings';
-import {defaultHost, getUrls, setGlobalDomain} from './urls';
-import {ConcurrencyLimiter} from './utils/concurrencyLimit';
-import {Netrc} from './utils/netrc';
-import {createFetchWithRetry} from './utils/retry';
-import {getWandbConfigs} from './wandb/settings';
-import {WandbServerApi} from './wandb/wandbServerApi';
-import {CallStackEntry, WeaveClient} from './weaveClient';
-import {globalSingleton} from './utils/globalSingleton';
+import {Api as TraceServerApi} from './generated/traceServerApi.js';
+import {makeSettings, SettingsInit} from './settings.js';
+import {defaultHost, getUrls, setGlobalDomain} from './urls.js';
+import {ConcurrencyLimiter} from './utils/concurrencyLimit.js';
+import {Netrc} from './utils/netrc.js';
+import {createFetchWithRetry} from './utils/retry.js';
+import {getWandbConfigs} from './wandb/settings.js';
+import {WandbServerApi} from './wandb/wandbServerApi.js';
+import {CallStackEntry, WeaveClient} from './weaveClient.js';
+import {globalSingleton} from './utils/globalSingleton.js';
 
 // Held behind a globalThis-backed container so that a dual-package-hazard load
 // (same module loaded as both CJS and ESM) resolves to a single shared client

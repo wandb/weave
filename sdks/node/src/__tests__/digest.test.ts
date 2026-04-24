@@ -1,4 +1,4 @@
-import {stringifyPythonDumps} from '../digest';
+import {stringifyPythonDumps} from '../digest.js';
 
 describe('stringifyPythonDumps', () => {
   test('Basic types', async () => {

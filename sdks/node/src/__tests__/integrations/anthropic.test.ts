@@ -1,6 +1,6 @@
-import {InMemoryTraceServer} from '../../inMemoryTraceServer';
-import {commonPatchAnthropic} from '../../integrations/anthropic';
-import {initWithCustomTraceServer} from '../clientMock';
+import {InMemoryTraceServer} from '../../inMemoryTraceServer.js';
+import {commonPatchAnthropic} from '../../integrations/anthropic.js';
+import {initWithCustomTraceServer} from '../clientMock.js';
 
 // Helper function to get calls
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {

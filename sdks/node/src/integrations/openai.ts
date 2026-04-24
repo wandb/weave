@@ -1,12 +1,15 @@
-import {weaveImage} from '../media';
-import {op} from '../op';
-import {OpOptions} from '../opType';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {getGlobalClient} from '../clientApi';
-import {InternalCall} from '../call';
-import {WeaveClient} from '../weaveClient';
-import {warnOnce} from '../utils/warnOnce';
-import {getCallStackFromOpenAIAgents} from './openai.agent';
+import {weaveImage} from '../media.js';
+import {op} from '../op.js';
+import {OpOptions} from '../opType.js';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+} from './instrumentations.js';
+import {getGlobalClient} from '../clientApi.js';
+import {InternalCall} from '../call.js';
+import {WeaveClient} from '../weaveClient.js';
+import {warnOnce} from '../utils/warnOnce.js';
+import {getCallStackFromOpenAIAgents} from './openai.agent.js';
 
 /**
  * Wraps a function to run with OpenAI Agents call stack if available.
@@ -183,7 +186,7 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
   };
 }
 
-import {StreamReducer} from '../opType';
+import {StreamReducer} from '../opType.js';
 
 export type Response = {
   id: string;

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import {Netrc} from '../../utils/netrc';
+import {Netrc} from '../../utils/netrc.js';
 
 jest.mock('fs');
 jest.mock('os');

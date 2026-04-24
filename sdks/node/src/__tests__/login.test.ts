@@ -1,7 +1,7 @@
-import {login} from '../clientApi';
-import {Api as TraceServerApi} from '../generated/traceServerApi';
-import {getUrls} from '../urls';
-import {Netrc} from '../utils/netrc';
+import {login} from '../clientApi.js';
+import {Api as TraceServerApi} from '../generated/traceServerApi.js';
+import {getUrls} from '../urls.js';
+import {Netrc} from '../utils/netrc.js';
 
 // Mock dependencies
 jest.mock('../utils/netrc');

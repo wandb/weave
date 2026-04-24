@@ -1,6 +1,6 @@
-import {init, login} from '../../clientApi';
-import {op} from '../../op';
-import {WeaveObject} from '../../weaveObject';
+import {init, login} from '../../clientApi.js';
+import {op} from '../../op.js';
+import {WeaveObject} from '../../weaveObject.js';
 
 class ExampleObject extends WeaveObject {
   constructor(

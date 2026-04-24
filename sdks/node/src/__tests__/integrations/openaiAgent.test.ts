@@ -1,6 +1,6 @@
-import {InMemoryTraceServer} from '../../inMemoryTraceServer';
-import {createOpenAIAgentsTracingProcessor} from '../../integrations/openai.agent';
-import {initWithCustomTraceServer} from '../clientMock';
+import {InMemoryTraceServer} from '../../inMemoryTraceServer.js';
+import {createOpenAIAgentsTracingProcessor} from '../../integrations/openai.agent.js';
+import {initWithCustomTraceServer} from '../clientMock.js';
 
 describe('OpenAI Agents Integration', () => {
   let inMemoryTraceServer: InMemoryTraceServer;

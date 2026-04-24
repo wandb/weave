@@ -38,10 +38,10 @@ import {
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
 
-import {getGlobalClient} from '../clientApi';
-import {getWandbConfigs} from '../wandb/settings';
+import {getGlobalClient} from '../clientApi.js';
+import {getWandbConfigs} from '../wandb/settings.js';
 
-import {GEN_AI_ATTR, GEN_AI_EVENT, OTEL_ATTR} from './common/genai';
+import {GEN_AI_ATTR, GEN_AI_EVENT, OTEL_ATTR} from './common/genai.js';
 
 import type {
   PiAgentMessage,
@@ -51,7 +51,7 @@ import type {
   PiExtensionDefinition,
   PiExtensionEvent,
   PiModel,
-} from './piCodingAgent.types';
+} from './piCodingAgent.types.js';
 
 // ---------------------------------------------------------------------------
 // Options
@@ -606,4 +606,4 @@ export type {
   PiExtensionDefinition,
   PiExtensionContext,
   PiModel,
-} from './piCodingAgent.types';
+} from './piCodingAgent.types.js';

@@ -1,4 +1,4 @@
-import {weaveAudio, weaveImage} from '../media';
+import {weaveAudio, weaveImage} from '../media.js';
 
 describe('media', () => {
   test('logging weaveImage', () => {

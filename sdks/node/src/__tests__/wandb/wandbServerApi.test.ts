@@ -1,4 +1,4 @@
-import {WandbServerApi} from '../../wandb/wandbServerApi';
+import {WandbServerApi} from '../../wandb/wandbServerApi.js';
 
 const originalFetch = global.fetch;
 const api = new WandbServerApi('https://api.wandb.ai', 'abcdef123456');

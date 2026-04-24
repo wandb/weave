@@ -1,7 +1,7 @@
-import {requireGlobalClient} from './clientApi';
-import {isOp} from './op';
-import {getGlobalDomain} from './urls';
-import {parseWeaveUri} from './uriParser';
+import {requireGlobalClient} from './clientApi.js';
+import {isOp} from './op.js';
+import {getGlobalDomain} from './urls.js';
+import {parseWeaveUri} from './uriParser.js';
 
 export interface Callable {}
 

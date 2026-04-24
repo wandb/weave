@@ -1,6 +1,9 @@
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {op} from '../op';
-import {OpOptions, StreamReducer} from '../opType';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+} from './instrumentations.js';
+import {op} from '../op.js';
+import {OpOptions, StreamReducer} from '../opType.js';
 
 type Message = {
   id: string;

@@ -14,12 +14,15 @@
  * ```
  */
 
-import {getGlobalClient} from '../clientApi';
-import {CallStack} from '../weaveClient';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {getGlobalClient} from '../clientApi.js';
+import {CallStack} from '../weaveClient.js';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+} from './instrumentations.js';
 import {uuidv7} from 'uuidv7';
-import {topologicalSortChildrenFirst} from '../utils/topologicalSort';
-import {globalSingleton} from '../utils/globalSingleton';
+import {topologicalSortChildrenFirst} from '../utils/topologicalSort.js';
+import {globalSingleton} from '../utils/globalSingleton.js';
 import type {
   Span,
   Trace,
@@ -30,7 +33,7 @@ import type {
   HandoffSpanData,
   GuardrailSpanData,
   CustomSpanData,
-} from './openai.agent.types';
+} from './openai.agent.types.js';
 
 // ============================================================================
 // Helper Functions

@@ -1,4 +1,4 @@
-import {CallStackEntry} from './weaveClient';
+import {CallStackEntry} from './weaveClient.js';
 
 /**
  * Represents a summary object with string keys and any type of values.

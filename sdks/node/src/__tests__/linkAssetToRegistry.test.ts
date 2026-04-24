@@ -1,10 +1,10 @@
-import {ContentType} from '../generated/traceServerApi';
-import type {Api as TraceServerApi} from '../generated/traceServerApi';
+import {ContentType} from '../generated/traceServerApi.js';
+import type {Api as TraceServerApi} from '../generated/traceServerApi.js';
 import {
   LINK_TO_REGISTRY_PATH,
   linkAssetToRegistry,
-} from '../traceServerBindings/linkAssetToRegistry';
-import type {LinkAssetToRegistryReq} from '../traceServerBindings/linkAssetToRegistry';
+} from '../traceServerBindings/linkAssetToRegistry.js';
+import type {LinkAssetToRegistryReq} from '../traceServerBindings/linkAssetToRegistry.js';
 
 function makeReq(
   overrides: Partial<LinkAssetToRegistryReq> = {}

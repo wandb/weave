@@ -2,10 +2,10 @@
  * Unit tests for EvaluationLogger (Imperative Evaluation)
  */
 
-import {EvaluationLogger} from '../evaluationLogger';
-import {WeaveObject} from '../weaveObject';
-import {initWithCustomTraceServer} from './clientMock';
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
+import {EvaluationLogger} from '../evaluationLogger.js';
+import {WeaveObject} from '../weaveObject.js';
+import {initWithCustomTraceServer} from './clientMock.js';
+import {InMemoryTraceServer} from '../inMemoryTraceServer.js';
 
 // Helper function to get calls from trace server
 async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {

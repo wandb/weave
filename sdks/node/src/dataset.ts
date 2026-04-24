@@ -1,6 +1,6 @@
-import {requireGlobalClient} from './clientApi';
-import {Table} from './table';
-import {ObjectRef, WeaveObject, WeaveObjectParameters} from './weaveObject';
+import {requireGlobalClient} from './clientApi.js';
+import {Table} from './table.js';
+import {ObjectRef, WeaveObject, WeaveObjectParameters} from './weaveObject.js';
 
 interface DatasetParameters<R extends DatasetRow>
   extends WeaveObjectParameters {

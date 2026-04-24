@@ -1,7 +1,7 @@
-import {init, login} from '../../clientApi';
-import {CallableObject} from '../../fn';
-import {op} from '../../op';
-import {WeaveObjectParameters} from '../../weaveObject';
+import {init, login} from '../../clientApi.js';
+import {CallableObject} from '../../fn.js';
+import {op} from '../../op.js';
+import {WeaveObjectParameters} from '../../weaveObject.js';
 
 interface ParametrizedFunctionOptions extends WeaveObjectParameters {
   magicNumber?: number;

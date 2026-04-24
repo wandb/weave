@@ -1,13 +1,13 @@
-import {Api as TraceServerApi} from '../../generated/traceServerApi';
+import {Api as TraceServerApi} from '../../generated/traceServerApi.js';
 import {
   makeOpenAIImagesGenerateOp,
   openAIStreamReducer,
   wrapOpenAI,
-} from '../../integrations/openai';
-import {isWeaveImage} from '../../media';
-import {WandbServerApi} from '../../wandb/wandbServerApi';
-import {WeaveClient} from '../../weaveClient';
-import {makeAPIPromiseShim} from '../openaiMock';
+} from '../../integrations/openai.js';
+import {isWeaveImage} from '../../media.js';
+import {WandbServerApi} from '../../wandb/wandbServerApi.js';
+import {WeaveClient} from '../../weaveClient.js';
+import {makeAPIPromiseShim} from '../openaiMock.js';
 
 // Mock WeaveClient dependencies
 jest.mock('../../generated/traceServerApi');
