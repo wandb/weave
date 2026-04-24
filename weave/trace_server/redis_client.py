@@ -42,6 +42,9 @@ def get_redis_client() -> redis.Redis | None:
             socket_timeout=REDIS_SOCKET_TIMEOUT_SECS,
         )
 
+    if not parsed.hostname:
+        raise ValueError(f"WEAVE_REDIS_URL is missing a hostname: {url!r}")
+
     sentinel = Sentinel(
         [(parsed.hostname, parsed.port or 26379)],
         socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECS,
