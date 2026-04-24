@@ -237,6 +237,7 @@ class AgentSearchRes(BaseModel):
     """Response from a full-text search across agent messages."""
 
     results: list[AgentSearchConversationResult]
+    total_conversations: int = 0
 
 
 class AgentChatMessage(BaseModel):

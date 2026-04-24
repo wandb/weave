@@ -211,7 +211,7 @@ class AgentQueryHandler:
             key=lambda c: c.last_activity,
             reverse=True,
         )
-        return AgentSearchRes(results=results)
+        return AgentSearchRes(results=results, total_conversations=len(results))
 
     # ------------------------------------------------------------------
     # Internal: spans-for-one-trace with chat projection

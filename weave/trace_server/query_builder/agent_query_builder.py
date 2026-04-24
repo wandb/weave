@@ -152,6 +152,10 @@ _SPANS_LIST_EXCLUDE = frozenset(
         "content_refs",
         "artifact_refs",
         "object_refs",
+        # The list endpoint is a lightweight table projection. Custom attrs
+        # remain queryable/filterable server-side, but the UI does not need to
+        # hydrate arbitrary Map payloads for every span row.
+        "custom_attrs_string",
         "request_temperature",
         "request_max_tokens",
         "request_top_p",
@@ -367,6 +371,16 @@ def _agent_versions_where(pb: ParamBuilder, req: AgentVersionsQueryReq) -> str:
     return f"project_id = {pid} AND agent_name = {aname}"
 
 
+def _normalize_search_roles(roles: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for role in roles:
+        if role == "tool":
+            normalized.extend(["tool_call", "tool_result"])
+        else:
+            normalized.append(role)
+    return list(dict.fromkeys(normalized))
+
+
 def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
     """Build the WHERE clause for a search against the messages table."""
     pid_slot = pb.add(req.project_id, param_type="String")
@@ -376,7 +390,9 @@ def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
         f"content LIKE {content_slot}",
     ]
     if req.roles:
-        roles_slot = pb.add(req.roles, param_type="Array(String)")
+        roles_slot = pb.add(
+            _normalize_search_roles(req.roles), param_type="Array(String)"
+        )
         conditions.append(f"role IN {roles_slot}")
     if req.agent_name:
         agent_slot = pb.add(req.agent_name, param_type="String")

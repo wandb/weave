@@ -643,6 +643,33 @@ class TestMakeMessageSearchQuery:
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_tool_role_alias_expands_to_tool_message_roles(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_message_search_query(
+            pb,
+            AgentSearchReq(project_id="p1", query="test", roles=["tool"]),
+        )
+
+        expected = """
+            SELECT conversation_id, conversation_name, agent_name,
+                   span_id, trace_id, role, content,
+                   lower(hex(content_digest)) AS content_digest, started_at
+            FROM messages
+            WHERE project_id = {genai_0:String}
+              AND content LIKE {genai_1:String}
+              AND role IN {genai_2:Array(String)}
+            ORDER BY started_at DESC
+            LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "%test%",
+            "genai_2": ["tool_call", "tool_result"],
+            "genai_3": 20,
+            "genai_4": 0,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
     def test_limit_rejected_when_above_max(self) -> None:
         with pytest.raises(ValidationError):
             AgentSearchReq(project_id="p1", query="x", limit=5000)

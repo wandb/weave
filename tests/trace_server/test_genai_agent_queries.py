@@ -565,6 +565,13 @@ def test_message_search_indexes_tool_calls(ch_server):
     assert len(res_result.results) == 1
     assert res_result.results[0].matched_messages[0].role == "tool_result"
 
+    # UI/back-compat alias: "tool" should include both persisted tool roles.
+    res_tool_alias = ch_server.agent_search(
+        AgentSearchReq(project_id=project_id, query="Reykjavík", roles=["tool"])
+    )
+    assert len(res_tool_alias.results) == 1
+    assert res_tool_alias.results[0].matched_messages[0].role == "tool_call"
+
 
 # ---------------------------------------------------------------------------
 # Test: Query DSL end-to-end
