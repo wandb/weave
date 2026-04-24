@@ -67,7 +67,7 @@ class _SpanBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
-class Tool(BaseModel):
+class Tool(_SpanBase):
     """One tool execution. Maps to an execute_tool OTel span."""
 
     name: str = ""
