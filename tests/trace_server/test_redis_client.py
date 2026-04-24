@@ -13,10 +13,10 @@ def test_no_url_returns_none(monkeypatch):
 
 def test_client_resolution_from_url(monkeypatch):
     """Direct URL -> redis.from_url; ?master= URL -> Sentinel.master_for (port defaults to 26379)."""
-    timeouts = dict(
-        socket_connect_timeout=redis_client.REDIS_CONNECT_TIMEOUT_SECS,
-        socket_timeout=redis_client.REDIS_SOCKET_TIMEOUT_SECS,
-    )
+    timeouts = {
+        "socket_connect_timeout": redis_client.REDIS_CONNECT_TIMEOUT_SECS,
+        "socket_timeout": redis_client.REDIS_SOCKET_TIMEOUT_SECS,
+    }
 
     # Direct URL path.
     with patch.object(redis_client.redis, "from_url") as mock_from_url:
@@ -35,9 +35,7 @@ def test_client_resolution_from_url(monkeypatch):
             "WEAVE_REDIS_URL", "redis://redis.example:26379?master=gorilla"
         )
         client = redis_client.get_redis_client()
-        mock_sentinel.assert_called_once_with(
-            [("redis.example", 26379)], **timeouts
-        )
+        mock_sentinel.assert_called_once_with([("redis.example", 26379)], **timeouts)
         mock_sentinel.return_value.master_for.assert_called_once_with(
             "gorilla", decode_responses=True, **timeouts
         )
