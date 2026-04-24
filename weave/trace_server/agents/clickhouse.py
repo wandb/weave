@@ -106,7 +106,7 @@ class AgentQueryHandler:
         If `req.group_by` is empty, returns raw span rows in `spans`.
         Otherwise, groups by the supplied refs and returns aggregate rows
         in `groups` (with the same fixed aggregate bundle regardless of
-        which columns / custom_attrs are grouped on).
+        which columns / custom attributes are grouped on).
         """
         total, rows = self._run_paginated(
             make_spans_count_query, make_spans_list_query, req

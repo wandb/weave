@@ -149,7 +149,7 @@ class AgentSpanCHInsertable(BaseModel):
     object_refs: list[str] = Field(default_factory=list)
 
     # [Weave] custom attributes — typed Maps for vendor/user attrs not in schema
-    custom_attrs: dict[str, str] = Field(default_factory=dict)
+    custom_attrs_string: dict[str, str] = Field(default_factory=dict)
     custom_attrs_int: dict[str, int] = Field(default_factory=dict)
     custom_attrs_float: dict[str, float] = Field(default_factory=dict)
     custom_attrs_bool: dict[str, bool] = Field(default_factory=dict)

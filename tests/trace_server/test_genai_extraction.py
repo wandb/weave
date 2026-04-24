@@ -157,7 +157,7 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.content_refs == ["ref1", "ref2"]
 
     # Custom attrs spill into typed maps
-    assert result.custom_attrs["my.custom.string"] == "hello"
+    assert result.custom_attrs_string["my.custom.string"] == "hello"
     assert result.custom_attrs_int["my.custom.int"] == 42
     assert result.custom_attrs_float["my.custom.float"] == 3.14
 
@@ -194,7 +194,7 @@ def test_extract_custom_attrs_caps_total_entries() -> None:
     result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
 
     total = (
-        len(result.custom_attrs)
+        len(result.custom_attrs_string)
         + len(result.custom_attrs_int)
         + len(result.custom_attrs_float)
     )
@@ -213,7 +213,7 @@ def test_extract_custom_attrs_truncates_large_string_values() -> None:
         project_id="p1",
     )
 
-    stored = result.custom_attrs["lorem.big_string"]
+    stored = result.custom_attrs_string["lorem.big_string"]
     assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_BYTES
     assert stored.endswith("bytes]")
     assert "truncated from" in stored
@@ -232,13 +232,13 @@ def test_extract_custom_attrs_truncates_large_json_values() -> None:
         project_id="p1",
     )
 
-    stored = result.custom_attrs["lorem.big_list"]
+    stored = result.custom_attrs_string["lorem.big_list"]
     assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_BYTES
     assert "truncated from" in stored
 
 
 def test_extract_custom_attrs_routes_bool_to_bool_map() -> None:
-    """Bool values land in custom_attrs_bool, not custom_attrs or
+    """Bool values land in custom_attrs_bool, not custom_attrs_string or
     custom_attrs_int.
 
     Ordering matters: Python `bool` is a subclass of `int`, so the
@@ -262,7 +262,7 @@ def test_extract_custom_attrs_routes_bool_to_bool_map() -> None:
     # A plain int stays in custom_attrs_int even though 0/1 look bool-ish.
     assert result.custom_attrs_int["lorem.int_looks_like_bool"] == 1
     # Bools don't leak into the other maps.
-    assert "lorem.is_active" not in result.custom_attrs
+    assert "lorem.is_active" not in result.custom_attrs_string
     assert "lorem.is_active" not in result.custom_attrs_int
     assert "lorem.is_active" not in result.custom_attrs_float
 
@@ -287,5 +287,5 @@ def test_extract_custom_attrs_skips_non_finite_floats() -> None:
     assert result.custom_attrs_float["lorem.finite"] == 3.14
     for key in ("lorem.nan", "lorem.pos_inf", "lorem.neg_inf"):
         assert key not in result.custom_attrs_float
-        assert key not in result.custom_attrs
+        assert key not in result.custom_attrs_string
         assert key not in result.custom_attrs_int

@@ -115,7 +115,12 @@ _IDENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 #: Sources that read from a Map(...) column on spans, keyed by user-supplied key
 _CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(
-    {"custom_attrs", "custom_attrs_int", "custom_attrs_float", "custom_attrs_bool"}
+    {
+        "custom_attrs_string",
+        "custom_attrs_int",
+        "custom_attrs_float",
+        "custom_attrs_bool",
+    }
 )
 
 # ---------------------------------------------------------------------------
@@ -165,7 +170,7 @@ SPANS_LIST_COLS: str = ", ".join(
 # and request params not needed for rendering.
 _CHAT_VIEW_EXCLUDE = frozenset(
     {
-        "custom_attrs",
+        "custom_attrs_string",
         "raw_span_dump",
         "attributes_dump",
         "events_dump",
@@ -251,14 +256,16 @@ def add_custom_attr_filters(
     *,
     table_alias: str = "s",
 ) -> None:
-    """Add custom_attrs Map(String, String) filters with parameterized values."""
+    """Add custom_attrs_string Map(String, String) filters with parameterized values."""
     if not custom_filters:
         return
     for cf in custom_filters:
         op = _ATTR_OPS.get(cf.operator, "=")
         key_slot = pb.add(str(cf.attr_key), param_type="String")
         val_slot = pb.add(str(cf.value), param_type="String")
-        conditions.append(f"{table_alias}.custom_attrs[{key_slot}] {op} {val_slot}")
+        conditions.append(
+            f"{table_alias}.custom_attrs_string[{key_slot}] {op} {val_slot}"
+        )
 
 
 def _pagination_slots(
@@ -290,7 +297,7 @@ def resolve_group_by(
 
     Validates that:
       - column refs target an allowlisted span column (`SPAN_GROUP_BY_COLS`)
-      - custom_attrs refs target one of the three Map columns
+      - custom attribute refs target one of the typed Map columns
       - the resulting alias is a valid SQL identifier
       - aliases are unique within the request
     """

@@ -1,6 +1,6 @@
 """Unit tests for the agent-spans Query DSL compiler.
 
-Focus is on field resolution (semconv, direct columns, custom_attrs with
+Focus is on field resolution (semconv, direct columns, custom_attrs_string with
 and without explicit prefix) and operator shape. End-to-end execution
 against ClickHouse is exercised separately in
 ``tests/trace_server/test_genai_agent_queries.py``.
@@ -60,10 +60,10 @@ class TestFieldResolution:
 
     def test_custom_attr_explicit_prefix_string(self) -> None:
         sql, params = _compile(
-            {"$eq": [{"$getField": "custom_attrs.env"}, {"$literal": "prod"}]}
+            {"$eq": [{"$getField": "custom_attrs_string.env"}, {"$literal": "prod"}]}
         )
         # key param added before value param
-        assert "s.custom_attrs[{genai_0:String}] = {genai_1:String}" in sql
+        assert "s.custom_attrs_string[{genai_0:String}] = {genai_1:String}" in sql
         assert params == {"genai_0": "env", "genai_1": "prod"}
 
     def test_custom_attr_explicit_prefix_int(self) -> None:
@@ -97,7 +97,7 @@ class TestFieldResolution:
 
     def test_custom_attr_unprefixed_sibling_str(self) -> None:
         sql, _ = _compile({"$eq": [{"$getField": "env"}, {"$literal": "prod"}]})
-        assert "s.custom_attrs[" in sql
+        assert "s.custom_attrs_string[" in sql
 
     def test_custom_attr_explicit_prefix_bool(self) -> None:
         sql, params = _compile(
@@ -199,7 +199,7 @@ class TestOperatorShapes:
         assert "positionCaseInsensitive(" in sql
 
     def test_convert_forces_custom_attr_map(self) -> None:
-        # ``to: "int"`` on a custom_attrs field routes to custom_attrs_int
+        # ``to: "int"`` on a custom_attrs_string field routes to custom_attrs_int
         # and wraps in toInt64OrNull.
         sql, params = _compile(
             {

@@ -30,7 +30,7 @@ MAX_WALK_DEPTH = 200
 # Custom attribute limits (enforced at OTel ingest time)
 # ---------------------------------------------------------------------------
 
-# Maximum total number of entries across the three custom_attrs* Maps per
+# Maximum total number of entries across the typed custom attribute Maps per
 # span. Once reached, further attributes are silently dropped — keeps a single
 # misbehaving span from blowing up storage or aggregation memory.
 MAX_CUSTOM_ATTRS_PER_SPAN = 1024

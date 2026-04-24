@@ -94,7 +94,7 @@ class TestMakeSpansCountQuery:
               AND s.started_at >= parseDateTimeBestEffort({genai_1:String})
               AND s.started_at < parseDateTimeBestEffort({genai_2:String})
               AND s.agent_name = {genai_3:String}
-              AND s.custom_attrs[{genai_4:String}] = {genai_5:String}
+              AND s.custom_attrs_string[{genai_4:String}] = {genai_5:String}
         """
         expected_params = {
             "genai_0": "p1",
@@ -215,15 +215,15 @@ class TestMakeGroupedSpansCountQuery:
             pb,
             AgentSpansQueryReq(
                 project_id="p1",
-                group_by=[AgentGroupByRef(source="custom_attrs", key="env")],
+                group_by=[AgentGroupByRef(source="custom_attrs_string", key="env")],
             ),
         )
 
         expected = """
             SELECT count() FROM (
-                SELECT s.custom_attrs[{genai_1:String}] FROM spans s
+                SELECT s.custom_attrs_string[{genai_1:String}] FROM spans s
                 WHERE s.project_id = {genai_0:String}
-                GROUP BY s.custom_attrs[{genai_1:String}]
+                GROUP BY s.custom_attrs_string[{genai_1:String}]
             )
         """
         expected_params = {"genai_0": "p1", "genai_1": "env"}
@@ -299,13 +299,13 @@ class TestMakeGroupedSpansListQuery:
             AgentSpansQueryReq(
                 project_id="p1",
                 group_by=[
-                    AgentGroupByRef(source="custom_attrs", key="env"),
+                    AgentGroupByRef(source="custom_attrs_string", key="env"),
                 ],
             ),
         )
 
         expected = f"""
-            SELECT s.custom_attrs[{{genai_3:String}}] AS env,
+            SELECT s.custom_attrs_string[{{genai_3:String}}] AS env,
                    {_GROUPED_AGG_TAIL}
             FROM spans s
             WHERE s.project_id = {{genai_0:String}}
@@ -380,15 +380,19 @@ class TestResolveGroupBy:
                 pb,
                 [
                     AgentGroupByRef(
-                        source="custom_attrs", key="has spaces", alias="bad alias"
+                        source="custom_attrs_string",
+                        key="has spaces",
+                        alias="bad alias",
                     )
                 ],
             )
 
     def test_defaults_alias_to_key_when_valid(self) -> None:
         pb = ParamBuilder("genai")
-        out = resolve_group_by(pb, [AgentGroupByRef(source="custom_attrs", key="env")])
-        assert out == [("s.custom_attrs[{genai_0:String}]", "env")]
+        out = resolve_group_by(
+            pb, [AgentGroupByRef(source="custom_attrs_string", key="env")]
+        )
+        assert out == [("s.custom_attrs_string[{genai_0:String}]", "env")]
 
     def test_custom_alias_used_when_key_non_identifier(self) -> None:
         pb = ParamBuilder("genai")
@@ -396,13 +400,13 @@ class TestResolveGroupBy:
             pb,
             [
                 AgentGroupByRef(
-                    source="custom_attrs",
+                    source="custom_attrs_string",
                     key="has spaces",
                     alias="spaced_attr",
                 )
             ],
         )
-        assert out == [("s.custom_attrs[{genai_0:String}]", "spaced_attr")]
+        assert out == [("s.custom_attrs_string[{genai_0:String}]", "spaced_attr")]
 
 
 # ============================================================================

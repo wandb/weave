@@ -529,7 +529,7 @@ def extract_genai_span(
         content_refs=_str_list(_get(attrs, *K["weave.content_refs"])),
         artifact_refs=_str_list(_get(attrs, *K["weave.artifact_refs"])),
         object_refs=_str_list(_get(attrs, *K["weave.object_refs"])),
-        custom_attrs=custom_str,
+        custom_attrs_string=custom_str,
         custom_attrs_int=custom_int,
         custom_attrs_float=custom_float,
         custom_attrs_bool=custom_bool,

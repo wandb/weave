@@ -15,11 +15,11 @@ Field-name resolution understands three sources, checked in order:
 3. **Custom attributes.** Everything else is treated as a custom attribute
    key. Three forms are accepted:
 
-   - Explicit prefix: `custom_attrs.env` / `custom_attrs_int.retries` /
+   - Explicit prefix: `custom_attrs_string.env` / `custom_attrs_int.retries` /
      `custom_attrs_float.latency_ms` force a specific map.
    - Unprefixed: the map is picked from the *sibling literal's Python type*
      in the enclosing comparison — `$eq(foo, 5)` reads `custom_attrs_int['foo']`,
-     `$eq(foo, "x")` reads `custom_attrs['foo']`. Field-compared-to-field
+     `$eq(foo, "x")` reads `custom_attrs_string['foo']`. Field-compared-to-field
      without a literal is rejected because there's no type signal.
 """
 
@@ -62,23 +62,23 @@ _ALL_QUERYABLE_COLUMNS: frozenset[str] = DIRECT_COLUMNS | frozenset(
 
 #: Field-name prefix -> Map column on the spans table.
 #: Longer prefixes must come before shorter ones — `custom_attrs_int.`
-#: has to be tried before `custom_attrs.` or every int field resolves
+#: has to be tried before `custom_attrs_string.` or every int field resolves
 #: to the string map.
 _CUSTOM_ATTR_PREFIXES: dict[str, str] = {
     "custom_attrs_int.": "custom_attrs_int",
     "custom_attrs_float.": "custom_attrs_float",
     "custom_attrs_bool.": "custom_attrs_bool",
-    "custom_attrs.": "custom_attrs",
+    "custom_attrs_string.": "custom_attrs_string",
 }
 
-#: Python literal type -> custom_attrs* map when no explicit prefix is given.
+#: Python literal type -> custom attribute map when no explicit prefix is given.
 #: `bool` is a subclass of `int` in Python, but `dict.get(type(val))`
 #: uses exact-type lookup (not MRO), so `type(True)` finds `bool` first.
 _LITERAL_TYPE_TO_MAP: dict[type, str] = {
     bool: "custom_attrs_bool",
     int: "custom_attrs_int",
     float: "custom_attrs_float",
-    str: "custom_attrs",
+    str: "custom_attrs_string",
 }
 
 
@@ -266,7 +266,7 @@ def _resolve_field(
     if name in _ALL_QUERYABLE_COLUMNS:
         return f"{alias}.{name}"
 
-    # (3a) Explicit custom_attrs prefix — user-chosen map wins over sibling type
+    # (3a) Explicit custom_attrs_string prefix — user-chosen map wins over sibling type
     for prefix, map_col in _CUSTOM_ATTR_PREFIXES.items():
         if name.startswith(prefix):
             key = name[len(prefix) :]
@@ -281,16 +281,16 @@ def _resolve_field(
     if sibling_hint is None:
         raise InvalidAgentFilterFieldError(
             f"cannot resolve field {name!r}: not a known column and no sibling "
-            "literal to infer the custom_attrs* map from. Either add the column "
+            "literal to infer the custom attribute map from. Either add the column "
             "to semconv / DIRECT_COLUMNS or use an explicit prefix like "
-            "'custom_attrs.<key>' / 'custom_attrs_int.<key>' / "
+            "'custom_attrs_string.<key>' / 'custom_attrs_int.<key>' / "
             "'custom_attrs_float.<key>' / 'custom_attrs_bool.<key>'."
         )
     inferred_map = _LITERAL_TYPE_TO_MAP.get(sibling_hint)
     if inferred_map is None:
         raise InvalidAgentFilterFieldError(
             f"cannot resolve field {name!r}: sibling literal type "
-            f"{sibling_hint.__name__} has no custom_attrs* map."
+            f"{sibling_hint.__name__} has no custom attribute map."
         )
     key_slot = pb.add(name, param_type="String")
     return f"{alias}.{inferred_map}[{key_slot}]"
@@ -310,7 +310,7 @@ def _compile_comparison_operands(
     """Compile (lhs, rhs) with custom-attr sibling-type dispatch.
 
     Peeks at the operands so a `GetFieldOperator` on one side is resolved
-    using the other side's literal type as the custom_attrs-map hint.
+    using the other side's literal type as the custom attribute map hint.
     """
     lhs_hint = _literal_python_type(rhs)
     rhs_hint = _literal_python_type(lhs)

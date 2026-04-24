@@ -280,7 +280,7 @@ def resolve(key: str) -> str | None:
 
 #: All attribute keys (both weave.* and gen_ai.* aliases) that are extracted
 #: into dedicated columns.  Used by the extraction layer to exclude these
-#: from the custom_attrs overflow map.
+#: from the custom attribute overflow maps.
 KNOWN_KEYS: frozenset[str] = frozenset(_ALIAS_TO_CANONICAL.keys())
 
 

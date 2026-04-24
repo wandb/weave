@@ -232,12 +232,12 @@ def test_group_by_conversation_id(ch_server):
 
 
 # ---------------------------------------------------------------------------
-# Test: group by a custom_attrs map key (the new capability)
+# Test: group by a custom_attrs_string map key (the new capability)
 # ---------------------------------------------------------------------------
 
 
 def test_group_by_custom_attrs(ch_server):
-    """Grouping on a custom_attrs key buckets spans by the user-supplied label."""
+    """Grouping on a custom_attrs_string key buckets spans by the user-supplied label."""
     project_id = _make_project_id("cattr")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
@@ -245,21 +245,21 @@ def test_group_by_custom_attrs(ch_server):
         _make_span(
             project_id,
             agent_name="a1",
-            custom_attrs={"env": "prod"},
+            custom_attrs_string={"env": "prod"},
             input_tokens=100,
             started_at=now,
         ),
         _make_span(
             project_id,
             agent_name="a1",
-            custom_attrs={"env": "prod"},
+            custom_attrs_string={"env": "prod"},
             input_tokens=200,
             started_at=now + datetime.timedelta(seconds=1),
         ),
         _make_span(
             project_id,
             agent_name="a1",
-            custom_attrs={"env": "staging"},
+            custom_attrs_string={"env": "staging"},
             input_tokens=50,
             started_at=now + datetime.timedelta(seconds=2),
         ),
@@ -270,7 +270,7 @@ def test_group_by_custom_attrs(ch_server):
         AgentSpansQueryReq(
             project_id=project_id,
             group_by=[
-                AgentGroupByRef(source="custom_attrs", key="env"),
+                AgentGroupByRef(source="custom_attrs_string", key="env"),
             ],
         )
     )
@@ -573,7 +573,7 @@ def test_message_search_indexes_tool_calls(ch_server):
 
 def test_query_dsl_combines_semconv_column_and_custom_attr(ch_server):
     """Compile and execute a Mongo-style query mixing a semconv-mapped column
-    and an unprefixed custom_attrs key dispatched via sibling-literal type.
+    and an unprefixed custom_attrs_string key dispatched via sibling-literal type.
     """
     project_id = _make_project_id("dsl")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -583,21 +583,21 @@ def test_query_dsl_combines_semconv_column_and_custom_attr(ch_server):
         _make_span(
             project_id,
             agent_name="alpha",
-            custom_attrs={"env": "prod"},
+            custom_attrs_string={"env": "prod"},
             started_at=now,
         ),
         # alpha / staging — agent matches but env doesn't
         _make_span(
             project_id,
             agent_name="alpha",
-            custom_attrs={"env": "staging"},
+            custom_attrs_string={"env": "staging"},
             started_at=now + datetime.timedelta(seconds=1),
         ),
         # beta / prod — env matches but agent doesn't
         _make_span(
             project_id,
             agent_name="beta",
-            custom_attrs={"env": "prod"},
+            custom_attrs_string={"env": "prod"},
             started_at=now + datetime.timedelta(seconds=2),
         ),
     ]
@@ -613,7 +613,7 @@ def test_query_dsl_combines_semconv_column_and_custom_attr(ch_server):
                             {"$literal": "alpha"},
                         ]
                     },
-                    # `env` is unknown -> falls through to custom_attrs
+                    # `env` is unknown -> falls through to custom_attrs_string
                     # (sibling literal is a str, so the String map).
                     {"$eq": [{"$getField": "env"}, {"$literal": "prod"}]},
                 ]

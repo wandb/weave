@@ -22,7 +22,8 @@ Producers should consider every `gen_ai.*` key potentially subject to change.
 ### What Weave extracts
 - The full current span-attribute surface of the spec, minus a small set of
   spec attributes we don't yet extract (see "Known gaps" below). Unsupported
-  spec attributes still land in `raw_span_dump` and `custom_attrs*`.
+  spec attributes still land in `raw_span_dump` and the typed custom attribute
+  maps.
 - A small set of **Weave extensions** — additional operation names and
   attributes that have no spec equivalent. They're called out explicitly in
   each table below with the **[Weave]** tag.
@@ -221,7 +222,7 @@ schema.
 
 | Column | Value type | Description |
 |---|---|---|
-| `custom_attrs` | `Map(String, String)` | String-valued custom attributes (also: any non-primitive value JSON-serialized) |
+| `custom_attrs_string` | `Map(String, String)` | String-valued custom attributes (also: any non-primitive value JSON-serialized) |
 | `custom_attrs_int` | `Map(String, Int64)` | Integer-valued custom attributes |
 | `custom_attrs_float` | `Map(String, Float64)` | Finite float-valued custom attributes |
 | `custom_attrs_bool` | `Map(String, Bool)` | Boolean-valued custom attributes |
@@ -238,8 +239,8 @@ target Map is inferred from the literal on the other side of the comparison.
 
 These OTel-defined surfaces are **not** extracted into typed columns today.
 The data still arrives and is preserved lossless in `raw_span_dump` /
-`events_dump` / `attributes_dump` / `custom_attrs*` — it's just not
-promoted for typed querying.
+`events_dump` / `attributes_dump` / the typed custom attribute maps — it's
+just not promoted for typed querying.
 
 **Span attributes we don't extract:**
 

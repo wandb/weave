@@ -70,7 +70,7 @@ class AgentSpanSchema(BaseModel):
     content_refs: list[str] = Field(default_factory=list)
     artifact_refs: list[str] = Field(default_factory=list)
     object_refs: list[str] = Field(default_factory=list)
-    custom_attrs: dict[str, str] = Field(default_factory=dict)
+    custom_attrs_string: dict[str, str] = Field(default_factory=dict)
     raw_span_dump: str = ""
     attributes_dump: str = ""
     events_dump: str = ""
@@ -107,13 +107,13 @@ class AgentGroupByRef(BaseModel):
     """Reference to a column or map-key that spans should be grouped by.
 
     `source="column"` targets a named span column (allowlisted server-side).
-    The other sources target keys inside the `custom_attrs*` Map columns,
+    The other sources target keys inside the typed custom attribute Map columns,
     which accept arbitrary user-defined keys.
     """
 
     source: Literal[
         "column",
-        "custom_attrs",
+        "custom_attrs_string",
         "custom_attrs_int",
         "custom_attrs_float",
         "custom_attrs_bool",
@@ -160,7 +160,7 @@ class AgentSpansQueryReq(BaseModel):
     filters: AgentSpansQueryFilters | None = None
     #: Mongo-style filter expression applied alongside `filters`. Both are
     #: AND-ed. Field names resolve via semconv, direct span columns, or the
-    #: `custom_attrs*` Map columns — see :mod:`agent_query_compiler`.
+    #: typed custom attribute Map columns — see :mod:`agent_query_compiler`.
     query: Query | None = None
     group_by: list[AgentGroupByRef] | None = None
     sort_by: list[AgentSortBy] | None = None
@@ -393,7 +393,7 @@ class AgentsQueryRes(BaseModel):
 
 
 class AgentCustomAttrFilter(BaseModel):
-    """Filter on a custom attribute stored in `custom_attrs` Map column."""
+    """Filter on a custom attribute stored in `custom_attrs_string` Map column."""
 
     attr_key: str
     operator: str = "eq"
