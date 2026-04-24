@@ -141,6 +141,7 @@ def test_full_agent_turn() -> None:
     assert by_type["tool_call"].tool_name == "get_weather"
     assert by_type["tool_call"].tool_arguments == '{"city":"NYC"}'
     assert by_type["tool_call"].tool_result == '{"temp":72}'
+    assert by_type["tool_call"].started_at == at(1)
     assert by_type["context_compacted"].compaction_summary == "Summarized 10 messages"
     assert by_type["context_compacted"].compaction_items_before == 10
     assert by_type["context_compacted"].compaction_items_after == 3
@@ -225,6 +226,7 @@ def test_build_trace_chat_handles_null_started_at() -> None:
     user_msgs = [m for m in res.messages if m.type == "user_message"]
     assert len(user_msgs) == 1
     assert user_msgs[0].text == "hello from the void"
+    assert user_msgs[0].started_at is None
 
 
 def test_invoke_agent_mirrors_child_llm_output_messages() -> None:

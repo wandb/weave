@@ -168,8 +168,8 @@ class AgentSpansQueryReq(BaseModel):
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
     )
     offset: int = Field(default=0, ge=0)
-    start: str | None = None  # ISO timestamp — filter started_at >= start
-    end: str | None = None  # ISO timestamp — filter started_at < end
+    start: datetime.datetime | None = None  # filter started_at >= start
+    end: datetime.datetime | None = None  # filter started_at < end
 
 
 class AgentSpansQueryRes(BaseModel):
@@ -275,7 +275,7 @@ class AgentChatMessage(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     duration_ms: int = 0
-    started_at: str = ""
+    started_at: datetime.datetime | None = None
     status: str = "OK"
     content_refs: list[str] = Field(default_factory=list)
     compaction_summary: str = ""

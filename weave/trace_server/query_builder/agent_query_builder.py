@@ -11,6 +11,7 @@ see `tests/trace_server/query_builder/test_agent_query_builder.py`.
 
 from __future__ import annotations
 
+import datetime
 import re
 from typing import Any
 
@@ -221,17 +222,17 @@ def add_time_filters(
     conditions: list[str],
     pb: ParamBuilder,
     *,
-    start: str | None,
-    end: str | None,
+    start: datetime.datetime | None,
+    end: datetime.datetime | None,
     column: str = "s.started_at",
 ) -> None:
-    """Add start/end time range conditions using parseDateTimeBestEffort."""
+    """Add start/end time range conditions."""
     if start:
-        start_slot = pb.add(str(start), param_type="String")
-        conditions.append(f"{column} >= parseDateTimeBestEffort({start_slot})")
+        start_slot = pb.add(start, param_type="DateTime64(6)")
+        conditions.append(f"{column} >= {start_slot}")
     if end:
-        end_slot = pb.add(str(end), param_type="String")
-        conditions.append(f"{column} < parseDateTimeBestEffort({end_slot})")
+        end_slot = pb.add(end, param_type="DateTime64(6)")
+        conditions.append(f"{column} < {end_slot}")
 
 
 def add_span_filters(

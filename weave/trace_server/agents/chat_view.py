@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 class UserPrompt(NamedTuple):
     text: str
-    started_at: str
+    started_at: datetime | None
     content_refs: list[str]
 
 
@@ -137,7 +137,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                 type="user_message",
                 text=user_prompt,
                 agent_name="User",
-                started_at=_dt_to_iso(user_started_at),
+                started_at=user_started_at,
                 content_refs=user_refs,
             )
         )
@@ -182,7 +182,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                         if span.system_instructions
                         else "",
                         tool_definitions=span.tool_definitions or "",
-                        started_at=_dt_to_iso(span.started_at),
+                        started_at=span.started_at,
                     )
                 )
             else:
@@ -218,7 +218,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                         compaction_summary=span.compaction_summary,
                         compaction_items_before=span.compaction_items_before,
                         compaction_items_after=span.compaction_items_after,
-                        started_at=_dt_to_iso(span.started_at),
+                        started_at=span.started_at,
                     )
                 )
             return emitted_in_subtree
@@ -235,7 +235,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                     tool_arguments=span.tool_call_arguments,
                     tool_result=span.tool_call_result,
                     duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
-                    started_at=_dt_to_iso(span.started_at),
+                    started_at=span.started_at,
                     status=span.status_code,
                     content_refs=_content_refs(span),
                 )
@@ -349,18 +349,6 @@ def _extract_assistant_text(messages: list[dict[str, Any]]) -> str:
     return "\n".join(texts)
 
 
-def _dt_to_iso(dt: Any) -> str:
-    if dt is None:
-        return ""
-    if isinstance(dt, str):
-        return dt
-    try:
-        return dt.isoformat()
-    except AttributeError:
-        logger.exception("unexpected non-datetime value %r in _dt_to_iso", dt)
-        return str(dt)
-
-
 def _compute_duration_ms(started_at: Any, ended_at: Any) -> int:
     if not started_at or not ended_at:
         return 0
@@ -422,8 +410,8 @@ def _find_user_prompt(spans: list[AgentSpanSchema]) -> UserPrompt:
             continue
         text = _extract_user_text(msgs, last_only=True)
         if text:
-            return UserPrompt(text, _dt_to_iso(s.started_at), _content_refs(s))
-    return UserPrompt("", "", [])
+            return UserPrompt(text, s.started_at, _content_refs(s))
+    return UserPrompt("", None, [])
 
 
 def _emit_agent_message(
@@ -460,7 +448,7 @@ def _emit_agent_message(
         input_tokens=agg_in or span.input_tokens,
         output_tokens=agg_out or span.output_tokens,
         duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
-        started_at=_dt_to_iso(span.started_at),
+        started_at=span.started_at,
         status=span.status_code,
         content_refs=_content_refs(span),
     )

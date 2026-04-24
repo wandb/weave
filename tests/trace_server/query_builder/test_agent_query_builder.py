@@ -6,6 +6,8 @@ formatted SQL + param dict against an expected value, matching the style of
 ``test_annotation_queues_query_builder.py`` etc.
 """
 
+import datetime
+
 import pytest
 import sqlparse
 from pydantic import ValidationError
@@ -71,6 +73,8 @@ class TestMakeSpansCountQuery:
 
     def test_with_filters_and_time(self) -> None:
         pb = ParamBuilder("genai")
+        start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2026, 2, 1, tzinfo=datetime.timezone.utc)
         query = make_spans_count_query(
             pb,
             AgentSpansQueryReq(
@@ -83,23 +87,23 @@ class TestMakeSpansCountQuery:
                         )
                     ],
                 ),
-                start="2026-01-01",
-                end="2026-02-01",
+                start=start,
+                end=end,
             ),
         )
 
         expected = """
             SELECT count() FROM spans s
             WHERE s.project_id = {genai_0:String}
-              AND s.started_at >= parseDateTimeBestEffort({genai_1:String})
-              AND s.started_at < parseDateTimeBestEffort({genai_2:String})
+              AND s.started_at >= {genai_1:DateTime64(6)}
+              AND s.started_at < {genai_2:DateTime64(6)}
               AND s.agent_name = {genai_3:String}
               AND s.custom_attrs_string[{genai_4:String}] = {genai_5:String}
         """
         expected_params = {
             "genai_0": "p1",
-            "genai_1": "2026-01-01",
-            "genai_2": "2026-02-01",
+            "genai_1": start,
+            "genai_2": end,
             "genai_3": "bot",
             "genai_4": "env",
             "genai_5": "prod",
@@ -260,6 +264,8 @@ class TestMakeGroupedSpansListQuery:
 
     def test_group_by_conversation_id_with_time(self) -> None:
         pb = ParamBuilder("genai")
+        start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2026, 2, 1, tzinfo=datetime.timezone.utc)
         query = make_spans_list_query(
             pb,
             AgentSpansQueryReq(
@@ -267,8 +273,8 @@ class TestMakeGroupedSpansListQuery:
                 group_by=[
                     AgentGroupByRef(source="column", key="conversation_id"),
                 ],
-                start="2026-01-01",
-                end="2026-02-01",
+                start=start,
+                end=end,
             ),
         )
 
@@ -277,16 +283,16 @@ class TestMakeGroupedSpansListQuery:
                    {_GROUPED_AGG_TAIL}
             FROM spans s
             WHERE s.project_id = {{genai_0:String}}
-              AND s.started_at >= parseDateTimeBestEffort({{genai_1:String}})
-              AND s.started_at < parseDateTimeBestEffort({{genai_2:String}})
+              AND s.started_at >= {{genai_1:DateTime64(6)}}
+              AND s.started_at < {{genai_2:DateTime64(6)}}
             GROUP BY conversation_id
             ORDER BY last_seen DESC
             LIMIT {{genai_3:UInt64}} OFFSET {{genai_4:UInt64}}
         """
         expected_params = {
             "genai_0": "p1",
-            "genai_1": "2026-01-01",
-            "genai_2": "2026-02-01",
+            "genai_1": start,
+            "genai_2": end,
             "genai_3": 100,
             "genai_4": 0,
         }
