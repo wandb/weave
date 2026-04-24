@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from weave.trace.session import (
     LLM,
     LogResult,
@@ -24,6 +26,18 @@ from weave.trace.session import (
     start_session,
     start_turn,
 )
+
+@pytest.fixture(autouse=True)
+def _reset_contextvars():
+    """Reset contextvar state after each test to prevent leakage."""
+    yield
+    if (llm := get_current_llm()) is not None:
+        llm.end()
+    if (turn := get_current_turn()) is not None:
+        turn.end()
+    if (session := get_current_session()) is not None:
+        session.end()
+
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -123,18 +137,13 @@ class TestLLM:
         assert c.input_messages == []
         assert c.output_messages == []
 
-    def test_output_appends_assistant_message(self) -> None:
+    def test_fluent_builders(self) -> None:
         c = LLM(model="gpt-4o")
-        result = c.output("Hello!")
-        assert result is c  # chainable
+        assert c.output("Hello!") is c
         assert len(c.output_messages) == 1
         assert c.output_messages[0].role == "assistant"
         assert c.output_messages[0].content == "Hello!"
-
-    def test_think_sets_reasoning(self) -> None:
-        c = LLM(model="gpt-4o")
-        result = c.think("Let me consider...")
-        assert result is c
+        assert c.think("Let me consider...") is c
         assert c.reasoning.content == "Let me consider..."
 
     def test_attach_methods_return_self(self) -> None:
@@ -160,16 +169,14 @@ class TestSubAgent:
         assert sa.name == "research-bot"
         assert sa.model == ""
 
-    def test_llm_returns_llm(self) -> None:
+    def test_llm_returns_llm_and_inherits_model(self) -> None:
         sa = SubAgent(name="research-bot", model="gpt-4o-mini")
         c = sa.llm(model="gpt-4o-mini")
         assert isinstance(c, LLM)
         assert c.model == "gpt-4o-mini"
-
-    def test_llm_inherits_model(self) -> None:
-        sa = SubAgent(name="bot", model="gpt-4o-mini")
-        c = sa.llm()
-        assert c.model == "gpt-4o-mini"
+        # inherits model when not specified
+        c2 = sa.llm()
+        assert c2.model == "gpt-4o-mini"
 
     def test_tool_returns_tool(self) -> None:
         sa = SubAgent(name="bot")
@@ -215,7 +222,7 @@ class TestTurn:
         assert t.messages[0].role == "user"
         assert t.messages[0].content == "Hello"
 
-    def test_llm_returns_llm(self) -> None:
+    def test_llm_returns_llm_and_inherits_model(self) -> None:
         t = Turn(model="gpt-4o")
         c = t.llm(
             model="gpt-4o",
@@ -226,11 +233,9 @@ class TestTurn:
         assert c.model == "gpt-4o"
         assert c.provider_name == "openai"
         assert c.system_instructions == ["Be helpful"]
-
-    def test_llm_inherits_model(self) -> None:
-        t = Turn(model="gpt-4o")
-        c = t.llm()
-        assert c.model == "gpt-4o"
+        # inherits model when not specified
+        c2 = t.llm()
+        assert c2.model == "gpt-4o"
 
     def test_tool_returns_tool(self) -> None:
         t = Turn()
@@ -241,17 +246,15 @@ class TestTurn:
         assert tool.name == "get_weather"
         assert tool.tool_call_id == "tc_1"
 
-    def test_subagent_returns_subagent(self) -> None:
+    def test_subagent_returns_subagent_and_inherits_model(self) -> None:
         t = Turn(model="gpt-4o")
         sa = t.subagent(name="research-bot", model="gpt-4o-mini")
         assert isinstance(sa, SubAgent)
         assert sa.name == "research-bot"
         assert sa.model == "gpt-4o-mini"
-
-    def test_subagent_inherits_model(self) -> None:
-        t = Turn(model="gpt-4o")
-        sa = t.subagent(name="bot")
-        assert sa.model == "gpt-4o"
+        # inherits model when not specified
+        sa2 = t.subagent(name="bot")
+        assert sa2.model == "gpt-4o"
 
     def test_context_manager_sets_timestamps(self) -> None:
         with Turn() as t:
@@ -287,15 +290,12 @@ class TestSession:
         assert t.messages[0].role == "user"
         assert t.messages[0].content == "What's the weather?"
 
-    def test_start_turn_inherits_agent_name(self) -> None:
+    def test_start_turn_inherits_and_overrides_agent_name(self) -> None:
         s = Session(agent_name="weather-bot")
         t = s.start_turn()
         assert t.agent_name == "weather-bot"
-
-    def test_start_turn_overrides_agent_name(self) -> None:
-        s = Session(agent_name="weather-bot")
-        t = s.start_turn(agent_name="custom-bot")
-        assert t.agent_name == "custom-bot"
+        t2 = s.start_turn(agent_name="custom-bot")
+        assert t2.agent_name == "custom-bot"
 
     def test_start_turn_no_user_message(self) -> None:
         s = Session()

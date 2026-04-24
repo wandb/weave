@@ -16,7 +16,7 @@ from contextvars import ContextVar, Token
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 from typing_extensions import Self
 
 # ---------------------------------------------------------------------------
@@ -61,6 +61,12 @@ class LogResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class _SpanBase(BaseModel):
+    """Shared config for span classes that use ``model`` as a field name."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+
 class Tool(BaseModel):
     """One tool execution. Maps to an execute_tool OTel span."""
 
@@ -95,7 +101,7 @@ class Tool(BaseModel):
         return False
 
 
-class LLM(BaseModel):
+class LLM(_SpanBase):
     """One LLM API call. Maps to a chat OTel span."""
 
     model: str = ""
@@ -113,6 +119,10 @@ class LLM(BaseModel):
     _ended: bool = PrivateAttr(default=False)
     _token: Token[LLM | None] | None = PrivateAttr(default=None)
 
+    def model_post_init(self, context: Any, /) -> None:
+        if self.started_at is None:
+            self.started_at = datetime.now(timezone.utc)
+
     def output(self, content: str) -> LLM:
         """Append an assistant message to output_messages."""
         self.output_messages.append(Message(role="assistant", content=content))
@@ -123,7 +133,7 @@ class LLM(BaseModel):
         self.reasoning = Reasoning(content=content)
         return self
 
-    def attach_file(self, file_id: str, *, modality: str = "document") -> LLM:
+    def attach_file(self, file_id: str) -> LLM:
         """Attach a file reference. Stub — stores nothing yet."""
         return self
 
@@ -147,8 +157,6 @@ class LLM(BaseModel):
             self._token = None
 
     def __enter__(self) -> Self:
-        if self.started_at is None:
-            self.started_at = datetime.now(timezone.utc)
         if self._token is None:
             self._token = _current_llm.set(self)
         return self
@@ -163,7 +171,7 @@ class LLM(BaseModel):
         return False
 
 
-class SubAgent(BaseModel):
+class SubAgent(_SpanBase):
     """A delegated agent invocation within a turn.
 
     Maps to a nested invoke_agent OTel span in the same trace.
@@ -183,12 +191,18 @@ class SubAgent(BaseModel):
         provider_name: str = "",
         system_instructions: list[str] | None = None,
     ) -> LLM:
-        """Start an LLM call within this sub-agent."""
-        return LLM(
+        """Start an LLM call within this sub-agent.
+
+        Sets the ``_current_llm`` contextvar so the LLM is visible via
+        ``get_current_llm()`` regardless of whether a context manager is used.
+        """
+        llm = LLM(
             model=model or self.model,
             provider_name=provider_name,
             system_instructions=system_instructions or [],
         )
+        llm._token = _current_llm.set(llm)
+        return llm
 
     def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
         """Start a tool execution within this sub-agent."""
@@ -219,7 +233,7 @@ class SubAgent(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class Turn(BaseModel):
+class Turn(_SpanBase):
     """One user-agent exchange. Maps to an invoke_agent OTel span (root, new trace)."""
 
     agent_name: str = ""
@@ -230,6 +244,10 @@ class Turn(BaseModel):
 
     _ended: bool = PrivateAttr(default=False)
     _token: Token[Turn | None] | None = PrivateAttr(default=None)
+
+    def model_post_init(self, context: Any, /) -> None:
+        if self.started_at is None:
+            self.started_at = datetime.now(timezone.utc)
 
     def user(self, content: str) -> Turn:
         """Append a user message mid-turn."""
@@ -243,12 +261,18 @@ class Turn(BaseModel):
         provider_name: str = "",
         system_instructions: list[str] | None = None,
     ) -> LLM:
-        """Start an LLM call (chat span, child of this turn)."""
-        return LLM(
+        """Start an LLM call (chat span, child of this turn).
+
+        Sets the ``_current_llm`` contextvar so the LLM is visible via
+        ``get_current_llm()`` regardless of whether a context manager is used.
+        """
+        llm = LLM(
             model=model or self.model,
             provider_name=provider_name,
             system_instructions=system_instructions or [],
         )
+        llm._token = _current_llm.set(llm)
+        return llm
 
     def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
         """Start a tool execution (execute_tool span, child of this turn)."""
@@ -268,8 +292,6 @@ class Turn(BaseModel):
             self._token = None
 
     def __enter__(self) -> Self:
-        if self.started_at is None:
-            self.started_at = datetime.now(timezone.utc)
         if self._token is None:
             self._token = _current_turn.set(self)
         return self
@@ -284,7 +306,7 @@ class Turn(BaseModel):
         return False
 
 
-class Session(BaseModel):
+class Session(_SpanBase):
     """A conversation session. Groups turns by conversation_id (no span)."""
 
     session_id: str = ""
@@ -308,7 +330,11 @@ class Session(BaseModel):
         model: str = "",
         agent_name: str = "",
     ) -> Turn:
-        """Create a new turn. Auto-ends the previous turn if still open."""
+        """Create a new turn. Auto-ends the previous turn if still open.
+
+        Sets the ``_current_turn`` contextvar so the turn is visible via
+        ``get_current_turn()`` regardless of whether a context manager is used.
+        """
         if self._current_turn is not None and not self._current_turn._ended:
             self._current_turn.end()
         turn = Turn(
@@ -317,6 +343,7 @@ class Session(BaseModel):
         )
         if user_message:
             turn.messages.append(Message(role="user", content=user_message))
+        turn._token = _current_turn.set(turn)
         self._current_turn = turn
         return turn
 
@@ -393,16 +420,12 @@ def start_turn(
     """
     session = get_current_session()
     if session is not None:
-        turn = session.start_turn(
+        return session.start_turn(
             user_message=user_message, model=model, agent_name=agent_name
         )
-    else:
-        turn = Turn(agent_name=agent_name, model=model)
-        if user_message:
-            turn.messages.append(Message(role="user", content=user_message))
-        return turn
-    turn._token = _current_turn.set(turn)
-    turn.started_at = datetime.now(timezone.utc)
+    turn = Turn(agent_name=agent_name, model=model)
+    if user_message:
+        turn.messages.append(Message(role="user", content=user_message))
     return turn
 
 
@@ -418,20 +441,16 @@ def start_llm(
     """
     turn = get_current_turn()
     if turn is not None:
-        llm = turn.llm(
+        return turn.llm(
             model=model,
             provider_name=provider_name,
             system_instructions=system_instructions,
         )
-    else:
-        return LLM(
-            model=model,
-            provider_name=provider_name,
-            system_instructions=system_instructions or [],
-        )
-    llm._token = _current_llm.set(llm)
-    llm.started_at = datetime.now(timezone.utc)
-    return llm
+    return LLM(
+        model=model,
+        provider_name=provider_name,
+        system_instructions=system_instructions or [],
+    )
 
 
 def end_session() -> None:
