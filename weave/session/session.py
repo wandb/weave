@@ -4,8 +4,8 @@ Provides Python classes and functions for logging agent conversations
 to Weave's Agents tab. All data flows through OpenTelemetry — the SDK
 creates OTel spans with GenAI semantic convention attributes.
 
-OTel span emission is not yet implemented — classes are functional
-stubs that track state locally.
+Each SDK class creates OTel spans with GenAI semantic convention
+attributes when used as context managers.
 """
 
 from __future__ import annotations
@@ -66,6 +66,9 @@ class _SpanBase(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
+    _otel_span: Any = PrivateAttr(default=None)  # trace.Span
+    _otel_token: Any = PrivateAttr(default=None)  # context token from attach()
+
 
 class Tool(_SpanBase):
     """One tool execution. Maps to an execute_tool OTel span."""
@@ -87,8 +90,47 @@ class Tool(_SpanBase):
             elapsed = datetime.now(timezone.utc) - self._started_at
             self.duration_ms = int(elapsed.total_seconds() * 1000)
 
+        if (
+            self._otel_span is not None
+            and hasattr(self._otel_span, "is_recording")
+            and self._otel_span.is_recording()
+        ):
+            # Lazy import: opentelemetry is optional.
+            from weave.session.session_otel import execute_tool_attributes
+
+            session = _current_session.get()
+            include = session.include_content if session else True
+            attrs = execute_tool_attributes(
+                tool_name=self.name,
+                tool_call_arguments=self.arguments if include else "",
+                tool_call_result=self.result if include else "",
+                tool_call_id=self.tool_call_id,
+            )
+            for k, v in attrs.items():
+                self._otel_span.set_attribute(k, v)
+            self._otel_span.end()
+
+        if self._otel_token is not None:
+            # Lazy import: opentelemetry is optional.
+            from opentelemetry import context as otel_context
+
+            otel_context.detach(self._otel_token)
+            self._otel_token = None
+
     def __enter__(self) -> Self:
         self._started_at = datetime.now(timezone.utc)
+
+        # Lazy import: opentelemetry is optional.
+        from opentelemetry import context as otel_context
+        from opentelemetry import trace
+
+        from weave.session.otel_setup import get_tracer
+
+        tracer = get_tracer()
+        self._otel_span = tracer.start_span(f"execute_tool {self.name}")
+        self._otel_token = otel_context.attach(
+            trace.set_span_in_context(self._otel_span)
+        )
         return self
 
     def __exit__(
@@ -152,6 +194,39 @@ class LLM(_SpanBase):
             return
         self._ended = True
         self.ended_at = datetime.now(timezone.utc)
+
+        if (
+            self._otel_span is not None
+            and hasattr(self._otel_span, "is_recording")
+            and self._otel_span.is_recording()
+        ):
+            # Lazy import: opentelemetry is optional.
+            from weave.session.session_otel import llm_attributes
+
+            session = _current_session.get()
+            include = session.include_content if session else True
+            attrs = llm_attributes(
+                model=self.model,
+                provider_name=self.provider_name,
+                input_messages=self.input_messages if include else None,
+                output_messages=self.output_messages if include else None,
+                system_instructions=self.system_instructions if include else None,
+                usage=self.usage,
+                reasoning=self.reasoning,
+                finish_reasons=self.finish_reasons,
+                response_id=self.response_id,
+            )
+            for k, v in attrs.items():
+                self._otel_span.set_attribute(k, v)
+            self._otel_span.end()
+
+        if self._otel_token is not None:
+            # Lazy import: opentelemetry is optional.
+            from opentelemetry import context as otel_context
+
+            otel_context.detach(self._otel_token)
+            self._otel_token = None
+
         if self._token is not None:
             _current_llm.reset(self._token)
             self._token = None
@@ -159,6 +234,18 @@ class LLM(_SpanBase):
     def __enter__(self) -> Self:
         if self._token is None:
             self._token = _current_llm.set(self)
+
+        # Lazy import: opentelemetry is optional.
+        from opentelemetry import context as otel_context
+        from opentelemetry import trace
+
+        from weave.session.otel_setup import get_tracer
+
+        tracer = get_tracer()
+        self._otel_span = tracer.start_span(f"chat {self.model}")
+        self._otel_token = otel_context.attach(
+            trace.set_span_in_context(self._otel_span)
+        )
         return self
 
     def __exit__(
@@ -214,8 +301,47 @@ class SubAgent(_SpanBase):
         self._ended = True
         self.ended_at = datetime.now(timezone.utc)
 
+        if (
+            self._otel_span is not None
+            and hasattr(self._otel_span, "is_recording")
+            and self._otel_span.is_recording()
+        ):
+            # Lazy import: opentelemetry is optional.
+            from weave.session.session_otel import invoke_agent_attributes
+
+            session = _current_session.get()
+            include = session.include_content if session else True
+            attrs = invoke_agent_attributes(
+                agent_name=self.name,
+                model=self.model,
+                conversation_id=session.session_id if session else "",
+                conversation_name=session.session_name if session else "",
+            )
+            for k, v in attrs.items():
+                self._otel_span.set_attribute(k, v)
+            self._otel_span.end()
+
+        if self._otel_token is not None:
+            # Lazy import: opentelemetry is optional.
+            from opentelemetry import context as otel_context
+
+            otel_context.detach(self._otel_token)
+            self._otel_token = None
+
     def __enter__(self) -> Self:
         self.started_at = datetime.now(timezone.utc)
+
+        # Lazy import: opentelemetry is optional.
+        from opentelemetry import context as otel_context
+        from opentelemetry import trace
+
+        from weave.session.otel_setup import get_tracer
+
+        tracer = get_tracer()
+        self._otel_span = tracer.start_span(f"invoke_agent {self.name}")
+        self._otel_token = otel_context.attach(
+            trace.set_span_in_context(self._otel_span)
+        )
         return self
 
     def __exit__(
@@ -244,6 +370,7 @@ class Turn(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
     _token: Token[Turn | None] | None = PrivateAttr(default=None)
+    _session: Any = PrivateAttr(default=None)  # Session reference
 
     def model_post_init(self, context: Any, /) -> None:
         if self.started_at is None:
@@ -287,6 +414,34 @@ class Turn(_SpanBase):
             return
         self._ended = True
         self.ended_at = datetime.now(timezone.utc)
+
+        if (
+            self._otel_span is not None
+            and hasattr(self._otel_span, "is_recording")
+            and self._otel_span.is_recording()
+        ):
+            # Lazy import: opentelemetry is optional.
+            from weave.session.session_otel import invoke_agent_attributes
+
+            include = self._session.include_content if self._session else True
+            attrs = invoke_agent_attributes(
+                agent_name=self.agent_name,
+                conversation_id=self._session.session_id if self._session else "",
+                conversation_name=self._session.session_name if self._session else "",
+                model=self.model,
+                input_messages=self.messages if include else None,
+            )
+            for k, v in attrs.items():
+                self._otel_span.set_attribute(k, v)
+            self._otel_span.end()
+
+        if self._otel_token is not None:
+            # Lazy import: opentelemetry is optional.
+            from opentelemetry import context as otel_context
+
+            otel_context.detach(self._otel_token)
+            self._otel_token = None
+
         if self._token is not None:
             _current_turn.reset(self._token)
             self._token = None
@@ -294,6 +449,23 @@ class Turn(_SpanBase):
     def __enter__(self) -> Self:
         if self._token is None:
             self._token = _current_turn.set(self)
+
+        # Lazy import: opentelemetry is optional.
+        from opentelemetry import context as otel_context
+        from opentelemetry import trace
+        from opentelemetry.context import Context
+
+        from weave.session.otel_setup import get_tracer
+
+        tracer = get_tracer()
+        # New trace per turn — empty Context() gives a fresh trace_id
+        self._otel_span = tracer.start_span(
+            f"invoke_agent {self.agent_name}",
+            context=Context(),
+        )
+        self._otel_token = otel_context.attach(
+            trace.set_span_in_context(self._otel_span)
+        )
         return self
 
     def __exit__(
@@ -343,6 +515,7 @@ class Session(_SpanBase):
         )
         if user_message:
             turn.messages.append(Message(role="user", content=user_message))
+        turn._session = self
         turn._token = _current_turn.set(turn)
         self._current_turn = turn
         return turn
