@@ -93,9 +93,7 @@ class _SpanBase(BaseModel):
     _otel_span: Any = PrivateAttr(default=None)  # trace.Span
     _otel_token: Any = PrivateAttr(default=None)  # context token from attach()
 
-    def _start_otel_span(
-        self, name: str, *, new_trace: bool = False
-    ) -> None:
+    def _start_otel_span(self, name: str, *, new_trace: bool = False) -> None:
         """Create an OTel span and attach it to the current context."""
         otel = _try_import_otel()
         if otel is None:
@@ -114,10 +112,7 @@ class _SpanBase(BaseModel):
 
     def _end_otel_span(self, attrs: dict[str, Any]) -> None:
         """Set attributes and end the OTel span, then detach context."""
-        if (
-            self._otel_span is not None
-            and self._otel_span.is_recording()
-        ):
+        if self._otel_span is not None and self._otel_span.is_recording():
             for k, v in attrs.items():
                 self._otel_span.set_attribute(k, v)
             self._otel_span.end()
@@ -241,9 +236,7 @@ class LLM(_SpanBase):
         """
         sources = sum(bool(s) for s in (content, uri, file_id))
         if sources != 1:
-            raise ValueError(
-                "Exactly one of content, uri, or file_id must be provided"
-            )
+            raise ValueError("Exactly one of content, uri, or file_id must be provided")
 
         if not modality and mime_type:
             prefix = mime_type.split("/", maxsplit=1)[0]
@@ -466,9 +459,7 @@ class Turn(_SpanBase):
     def __enter__(self) -> Self:
         if self._token is None:
             self._token = _current_turn.set(self)
-        self._start_otel_span(
-            f"invoke_agent {self.agent_name}", new_trace=True
-        )
+        self._start_otel_span(f"invoke_agent {self.agent_name}", new_trace=True)
         return self
 
     def __exit__(

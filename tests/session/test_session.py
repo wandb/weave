@@ -519,8 +519,12 @@ def otel_spans():
 
 
 class TestOTelSpanEmission:
-    def test_turn_creates_invoke_agent_span(self, otel_spans: InMemorySpanExporter) -> None:
-        with Session(agent_name="weather-bot", session_id="sess-1", session_name="Weather Chat") as s:
+    def test_turn_creates_invoke_agent_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(
+            agent_name="weather-bot", session_id="sess-1", session_name="Weather Chat"
+        ) as s:
             with s.start_turn(user_message="What's the weather?") as turn:
                 pass
 
@@ -553,10 +557,16 @@ class TestOTelSpanEmission:
         assert attrs["gen_ai.usage.input_tokens"] == 100
         assert attrs["gen_ai.usage.output_tokens"] == 50
 
-    def test_tool_creates_execute_tool_span(self, otel_spans: InMemorySpanExporter) -> None:
+    def test_tool_creates_execute_tool_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
         with Session(agent_name="bot", session_id="sess-tool") as s:
             with s.start_turn() as turn:
-                with turn.tool(name="get_weather", arguments='{"city":"Tokyo"}', tool_call_id="tc_1") as tool:
+                with turn.tool(
+                    name="get_weather",
+                    arguments='{"city":"Tokyo"}',
+                    tool_call_id="tc_1",
+                ) as tool:
                     tool.result = "75F"
 
         spans = otel_spans.get_finished_spans()
@@ -570,7 +580,9 @@ class TestOTelSpanEmission:
         assert attrs["gen_ai.tool.call.arguments"] == '{"city":"Tokyo"}'
         assert attrs["gen_ai.tool.call.result"] == "75F"
 
-    def test_subagent_creates_nested_invoke_agent_span(self, otel_spans: InMemorySpanExporter) -> None:
+    def test_subagent_creates_nested_invoke_agent_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
         with Session(agent_name="orchestrator") as s:
             with s.start_turn() as turn:
                 with turn.subagent(name="research-bot", model="gpt-4o-mini") as sa:
@@ -633,7 +645,9 @@ class TestOTelSpanEmission:
         finally:
             otel_setup._provider = original
 
-    def test_include_content_false_omits_messages(self, otel_spans: InMemorySpanExporter) -> None:
+    def test_include_content_false_omits_messages(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
         with Session(agent_name="bot", include_content=False) as s:
             with s.start_turn(user_message="secret input") as turn:
                 with turn.llm(model="gpt-4o") as llm:
@@ -684,7 +698,9 @@ class TestErrorRecording:
                 except ValueError:
                     pass
         spans = otel_spans.get_finished_spans()
-        chat_span = [s for s in spans if s.attributes.get("gen_ai.operation.name") == "chat"][0]
+        chat_span = next(
+            s for s in spans if s.attributes.get("gen_ai.operation.name") == "chat"
+        )
         assert chat_span.status.status_code == StatusCode.ERROR
         assert "LLM call failed" in chat_span.status.description
         assert len(chat_span.events) >= 1
@@ -699,7 +715,11 @@ class TestErrorRecording:
                 except RuntimeError:
                     pass
         spans = otel_spans.get_finished_spans()
-        tool_span = [s for s in spans if s.attributes.get("gen_ai.operation.name") == "execute_tool"][0]
+        tool_span = next(
+            s
+            for s in spans
+            if s.attributes.get("gen_ai.operation.name") == "execute_tool"
+        )
         assert tool_span.status.status_code == StatusCode.ERROR
 
     def test_turn_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
@@ -710,7 +730,11 @@ class TestErrorRecording:
             except RuntimeError:
                 pass
         spans = otel_spans.get_finished_spans()
-        turn_span = [s for s in spans if s.attributes.get("gen_ai.operation.name") == "invoke_agent"][0]
+        turn_span = next(
+            s
+            for s in spans
+            if s.attributes.get("gen_ai.operation.name") == "invoke_agent"
+        )
         assert turn_span.status.status_code == StatusCode.ERROR
 
     def test_subagent_records_exception(self, otel_spans: InMemorySpanExporter) -> None:

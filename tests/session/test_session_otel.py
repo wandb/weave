@@ -215,9 +215,7 @@ class TestLLMAttributes:
         assert "gen_ai.system_instructions" not in attrs
 
     def test_empty_messages_omitted(self) -> None:
-        attrs = llm_attributes(
-            model="gpt-4o", input_messages=[], output_messages=[]
-        )
+        attrs = llm_attributes(model="gpt-4o", input_messages=[], output_messages=[])
         assert "gen_ai.input.messages" not in attrs
         assert "gen_ai.output.messages" not in attrs
 
@@ -238,9 +236,7 @@ class TestLLMAttributes:
         assert "gen_ai.reasoning.content" not in attrs
 
     def test_multiple_finish_reasons(self) -> None:
-        attrs = llm_attributes(
-            model="gpt-4o", finish_reasons=["stop", "length"]
-        )
+        attrs = llm_attributes(model="gpt-4o", finish_reasons=["stop", "length"])
         assert attrs["gen_ai.response.finish_reasons"] == ["stop", "length"]
 
 
