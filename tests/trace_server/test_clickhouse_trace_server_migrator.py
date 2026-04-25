@@ -626,6 +626,28 @@ def test_create_distributed_table_sql_id_sharded():
 
 
 @pytest.mark.parametrize(
+    ("table_name", "expected_expr"),
+    [
+        ("spans", "sipHash64(trace_id)"),
+        ("messages", "sipHash64(trace_id)"),
+        ("agents", "sipHash64(project_id, agent_name)"),
+        ("agent_versions", "sipHash64(project_id, agent_name)"),
+    ],
+)
+def test_create_distributed_table_sql_agent_tables_sharded(table_name, expected_expr):
+    """Test distributed table creation SQL for GenAI agent tables."""
+    distributed_migrator = DistributedClickHouseTraceServerMigrator(
+        _make_ch_client(),
+        replicated_cluster="test_cluster",
+        migration_dir=DEFAULT_MIGRATION_DIR,
+    )
+
+    sql = distributed_migrator._create_distributed_table_sql(table_name)
+
+    assert expected_expr in sql
+
+
+@pytest.mark.parametrize(
     ("shard_key", "expected_expr"),
     [
         ("trace_id", "sipHash64(trace_id)"),

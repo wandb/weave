@@ -140,11 +140,21 @@ _MIGRATIONS_TABLE_COLUMNS = """
     partially_applied_version UInt64 NULL,
 """
 
-# Tables that use ID-based sharding (sipHash64(field)) instead of random sharding
-# in distributed mode. Maps table name to the field used for sharding.
+# Tables that use deterministic sharding instead of rand() in distributed mode.
+# Maps table name to the argument list passed to sipHash64(...).
 # calls_complete: shard key is configurable via WF_CLICKHOUSE_CALLS_SHARD_KEY env var
 # Valid values: "trace_id" (default), "id", "project_id"
-ID_SHARDED_TABLES: dict[str, str] = {"calls_complete": wf_clickhouse_calls_shard_key()}
+ID_SHARDED_TABLES: dict[str, str] = {
+    "calls_complete": wf_clickhouse_calls_shard_key(),
+    # Keep one trace/turn on one shard. This matches the default calls sharding
+    # key and keeps trace detail reads local.
+    "spans": "trace_id",
+    "messages": "trace_id",
+    # Keep each agent aggregate on one shard. Shard versions by the same key so
+    # "versions for agent" queries have the same locality as the agent row.
+    "agents": "project_id, agent_name",
+    "agent_versions": "project_id, agent_name",
+}
 
 
 @dataclass(frozen=True)
@@ -1125,13 +1135,13 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
     def _create_distributed_table_sql(self, table_name: str) -> str:
         """Generate SQL to create a distributed table.
 
-        For tables in ID_SHARDED_TABLES, uses sipHash64(field) as the sharding key
-        to ensure all data for a specific ID goes to the same shard, enabling
-        efficient point lookups. Other tables use rand() for even distribution.
+        For tables in ID_SHARDED_TABLES, uses sipHash64(...) as the sharding key
+        to keep rows for the query's locality key on one shard. Other tables
+        use rand() for even distribution.
         """
         local_table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
-        if shard_field := ID_SHARDED_TABLES.get(table_name):
-            sharding_key = f"sipHash64({shard_field})"
+        if shard_expr := ID_SHARDED_TABLES.get(table_name):
+            sharding_key = f"sipHash64({shard_expr})"
         else:
             sharding_key = "rand()"
         on_cluster = self._get_on_cluster_clause(self.ch_client.database)

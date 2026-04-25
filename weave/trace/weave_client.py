@@ -55,6 +55,8 @@ from weave.trace.object_record import (
 )
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import (
+    PostprocessInputsFunc,
+    PostprocessOutputFunc,
     as_op,
     is_op,
     is_placeholder_call,
@@ -365,10 +367,17 @@ class WeaveClient:
         project: str,
         server: TraceServerClientInterface,
         ensure_project_exists: bool = True,
+        *,
+        postprocess_inputs: PostprocessInputsFunc | None = None,
+        postprocess_output: PostprocessOutputFunc | None = None,
+        attributes: dict[str, Any] | None = None,
     ):
         self.entity = entity
         self.project = project
         self.server = server
+        self.postprocess_inputs = postprocess_inputs
+        self.postprocess_output = postprocess_output
+        self.attributes: dict[str, Any] = attributes or {}
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
         self.project_id_resolver = ProjectIdResolver(server)
@@ -756,8 +765,6 @@ class WeaveClient:
         ):
             return placeholder_call()
 
-        from weave.trace.api import _global_attributes, _global_postprocess_inputs
-
         if isinstance(op, str):
             if op not in self._anonymous_ops:
                 self._anonymous_ops[op] = _build_anonymous_op(op)
@@ -773,8 +780,8 @@ class WeaveClient:
         else:
             inputs_postprocessed = inputs_sensitive_keys_redacted
 
-        if _global_postprocess_inputs:
-            inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
+        if self.postprocess_inputs:
+            inputs_postprocessed = self.postprocess_inputs(inputs_postprocessed)
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -792,9 +799,9 @@ class WeaveClient:
         if not attributes:
             attributes = {}
 
-        # First create an AttributesDict with global attributes, then update with local attributes
-        # Local attributes take precedence over global ones
-        attributes_dict = AttributesDict(**zip_dicts(_global_attributes, attributes))
+        # First create an AttributesDict with the client's default attributes, then update with
+        # per-call attributes. Per-call attributes take precedence over the client defaults.
+        attributes_dict = AttributesDict(**zip_dicts(self.attributes, attributes))
 
         if should_capture_client_info():
             attributes_dict._set_weave_item("client_version", version.VERSION)
@@ -975,8 +982,6 @@ class WeaveClient:
         ):
             return None
 
-        from weave.trace.api import _global_postprocess_output
-
         if ended_at is None:
             ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
@@ -987,8 +992,8 @@ class WeaveClient:
         else:
             postprocessed_output = original_output
 
-        if _global_postprocess_output:
-            postprocessed_output = _global_postprocess_output(postprocessed_output)
+        if self.postprocess_output:
+            postprocessed_output = self.postprocess_output(postprocessed_output)
 
         self._save_nested_objects(postprocessed_output)
         output_as_refs = map_to_refs(postprocessed_output)

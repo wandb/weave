@@ -1,6 +1,7 @@
 import os
 import random
 
+import pytest
 import torch
 from pydantic import BaseModel
 from torch import Tensor
@@ -119,11 +120,19 @@ def test_generate_context_and_output():
 
 
 def test_download_model_default_env_var():
+    pytest.importorskip(
+        "wandb",
+        reason="requires `wandb`; install with `pip install 'weave[wandb]'`",
+    )
     tiny_model_path = download_model_from_wandb(TINY_MODEL_PATHS["bias_scorer"])
     assert tiny_model_path.exists()
 
 
 def test_download_model_custom_env_var():
+    pytest.importorskip(
+        "wandb",
+        reason="requires `wandb`; install with `pip install 'weave[wandb]'`",
+    )
     os.environ["WEAVE_SCORERS_DIR"] = "/tmp/weave-scorers"
     tiny_model_path = download_model_from_wandb(TINY_MODEL_PATHS["bias_scorer"])
     assert tiny_model_path.exists()
@@ -150,6 +159,10 @@ def test_load_hf_model_weights_with_default():
 
 def test_load_hf_model_weights_with_wandb_artifact():
     """Test load_local_model_weights function with W&B artifact path (backward compatibility)."""
+    pytest.importorskip(
+        "wandb",
+        reason="requires `wandb`; install with `pip install 'weave[wandb]'`",
+    )
     # Test with W&B artifact path (should still work)
     result_path = load_local_model_weights(
         model_name_or_path=TINY_MODEL_PATHS["bias_scorer"]

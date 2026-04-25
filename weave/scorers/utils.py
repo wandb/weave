@@ -15,7 +15,11 @@ def download_model_from_wandb(artifact_path: str | Path) -> Path:
         from wandb import Api
     except ImportError:
         raise ImportError(
-            "The `wandb` package is required to download models, please run `pip install wandb`"
+            "Loading a scorer model from a W&B Artifact requires the `wandb` "
+            "package. Install it with:\n"
+            "    pip install 'weave[wandb]'\n"
+            "Then retry. If you don't need W&B Artifact downloads, pass a "
+            "local path or a Hugging Face model name to the scorer instead."
         ) from None
 
     api = Api()

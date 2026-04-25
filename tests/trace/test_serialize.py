@@ -7,8 +7,8 @@ from weave.trace.object_record import pydantic_object_record
 from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
     dictify,
-    fallback_encode,
     is_pydantic_model_class,
+    stringify,
     to_json,
 )
 
@@ -144,21 +144,14 @@ def test_dictify_to_dict() -> None:
     }
 
 
-def test_fallback_encode_dictify_fails() -> None:
+def test_stringify_returns_repr() -> None:
+    @dataclass
     class Point:
         x: int
         y: int
 
-        def __init__(self, x: int, y: int) -> None:
-            self.x = x
-            self.y = y
-
-        def to_dict(self) -> dict:
-            # Intentionally make dictify fail
-            raise ValueError("a bug in user code")
-
     pt = Point(1, 2)
-    assert fallback_encode(pt) == repr(pt)
+    assert stringify(pt) == repr(pt)
 
 
 def test_dictify_sanitizes() -> None:

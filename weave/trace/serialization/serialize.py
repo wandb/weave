@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Sequence
 from types import CoroutineType
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, TypedDict
 
 from pydantic import BaseModel
 
@@ -13,7 +13,6 @@ from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
 from weave.trace_server.trace_server_interface import (
-    FileContentReadReq,
     FileCreateReq,
     TraceServerInterface,
 )
@@ -36,46 +35,146 @@ def is_pydantic_model_class(obj: Any) -> bool:
         return False
 
 
+# A JSON-safe value — the target shape every encoder produces on match. The
+# leaf types line up with what json.dumps accepts; the recursion covers nested
+# containers. Some encoder outputs are typed ``Any`` in practice (e.g. dictify,
+# or registry-produced CustomWeaveType payloads), but they still conform
+# structurally via the ``Any``-inside-``dict``/``list`` branches.
+JsonValue: TypeAlias = bool | int | float | str | list[Any] | dict[str, Any] | None
+
+
+class _MissType:
+    """Type of the ``_MISS`` sentinel — a distinct class so encoders can
+    declare "I might decline" in their return type without collapsing to
+    ``Any``. Exactly one instance exists (``_MISS``).
+    """
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "<_MISS>"
+
+
+# Sentinel returned by an encoder when the input is not its responsibility.
+_MISS: _MissType = _MissType()
+
+
+class Encoder(Protocol):
+    """A single step in the ``to_json`` priority ladder.
+
+    Called once per candidate value. The encoder either claims the value and
+    returns its JSON-safe encoded form, or declines by returning the ``_MISS``
+    sentinel — in which case ``to_json`` tries the next encoder in order.
+
+    Contract:
+        - Never mutate ``obj``.
+        - Never raise for "not my type" — return ``_MISS``. Exceptions should
+          be reserved for genuine encoding failures (bad state, I/O errors).
+        - Recurse through ``to_json`` for nested values rather than calling
+          other encoders directly, so the full ladder applies uniformly.
+    """
+
+    def __call__(
+        self,
+        obj: Any,
+        project_id: str,
+        client: WeaveClient,
+        use_dictify: bool,
+    ) -> JsonValue | _MissType: ...
+
+
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
-    if isinstance(obj, TableRef):
+    """Encode an arbitrary Python value to a JSON-safe payload.
+
+    Dispatch is a priority ladder. Each encoder below is asked in order;
+    the first one to return a non-_MISS value wins. ``stringify`` is the
+    terminal fallback and always succeeds.
+
+    Order:
+        1. _encode_ref                 Ref (TableRef, ObjectRef) -> URI string
+        2. _encode_object_record       ObjectRecord wrapper
+        3. _encode_container           namedtuple / list / tuple / dict
+        4. _encode_pydantic_schema     pydantic class (not instance) -> schema
+        5. _encode_primitive           int / float / str / bool / None
+        6. _encode_weave_scorer_result WeaveScorerResult (special case)
+        7. _encode_custom_obj          registered type serializers
+        8. _encode_dictify             use_dictify fallback
+        9. _encode_try_to_dict         duck-typed to_dict fallback
+       10. stringify                   repr/str terminal fallback
+    """
+    for encoder in _ENCODERS:
+        result = encoder(obj, project_id, client, use_dictify)
+        if not isinstance(result, _MissType):
+            return result
+    return stringify(obj)
+
+
+def _encode_ref(
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool
+) -> Any:
+    if isinstance(obj, (TableRef, ObjectRef)):
         return obj.uri
-    elif isinstance(obj, ObjectRef):
-        return obj.uri
-    elif isinstance(obj, ObjectRecord):
-        res = {"_type": obj._class_name}
-        for k, v in obj.__dict__.items():
-            if k == "ref":
-                # Refs are pointers to remote objects and should not be part of
-                # the serialized payload. They are attached by the client after
-                # the object is saved and returned from the server. If we encounter
-                # a ref in the serialized payload, this would almost certainly be a
-                # bug. However, we would prefer not to raise and error as that would
-                # result in lost data. These refs should be removed before serialization.
-                if v is not None:
-                    logging.exception("Unexpected ref in object record: %s", obj)
-                else:
-                    logging.warning("Unexpected null ref in object record: %s", obj)
-                    continue
-            res[k] = to_json(v, project_id, client, use_dictify)
-        return res
-    elif isinstance_namedtuple(obj):
+    return _MISS
+
+
+def _encode_object_record(
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool
+) -> Any:
+    if not isinstance(obj, ObjectRecord):
+        return _MISS
+    res: dict[str, Any] = {"_type": obj._class_name}
+    for k, v in obj.__dict__.items():
+        if k == "ref":
+            # Refs are pointers to remote objects and should not appear in a
+            # serialized payload — the client attaches them after save. A ref
+            # showing up here is almost certainly a bug, but we log rather
+            # than raise to avoid dropping user data.
+            if v is not None:
+                logging.exception("Unexpected ref in object record: %s", obj)
+            else:
+                logging.warning("Unexpected null ref in object record: %s", obj)
+                continue
+        res[k] = to_json(v, project_id, client, use_dictify)
+    return res
+
+
+def _encode_container(
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool
+) -> Any:
+    if isinstance_namedtuple(obj):
         return {
             k: to_json(v, project_id, client, use_dictify)
             for k, v in obj._asdict().items()
         }
-    elif isinstance(obj, (list, tuple)):
+    if isinstance(obj, (list, tuple)):
         return [to_json(v, project_id, client, use_dictify) for v in obj]
-    elif isinstance(obj, dict):
+    if isinstance(obj, dict):
         return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
-    elif is_pydantic_model_class(obj):
-        return obj.model_json_schema()
+    return _MISS
 
+
+def _encode_pydantic_schema(
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool
+) -> Any:
+    if is_pydantic_model_class(obj):
+        return obj.model_json_schema()
+    return _MISS
+
+
+def _encode_primitive(
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool
+) -> Any:
     if isinstance(obj, (int, float, str, bool)) or obj is None:
         return obj
+    return _MISS
 
-    # Add explicit handling for WeaveScorerResult models
+
+def _encode_weave_scorer_result(
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool
+) -> Any:
+    # Phase-3 target: replace with a registered serializer in weave/flow/scorer.py.
     from weave.flow.scorer import WeaveScorerResult
 
     if isinstance(obj, WeaveScorerResult):
@@ -83,27 +182,52 @@ def to_json(
             k: to_json(v, project_id, client, use_dictify)
             for k, v in obj.model_dump().items()
         }
+    return _MISS
 
-    # This still blocks potentially on large-file i/o.
+
+def _encode_custom_obj(
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool
+) -> Any:
+    # Can block on large-file I/O for file-backed serializers.
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
-        if (
-            use_dictify
-            and not isinstance(obj, ALWAYS_STRINGIFY)
-            and not has_custom_repr(obj)
-        ):
-            return dictify(obj)
+        return _MISS
+    return _build_result_from_encoded(encoded, project_id, client)
 
-        # TODO: I would prefer to only have this once in dictify? Maybe dictify and to_json need to be merged?
-        # However, even if dictify is false, i still want to try to convert to dict
-        elif as_dict := try_to_dict(obj):
-            return {
-                k: to_json(v, project_id, client, use_dictify)
-                for k, v in as_dict.items()
-            }
-        return fallback_encode(obj)
-    result = _build_result_from_encoded(encoded, project_id, client)
-    return result
+
+def _encode_dictify(
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool
+) -> Any:
+    if (
+        use_dictify
+        and not isinstance(obj, ALWAYS_STRINGIFY)
+        and not has_custom_repr(obj)
+    ):
+        return dictify(obj)
+    return _MISS
+
+
+def _encode_try_to_dict(
+    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool
+) -> Any:
+    if as_dict := try_to_dict(obj):
+        return {
+            k: to_json(v, project_id, client, use_dictify) for k, v in as_dict.items()
+        }
+    return _MISS
+
+
+_ENCODERS: list[Encoder] = [
+    _encode_ref,
+    _encode_object_record,
+    _encode_container,
+    _encode_pydantic_schema,
+    _encode_primitive,
+    _encode_weave_scorer_result,
+    _encode_custom_obj,
+    _encode_dictify,
+    _encode_try_to_dict,
+]
 
 
 class EncodedCustomObjDictWithFilesAsDigests(TypedDict, total=False):
@@ -270,36 +394,10 @@ ALWAYS_STRINGIFY = (logging.Logger, CoroutineType)
 DEFAULT_MAX_DICTIFY_DEPTH = 10
 
 
-def fallback_encode(obj: Any) -> Any:
-    rep = None
-    try:
-        rep = repr(obj)
-    except Exception:
-        try:
-            rep = str(obj)
-        except Exception:
-            rep = f"<{type(obj).__name__}: {id(obj)}>"
-    if isinstance(rep, str) and len(rep) > MAX_STR_LEN:
-        rep = rep[:MAX_STR_LEN] + "..."
-    return rep
-
-
 def isinstance_namedtuple(obj: Any) -> bool:
     return (
         isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
     )
-
-
-def _load_custom_obj_files(
-    project_id: str, server: TraceServerInterface, file_digests: dict
-) -> dict[str, bytes]:
-    loaded_files: dict[str, bytes] = {}
-    for name, digest in file_digests.items():
-        file_response = server.file_content_read(
-            FileContentReadReq(project_id=project_id, digest=digest)
-        )
-        loaded_files[name] = file_response.content
-    return loaded_files
 
 
 def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
@@ -323,7 +421,9 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             if "files" in obj:
                 file_spec = obj.get("files")
                 if file_spec:
-                    files = _load_custom_obj_files(project_id, server, file_spec)
+                    files = custom_objs._load_custom_obj_files(
+                        project_id, server, file_spec
+                    )
                     encoded["files"] = files
 
             return custom_objs.decode_custom_obj(encoded)
