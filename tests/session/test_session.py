@@ -167,30 +167,37 @@ class TestAttachMedia:
         llm = LLM(model="gpt-4o")
         result = llm.attach_media(content=b"png_bytes", mime_type="image/png")
         assert result is llm
-        assert len(llm.input_messages) == 1
-        msg = llm.input_messages[0]
-        assert msg.role == "user"
-        assert msg.content == ""
-        assert msg.tool_name == "media:blob:image"
+        assert len(llm.media_attachments) == 1
+        att = llm.media_attachments[0]
+        assert att.kind == "blob"
+        assert att.modality == "image"
+        assert att.mime_type == "image/png"
+        assert att.content == b"png_bytes"
 
     def test_attach_uri(self) -> None:
         llm = LLM(model="gpt-4o")
         llm.attach_media(uri="https://example.com/photo.jpg", modality="image")
-        assert len(llm.input_messages) == 1
-        assert llm.input_messages[0].tool_name == "media:uri:image"
+        assert len(llm.media_attachments) == 1
+        att = llm.media_attachments[0]
+        assert att.kind == "uri"
+        assert att.modality == "image"
+        assert att.uri == "https://example.com/photo.jpg"
 
     def test_attach_file_id(self) -> None:
         llm = LLM(model="gpt-4o")
         llm.attach_media(file_id="file-abc123", mime_type="audio/wav")
-        assert len(llm.input_messages) == 1
-        assert llm.input_messages[0].tool_name == "media:file:audio"
+        assert len(llm.media_attachments) == 1
+        att = llm.media_attachments[0]
+        assert att.kind == "file"
+        assert att.modality == "audio"
+        assert att.file_id == "file-abc123"
 
     def test_modality_inferred_from_mime_type(self) -> None:
         llm = LLM(model="gpt-4o")
         llm.attach_media(content=b"data", mime_type="audio/wav")
-        assert llm.input_messages[0].tool_name == "media:blob:audio"
+        assert llm.media_attachments[0].modality == "audio"
         llm.attach_media(content=b"data", mime_type="video/mp4")
-        assert llm.input_messages[1].tool_name == "media:blob:video"
+        assert llm.media_attachments[1].modality == "video"
 
     def test_requires_exactly_one_source(self) -> None:
         llm = LLM(model="gpt-4o")
@@ -203,7 +210,8 @@ class TestAttachMedia:
         llm = LLM(model="gpt-4o")
         assert not hasattr(llm, "attach_file")
         assert not hasattr(llm, "attach_image")
-        assert not hasattr(llm, "attach_uri")
+        # attach_uri was the old method name; attach_media is the new one
+        assert hasattr(llm, "attach_media")
 
 
 class TestSubAgent:
@@ -527,7 +535,7 @@ class TestOTelSpanEmission:
         assert attrs["gen_ai.conversation.name"] == "Weather Chat"
 
     def test_llm_creates_chat_span(self, otel_spans: InMemorySpanExporter) -> None:
-        with Session(agent_name="bot") as s:
+        with Session(agent_name="bot", session_id="sess-llm") as s:
             with s.start_turn() as turn:
                 with turn.llm(model="gpt-4o", provider_name="openai") as llm:
                     llm.usage = Usage(input_tokens=100, output_tokens=50)
@@ -541,11 +549,12 @@ class TestOTelSpanEmission:
         assert attrs["gen_ai.operation.name"] == "chat"
         assert attrs["gen_ai.request.model"] == "gpt-4o"
         assert attrs["gen_ai.provider.name"] == "openai"
+        assert attrs["gen_ai.conversation.id"] == "sess-llm"
         assert attrs["gen_ai.usage.input_tokens"] == 100
         assert attrs["gen_ai.usage.output_tokens"] == 50
 
     def test_tool_creates_execute_tool_span(self, otel_spans: InMemorySpanExporter) -> None:
-        with Session(agent_name="bot") as s:
+        with Session(agent_name="bot", session_id="sess-tool") as s:
             with s.start_turn() as turn:
                 with turn.tool(name="get_weather", arguments='{"city":"Tokyo"}', tool_call_id="tc_1") as tool:
                     tool.result = "75F"
@@ -556,6 +565,7 @@ class TestOTelSpanEmission:
         attrs = dict(tool_spans[0].attributes or {})
         assert attrs["gen_ai.operation.name"] == "execute_tool"
         assert attrs["gen_ai.tool.name"] == "get_weather"
+        assert attrs["gen_ai.conversation.id"] == "sess-tool"
         assert attrs["gen_ai.tool.call.id"] == "tc_1"
         assert attrs["gen_ai.tool.call.arguments"] == '{"city":"Tokyo"}'
         assert attrs["gen_ai.tool.call.result"] == "75F"

@@ -1,14 +1,15 @@
-"""TracerProvider lifecycle for the Weave Session SDK."""
+"""TracerProvider lifecycle for the Weave Session SDK.
+
+All opentelemetry imports are lazy (inside functions) so this module
+can be imported even when opentelemetry is not installed.
+"""
 
 from __future__ import annotations
 
-from opentelemetry import trace
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from typing import Any
 
 _TRACER_NAME = "weave.session"
-_provider: TracerProvider | None = None
+_provider: Any = None  # TracerProvider | None
 
 
 def setup_tracer_provider(
@@ -27,10 +28,12 @@ def setup_tracer_provider(
     if _provider is not None:
         _provider.shutdown()
 
-    # Lazy import: optional dependency that may not be installed.
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
         OTLPSpanExporter,
     )
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
     headers: dict[str, str] = {}
     if api_key:
@@ -50,8 +53,10 @@ def setup_tracer_provider(
     _provider.add_span_processor(processor)
 
 
-def get_tracer() -> trace.Tracer:
+def get_tracer() -> Any:
     """Return a Tracer from the current provider, or a no-op tracer."""
+    from opentelemetry import trace
+
     if _provider is not None:
         return _provider.get_tracer(_TRACER_NAME)
     return trace.get_tracer(_TRACER_NAME)

@@ -138,6 +138,7 @@ class TestLLMAttributes:
         attrs = llm_attributes(
             model="gpt-4o",
             provider_name="openai",
+            conversation_id="conv-123",
             response_id="resp-abc",
             finish_reasons=["stop"],
             system_instructions=["Be helpful", "Be concise"],
@@ -148,6 +149,7 @@ class TestLLMAttributes:
         assert attrs["gen_ai.operation.name"] == "chat"
         assert attrs["gen_ai.request.model"] == "gpt-4o"
         assert attrs["gen_ai.provider.name"] == "openai"
+        assert attrs["gen_ai.conversation.id"] == "conv-123"
         assert attrs["gen_ai.response.id"] == "resp-abc"
         assert attrs["gen_ai.response.finish_reasons"] == ["stop"]
         assert attrs["gen_ai.usage.input_tokens"] == 100
@@ -161,6 +163,14 @@ class TestLLMAttributes:
         assert raw_in[0]["role"] == "user"
         raw_out = json.loads(attrs["gen_ai.output.messages"])
         assert raw_out[0]["role"] == "assistant"
+
+    def test_conversation_id(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", conversation_id="sess-abc")
+        assert attrs["gen_ai.conversation.id"] == "sess-abc"
+
+    def test_empty_conversation_id_omitted(self) -> None:
+        attrs = llm_attributes(model="gpt-4o", conversation_id="")
+        assert "gen_ai.conversation.id" not in attrs
 
     def test_empty_optional_strings_omitted(self) -> None:
         attrs = llm_attributes(model="gpt-4o", provider_name="", response_id="")
@@ -250,15 +260,25 @@ class TestExecuteToolAttributes:
     def test_all_fields_populated(self) -> None:
         attrs = execute_tool_attributes(
             tool_name="get_weather",
+            conversation_id="conv-123",
             tool_call_id="tc_1",
             tool_call_arguments='{"city": "Tokyo"}',
             tool_call_result='{"temp": "75F"}',
         )
         assert attrs["gen_ai.operation.name"] == "execute_tool"
         assert attrs["gen_ai.tool.name"] == "get_weather"
+        assert attrs["gen_ai.conversation.id"] == "conv-123"
         assert attrs["gen_ai.tool.call.id"] == "tc_1"
         assert attrs["gen_ai.tool.call.arguments"] == '{"city": "Tokyo"}'
         assert attrs["gen_ai.tool.call.result"] == '{"temp": "75F"}'
+
+    def test_conversation_id(self) -> None:
+        attrs = execute_tool_attributes(tool_name="search", conversation_id="sess-abc")
+        assert attrs["gen_ai.conversation.id"] == "sess-abc"
+
+    def test_empty_conversation_id_omitted(self) -> None:
+        attrs = execute_tool_attributes(tool_name="search", conversation_id="")
+        assert "gen_ai.conversation.id" not in attrs
 
     def test_empty_optional_strings_omitted(self) -> None:
         attrs = execute_tool_attributes(

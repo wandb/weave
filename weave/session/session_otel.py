@@ -59,6 +59,7 @@ def llm_attributes(
     *,
     model: str,
     provider_name: str = "",
+    conversation_id: str = "",
     input_messages: list[Message] | None = None,
     output_messages: list[Message] | None = None,
     system_instructions: list[str] | None = None,
@@ -72,6 +73,8 @@ def llm_attributes(
         "gen_ai.operation.name": "chat",
         "gen_ai.request.model": model,
     }
+    if conversation_id:
+        attrs["gen_ai.conversation.id"] = conversation_id
     if provider_name:
         attrs["gen_ai.provider.name"] = provider_name
     if response_id:
@@ -102,6 +105,7 @@ def llm_attributes(
 def execute_tool_attributes(
     *,
     tool_name: str,
+    conversation_id: str = "",
     tool_call_arguments: str = "",
     tool_call_result: str = "",
     tool_call_id: str = "",
@@ -111,6 +115,8 @@ def execute_tool_attributes(
         "gen_ai.operation.name": "execute_tool",
         "gen_ai.tool.name": tool_name,
     }
+    if conversation_id:
+        attrs["gen_ai.conversation.id"] = conversation_id
     if tool_call_id:
         attrs["gen_ai.tool.call.id"] = tool_call_id
     if tool_call_arguments:

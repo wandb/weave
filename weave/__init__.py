@@ -63,6 +63,7 @@ from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
 from weave.session.session import (
     LLM,
     LogResult,
+    MediaAttachment,
     Message,
     Reasoning,
     Session,
@@ -108,6 +109,7 @@ __all__ = [
     "File",
     "LogResult",
     "Markdown",
+    "MediaAttachment",
     "Message",
     "MessagesPrompt",
     "Model",
