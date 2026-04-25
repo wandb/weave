@@ -139,6 +139,11 @@ class Tool(_SpanBase):
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
+        if exc_type is not None and self._otel_span is not None:
+            from opentelemetry.trace import StatusCode
+
+            self._otel_span.set_status(StatusCode.ERROR, str(exc_val))
+            self._otel_span.record_exception(exc_val)
         self.end()
         return False
 
@@ -254,6 +259,11 @@ class LLM(_SpanBase):
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
+        if exc_type is not None and self._otel_span is not None:
+            from opentelemetry.trace import StatusCode
+
+            self._otel_span.set_status(StatusCode.ERROR, str(exc_val))
+            self._otel_span.record_exception(exc_val)
         self.end()
         return False
 
@@ -350,6 +360,11 @@ class SubAgent(_SpanBase):
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
+        if exc_type is not None and self._otel_span is not None:
+            from opentelemetry.trace import StatusCode
+
+            self._otel_span.set_status(StatusCode.ERROR, str(exc_val))
+            self._otel_span.record_exception(exc_val)
         self.end()
         return False
 
@@ -474,6 +489,11 @@ class Turn(_SpanBase):
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
+        if exc_type is not None and self._otel_span is not None:
+            from opentelemetry.trace import StatusCode
+
+            self._otel_span.set_status(StatusCode.ERROR, str(exc_val))
+            self._otel_span.record_exception(exc_val)
         self.end()
         return False
 

@@ -613,3 +613,63 @@ class TestOTelSpanEmission:
         tool_attrs = dict(tool_spans[0].attributes or {})
         assert "gen_ai.tool.call.arguments" not in tool_attrs
         assert "gen_ai.tool.call.result" not in tool_attrs
+
+
+# ---------------------------------------------------------------------------
+# Error recording
+# ---------------------------------------------------------------------------
+
+from opentelemetry.trace import StatusCode
+
+
+class TestErrorRecording:
+    def test_llm_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            with session.start_turn() as turn:
+                try:
+                    with turn.llm(model="gpt-4o") as llm:
+                        raise ValueError("LLM call failed")
+                except ValueError:
+                    pass
+        spans = otel_spans.get_finished_spans()
+        chat_span = [s for s in spans if s.attributes.get("gen_ai.operation.name") == "chat"][0]
+        assert chat_span.status.status_code == StatusCode.ERROR
+        assert "LLM call failed" in chat_span.status.description
+        assert len(chat_span.events) >= 1
+        assert chat_span.events[0].name == "exception"
+
+    def test_tool_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            with session.start_turn() as turn:
+                try:
+                    with turn.tool(name="search") as tool:
+                        raise RuntimeError("tool broke")
+                except RuntimeError:
+                    pass
+        spans = otel_spans.get_finished_spans()
+        tool_span = [s for s in spans if s.attributes.get("gen_ai.operation.name") == "execute_tool"][0]
+        assert tool_span.status.status_code == StatusCode.ERROR
+
+    def test_turn_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            try:
+                with session.start_turn() as turn:
+                    raise RuntimeError("turn broke")
+            except RuntimeError:
+                pass
+        spans = otel_spans.get_finished_spans()
+        turn_span = [s for s in spans if s.attributes.get("gen_ai.operation.name") == "invoke_agent"][0]
+        assert turn_span.status.status_code == StatusCode.ERROR
+
+    def test_subagent_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            with session.start_turn() as turn:
+                try:
+                    with turn.subagent(name="sub") as sa:
+                        raise RuntimeError("sub broke")
+                except RuntimeError:
+                    pass
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [s for s in spans if s.attributes.get("gen_ai.agent.name") == "sub"]
+        assert len(sa_spans) == 1
+        assert sa_spans[0].status.status_code == StatusCode.ERROR
