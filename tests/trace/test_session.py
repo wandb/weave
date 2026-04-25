@@ -147,11 +147,9 @@ class TestLLM:
         assert c.think("Let me consider...") is c
         assert c.reasoning.content == "Let me consider..."
 
-    def test_attach_methods_return_self(self) -> None:
+    def test_attach_media_returns_self(self) -> None:
         c = LLM(model="gpt-4o")
-        assert c.attach_file("file_123") is c
-        assert c.attach_image(b"png_bytes") is c
-        assert c.attach_uri("https://example.com/img.png") is c
+        assert c.attach_media(content=b"png_bytes", mime_type="image/png") is c
 
     def test_context_manager_sets_timestamps(self) -> None:
         with LLM(model="gpt-4o") as c:
@@ -162,6 +160,50 @@ class TestLLM:
         c = LLM(model="gpt-4o")
         c.usage = Usage(input_tokens=100, output_tokens=50, reasoning_tokens=20)
         assert c.usage.input_tokens == 100
+
+
+class TestAttachMedia:
+    def test_attach_inline_image(self) -> None:
+        llm = LLM(model="gpt-4o")
+        result = llm.attach_media(content=b"png_bytes", mime_type="image/png")
+        assert result is llm
+        assert len(llm.input_messages) == 1
+        msg = llm.input_messages[0]
+        assert msg.role == "user"
+        assert msg.content == ""
+        assert msg.tool_name == "media:blob:image"
+
+    def test_attach_uri(self) -> None:
+        llm = LLM(model="gpt-4o")
+        llm.attach_media(uri="https://example.com/photo.jpg", modality="image")
+        assert len(llm.input_messages) == 1
+        assert llm.input_messages[0].tool_name == "media:uri:image"
+
+    def test_attach_file_id(self) -> None:
+        llm = LLM(model="gpt-4o")
+        llm.attach_media(file_id="file-abc123", mime_type="audio/wav")
+        assert len(llm.input_messages) == 1
+        assert llm.input_messages[0].tool_name == "media:file:audio"
+
+    def test_modality_inferred_from_mime_type(self) -> None:
+        llm = LLM(model="gpt-4o")
+        llm.attach_media(content=b"data", mime_type="audio/wav")
+        assert llm.input_messages[0].tool_name == "media:blob:audio"
+        llm.attach_media(content=b"data", mime_type="video/mp4")
+        assert llm.input_messages[1].tool_name == "media:blob:video"
+
+    def test_requires_exactly_one_source(self) -> None:
+        llm = LLM(model="gpt-4o")
+        with pytest.raises(ValueError, match="Exactly one of"):
+            llm.attach_media()
+        with pytest.raises(ValueError, match="Exactly one of"):
+            llm.attach_media(content=b"x", uri="http://x")
+
+    def test_old_methods_removed(self) -> None:
+        llm = LLM(model="gpt-4o")
+        assert not hasattr(llm, "attach_file")
+        assert not hasattr(llm, "attach_image")
+        assert not hasattr(llm, "attach_uri")
 
 
 class TestSubAgent:

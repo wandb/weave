@@ -180,18 +180,46 @@ class LLM(_SpanBase):
         self.reasoning = Reasoning(content=content)
         return self
 
-    def attach_file(self, file_id: str) -> LLM:
-        """Attach a file reference. Stub — stores nothing yet."""
-        return self
-
-    def attach_image(
-        self, content: bytes | str, *, mime_type: str = "image/png"
+    def attach_media(
+        self,
+        *,
+        content: bytes | str = "",
+        uri: str = "",
+        file_id: str = "",
+        mime_type: str = "",
+        modality: str = "",
     ) -> LLM:
-        """Attach an image. Stub — stores nothing yet."""
-        return self
+        """Attach media to input messages.
 
-    def attach_uri(self, uri: str, *, modality: str = "image") -> LLM:
-        """Attach a URI reference. Stub — stores nothing yet."""
+        Exactly one of content, uri, or file_id must be provided.
+        Modality is inferred from mime_type when not set explicitly.
+        """
+        sources = sum(bool(s) for s in (content, uri, file_id))
+        if sources != 1:
+            raise ValueError(
+                "Exactly one of content, uri, or file_id must be provided"
+            )
+
+        if not modality and mime_type:
+            prefix = mime_type.split("/", maxsplit=1)[0]
+            if prefix in {"image", "audio", "video"}:
+                modality = prefix
+
+        if content:
+            kind = "blob"
+        elif uri:
+            kind = "uri"
+        else:
+            kind = "file"
+
+        self.input_messages.append(
+            Message(
+                role="user",
+                content="",
+                tool_name=f"media:{kind}:{modality or 'unknown'}",
+                tool_call_id=mime_type,
+            )
+        )
         return self
 
     def end(self) -> None:
