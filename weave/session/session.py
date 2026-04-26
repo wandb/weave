@@ -494,7 +494,7 @@ class Session(_SpanBase):
     def start_turn(
         self,
         *,
-        user_message: str = "",
+        user_message: str | None = "",
         model: str = "",
         agent_name: str = "",
     ) -> Turn:
@@ -579,7 +579,7 @@ def start_session(
 
 def start_turn(
     *,
-    user_message: str = "",
+    user_message: str | None = "",
     model: str = "",
     agent_name: str = "",
 ) -> Turn:
