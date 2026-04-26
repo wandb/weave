@@ -622,6 +622,19 @@ def start_llm(
     )
 
 
+def start_tool(
+    *,
+    name: str,
+    arguments: str = "",
+    tool_call_id: str = "",
+) -> Tool:
+    """Create a tool execution span. Uses the current turn if available.
+
+    If no turn is active, returns a standalone Tool.
+    """
+    return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+
+
 def end_session() -> None:
     """End the current session (from contextvar)."""
     session = get_current_session()

@@ -81,6 +81,7 @@ from weave.session.session import (
     log_turn,
     start_llm,
     start_session,
+    start_tool,
     start_turn,
 )
 from weave.trace.log_call import log_call
@@ -161,6 +162,7 @@ __all__ = [
     "set_view",
     "start_llm",
     "start_session",
+    "start_tool",
     "start_turn",
     "thread",
     "weave_client_context",

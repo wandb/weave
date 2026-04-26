@@ -106,6 +106,41 @@ def _weave_is_available(server: TraceServerClientInterface) -> bool:
     return True
 
 
+def _setup_session_tracing(
+    entity: str, project: str, api_key: str | None
+) -> None:
+    """Configure the Session SDK's OTel TracerProvider using weave credentials.
+
+    Called automatically by init_weave(). No-ops silently if opentelemetry
+    is not installed or the trace server URL is not configured.
+    """
+    try:
+        from weave.session.otel_setup import get_tracer, setup_tracer_provider
+
+        # Don't reconfigure if already set up (e.g. from a previous init call)
+        tracer = get_tracer()
+        span = tracer.start_span("_probe")
+        is_recording = span.is_recording()
+        span.end()
+        if is_recording:
+            return
+
+        trace_server_url = env.weave_trace_server_url()
+        if not trace_server_url:
+            return
+
+        endpoint = f"{trace_server_url.rstrip('/')}/otel/v1/genai/traces"
+        setup_tracer_provider(
+            endpoint=endpoint,
+            api_key=api_key or "",
+            entity=entity,
+            project=project,
+        )
+    except Exception:
+        # Session SDK tracing is optional — never block init.
+        logger.debug("Session SDK tracing setup skipped", exc_info=True)
+
+
 def init_weave(
     project_name: str,
     ensure_project_exists: bool = True,
@@ -167,6 +202,11 @@ def init_weave(
     project_name = client.project
 
     weave_client_context.set_weave_client_global(client)
+
+    # Configure Session SDK OTel tracing using the same server credentials.
+    # This enables the Session → Turn → LLM → Tool span hierarchy for the
+    # Weave Agents tab. No-ops silently if opentelemetry is not installed.
+    _setup_session_tracing(entity_name, project_name, api_key)
 
     # Implicit patching:
     # 1. Check sys.modules and automatically patch any already-imported integrations
