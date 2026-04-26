@@ -495,8 +495,8 @@ class Session(_SpanBase):
         self,
         *,
         user_message: str | None = "",
-        model: str = "",
-        agent_name: str = "",
+        model: str | None = "",
+        agent_name: str | None = "",
     ) -> Turn:
         """Create a new turn. Auto-ends the previous turn if still open.
 
@@ -559,18 +559,18 @@ _current_llm: ContextVar[LLM | None] = ContextVar("_current_llm", default=None)
 
 def start_session(
     *,
-    agent_name: str = "",
-    model: str = "",
-    session_id: str = "",
-    session_name: str = "",
+    agent_name: str | None = "",
+    model: str | None = "",
+    session_id: str | None = "",
+    session_name: str | None = "",
     include_content: bool = True,
 ) -> Session:
     """Create and activate a session. Sets the contextvar for cross-module access."""
     session = Session(
-        agent_name=agent_name,
-        model=model,
-        session_id=session_id,
-        session_name=session_name,
+        agent_name=agent_name or "",
+        model=model or "",
+        session_id=session_id or "",
+        session_name=session_name or "",
         include_content=include_content,
     )
     session._token = _current_session.set(session)
@@ -580,8 +580,8 @@ def start_session(
 def start_turn(
     *,
     user_message: str | None = "",
-    model: str = "",
-    agent_name: str = "",
+    model: str | None = "",
+    agent_name: str | None = "",
 ) -> Turn:
     """Create and activate a turn. Uses the current session if available.
 
@@ -592,7 +592,7 @@ def start_turn(
         return session.start_turn(
             user_message=user_message, model=model, agent_name=agent_name
         )
-    turn = Turn(agent_name=agent_name, model=model)
+    turn = Turn(agent_name=agent_name or "", model=model or "")
     if user_message:
         turn.messages.append(Message(role="user", content=user_message))
     return turn
@@ -600,8 +600,8 @@ def start_turn(
 
 def start_llm(
     *,
-    model: str = "",
-    provider_name: str = "",
+    model: str | None = "",
+    provider_name: str | None = "",
     system_instructions: list[str] | None = None,
 ) -> LLM:
     """Create and activate an LLM call. Uses the current turn if available.
@@ -611,13 +611,13 @@ def start_llm(
     turn = get_current_turn()
     if turn is not None:
         return turn.llm(
-            model=model,
-            provider_name=provider_name,
+            model=model or "",
+            provider_name=provider_name or "",
             system_instructions=system_instructions,
         )
     return LLM(
-        model=model,
-        provider_name=provider_name,
+        model=model or "",
+        provider_name=provider_name or "",
         system_instructions=system_instructions or [],
     )
 
@@ -625,14 +625,14 @@ def start_llm(
 def start_tool(
     *,
     name: str,
-    arguments: str = "",
-    tool_call_id: str = "",
+    arguments: str | None = "",
+    tool_call_id: str | None = "",
 ) -> Tool:
     """Create a tool execution span. Uses the current turn if available.
 
     If no turn is active, returns a standalone Tool.
     """
-    return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+    return Tool(name=name, arguments=arguments or "", tool_call_id=tool_call_id or "")
 
 
 def end_session() -> None:
