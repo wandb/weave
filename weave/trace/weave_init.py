@@ -106,9 +106,7 @@ def _weave_is_available(server: TraceServerClientInterface) -> bool:
     return True
 
 
-def _setup_session_tracing(
-    entity: str, project: str, api_key: str | None
-) -> None:
+def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> None:
     """Configure the Session SDK's OTel TracerProvider using weave credentials.
 
     Called automatically by init_weave(). No-ops silently if opentelemetry
