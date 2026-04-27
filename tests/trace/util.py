@@ -138,3 +138,22 @@ def flushing_callback(client):
         time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
 
     return _callback
+
+
+def flush_and_wait_for_output(
+    client,
+    captured_logs: io.StringIO,
+    expected_text: str,
+    *,
+    expected_count: int = 1,
+    timeout: float = 1.0,
+) -> bool:
+    """Flush queued work and wait for output emitted by Future callbacks."""
+    deadline = time.monotonic() + timeout
+    while True:
+        client.future_executor.flush()
+        if captured_logs.getvalue().count(expected_text) >= expected_count:
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.01)

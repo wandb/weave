@@ -1,7 +1,11 @@
 import pytest
 
 import weave
-from tests.trace.util import capture_output, flushing_callback
+from tests.trace.util import (
+    capture_output,
+    flush_and_wait_for_output,
+    flushing_callback,
+)
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.display.term import configure_logger
 
@@ -19,9 +23,9 @@ async def afunc():
 
 
 def test_call_prints_link(client):
-    callbacks = [flushing_callback(client)]
-    with capture_output(callbacks) as captured:
+    with capture_output([]) as captured:
         func()
+        assert flush_and_wait_for_output(client, captured, TRACE_CALL_EMOJI)
 
     assert captured.getvalue().count(TRACE_CALL_EMOJI) == 1
 
@@ -37,9 +41,9 @@ def test_call_doesnt_print_link_if_failed(client_with_throwing_server):
 
 @pytest.mark.asyncio
 async def test_async_call_prints_link(client):
-    callbacks = [flushing_callback(client)]
-    with capture_output(callbacks) as captured:
+    with capture_output([]) as captured:
         await afunc()
+        assert flush_and_wait_for_output(client, captured, TRACE_CALL_EMOJI)
 
     assert captured.getvalue().count(TRACE_CALL_EMOJI) == 1
 
@@ -67,9 +71,9 @@ def test_nested_calls_print_single_link(client):
     def outer(a, b):
         return middle(a, b)
 
-    callbacks = [flushing_callback(client)]
-    with capture_output(callbacks) as captured:
+    with capture_output([]) as captured:
         outer(1, 2)
+        assert flush_and_wait_for_output(client, captured, TRACE_CALL_EMOJI)
 
     # Check that all 3 calls landed
     calls = list(client.get_calls())

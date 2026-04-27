@@ -8,11 +8,18 @@ import pytest
 import tenacity
 
 import weave
-from tests.trace.util import capture_output, flushing_callback
+from tests.trace.util import (
+    capture_output,
+    flush_and_wait_for_output,
+    flushing_callback,
+)
 from weave.trace.constants import TRACE_CALL_EMOJI, TRACE_OBJECT_EMOJI
+from weave.trace.display.term import configure_logger
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import get_parallelism_settings
 from weave.utils.retry import with_retry
+
+configure_logger()
 
 
 @weave.op
@@ -129,9 +136,9 @@ def test_print_call_link_setting(client_creator):
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
     with client_creator(settings=UserSettings(print_call_link=True)) as client:
-        callbacks = [flushing_callback(client)]
-        with capture_output(callbacks) as captured:
+        with capture_output([]) as captured:
             func()
+            assert flush_and_wait_for_output(client, captured, TRACE_CALL_EMOJI)
     assert TRACE_CALL_EMOJI in captured.getvalue()
 
 
@@ -144,9 +151,9 @@ def test_print_call_link_env(client):
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
     os.environ["WEAVE_PRINT_CALL_LINK"] = "true"
-    callbacks = [flushing_callback(client)]
-    with capture_output(callbacks) as captured:
+    with capture_output([]) as captured:
         func()
+        assert flush_and_wait_for_output(client, captured, TRACE_CALL_EMOJI)
 
     assert TRACE_CALL_EMOJI in captured.getvalue()
 
