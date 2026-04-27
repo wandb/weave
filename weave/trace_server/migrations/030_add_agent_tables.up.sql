@@ -52,8 +52,6 @@ CREATE TABLE IF NOT EXISTS spans (
     request_temperature     Float64 DEFAULT 0,
     request_max_tokens      UInt64 DEFAULT 0,
     request_top_p           Float64 DEFAULT 0,
-    request_top_k           UInt64 DEFAULT 0,
-    request_encoding_formats Array(String) DEFAULT [],
     request_frequency_penalty Float64 DEFAULT 0,
     request_presence_penalty  Float64 DEFAULT 0,
     request_seed            Int64 DEFAULT 0,
@@ -61,8 +59,6 @@ CREATE TABLE IF NOT EXISTS spans (
     request_choice_count    UInt32 DEFAULT 0,
 
     output_type         String DEFAULT '',
-    data_source_id      String DEFAULT '',
-    retrieval_query_text String DEFAULT '',
 
     input_messages  Array(Tuple(
         role String, content String, finish_reason String

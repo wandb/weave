@@ -68,6 +68,7 @@ def test_extract_genai_span_comprehensive() -> None:
             "weave.usage.reasoning_tokens": 30,
             "gen_ai.response.finish_reasons": ["stop"],
             "gen_ai.request.temperature": 0.7,
+            # Not promoted yet; these should fall through to custom attrs.
             "gen_ai.request.top_k": 40,
             "gen_ai.request.encoding_formats": ["float"],
             "gen_ai.data_source.id": "ds-1",
@@ -128,10 +129,6 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.request_model == "gpt-4o"
     assert result.response_model == "gpt-4o-2024-05-13"
     assert result.request_temperature == 0.7
-    assert result.request_top_k == 40
-    assert result.request_encoding_formats == ["float"]
-    assert result.data_source_id == "ds-1"
-    assert result.retrieval_query_text == "Paris weather"
 
     # Token usage
     assert result.input_tokens == 100
@@ -168,6 +165,10 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.custom_attrs_string["my.custom.string"] == "hello"
     assert result.custom_attrs_int["my.custom.int"] == 42
     assert result.custom_attrs_float["my.custom.float"] == 3.14
+    assert result.custom_attrs_int["gen_ai.request.top_k"] == 40
+    assert result.custom_attrs_string["gen_ai.request.encoding_formats"] == '["float"]'
+    assert result.custom_attrs_string["gen_ai.data_source.id"] == "ds-1"
+    assert result.custom_attrs_string["gen_ai.retrieval.query.text"] == "Paris weather"
 
     # Raw dumps populated for debugging
     assert result.raw_span_dump != ""

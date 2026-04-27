@@ -14,6 +14,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
     CUSTOM_ATTR_TRUNCATION_MARKER,
     MAX_CUSTOM_ATTR_VALUE_CHARS,
@@ -23,7 +24,6 @@ from weave.trace_server.agents.schema import (
     AgentSpanCHInsertable,
     NormalizedMessage,
 )
-from weave.trace_server.agents.semconv import KNOWN_KEYS, K
 from weave.trace_server.opentelemetry.helpers import get_attribute, to_json_serializable
 from weave.trace_server.opentelemetry.python_spans import Span
 from weave.trace_server.query_builder.agent_query_builder import (
@@ -107,12 +107,16 @@ def _str_list(val: Any) -> list[str]:
 
 
 def extract_provider(attrs: dict[str, Any]) -> str:
-    val = _get(attrs, *K["weave.provider.name"], *K["weave.system"])
+    val = _get(
+        attrs,
+        *semconv.PROVIDER_NAME.lookup_keys,
+        *semconv.SYSTEM.lookup_keys,
+    )
     return str(val).lower() if val else ""
 
 
 def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
-    val = _get(attrs, *K["weave.operation.name"])
+    val = _get(attrs, *semconv.OPERATION_NAME.lookup_keys)
     if val:
         return str(val)
 
@@ -125,7 +129,7 @@ def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
 
 
 def extract_agent_name(attrs: dict[str, Any], span_name: str) -> str:
-    val = _get(attrs, *K["weave.agent.name"])
+    val = _get(attrs, *semconv.AGENT_NAME.lookup_keys)
     if val:
         return str(val)
     if span_name.lower().startswith("invoke_agent "):
@@ -134,25 +138,25 @@ def extract_agent_name(attrs: dict[str, Any], span_name: str) -> str:
 
 
 def extract_conversation_id(attrs: dict[str, Any]) -> str:
-    val = _get(attrs, *K["weave.conversation.id"])
+    val = _get(attrs, *semconv.CONVERSATION_ID.lookup_keys)
     return str(val) if val else ""
 
 
 def extract_conversation_name(attrs: dict[str, Any]) -> str:
-    val = _get(attrs, *K["weave.conversation.name"])
+    val = _get(attrs, *semconv.CONVERSATION_NAME.lookup_keys)
     return str(val) if val else ""
 
 
 def extract_input_tokens(attrs: dict[str, Any]) -> int:
-    return safe_int(_get(attrs, *K["weave.usage.input_tokens"]))
+    return safe_int(_get(attrs, *semconv.USAGE_INPUT_TOKENS.lookup_keys))
 
 
 def extract_output_tokens(attrs: dict[str, Any]) -> int:
-    return safe_int(_get(attrs, *K["weave.usage.output_tokens"]))
+    return safe_int(_get(attrs, *semconv.USAGE_OUTPUT_TOKENS.lookup_keys))
 
 
 def extract_reasoning_tokens(attrs: dict[str, Any]) -> int:
-    return safe_int(_get(attrs, *K["weave.usage.reasoning_tokens"]))
+    return safe_int(_get(attrs, *semconv.USAGE_REASONING_TOKENS.lookup_keys))
 
 
 def extract_reasoning_content(raw_output: Any) -> str:
@@ -183,7 +187,7 @@ def extract_reasoning_content(raw_output: Any) -> str:
 
 
 def extract_finish_reasons(attrs: dict[str, Any]) -> list[str]:
-    val = _get(attrs, *K["weave.response.finish_reasons"])
+    val = _get(attrs, *semconv.RESPONSE_FINISH_REASONS.lookup_keys)
     if isinstance(val, list):
         return [str(v) for v in val]
     if isinstance(val, str):
@@ -194,7 +198,7 @@ def extract_finish_reasons(attrs: dict[str, Any]) -> list[str]:
 def extract_tool_call_arguments(
     attrs: dict[str, Any], events: list[dict[str, Any]]
 ) -> str:
-    val = _get(attrs, *K["weave.tool.call.arguments"])
+    val = _get(attrs, *semconv.TOOL_CALL_ARGUMENTS.lookup_keys)
     if val:
         return _json_str(val)
 
@@ -211,7 +215,7 @@ def extract_tool_call_arguments(
 def extract_tool_call_result(
     attrs: dict[str, Any], events: list[dict[str, Any]]
 ) -> str:
-    val = _get(attrs, *K["weave.tool.call.result"])
+    val = _get(attrs, *semconv.TOOL_CALL_RESULT.lookup_keys)
     if val:
         return _json_str(val)
 
@@ -329,11 +333,11 @@ def _extract_raw_input(attrs: dict[str, Any], events: list[dict[str, Any]]) -> A
     span row. Event fallbacks cover producers that follow the older GenAI
     semantic convention event shape.
     """
-    val = _get(attrs, *K["weave.input.messages"])
+    val = _get(attrs, *semconv.INPUT_MESSAGES.lookup_keys)
     if val is not None:
         return val
 
-    val = _get(attrs, *K["weave.prompt"])
+    val = _get(attrs, *semconv.PROMPT.lookup_keys)
     if val is not None:
         return val
 
@@ -349,11 +353,11 @@ def _extract_raw_input(attrs: dict[str, Any], events: list[dict[str, Any]]) -> A
 
 def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
     """Return raw output messages from attrs, legacy completion attrs, or events."""
-    val = _get(attrs, *K["weave.output.messages"])
+    val = _get(attrs, *semconv.OUTPUT_MESSAGES.lookup_keys)
     if val is not None:
         return val
 
-    val = _get(attrs, *K["weave.completion"])
+    val = _get(attrs, *semconv.COMPLETION.lookup_keys)
     if val is not None:
         return val
 
@@ -410,7 +414,7 @@ def _extract_custom_attrs(attrs: dict[str, Any]) -> CustomAttrs:
     bool_map: dict[str, bool] = {}
 
     for key, val in _flatten_attrs(attrs):
-        if key in KNOWN_KEYS:
+        if key in semconv.KNOWN_KEYS:
             continue
         if val is None or val == "":
             continue
@@ -498,75 +502,75 @@ def extract_genai_span(
         operation_name=extract_operation_name(attrs, span.name),
         provider_name=extract_provider(attrs),
         agent_name=extract_agent_name(attrs, span.name),
-        agent_id=_get_str(attrs, *K["weave.agent.id"]),
-        agent_description=_get_str(attrs, *K["weave.agent.description"]),
-        agent_version=_get_str(attrs, *K["weave.agent.version"]),
-        request_model=_get_str(attrs, *K["weave.request.model"]),
-        response_model=_get_str(attrs, *K["weave.response.model"]),
-        response_id=_get_str(attrs, *K["weave.response.id"]),
+        agent_id=_get_str(attrs, *semconv.AGENT_ID.lookup_keys),
+        agent_description=_get_str(attrs, *semconv.AGENT_DESCRIPTION.lookup_keys),
+        agent_version=_get_str(attrs, *semconv.AGENT_VERSION.lookup_keys),
+        request_model=_get_str(attrs, *semconv.REQUEST_MODEL.lookup_keys),
+        response_model=_get_str(attrs, *semconv.RESPONSE_MODEL.lookup_keys),
+        response_id=_get_str(attrs, *semconv.RESPONSE_ID.lookup_keys),
         input_tokens=input_t,
         output_tokens=output_t,
         reasoning_tokens=reasoning_t,
         cache_creation_input_tokens=safe_int(
-            _get(attrs, *K["weave.usage.cache_creation.input_tokens"])
+            _get(attrs, *semconv.USAGE_CACHE_CREATION_INPUT_TOKENS.lookup_keys)
         ),
         cache_read_input_tokens=safe_int(
-            _get(attrs, *K["weave.usage.cache_read.input_tokens"])
+            _get(attrs, *semconv.USAGE_CACHE_READ_INPUT_TOKENS.lookup_keys)
         ),
         reasoning_content=reasoning_content,
         conversation_id=extract_conversation_id(attrs),
         conversation_name=extract_conversation_name(attrs),
-        tool_name=_get_str(attrs, *K["weave.tool.name"]),
-        tool_type=_get_str(attrs, *K["weave.tool.type"]),
-        tool_call_id=_get_str(attrs, *K["weave.tool.call.id"]),
-        tool_description=_get_str(attrs, *K["weave.tool.description"]),
-        tool_definitions=_json_str(_get(attrs, *K["weave.tool.definitions"])),
+        tool_name=_get_str(attrs, *semconv.TOOL_NAME.lookup_keys),
+        tool_type=_get_str(attrs, *semconv.TOOL_TYPE.lookup_keys),
+        tool_call_id=_get_str(attrs, *semconv.TOOL_CALL_ID.lookup_keys),
+        tool_description=_get_str(attrs, *semconv.TOOL_DESCRIPTION.lookup_keys),
+        tool_definitions=_json_str(_get(attrs, *semconv.TOOL_DEFINITIONS.lookup_keys)),
         finish_reasons=extract_finish_reasons(attrs),
-        error_type=_get_str(attrs, *K["weave.error.type"]),
-        request_temperature=safe_float(_get(attrs, *K["weave.request.temperature"])),
-        request_max_tokens=safe_int(_get(attrs, *K["weave.request.max_tokens"])),
-        request_top_p=safe_float(_get(attrs, *K["weave.request.top_p"])),
-        request_top_k=safe_int(_get(attrs, *K["weave.request.top_k"])),
-        request_encoding_formats=_str_list(
-            _get(attrs, *K["weave.request.encoding_formats"])
+        error_type=_get_str(attrs, *semconv.ERROR_TYPE.lookup_keys),
+        request_temperature=safe_float(
+            _get(attrs, *semconv.REQUEST_TEMPERATURE.lookup_keys)
         ),
+        request_max_tokens=safe_int(
+            _get(attrs, *semconv.REQUEST_MAX_TOKENS.lookup_keys)
+        ),
+        request_top_p=safe_float(_get(attrs, *semconv.REQUEST_TOP_P.lookup_keys)),
         request_frequency_penalty=safe_float(
-            _get(attrs, *K["weave.request.frequency_penalty"])
+            _get(attrs, *semconv.REQUEST_FREQUENCY_PENALTY.lookup_keys)
         ),
         request_presence_penalty=safe_float(
-            _get(attrs, *K["weave.request.presence_penalty"])
+            _get(attrs, *semconv.REQUEST_PRESENCE_PENALTY.lookup_keys)
         ),
-        request_seed=safe_int(_get(attrs, *K["weave.request.seed"])),
+        request_seed=safe_int(_get(attrs, *semconv.REQUEST_SEED.lookup_keys)),
         request_stop_sequences=_str_list(
-            _get(attrs, *K["weave.request.stop_sequences"])
+            _get(attrs, *semconv.REQUEST_STOP_SEQUENCES.lookup_keys)
         ),
-        request_choice_count=safe_int(_get(attrs, *K["weave.request.choice.count"])),
-        output_type=_get_str(attrs, *K["weave.output.type"]),
-        data_source_id=_get_str(attrs, *K["weave.data_source.id"]),
-        retrieval_query_text=_get_str(attrs, *K["weave.retrieval.query.text"]),
+        request_choice_count=safe_int(
+            _get(attrs, *semconv.REQUEST_CHOICE_COUNT.lookup_keys)
+        ),
+        output_type=_get_str(attrs, *semconv.OUTPUT_TYPE.lookup_keys),
         input_messages=_normalize_raw_messages(_extract_raw_input(attrs, events_dicts)),
         output_messages=output_msgs,
         system_instructions=_normalize_system_instructions(
-            _get(attrs, *K["weave.system_instructions"])
+            _get(attrs, *semconv.SYSTEM_INSTRUCTIONS.lookup_keys)
         ),
         tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts),
         tool_call_result=extract_tool_call_result(attrs, events_dicts),
-        compaction_summary=_get_str(attrs, *K["weave.compaction.summary"]),
+        compaction_summary=_get_str(attrs, *semconv.COMPACTION_SUMMARY.lookup_keys),
         compaction_items_before=safe_int(
-            _get(attrs, *K["weave.compaction.items_before"])
+            _get(attrs, *semconv.COMPACTION_ITEMS_BEFORE.lookup_keys)
         ),
         compaction_items_after=safe_int(
-            _get(attrs, *K["weave.compaction.items_after"])
+            _get(attrs, *semconv.COMPACTION_ITEMS_AFTER.lookup_keys)
         ),
-        content_refs=_str_list(_get(attrs, *K["weave.content_refs"])),
-        artifact_refs=_str_list(_get(attrs, *K["weave.artifact_refs"])),
-        object_refs=_str_list(_get(attrs, *K["weave.object_refs"])),
+        content_refs=_str_list(_get(attrs, *semconv.CONTENT_REFS.lookup_keys)),
+        artifact_refs=_str_list(_get(attrs, *semconv.ARTIFACT_REFS.lookup_keys)),
+        object_refs=_str_list(_get(attrs, *semconv.OBJECT_REFS.lookup_keys)),
         custom_attrs_string=custom_attrs.string,
         custom_attrs_int=custom_attrs.int,
         custom_attrs_float=custom_attrs.float,
         custom_attrs_bool=custom_attrs.bool,
-        server_address=_get_str(attrs, *K["weave.server.address"]),
-        server_port=safe_int(_get(attrs, *K["weave.server.port"])),
+        server_address=_get_str(attrs, *semconv.SERVER_ADDRESS.lookup_keys),
+        server_port=safe_int(_get(attrs, *semconv.SERVER_PORT.lookup_keys)),
         raw_span_dump=_json_str(span.as_dict()),
         attributes_dump=_json_str(attrs),
         events_dump=_json_str(events_dicts) if events_dicts else "",

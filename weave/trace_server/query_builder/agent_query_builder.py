@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime
 import re
+from collections.abc import Sequence
 from typing import Any
 
 from weave.trace_server.agents.types import (
@@ -173,7 +174,6 @@ _SPANS_LIST_FIELD_NAMES = [
     "tool_call_id",
     "finish_reasons",
     "error_type",
-    "data_source_id",
     "wb_user_id",
     "wb_run_id",
 ]
@@ -403,7 +403,7 @@ def _agent_versions_where(pb: ParamBuilder, req: AgentVersionsQueryReq) -> str:
     return f"project_id = {pid} AND agent_name = {aname}"
 
 
-def _normalize_search_roles(roles: list[str]) -> list[str]:
+def _normalize_search_roles(roles: Sequence[str]) -> list[str]:
     normalized: list[str] = []
     for role in roles:
         if role == "tool":

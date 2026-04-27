@@ -82,16 +82,12 @@ class AgentSpanSchema(BaseModel):
     request_temperature: float | None = None
     request_max_tokens: int | None = None
     request_top_p: float | None = None
-    request_top_k: int | None = None
-    request_encoding_formats: list[str] = Field(default_factory=list)
     request_frequency_penalty: float | None = None
     request_presence_penalty: float | None = None
     request_seed: int | None = None
     request_stop_sequences: list[str] = Field(default_factory=list)
     request_choice_count: int | None = None
     output_type: str | None = None
-    data_source_id: str | None = None
-    retrieval_query_text: str | None = None
     input_messages: list[NormalizedMessage] = Field(default_factory=list)
     output_messages: list[NormalizedMessage] = Field(default_factory=list)
     system_instructions: list[str] = Field(default_factory=list)

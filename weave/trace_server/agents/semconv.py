@@ -6,13 +6,16 @@ columns.  Each attribute has a canonical `weave.*` key and an optional
 
 Usage:
 
-    from weave.trace_server.agents.semconv import ATTRIBUTES, resolve_alias_to_canonical
+    from weave.trace_server.agents import semconv
 
     # Look up by canonical key
-    attr = ATTRIBUTES["weave.operation.name"]
+    attr = semconv.ATTRIBUTES[semconv.OPERATION_NAME.key]
+
+    # Use a typed registry entry for extraction
+    lookup_keys = semconv.OPERATION_NAME.lookup_keys
 
     # Resolve any recognized key (weave.* or gen_ai.*) to the canonical key
-    canonical = resolve_alias_to_canonical("gen_ai.operation.name")
+    canonical = semconv.resolve_alias_to_canonical("gen_ai.operation.name")
 """
 
 from __future__ import annotations
@@ -44,234 +47,279 @@ class Attribute:
 # Attribute definitions
 # ---------------------------------------------------------------------------
 
+OPERATION_NAME = Attribute(
+    "weave.operation.name",
+    "string",
+    "Operation type (chat, invoke_agent, execute_tool, ...)",
+    "gen_ai.operation.name",
+)
+PROVIDER_NAME = Attribute(
+    "weave.provider.name",
+    "string",
+    "Provider: openai, anthropic, gcp.gemini, ...",
+    "gen_ai.provider.name",
+)
+SYSTEM = Attribute(
+    "weave.system", "string", "Deprecated alias for provider.name", "gen_ai.system"
+)
+AGENT_NAME = Attribute(
+    "weave.agent.name", "string", "Agent display name", "gen_ai.agent.name"
+)
+AGENT_ID = Attribute("weave.agent.id", "string", "Agent identifier", "gen_ai.agent.id")
+AGENT_DESCRIPTION = Attribute(
+    "weave.agent.description",
+    "string",
+    "Agent description",
+    "gen_ai.agent.description",
+)
+AGENT_VERSION = Attribute(
+    "weave.agent.version", "string", "Agent version", "gen_ai.agent.version"
+)
+REQUEST_MODEL = Attribute(
+    "weave.request.model", "string", "Requested model name", "gen_ai.request.model"
+)
+RESPONSE_MODEL = Attribute(
+    "weave.response.model", "string", "Actual model used", "gen_ai.response.model"
+)
+RESPONSE_ID = Attribute(
+    "weave.response.id",
+    "string",
+    "Provider response identifier",
+    "gen_ai.response.id",
+)
+USAGE_INPUT_TOKENS = Attribute(
+    "weave.usage.input_tokens",
+    "int",
+    "Input tokens (includes cached)",
+    "gen_ai.usage.input_tokens",
+)
+USAGE_OUTPUT_TOKENS = Attribute(
+    "weave.usage.output_tokens",
+    "int",
+    "Output tokens",
+    "gen_ai.usage.output_tokens",
+)
+USAGE_REASONING_TOKENS = Attribute(
+    "weave.usage.reasoning_tokens",
+    "int",
+    "Reasoning/thinking tokens",
+    "gen_ai.usage.reasoning_tokens",
+)
+USAGE_CACHE_CREATION_INPUT_TOKENS = Attribute(
+    "weave.usage.cache_creation.input_tokens",
+    "int",
+    "Tokens written to cache",
+    "gen_ai.usage.cache_creation.input_tokens",
+)
+USAGE_CACHE_READ_INPUT_TOKENS = Attribute(
+    "weave.usage.cache_read.input_tokens",
+    "int",
+    "Tokens served from cache",
+    "gen_ai.usage.cache_read.input_tokens",
+)
+CONVERSATION_ID = Attribute(
+    "weave.conversation.id",
+    "string",
+    "Conversation or session ID",
+    "gen_ai.conversation.id",
+)
+CONVERSATION_NAME = Attribute(
+    "weave.conversation.name",
+    "string",
+    "Human-readable conversation name",
+    "gen_ai.conversation.name",
+)
+TOOL_NAME = Attribute(
+    "weave.tool.name", "string", "Tool/function name", "gen_ai.tool.name"
+)
+TOOL_TYPE = Attribute(
+    "weave.tool.type",
+    "string",
+    "Tool type: function, extension, datastore",
+    "gen_ai.tool.type",
+)
+TOOL_CALL_ID = Attribute(
+    "weave.tool.call.id", "string", "Tool call identifier", "gen_ai.tool.call.id"
+)
+TOOL_DESCRIPTION = Attribute(
+    "weave.tool.description",
+    "string",
+    "Tool description",
+    "gen_ai.tool.description",
+)
+TOOL_DEFINITIONS = Attribute(
+    "weave.tool.definitions",
+    "json",
+    "Available tool definitions",
+    "gen_ai.tool.definitions",
+)
+TOOL_CALL_ARGUMENTS = Attribute(
+    "weave.tool.call.arguments",
+    "json",
+    "Arguments passed to the tool",
+    "gen_ai.tool.call.arguments",
+)
+TOOL_CALL_RESULT = Attribute(
+    "weave.tool.call.result",
+    "json",
+    "Result returned by the tool",
+    "gen_ai.tool.call.result",
+)
+REQUEST_TEMPERATURE = Attribute(
+    "weave.request.temperature",
+    "float",
+    "Sampling temperature",
+    "gen_ai.request.temperature",
+)
+REQUEST_MAX_TOKENS = Attribute(
+    "weave.request.max_tokens",
+    "int",
+    "Maximum output tokens",
+    "gen_ai.request.max_tokens",
+)
+REQUEST_TOP_P = Attribute(
+    "weave.request.top_p",
+    "float",
+    "Nucleus sampling threshold",
+    "gen_ai.request.top_p",
+)
+REQUEST_FREQUENCY_PENALTY = Attribute(
+    "weave.request.frequency_penalty",
+    "float",
+    "Frequency penalty",
+    "gen_ai.request.frequency_penalty",
+)
+REQUEST_PRESENCE_PENALTY = Attribute(
+    "weave.request.presence_penalty",
+    "float",
+    "Presence penalty",
+    "gen_ai.request.presence_penalty",
+)
+REQUEST_SEED = Attribute(
+    "weave.request.seed", "int", "Random seed", "gen_ai.request.seed"
+)
+REQUEST_STOP_SEQUENCES = Attribute(
+    "weave.request.stop_sequences",
+    "string[]",
+    "Stop sequences",
+    "gen_ai.request.stop_sequences",
+)
+REQUEST_CHOICE_COUNT = Attribute(
+    "weave.request.choice.count",
+    "int",
+    "Number of choices requested",
+    "gen_ai.request.choice.count",
+)
+RESPONSE_FINISH_REASONS = Attribute(
+    "weave.response.finish_reasons",
+    "string[]",
+    "Finish reasons",
+    "gen_ai.response.finish_reasons",
+)
+OUTPUT_TYPE = Attribute(
+    "weave.output.type",
+    "string",
+    "Output modality: text, json, image, speech",
+    "gen_ai.output.type",
+)
+INPUT_MESSAGES = Attribute(
+    "weave.input.messages", "json", "Input messages", "gen_ai.input.messages"
+)
+OUTPUT_MESSAGES = Attribute(
+    "weave.output.messages", "json", "Output messages", "gen_ai.output.messages"
+)
+SYSTEM_INSTRUCTIONS = Attribute(
+    "weave.system_instructions",
+    "json",
+    "System instructions",
+    "gen_ai.system_instructions",
+)
+PROMPT = Attribute(
+    "weave.prompt", "json", "Input messages (pre-v1.36 format)", "gen_ai.prompt"
+)
+COMPLETION = Attribute(
+    "weave.completion",
+    "json",
+    "Output messages (pre-v1.36 format)",
+    "gen_ai.completion",
+)
+ERROR_TYPE = Attribute("weave.error.type", "string", "Error type", "error.type")
+SERVER_ADDRESS = Attribute(
+    "weave.server.address", "string", "Server hostname", "server.address"
+)
+SERVER_PORT = Attribute("weave.server.port", "int", "Server port", "server.port")
+
+# Weave-only extensions (no gen_ai.* alias)
+REASONING_CONTENT = Attribute(
+    "weave.reasoning_content",
+    "string",
+    "Reasoning/thinking text from output messages",
+)
+COMPACTION_SUMMARY = Attribute(
+    "weave.compaction.summary", "string", "Context compaction summary"
+)
+COMPACTION_ITEMS_BEFORE = Attribute(
+    "weave.compaction.items_before", "int", "Items before compaction"
+)
+COMPACTION_ITEMS_AFTER = Attribute(
+    "weave.compaction.items_after", "int", "Items after compaction"
+)
+CONTENT_REFS = Attribute(
+    "weave.content_refs", "string[]", "Uploaded content references"
+)
+ARTIFACT_REFS = Attribute("weave.artifact_refs", "string[]", "W&B artifact references")
+OBJECT_REFS = Attribute("weave.object_refs", "string[]", "W&B object references")
+
 _DEFS: list[Attribute] = [
-    Attribute(
-        "weave.operation.name",
-        "string",
-        "Operation type (chat, invoke_agent, execute_tool, ...)",
-        "gen_ai.operation.name",
-    ),
-    Attribute(
-        "weave.provider.name",
-        "string",
-        "Provider: openai, anthropic, gcp.gemini, ...",
-        "gen_ai.provider.name",
-    ),
-    Attribute(
-        "weave.system", "string", "Deprecated alias for provider.name", "gen_ai.system"
-    ),
-    Attribute("weave.agent.name", "string", "Agent display name", "gen_ai.agent.name"),
-    Attribute("weave.agent.id", "string", "Agent identifier", "gen_ai.agent.id"),
-    Attribute(
-        "weave.agent.description",
-        "string",
-        "Agent description",
-        "gen_ai.agent.description",
-    ),
-    Attribute("weave.agent.version", "string", "Agent version", "gen_ai.agent.version"),
-    Attribute(
-        "weave.request.model", "string", "Requested model name", "gen_ai.request.model"
-    ),
-    Attribute(
-        "weave.response.model", "string", "Actual model used", "gen_ai.response.model"
-    ),
-    Attribute(
-        "weave.response.id",
-        "string",
-        "Provider response identifier",
-        "gen_ai.response.id",
-    ),
-    Attribute(
-        "weave.usage.input_tokens",
-        "int",
-        "Input tokens (includes cached)",
-        "gen_ai.usage.input_tokens",
-    ),
-    Attribute(
-        "weave.usage.output_tokens",
-        "int",
-        "Output tokens",
-        "gen_ai.usage.output_tokens",
-    ),
-    Attribute(
-        "weave.usage.reasoning_tokens",
-        "int",
-        "Reasoning/thinking tokens",
-        "gen_ai.usage.reasoning_tokens",
-    ),
-    Attribute(
-        "weave.usage.cache_creation.input_tokens",
-        "int",
-        "Tokens written to cache",
-        "gen_ai.usage.cache_creation.input_tokens",
-    ),
-    Attribute(
-        "weave.usage.cache_read.input_tokens",
-        "int",
-        "Tokens served from cache",
-        "gen_ai.usage.cache_read.input_tokens",
-    ),
-    Attribute(
-        "weave.conversation.id",
-        "string",
-        "Conversation or session ID",
-        "gen_ai.conversation.id",
-    ),
-    Attribute(
-        "weave.conversation.name",
-        "string",
-        "Human-readable conversation name",
-        "gen_ai.conversation.name",
-    ),
-    Attribute("weave.tool.name", "string", "Tool/function name", "gen_ai.tool.name"),
-    Attribute(
-        "weave.tool.type",
-        "string",
-        "Tool type: function, extension, datastore",
-        "gen_ai.tool.type",
-    ),
-    Attribute(
-        "weave.tool.call.id", "string", "Tool call identifier", "gen_ai.tool.call.id"
-    ),
-    Attribute(
-        "weave.tool.description",
-        "string",
-        "Tool description",
-        "gen_ai.tool.description",
-    ),
-    Attribute(
-        "weave.tool.definitions",
-        "json",
-        "Available tool definitions",
-        "gen_ai.tool.definitions",
-    ),
-    Attribute(
-        "weave.tool.call.arguments",
-        "json",
-        "Arguments passed to the tool",
-        "gen_ai.tool.call.arguments",
-    ),
-    Attribute(
-        "weave.tool.call.result",
-        "json",
-        "Result returned by the tool",
-        "gen_ai.tool.call.result",
-    ),
-    Attribute(
-        "weave.request.temperature",
-        "float",
-        "Sampling temperature",
-        "gen_ai.request.temperature",
-    ),
-    Attribute(
-        "weave.request.max_tokens",
-        "int",
-        "Maximum output tokens",
-        "gen_ai.request.max_tokens",
-    ),
-    Attribute(
-        "weave.request.top_p",
-        "float",
-        "Nucleus sampling threshold",
-        "gen_ai.request.top_p",
-    ),
-    Attribute(
-        "weave.request.top_k",
-        "int",
-        "Top-k sampling threshold",
-        "gen_ai.request.top_k",
-    ),
-    Attribute(
-        "weave.request.encoding_formats",
-        "string[]",
-        "Requested embedding encoding formats",
-        "gen_ai.request.encoding_formats",
-    ),
-    Attribute(
-        "weave.request.frequency_penalty",
-        "float",
-        "Frequency penalty",
-        "gen_ai.request.frequency_penalty",
-    ),
-    Attribute(
-        "weave.request.presence_penalty",
-        "float",
-        "Presence penalty",
-        "gen_ai.request.presence_penalty",
-    ),
-    Attribute("weave.request.seed", "int", "Random seed", "gen_ai.request.seed"),
-    Attribute(
-        "weave.request.stop_sequences",
-        "string[]",
-        "Stop sequences",
-        "gen_ai.request.stop_sequences",
-    ),
-    Attribute(
-        "weave.request.choice.count",
-        "int",
-        "Number of choices requested",
-        "gen_ai.request.choice.count",
-    ),
-    Attribute(
-        "weave.response.finish_reasons",
-        "string[]",
-        "Finish reasons",
-        "gen_ai.response.finish_reasons",
-    ),
-    Attribute(
-        "weave.output.type",
-        "string",
-        "Output modality: text, json, image, speech",
-        "gen_ai.output.type",
-    ),
-    Attribute(
-        "weave.data_source.id",
-        "string",
-        "Data source identifier for retrieval spans",
-        "gen_ai.data_source.id",
-    ),
-    Attribute(
-        "weave.retrieval.query.text",
-        "string",
-        "Retrieval query text",
-        "gen_ai.retrieval.query.text",
-    ),
-    Attribute(
-        "weave.input.messages", "json", "Input messages", "gen_ai.input.messages"
-    ),
-    Attribute(
-        "weave.output.messages", "json", "Output messages", "gen_ai.output.messages"
-    ),
-    Attribute(
-        "weave.system_instructions",
-        "json",
-        "System instructions",
-        "gen_ai.system_instructions",
-    ),
-    Attribute(
-        "weave.prompt", "json", "Input messages (pre-v1.36 format)", "gen_ai.prompt"
-    ),
-    Attribute(
-        "weave.completion",
-        "json",
-        "Output messages (pre-v1.36 format)",
-        "gen_ai.completion",
-    ),
-    Attribute("weave.error.type", "string", "Error type", "error.type"),
-    Attribute("weave.server.address", "string", "Server hostname", "server.address"),
-    Attribute("weave.server.port", "int", "Server port", "server.port"),
-    # Weave-only extensions (no gen_ai.* alias)
-    Attribute(
-        "weave.reasoning_content",
-        "string",
-        "Reasoning/thinking text from output messages",
-    ),
-    Attribute("weave.compaction.summary", "string", "Context compaction summary"),
-    Attribute("weave.compaction.items_before", "int", "Items before compaction"),
-    Attribute("weave.compaction.items_after", "int", "Items after compaction"),
-    Attribute("weave.content_refs", "string[]", "Uploaded content references"),
-    Attribute("weave.artifact_refs", "string[]", "W&B artifact references"),
-    Attribute("weave.object_refs", "string[]", "W&B object references"),
+    OPERATION_NAME,
+    PROVIDER_NAME,
+    SYSTEM,
+    AGENT_NAME,
+    AGENT_ID,
+    AGENT_DESCRIPTION,
+    AGENT_VERSION,
+    REQUEST_MODEL,
+    RESPONSE_MODEL,
+    RESPONSE_ID,
+    USAGE_INPUT_TOKENS,
+    USAGE_OUTPUT_TOKENS,
+    USAGE_REASONING_TOKENS,
+    USAGE_CACHE_CREATION_INPUT_TOKENS,
+    USAGE_CACHE_READ_INPUT_TOKENS,
+    CONVERSATION_ID,
+    CONVERSATION_NAME,
+    TOOL_NAME,
+    TOOL_TYPE,
+    TOOL_CALL_ID,
+    TOOL_DESCRIPTION,
+    TOOL_DEFINITIONS,
+    TOOL_CALL_ARGUMENTS,
+    TOOL_CALL_RESULT,
+    REQUEST_TEMPERATURE,
+    REQUEST_MAX_TOKENS,
+    REQUEST_TOP_P,
+    REQUEST_FREQUENCY_PENALTY,
+    REQUEST_PRESENCE_PENALTY,
+    REQUEST_SEED,
+    REQUEST_STOP_SEQUENCES,
+    REQUEST_CHOICE_COUNT,
+    RESPONSE_FINISH_REASONS,
+    OUTPUT_TYPE,
+    INPUT_MESSAGES,
+    OUTPUT_MESSAGES,
+    SYSTEM_INSTRUCTIONS,
+    PROMPT,
+    COMPLETION,
+    ERROR_TYPE,
+    SERVER_ADDRESS,
+    SERVER_PORT,
+    REASONING_CONTENT,
+    COMPACTION_SUMMARY,
+    COMPACTION_ITEMS_BEFORE,
+    COMPACTION_ITEMS_AFTER,
+    CONTENT_REFS,
+    ARTIFACT_REFS,
+    OBJECT_REFS,
 ]
 
 
@@ -282,12 +330,10 @@ _DEFS: list[Attribute] = [
 # All attributes keyed by canonical weave.* key.
 ATTRIBUTES: dict[str, Attribute] = {a.key: a for a in _DEFS}
 
-# Canonical key -> lookup_keys tuple for extraction.
-# Usage: `_get(attrs, *SEMCONV_LOOKUP_KEYS["weave.agent.name"])`
+# Canonical key -> lookup_keys tuple for dynamic extraction paths.
+# Prefer named Attribute constants (e.g. `AGENT_NAME.lookup_keys`) when the
+# attribute is known statically.
 SEMCONV_LOOKUP_KEYS: dict[str, tuple[str, ...]] = {a.key: a.lookup_keys for a in _DEFS}
-
-# Short alias for call sites that repeatedly unpack lookup keys.
-K = SEMCONV_LOOKUP_KEYS
 
 # Map from any recognized key (weave.* or gen_ai.*) to canonical weave.* key.
 _ALIAS_TO_CANONICAL: dict[str, str] = {}
@@ -323,48 +369,45 @@ KNOWN_KEYS: frozenset[str] = frozenset(_ALIAS_TO_CANONICAL.keys())
 # intentionally omitted because filtering those needs different operators.
 CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     # string scalars
-    "weave.operation.name": "operation_name",
-    "weave.provider.name": "provider_name",
-    "weave.agent.name": "agent_name",
-    "weave.agent.id": "agent_id",
-    "weave.agent.description": "agent_description",
-    "weave.agent.version": "agent_version",
-    "weave.request.model": "request_model",
-    "weave.response.model": "response_model",
-    "weave.response.id": "response_id",
-    "weave.conversation.id": "conversation_id",
-    "weave.conversation.name": "conversation_name",
-    "weave.tool.name": "tool_name",
-    "weave.tool.type": "tool_type",
-    "weave.tool.call.id": "tool_call_id",
-    "weave.tool.description": "tool_description",
-    "weave.tool.call.arguments": "tool_call_arguments",
-    "weave.tool.call.result": "tool_call_result",
-    "weave.reasoning_content": "reasoning_content",
-    "weave.output.type": "output_type",
-    "weave.data_source.id": "data_source_id",
-    "weave.retrieval.query.text": "retrieval_query_text",
-    "weave.error.type": "error_type",
-    "weave.server.address": "server_address",
-    "weave.compaction.summary": "compaction_summary",
+    OPERATION_NAME.key: "operation_name",
+    PROVIDER_NAME.key: "provider_name",
+    AGENT_NAME.key: "agent_name",
+    AGENT_ID.key: "agent_id",
+    AGENT_DESCRIPTION.key: "agent_description",
+    AGENT_VERSION.key: "agent_version",
+    REQUEST_MODEL.key: "request_model",
+    RESPONSE_MODEL.key: "response_model",
+    RESPONSE_ID.key: "response_id",
+    CONVERSATION_ID.key: "conversation_id",
+    CONVERSATION_NAME.key: "conversation_name",
+    TOOL_NAME.key: "tool_name",
+    TOOL_TYPE.key: "tool_type",
+    TOOL_CALL_ID.key: "tool_call_id",
+    TOOL_DESCRIPTION.key: "tool_description",
+    TOOL_CALL_ARGUMENTS.key: "tool_call_arguments",
+    TOOL_CALL_RESULT.key: "tool_call_result",
+    REASONING_CONTENT.key: "reasoning_content",
+    OUTPUT_TYPE.key: "output_type",
+    ERROR_TYPE.key: "error_type",
+    SERVER_ADDRESS.key: "server_address",
+    COMPACTION_SUMMARY.key: "compaction_summary",
     # int scalars
-    "weave.usage.input_tokens": "input_tokens",
-    "weave.usage.output_tokens": "output_tokens",
-    "weave.usage.reasoning_tokens": "reasoning_tokens",
-    "weave.usage.cache_creation.input_tokens": "cache_creation_input_tokens",
-    "weave.usage.cache_read.input_tokens": "cache_read_input_tokens",
-    "weave.request.max_tokens": "request_max_tokens",
-    "weave.request.top_k": "request_top_k",
-    "weave.request.seed": "request_seed",
-    "weave.request.choice.count": "request_choice_count",
-    "weave.server.port": "server_port",
-    "weave.compaction.items_before": "compaction_items_before",
-    "weave.compaction.items_after": "compaction_items_after",
+    USAGE_INPUT_TOKENS.key: "input_tokens",
+    USAGE_OUTPUT_TOKENS.key: "output_tokens",
+    USAGE_REASONING_TOKENS.key: "reasoning_tokens",
+    USAGE_CACHE_CREATION_INPUT_TOKENS.key: "cache_creation_input_tokens",
+    USAGE_CACHE_READ_INPUT_TOKENS.key: "cache_read_input_tokens",
+    REQUEST_MAX_TOKENS.key: "request_max_tokens",
+    REQUEST_SEED.key: "request_seed",
+    REQUEST_CHOICE_COUNT.key: "request_choice_count",
+    SERVER_PORT.key: "server_port",
+    COMPACTION_ITEMS_BEFORE.key: "compaction_items_before",
+    COMPACTION_ITEMS_AFTER.key: "compaction_items_after",
     # float scalars
-    "weave.request.temperature": "request_temperature",
-    "weave.request.top_p": "request_top_p",
-    "weave.request.frequency_penalty": "request_frequency_penalty",
-    "weave.request.presence_penalty": "request_presence_penalty",
+    REQUEST_TEMPERATURE.key: "request_temperature",
+    REQUEST_TOP_P.key: "request_top_p",
+    REQUEST_FREQUENCY_PENALTY.key: "request_frequency_penalty",
+    REQUEST_PRESENCE_PENALTY.key: "request_presence_penalty",
 }
 
 

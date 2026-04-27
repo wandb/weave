@@ -14,7 +14,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from weave.trace_server.agents.constants import SPAN_KIND_UNSPECIFIED
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
 
@@ -68,7 +67,7 @@ class AgentSpanCHInsertable(BaseModel):
     span_id: str
     parent_span_id: str = ""
     span_name: str
-    span_kind: SpanKindLiteral = SPAN_KIND_UNSPECIFIED
+    span_kind: SpanKindLiteral = "UNSPECIFIED"
 
     # [OTel Core] timestamps
     started_at: datetime.datetime
@@ -128,8 +127,6 @@ class AgentSpanCHInsertable(BaseModel):
     request_temperature: float = 0.0
     request_max_tokens: int = 0
     request_top_p: float = 0.0
-    request_top_k: int = 0
-    request_encoding_formats: list[str] = Field(default_factory=list)
     request_frequency_penalty: float = 0.0
     request_presence_penalty: float = 0.0
     request_seed: int = 0
@@ -138,10 +135,6 @@ class AgentSpanCHInsertable(BaseModel):
 
     # [OTel GenAI] output type — gen_ai.output.type (text, json, image, speech)
     output_type: str = ""
-
-    # [OTel GenAI] retrieval — gen_ai.data_source.id, gen_ai.retrieval.*
-    data_source_id: str = ""
-    retrieval_query_text: str = ""
 
     # [OTel GenAI] messages — gen_ai.input.messages, gen_ai.output.messages
     input_messages: list[NormalizedMessage] = Field(default_factory=list)
