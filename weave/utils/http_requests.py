@@ -171,50 +171,59 @@ def _log_response(response: Response) -> None:
     pprint_response(response)
 
 
+# Shared httpx.Client lifecycle.
+#
+# The client is built lazily on first use so env-driven config such as
+# ``WEAVE_INSECURE_DISABLE_SSL`` and ``WF_HTTP_TIMEOUT`` is read at first-use
+# time, not at import time. The trade-off this design makes:
+#
+#   Config (verify=, timeout=, event_hooks) is captured when the client is
+#   built, and frozen for the life of the process.
+#
+# This matches how httpx itself wants to be used — ``verify`` is a property of
+# the connection pool and cannot be changed per-request (see encode/httpx#554).
+# It also matches the openai/anthropic SDKs, which build their httpx.Client
+# eagerly per SDK instance and do not reconfigure it. Callers who need to
+# change SSL/timeout config must set the env var *before* the first HTTP
+# call (typically before ``weave.init``).
 _client: httpx.Client | None = None
 _client_lock = threading.Lock()
 
 
-def _create_client() -> httpx.Client:
-    # Use HTTPX's default transport so env proxy handling (including NO_PROXY)
-    # works natively.
-    return httpx.Client(
-        event_hooks={"request": [_log_request], "response": [_log_response]},
-        timeout=http_timeout(),
-        limits=CLIENT_LIMITS,
-        verify=ssl_verify(),
-    )
-
-
 def get_client() -> httpx.Client:
-    """Return the shared httpx.Client, creating it on first use.
+    """Return the shared httpx.Client, building it on first use.
 
-    Lazy creation lets env-driven settings like ``WEAVE_INSECURE_DISABLE_SSL``
-    take effect even if ``import weave`` happened before the env var was set.
+    See module-level comment for the freeze-after-first-use contract.
     """
     global _client  # noqa: PLW0603
-    if _client is None:
-        with _client_lock:
-            if _client is None:
-                _client = _create_client()
-    return _client
+    with _client_lock:
+        if _client is None:
+            # Use HTTPX's default transport so env proxy handling
+            # (including NO_PROXY) works natively.
+            _client = httpx.Client(
+                event_hooks={
+                    "request": [_log_request],
+                    "response": [_log_response],
+                },
+                timeout=http_timeout(),
+                limits=CLIENT_LIMITS,
+                verify=ssl_verify(),
+            )
+        return _client
 
 
-def reset_client() -> None:
-    """Close and forget the cached client so the next call re-reads env vars."""
+def _reset_client_for_tests() -> None:
+    """Close the cached client and clear it. Test seam only.
+
+    Production code must not call this — the freeze-after-first-use contract
+    is intentional. Tests use it to simulate a fresh process when asserting
+    behavior tied to env vars read at client-construction time.
+    """
     global _client  # noqa: PLW0603
     with _client_lock:
         if _client is not None:
             _client.close()
         _client = None
-
-
-def __getattr__(name: str) -> Any:
-    # PEP 562: expose ``client`` as a lazily-initialized module attribute
-    # so existing ``http_requests.client`` access keeps working.
-    if name == "client":
-        return get_client()
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get(
