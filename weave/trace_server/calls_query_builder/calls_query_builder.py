@@ -1786,6 +1786,26 @@ class CallsQuery(BaseModel):
             return None
         if any(of.field.is_heavy() for of in self.order_fields):
             return None
+        # Skip if any ORDER BY field requires aggregate-state merging. The
+        # candidate CTE has no GROUP BY, so raw column references on
+        # AggregateFunction(...) state columns hit an ILLEGAL_TYPE_OF_ARGUMENT
+        # in ClickHouse — the column type isn't a plain value until it's
+        # merged. SimpleAggregateFunction columns (`any`, `array_concat_agg`)
+        # are fine; their raw value IS the aggregated value.
+        #
+        # Caught here:
+        # - CallsMergedAggField with an agg_fn ending in "Merge"
+        #   (display_name's argMaxMerge over AggregateFunction(argMax, ...));
+        # - CallsMergedSummaryField, conservatively, since handlers like
+        #   `trace_name` expand into expressions that reference display_name
+        #   raw when use_agg_fn=False.
+        for of in self.order_fields:
+            if isinstance(of.field, CallsMergedSummaryField):
+                return None
+            if isinstance(of.field, CallsMergedAggField) and of.field.agg_fn.endswith(
+                "Merge"
+            ):
+                return None
 
         # Peek for a strict heavy-filter LIKE before we build anything else,
         # so that queries without a heavy-filter optimization don't pay for
