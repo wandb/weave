@@ -211,6 +211,16 @@ def test_normalize_message_missing_role_and_finish_reason() -> None:
     assert result.output_messages[0].finish_reason == ""
 
 
+def test_legacy_prompt_strings_normalize_as_user_messages() -> None:
+    result = extract_genai_span(
+        _make_span(attrs={"gen_ai.prompt": "hello"}),
+        project_id="p1",
+    )
+
+    assert result.input_messages[0].role == "user"
+    assert result.input_messages[0].content == "hello"
+
+
 def test_extract_custom_attrs_caps_total_entries() -> None:
     """A span with more than MAX_CUSTOM_ATTRS_PER_SPAN attributes has the
     excess silently dropped so a single misbehaving client can't blow up the

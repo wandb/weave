@@ -43,6 +43,8 @@ _KNOWN_OP_PREFIXES = (
     "retrieval",
 )
 
+_LEGACY_PROMPT_ROLE = "user"
+
 
 @dataclass(frozen=True)
 class CustomAttrs:
@@ -84,13 +86,9 @@ def _json_str(val: Any) -> str:
 
 def _str_list(val: Any) -> list[str]:
     """Coerce an attribute value to a list of strings."""
-    if val is None:
-        return []
     if isinstance(val, list):
         return [str(v) for v in val if v is not None]
-    if isinstance(val, str):
-        if not val:
-            return []
+    if val and isinstance(val, str):
         try:
             parsed = json.loads(val)
             if isinstance(parsed, list):
@@ -273,16 +271,13 @@ def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
 
     Handles structured message arrays, plain strings, and JSON-encoded strings.
     """
-    if raw is None:
-        return []
-    if isinstance(raw, str):
-        if not raw:
-            return []
+    if raw and isinstance(raw, str):
         try:
             raw = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
-            # A bare string in the input slot is the legacy prompt shape.
-            return [NormalizedMessage(role="user", content=raw)]
+            # Bare strings in input slots come from legacy prompt attrs. They
+            # represent user prompts; system prompts use system_instructions.
+            return [NormalizedMessage(role=_LEGACY_PROMPT_ROLE, content=raw)]
 
     if isinstance(raw, dict):
         if "role" in raw:
@@ -294,7 +289,7 @@ def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
         for item in raw:
             if isinstance(item, str):
                 # String array entries are prompt fragments with no explicit role.
-                result.append(NormalizedMessage(role="user", content=item))
+                result.append(NormalizedMessage(role=_LEGACY_PROMPT_ROLE, content=item))
             elif isinstance(item, dict):
                 result.append(_normalize_single_message(item))
         return result
@@ -304,11 +299,7 @@ def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
 
 def _normalize_system_instructions(raw: Any) -> list[str]:
     """Normalize system instructions into a plain text list."""
-    if raw is None:
-        return []
-    if isinstance(raw, str):
-        if not raw:
-            return []
+    if raw and isinstance(raw, str):
         try:
             raw = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
