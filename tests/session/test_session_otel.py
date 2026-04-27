@@ -1,15 +1,56 @@
-"""Tests for OTel GenAI attribute builders in session_otel.py."""
+"""Tests for OTel GenAI attribute builders and span emission in session_otel.py."""
 
 from __future__ import annotations
 
 import json
 
-from weave.session.session import Message, Reasoning, Usage
+import pytest
+from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
+
+from weave.session.session import (
+    Message,
+    Reasoning,
+    Session,
+    Usage,
+    get_current_llm,
+    get_current_session,
+    get_current_turn,
+    start_session,
+)
 from weave.session.session_otel import (
     execute_tool_attributes,
     invoke_agent_attributes,
     llm_attributes,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_contextvars():
+    """Reset contextvar state after each test to prevent leakage."""
+    yield
+    if (llm := get_current_llm()) is not None:
+        llm.end()
+    if (turn := get_current_turn()) is not None:
+        turn.end()
+    if (session := get_current_session()) is not None:
+        session.end()
+
+
+@pytest.fixture
+def otel_spans():
+    """Provide an in-memory span exporter for capturing OTel spans."""
+    from weave.session import otel_setup
+
+    exporter = InMemorySpanExporter()
+    provider = SDKTracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    otel_setup._provider = provider
+    yield exporter
+    provider.shutdown()
+    otel_setup._provider = None
 
 # ---------------------------------------------------------------------------
 # invoke_agent_attributes
@@ -319,3 +360,239 @@ class TestCrossCutting:
         source = open(mod.__file__, encoding="utf-8").read()
         assert "import opentelemetry" not in source
         assert "from opentelemetry" not in source
+
+
+# ---------------------------------------------------------------------------
+# OTel span emission
+# ---------------------------------------------------------------------------
+
+
+class TestOTelSpanEmission:
+    def test_turn_creates_invoke_agent_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(
+            agent_name="weather-bot", session_id="sess-1", session_name="Weather Chat"
+        ) as s:
+            with s.start_turn(user_message="What's the weather?") as turn:
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.name == "invoke_agent weather-bot"
+        attrs = dict(span.attributes or {})
+        assert attrs["gen_ai.operation.name"] == "invoke_agent"
+        assert attrs["gen_ai.agent.name"] == "weather-bot"
+        assert attrs["gen_ai.conversation.id"] == "sess-1"
+        assert attrs["gen_ai.conversation.name"] == "Weather Chat"
+
+    def test_llm_creates_chat_span(self, otel_spans: InMemorySpanExporter) -> None:
+        with Session(agent_name="bot", session_id="sess-llm") as s:
+            with s.start_turn() as turn:
+                with turn.llm(model="gpt-4o", provider_name="openai") as llm:
+                    llm.usage = Usage(input_tokens=100, output_tokens=50)
+                    llm.output("Hello!")
+
+        spans = otel_spans.get_finished_spans()
+        # LLM span ends first, then Turn span
+        llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
+        assert len(llm_spans) == 1
+        attrs = dict(llm_spans[0].attributes or {})
+        assert attrs["gen_ai.operation.name"] == "chat"
+        assert attrs["gen_ai.request.model"] == "gpt-4o"
+        assert attrs["gen_ai.provider.name"] == "openai"
+        assert attrs["gen_ai.conversation.id"] == "sess-llm"
+        assert attrs["gen_ai.usage.input_tokens"] == 100
+        assert attrs["gen_ai.usage.output_tokens"] == 50
+
+    def test_tool_creates_execute_tool_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="bot", session_id="sess-tool") as s:
+            with s.start_turn() as turn:
+                with turn.tool(
+                    name="get_weather",
+                    arguments='{"city":"Tokyo"}',
+                    tool_call_id="tc_1",
+                ) as tool:
+                    tool.result = "75F"
+
+        spans = otel_spans.get_finished_spans()
+        tool_spans = [sp for sp in spans if sp.name == "execute_tool get_weather"]
+        assert len(tool_spans) == 1
+        attrs = dict(tool_spans[0].attributes or {})
+        assert attrs["gen_ai.operation.name"] == "execute_tool"
+        assert attrs["gen_ai.tool.name"] == "get_weather"
+        assert attrs["gen_ai.conversation.id"] == "sess-tool"
+        assert attrs["gen_ai.tool.call.id"] == "tc_1"
+        assert attrs["gen_ai.tool.call.arguments"] == '{"city":"Tokyo"}'
+        assert attrs["gen_ai.tool.call.result"] == "75F"
+
+    def test_subagent_creates_nested_invoke_agent_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="orchestrator") as s:
+            with s.start_turn() as turn:
+                with turn.subagent(name="research-bot", model="gpt-4o-mini") as sa:
+                    pass
+
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent orchestrator"]
+        assert len(sa_spans) == 1
+        assert len(turn_spans) == 1
+        # SubAgent and Turn should share the same trace_id
+        assert sa_spans[0].context.trace_id == turn_spans[0].context.trace_id
+        # SubAgent's parent should be the Turn span
+        assert sa_spans[0].parent.span_id == turn_spans[0].context.span_id
+
+    def test_parent_child_hierarchy(self, otel_spans: InMemorySpanExporter) -> None:
+        """LLM and Tool are both children of Turn (flat model)."""
+        with Session(agent_name="bot") as s:
+            with s.start_turn() as turn:
+                with turn.llm(model="gpt-4o") as llm:
+                    llm.output("checking...")
+                with turn.tool(name="search", arguments='{"q":"X"}') as tool:
+                    tool.result = "found"
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
+        tool_spans = [sp for sp in spans if sp.name == "execute_tool search"]
+
+        assert len(turn_spans) == 1
+        assert len(llm_spans) == 1
+        assert len(tool_spans) == 1
+
+        turn_span = turn_spans[0]
+        llm_span = llm_spans[0]
+        tool_span = tool_spans[0]
+
+        # Both LLM and Tool share the same trace
+        assert llm_span.context.trace_id == turn_span.context.trace_id
+        assert tool_span.context.trace_id == turn_span.context.trace_id
+
+        # Both are children of the Turn span
+        assert llm_span.parent.span_id == turn_span.context.span_id
+        assert tool_span.parent.span_id == turn_span.context.span_id
+
+    def test_no_spans_without_setup(self) -> None:
+        """No errors when no provider configured (no-op spans)."""
+        from weave.session import otel_setup
+
+        original = otel_setup._provider
+        otel_setup._provider = None
+        try:
+            with Session(agent_name="bot") as s:
+                with s.start_turn() as turn:
+                    with turn.llm(model="gpt-4o") as llm:
+                        llm.output("Hello")
+                    with turn.tool(name="search") as tool:
+                        tool.result = "done"
+            # Should not raise — just silently use no-op spans
+        finally:
+            otel_setup._provider = original
+
+    def test_include_content_false_omits_messages(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="bot", include_content=False) as s:
+            with s.start_turn(user_message="secret input") as turn:
+                with turn.llm(model="gpt-4o") as llm:
+                    llm.input_messages.append(Message(role="user", content="secret"))
+                    llm.output("secret output")
+                    llm.system_instructions = ["be helpful"]
+                with turn.tool(name="search", arguments='{"q":"secret"}') as tool:
+                    tool.result = "secret result"
+
+        spans = otel_spans.get_finished_spans()
+
+        # Check Turn span — no input messages
+        turn_spans = [sp for sp in spans if sp.name.startswith("invoke_agent")]
+        assert len(turn_spans) == 1
+        turn_attrs = dict(turn_spans[0].attributes or {})
+        assert "gen_ai.input.messages" not in turn_attrs
+
+        # Check LLM span — no messages or system instructions
+        llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
+        assert len(llm_spans) == 1
+        llm_attrs = dict(llm_spans[0].attributes or {})
+        assert "gen_ai.input.messages" not in llm_attrs
+        assert "gen_ai.output.messages" not in llm_attrs
+        assert "gen_ai.system_instructions" not in llm_attrs
+
+        # Check Tool span — no arguments or result
+        tool_spans = [sp for sp in spans if sp.name == "execute_tool search"]
+        assert len(tool_spans) == 1
+        tool_attrs = dict(tool_spans[0].attributes or {})
+        assert "gen_ai.tool.call.arguments" not in tool_attrs
+        assert "gen_ai.tool.call.result" not in tool_attrs
+
+
+# ---------------------------------------------------------------------------
+# Error recording
+# ---------------------------------------------------------------------------
+
+
+class TestErrorRecording:
+    def test_llm_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            with session.start_turn() as turn:
+                try:
+                    with turn.llm(model="gpt-4o") as llm:
+                        raise ValueError("LLM call failed")
+                except ValueError:
+                    pass
+        spans = otel_spans.get_finished_spans()
+        chat_span = next(
+            s for s in spans if s.attributes.get("gen_ai.operation.name") == "chat"
+        )
+        assert chat_span.status.status_code == StatusCode.ERROR
+        assert "LLM call failed" in chat_span.status.description
+        assert len(chat_span.events) >= 1
+        assert chat_span.events[0].name == "exception"
+
+    def test_tool_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            with session.start_turn() as turn:
+                try:
+                    with turn.tool(name="search") as tool:
+                        raise RuntimeError("tool broke")
+                except RuntimeError:
+                    pass
+        spans = otel_spans.get_finished_spans()
+        tool_span = next(
+            s
+            for s in spans
+            if s.attributes.get("gen_ai.operation.name") == "execute_tool"
+        )
+        assert tool_span.status.status_code == StatusCode.ERROR
+
+    def test_turn_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            try:
+                with session.start_turn() as turn:
+                    raise RuntimeError("turn broke")
+            except RuntimeError:
+                pass
+        spans = otel_spans.get_finished_spans()
+        turn_span = next(
+            s
+            for s in spans
+            if s.attributes.get("gen_ai.operation.name") == "invoke_agent"
+        )
+        assert turn_span.status.status_code == StatusCode.ERROR
+
+    def test_subagent_records_exception(self, otel_spans: InMemorySpanExporter) -> None:
+        with start_session(agent_name="bot") as session:
+            with session.start_turn() as turn:
+                try:
+                    with turn.subagent(name="sub") as sa:
+                        raise RuntimeError("sub broke")
+                except RuntimeError:
+                    pass
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [s for s in spans if s.attributes.get("gen_ai.agent.name") == "sub"]
+        assert len(sa_spans) == 1
+        assert sa_spans[0].status.status_code == StatusCode.ERROR

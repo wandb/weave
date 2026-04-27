@@ -64,7 +64,7 @@ def llm_attributes(
     output_messages: list[Message] | None = None,
     system_instructions: list[str] | None = None,
     usage: Usage | None = None,
-    reasoning: Reasoning | None = None,
+    reasoning: Reasoning | None = None,  # TODO: reasoning not yet in GenAI semconv, accepted for future use
     finish_reasons: list[str] | None = None,
     response_id: str = "",
 ) -> dict[str, Any]:

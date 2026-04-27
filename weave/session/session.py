@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import types
 import uuid
+import warnings
 from contextvars import ContextVar, Token
 from datetime import datetime, timezone
 from typing import Any, Literal
@@ -72,17 +73,23 @@ class LogResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _try_import_otel() -> tuple[Any, Any, Any] | None:
-    """Try to import opentelemetry modules. Returns (trace, context, otel_setup) or None."""
-    try:
-        from opentelemetry import context as otel_context
-        from opentelemetry import trace
+_otel_cache: tuple[Any, Any, Any] | None = ...  # type: ignore[assignment]  # Ellipsis = not yet tried
 
-        from weave.session import otel_setup
-    except ImportError:
-        return None
-    else:
-        return trace, otel_context, otel_setup
+
+def _get_otel() -> tuple[Any, Any, Any] | None:
+    """Return (trace, otel_context, otel_setup) or None, cached after first attempt."""
+    global _otel_cache  # noqa: PLW0603
+    if _otel_cache is ...:
+        try:
+            from opentelemetry import context as otel_context
+            from opentelemetry import trace
+
+            from weave.session import otel_setup
+        except ImportError:
+            _otel_cache = None
+        else:
+            _otel_cache = (trace, otel_context, otel_setup)
+    return _otel_cache
 
 
 class _SpanBase(BaseModel):
@@ -95,7 +102,7 @@ class _SpanBase(BaseModel):
 
     def _start_otel_span(self, name: str, *, new_trace: bool = False) -> None:
         """Create an OTel span and attach it to the current context."""
-        otel = _try_import_otel()
+        otel = _get_otel()
         if otel is None:
             return
         trace, otel_context, otel_setup = otel
@@ -118,7 +125,7 @@ class _SpanBase(BaseModel):
             self._otel_span.end()
 
         if self._otel_token is not None:
-            otel = _try_import_otel()
+            otel = _get_otel()
             if otel is not None:
                 _, otel_context, _ = otel
                 otel_context.detach(self._otel_token)
@@ -272,6 +279,8 @@ class LLM(_SpanBase):
 
         session = _current_session.get()
         include = session.include_content if session else True
+        # TODO: media_attachments not yet serialized to OTel attributes.
+        # OTel GenAI semconv defines BlobPart/UriPart/FilePart in message parts format.
         attrs = llm_attributes(
             model=self.model,
             provider_name=self.provider_name,
@@ -284,11 +293,13 @@ class LLM(_SpanBase):
             finish_reasons=self.finish_reasons,
             response_id=self.response_id,
         )
-        self._end_otel_span(attrs)
 
+        # Reset contextvar BEFORE flushing span
         if self._token is not None:
             _current_llm.reset(self._token)
             self._token = None
+
+        self._end_otel_span(attrs)
 
     def __enter__(self) -> Self:
         if self._token is None:
@@ -450,11 +461,13 @@ class Turn(_SpanBase):
             model=self.model,
             input_messages=self.messages if include else None,
         )
-        self._end_otel_span(attrs)
 
+        # Reset contextvar BEFORE flushing span
         if self._token is not None:
             _current_turn.reset(self._token)
             self._token = None
+
+        self._end_otel_span(attrs)
 
     def __enter__(self) -> Self:
         if self._token is None:
@@ -585,7 +598,10 @@ def start_turn(
 ) -> Turn:
     """Create and activate a turn. Uses the current session if available.
 
-    If no session is active, returns a disconnected Turn (no contextvar set).
+    If no session is active, returns a disconnected Turn that is NOT set
+    in the contextvar. This means ``get_current_turn()`` will return None.
+    Use ``session.start_turn()`` instead if you need contextvar-based
+    cross-module access.
     """
     session = get_current_session()
     if session is not None:
@@ -680,7 +696,8 @@ def log_turn(
     model: str = "",
     session_name: str = "",
 ) -> LogResult:
-    """Batch-ingest a single turn. Stub — returns empty LogResult."""
+    """Batch-ingest a single turn. Stub — not yet implemented."""
+    warnings.warn("log_turn is not yet implemented; call is a no-op", stacklevel=2)
     return LogResult(session_id=session_id)
 
 
@@ -692,5 +709,6 @@ def log_session(
     session_id: str = "",
     session_name: str = "",
 ) -> LogResult:
-    """Batch-ingest a complete session. Stub — returns empty LogResult."""
+    """Batch-ingest a complete session. Stub — not yet implemented."""
+    warnings.warn("log_session is not yet implemented; call is a no-op", stacklevel=2)
     return LogResult(session_id=session_id or str(uuid.uuid4()))
