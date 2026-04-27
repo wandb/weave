@@ -8,7 +8,7 @@ endpoints (services/weave-trace) and the ClickHouse query handlers
 from __future__ import annotations
 
 import datetime
-from typing import Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -19,7 +19,27 @@ from weave.trace_server.agents.constants import (
     MAX_CONVERSATION_CHAT_TURNS,
     MAX_SEARCH_LIMIT,
 )
+from weave.trace_server.agents.schema import (
+    NormalizedMessage,
+    SpanKindLiteral,
+    StatusCodeLiteral,
+)
 from weave.trace_server.interface.query import Query
+
+if TYPE_CHECKING:
+    from weave.trace_server.trace_server_interface import ProcessedResourceSpans
+else:
+    ProcessedResourceSpans = Any
+
+SearchMessageRole = Literal[
+    "",
+    "user",
+    "assistant",
+    "system",
+    "tool",
+    "tool_call",
+    "tool_result",
+]
 
 
 class AgentSpanSchema(BaseModel):
@@ -28,57 +48,71 @@ class AgentSpanSchema(BaseModel):
     project_id: str
     trace_id: str
     span_id: str
-    parent_span_id: str = ""
-    span_name: str = ""
-    span_kind: str = ""
+    parent_span_id: str | None = None
+    span_name: str | None = None
+    span_kind: SpanKindLiteral | None = None
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
-    status_code: str = ""
-    status_message: str = ""
-    operation_name: str = ""
-    provider_name: str = ""
-    agent_name: str = ""
-    agent_id: str = ""
-    agent_description: str = ""
-    agent_version: str = ""
-    request_model: str = ""
-    response_model: str = ""
-    response_id: str = ""
-    input_tokens: int = 0
-    output_tokens: int = 0
-    reasoning_tokens: int = 0
-    reasoning_content: str = ""
-    conversation_id: str = ""
-    conversation_name: str = ""
-    tool_name: str = ""
-    tool_type: str = ""
-    tool_call_id: str = ""
-    tool_description: str = ""
-    tool_definitions: str = ""
+    status_code: StatusCodeLiteral | None = None
+    status_message: str | None = None
+    operation_name: str | None = None
+    provider_name: str | None = None
+    agent_name: str | None = None
+    agent_id: str | None = None
+    agent_description: str | None = None
+    agent_version: str | None = None
+    request_model: str | None = None
+    response_model: str | None = None
+    response_id: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    cache_creation_input_tokens: int | None = None
+    cache_read_input_tokens: int | None = None
+    reasoning_content: str | None = None
+    conversation_id: str | None = None
+    conversation_name: str | None = None
+    tool_name: str | None = None
+    tool_type: str | None = None
+    tool_call_id: str | None = None
+    tool_description: str | None = None
+    tool_definitions: str | None = None
     finish_reasons: list[str] = Field(default_factory=list)
-    request_temperature: float = 0.0
-    request_max_tokens: int = 0
-    request_top_p: float = 0.0
-    input_messages: list[dict] = Field(default_factory=list)
-    output_messages: list[dict] = Field(default_factory=list)
+    error_type: str | None = None
+    request_temperature: float | None = None
+    request_max_tokens: int | None = None
+    request_top_p: float | None = None
+    request_top_k: int | None = None
+    request_encoding_formats: list[str] = Field(default_factory=list)
+    request_frequency_penalty: float | None = None
+    request_presence_penalty: float | None = None
+    request_seed: int | None = None
+    request_stop_sequences: list[str] = Field(default_factory=list)
+    request_choice_count: int | None = None
+    output_type: str | None = None
+    data_source_id: str | None = None
+    retrieval_query_text: str | None = None
+    input_messages: list[NormalizedMessage] = Field(default_factory=list)
+    output_messages: list[NormalizedMessage] = Field(default_factory=list)
     system_instructions: list[str] = Field(default_factory=list)
-    tool_call_arguments: str = ""
-    tool_call_result: str = ""
-    compaction_summary: str = ""
-    compaction_items_before: int = 0
-    compaction_items_after: int = 0
+    tool_call_arguments: str | None = None
+    tool_call_result: str | None = None
+    compaction_summary: str | None = None
+    compaction_items_before: int | None = None
+    compaction_items_after: int | None = None
     content_refs: list[str] = Field(default_factory=list)
     artifact_refs: list[str] = Field(default_factory=list)
     object_refs: list[str] = Field(default_factory=list)
     custom_attrs_string: dict[str, str] = Field(default_factory=dict)
-    raw_span_dump: str = ""
-    attributes_dump: str = ""
-    events_dump: str = ""
-    resource_dump: str = ""
-    wb_user_id: str = ""
-    wb_run_id: str = ""
-    wb_run_step: int = 0
-    wb_run_step_end: int = 0
+    custom_attrs_int: dict[str, int] = Field(default_factory=dict)
+    custom_attrs_float: dict[str, float] = Field(default_factory=dict)
+    custom_attrs_bool: dict[str, bool] = Field(default_factory=dict)
+    server_address: str | None = None
+    server_port: int | None = None
+    wb_user_id: str | None = None
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
+    wb_run_step_end: int | None = None
 
 
 class AgentSortBy(BaseModel):
@@ -131,7 +165,7 @@ class AgentSpanGroupRow(BaseModel):
     The remaining fields are a fixed aggregate bundle computed per group.
     """
 
-    group_keys: dict[str, str | int | float | None] = Field(default_factory=dict)
+    group_keys: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
     span_count: int = 0
     invocation_count: int = 0  # countIf(operation_name = 'invoke_agent')
     conversation_count: int = 0
@@ -158,9 +192,10 @@ class AgentSpansQueryReq(BaseModel):
 
     project_id: str
     filters: AgentSpansQueryFilters | None = None
-    #: Mongo-style filter expression applied alongside `filters`. Both are
-    #: AND-ed. Field names resolve via semconv, direct span columns, or the
-    #: typed custom attribute Map columns — see :mod:`agent_query_compiler`.
+    # Mongo-style filter expression applied alongside `filters`. Both are
+    # AND-ed. Field names resolve via semconv, direct span columns, or the
+    # typed custom attribute Map columns. The narrower `filters` object keeps
+    # common UI filters simple; `query` covers advanced nested expressions.
     query: Query | None = None
     group_by: list[AgentGroupByRef] | None = None
     sort_by: list[AgentSortBy] | None = None
@@ -200,7 +235,7 @@ class AgentSearchReq(BaseModel):
     project_id: str
     query: str
 
-    roles: list[str] | None = None
+    roles: list[SearchMessageRole] | None = None
     conversation_id: str | None = None
     agent_name: str | None = None
     provider_name: str | None = None
@@ -217,7 +252,7 @@ class AgentSearchMatchedMessage(BaseModel):
 
     span_id: str
     trace_id: str
-    role: str
+    role: SearchMessageRole
     content_preview: str
     content_digest: str
     started_at: datetime.datetime
@@ -248,40 +283,42 @@ class AgentChatMessage(BaseModel):
     lifecycle boundaries.
 
     Message types derived from OTel GenAI semconv operations:
-    - `user_message`, `agent_message`, `tool_call`
+    - `user_message`, `assistant_message`, `tool_call`
 
     Weave-specific product extensions (no semconv equivalent):
     - `agent_start`: agent lifecycle boundary marker
+    - `agent_handoff`: agent-to-agent handoff marker
     - `context_compacted`: context window compaction event
     """
 
     type: Literal[
         "user_message",
-        "agent_message",
+        "assistant_message",
         "tool_call",
+        "agent_handoff",
         "agent_start",
         "context_compacted",
     ]
-    span_id: str = ""
-    agent_name: str = ""
-    text: str = ""
-    model: str = ""
-    system_instructions: str = ""
-    reasoning_content: str = ""
-    reasoning_tokens: int = 0
-    tool_name: str = ""
-    tool_arguments: str = ""
-    tool_result: str = ""
-    tool_definitions: str = ""
-    input_tokens: int = 0
-    output_tokens: int = 0
-    duration_ms: int = 0
+    span_id: str | None = None
+    agent_name: str | None = None
+    text: str | None = None
+    model: str | None = None
+    system_instructions: str | None = None
+    reasoning_content: str | None = None
+    reasoning_tokens: int | None = None
+    tool_name: str | None = None
+    tool_arguments: str | None = None
+    tool_result: str | None = None
+    tool_definitions: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    duration_ms: int | None = None
     started_at: datetime.datetime | None = None
-    status: str = "OK"
+    status: StatusCodeLiteral | None = None
     content_refs: list[str] = Field(default_factory=list)
-    compaction_summary: str = ""
-    compaction_items_before: int = 0
-    compaction_items_after: int = 0
+    compaction_summary: str | None = None
+    compaction_items_before: int | None = None
+    compaction_items_after: int | None = None
 
 
 class AgentTraceChatReq(BaseModel):
@@ -297,10 +334,10 @@ class AgentTraceChatRes(BaseModel):
     """
 
     trace_id: str
-    root_span_name: str = ""
-    provider: str = ""
-    total_duration_ms: int = Field(
-        default=0,
+    root_span_name: str | None = None
+    provider: str | None = None
+    total_duration_ms: int | None = Field(
+        default=None,
         description=(
             "Wall-clock duration of the trace root span in milliseconds. "
             "This is not a sum of child span durations."
@@ -353,14 +390,14 @@ class AgentSchema(BaseModel):
 
     project_id: str
     agent_name: str
-    invocation_count: int = 0
-    span_count: int = 0
-    total_input_tokens: int = 0
-    total_output_tokens: int = 0
-    total_duration_ms: int = 0
-    error_count: int = 0
-    first_seen: datetime.datetime | None = None
-    last_seen: datetime.datetime | None = None
+    invocation_count: int
+    span_count: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_duration_ms: int
+    error_count: int
+    first_seen: datetime.datetime | None
+    last_seen: datetime.datetime | None
 
 
 class AgentsQueryFilters(BaseModel):
@@ -398,7 +435,7 @@ class AgentCustomAttrFilter(BaseModel):
 
     attr_key: str
     operator: str = "eq"
-    value: str | int | float = ""
+    value: str | int | float | bool = ""
 
 
 # ---------------------------------------------------------------------------
@@ -406,20 +443,10 @@ class AgentCustomAttrFilter(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class AgentVersionSchema(BaseModel):
+class AgentVersionSchema(AgentSchema):
     """Aggregated per-version stats from the agent_versions AMT."""
 
-    project_id: str = ""
-    agent_name: str = ""
-    agent_version: str = ""
-    invocation_count: int = 0
-    span_count: int = 0
-    total_input_tokens: int = 0
-    total_output_tokens: int = 0
-    total_duration_ms: int = 0
-    error_count: int = 0
-    first_seen: datetime.datetime | None = None
-    last_seen: datetime.datetime | None = None
+    agent_version: str
 
 
 class AgentVersionsQueryReq(BaseModel):
@@ -455,7 +482,7 @@ class GenAIOTelExportReq(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    processed_spans: list = Field(
+    processed_spans: list[ProcessedResourceSpans] = Field(
         ..., description="List of ProcessedResourceSpans from OTel deserialization"
     )
     project_id: str

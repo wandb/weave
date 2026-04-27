@@ -4,15 +4,15 @@ Defines every attribute the GenAI observability system extracts into dedicated
 columns.  Each attribute has a canonical `weave.*` key and an optional
 `gen_ai.*` alias (recognized on ingest as equivalent).
 
-Usage::
+Usage:
 
-    from weave.trace_server.agents.semconv import ATTRIBUTES, resolve
+    from weave.trace_server.agents.semconv import ATTRIBUTES, resolve_alias_to_canonical
 
     # Look up by canonical key
     attr = ATTRIBUTES["weave.operation.name"]
 
     # Resolve any recognized key (weave.* or gen_ai.*) to the canonical key
-    canonical = resolve("gen_ai.operation.name")  # -> "weave.operation.name"
+    canonical = resolve_alias_to_canonical("gen_ai.operation.name")
 """
 
 from __future__ import annotations
@@ -176,6 +176,18 @@ _DEFS: list[Attribute] = [
         "gen_ai.request.top_p",
     ),
     Attribute(
+        "weave.request.top_k",
+        "int",
+        "Top-k sampling threshold",
+        "gen_ai.request.top_k",
+    ),
+    Attribute(
+        "weave.request.encoding_formats",
+        "string[]",
+        "Requested embedding encoding formats",
+        "gen_ai.request.encoding_formats",
+    ),
+    Attribute(
         "weave.request.frequency_penalty",
         "float",
         "Frequency penalty",
@@ -211,6 +223,18 @@ _DEFS: list[Attribute] = [
         "string",
         "Output modality: text, json, image, speech",
         "gen_ai.output.type",
+    ),
+    Attribute(
+        "weave.data_source.id",
+        "string",
+        "Data source identifier for retrieval spans",
+        "gen_ai.data_source.id",
+    ),
+    Attribute(
+        "weave.retrieval.query.text",
+        "string",
+        "Retrieval query text",
+        "gen_ai.retrieval.query.text",
     ),
     Attribute(
         "weave.input.messages", "json", "Input messages", "gen_ai.input.messages"
@@ -255,14 +279,17 @@ _DEFS: list[Attribute] = [
 # Derived lookups
 # ---------------------------------------------------------------------------
 
-#: All attributes keyed by canonical weave.* key.
+# All attributes keyed by canonical weave.* key.
 ATTRIBUTES: dict[str, Attribute] = {a.key: a for a in _DEFS}
 
-#: Shortcut: maps canonical key -> lookup_keys tuple for extraction.
-#: Usage: `_get(attrs, *K["weave.agent.name"])`
-K: dict[str, tuple[str, ...]] = {a.key: a.lookup_keys for a in _DEFS}
+# Canonical key -> lookup_keys tuple for extraction.
+# Usage: `_get(attrs, *SEMCONV_LOOKUP_KEYS["weave.agent.name"])`
+SEMCONV_LOOKUP_KEYS: dict[str, tuple[str, ...]] = {a.key: a.lookup_keys for a in _DEFS}
 
-#: Map from any recognized key (weave.* or gen_ai.*) to canonical weave.* key.
+# Short alias for call sites that repeatedly unpack lookup keys.
+K = SEMCONV_LOOKUP_KEYS
+
+# Map from any recognized key (weave.* or gen_ai.*) to canonical weave.* key.
 _ALIAS_TO_CANONICAL: dict[str, str] = {}
 for _a in _DEFS:
     _ALIAS_TO_CANONICAL[_a.key] = _a.key
@@ -270,7 +297,7 @@ for _a in _DEFS:
         _ALIAS_TO_CANONICAL[_a.gen_ai_alias] = _a.key
 
 
-def resolve(key: str) -> str | None:
+def resolve_alias_to_canonical(key: str) -> str | None:
     """Resolve any recognized attribute key to its canonical weave.* key.
 
     Returns None if the key is not a known convention attribute.
@@ -278,9 +305,9 @@ def resolve(key: str) -> str | None:
     return _ALIAS_TO_CANONICAL.get(key)
 
 
-#: All attribute keys (both weave.* and gen_ai.* aliases) that are extracted
-#: into dedicated columns.  Used by the extraction layer to exclude these
-#: from the custom attribute overflow maps.
+# All attribute keys (both weave.* and gen_ai.* aliases) that are extracted
+# into dedicated columns. Used by the extraction layer to exclude these
+# from the custom attribute overflow maps.
 KNOWN_KEYS: frozenset[str] = frozenset(_ALIAS_TO_CANONICAL.keys())
 
 
@@ -288,12 +315,12 @@ KNOWN_KEYS: frozenset[str] = frozenset(_ALIAS_TO_CANONICAL.keys())
 # Query-DSL filtering: canonical attribute -> span column
 # ---------------------------------------------------------------------------
 
-#: Maps each filterable canonical attribute key to its span column name.
-#:
-#: Only attributes that land in dedicated span columns with a meaningful
-#: scalar equality / comparison surface are listed. Array and JSON columns
-#: (`finish_reasons`, `content_refs`, `input_messages`, etc.) are
-#: intentionally omitted — filtering those needs different operators.
+# Maps each filterable canonical attribute key to its span column name.
+#
+# Only attributes that land in dedicated span columns with a meaningful
+# scalar equality / comparison surface are listed. Array and JSON columns
+# (`finish_reasons`, `content_refs`, `input_messages`, etc.) are
+# intentionally omitted because filtering those needs different operators.
 CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     # string scalars
     "weave.operation.name": "operation_name",
@@ -315,6 +342,8 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     "weave.tool.call.result": "tool_call_result",
     "weave.reasoning_content": "reasoning_content",
     "weave.output.type": "output_type",
+    "weave.data_source.id": "data_source_id",
+    "weave.retrieval.query.text": "retrieval_query_text",
     "weave.error.type": "error_type",
     "weave.server.address": "server_address",
     "weave.compaction.summary": "compaction_summary",
@@ -325,6 +354,7 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     "weave.usage.cache_creation.input_tokens": "cache_creation_input_tokens",
     "weave.usage.cache_read.input_tokens": "cache_read_input_tokens",
     "weave.request.max_tokens": "request_max_tokens",
+    "weave.request.top_k": "request_top_k",
     "weave.request.seed": "request_seed",
     "weave.request.choice.count": "request_choice_count",
     "weave.server.port": "server_port",
@@ -355,7 +385,7 @@ def _build_filterable_lookup() -> dict[str, str]:
     return out
 
 
-#: Lookup: any attribute name a caller types in the query DSL -> span column.
-#: Covers canonical `weave.*`, `gen_ai.*` alias, and the short-form
-#: with the prefix stripped (e.g. `agent.name`).
+# Lookup: any attribute name a caller types in the query DSL -> span column.
+# Covers canonical `weave.*`, `gen_ai.*` alias, and the short-form
+# with the prefix stripped (e.g. `agent.name`).
 FILTERABLE_KEY_TO_COLUMN: dict[str, str] = _build_filterable_lookup()

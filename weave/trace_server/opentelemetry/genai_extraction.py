@@ -1,21 +1,22 @@
 """Extract GenAI semantic convention fields from OTel spans.
 
-Extracts standard ``gen_ai.*`` attributes into dedicated columns for efficient
-querying.  Weave-specific ``weave.*`` attributes are also extracted.  All other
+Extracts standard `gen_ai.*` attributes into dedicated columns for efficient
+querying.  Weave-specific `weave.*` attributes are also extracted.  All other
 attributes are preserved in typed custom attribute maps and in the lossless
 raw span dump.
 
-The main entry point is ``extract_genai_span()`` which takes a parsed OTel
-``Span`` and returns an ``AgentSpanCHInsertable`` ready for ClickHouse insert.
+The main entry point is `extract_genai_span()` which takes a parsed OTel
+`Span` and returns an `AgentSpanCHInsertable` ready for ClickHouse insert.
 """
 
 import json
 import math
+from dataclasses import dataclass
 from typing import Any
 
 from weave.trace_server.agents.constants import (
     CUSTOM_ATTR_TRUNCATION_MARKER,
-    MAX_CUSTOM_ATTR_VALUE_BYTES,
+    MAX_CUSTOM_ATTR_VALUE_CHARS,
     MAX_CUSTOM_ATTRS_PER_SPAN,
 )
 from weave.trace_server.agents.schema import (
@@ -43,6 +44,14 @@ _KNOWN_OP_PREFIXES = (
 )
 
 
+@dataclass(frozen=True)
+class CustomAttrs:
+    string: dict[str, str]
+    int: dict[str, int]
+    float: dict[str, float]
+    bool: dict[str, bool]
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -55,6 +64,11 @@ def _get(attrs: dict[str, Any], *keys: str) -> Any:
         if val is not None:
             return val
     return None
+
+
+def _get_str(attrs: dict[str, Any], *keys: str) -> str:
+    """Return the first non-empty attribute value as a string."""
+    return str(_get(attrs, *keys) or "")
 
 
 def _json_str(val: Any) -> str:
@@ -144,7 +158,7 @@ def extract_reasoning_tokens(attrs: dict[str, Any]) -> int:
 def extract_reasoning_content(raw_output: Any) -> str:
     """Extract reasoning/thinking text from raw output message data.
 
-    Looks for ReasoningPart with ``{"type": "reasoning", "content": "..."}``.
+    Looks for ReasoningPart with `{"type": "reasoning", "content": "..."}`.
     """
     if raw_output is None:
         return ""
@@ -232,7 +246,7 @@ def _text_from_parts(parts: list[Any]) -> str:
 
 def _normalize_single_message(msg: dict[str, Any]) -> NormalizedMessage:
     """Normalize a single message dict into a NormalizedMessage."""
-    role = str(msg.get("role", "user"))
+    role = str(msg.get("role") or "")
 
     content = ""
     raw_parts = msg.get("parts")
@@ -246,7 +260,7 @@ def _normalize_single_message(msg: dict[str, Any]) -> NormalizedMessage:
     return NormalizedMessage(
         role=role,
         content=content,
-        finish_reason=str(msg.get("finish_reason", "")),
+        finish_reason=str(msg.get("finish_reason") or ""),
     )
 
 
@@ -263,6 +277,7 @@ def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
         try:
             raw = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
+            # A bare string in the input slot is the legacy prompt shape.
             return [NormalizedMessage(role="user", content=raw)]
 
     if isinstance(raw, dict):
@@ -274,6 +289,7 @@ def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
         result: list[NormalizedMessage] = []
         for item in raw:
             if isinstance(item, str):
+                # String array entries are prompt fragments with no explicit role.
                 result.append(NormalizedMessage(role="user", content=item))
             elif isinstance(item, dict):
                 result.append(_normalize_single_message(item))
@@ -307,6 +323,12 @@ def _normalize_system_instructions(raw: Any) -> list[str]:
 
 
 def _extract_raw_input(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
+    """Return raw input messages from attrs, legacy prompt attrs, or OTel events.
+
+    Attribute values are preferred because they are already attached to the
+    span row. Event fallbacks cover producers that follow the older GenAI
+    semantic convention event shape.
+    """
     val = _get(attrs, *K["weave.input.messages"])
     if val is not None:
         return val
@@ -326,6 +348,7 @@ def _extract_raw_input(attrs: dict[str, Any], events: list[dict[str, Any]]) -> A
 
 
 def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
+    """Return raw output messages from attrs, legacy completion attrs, or events."""
     val = _get(attrs, *K["weave.output.messages"])
     if val is not None:
         return val
@@ -350,38 +373,36 @@ def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> 
 
 
 def _truncate_if_needed(val: str) -> str:
-    """Truncate a string to MAX_CUSTOM_ATTR_VALUE_BYTES chars with a marker.
+    """Truncate a string to MAX_CUSTOM_ATTR_VALUE_CHARS chars with a marker.
 
     Uses character length rather than UTF-8 byte length for simplicity —
     the cap is a cost/UX safety net, not a strict ClickHouse invariant, so
     slight overage on multi-byte payloads is acceptable.
     """
     n = len(val)
-    if n <= MAX_CUSTOM_ATTR_VALUE_BYTES:
+    if n <= MAX_CUSTOM_ATTR_VALUE_CHARS:
         return val
     marker = CUSTOM_ATTR_TRUNCATION_MARKER.format(n=n)
-    keep = max(0, MAX_CUSTOM_ATTR_VALUE_BYTES - len(marker))
+    keep = max(0, MAX_CUSTOM_ATTR_VALUE_CHARS - len(marker))
     return val[:keep] + marker
 
 
-def _extract_custom_attrs(
-    attrs: dict[str, Any],
-) -> tuple[dict[str, str], dict[str, int], dict[str, float], dict[str, bool]]:
+def _extract_custom_attrs(attrs: dict[str, Any]) -> CustomAttrs:
     """Route non-semconv attributes into the four typed Maps.
 
     Enforces two limits to keep misbehaving spans from blowing up storage:
-    - at most ``MAX_CUSTOM_ATTRS_PER_SPAN`` entries across all four maps;
+    - at most `MAX_CUSTOM_ATTRS_PER_SPAN` entries across all four maps;
     - each string / JSON-serialized value truncated at
-      ``MAX_CUSTOM_ATTR_VALUE_BYTES`` with a truncation marker.
+      `MAX_CUSTOM_ATTR_VALUE_CHARS` with a truncation marker.
 
-    Non-finite floats (``NaN``, ``+Inf``, ``-Inf``) are dropped because they
+    Non-finite floats (`NaN`, `+Inf`, `-Inf`) are dropped because they
     break JSON response serialization downstream and have no useful
     aggregation semantics.
 
     Note: the bool branch must come before the int branch. Python's
-    ``bool`` is a subclass of ``int``, so ``isinstance(True, int)`` is
+    `bool` is a subclass of `int`, so `isinstance(True, int)` is
     True — if the int branch runs first, True and False land in
-    ``custom_attrs_int`` instead of ``custom_attrs_bool``.
+    `custom_attrs_int` instead of `custom_attrs_bool`.
     """
     string_map: dict[str, str] = {}
     int_map: dict[str, int] = {}
@@ -391,7 +412,7 @@ def _extract_custom_attrs(
     for key, val in _flatten_attrs(attrs):
         if key in KNOWN_KEYS:
             continue
-        if val is None:
+        if val is None or val == "":
             continue
         total = len(string_map) + len(int_map) + len(float_map) + len(bool_map)
         if total >= MAX_CUSTOM_ATTRS_PER_SPAN:
@@ -409,17 +430,24 @@ def _extract_custom_attrs(
         else:
             string_map[key] = _truncate_if_needed(_json_str(val))
 
-    return string_map, int_map, float_map, bool_map
+    return CustomAttrs(
+        string=string_map,
+        int=int_map,
+        float=float_map,
+        bool=bool_map,
+    )
 
 
 def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, Any]]:
     """Flatten a nested attribute dict into dot-separated key-value pairs."""
     result: list[tuple[str, Any]] = []
     for key, val in attrs.items():
-        full_key = f"{prefix}{key}" if not prefix else f"{prefix}.{key}"
+        full_key = key if not prefix else f"{prefix}.{key}"
         if isinstance(val, dict):
             result.extend(_flatten_attrs(val, full_key))
         else:
+            # Lists stay as leaf values. Flattening array indexes into keys would
+            # produce high-cardinality map keys and make typed filters awkward.
             result.append((full_key, val))
     return result
 
@@ -439,7 +467,7 @@ def extract_genai_span(
 ) -> AgentSpanCHInsertable:
     """Extract GenAI semantic convention fields from a parsed OTel span.
 
-    Returns an ``AgentSpanCHInsertable`` ready for ClickHouse insert.
+    Returns an `AgentSpanCHInsertable` ready for ClickHouse insert.
     """
     attrs = span.attributes
     events_dicts = [e.as_dict() for e in span.events]
@@ -449,14 +477,12 @@ def extract_genai_span(
     reasoning_t = extract_reasoning_tokens(attrs)
 
     status_code = span.status.code.name
-    if status_code == "UNSET" and not span.status.message:
-        status_code = "OK"
 
     raw_output = _extract_raw_output(attrs, events_dicts)
     output_msgs = _normalize_raw_messages(raw_output)
     reasoning_content = extract_reasoning_content(raw_output)
 
-    custom_str, custom_int, custom_float, custom_bool = _extract_custom_attrs(attrs)
+    custom_attrs = _extract_custom_attrs(attrs)
 
     return AgentSpanCHInsertable(
         project_id=project_id,
@@ -472,12 +498,12 @@ def extract_genai_span(
         operation_name=extract_operation_name(attrs, span.name),
         provider_name=extract_provider(attrs),
         agent_name=extract_agent_name(attrs, span.name),
-        agent_id=str(_get(attrs, *K["weave.agent.id"]) or ""),
-        agent_description=str(_get(attrs, *K["weave.agent.description"]) or ""),
-        agent_version=str(_get(attrs, *K["weave.agent.version"]) or ""),
-        request_model=str(_get(attrs, *K["weave.request.model"]) or ""),
-        response_model=str(_get(attrs, *K["weave.response.model"]) or ""),
-        response_id=str(_get(attrs, *K["weave.response.id"]) or ""),
+        agent_id=_get_str(attrs, *K["weave.agent.id"]),
+        agent_description=_get_str(attrs, *K["weave.agent.description"]),
+        agent_version=_get_str(attrs, *K["weave.agent.version"]),
+        request_model=_get_str(attrs, *K["weave.request.model"]),
+        response_model=_get_str(attrs, *K["weave.response.model"]),
+        response_id=_get_str(attrs, *K["weave.response.id"]),
         input_tokens=input_t,
         output_tokens=output_t,
         reasoning_tokens=reasoning_t,
@@ -490,16 +516,20 @@ def extract_genai_span(
         reasoning_content=reasoning_content,
         conversation_id=extract_conversation_id(attrs),
         conversation_name=extract_conversation_name(attrs),
-        tool_name=str(_get(attrs, *K["weave.tool.name"]) or ""),
-        tool_type=str(_get(attrs, *K["weave.tool.type"]) or ""),
-        tool_call_id=str(_get(attrs, *K["weave.tool.call.id"]) or ""),
-        tool_description=str(_get(attrs, *K["weave.tool.description"]) or ""),
+        tool_name=_get_str(attrs, *K["weave.tool.name"]),
+        tool_type=_get_str(attrs, *K["weave.tool.type"]),
+        tool_call_id=_get_str(attrs, *K["weave.tool.call.id"]),
+        tool_description=_get_str(attrs, *K["weave.tool.description"]),
         tool_definitions=_json_str(_get(attrs, *K["weave.tool.definitions"])),
         finish_reasons=extract_finish_reasons(attrs),
-        error_type=str(_get(attrs, *K["weave.error.type"]) or ""),
+        error_type=_get_str(attrs, *K["weave.error.type"]),
         request_temperature=safe_float(_get(attrs, *K["weave.request.temperature"])),
         request_max_tokens=safe_int(_get(attrs, *K["weave.request.max_tokens"])),
         request_top_p=safe_float(_get(attrs, *K["weave.request.top_p"])),
+        request_top_k=safe_int(_get(attrs, *K["weave.request.top_k"])),
+        request_encoding_formats=_str_list(
+            _get(attrs, *K["weave.request.encoding_formats"])
+        ),
         request_frequency_penalty=safe_float(
             _get(attrs, *K["weave.request.frequency_penalty"])
         ),
@@ -511,7 +541,9 @@ def extract_genai_span(
             _get(attrs, *K["weave.request.stop_sequences"])
         ),
         request_choice_count=safe_int(_get(attrs, *K["weave.request.choice.count"])),
-        output_type=str(_get(attrs, *K["weave.output.type"]) or ""),
+        output_type=_get_str(attrs, *K["weave.output.type"]),
+        data_source_id=_get_str(attrs, *K["weave.data_source.id"]),
+        retrieval_query_text=_get_str(attrs, *K["weave.retrieval.query.text"]),
         input_messages=_normalize_raw_messages(_extract_raw_input(attrs, events_dicts)),
         output_messages=output_msgs,
         system_instructions=_normalize_system_instructions(
@@ -519,7 +551,7 @@ def extract_genai_span(
         ),
         tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts),
         tool_call_result=extract_tool_call_result(attrs, events_dicts),
-        compaction_summary=str(_get(attrs, *K["weave.compaction.summary"]) or ""),
+        compaction_summary=_get_str(attrs, *K["weave.compaction.summary"]),
         compaction_items_before=safe_int(
             _get(attrs, *K["weave.compaction.items_before"])
         ),
@@ -529,11 +561,11 @@ def extract_genai_span(
         content_refs=_str_list(_get(attrs, *K["weave.content_refs"])),
         artifact_refs=_str_list(_get(attrs, *K["weave.artifact_refs"])),
         object_refs=_str_list(_get(attrs, *K["weave.object_refs"])),
-        custom_attrs_string=custom_str,
-        custom_attrs_int=custom_int,
-        custom_attrs_float=custom_float,
-        custom_attrs_bool=custom_bool,
-        server_address=str(_get(attrs, *K["weave.server.address"]) or ""),
+        custom_attrs_string=custom_attrs.string,
+        custom_attrs_int=custom_attrs.int,
+        custom_attrs_float=custom_attrs.float,
+        custom_attrs_bool=custom_attrs.bool,
+        server_address=_get_str(attrs, *K["weave.server.address"]),
         server_port=safe_int(_get(attrs, *K["weave.server.port"])),
         raw_span_dump=_json_str(span.as_dict()),
         attributes_dump=_json_str(attrs),

@@ -18,6 +18,16 @@ from weave.trace_server.agents.constants import SPAN_KIND_UNSPECIFIED
 from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.clickhouse_schema import EXPIRE_AT_NEVER
 
+SpanKindLiteral = Literal[
+    "UNSPECIFIED",
+    "INTERNAL",
+    "SERVER",
+    "CLIENT",
+    "PRODUCER",
+    "CONSUMER",
+]
+StatusCodeLiteral = Literal["UNSET", "OK", "ERROR"]
+
 
 class NormalizedMessage(BaseModel):
     """A single message normalized from any provider format.
@@ -58,7 +68,7 @@ class AgentSpanCHInsertable(BaseModel):
     span_id: str
     parent_span_id: str = ""
     span_name: str
-    span_kind: str = SPAN_KIND_UNSPECIFIED
+    span_kind: SpanKindLiteral = SPAN_KIND_UNSPECIFIED
 
     # [OTel Core] timestamps
     started_at: datetime.datetime
@@ -67,7 +77,7 @@ class AgentSpanCHInsertable(BaseModel):
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
     # [OTel Core] status — matches the ClickHouse Enum8 exactly.
-    status_code: Literal["UNSET", "OK", "ERROR"] = "UNSET"
+    status_code: StatusCodeLiteral = "UNSET"
     status_message: str = ""
 
     # [OTel GenAI] classification — gen_ai.operation.name, gen_ai.provider.name
@@ -118,6 +128,8 @@ class AgentSpanCHInsertable(BaseModel):
     request_temperature: float = 0.0
     request_max_tokens: int = 0
     request_top_p: float = 0.0
+    request_top_k: int = 0
+    request_encoding_formats: list[str] = Field(default_factory=list)
     request_frequency_penalty: float = 0.0
     request_presence_penalty: float = 0.0
     request_seed: int = 0
@@ -126,6 +138,10 @@ class AgentSpanCHInsertable(BaseModel):
 
     # [OTel GenAI] output type — gen_ai.output.type (text, json, image, speech)
     output_type: str = ""
+
+    # [OTel GenAI] retrieval — gen_ai.data_source.id, gen_ai.retrieval.*
+    data_source_id: str = ""
+    retrieval_query_text: str = ""
 
     # [OTel GenAI] messages — gen_ai.input.messages, gen_ai.output.messages
     input_messages: list[NormalizedMessage] = Field(default_factory=list)

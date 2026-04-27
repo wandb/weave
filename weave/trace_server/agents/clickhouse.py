@@ -11,7 +11,7 @@ import datetime
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
 from weave.trace_server.agents.chat_view import build_trace_chat
 from weave.trace_server.agents.constants import (
@@ -72,9 +72,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-#: Signature of the server's `_query` method — takes (sql, params), returns QueryResult.
-QueryParams: TypeAlias = dict[str, object]
-ClickHouseRow: TypeAlias = dict[str, object]
+# Signature of the server's `_query` method; takes (sql, params), returns QueryResult.
+QueryParams: TypeAlias = dict[str, Any]
+ClickHouseRow: TypeAlias = dict[str, Any]
 QueryFn = Callable[[str, QueryParams], "QueryResult"]
 PaginatedReqT = TypeVar(
     "PaginatedReqT",
@@ -476,7 +476,7 @@ def _datetime_or_min(val: object) -> datetime.datetime:
     return _datetime_or_none(val) or datetime.datetime.min
 
 
-def _group_key_value(val: object) -> str | int | float | None:
-    if isinstance(val, str | int | float):
+def _group_key_value(val: object) -> str | int | float | bool | None:
+    if isinstance(val, str | int | float | bool):
         return val
     return None

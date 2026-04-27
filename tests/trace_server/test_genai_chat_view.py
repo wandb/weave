@@ -33,6 +33,7 @@ def _span(
     compaction_items_before: int = 0,
     compaction_items_after: int = 0,
     started_at: datetime.datetime | None = None,
+    ended_at: datetime.datetime | None = None,
     **kwargs: object,
 ) -> AgentSpanSchema:
     return AgentSpanSchema(
@@ -56,7 +57,8 @@ def _span(
         status_code="OK",
         started_at=started_at
         or datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
-        ended_at=datetime.datetime(2026, 1, 1, 0, 0, 1, tzinfo=datetime.timezone.utc),
+        ended_at=ended_at
+        or datetime.datetime(2026, 1, 1, 0, 0, 1, tzinfo=datetime.timezone.utc),
         **kwargs,
     )
 
@@ -71,7 +73,7 @@ def test_empty() -> None:
 def test_full_agent_turn() -> None:
     """A realistic agent trace exercising every message type the projection
     emits (user_message, agent_start, tool_call, context_compacted,
-    agent_message), plus token aggregation from child spans and
+    assistant_message), plus token aggregation from child spans and
     build_trace_chat wrapper metadata.
     """
 
@@ -132,7 +134,7 @@ def test_full_agent_turn() -> None:
         "agent_start",
         "tool_call",
         "context_compacted",
-        "agent_message",
+        "assistant_message",
     }
 
     # Per-message content
@@ -145,12 +147,12 @@ def test_full_agent_turn() -> None:
     assert by_type["context_compacted"].compaction_summary == "Summarized 10 messages"
     assert by_type["context_compacted"].compaction_items_before == 10
     assert by_type["context_compacted"].compaction_items_after == 3
-    assert by_type["agent_message"].text == "It's 72°F."
+    assert by_type["assistant_message"].text == "It's 72°F."
 
     # Token aggregation: root 10 + llm 200 = 210 in, 5 + 100 = 105 out.
     # Tool spans don't contribute tokens.
-    assert by_type["agent_message"].input_tokens == 210
-    assert by_type["agent_message"].output_tokens == 105
+    assert by_type["assistant_message"].input_tokens == 210
+    assert by_type["assistant_message"].output_tokens == 105
 
 
 def test_build_span_tree_handles_null_started_at() -> None:
@@ -229,10 +231,39 @@ def test_build_trace_chat_handles_null_started_at() -> None:
     assert user_msgs[0].started_at is None
 
 
+def test_build_trace_chat_uses_latest_ended_span_when_root_missing() -> None:
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    spans = [
+        _span(
+            span_id="early",
+            parent_span_id="missing",
+            span_name="early span",
+            started_at=at(0),
+            ended_at=at(1),
+        ),
+        _span(
+            span_id="late",
+            parent_span_id="missing",
+            span_name="late span",
+            provider_name="openai",
+            started_at=at(0),
+            ended_at=at(2),
+        ),
+    ]
+
+    res = build_trace_chat(spans, "trace-without-root")
+    assert res.root_span_name == "late span"
+    assert res.provider == "openai"
+
+
 def test_invoke_agent_mirrors_child_llm_output_messages() -> None:
     """When an invoke_agent span and its inner LLM span both carry the same
     final `output_messages` (OpenAI Agents SDK / Google ADK single-call
-    turn), we should emit exactly one `agent_message`, not two.
+    turn), we should emit exactly one `assistant_message`, not two.
 
     The inner LLM span is the canonical content source; the parent
     invoke_agent only emits if no descendant did.
@@ -268,9 +299,9 @@ def test_invoke_agent_mirrors_child_llm_output_messages() -> None:
     ]
 
     messages = build_chat_messages(spans)
-    agent_messages = [m for m in messages if m.type == "agent_message"]
+    agent_messages = [m for m in messages if m.type == "assistant_message"]
 
-    # Exactly one agent_message, sourced from the child chat span (not
+    # Exactly one assistant_message, sourced from the child chat span (not
     # duplicated from the parent invoke_agent).
     assert len(agent_messages) == 1
     assert agent_messages[0].text == "It's 72°F."
@@ -298,9 +329,23 @@ def test_invoke_agent_emits_when_no_descendant_llm_span() -> None:
     ]
 
     messages = build_chat_messages(spans)
-    agent_messages = [m for m in messages if m.type == "agent_message"]
+    agent_messages = [m for m in messages if m.type == "assistant_message"]
     assert len(agent_messages) == 1
     assert agent_messages[0].text == "hi there"
+
+
+def test_system_message_not_used_as_user_prompt_fallback() -> None:
+    messages = build_chat_messages(
+        [
+            _span(
+                span_id="s1",
+                input_messages=[{"role": "system", "content": "You are helpful."}],
+                output_messages=[{"role": "assistant", "content": "hello"}],
+            )
+        ]
+    )
+
+    assert [m.type for m in messages] == ["assistant_message"]
 
 
 def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:

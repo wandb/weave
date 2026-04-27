@@ -25,12 +25,17 @@ def genai_span_to_row(span: AgentSpanCHInsertable) -> list[Any]:
     for key in ("input_messages", "output_messages"):
         msgs = params.get(key)
         if msgs and isinstance(msgs, list):
-            params[key] = [
-                (m["role"], m["content"], m["finish_reason"])
-                if isinstance(m, dict)
-                else m
-                for m in msgs
-            ]
+            try:
+                params[key] = [
+                    (m["role"], m["content"], m["finish_reason"])
+                    if isinstance(m, dict)
+                    else m
+                    for m in msgs
+                ]
+            except KeyError as e:
+                raise ValueError(
+                    f"{key} message missing required field {e.args[0]!r}"
+                ) from e
     return [params.get(col) for col in ALL_SPAN_INSERT_COLUMNS]
 
 
@@ -58,6 +63,10 @@ def normalize_span_row(d: dict[str, Any]) -> dict[str, Any]:
         normalized: list[Any] = []
         for m in msgs:
             if isinstance(m, tuple):
+                if len(m) != 3:
+                    raise ValueError(
+                        f"{key} tuple must have 3 values (role, content, finish_reason), got {len(m)}"
+                    )
                 normalized.append(
                     {"role": m[0], "content": m[1], "finish_reason": m[2]}
                 )

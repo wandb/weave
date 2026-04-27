@@ -33,11 +33,10 @@ from weave.trace_server.orm import (
     python_value_to_ch_type,
 )
 
-#: Span columns queryable by their literal column name without a
-#: corresponding semconv key — OTel-core span identity and W&B plumbing.
-#: Columns that are the target of a semconv key (`agent_name`,
-#: `input_tokens`, etc.) are also accepted by column name; see
-#: :data:`_ALL_QUERYABLE_COLUMNS`.
+# Span columns queryable by their literal column name without a corresponding
+# semconv key: OTel-core span identity and W&B plumbing. Columns that are the
+# target of a semconv key (`agent_name`, `input_tokens`, etc.) are also
+# accepted by column name; see `_ALL_QUERYABLE_COLUMNS`.
 DIRECT_COLUMNS: frozenset[str] = frozenset(
     {
         "trace_id",
@@ -54,16 +53,15 @@ DIRECT_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-#: Every column name the DSL will accept verbatim — OTel-core plus every
-#: column that some semconv key maps to.
-_ALL_QUERYABLE_COLUMNS: frozenset[str] = DIRECT_COLUMNS | frozenset(
-    FILTERABLE_KEY_TO_COLUMN.values()
+# Every column name the DSL will accept verbatim: OTel-core plus every column
+# that some semconv key maps to.
+_ALL_QUERYABLE_COLUMNS: frozenset[str] = DIRECT_COLUMNS.union(
+    frozenset(FILTERABLE_KEY_TO_COLUMN.values())
 )
 
-#: Field-name prefix -> Map column on the spans table.
-#: Longer prefixes must come before shorter ones — `custom_attrs_int.`
-#: has to be tried before `custom_attrs_string.` or every int field resolves
-#: to the string map.
+# Field-name prefix -> Map column on the spans table. Longer prefixes must come
+# before shorter ones: `custom_attrs_int.` has to be tried before
+# `custom_attrs_string.` or every int field resolves to the string map.
 _CUSTOM_ATTR_PREFIXES: dict[str, str] = {
     "custom_attrs_int.": "custom_attrs_int",
     "custom_attrs_float.": "custom_attrs_float",
@@ -71,9 +69,9 @@ _CUSTOM_ATTR_PREFIXES: dict[str, str] = {
     "custom_attrs_string.": "custom_attrs_string",
 }
 
-#: Python literal type -> custom attribute map when no explicit prefix is given.
-#: `bool` is a subclass of `int` in Python, but `dict.get(type(val))`
-#: uses exact-type lookup (not MRO), so `type(True)` finds `bool` first.
+# Python literal type -> custom attribute map when no explicit prefix is given.
+# `bool` is a subclass of `int` in Python, but `dict.get(type(val))` uses
+# exact-type lookup (not MRO), so `type(True)` finds `bool` first.
 _LITERAL_TYPE_TO_MAP: dict[type, str] = {
     bool: "custom_attrs_bool",
     int: "custom_attrs_int",
@@ -233,8 +231,8 @@ def _compile_operand(
     raise TypeError(f"Unknown operand type: {type(operand).__name__}")
 
 
-#: `$convert` target type -> sibling hint for the inner field operand so
-#: `$convert(field=foo, to=int)` picks custom_attrs_int.
+# `$convert` target type -> sibling hint for the inner field operand so
+# `$convert(field=foo, to=int)` picks custom_attrs_int.
 _CAST_TO_TYPE: dict[str, type] = {
     "int": int,
     "double": float,

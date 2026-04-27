@@ -131,6 +131,8 @@ OTel-derived or a Weave extension.
 | `request_temperature` | float | `gen_ai.request.temperature` / `weave.request.temperature` | OTel |
 | `request_max_tokens` | int | `gen_ai.request.max_tokens` / `weave.request.max_tokens` | OTel |
 | `request_top_p` | float | `gen_ai.request.top_p` / `weave.request.top_p` | OTel |
+| `request_top_k` | int | `gen_ai.request.top_k` / `weave.request.top_k` | OTel |
+| `request_encoding_formats` | string[] | `gen_ai.request.encoding_formats` / `weave.request.encoding_formats` | OTel |
 | `request_frequency_penalty` | float | `gen_ai.request.frequency_penalty` / `weave.request.frequency_penalty` | OTel |
 | `request_presence_penalty` | float | `gen_ai.request.presence_penalty` / `weave.request.presence_penalty` | OTel |
 | `request_seed` | int | `gen_ai.request.seed` / `weave.request.seed` | OTel |
@@ -143,6 +145,8 @@ OTel-derived or a Weave extension.
 |---|---|---|---|
 | `finish_reasons` | string[] | `gen_ai.response.finish_reasons` / `weave.response.finish_reasons` (values: `stop`, `length`, `tool_call`, `content_filter`, `error`) | OTel |
 | `output_type` | string | `gen_ai.output.type` / `weave.output.type` (values: `text`, `json`, `image`, `speech`) | OTel |
+| `data_source_id` | string | `gen_ai.data_source.id` / `weave.data_source.id` | OTel |
+| `retrieval_query_text` | string | `gen_ai.retrieval.query.text` / `weave.retrieval.query.text` | OTel (opt-in) |
 | `error_type` | string | `error.type` / `weave.error.type` | OTel |
 
 ### Server
@@ -244,10 +248,6 @@ just not promoted for typed querying.
 
 **Span attributes we don't extract:**
 
-- `gen_ai.data_source.id` — conditionally required for retrieval spans.
-- `gen_ai.request.top_k` — recommended for inference spans.
-- `gen_ai.request.encoding_formats` — recommended for embedding spans.
-- `gen_ai.retrieval.query.text` — opt-in for retrieval spans (content side).
 - `gen_ai.retrieval.documents` — opt-in for retrieval spans (content side).
 - `gen_ai.embeddings.dimension.count` — recommended for embedding spans.
 
@@ -277,7 +277,8 @@ message sequence for UI rendering. Types emitted:
 | Type | Source | Description |
 |---|---|---|
 | `user_message` | OTel (input_messages, role=user) | User input text |
-| `agent_message` | OTel (output_messages on chat/generate_content) | Agent / assistant response |
+| `assistant_message` | OTel (output_messages on chat/generate_content) | Agent / assistant response |
 | `tool_call` | OTel (execute_tool spans) | Tool invocation with arguments and result |
 | `agent_start` | **[Weave]** | Agent lifecycle boundary (invoke_agent span entry) |
+| `agent_handoff` | **[Weave]** | Agent-to-agent handoff marker |
 | `context_compacted` | **[Weave]** | Context compaction event |

@@ -32,7 +32,7 @@ from weave.trace_server.orm import ParamBuilder
 # Column whitelists — only these can appear in WHERE/ORDER BY/GROUP BY
 # ---------------------------------------------------------------------------
 
-#: Columns on spans that can be filtered with equality/IN
+# Columns on spans that can be filtered with equality/IN.
 SPAN_FILTERABLE_COLS: frozenset[str] = frozenset(
     {
         "operation_name",
@@ -53,18 +53,17 @@ SPAN_FILTERABLE_COLS: frozenset[str] = frozenset(
     }
 )
 
-#: Columns on spans that can be grouped by (superset of filterable).
-#: Kept separate so aggregation-only dimensions like agent_id can be added
-#: without widening the filter surface.
-SPAN_GROUP_BY_COLS: frozenset[str] = SPAN_FILTERABLE_COLS | frozenset(
-    {
-        "agent_id",
-        "tool_call_id",
-        "wb_user_id",
-    }
+SPAN_GROUP_BY_COLS: frozenset[str] = SPAN_FILTERABLE_COLS.union(
+    frozenset(
+        {
+            "agent_id",
+            "tool_call_id",
+            "wb_user_id",
+        }
+    )
 )
 
-#: Aggregate aliases produced by a grouped spans list query.
+# Aggregate aliases produced by a grouped spans list query.
 SPAN_GROUP_AGGREGATE_COLS: frozenset[str] = frozenset(
     {
         "span_count",
@@ -79,15 +78,16 @@ SPAN_GROUP_AGGREGATE_COLS: frozenset[str] = frozenset(
     }
 )
 
-#: Columns on spans that can be sorted in ungrouped mode
-SPAN_SORTABLE_COLS: frozenset[str] = SPAN_FILTERABLE_COLS | frozenset(
-    {
-        "started_at",
-        "ended_at",
-        "input_tokens",
-        "output_tokens",
-        "reasoning_tokens",
-    }
+SPAN_SORTABLE_COLS: frozenset[str] = SPAN_FILTERABLE_COLS.union(
+    frozenset(
+        {
+            "started_at",
+            "ended_at",
+            "input_tokens",
+            "output_tokens",
+            "reasoning_tokens",
+        }
+    )
 )
 
 AGENT_SORTABLE_COLS: frozenset[str] = frozenset(
@@ -101,7 +101,7 @@ AGENT_SORTABLE_COLS: frozenset[str] = frozenset(
     }
 )
 
-#: Allowed operators for custom attribute filters
+# Allowed operators for custom attribute filters.
 _ATTR_OPS: dict[str, str] = {
     "eq": "=",
     "ne": "!=",
@@ -111,10 +111,10 @@ _ATTR_OPS: dict[str, str] = {
     "lte": "<=",
 }
 
-#: Valid SQL identifier (used to validate group_by aliases)
+# Valid SQL identifier (used to validate group_by aliases).
 _IDENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
-#: Sources that read from a Map(...) column on spans, keyed by user-supplied key
+# Sources that read from a Map(...) column on spans, keyed by user-supplied key.
 _CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(
     {
         "custom_attrs_string",
@@ -128,73 +128,105 @@ _CUSTOM_ATTR_SOURCES: frozenset[str] = frozenset(
 # Column projections
 # ---------------------------------------------------------------------------
 
-#: Every column we ever SELECT into an `AgentSpanSchema` response. Driving
-#: this off the response schema (instead of the storage-side
-#: `AgentSpanCHInsertable`) guarantees we never SELECT a column with no home
-#: in the response, and adding a response field is enough to make it flow
-#: through — no separate "include this column" list to maintain.
-_ALL_SPAN_FIELDS: list[str] = list(AgentSpanSchema.model_fields.keys())
 
-# Spans list query — lightweight projection that skips blob/message columns.
-_SPANS_LIST_EXCLUDE = frozenset(
-    {
-        "reasoning_content",
-        "tool_description",
-        "tool_definitions",
-        "tool_call_arguments",
-        "tool_call_result",
-        "input_messages",
-        "output_messages",
-        "system_instructions",
-        "compaction_summary",
-        "compaction_items_before",
-        "compaction_items_after",
-        "content_refs",
-        "artifact_refs",
-        "object_refs",
-        # The list endpoint is a lightweight table projection. Custom attrs
-        # remain queryable/filterable server-side, but the UI does not need to
-        # hydrate arbitrary Map payloads for every span row.
-        "custom_attrs_string",
-        "request_temperature",
-        "request_max_tokens",
-        "request_top_p",
-        "wb_run_step",
-        "wb_run_step_end",
-        "raw_span_dump",
-        "attributes_dump",
-        "events_dump",
-        "resource_dump",
-    }
-)
-SPANS_LIST_COLS: str = ", ".join(
-    c for c in _ALL_SPAN_FIELDS if c not in _SPANS_LIST_EXCLUDE
-)
+def _projection(cols: list[str], *, table_alias: str | None = None) -> str:
+    unknown = [c for c in cols if c not in AgentSpanSchema.model_fields]
+    if unknown:
+        raise ValueError(
+            f"projection contains fields not in AgentSpanSchema: {unknown}"
+        )
+    if table_alias:
+        return ", ".join(f"{table_alias}.{c} AS {c}" for c in cols)
+    return ", ".join(cols)
 
-# Chat view projection — includes messages and tool data but skips raw dumps
-# and request params not needed for rendering.
-_CHAT_VIEW_EXCLUDE = frozenset(
-    {
-        "custom_attrs_string",
-        "raw_span_dump",
-        "attributes_dump",
-        "events_dump",
-        "resource_dump",
-        "wb_user_id",
-        "wb_run_id",
-        "wb_run_step",
-        "wb_run_step_end",
-        "request_temperature",
-        "request_max_tokens",
-        "request_top_p",
-    }
-)
-CHAT_VIEW_COLS: str = ", ".join(
-    c for c in _ALL_SPAN_FIELDS if c not in _CHAT_VIEW_EXCLUDE
-)
-QUALIFIED_CHAT_VIEW_COLS: str = ", ".join(
-    f"s.{c} AS {c}" for c in _ALL_SPAN_FIELDS if c not in _CHAT_VIEW_EXCLUDE
-)
+
+# Spans list query: lightweight table projection. Custom attrs and raw dumps
+# remain queryable/filterable server-side, but the UI does not need to hydrate
+# arbitrary Map/blob payloads for every span row.
+_SPANS_LIST_FIELD_NAMES = [
+    "project_id",
+    "trace_id",
+    "span_id",
+    "parent_span_id",
+    "span_name",
+    "span_kind",
+    "started_at",
+    "ended_at",
+    "status_code",
+    "status_message",
+    "operation_name",
+    "provider_name",
+    "agent_name",
+    "agent_id",
+    "agent_description",
+    "agent_version",
+    "request_model",
+    "response_model",
+    "response_id",
+    "input_tokens",
+    "output_tokens",
+    "reasoning_tokens",
+    "conversation_id",
+    "conversation_name",
+    "tool_name",
+    "tool_type",
+    "tool_call_id",
+    "finish_reasons",
+    "error_type",
+    "data_source_id",
+    "wb_user_id",
+    "wb_run_id",
+]
+SPANS_LIST_COLS: str = _projection(_SPANS_LIST_FIELD_NAMES)
+
+# Chat view projection: includes messages and tool data but skips raw dumps,
+# custom attrs, W&B integration IDs, and request params not needed for rendering.
+_CHAT_VIEW_FIELD_NAMES = [
+    "project_id",
+    "trace_id",
+    "span_id",
+    "parent_span_id",
+    "span_name",
+    "span_kind",
+    "started_at",
+    "ended_at",
+    "status_code",
+    "status_message",
+    "operation_name",
+    "provider_name",
+    "agent_name",
+    "agent_id",
+    "agent_description",
+    "agent_version",
+    "request_model",
+    "response_model",
+    "response_id",
+    "input_tokens",
+    "output_tokens",
+    "reasoning_tokens",
+    "reasoning_content",
+    "conversation_id",
+    "conversation_name",
+    "tool_name",
+    "tool_type",
+    "tool_call_id",
+    "tool_description",
+    "tool_definitions",
+    "finish_reasons",
+    "input_messages",
+    "output_messages",
+    "system_instructions",
+    "tool_call_arguments",
+    "tool_call_result",
+    "compaction_summary",
+    "compaction_items_before",
+    "compaction_items_after",
+    "content_refs",
+    "artifact_refs",
+    "object_refs",
+]
+CHAT_VIEW_COLS: str = _projection(_CHAT_VIEW_FIELD_NAMES)
+QUALIFIED_CHAT_VIEW_COLS: str = _projection(_CHAT_VIEW_FIELD_NAMES, table_alias="s")
 
 # ---------------------------------------------------------------------------
 # Clause helpers (mutate pb in-place, append to conditions)
@@ -420,11 +452,11 @@ def _search_where(pb: ParamBuilder, req: AgentSearchReq) -> str:
 # ---------------------------------------------------------------------------
 
 
-#: Aggregate SELECT list shared between grouped list queries.
-#: The bundle is intentionally fixed — callers do not pick aggregates. Fields
-#: that map to specific UI pivots (invocation_count, conversation_names) are
-#: included alongside cross-cutting totals so all group_by shapes return the
-#: same schema.
+# Aggregate SELECT list shared between grouped list queries.
+# The bundle is intentionally fixed because callers do not pick aggregates.
+# Fields that map to specific UI pivots (invocation_count, conversation_names)
+# are included alongside cross-cutting totals so all group_by shapes return the
+# same schema.
 _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
                countIf(s.operation_name = 'invoke_agent') AS invocation_count,
                uniqExact(s.conversation_id) AS conversation_count,
@@ -475,7 +507,7 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     select_group_cols = ", ".join(f"{expr} AS {alias}" for expr, alias in resolved)
     group_by_clause = ", ".join(aliases)
 
-    sortable = SPAN_GROUP_AGGREGATE_COLS | frozenset(aliases)
+    sortable = SPAN_GROUP_AGGREGATE_COLS.union(frozenset(aliases))
     order_by = build_order_by(req.sort_by, sortable, "last_seen DESC")
 
     return f"""

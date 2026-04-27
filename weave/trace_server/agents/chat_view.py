@@ -19,9 +19,14 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, NamedTuple
+from typing import Any
 
-from weave.trace_server.agents.constants import MAX_WALK_DEPTH, OP_INVOKE_AGENT
+from weave.trace_server.agents.constants import (
+    MAX_WALK_DEPTH,
+    OP_EXECUTE_TOOL,
+    OP_INVOKE_AGENT,
+)
+from weave.trace_server.agents.schema import NormalizedMessage
 from weave.trace_server.agents.types import (
     AgentChatMessage,
     AgentSpanSchema,
@@ -30,16 +35,20 @@ from weave.trace_server.agents.types import (
 
 logger = logging.getLogger(__name__)
 
+_USER_ROLE = "user"
+_ASSISTANT_ROLE = "assistant"
+_NON_USER_PROMPT_ROLES = {
+    _ASSISTANT_ROLE,
+    "system",
+    "tool",
+    "tool_call",
+    "tool_result",
+}
+
 
 # ---------------------------------------------------------------------------
 # Data types — used in the public API signatures below
 # ---------------------------------------------------------------------------
-
-
-class UserPrompt(NamedTuple):
-    text: str
-    started_at: datetime | None
-    content_refs: list[str]
 
 
 @dataclass
@@ -48,6 +57,14 @@ class SpanNode:
 
     span: AgentSpanSchema
     children: list[SpanNode] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class TokenTotals:
+    input_tokens: int
+    output_tokens: int
+    reasoning_tokens: int
+    reasoning_content: str | None
 
 
 def _span_sort_key(span: AgentSpanSchema) -> tuple[bool, datetime | None, str]:
@@ -59,6 +76,11 @@ def _span_sort_key(span: AgentSpanSchema) -> tuple[bool, datetime | None, str]:
     and naive values). span_id tiebreaks equal timestamps.
     """
     return (span.started_at is None, span.started_at, span.span_id)
+
+
+def _root_sort_key(span: AgentSpanSchema) -> tuple[bool, datetime | None, str]:
+    """Prefer spans that ended latest when a trace has no single root."""
+    return (span.ended_at is not None, span.ended_at, span.span_id)
 
 
 # ---------------------------------------------------------------------------
@@ -73,12 +95,12 @@ def build_trace_chat(
     """Build the full chat response for a trace."""
     messages = build_chat_messages(spans)
 
-    root_span_name = ""
-    provider = ""
-    total_duration_ms = 0
+    root_span_name: str | None = None
+    provider: str | None = None
+    total_duration_ms: int | None = None
 
     if spans:
-        root = next((s for s in spans if not s.parent_span_id), spans[0])
+        root = _select_root_span(spans)
         root_span_name = root.agent_name or root.span_name
         provider = root.provider_name
         # `total_duration_ms` == root span wall-clock duration
@@ -115,7 +137,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
 
     - `agent_start` when we enter an `invoke_agent` span that names an agent.
     - `tool_call` for each `execute_tool` span.
-    - `agent_message` for the final assistant text in each subtree — either
+    - `assistant_message` for the final assistant text in each subtree — either
       from a descendant LLM span (`chat` / `generate_content`), or from the
       `invoke_agent` span itself if no descendant emitted one. This avoids
       double-rendering when SDKs (e.g. OpenAI Agents SDK, Google ADK) mirror
@@ -123,6 +145,10 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
       LLM call.
     - `context_compacted` when a compaction event rides on an `invoke_agent`
       span.
+
+    Subagents are not flattened into separate turns. They are traversed in
+    place, inherit the nearest enclosing agent name when their own span omits
+    one, and can still emit their own lifecycle/tool/assistant messages.
     """
     if not spans:
         return []
@@ -130,22 +156,13 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
     tree = build_span_tree(spans)
     messages: list[AgentChatMessage] = []
 
-    user_prompt, user_started_at, user_refs = _find_user_prompt(spans)
-    if user_prompt:
-        messages.append(
-            AgentChatMessage(
-                type="user_message",
-                text=user_prompt,
-                agent_name="User",
-                started_at=user_started_at,
-                content_refs=user_refs,
-            )
-        )
+    if user_message := _find_user_message(spans):
+        messages.append(user_message)
 
     def _walk(node: SpanNode, nearest_agent: str = "", _depth: int = 0) -> bool:
         """Preorder-walk one subtree, appending to the enclosing `messages`.
 
-        Returns True iff this subtree emitted at least one `agent_message`.
+        Returns True iff this subtree emitted at least one `assistant_message`.
         An enclosing `invoke_agent` uses that signal to decide whether to
         emit its own mirrored response: if any descendant already did, the
         parent stays quiet to avoid showing the same text twice.
@@ -168,7 +185,12 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
 
         # ---- invoke_agent ----
         if op == OP_INVOKE_AGENT:
-            name = span.agent_name or span.span_name.removeprefix(f"{OP_INVOKE_AGENT} ")
+            span_name = span.span_name or ""
+            name = (
+                span.agent_name
+                or nearest_agent
+                or span_name.removeprefix(f"{OP_INVOKE_AGENT} ")
+            )
 
             if span.agent_name:
                 messages.append(
@@ -201,15 +223,15 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
                     emitted_in_subtree = True
 
             # Only emit from the invoke_agent itself if no descendant LLM
-            # span already produced an `agent_message`. This is the
+            # span already produced an `assistant_message`. This is the
             # mirroring guard described in the function docstring.
             if not emitted_in_subtree:
-                msg = _emit_agent_message(span, name, aggregate_node=node)
+                msg = _emit_assistant_message(span, name, aggregate_node=node)
                 if msg:
                     messages.append(msg)
                     emitted_in_subtree = True
 
-            if span.compaction_summary or span.compaction_items_before > 0:
+            if span.compaction_summary or (span.compaction_items_before or 0) > 0:
                 messages.append(
                     AgentChatMessage(
                         type="context_compacted",
@@ -224,8 +246,9 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
             return emitted_in_subtree
 
         # ---- execute_tool ----
-        if op == "execute_tool":
-            tool_name = span.tool_name or span.span_name.removeprefix("execute_tool ")
+        if op == OP_EXECUTE_TOOL:
+            span_name = span.span_name or ""
+            tool_name = span.tool_name or span_name.removeprefix(f"{OP_EXECUTE_TOOL} ")
             messages.append(
                 AgentChatMessage(
                     type="tool_call",
@@ -252,7 +275,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
             if _walk(child, agent_name, _depth + 1):
                 emitted_in_subtree = True
 
-        msg = _emit_agent_message(span, agent_name)
+        msg = _emit_assistant_message(span, agent_name)
         if msg:
             messages.append(msg)
             emitted_in_subtree = True
@@ -266,17 +289,13 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
 
 def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
     """Build a parent-child tree from flat spans, sorted by start time."""
-    node_map: dict[str, SpanNode] = {}
+    node_map = {s.span_id: SpanNode(span=s) for s in spans}
     roots: list[SpanNode] = []
-
-    for span in spans:
-        node_map[span.span_id] = SpanNode(span=span)
 
     for span in spans:
         node = node_map[span.span_id]
         if span.parent_span_id:
-            parent = node_map.get(span.parent_span_id)
-            if parent:
+            if parent := node_map.get(span.parent_span_id):
                 parent.children.append(node)
             else:
                 # Orphan: parent is referenced but not in the input set
@@ -301,55 +320,100 @@ def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
 # ---------------------------------------------------------------------------
 
 
+def _select_root_span(spans: list[AgentSpanSchema]) -> AgentSpanSchema:
+    """Select the trace root span.
+
+    A well-formed trace has exactly one span with no parent. If the input is
+    partial or malformed, use the latest-ended span so the wrapper metadata
+    still reflects the most enclosing-looking span available.
+    """
+    roots = [s for s in spans if not s.parent_span_id]
+    if len(roots) == 1:
+        return roots[0]
+
+    logger.warning(
+        "expected exactly one root span, found %d (trace_ids=%r)",
+        len(roots),
+        sorted({s.trace_id for s in spans}),
+    )
+    return max(spans, key=_root_sort_key)
+
+
+def _message_role(message: NormalizedMessage | dict[str, Any]) -> str:
+    if isinstance(message, NormalizedMessage):
+        return message.role
+    return str(message.get("role") or "")
+
+
+def _message_content(message: NormalizedMessage | dict[str, Any]) -> str:
+    if isinstance(message, NormalizedMessage):
+        return message.content
+    return str(message.get("content") or "")
+
+
+def _filter_message_texts(
+    messages: list[NormalizedMessage],
+    *,
+    include_roles: set[str] | None = None,
+    exclude_roles: set[str] | None = None,
+) -> list[str]:
+    """Return non-empty message content matching role include/exclude filters."""
+    texts: list[str] = []
+    for message in messages:
+        role = _message_role(message)
+        content = _message_content(message)
+        if not content:
+            continue
+        if include_roles is not None and role not in include_roles:
+            continue
+        if exclude_roles is not None and role in exclude_roles:
+            continue
+        texts.append(content)
+    return texts
+
+
 def _extract_user_text(
-    messages: list[dict[str, Any]], *, last_only: bool = False
+    messages: list[NormalizedMessage], *, last_only: bool = False
 ) -> str:
     """Extract user text from normalized input_messages.
 
     First pass: entries tagged `role == "user"`. Fallback pass: entries
-    that could plausibly be the user prompt — anything that isn't
-    explicitly an `assistant` or `tool` message. Some SDKs (notably
-    Google ADK) store the user prompt with an empty or provider-specific
-    role, so a strict `role == "user"` filter misses them; but we still
-    want to exclude model replies and tool results to avoid surfacing
-    one of those as "the user prompt".
+    that could plausibly be the user prompt: provider-specific or empty-role
+    messages. We intentionally exclude assistant, system, and tool roles so
+    those do not render as a user prompt.
     """
     if not messages:
         return ""
-    texts = [
-        m.get("content", "")
-        for m in messages
-        if m.get("role") == "user" and m.get("content")
-    ]
+    texts = _filter_message_texts(messages, include_roles={_USER_ROLE})
     if not texts:
-        texts = [
-            m.get("content", "")
-            for m in messages
-            if m.get("content") and m.get("role") not in {"assistant", "tool"}
-        ]
+        texts = _filter_message_texts(messages, exclude_roles=_NON_USER_PROMPT_ROLES)
         if texts:
             logger.debug(
-                "no role=user input messages; falling back to non-assistant/tool entries (roles=%r)",
-                [m.get("role") for m in messages],
+                "no role=user input messages; falling back to unknown/provider roles (roles=%r)",
+                [_message_role(m) for m in messages],
             )
     if last_only and texts:
         return texts[-1]
-    return "\n".join(texts)
+    return "\n\n".join(texts)
 
 
-def _extract_assistant_text(messages: list[dict[str, Any]]) -> str:
-    """Extract assistant text from normalized output_messages."""
+def _extract_non_user_output_text(messages: list[NormalizedMessage]) -> str:
+    """Extract renderable output text from normalized output_messages.
+
+    Output arrays are expected to contain assistant messages, but some SDKs
+    include provider-specific roles. The only role we deliberately exclude is
+    `user`, which should not be rendered as an assistant response.
+    """
     if not messages:
         return ""
-    texts = [
-        m.get("content", "")
-        for m in messages
-        if m.get("role") != "user" and m.get("content")
-    ]
-    return "\n".join(texts)
+    texts = _filter_message_texts(messages, exclude_roles={_USER_ROLE})
+    return "\n\n".join(texts)
 
 
-def _compute_duration_ms(started_at: Any, ended_at: Any) -> int:
+def _compute_duration_ms(
+    started_at: datetime | str | None, ended_at: datetime | str | None
+) -> int:
+    """Return elapsed milliseconds, or 0 when either timestamp is missing."""
     if not started_at or not ended_at:
         return 0
     try:
@@ -369,36 +433,32 @@ def _compute_duration_ms(started_at: Any, ended_at: Any) -> int:
 
 
 def _content_refs(span: AgentSpanSchema) -> list[str]:
-    raw = span.content_refs
-    if not raw:
-        return []
-    if isinstance(raw, list):
-        return [str(r) for r in raw if r]
-    return []
+    """Return opaque content handles for UI-side attachment rendering."""
+    return [str(r) for r in (span.content_refs or []) if r]
 
 
-def _sum_descendant_tokens(node: SpanNode) -> tuple[int, int, int, str]:
+def _sum_descendant_tokens(node: SpanNode) -> TokenTotals:
     """Sum input, output, and reasoning tokens across a subtree."""
     input_t = node.span.input_tokens or 0
     output_t = node.span.output_tokens or 0
     reasoning_t = node.span.reasoning_tokens or 0
-    reasoning_text = node.span.reasoning_content or ""
+    reasoning_text = node.span.reasoning_content
     for child in node.children:
-        ci, co, cr, ct = _sum_descendant_tokens(child)
-        input_t += ci
-        output_t += co
-        reasoning_t += cr
-        if ct and not reasoning_text:
-            reasoning_text = ct
-    return input_t, output_t, reasoning_t, reasoning_text
+        child_totals = _sum_descendant_tokens(child)
+        input_t += child_totals.input_tokens
+        output_t += child_totals.output_tokens
+        reasoning_t += child_totals.reasoning_tokens
+        if child_totals.reasoning_content and not reasoning_text:
+            reasoning_text = child_totals.reasoning_content
+    return TokenTotals(input_t, output_t, reasoning_t, reasoning_text)
 
 
-def _find_user_prompt(spans: list[AgentSpanSchema]) -> UserPrompt:
+def _find_user_message(spans: list[AgentSpanSchema]) -> AgentChatMessage | None:
     """Find the user prompt for this trace.
 
     Priority order: invoke_agent spans first, then anything else, with
     started_at tiebreaking inside each group. Returns the first span whose
-    `input_messages` yields user text.
+    `input_messages` yields user text, already shaped as an API message.
     """
     prioritized = sorted(
         spans,
@@ -410,43 +470,49 @@ def _find_user_prompt(spans: list[AgentSpanSchema]) -> UserPrompt:
             continue
         text = _extract_user_text(msgs, last_only=True)
         if text:
-            return UserPrompt(text, s.started_at, _content_refs(s))
-    return UserPrompt("", None, [])
+            return AgentChatMessage(
+                type="user_message",
+                text=text,
+                agent_name="User",
+                started_at=s.started_at,
+                content_refs=_content_refs(s),
+            )
+    return None
 
 
-def _emit_agent_message(
+def _emit_assistant_message(
     span: AgentSpanSchema,
     agent_name: str,
     *,
     aggregate_node: SpanNode | None = None,
 ) -> AgentChatMessage | None:
-    """Build an agent_message from a span's output_messages, or None if empty."""
+    """Build an assistant_message from a span's output_messages, or None if empty."""
     if not span.output_messages:
         return None
-    text = _extract_assistant_text(span.output_messages)
+    text = _extract_non_user_output_text(span.output_messages)
     if not text:
         return None
 
     if aggregate_node:
-        agg_in, agg_out, agg_reasoning, agg_reasoning_text = _sum_descendant_tokens(
-            aggregate_node
-        )
+        totals = _sum_descendant_tokens(aggregate_node)
     else:
-        agg_in = span.input_tokens
-        agg_out = span.output_tokens
-        agg_reasoning = span.reasoning_tokens
-        agg_reasoning_text = span.reasoning_content or ""
+        totals = TokenTotals(
+            input_tokens=span.input_tokens or 0,
+            output_tokens=span.output_tokens or 0,
+            reasoning_tokens=span.reasoning_tokens or 0,
+            reasoning_content=span.reasoning_content,
+        )
 
     return AgentChatMessage(
-        type="agent_message",
+        type="assistant_message",
         span_id=span.span_id,
         agent_name=agent_name,
         model=span.response_model or span.request_model,
         text=text,
-        reasoning_content=agg_reasoning_text,
-        reasoning_tokens=agg_reasoning,
-        input_tokens=agg_in or span.input_tokens,
-        output_tokens=agg_out or span.output_tokens,
+        reasoning_content=totals.reasoning_content,
+        reasoning_tokens=totals.reasoning_tokens,
+        input_tokens=totals.input_tokens or span.input_tokens,
+        output_tokens=totals.output_tokens or span.output_tokens,
         duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
         started_at=span.started_at,
         status=span.status_code,

@@ -68,6 +68,10 @@ def test_extract_genai_span_comprehensive() -> None:
             "weave.usage.reasoning_tokens": 30,
             "gen_ai.response.finish_reasons": ["stop"],
             "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_k": 40,
+            "gen_ai.request.encoding_formats": ["float"],
+            "gen_ai.data_source.id": "ds-1",
+            "gen_ai.retrieval.query.text": "Paris weather",
             # Messages (normalized)
             "gen_ai.input.messages": [
                 {"role": "system", "content": "You are helpful."},
@@ -124,6 +128,10 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.request_model == "gpt-4o"
     assert result.response_model == "gpt-4o-2024-05-13"
     assert result.request_temperature == 0.7
+    assert result.request_top_k == 40
+    assert result.request_encoding_formats == ["float"]
+    assert result.data_source_id == "ds-1"
+    assert result.retrieval_query_text == "Paris weather"
 
     # Token usage
     assert result.input_tokens == 100
@@ -181,6 +189,27 @@ def test_extract_genai_span_error_status() -> None:
     assert result.error_type == "RateLimitError"
 
 
+def test_extract_genai_span_preserves_unset_status() -> None:
+    span = _make_span(status=Status(code=StatusCode.UNSET))
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.status_code == "UNSET"
+
+
+def test_normalize_message_missing_role_and_finish_reason() -> None:
+    span = _make_span(
+        attrs={
+            "gen_ai.output.messages": [
+                {"content": "hello", "finish_reason": None},
+            ],
+        },
+    )
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.output_messages[0].role == ""
+    assert result.output_messages[0].finish_reason == ""
+
+
 def test_extract_custom_attrs_caps_total_entries() -> None:
     """A span with more than MAX_CUSTOM_ATTRS_PER_SPAN attributes has the
     excess silently dropped so a single misbehaving client can't blow up the
@@ -201,21 +230,31 @@ def test_extract_custom_attrs_caps_total_entries() -> None:
     assert total == MAX_CUSTOM_ATTRS_PER_SPAN
 
 
+def test_extract_custom_attrs_skips_empty_strings() -> None:
+    result = extract_genai_span(
+        _make_span(attrs={"lorem.empty": "", "lorem.nonempty": "x"}),
+        project_id="p1",
+    )
+
+    assert "lorem.empty" not in result.custom_attrs_string
+    assert result.custom_attrs_string["lorem.nonempty"] == "x"
+
+
 def test_extract_custom_attrs_truncates_large_string_values() -> None:
-    """String values larger than MAX_CUSTOM_ATTR_VALUE_BYTES are truncated
+    """String values larger than MAX_CUSTOM_ATTR_VALUE_CHARS are truncated
     with a marker suffix so downstream tools can tell truncation happened.
     """
-    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_BYTES
+    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_CHARS
 
-    huge = "x" * (MAX_CUSTOM_ATTR_VALUE_BYTES + 50_000)
+    huge = "x" * (MAX_CUSTOM_ATTR_VALUE_CHARS + 50_000)
     result = extract_genai_span(
         _make_span(attrs={"lorem.big_string": huge}),
         project_id="p1",
     )
 
     stored = result.custom_attrs_string["lorem.big_string"]
-    assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_BYTES
-    assert stored.endswith("bytes]")
+    assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_CHARS
+    assert stored.endswith("chars]")
     assert "truncated from" in stored
 
 
@@ -224,7 +263,7 @@ def test_extract_custom_attrs_truncates_large_json_values() -> None:
     truncated the same way. Dicts get flattened by `_flatten_attrs` so
     they never hit the JSON-encoding branch.
     """
-    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_BYTES
+    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_CHARS
 
     huge_list = ["x" * 100] * 5000  # JSON encoding ~500KB
     result = extract_genai_span(
@@ -233,7 +272,7 @@ def test_extract_custom_attrs_truncates_large_json_values() -> None:
     )
 
     stored = result.custom_attrs_string["lorem.big_list"]
-    assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_BYTES
+    assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_CHARS
     assert "truncated from" in stored
 
 

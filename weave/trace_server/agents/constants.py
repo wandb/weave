@@ -35,14 +35,14 @@ MAX_WALK_DEPTH = 200
 # misbehaving span from blowing up storage or aggregation memory.
 MAX_CUSTOM_ATTRS_PER_SPAN = 1024
 
-# Maximum serialized byte length of any single custom attribute value. String
+# Maximum serialized char length of any single custom attribute value. String
 # values over this are truncated with a `TRUNCATION_MARKER` suffix; dict /
 # list values are JSON-serialized first, then truncated the same way.
-MAX_CUSTOM_ATTR_VALUE_BYTES = 256 * 1024
+MAX_CUSTOM_ATTR_VALUE_CHARS = 256 * 1024
 
 # Suffix appended to truncated custom attribute values so downstream tools can
 # tell that truncation happened. Formatted lazily via `.format(n=...)`.
-CUSTOM_ATTR_TRUNCATION_MARKER = "...[truncated from {n} bytes]"
+CUSTOM_ATTR_TRUNCATION_MARKER = "...[truncated from {n} chars]"
 
 # OTel span.kind default when the ingested span omits it. Matches the
 # ClickHouse Enum8 default in migration 030.
@@ -73,3 +73,4 @@ MAX_INGEST_ERRORS_REPORTED = 20
 # ---------------------------------------------------------------------------
 
 OP_INVOKE_AGENT = "invoke_agent"
+OP_EXECUTE_TOOL = "execute_tool"
