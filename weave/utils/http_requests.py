@@ -171,14 +171,50 @@ def _log_response(response: Response) -> None:
     pprint_response(response)
 
 
-client = httpx.Client(
+_client: httpx.Client | None = None
+_client_lock = threading.Lock()
+
+
+def _create_client() -> httpx.Client:
     # Use HTTPX's default transport so env proxy handling (including NO_PROXY)
     # works natively.
-    event_hooks={"request": [_log_request], "response": [_log_response]},
-    timeout=http_timeout(),
-    limits=CLIENT_LIMITS,
-    verify=ssl_verify(),
-)
+    return httpx.Client(
+        event_hooks={"request": [_log_request], "response": [_log_response]},
+        timeout=http_timeout(),
+        limits=CLIENT_LIMITS,
+        verify=ssl_verify(),
+    )
+
+
+def get_client() -> httpx.Client:
+    """Return the shared httpx.Client, creating it on first use.
+
+    Lazy creation lets env-driven settings like ``WEAVE_INSECURE_DISABLE_SSL``
+    take effect even if ``import weave`` happened before the env var was set.
+    """
+    global _client  # noqa: PLW0603
+    if _client is None:
+        with _client_lock:
+            if _client is None:
+                _client = _create_client()
+    return _client
+
+
+def reset_client() -> None:
+    """Close and forget the cached client so the next call re-reads env vars."""
+    global _client  # noqa: PLW0603
+    with _client_lock:
+        if _client is not None:
+            _client.close()
+        _client = None
+
+
+def __getattr__(name: str) -> Any:
+    # PEP 562: expose ``client`` as a lazily-initialized module attribute
+    # so existing ``http_requests.client`` access keeps working.
+    if name == "client":
+        return get_client()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get(
@@ -189,6 +225,7 @@ def get(
     **kwargs: Any,
 ) -> Response:
     """Send a GET request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -206,6 +243,7 @@ def post(
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -223,6 +261,7 @@ def put(
     **kwargs: Any,
 ) -> Response:
     """Send a PUT request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
@@ -239,6 +278,7 @@ def delete(
     **kwargs: Any,
 ) -> Response:
     """Send a DELETE request with optional logging."""
+    client = get_client()
     if stream:
         # Extract auth since build_request doesn't accept it
         auth = kwargs.pop("auth", None)
