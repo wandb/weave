@@ -49,6 +49,11 @@ dependencies = [
   # Used for content type detection
   # Remove once license content filtering is upstreamed
   "polyfile-weave>=0.5.9",
+
+  # Session SDK — uses OTel GenAI semantic conventions for span emission
+  "opentelemetry-api",
+  "opentelemetry-sdk",
+  "opentelemetry-exporter-otlp-proto-http",
 ]
 
 [project.optional-dependencies]
@@ -484,9 +489,6 @@ test = [
   "weave[trace_server]",
   "moto[s3]>=5.0.0",
   "respx",
-
-  # Session SDK OTel exporter
-  "opentelemetry-exporter-otlp-proto-http",
 ]
 
 [tool.uv]

@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from weave.session.session import Message, Reasoning, Usage
+from weave.session.types import Message, Reasoning, Usage
 
 
 def _serialize_messages(messages: list[Message] | None) -> str | None:

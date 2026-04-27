@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import logging
 import os
 from json import JSONDecodeError
@@ -109,10 +110,13 @@ def _weave_is_available(server: TraceServerClientInterface) -> bool:
 def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> None:
     """Configure OTel TracerProvider for the Session SDK using weave credentials.
 
-    Called automatically by init_weave(). Sets the global OTel TracerProvider
-    so that ``trace.get_tracer("weave.session")`` returns a real tracer.
-    No-ops silently if opentelemetry is not installed or the trace server URL
-    is not configured.
+    Called automatically by init_weave() once version checks have passed.
+    Sets the global OTel TracerProvider so that ``trace.get_tracer("weave.session")``
+    returns a real tracer.
+
+    No-ops if the trace server URL is not configured. Logs a warning and
+    returns early if opentelemetry is unavailable. Other errors propagate
+    so misconfiguration is visible to the user.
     """
     try:
         from opentelemetry import trace
@@ -122,36 +126,43 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
-
-        # Don't reconfigure if already set up (e.g. from a previous init call)
-        provider = trace.get_tracer_provider()
-        if isinstance(provider, TracerProvider):
-            return
-
-        trace_server_url = env.weave_trace_server_url()
-        if not trace_server_url:
-            return
-
-        endpoint = f"{trace_server_url.rstrip('/')}/otel/v1/genai/traces"
-
-        headers: dict[str, str] = {}
-        if api_key:
-            headers["authorization"] = f"Basic {api_key}"
-
-        resource = Resource.create(
-            {
-                "service.name": "weave-session-sdk",
-                "wandb.entity": entity,
-                "wandb.project": project,
-            }
+    except ImportError as e:
+        logger.warning(
+            "Session SDK tracing skipped: opentelemetry not available (%s)", e
         )
-        exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
-        provider = TracerProvider(resource=resource)
-        provider.add_span_processor(BatchSpanProcessor(exporter))
-        trace.set_tracer_provider(provider)
-    except Exception:
-        # Session SDK tracing is optional — never block init.
-        logger.debug("Session SDK tracing setup skipped", exc_info=True)
+        return
+
+    # Don't reconfigure if already set up (e.g. from a previous init call
+    # or from a user who installed their own provider before weave.init()).
+    if isinstance(trace.get_tracer_provider(), TracerProvider):
+        return
+
+    trace_server_url = env.weave_trace_server_url()
+    if not trace_server_url:
+        return
+
+    endpoint = f"{trace_server_url.rstrip('/')}/otel/v1/genai/traces"
+
+    # Match the auth pattern used by the rest of weave (see
+    # init_weave_get_server: res.set_auth(("api", api_key)) and
+    # wandb_thin/internal_api.py: BasicAuth("api", api_key)).
+    # HTTP Basic auth requires base64("user:pass").
+    headers: dict[str, str] = {}
+    if api_key:
+        token = base64.b64encode(f"api:{api_key}".encode()).decode()
+        headers["Authorization"] = f"Basic {token}"
+
+    resource = Resource.create(
+        {
+            "service.name": "weave-session-sdk",
+            "wandb.entity": entity,
+            "wandb.project": project,
+        }
+    )
+    exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
 
 
 def init_weave(
@@ -216,11 +227,6 @@ def init_weave(
 
     weave_client_context.set_weave_client_global(client)
 
-    # Configure Session SDK OTel tracing using the same server credentials.
-    # This enables the Session → Turn → LLM → Tool span hierarchy for the
-    # Weave Agents tab. No-ops silently if opentelemetry is not installed.
-    _setup_session_tracing(entity_name, project_name, api_key)
-
     # Implicit patching:
     # 1. Check sys.modules and automatically patch any already-imported integrations
     # 2. Register import hook to patch integrations imported after weave.init()
@@ -255,6 +261,13 @@ def init_weave(
         trace_server_url,
     ):
         return init_weave_disabled()
+
+    # Configure Session SDK OTel tracing using the same server credentials.
+    # Placed after the version checks so a disabled init never installs a
+    # global TracerProvider that would keep exporting spans to an
+    # incompatible server.
+    _setup_session_tracing(entity_name, project_name, api_key)
+
     init_message.print_init_message(
         username, entity_name, project_name, read_only=not ensure_project_exists
     )

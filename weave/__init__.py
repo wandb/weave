@@ -81,6 +81,7 @@ from weave.session.session import (
     log_turn,
     start_llm,
     start_session,
+    start_subagent,
     start_tool,
     start_turn,
 )
@@ -162,6 +163,7 @@ __all__ = [
     "set_view",
     "start_llm",
     "start_session",
+    "start_subagent",
     "start_tool",
     "start_turn",
     "thread",

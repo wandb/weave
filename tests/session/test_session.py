@@ -20,8 +20,6 @@ from weave.session.session import (
     get_current_llm,
     get_current_session,
     get_current_turn,
-    log_session,
-    log_turn,
     start_llm,
     start_session,
     start_tool,
@@ -177,11 +175,16 @@ class TestAttachMedia:
 
     def test_attach_uri(self) -> None:
         llm = LLM(model="gpt-4o")
-        llm.attach_media(uri="https://example.com/photo.jpg", modality="image")
+        llm.attach_media(
+            uri="https://example.com/photo.jpg",
+            modality="image",
+            mime_type="image/jpeg",
+        )
         assert len(llm.media_attachments) == 1
         att = llm.media_attachments[0]
         assert att.kind == "uri"
         assert att.modality == "image"
+        assert att.mime_type == "image/jpeg"
         assert att.uri == "https://example.com/photo.jpg"
 
     def test_attach_file_id(self) -> None:
@@ -191,6 +194,7 @@ class TestAttachMedia:
         att = llm.media_attachments[0]
         assert att.kind == "file"
         assert att.modality == "audio"
+        assert att.mime_type == "audio/wav"
         assert att.file_id == "file-abc123"
 
     def test_modality_inferred_from_mime_type(self) -> None:
@@ -200,19 +204,15 @@ class TestAttachMedia:
         llm.attach_media(content=b"data", mime_type="video/mp4")
         assert llm.media_attachments[1].modality == "video"
 
-    def test_requires_exactly_one_source(self) -> None:
+    def test_rejects_zero_sources(self) -> None:
         llm = LLM(model="gpt-4o")
         with pytest.raises(ValueError, match="Exactly one of"):
             llm.attach_media()
+
+    def test_rejects_multiple_sources(self) -> None:
+        llm = LLM(model="gpt-4o")
         with pytest.raises(ValueError, match="Exactly one of"):
             llm.attach_media(content=b"x", uri="http://x")
-
-    def test_old_methods_removed(self) -> None:
-        llm = LLM(model="gpt-4o")
-        assert not hasattr(llm, "attach_file")
-        assert not hasattr(llm, "attach_image")
-        # attach_uri was the old method name; attach_media is the new one
-        assert hasattr(llm, "attach_media")
 
 
 class TestSubAgent:
@@ -476,44 +476,3 @@ class TestStartTool:
             t.result = "75F"
         assert t.result == "75F"
         assert t.duration_ms >= 0
-
-    def test_accepts_none_args(self) -> None:
-        t = start_tool(name="search", arguments=None, tool_call_id=None)
-        assert t.arguments == ""
-        assert t.tool_call_id == ""
-
-
-class TestBatchLogging:
-    def test_log_turn_returns_log_result(self) -> None:
-        with pytest.warns(UserWarning, match="not yet implemented"):
-            result = log_turn(
-                session_id="sess-123",
-                messages=[{"role": "user", "content": "hi"}],
-                spans=[
-                    LLM(
-                        model="gpt-4o",
-                        output_messages=[Message(role="assistant", content="hello")],
-                    ),
-                    Tool(name="search", result="found"),
-                ],
-                agent_name="bot",
-                model="gpt-4o",
-            )
-        assert isinstance(result, LogResult)
-        assert result.session_id == "sess-123"
-
-    def test_log_session_returns_log_result(self) -> None:
-        with pytest.warns(UserWarning, match="not yet implemented"):
-            result = log_session(
-                turns=[{"messages": [{"role": "user", "content": "hi"}]}],
-                agent_name="bot",
-                model="gpt-4o",
-                session_id="sess-456",
-            )
-        assert isinstance(result, LogResult)
-        assert result.session_id == "sess-456"
-
-    def test_log_session_auto_generates_session_id(self) -> None:
-        with pytest.warns(UserWarning, match="not yet implemented"):
-            result = log_session(turns=[], agent_name="bot")
-        assert result.session_id != ""

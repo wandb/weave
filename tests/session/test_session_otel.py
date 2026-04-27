@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
+from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import StatusCode
+from opentelemetry.trace import NoOpTracerProvider, StatusCode
 
 from weave.session.session import (
     Message,
@@ -41,17 +43,20 @@ def _reset_contextvars():
 
 
 @pytest.fixture
-def otel_spans():
-    """Provide an in-memory span exporter for capturing OTel spans."""
-    import weave.session.session as session_mod
+def otel_spans(monkeypatch: pytest.MonkeyPatch):
+    """Provide an in-memory span exporter for capturing OTel spans.
 
+    Overrides the global OTel tracer provider for the duration of the test.
+    Uses ``monkeypatch.setattr`` on the private ``_TRACER_PROVIDER`` symbol
+    rather than ``set_tracer_provider`` to avoid the "set once" warning
+    and to guarantee restoration of the prior value.
+    """
     exporter = InMemorySpanExporter()
     provider = SDKTracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    session_mod._tracer_provider_override = provider
+    monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
     yield exporter
     provider.shutdown()
-    session_mod._tracer_provider_override = None
 
 
 # ---------------------------------------------------------------------------
@@ -355,14 +360,6 @@ class TestCrossCutting:
         assert type(b) is dict
         assert type(c) is dict
 
-    def test_no_otel_sdk_import_required(self) -> None:
-        """The module should not import opentelemetry at all."""
-        import weave.session.session_otel as mod
-
-        source = open(mod.__file__, encoding="utf-8").read()
-        assert "import opentelemetry" not in source
-        assert "from opentelemetry" not in source
-
 
 # ---------------------------------------------------------------------------
 # OTel span emission
@@ -479,22 +476,19 @@ class TestOTelSpanEmission:
         assert llm_span.parent.span_id == turn_span.context.span_id
         assert tool_span.parent.span_id == turn_span.context.span_id
 
-    def test_no_spans_without_setup(self) -> None:
+    def test_no_spans_without_setup(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """No errors when no provider configured (no-op spans)."""
-        import weave.session.session as session_mod
-
-        original = session_mod._tracer_provider_override
-        session_mod._tracer_provider_override = None
-        try:
-            with Session(agent_name="bot") as s:
-                with s.start_turn() as turn:
-                    with turn.llm(model="gpt-4o") as llm:
-                        llm.output("Hello")
-                    with turn.tool(name="search") as tool:
-                        tool.result = "done"
-            # Should not raise — just silently use no-op spans
-        finally:
-            session_mod._tracer_provider_override = original
+        # Install a NoOpTracerProvider as the global provider. This produces
+        # non-recording spans (no exporter, no recording overhead) and is the
+        # canonical OTel pattern for "tracing not configured".
+        monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", NoOpTracerProvider())
+        with Session(agent_name="bot") as s:
+            with s.start_turn() as turn:
+                with turn.llm(model="gpt-4o") as llm:
+                    llm.output("Hello")
+                with turn.tool(name="search") as tool:
+                    tool.result = "done"
+        # Should not raise — just silently use no-op spans
 
     def test_include_content_false_omits_messages(
         self, otel_spans: InMemorySpanExporter
@@ -644,3 +638,88 @@ class TestDistinctTracePerTurn:
         assert len(spans) == 2
         trace_ids = {sp.context.trace_id for sp in spans}
         assert len(trace_ids) == 2, "Each turn should have a distinct trace_id"
+
+
+class TestContinueParentTrace:
+    """Verifies the ``continue_parent_trace`` knob nests turns inside an
+    outer trace instead of starting a fresh one. Mirrors the case where the
+    application is already instrumented (e.g. fastapi/django) and weave is
+    invoked inside an existing request span.
+    """
+
+    def test_default_starts_new_trace_even_under_outer_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # Default behavior: turn ignores the ambient trace.
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request") as outer:
+            outer_trace_id = outer.get_span_context().trace_id
+            with start_session(agent_name="bot") as s:
+                with s.start_turn() as turn:
+                    pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        assert turn_spans[0].context.trace_id != outer_trace_id
+
+    def test_continue_parent_trace_nests_turn_under_outer_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request") as outer:
+            outer_trace_id = outer.get_span_context().trace_id
+            outer_span_id = outer.get_span_context().span_id
+            with start_session(agent_name="bot", continue_parent_trace=True) as s:
+                with s.start_turn() as turn:
+                    pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        # Same trace and Turn parents under the outer request span
+        assert turn_spans[0].context.trace_id == outer_trace_id
+        assert turn_spans[0].parent is not None
+        assert turn_spans[0].parent.span_id == outer_span_id
+
+
+class TestStartTimeFromLogicalConstruction:
+    """Verifies that the OTel span ``start_time`` reflects when the SDK
+    object was constructed (``started_at``), not when ``__enter__`` ran.
+    Addresses prior-PR review feedback about start-time drift on Turn/LLM.
+    """
+
+    def test_turn_span_start_time_matches_started_at(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_session(agent_name="bot") as s:
+            turn = s.start_turn()  # constructed here, started_at set
+            assert turn.started_at is not None
+            expected_ns = int(turn.started_at.timestamp() * 1_000_000_000)
+            # Sleep so __enter__ runs measurably later than construction.
+            time.sleep(0.05)
+            with turn:
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        # Allow up to 1ms of drift from int conversion / pydantic timing.
+        assert abs(turn_spans[0].start_time - expected_ns) <= 1_000_000
+
+    def test_llm_span_start_time_matches_started_at(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_session(agent_name="bot") as s:
+            with s.start_turn() as turn:
+                llm = turn.llm(model="gpt-4o")
+                assert llm.started_at is not None
+                expected_ns = int(llm.started_at.timestamp() * 1_000_000_000)
+                time.sleep(0.05)
+                with llm:
+                    pass
+
+        spans = otel_spans.get_finished_spans()
+        llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
+        assert len(llm_spans) == 1
+        assert abs(llm_spans[0].start_time - expected_ns) <= 1_000_000
