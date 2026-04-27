@@ -301,10 +301,10 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             SELECT calls_merged.id AS id
             FROM calls_merged
             PREWHERE calls_merged.project_id = {pb_4:String}
-            WHERE ((calls_merged.op_name IN {pb_2:Array(String)}) OR (calls_merged.op_name IS NULL))
-                AND (calls_merged.trace_id = {pb_3:String} OR calls_merged.trace_id IS NULL)
-                AND (ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String}
-                     AND ifNull(calls_merged.inputs_dump, '') LIKE {pb_1:String})
+            WHERE ((calls_merged.op_name IN {pb_0:Array(String)}) OR (calls_merged.op_name IS NULL))
+                AND (calls_merged.trace_id = {pb_1:String} OR calls_merged.trace_id IS NULL)
+                AND (ifNull(calls_merged.inputs_dump, '') LIKE {pb_2:String}
+                     AND ifNull(calls_merged.inputs_dump, '') LIKE {pb_3:String})
             ORDER BY calls_merged.started_at DESC
             LIMIT 10
         ),
@@ -314,9 +314,9 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             PREWHERE calls_merged.project_id = {pb_4:String}
             WHERE (calls_merged.id IN filter_candidate_ids)
                 AND ((calls_merged.op_name IN {pb_10:Array(String)}) OR (calls_merged.op_name IS NULL))
-                AND (calls_merged.trace_id = {pb_3:String} OR calls_merged.trace_id IS NULL)
-                AND ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String} OR calls_merged.inputs_dump IS NULL)
-                     AND (ifNull(calls_merged.inputs_dump, '') LIKE {pb_1:String} OR calls_merged.inputs_dump IS NULL))
+                AND (calls_merged.trace_id = {pb_1:String} OR calls_merged.trace_id IS NULL)
+                AND ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL)
+                     AND (ifNull(calls_merged.inputs_dump, '') LIKE {pb_3:String} OR calls_merged.inputs_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}), 'null'), '') = {pb_6:String}))
@@ -338,10 +338,10 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         ORDER BY any(calls_merged.started_at) DESC
         """,
         {
-            "pb_0": '%"hello"%',
-            "pb_1": "%true%",
-            "pb_2": ["a", "b"],
-            "pb_3": "111111111111",
+            "pb_0": ["a", "b"],
+            "pb_1": "111111111111",
+            "pb_2": '%"hello"%',
+            "pb_3": "%true%",
             "pb_4": "project",
             "pb_5": '$."param"."val"',
             "pb_6": "hello",
@@ -1082,30 +1082,37 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
     assert_sql(
         cq,
         """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String}
+                    OR ifNull(calls_merged.output_dump, '') LIKE {pb_1:String})))
         SELECT
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_6:String}
-        WHERE (((ifNull(calls_merged.inputs_dump, '') LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL)
-                OR (ifNull(calls_merged.output_dump, '') LIKE {pb_5:String} OR calls_merged.output_dump IS NULL)))
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE (calls_merged.id IN filter_candidate_ids)
+            AND (((ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String} OR calls_merged.inputs_dump IS NULL)
+                  OR (ifNull(calls_merged.output_dump, '') LIKE {pb_1:String} OR calls_merged.output_dump IS NULL)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING ((
-            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String})
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}), 'null'), '') = {pb_4:String})
             OR
-            (coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}), 'null'), '') = {pb_3:String})))
+            (coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_5:String}), 'null'), '') = {pb_6:String})))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
         {
-            "pb_0": '$."param"."val"',
-            "pb_1": "hello",
-            "pb_2": '$."result"',
-            "pb_3": "success",
-            "pb_4": '%"hello"%',
-            "pb_5": '%"success"%',
-            "pb_6": "project",
+            "pb_0": '%"hello"%',
+            "pb_1": '%"success"%',
+            "pb_2": "project",
+            "pb_3": '$."param"."val"',
+            "pb_4": "hello",
+            "pb_5": '$."result"',
+            "pb_6": "success",
         },
     )
 
@@ -1237,23 +1244,29 @@ def test_calls_query_with_like_optimization() -> None:
     assert_sql(
         cq,
         """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE (ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String}))
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filter_candidate_ids)
+            AND ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') = {pb_3:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
         {
-            "pb_3": "project",
-            "pb_2": '%"hello"%',
-            "pb_1": "hello",
-            "pb_0": '$."param"',
+            "pb_0": '%"hello"%',
+            "pb_1": "project",
+            "pb_2": '$."param"',
+            "pb_3": "hello",
         },
     )
 
@@ -1277,23 +1290,29 @@ def test_calls_query_with_like_optimization_contains() -> None:
     assert_sql(
         cq,
         """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE (lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_0:String}))
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE ((lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filter_candidate_ids)
+            AND ((lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_0:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
+            (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), ''), {pb_3:String}) > 0)
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
         {
-            "pb_0": '$."param"',
-            "pb_3": "project",
-            "pb_2": '%"%hello%"%',
-            "pb_1": "hello",
+            "pb_0": '%"%hello%"%',
+            "pb_1": "project",
+            "pb_2": '$."param"',
+            "pb_3": "hello",
         },
     )
 
@@ -1316,26 +1335,33 @@ def test_query_with_json_value_in_condition() -> None:
     assert_sql(
         cq,
         """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_2:String}
+            WHERE ((ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String}
+                    OR ifNull(calls_merged.inputs_dump, '') LIKE {pb_1:String})))
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_5:String}
-        WHERE (((ifNull(calls_merged.inputs_dump, '') LIKE {pb_3:String} OR ifNull(calls_merged.inputs_dump, '') LIKE {pb_4:String})
-                OR calls_merged.inputs_dump IS NULL))
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE (calls_merged.id IN filter_candidate_ids)
+            AND (((ifNull(calls_merged.inputs_dump, '') LIKE {pb_0:String} OR ifNull(calls_merged.inputs_dump, '') LIKE {pb_1:String})
+                  OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}), 'null'), '') IN ({pb_4:String},{pb_5:String})))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
         {
-            "pb_0": '$."param"',
-            "pb_1": "hello",
-            "pb_2": "world",
-            "pb_5": "project",
-            "pb_3": '%"hello"%',
-            "pb_4": '%"world"%',
+            "pb_0": '%"hello"%',
+            "pb_1": '%"world"%',
+            "pb_2": "project",
+            "pb_3": '$."param"',
+            "pb_4": "hello",
+            "pb_5": "world",
         },
     )
 
@@ -1514,11 +1540,11 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             SELECT calls_merged.id AS id
             FROM calls_merged
             PREWHERE calls_merged.project_id = {pb_5:String}
-            WHERE ((calls_merged.op_name IN {pb_4:Array(String)}) OR (calls_merged.op_name IS NULL))
-                AND (ifNull(calls_merged.attributes_dump, '') LIKE {pb_0:String}
-                     AND lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_1:String}
-                     AND (ifNull(calls_merged.attributes_dump, '') LIKE {pb_2:String}
-                          OR ifNull(calls_merged.attributes_dump, '') LIKE {pb_3:String}))),
+            WHERE ((calls_merged.op_name IN {pb_0:Array(String)}) OR (calls_merged.op_name IS NULL))
+                AND (ifNull(calls_merged.attributes_dump, '') LIKE {pb_1:String}
+                     AND lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_2:String}
+                     AND (ifNull(calls_merged.attributes_dump, '') LIKE {pb_3:String}
+                          OR ifNull(calls_merged.attributes_dump, '') LIKE {pb_4:String}))),
         filtered_calls AS (
             SELECT
                 calls_merged.id AS id
@@ -1526,9 +1552,9 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
             PREWHERE calls_merged.project_id = {pb_5:String}
             WHERE (calls_merged.id IN filter_candidate_ids)
                 AND ((calls_merged.op_name IN {pb_13:Array(String)}) OR (calls_merged.op_name IS NULL))
-                AND ((ifNull(calls_merged.attributes_dump, '') LIKE {pb_0:String} OR calls_merged.attributes_dump IS NULL)
-                    AND (lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_1:String} OR calls_merged.inputs_dump IS NULL)
-                    AND ((ifNull(calls_merged.attributes_dump, '') LIKE {pb_2:String} OR ifNull(calls_merged.attributes_dump, '') LIKE {pb_3:String})
+                AND ((ifNull(calls_merged.attributes_dump, '') LIKE {pb_1:String} OR calls_merged.attributes_dump IS NULL)
+                    AND (lower(ifNull(calls_merged.inputs_dump, '')) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL)
+                    AND ((ifNull(calls_merged.attributes_dump, '') LIKE {pb_3:String} OR ifNull(calls_merged.attributes_dump, '') LIKE {pb_4:String})
                         OR calls_merged.attributes_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
@@ -1551,11 +1577,11 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
         GROUP BY (calls_merged.project_id, calls_merged.id)
         """,
         {
-            "pb_0": '%"gpt-4"%',
-            "pb_1": '%"%weather%"%',
-            "pb_2": '%"0.7"%',
-            "pb_3": '%"0.8"%',
-            "pb_4": ["llm/openai", "llm/anthropic"],
+            "pb_0": ["llm/openai", "llm/anthropic"],
+            "pb_1": '%"gpt-4"%',
+            "pb_2": '%"%weather%"%',
+            "pb_3": '%"0.7"%',
+            "pb_4": '%"0.8"%',
             "pb_5": "project",
             "pb_6": '$."model"',
             "pb_7": "gpt-4",
@@ -2687,90 +2713,6 @@ def test_filter_candidate_ids_cte_matches_user_example() -> None:
     )
 
 
-def test_filter_candidate_ids_cte_skipped_for_heavy_order() -> None:
-    """When ORDER BY is on a heavy field, the candidate CTE cannot mirror it
-    on raw columns (no GROUP BY → no any()), so the optimization is skipped.
-    The strict-form heavy LIKE pre-filter is still emitted in the WHERE
-    clause via the existing optimization path.
-    """
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {
-                "$eq": [
-                    {"$getField": "inputs.x"},
-                    {"$literal": "hello"},
-                ]
-            }
-        )
-    )
-    # output is a heavy field — gates out the candidate CTE.
-    cq.add_order("output.score", "desc")
-    cq.set_limit(10)
-
-    pb = ParamBuilder()
-    sql = cq.as_sql(pb)
-    assert "filter_candidate_ids" not in sql
-    # The OR-IS-NULL form is still in the WHERE clause for unmerged-part safety.
-    assert "ifNull(calls_merged.inputs_dump, '') LIKE" in sql
-
-
-def test_filter_candidate_ids_cte_optimizes_summary_dump() -> None:
-    """summary_dump is now in HEAVY_FIELDS_TO_OPTIMIZE, so user-defined
-    summary fields (e.g. summary.usage.total_tokens) emit ifNull LIKE
-    expressions that match the idx_summary_dump_ngram index alongside the
-    candidate-id CTE narrowing. Status-derived fields like
-    summary.weave.status route through CallsMergedSummaryField's CASE
-    expression and are unaffected.
-    """
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(filter={"trace_roots_only": True})
-    cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {
-                "$eq": [
-                    {"$getField": "summary.usage.total_tokens"},
-                    {"$literal": "42"},
-                ]
-            }
-        )
-    )
-
-    pb = ParamBuilder()
-    sql = cq.as_sql(pb)
-    # Candidate CTE uses the strict (no OR-IS-NULL) summary form.
-    assert "filter_candidate_ids" in sql
-    assert "ifNull(calls_merged.summary_dump, '') LIKE" in sql
-    # Outer filter_query keeps OR-IS-NULL for unmerged-call-part safety.
-    assert "OR calls_merged.summary_dump IS NULL" in sql
-
-
-def test_filter_candidate_ids_cte_skipped_for_calls_complete() -> None:
-    """calls_complete has no GROUP BY (one row per call) so a candidate CTE
-    adds no value. The single-pass query keeps the strict `ifNull` LIKE form
-    that already hits the equivalent index on calls_complete.
-    """
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {
-                "$eq": [
-                    {"$getField": "inputs.x"},
-                    {"$literal": "hello"},
-                ]
-            }
-        )
-    )
-
-    pb = ParamBuilder()
-    sql = cq.as_sql(pb)
-    assert "filter_candidate_ids" not in sql
-    assert "ifNull(calls_complete.inputs_dump, '') LIKE" in sql
-
-
 def test_trace_roots_only_filter_with_condition():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -3361,22 +3303,28 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
     assert_sql(
         cq,
         """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE (ifNull(calls_merged.output_dump, '') LIKE {pb_0:String}))
         SELECT calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_3:String}
-        WHERE ((ifNull(calls_merged.output_dump, '') LIKE {pb_2:String}
-                OR calls_merged.output_dump IS NULL))
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filter_candidate_ids)
+            AND ((ifNull(calls_merged.output_dump, '') LIKE {pb_0:String}
+                  OR calls_merged.output_dump IS NULL))
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
-        HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_0:String}), 'null'), '') = {pb_1:Int64}))
+        HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}), 'null'), '') = {pb_3:Int64}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
         {
-            "pb_0": '$."metrics.scorer.run"."value"',
-            "pb_1": 42,
-            "pb_2": "%42%",
-            "pb_3": "project",
+            "pb_0": "%42%",
+            "pb_1": "project",
+            "pb_2": '$."metrics.scorer.run"."value"',
+            "pb_3": 42,
         },
     )
 

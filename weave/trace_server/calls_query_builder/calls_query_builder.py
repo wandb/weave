@@ -1174,8 +1174,35 @@ class CallsQuery(BaseModel):
             table_alias_resolved,
         )
 
+        # Optionally pre-narrow with a filter_candidate_ids CTE that uses
+        # the strict heavy LIKE filter. ClickHouse can use the
+        # `ifNull(<dump>, '')` ngram bloom filter index (migration 031) to
+        # prune granules; downstream queries keep the OR-IS-NULL form for
+        # unmerged-call-part correctness. Fires anywhere the outer query
+        # is calls_merged with a heavy LIKE optimization eligible and no
+        # heavy ORDER BY field — including single-pass queries that
+        # otherwise have nothing to push down (heavy filter + light ORDER
+        # BY + LIMIT, no light filter).
+        ctes, field_to_object_join_alias_map = build_object_ref_ctes(
+            pb, self.project_id, object_ref_conditions
+        )
+        candidate_cte_name: str | None = None
+        candidate_cte_sql = self._build_filter_candidate_ids_cte_sql(
+            pb, table_alias_resolved, self.expand_columns
+        )
+        if candidate_cte_sql is not None:
+            ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
+            candidate_cte_name = CTE_FILTER_CANDIDATE_IDS
+
         if not should_optimize and not self.include_costs and not object_ref_conditions:
-            return self._as_sql_base_format(pb, table_alias_resolved)
+            base_sql = self._as_sql_base_format(
+                pb,
+                table_alias_resolved,
+                id_subquery_name=candidate_cte_name,
+            )
+            if ctes.has_ctes():
+                return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
+            return base_sql
 
         # Use the filtered_calls CTE (two-pass) pattern only for calls_merged
         # where it reduces rows before expensive GROUP BY aggregation.
@@ -1183,10 +1210,6 @@ class CallsQuery(BaseModel):
         # single-pass query — it's both simpler and significantly faster.
         use_filter_cte = self.read_table != ReadTable.CALLS_COMPLETE and (
             should_optimize or self.include_costs or bool(object_ref_conditions)
-        )
-
-        ctes, field_to_object_join_alias_map = build_object_ref_ctes(
-            pb, self.project_id, object_ref_conditions
         )
 
         if use_filter_cte:
@@ -1223,19 +1246,6 @@ class CallsQuery(BaseModel):
             if self.include_costs:
                 self._ensure_order_fields_selected(select_query.select_fields)
 
-            # Optionally pre-narrow with a filter_candidate_ids CTE that uses
-            # the strict heavy LIKE filter. ClickHouse can use the
-            # `ifNull(<dump>, '')` ngram bloom filter index (migration 031)
-            # to prune granules; the outer filter_query keeps the OR-IS-NULL
-            # form for unmerged-call-part correctness.
-            candidate_cte_name: str | None = None
-            candidate_cte_sql = filter_query._build_filter_candidate_ids_cte_sql(
-                pb, table_alias_resolved, self.expand_columns
-            )
-            if candidate_cte_sql is not None:
-                ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
-                candidate_cte_name = CTE_FILTER_CANDIDATE_IDS
-
             filtered_calls_sql = filter_query._as_sql_base_format(
                 pb,
                 table_alias_resolved,
@@ -1255,6 +1265,8 @@ class CallsQuery(BaseModel):
         else:
             # Single-pass: the full query (with all filters, ordering, and
             # limit) is built directly — no filtered_calls CTE needed.
+            # The candidate CTE (if eligible) still injects
+            # `id IN filter_candidate_ids` here so the index can prune.
             #
             # When costs are included, ensure all fields used in ordering are
             # selected so they're available in the cost query's final
@@ -1265,6 +1277,7 @@ class CallsQuery(BaseModel):
             base_sql = self._as_sql_base_format(
                 pb,
                 table_alias_resolved,
+                id_subquery_name=candidate_cte_name,
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
             )
@@ -1776,15 +1789,18 @@ class CallsQuery(BaseModel):
 
         # Peek for a strict heavy-filter LIKE before we build anything else,
         # so that queries without a heavy-filter optimization don't pay for
-        # duplicate hardcoded-filter params (op_names lists, etc.) that the
-        # filter_query path will add anyway.
+        # duplicate hardcoded-filter params (op_names lists, etc.) or shift
+        # the public param numbering. Use a throwaway ParamBuilder for the
+        # eligibility check; the real CTE construction below re-runs the
+        # optimizer on `pb` so its params become canonical.
         non_object_ref_conditions = [
             c
             for c in self.query_conditions
             if not (expand_columns and is_object_ref_operand(c.operand, expand_columns))
         ]
+        peek_pb = ParamBuilder()
         peek = process_query_to_optimization_sql(
-            non_object_ref_conditions, pb, table_alias, self.read_table
+            non_object_ref_conditions, peek_pb, table_alias, self.read_table
         )
         if not peek.heavy_filter_opt_strict_sql:
             return None
