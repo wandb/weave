@@ -10,11 +10,12 @@ from unittest.mock import MagicMock, Mock, patch
 import clickhouse_connect
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
+from tenacity import wait_none
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import ALL_CALL_INSERT_COLUMNS
-from weave.trace_server.errors import NotFoundError
+from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -967,6 +968,135 @@ def test_ensure_obj_version_exists_retries_eventual_consistency():
             server._ensure_obj_version_exists("test_project", "test_object", "digest-1")
 
         assert mock_query.call_count == chts.OBJ_READ_RETRY_ATTEMPTS
+
+
+def test_obj_read_retries_eventual_consistency():
+    """Object reads should tolerate transient read-after-write misses."""
+    server = chts.ClickHouseTraceServer(host="test_host")
+    req = tsi.ObjReadReq(
+        project_id="test_project",
+        object_id="test_object",
+        digest="digest-1",
+    )
+    obj = tsi.ObjSchema(
+        project_id="test_project",
+        object_id="test_object",
+        digest="digest-1",
+        base_object_class=None,
+        val={"ok": True},
+        created_at=datetime.now(),
+        version_index=1,
+        is_latest=1,
+        kind="object",
+        deleted_at=None,
+    )
+    diagnostics = {
+        "candidate_rows": 0,
+        "exact_rows": 0,
+        "project_object_rows": 0,
+        "project_digest_rows": 0,
+        "object_digest_rows": 0,
+        "exact_deleted_rows": 0,
+        "example_project_for_object_digest": None,
+        "example_object_for_project_digest": None,
+        "example_digest_for_project_object": None,
+    }
+
+    # Transient miss: the first lookup doesn't see the object yet, but the retry does.
+    with (
+        patch.object(chts, "wait_exponential", return_value=wait_none()),
+        patch.object(
+            server, "_obj_read_miss_diagnostics", return_value=diagnostics
+        ) as mock_diagnostics,
+        patch.object(server, "_obj_read_once") as mock_read_once,
+    ):
+        mock_read_once.side_effect = [
+            NotFoundError("Obj test_object:digest-1 not found"),
+            tsi.ObjReadRes(obj=obj),
+        ]
+
+        assert server.obj_read(req).obj.val == {"ok": True}
+        assert mock_read_once.call_count == 2
+        assert mock_diagnostics.call_count == 1
+
+    # Real miss: after exhausting retries, the original NotFoundError still surfaces.
+    with (
+        patch.object(chts, "wait_exponential", return_value=wait_none()),
+        patch.object(
+            server, "_obj_read_miss_diagnostics", return_value=diagnostics
+        ) as mock_diagnostics,
+        patch.object(
+            server,
+            "_obj_read_once",
+            side_effect=NotFoundError("Obj test_object:digest-1 not found"),
+        ) as mock_read_once,
+    ):
+        with pytest.raises(
+            NotFoundError,
+            match="Obj test_object:digest-1 not found",
+        ):
+            server.obj_read(req)
+
+        assert mock_read_once.call_count == chts.OBJ_READ_RETRY_ATTEMPTS
+        assert mock_diagnostics.call_count == chts.OBJ_READ_RETRY_ATTEMPTS
+
+    # Authoritative deletes are not eventual-consistency misses and should not retry.
+    with (
+        patch.object(chts, "wait_exponential", return_value=wait_none()),
+        patch.object(server, "_obj_read_miss_diagnostics") as mock_diagnostics,
+        patch.object(
+            server,
+            "_obj_read_once",
+            side_effect=ObjectDeletedError(
+                "test_object:v1 was deleted",
+                deleted_at=datetime.now(timezone.utc),
+            ),
+        ) as mock_read_once,
+    ):
+        with pytest.raises(ObjectDeletedError):
+            server.obj_read(req)
+
+        assert mock_read_once.call_count == 1
+        assert mock_diagnostics.call_count == 0
+
+    # Diagnostics distinguish stale reads from project/object/digest mismatches.
+    with patch.object(
+        server,
+        "_query",
+        return_value=MagicMock(
+            result_rows=[
+                (
+                    3,
+                    0,
+                    2,
+                    0,
+                    1,
+                    0,
+                    "other_project",
+                    "",
+                    "other_digest",
+                )
+            ]
+        ),
+    ) as mock_query:
+        assert server._obj_read_miss_diagnostics(req) == {
+            "candidate_rows": 3,
+            "exact_rows": 0,
+            "project_object_rows": 2,
+            "project_digest_rows": 0,
+            "object_digest_rows": 1,
+            "exact_deleted_rows": 0,
+            "example_project_for_object_digest": "other_project",
+            "example_object_for_project_digest": None,
+            "example_digest_for_project_object": "other_digest",
+        }
+        query, params = mock_query.call_args.args
+        assert "object_versions" in query
+        assert params == {
+            "project_id": "test_project",
+            "object_id": "test_object",
+            "digest": "digest-1",
+        }
 
 
 def test_file_content_read_retries_eventual_consistency():
