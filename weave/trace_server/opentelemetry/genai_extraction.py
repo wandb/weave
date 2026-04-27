@@ -43,8 +43,6 @@ _KNOWN_OP_PREFIXES = (
     "retrieval",
 )
 
-_LEGACY_PROMPT_ROLE = "user"
-
 
 @dataclass(frozen=True)
 class CustomAttrs:
@@ -275,9 +273,7 @@ def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
         try:
             raw = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
-            # Bare strings in input slots come from legacy prompt attrs. They
-            # represent user prompts; system prompts use system_instructions.
-            return [NormalizedMessage(role=_LEGACY_PROMPT_ROLE, content=raw)]
+            return [NormalizedMessage(content=raw)]
 
     if isinstance(raw, dict):
         if "role" in raw:
@@ -288,8 +284,7 @@ def _normalize_raw_messages(raw: Any) -> list[NormalizedMessage]:
         result: list[NormalizedMessage] = []
         for item in raw:
             if isinstance(item, str):
-                # String array entries are prompt fragments with no explicit role.
-                result.append(NormalizedMessage(role=_LEGACY_PROMPT_ROLE, content=item))
+                result.append(NormalizedMessage(content=item))
             elif isinstance(item, dict):
                 result.append(_normalize_single_message(item))
         return result
@@ -317,27 +312,11 @@ def _normalize_system_instructions(raw: Any) -> list[str]:
     return []
 
 
-def _extract_raw_input(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
-    """Return raw input messages from attrs, legacy prompt attrs, or OTel events.
-
-    Attribute values are preferred because they are already attached to the
-    span row. Event fallbacks cover producers that follow the older GenAI
-    semantic convention event shape.
-    """
+def _extract_raw_input(attrs: dict[str, Any]) -> Any:
+    """Return raw input messages from attrs."""
     val = _get(attrs, *semconv.INPUT_MESSAGES.lookup_keys)
     if val is not None:
         return val
-
-    val = _get(attrs, *semconv.PROMPT.lookup_keys)
-    if val is not None:
-        return val
-
-    for event in events:
-        if event.get("name") == "gen_ai.content.prompt":
-            event_attrs = event.get("attributes", {})
-            val = get_attribute(event_attrs, "gen_ai.prompt")
-            if val is not None:
-                return val
 
     return None
 
@@ -539,7 +518,7 @@ def extract_genai_span(
             _get(attrs, *semconv.REQUEST_CHOICE_COUNT.lookup_keys)
         ),
         output_type=_get_str(attrs, *semconv.OUTPUT_TYPE.lookup_keys),
-        input_messages=_normalize_raw_messages(_extract_raw_input(attrs, events_dicts)),
+        input_messages=_normalize_raw_messages(_extract_raw_input(attrs)),
         output_messages=output_msgs,
         system_instructions=_normalize_system_instructions(
             _get(attrs, *semconv.SYSTEM_INSTRUCTIONS.lookup_keys)

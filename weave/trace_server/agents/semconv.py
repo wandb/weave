@@ -234,9 +234,6 @@ SYSTEM_INSTRUCTIONS = Attribute(
     "System instructions",
     "gen_ai.system_instructions",
 )
-PROMPT = Attribute(
-    "weave.prompt", "json", "Input messages (pre-v1.36 format)", "gen_ai.prompt"
-)
 COMPLETION = Attribute(
     "weave.completion",
     "json",
@@ -308,7 +305,6 @@ _DEFS: list[Attribute] = [
     INPUT_MESSAGES,
     OUTPUT_MESSAGES,
     SYSTEM_INSTRUCTIONS,
-    PROMPT,
     COMPLETION,
     ERROR_TYPE,
     SERVER_ADDRESS,

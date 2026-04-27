@@ -175,13 +175,15 @@ Each message tuple:
 | `content` | string | Concatenated text content; non-text parts (tool calls, reasoning) are serialized per provider convention |
 | `finish_reason` | string | Per-message finish reason (output messages only) |
 
-**Legacy fallbacks** accepted for back-compat only:
+**Legacy output fallbacks** accepted for back-compat only:
 
-- `gen_ai.prompt` / `weave.prompt` → `input_messages`
 - `gen_ai.completion` / `weave.completion` → `output_messages`
-- Span events named `gen_ai.content.prompt` / `gen_ai.content.completion`
-  (with the content carried as a `gen_ai.prompt` / `gen_ai.completion`
-  event attribute) → `input_messages` / `output_messages`
+- Span events named `gen_ai.content.completion`
+  (with the content carried as a `gen_ai.completion` event attribute)
+  → `output_messages`
+
+Legacy `gen_ai.prompt` / `weave.prompt` attributes are not promoted by the
+agent extraction path. They remain in custom attributes and the raw span dump.
 
 ## Weave-only extensions
 

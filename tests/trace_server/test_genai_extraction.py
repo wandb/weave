@@ -211,14 +211,14 @@ def test_normalize_message_missing_role_and_finish_reason() -> None:
     assert result.output_messages[0].finish_reason == ""
 
 
-def test_legacy_prompt_strings_normalize_as_user_messages() -> None:
+def test_genai_prompt_attr_stays_custom_attr() -> None:
     result = extract_genai_span(
         _make_span(attrs={"gen_ai.prompt": "hello"}),
         project_id="p1",
     )
 
-    assert result.input_messages[0].role == "user"
-    assert result.input_messages[0].content == "hello"
+    assert result.input_messages == []
+    assert result.custom_attrs_string["gen_ai.prompt"] == "hello"
 
 
 def test_extract_custom_attrs_caps_total_entries() -> None:
