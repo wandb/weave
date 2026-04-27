@@ -39,18 +39,54 @@ DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
 # https://clickhouse.com/docs/operations/settings/settings#max_execution_time
 DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
 
+# https://clickhouse.com/docs/operations/settings/settings#max_estimated_execution_time
+DEFAULT_MAX_ESTIMATED_EXECUTION_TIME = DEFAULT_MAX_EXECUTION_TIME
+
+# https://clickhouse.com/docs/operations/settings/settings#timeout_before_checking_execution_speed
+DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED = 5
+
 # https://clickhouse.com/docs/sql-reference/functions/json-functions#json_value
 RETURN_TYPE_ALLOW_COMPLEX = "1"
+
+_env_max_execution_time = wf_env.wf_clickhouse_max_execution_time()
+_max_execution_time = _env_max_execution_time or DEFAULT_MAX_EXECUTION_TIME
+_disable_query_failure_prediction = (
+    wf_env.wf_clickhouse_disable_query_failure_prediction()
+)
 
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS: dict[str, int | str] = {
     "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
     or DEFAULT_MAX_MEMORY_USAGE,
-    "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
-    or DEFAULT_MAX_EXECUTION_TIME,
+    "max_execution_time": _max_execution_time,
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
     # Valid values here are 'allow' or 'global', with 'global' slightly outperforming in testing
     "distributed_product_mode": "global",
 }
+
+if not _disable_query_failure_prediction:
+    _env_max_estimated_execution_time = (
+        wf_env.wf_clickhouse_max_estimated_execution_time()
+    )
+    _max_estimated_execution_time = (
+        _env_max_estimated_execution_time
+        if _env_max_estimated_execution_time is not None
+        else _max_execution_time
+    )
+    _env_timeout_before_checking_execution_speed = (
+        wf_env.wf_clickhouse_timeout_before_checking_execution_speed()
+    )
+    _timeout_before_checking_execution_speed = (
+        _env_timeout_before_checking_execution_speed
+        if _env_timeout_before_checking_execution_speed is not None
+        else DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED
+    )
+    CLICKHOUSE_DEFAULT_QUERY_SETTINGS.update(
+        {
+            "max_estimated_execution_time": _max_estimated_execution_time,
+            "timeout_before_checking_execution_speed": _timeout_before_checking_execution_speed,
+            "timeout_overflow_mode": "throw",
+        }
+    )
 
 # Settings required for lightweight UPDATE/DELETE queries (ClickHouse 23.12+).
 # Only applied to endpoints that use lightweight updates: calls_complete updates,
