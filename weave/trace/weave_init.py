@@ -107,20 +107,25 @@ def _weave_is_available(server: TraceServerClientInterface) -> bool:
 
 
 def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> None:
-    """Configure the Session SDK's OTel TracerProvider using weave credentials.
+    """Configure OTel TracerProvider for the Session SDK using weave credentials.
 
-    Called automatically by init_weave(). No-ops silently if opentelemetry
-    is not installed or the trace server URL is not configured.
+    Called automatically by init_weave(). Sets the global OTel TracerProvider
+    so that ``trace.get_tracer("weave.session")`` returns a real tracer.
+    No-ops silently if opentelemetry is not installed or the trace server URL
+    is not configured.
     """
     try:
-        from weave.session.otel_setup import get_tracer, setup_tracer_provider
+        from opentelemetry import trace
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter,
+        )
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         # Don't reconfigure if already set up (e.g. from a previous init call)
-        tracer = get_tracer()
-        span = tracer.start_span("_probe")
-        is_recording = span.is_recording()
-        span.end()
-        if is_recording:
+        provider = trace.get_tracer_provider()
+        if isinstance(provider, TracerProvider):
             return
 
         trace_server_url = env.weave_trace_server_url()
@@ -128,12 +133,20 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
             return
 
         endpoint = f"{trace_server_url.rstrip('/')}/otel/v1/genai/traces"
-        setup_tracer_provider(
-            endpoint=endpoint,
-            api_key=api_key or "",
-            entity=entity,
-            project=project,
-        )
+
+        headers: dict[str, str] = {}
+        if api_key:
+            headers["authorization"] = f"Basic {api_key}"
+
+        resource = Resource.create({
+            "service.name": "weave-session-sdk",
+            "wandb.entity": entity,
+            "wandb.project": project,
+        })
+        exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
+        provider = TracerProvider(resource=resource)
+        provider.add_span_processor(BatchSpanProcessor(exporter))
+        trace.set_tracer_provider(provider)
     except Exception:
         # Session SDK tracing is optional — never block init.
         logger.debug("Session SDK tracing setup skipped", exc_info=True)

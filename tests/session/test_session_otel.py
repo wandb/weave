@@ -42,15 +42,15 @@ def _reset_contextvars():
 @pytest.fixture
 def otel_spans():
     """Provide an in-memory span exporter for capturing OTel spans."""
-    from weave.session import otel_setup
+    import weave.session.session as session_mod
 
     exporter = InMemorySpanExporter()
     provider = SDKTracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    otel_setup._provider = provider
+    session_mod._tracer_provider_override = provider
     yield exporter
     provider.shutdown()
-    otel_setup._provider = None
+    session_mod._tracer_provider_override = None
 
 # ---------------------------------------------------------------------------
 # invoke_agent_attributes
@@ -479,10 +479,10 @@ class TestOTelSpanEmission:
 
     def test_no_spans_without_setup(self) -> None:
         """No errors when no provider configured (no-op spans)."""
-        from weave.session import otel_setup
+        import weave.session.session as session_mod
 
-        original = otel_setup._provider
-        otel_setup._provider = None
+        original = session_mod._tracer_provider_override
+        session_mod._tracer_provider_override = None
         try:
             with Session(agent_name="bot") as s:
                 with s.start_turn() as turn:
@@ -492,7 +492,7 @@ class TestOTelSpanEmission:
                         tool.result = "done"
             # Should not raise — just silently use no-op spans
         finally:
-            otel_setup._provider = original
+            session_mod._tracer_provider_override = original
 
     def test_include_content_false_omits_messages(
         self, otel_spans: InMemorySpanExporter

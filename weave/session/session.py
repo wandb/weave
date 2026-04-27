@@ -73,22 +73,28 @@ class LogResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-_otel_cache: tuple[Any, Any, Any] | None = ...  # type: ignore[assignment]  # Ellipsis = not yet tried
+_TRACER_NAME = "weave.session"
+
+# Internal override for tests. When set, _get_tracer() returns a tracer from
+# this provider instead of the global OTel provider. Production code should
+# leave this as None and configure via weave.init() which calls
+# trace.set_tracer_provider().
+_tracer_provider_override: Any = None
+
+_otel_cache: tuple[Any, Any] | None = ...  # type: ignore[assignment]  # Ellipsis = not yet tried
 
 
-def _get_otel() -> tuple[Any, Any, Any] | None:
-    """Return (trace, otel_context, otel_setup) or None, cached after first attempt."""
+def _get_otel() -> tuple[Any, Any] | None:
+    """Return (trace, otel_context) or None, cached after first attempt."""
     global _otel_cache  # noqa: PLW0603
     if _otel_cache is ...:
         try:
             from opentelemetry import context as otel_context
             from opentelemetry import trace
-
-            from weave.session import otel_setup
         except ImportError:
             _otel_cache = None
         else:
-            _otel_cache = (trace, otel_context, otel_setup)
+            _otel_cache = (trace, otel_context)
     return _otel_cache
 
 
@@ -105,8 +111,11 @@ class _SpanBase(BaseModel):
         otel = _get_otel()
         if otel is None:
             return
-        trace, otel_context, otel_setup = otel
-        tracer = otel_setup.get_tracer()
+        trace, otel_context = otel
+        if _tracer_provider_override is not None:
+            tracer = _tracer_provider_override.get_tracer(_TRACER_NAME)
+        else:
+            tracer = trace.get_tracer(_TRACER_NAME)
         if new_trace:
             from opentelemetry.context import Context
 
@@ -127,7 +136,7 @@ class _SpanBase(BaseModel):
         if self._otel_token is not None:
             otel = _get_otel()
             if otel is not None:
-                _, otel_context, _ = otel
+                _, otel_context = otel
                 otel_context.detach(self._otel_token)
             self._otel_token = None
 
