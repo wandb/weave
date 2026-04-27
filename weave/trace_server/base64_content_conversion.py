@@ -128,8 +128,7 @@ def replace_base64_with_content_objects(
 
     def _visit(val: Any) -> Any:
         if isinstance(val, dict):
-            # Clone on first change so no-op requests can reuse the original
-            # payload.
+            # Clone on first change so no-op requests can reuse the original payload.
             updated_dict: dict[Any, Any] | None = None
             for key, child in val.items():
                 visited_child = _visit(child)
