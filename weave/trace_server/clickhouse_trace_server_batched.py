@@ -250,7 +250,6 @@ from weave.trace_server.query_builder.table_query_builder import (
     make_table_stats_basic_query,
     make_table_stats_query_with_storage_size,
 )
-from weave.trace_server.redis_client import get_redis_client
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
@@ -2613,9 +2612,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReadReq
     ) -> tsi.ProjectTTLSettingsReadRes:
-        stored_days = get_project_retention_days(
-            req.project_id, self.ch_client, redis_client=get_redis_client()
-        )
+        stored_days = get_project_retention_days(req.project_id, self.ch_client)
         return tsi.ProjectTTLSettingsReadRes(
             retention_days=stored_days if stored_days > 0 else None
         )
@@ -2645,7 +2642,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ],
             column_names=["project_id", "retention_days", "updated_at", "updated_by"],
         )
-        invalidate_ttl_cache(req.project_id, redis_client=get_redis_client())
+        invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
 
     def threads_query_stream(
