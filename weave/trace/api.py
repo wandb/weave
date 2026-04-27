@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import warnings
 from collections.abc import Iterator, Sequence
 from typing import Any, cast
 
@@ -36,16 +37,16 @@ logger = logging.getLogger(__name__)
 # Sentinel object to distinguish between "not provided" (auto-generate) and explicit None (disable)
 _AUTO_GENERATE = object()
 
-_global_postprocess_inputs: PostprocessInputsFunc | None = None
-_global_postprocess_output: PostprocessOutputFunc | None = None
-_global_attributes: dict[str, Any] = {}
-
 
 def init(
     project_name: str,
     *,
     settings: UserSettings | dict[str, Any] | None = None,
     autopatch_settings: AutopatchSettings | None = None,
+    postprocess_inputs: PostprocessInputsFunc | None = None,
+    postprocess_output: PostprocessOutputFunc | None = None,
+    attributes: dict[str, Any] | None = None,
+    # Deprecated aliases — remove in a future release.
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
@@ -108,14 +109,14 @@ def init(
                     This reduces server load and improves performance, especially for short-lived ops.
                     Default: `False`
         autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
-        global_postprocess_inputs: A function that will be applied to all inputs of all ops.
-        global_postprocess_output: A function that will be applied to all outputs of all ops.
-        global_attributes: A dictionary of attributes that will be applied to all traces.
+        postprocess_inputs: A function applied to the inputs of every op traced by this client.
+        postprocess_output: A function applied to the output of every op traced by this client.
+        attributes: A dictionary of attributes applied to every trace produced by this client.
 
-    NOTE: Global postprocessing settings are applied to all ops after each op's own
-    postprocessing.  The order is always:
+    NOTE: Client-level postprocessing runs after each op's own postprocessing.
+    The order is always:
     1. Op-specific postprocessing
-    2. Global postprocessing
+    2. Client-level postprocessing
 
     Returns:
         A Weave client.
@@ -141,19 +142,40 @@ def init(
 
     parse_and_apply_settings(settings)
 
-    global _global_postprocess_inputs  # noqa: PLW0603
-    global _global_postprocess_output  # noqa: PLW0603
-    global _global_attributes  # noqa: PLW0603
-
-    _global_postprocess_inputs = global_postprocess_inputs
-    _global_postprocess_output = global_postprocess_output
-    _global_attributes = global_attributes or {}
+    if global_postprocess_inputs is not None:
+        warnings.warn(
+            "`global_postprocess_inputs` is deprecated; use `postprocess_inputs` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        postprocess_inputs = postprocess_inputs or global_postprocess_inputs
+    if global_postprocess_output is not None:
+        warnings.warn(
+            "`global_postprocess_output` is deprecated; use `postprocess_output` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        postprocess_output = postprocess_output or global_postprocess_output
+    if global_attributes is not None:
+        warnings.warn(
+            "`global_attributes` is deprecated; use `attributes` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        attributes = attributes or global_attributes
 
     if should_disable_weave():
-        return weave_init.init_weave_disabled()
+        return weave_init.init_weave_disabled(
+            postprocess_inputs=postprocess_inputs,
+            postprocess_output=postprocess_output,
+            attributes=attributes,
+        )
 
     return weave_init.init_weave(
         project_name,
+        postprocess_inputs=postprocess_inputs,
+        postprocess_output=postprocess_output,
+        attributes=attributes,
     )
 
 

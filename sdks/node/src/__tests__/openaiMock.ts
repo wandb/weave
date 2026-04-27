@@ -1,3 +1,41 @@
+// Stands in for the OpenAI SDK's APIPromise — supplies the helpers
+// (_thenUnwrap, withResponse, asResponse) that the weave integration
+// drives through. _thenUnwrap is what the integration uses to install
+// tracing on the parsed value (stream wrap or non-streaming finishCall
+// fire-and-forget), while still yielding an APIPromise-shaped object
+// so the caller gets the SDK's native surface.
+export function makeAPIPromiseShim<T>(value: T): any {
+  const promise = Promise.resolve(value);
+  const mockResponse = {
+    status: 200,
+    headers: {get: (_k: string) => null},
+  };
+  return {
+    then(onF: any, onR: any) {
+      return promise.then(onF, onR);
+    },
+    catch(onR: any) {
+      return promise.catch(onR);
+    },
+    finally(onFinally: any) {
+      return promise.finally(onFinally);
+    },
+    asResponse() {
+      return Promise.resolve(mockResponse);
+    },
+    async withResponse() {
+      return {
+        data: await promise,
+        response: mockResponse,
+        request_id: null,
+      };
+    },
+    _thenUnwrap(transform: (v: T) => any) {
+      return makeAPIPromiseShim(transform(value));
+    },
+  };
+}
+
 function generateId() {
   return 'chatcmpl-' + Math.random().toString(36).substr(2, 9);
 }
@@ -54,7 +92,7 @@ export function makeMockOpenAIChat(responseFn: ResponseFn) {
     const totalTokens = promptTokens + completionTokens;
 
     if (stream) {
-      return {
+      return makeAPIPromiseShim({
         [Symbol.asyncIterator]: async function* () {
           yield* generateChunks(
             content,
@@ -66,9 +104,9 @@ export function makeMockOpenAIChat(responseFn: ResponseFn) {
             stream_options
           );
         },
-      };
+      });
     } else {
-      return {
+      return makeAPIPromiseShim({
         id: generateId(),
         object: 'chat.completion',
         created: Math.floor(Date.now() / 1000),
@@ -97,7 +135,7 @@ export function makeMockOpenAIChat(responseFn: ResponseFn) {
           total_tokens: totalTokens,
         },
         system_fingerprint: generateSystemFingerprint(),
-      };
+      });
     }
   };
 }

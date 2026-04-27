@@ -101,6 +101,13 @@ from weave.trace_server.database_engine import (
     wait_for_database_engine,
 )
 from weave.trace_server.environment import wf_clickhouse_calls_shard_key
+from weave.trace_server.migration_lock import (
+    LOCK_TABLE,
+    LOCK_TABLE_COLUMNS,
+    LOCK_TTL_SECONDS,
+    create_lock_table_sql,
+    migration_lock,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -140,11 +147,21 @@ _MIGRATIONS_TABLE_COLUMNS = """
     partially_applied_version UInt64 NULL,
 """
 
-# Tables that use ID-based sharding (sipHash64(field)) instead of random sharding
-# in distributed mode. Maps table name to the field used for sharding.
+# Tables that use deterministic sharding instead of rand() in distributed mode.
+# Maps table name to the argument list passed to sipHash64(...).
 # calls_complete: shard key is configurable via WF_CLICKHOUSE_CALLS_SHARD_KEY env var
 # Valid values: "trace_id" (default), "id", "project_id"
-ID_SHARDED_TABLES: dict[str, str] = {"calls_complete": wf_clickhouse_calls_shard_key()}
+ID_SHARDED_TABLES: dict[str, str] = {
+    "calls_complete": wf_clickhouse_calls_shard_key(),
+    # Keep one trace/turn on one shard. This matches the default calls sharding
+    # key and keeps trace detail reads local.
+    "spans": "trace_id",
+    "messages": "trace_id",
+    # Keep each agent aggregate on one shard. Shard versions by the same key so
+    # "versions for agent" queries have the same locality as the agent row.
+    "agents": "project_id, agent_name",
+    "agent_versions": "project_id, agent_name",
+}
 
 
 @dataclass(frozen=True)
@@ -245,10 +262,20 @@ class BaseClickHouseTraceServerMigrator(ABC):
     ) -> None:
         """Apply migrations to the target database up to the specified version.
 
+        Acquires a distributed lock so that only one replica runs migrations
+        at a time on multi-replica deployments.
+
         Args:
             target_db: The database to migrate
             target_version: The target version to migrate to (None = latest)
         """
+        with migration_lock(self.ch_client, self.management_db):
+            self._apply_migrations_locked(target_db, target_version)
+
+    def _apply_migrations_locked(
+        self, target_db: str, target_version: int | None = None
+    ) -> None:
+        """Inner migration logic, called while holding the migration lock."""
         status = self._get_migration_status(target_db)
         logger.info("""`%s` migration status: %s""", target_db, status)
         if status["partially_applied_version"]:
@@ -293,10 +320,19 @@ class BaseClickHouseTraceServerMigrator(ABC):
         )
 
     def _initialize_migration_db(self) -> None:
-        """Initialize the management database and migrations table."""
+        """Initialize the management database, migrations table, and lock table."""
         self._ensure_database(self.management_db)
         create_table_sql = self._create_management_table_sql()
         self._run_ddl_with_retry(create_table_sql)
+        lock_table_sql = self._create_lock_table_sql()
+        self._run_ddl_with_retry(lock_table_sql)
+
+    def _create_lock_table_sql(self) -> str:
+        """Generate SQL for the migration lock table.
+
+        Subclasses that need ON CLUSTER or Replicated engines override this.
+        """
+        return create_lock_table_sql(self.management_db)
 
     def _get_migration_status(self, db_name: str) -> dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
@@ -658,6 +694,11 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         """
         return self._prepare_ddl_for_database(create_table_sql, self.management_db)
 
+    def _create_lock_table_sql(self) -> str:
+        """Generate SQL for the lock table, adapted for the management DB engine."""
+        base_sql = create_lock_table_sql(self.management_db)
+        return self._prepare_ddl_for_database(base_sql, self.management_db)
+
     def _execute_migration_command(self, target_db: str, command: str) -> None:
         """Execute command in replicated mode."""
         command = command.strip()
@@ -862,6 +903,24 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             ({_MIGRATIONS_TABLE_COLUMNS})
             ENGINE = ReplicatedMergeTree('/clickhouse/tables/shared/{self.management_db}/migrations', '{{shard}}-{{replica}}')
             ORDER BY (db_name)
+        """
+
+    def _create_lock_table_sql(self) -> str:
+        """Generate SQL for the lock table in distributed mode.
+
+        Mirrors the management table logic: Replicated DB uses plain MergeTree
+        (auto-converted); Atomic DB uses explicit ReplicatedMergeTree with a
+        shared ZK path so all shards see the same lock state.
+        """
+        if self._uses_replicated_db_engine(self.management_db):
+            return create_lock_table_sql(self.management_db)
+        return f"""
+            CREATE TABLE IF NOT EXISTS {self.management_db}.{LOCK_TABLE}
+            ON CLUSTER {self.replicated_cluster}
+            ({LOCK_TABLE_COLUMNS})
+            ENGINE = ReplicatedMergeTree('/clickhouse/tables/shared/{self.management_db}/{LOCK_TABLE}', '{{shard}}-{{replica}}')
+            ORDER BY lock_id
+            TTL toDateTime(acquired_at) + INTERVAL {LOCK_TTL_SECONDS} SECOND
         """
 
     def _execute_migration_command(self, target_db: str, command: str) -> None:
@@ -1125,13 +1184,13 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
     def _create_distributed_table_sql(self, table_name: str) -> str:
         """Generate SQL to create a distributed table.
 
-        For tables in ID_SHARDED_TABLES, uses sipHash64(field) as the sharding key
-        to ensure all data for a specific ID goes to the same shard, enabling
-        efficient point lookups. Other tables use rand() for even distribution.
+        For tables in ID_SHARDED_TABLES, uses sipHash64(...) as the sharding key
+        to keep rows for the query's locality key on one shard. Other tables
+        use rand() for even distribution.
         """
         local_table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
-        if shard_field := ID_SHARDED_TABLES.get(table_name):
-            sharding_key = f"sipHash64({shard_field})"
+        if shard_expr := ID_SHARDED_TABLES.get(table_name):
+            sharding_key = f"sipHash64({shard_expr})"
         else:
             sharding_key = "rand()"
         on_cluster = self._get_on_cluster_clause(self.ch_client.database)
