@@ -34,7 +34,12 @@ if TYPE_CHECKING:
 
 START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
 END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
-HEAVY_FIELDS_TO_OPTIMIZE = {"inputs_dump", "output_dump", "attributes_dump"}
+HEAVY_FIELDS_TO_OPTIMIZE = {
+    "inputs_dump",
+    "output_dump",
+    "attributes_dump",
+    "summary_dump",
+}
 DATETIME_FIELDS_TO_OPTIMIZE = {"started_at"}
 
 DATETIME_BUFFER_TIME_SECONDS = 60 * 5  # 5 minutes
@@ -469,8 +474,8 @@ def _create_like_condition(
 ) -> str:
     """Creates a LIKE condition for a JSON field.
 
-    The dump column is wrapped in ``ifNull(..., '')`` so that the expression
-    matches the ``idx_inputs_dump_ngram`` ngram bloom filter index on
+    The dump column is wrapped in `ifNull(..., '')` so that the expression
+    matches the `idx_inputs_dump_ngram` ngram bloom filter index on
     calls_merged (see migration 031), and so that LIKE never returns NULL
     over Nullable(String) columns.
     """

@@ -2716,6 +2716,37 @@ def test_filter_candidate_ids_cte_skipped_for_heavy_order() -> None:
     assert "ifNull(calls_merged.inputs_dump, '') LIKE" in sql
 
 
+def test_filter_candidate_ids_cte_optimizes_summary_dump() -> None:
+    """summary_dump is now in HEAVY_FIELDS_TO_OPTIMIZE, so user-defined
+    summary fields (e.g. summary.usage.total_tokens) emit ifNull LIKE
+    expressions that match the idx_summary_dump_ngram index alongside the
+    candidate-id CTE narrowing. Status-derived fields like
+    summary.weave.status route through CallsMergedSummaryField's CASE
+    expression and are unaffected.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"trace_roots_only": True})
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "summary.usage.total_tokens"},
+                    {"$literal": "42"},
+                ]
+            }
+        )
+    )
+
+    pb = ParamBuilder()
+    sql = cq.as_sql(pb)
+    # Candidate CTE uses the strict (no OR-IS-NULL) summary form.
+    assert "filter_candidate_ids" in sql
+    assert "ifNull(calls_merged.summary_dump, '') LIKE" in sql
+    # Outer filter_query keeps OR-IS-NULL for unmerged-call-part safety.
+    assert "OR calls_merged.summary_dump IS NULL" in sql
+
+
 def test_filter_candidate_ids_cte_skipped_for_calls_complete() -> None:
     """calls_complete has no GROUP BY (one row per call) so a candidate CTE
     adds no value. The single-pass query keeps the strict `ifNull` LIKE form

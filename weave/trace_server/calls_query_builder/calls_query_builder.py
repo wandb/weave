@@ -1225,7 +1225,7 @@ class CallsQuery(BaseModel):
 
             # Optionally pre-narrow with a filter_candidate_ids CTE that uses
             # the strict heavy LIKE filter. ClickHouse can use the
-            # `ifNull(<dump>, '')` ngram bloom filter index (migration 030)
+            # `ifNull(<dump>, '')` ngram bloom filter index (migration 031)
             # to prune granules; the outer filter_query keeps the OR-IS-NULL
             # form for unmerged-call-part correctness.
             candidate_cte_name: str | None = None
@@ -1757,12 +1757,12 @@ class CallsQuery(BaseModel):
         """Build the filter_candidate_ids CTE body, or None if not applicable.
 
         The strict (no OR-IS-NULL) heavy LIKE expression matches the
-        ``ifNull(<dump>, '') TYPE ngrambf_v1(...)`` index on calls_merged
-        (migration 030). The OR-IS-NULL form we keep in the outer filter_query
+        `ifNull(<dump>, '') TYPE ngrambf_v1(...)` index on calls_merged
+        (migration 031). The OR-IS-NULL form we keep in the outer filter_query
         for unmerged-call-part correctness defeats that index, so this CTE
         runs the strict form alone with the outer ORDER BY/LIMIT/OFFSET to
         pre-narrow rows; the outer filter_query then restricts to
-        ``id IN filter_candidate_ids`` and keeps the OR-IS-NULL form.
+        `id IN filter_candidate_ids` and keeps the OR-IS-NULL form.
 
         Returns None when the optimization does not apply:
         - non-calls_merged read tables (no GROUP BY, so no benefit),
