@@ -3,8 +3,14 @@ from __future__ import annotations
 import logging
 import os
 from json import JSONDecodeError
+from typing import TYPE_CHECKING, Any
 
 from weave.compat import wandb
+from weave.integrations.patch import (
+    implicit_patch,
+    register_import_hook,
+    unregister_import_hook,
+)
 from weave.telemetry import trace_sentry
 from weave.trace import env, init_message, weave_client
 from weave.trace.context import weave_client_context
@@ -23,6 +29,10 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
+from weave.wandb_interface.context import get_wandb_api_context
+
+if TYPE_CHECKING:
+    from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +62,11 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
             entity_name = api.default_entity_name()
             if entity_name is None:
                 raise WeaveWandbAuthenticationException(
-                    'weave init requires wandb. Run "wandb login"'
+                    "Could not determine a W&B entity for this project. Fix with one of:\n"
+                    "  1. Pass the project as 'entity/project' to weave.init(...)\n"
+                    "  2. Set the WANDB_ENTITY environment variable\n"
+                    "  3. Set a default entity on your W&B account and re-run "
+                    "weave.init(...) to re-authenticate"
                 )
         project_name = fields[0]
     elif len(fields) == 2:
@@ -95,6 +109,10 @@ def _weave_is_available(server: TraceServerClientInterface) -> bool:
 def init_weave(
     project_name: str,
     ensure_project_exists: bool = True,
+    *,
+    postprocess_inputs: PostprocessInputsFunc | None = None,
+    postprocess_output: PostprocessOutputFunc | None = None,
+    attributes: dict[str, Any] | None = None,
 ) -> weave_client.WeaveClient:
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
@@ -111,8 +129,6 @@ def init_weave(
             # Flush any pending calls before switching to a new project
             current_client.finish()
             weave_client_context.set_weave_client_global(None)
-
-    from weave.wandb_interface.context import get_wandb_api_context
 
     api_key = get_wandb_api_context()
     if api_key is None:
@@ -138,7 +154,13 @@ def init_weave(
         server = CachingMiddlewareTraceServer.from_env(server)
 
     client = weave_client.WeaveClient(
-        entity_name, project_name, server, ensure_project_exists
+        entity_name,
+        project_name,
+        server,
+        ensure_project_exists,
+        postprocess_inputs=postprocess_inputs,
+        postprocess_output=postprocess_output,
+        attributes=attributes,
     )
 
     # If the project name was formatted by init, update the project name
@@ -149,8 +171,6 @@ def init_weave(
     # Implicit patching:
     # 1. Check sys.modules and automatically patch any already-imported integrations
     # 2. Register import hook to patch integrations imported after weave.init()
-    from weave.integrations.patch import implicit_patch, register_import_hook
-
     implicit_patch()
     register_import_hook()
 
@@ -198,7 +218,12 @@ def init_weave(
     return client
 
 
-def init_weave_disabled() -> weave_client.WeaveClient:
+def init_weave_disabled(
+    *,
+    postprocess_inputs: PostprocessInputsFunc | None = None,
+    postprocess_output: PostprocessOutputFunc | None = None,
+    attributes: dict[str, Any] | None = None,
+) -> weave_client.WeaveClient:
     """Initialize a dummy client that does nothing.
 
     This is used when the program is execuring with Weave disabled.
@@ -218,6 +243,9 @@ def init_weave_disabled() -> weave_client.WeaveClient:
         "DISABLED",
         init_weave_get_server("DISABLED", should_batch=False),
         ensure_project_exists=False,
+        postprocess_inputs=postprocess_inputs,
+        postprocess_output=postprocess_output,
+        attributes=attributes,
     )
 
     weave_client_context.set_weave_client_global(client)
@@ -248,8 +276,6 @@ def finish() -> None:
         weave_client_context.set_weave_client_global(None)
 
     # Unregister the import hook
-    from weave.integrations.patch import unregister_import_hook
-
     unregister_import_hook()
 
     trace_sentry.global_trace_sentry.end_session()

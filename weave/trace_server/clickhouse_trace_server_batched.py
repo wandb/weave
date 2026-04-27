@@ -203,6 +203,7 @@ from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
 from weave.trace_server.project_version.types import WriteTarget
+from weave.trace_server.query_builder import eval_results_query_builder
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_annotator_progress_insert_query,
     make_annotator_progress_state_check_query,
@@ -245,6 +246,7 @@ from weave.trace_server.query_builder.table_query_builder import (
     make_natural_sort_table_query,
     make_standard_table_query,
     make_table_row_digests_query,
+    make_table_rows_read_batch_query,
     make_table_stats_basic_query,
     make_table_stats_query_with_storage_size,
 )
@@ -257,6 +259,7 @@ from weave.trace_server.token_costs import (
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
+    MAX_FILTER_LENGTH,
     DynamicBatchProcessor,
     LRUCache,
     determine_call_status,
@@ -264,7 +267,9 @@ from weave.trace_server.trace_server_common import (
     hydrate_calls_with_feedback,
     make_feedback_query_req,
     set_nested_key,
+    try_parse_json,
 )
+from weave.trace_server.ttl_settings import get_project_retention_days
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
     EvaluateModelDispatcher,
@@ -663,7 +668,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     self._op_ref_cache[req.project_id, op_name] = op_ref_uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
-            req.project_id, self._mint_client
+            req.project_id,
+            self.ch_client,
         )
 
         # Build event callbacks (same for both write targets)
@@ -679,11 +685,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for _, end_call in calls
         ]
 
-        # Convert and insert based on write target
+        # Convert and insert based on write target. All calls in the batch
+        # share req.project_id, so we resolve retention once.
+        retention_days = get_project_retention_days(req.project_id, self.ch_client)
         if write_target == WriteTarget.CALLS_COMPLETE:
             rows = [
                 ch_complete_call_to_row(
-                    start_end_calls_to_ch_complete_insertable(start, end)
+                    start_end_calls_to_ch_complete_insertable(
+                        start, end, retention_days
+                    )
                 )
                 for start, end in calls
             ]
@@ -692,9 +702,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             rows = []
             for start, end in calls:
                 rows.append(
-                    ch_call_to_row(start_call_for_insert_to_ch_insertable(start))
+                    ch_call_to_row(
+                        start_call_for_insert_to_ch_insertable(start, retention_days)
+                    )
                 )
-                rows.append(ch_call_to_row(end_call_for_insert_to_ch_insertable(end)))
+                rows.append(
+                    ch_call_to_row(
+                        end_call_for_insert_to_ch_insertable(end, retention_days)
+                    )
+                )
             self._insert_call_batch(rows)
 
         # Run callbacks and flush
@@ -788,11 +804,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
 
         req = process_call_req_to_content(req, self)
-        ch_call = start_call_for_insert_to_ch_insertable(req.start)
+        retention_days = get_project_retention_days(
+            req.start.project_id, self.ch_client
+        )
+        ch_call = start_call_for_insert_to_ch_insertable(req.start, retention_days)
 
         # Check write target - v1 call_start cannot write to calls_complete
         write_target = self.table_routing_resolver.resolve_v1_write_target(
-            ch_call.project_id, self._mint_client
+            ch_call.project_id,
+            self.ch_client,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
@@ -816,11 +836,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
         req = process_call_req_to_content(req, self)
-        ch_call = end_call_for_insert_to_ch_insertable(req.end)
+        retention_days = get_project_retention_days(req.end.project_id, self.ch_client)
+        ch_call = end_call_for_insert_to_ch_insertable(req.end, retention_days)
 
         # Check write target - v1 call_end cannot write to calls_complete
         write_target = self.table_routing_resolver.resolve_v1_write_target(
-            ch_call.project_id, self._mint_client
+            ch_call.project_id,
+            self.ch_client,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
@@ -875,10 +897,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 # is here for technical correctness, in case we relax project_id target
                 # constraints intra-batch
                 write_target = self.table_routing_resolver.resolve_v2_write_target(
-                    processed_complete_call.project_id, self._mint_client
+                    processed_complete_call.project_id,
+                    self.ch_client,
                 )
 
-                ch_call = complete_call_to_ch_insertable(processed_complete_call)
+                retention_days = get_project_retention_days(
+                    processed_complete_call.project_id, self.ch_client
+                )
+                ch_call = complete_call_to_ch_insertable(
+                    processed_complete_call, retention_days
+                )
                 if write_target == WriteTarget.CALLS_COMPLETE:
                     self._insert_call_complete(ch_call)
                 else:
@@ -900,10 +928,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         their start to be visible immediately in the UI.
         """
         start_req = process_call_req_to_content(tsi.CallStartReq(start=req.start), self)
-        ch_start = start_call_for_insert_to_ch_insertable(start_req.start)
+        retention_days = get_project_retention_days(
+            start_req.start.project_id, self.ch_client
+        )
+        ch_start = start_call_for_insert_to_ch_insertable(
+            start_req.start, retention_days
+        )
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
-            ch_start.project_id, self._mint_client
+            ch_start.project_id,
+            self.ch_client,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             ch_complete_start = start_call_insertable_to_complete_start(ch_start)
@@ -929,14 +963,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         req = process_call_req_to_content(req, self)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
-            req.end.project_id, self._mint_client
+            req.end.project_id,
+            self.ch_client,
         )
 
         # If writing to calls_complete, perform lightweight UPDATE
         if write_target == WriteTarget.CALLS_COMPLETE:
             self._update_call_end_in_calls_complete(req.end)
         elif write_target == WriteTarget.CALLS_MERGED:
-            ch_end = end_call_for_insert_to_ch_insertable(req.end)
+            retention_days = get_project_retention_days(
+                req.end.project_id, self.ch_client
+            )
+            ch_end = end_call_for_insert_to_ch_insertable(req.end, retention_days)
             self._insert_call(ch_end)
             if self._flush_immediately:
                 self._flush_calls()
@@ -1051,7 +1089,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         aggregate statistics that are not directly queryable from the calls themselves.
         """
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self._mint_client
+            req.project_id, self.ch_client
         )
         pb = ParamBuilder()
         query, columns = build_calls_stats_query(req, pb, read_table)
@@ -1193,7 +1231,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Resolve which table to read from based on project data residence
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self._mint_client
+            req.project_id, self.ch_client
         )
 
         token_metrics, requested_cost_metrics = split_usage_metrics(req.usage_metrics)
@@ -1364,7 +1402,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self._mint_client
+            req.project_id, self.ch_client
         )
         settings = None
         cq = CallsQuery(
@@ -1497,40 +1535,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if hasattr(raw_res, "close"):
                 raw_res.close()
 
-    def _calls_query_stream_for_eval_subtree(
-        self,
-        project_id: str,
-        eval_root_ids: list[str],
-        include_children: bool = True,
-    ) -> Iterator[tsi.CallSchema]:
-        """Fetch direct children of eval root IDs and optionally their children."""
-        read_table = self.table_routing_resolver.resolve_read_table(
-            project_id, self._mint_client
-        )
-        columns = sorted(
-            [*REQUIRED_CALL_COLUMNS, *ALL_CALL_JSON_COLUMNS, "parent_id", "ended_at"]
-        )
-        cq = CallsQuery(project_id=project_id, read_table=read_table)
-        for col in columns:
-            cq.add_field(col)
-        cq.eval_root_ids = eval_root_ids
-        cq.include_predict_and_score_children = include_children
-        cq.add_order("started_at", "asc")
-        cq.add_order("id", "asc")
-        pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
-        select_columns = [c.field for c in cq.select_fields]
-        try:
-            for row in raw_res:
-                yield tsi.CallSchema.model_validate(
-                    ch_call_dict_to_call_schema_dict(
-                        dict(zip(select_columns, row, strict=True))
-                    )
-                )
-        finally:
-            if hasattr(raw_res, "close"):
-                raw_res.close()
-
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
         self, project_id: str, calls: list[dict[str, Any]]
@@ -1539,8 +1543,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return
 
         feedback_query_req = make_feedback_query_req(project_id, calls)
-        with self.with_new_client():
-            feedback = self.feedback_query(feedback_query_req)
+        feedback = self.feedback_query(feedback_query_req)
         hydrate_calls_with_feedback(calls, feedback)
 
     def _get_refs_to_resolve(
@@ -1589,31 +1592,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if not refs_to_resolve:
                 continue
 
-            with self.with_new_client():
-                # Filter out non-unique refs
-                unique_ref_map = {}
-                for ref in refs_to_resolve.values():
-                    if ref.uri not in unique_ref_map:
-                        unique_ref_map[ref.uri] = ref
+            # Filter out non-unique refs
+            unique_ref_map = {}
+            for ref in refs_to_resolve.values():
+                if ref.uri not in unique_ref_map:
+                    unique_ref_map[ref.uri] = ref
 
-                # Fetch values only for the unique refs
-                vals = self._refs_read_batch_within_project(
-                    project_id, list(unique_ref_map.values()), ref_cache
-                )
+            # Fetch values only for the unique refs
+            vals = self._refs_read_batch_within_project(
+                project_id, list(unique_ref_map.values()), ref_cache
+            )
 
-                # update the ref map with the fetched values
-                ref_val_map = {}
-                for ref, val in zip(unique_ref_map.values(), vals, strict=False):
-                    ref_val_map[ref.uri] = val
+            # update the ref map with the fetched values
+            ref_val_map = {}
+            for ref, val in zip(unique_ref_map.values(), vals, strict=False):
+                ref_val_map[ref.uri] = val
 
-                # Replace the refs with values and add ref key
-                for (i, col), ref in refs_to_resolve.items():
-                    # Look up the value using the ref's URI
-                    val = ref_val_map.get(ref.uri)
-                    if val is not None:
-                        if isinstance(val, dict) and "_ref" not in val:
-                            val["_ref"] = ref.uri
-                        set_nested_key(calls[i], col, val)
+            # Replace the refs with values and add ref key
+            for (i, col), ref in refs_to_resolve.items():
+                # Look up the value using the ref's URI
+                val = ref_val_map.get(ref.uri)
+                if val is not None:
+                    if isinstance(val, dict) and "_ref" not in val:
+                        val["_ref"] = ref.uri
+                    set_nested_key(calls[i], col, val)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -1662,7 +1664,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         write_target = self.table_routing_resolver.resolve_v1_write_target(
-            req.project_id, self._mint_client
+            req.project_id,
+            self.ch_client,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             self._delete_calls_complete(req.project_id, all_descendants)
@@ -1718,7 +1721,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._ensure_valid_update_field(req)
 
         write_target = self.table_routing_resolver.resolve_v1_write_target(
-            req.project_id, self._mint_client
+            req.project_id,
+            self.ch_client,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             self._update_calls_complete(req.project_id, req.call_id, req.display_name)
@@ -2577,7 +2581,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Resolve which table to read from based on project data residence
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self._mint_client
+            req.project_id, self.ch_client
         )
 
         pb = ParamBuilder()
@@ -2604,7 +2608,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self._mint_client
+            req.project_id, self.ch_client
         )
         pb = ParamBuilder()
 
@@ -2947,7 +2951,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Step 0: Determine which table to query based on project data residence
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self._mint_client
+            req.project_id, self.ch_client
         )
 
         # Step 1: Check for existing calls (duplicate prevention)
@@ -5138,20 +5142,163 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         """Return grouped prediction/trial/score data for evaluation results."""
+        eval_helpers.validate_eval_results_request(req)
         eval_root_ids = eval_helpers.resolve_eval_root_ids(req)
         if not eval_root_ids:
             empty_summary = tsi.EvalResultsSummaryRes() if req.include_summary else None
             return tsi.EvalResultsQueryRes(
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
-        all_calls = list(
-            self._calls_query_stream_for_eval_subtree(
-                req.project_id,
-                eval_root_ids,
-                req.include_predict_and_score_children,
-            )
+        return self._eval_results_via_cte(req, eval_root_ids)
+
+    def _eval_results_via_cte(
+        self,
+        req: tsi.EvalResultsQueryReq,
+        eval_root_ids: list[str],
+    ) -> tsi.EvalResultsQueryRes:
+        """Sort/filter/paginate eval results with a single ClickHouse query."""
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
         )
-        return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
+
+        # when summary is requested, fetch all rows
+        ch_limit = None if req.include_summary else req.limit
+        ch_offset = 0 if req.include_summary else req.offset
+
+        pb = ParamBuilder()
+
+        page_query = eval_results_query_builder.build_eval_results_query(
+            req.project_id,
+            eval_root_ids,
+            req.sort_by,
+            req.filters,
+            req.require_intersection,
+            ch_limit,
+            ch_offset,
+            pb,
+            read_table,
+        )
+
+        result = self._query(page_query, pb.get_params())
+
+        digest_by_call: dict[str, str] = {}
+        resolved_by_call_id: dict[str, Any] = {}
+        total_rows = 0
+        page_calls: list[tsi.CallSchema] = []
+
+        for row in result.result_rows:
+            row_data = dict(zip(result.column_names, row, strict=True))
+            total_rows = int(row_data.get("__total_rows", 0))
+            row_digest = row_data.get("__row_digest")
+            resolved_raw = row_data.get("__resolved_inputs")
+
+            call_id = row_data.get("id")
+            if row_digest and call_id:
+                digest_by_call[call_id] = row_digest
+            if resolved_raw and call_id and req.resolve_row_refs:
+                parsed = try_parse_json(resolved_raw)
+                if parsed is not None:
+                    resolved_by_call_id[call_id] = parsed
+
+            page_calls.append(
+                tsi.CallSchema.model_validate(
+                    ch_call_dict_to_call_schema_dict(row_data)
+                )
+            )
+
+        for call in page_calls:
+            if call.id in resolved_by_call_id and isinstance(call.inputs, dict):
+                call.inputs["example"] = resolved_by_call_id[call.id]
+
+        if req.include_predict_and_score_children and len(page_calls) > 0:
+            predict_and_score_ids = [c.id for c in page_calls]
+            child_columns = [
+                *REQUIRED_CALL_COLUMNS,
+                *ALL_CALL_JSON_COLUMNS,
+                "parent_id",
+                "ended_at",
+            ]
+            for i in range(0, len(predict_and_score_ids), MAX_FILTER_LENGTH):
+                batch = predict_and_score_ids[i : i + MAX_FILTER_LENGTH]
+                child_req = tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=tsi.CallsFilter(parent_ids=batch),
+                    columns=child_columns,
+                    sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                )
+                page_calls.extend(self.calls_query_stream(child_req))
+
+        all_rows = eval_helpers.build_eval_rows(
+            page_calls,
+            eval_root_ids,
+            digest_by_call,
+            req.include_raw_data_rows if req.include_rows else False,
+            req.include_predict_and_score_children,
+        )
+
+        summary: tsi.EvalResultsSummaryRes | None = None
+        if req.include_summary:
+            summary_intersection = (
+                req.summary_require_intersection
+                if req.summary_require_intersection is not None
+                else req.require_intersection
+            )
+            summary_rows, _ = eval_helpers.apply_row_selection(
+                all_rows, eval_root_ids, summary_intersection, 0, None
+            )
+            eval_call_metadata = eval_helpers.fetch_eval_root_metadata(
+                self, req.project_id, eval_root_ids
+            )
+            summary = eval_helpers.compute_summary_from_rows(
+                summary_rows, eval_call_metadata
+            )
+
+        # apply pagination in python if include_summary is True; otherwise, we already applied pagination in the CH query
+        rows: list[tsi.EvalResultsRow] = []
+        warnings: list[str] = []
+        if req.include_rows:
+            if req.include_summary:
+                # all_rows has everything; apply pagination in Python
+                rows, total_rows = eval_helpers.apply_row_selection(
+                    all_rows,
+                    eval_root_ids,
+                    req.require_intersection,
+                    req.offset,
+                    req.limit,
+                )
+            else:
+                rows = all_rows
+
+            if rows and req.include_raw_data_rows and req.resolve_row_refs:
+                unresolved = [
+                    r.row_digest for r in rows if isinstance(r.raw_data_row, str)
+                ]
+                if unresolved:
+                    warnings.append(
+                        "Failed to resolve dataset row refs; raw_data_row may contain refs"
+                    )
+
+        return tsi.EvalResultsQueryRes(
+            rows=rows, total_rows=total_rows, summary=summary, warnings=warnings
+        )
+
+    def _table_rows_read_batch(
+        self, project_id: str, digests: list[str]
+    ) -> dict[str, Any]:
+        """Batch read table_rows by digest. Returns {digest: parsed_val}."""
+        if len(digests) == 0:
+            return {}
+
+        pb = ParamBuilder()
+        sql = make_table_rows_read_batch_query(project_id, digests, pb)
+        result = self._query(sql, pb.get_params())
+        out: dict[str, Any] = {}
+        for row in result.result_rows:
+            d, val_dump = row[0], row[1]
+            parsed = try_parse_json(val_dump)
+            if parsed is not None:
+                out[d] = parsed
+        return out
 
     @staticmethod
     def _read_with_retry(
@@ -5983,8 +6130,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return tsi.CompletionsCreateRes(response=res.response)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
-            req.project_id, self._mint_client
+            req.project_id,
+            self.ch_client,
         )
+        retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
         req.inputs.messages = initial_messages
         call_id = generate_id()
@@ -6020,7 +6169,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 exception=exception,
                 wb_user_id=req.wb_user_id,
             )
-            ch_call = complete_call_to_ch_insertable(completed)
+            ch_call = complete_call_to_ch_insertable(completed, retention_days)
             self._insert_call_complete(ch_call)
         else:
             # Write to call_parts/calls_merged via start/end pattern
@@ -6039,7 +6188,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 },
                 attributes={},
             )
-            start_call = start_call_for_insert_to_ch_insertable(start)
+            start_call = start_call_for_insert_to_ch_insertable(start, retention_days)
             end = tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=start_call.id,
@@ -6049,7 +6198,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             if exception:
                 end.exception = exception
-            end_call = end_call_for_insert_to_ch_insertable(end)
+            end_call = end_call_for_insert_to_ch_insertable(end, retention_days)
             calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
                 start_call,
                 end_call,
@@ -6125,10 +6274,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
         write_target: WriteTarget | None = None
+        retention_days: int | None = None
         if req.track_llm_call:
             write_target = self.table_routing_resolver.resolve_v2_write_target(
-                req.project_id, self._mint_client
+                req.project_id,
+                self.ch_client,
             )
+            retention_days = get_project_retention_days(req.project_id, self.ch_client)
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
             tracked_inputs = req.inputs.model_dump(
@@ -6151,7 +6303,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 inputs=tracked_inputs,
                 attributes={},
             )
-            start_call = start_call_for_insert_to_ch_insertable(start)
+            start_call = start_call_for_insert_to_ch_insertable(start, retention_days)
             # Insert immediately so that callers can see the call in progress
             if write_target == WriteTarget.CALLS_COMPLETE:
                 ch_complete_start = start_call_insertable_to_complete_start(start_call)
@@ -6193,12 +6345,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     started_at=start_call.started_at,
                 )
             )
+
+        assert retention_days is not None  # narrowed by track_llm_call guard above
         return _create_tracked_stream_wrapper(
             self._insert_call,
             chunk_iter,
             start_call,
             model_name,
             req.project_id,
+            retention_days,
             end_call_handler=end_call_handler,
         )
 
@@ -6273,6 +6428,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Capture all input fields for call tracking
         input_data = req.inputs.model_dump(exclude_none=False)
+        retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
@@ -6282,7 +6438,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             inputs=input_data,
             attributes={},
         )
-        start_call = start_call_for_insert_to_ch_insertable(start)
+        start_call = start_call_for_insert_to_ch_insertable(start, retention_days)
 
         end = tsi.EndedCallSchemaForInsert(
             project_id=req.project_id,
@@ -6298,7 +6454,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if "error" in res.response:
             end.exception = res.response["error"]
 
-        end_call = end_call_for_insert_to_ch_insertable(end)
+        end_call = end_call_for_insert_to_ch_insertable(end, retention_days)
         calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
             start_call,
             end_call,
@@ -6360,8 +6516,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def ch_client(self) -> CHClient:
         """Returns a thread-local clickhouse client.
 
-        Each thread gets its own client instance to avoid session conflicts,
-        but all clients share the same underlying connection pool via _CH_POOL_MANAGER.
+        Each thread gets its own client instance; all clients share the
+        same underlying connection pool via _CH_POOL_MANAGER.
         """
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
@@ -6378,7 +6534,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._database_ensured = True
 
     def _mint_client(self) -> CHClient:
-        """Create a new ClickHouse client using the shared pool manager."""
+        """Create a new ClickHouse client using the shared pool manager.
+
+        autogenerate_session_id=False: weave-trace uses no session features,
+        and the default collides on overlapping queries with SESSION_IS_LOCKED
+        (code 373). See PR #6655.
+        """
         client = clickhouse_connect.get_client(
             host=self._host,
             port=self._port,
@@ -6386,30 +6547,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             password=self._password,
             secure=self._port == CLICKHOUSE_SECURE_PORT,
             pool_mgr=_CH_POOL_MANAGER,
+            autogenerate_session_id=False,
         )
         self._ensure_database(client)
         client.database = self._database
         return client
-
-    @contextmanager
-    def with_new_client(self) -> Iterator[None]:
-        """Context manager to use a new client for operations.
-        Each call gets a fresh client with its own clickhouse session ID.
-
-        Usage:
-        ```
-        with self.with_new_client():
-            self.feedback_query(req)
-        ```
-        """
-        client = self._mint_client()
-        original_client = self.ch_client
-        self._thread_local.ch_client = client
-        try:
-            yield
-        finally:
-            self._thread_local.ch_client = original_client
-            client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(
@@ -6933,6 +7075,7 @@ def _create_tracked_stream_wrapper(
     start_call: CallStartCHInsertable,
     model_name: str,
     project_id: str,
+    retention_days: int,
     end_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Create a wrapper that tracks streaming completion and emits call records."""
@@ -7037,7 +7180,7 @@ def _create_tracked_stream_wrapper(
             if end_call_handler is not None:
                 end_call_handler(end)
             else:
-                end_call_ch = end_call_for_insert_to_ch_insertable(end)
+                end_call_ch = end_call_for_insert_to_ch_insertable(end, retention_days)
                 insert_call(end_call_ch)
 
     return _stream_wrapper()

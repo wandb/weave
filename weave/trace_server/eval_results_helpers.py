@@ -14,6 +14,11 @@ from collections.abc import Callable, Iterable
 from typing import Any, TypeVar
 
 from weave.shared import refs_internal as ri
+from weave.shared.digest import str_digest
+from weave.trace_server import constants
+from weave.trace_server import trace_server_common as tsc
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import InvalidRequest
 
 try:
     import ddtrace
@@ -21,6 +26,13 @@ except ImportError:
     ddtrace = None  # type: ignore[assignment]
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+_SUPPORTED_SORT_PREFIXES = (
+    "scores.",
+    "inputs.",
+    "output.",
+)
+_NUMERIC_SORT_PREFIXES = ("scores.",)
 
 
 def _trace_wrap(name: str) -> Callable[[F], F]:
@@ -33,11 +45,6 @@ def _trace_wrap(name: str) -> Callable[[F], F]:
 
     return decorator  # type: ignore[return-value]
 
-
-from weave.shared.digest import str_digest
-from weave.trace_server import constants
-from weave.trace_server import trace_server_common as tsc
-from weave.trace_server import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
 
@@ -89,8 +96,9 @@ def filter_predict_and_score_calls(
         call
         for call in calls
         if call.parent_id in eval_root_set
-        and tsc.op_name_matches(
-            call.op_name, constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME
+        and any(
+            tsc.op_name_matches(call.op_name, variant)
+            for variant in constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES
         )
     ]
 
@@ -142,6 +150,53 @@ def apply_resolved_refs_to_rows(
     ):
         if val is not None and row_digest in row_lookup:
             row_lookup[row_digest].raw_data_row = val
+
+
+def resolve_eval_inputs(
+    calls: list[tsi.CallSchema],
+    eval_root_ids: list[str],
+    table_rows_reader: Callable[[list[str]], dict[str, Any]],
+) -> None:
+    """Resolve dataset-backed inputs on predict-and-score calls in-place.
+
+    For each predict-and-score call whose inputs.example is a dataset ref
+    string, batch-lookup the actual row data via table_rows_reader and
+    replace the ref string with the resolved dict.
+
+    Args:
+        calls: All calls in the eval subtree.
+        eval_root_ids: Eval root call IDs (to identify predict-and-score calls).
+        table_rows_reader: Callback that takes a list of digests and returns
+            {digest: parsed_val}. Provided by the server's table_rows lookup.
+    """
+    eval_root_set = frozenset(eval_root_ids)
+    digests_to_resolve: set[str] = set()
+    for call in calls:
+        if call.parent_id not in eval_root_set:
+            continue
+        if not isinstance(call.inputs, dict):
+            continue
+        example = call.inputs.get("example")
+        if isinstance(example, str):
+            digest, was_ref = extract_row_digest_from_example(example)
+            if was_ref:
+                digests_to_resolve.add(digest)
+
+    if len(digests_to_resolve) == 0:
+        return
+
+    resolved_map = table_rows_reader(list(digests_to_resolve))
+
+    for call in calls:
+        if call.parent_id not in eval_root_set:
+            continue
+        if not isinstance(call.inputs, dict):
+            continue
+        example = call.inputs.get("example")
+        if isinstance(example, str):
+            digest, was_ref = extract_row_digest_from_example(example)
+            if was_ref and digest in resolved_map:
+                call.inputs["example"] = resolved_map[digest]
 
 
 def extract_row_digest_from_example(example: Any) -> tuple[str, bool]:
@@ -232,6 +287,47 @@ def best_effort_scorer_call_ids(
     return result
 
 
+def _build_trial(
+    predict_and_score_call: tsi.CallSchema,
+    child_by_parent: dict[str, list[tsi.CallSchema]],
+) -> tsi.EvalResultsTrial:
+    """Build a single EvalResultsTrial from a predict-and-score call."""
+    output = (
+        predict_and_score_call.output
+        if isinstance(predict_and_score_call.output, dict)
+        else {}
+    )
+    scores = output.get("scores", {})
+    trial_children = child_by_parent.get(predict_and_score_call.id, [])
+    model_ref = (
+        predict_and_score_call.inputs.get("model")
+        if isinstance(predict_and_score_call.inputs, dict)
+        else None
+    )
+    predict_call = select_predict_call(trial_children, model_ref)
+    latency_seconds = None
+    if predict_call and predict_call.started_at and predict_call.ended_at:
+        latency_seconds = (
+            predict_call.ended_at - predict_call.started_at
+        ).total_seconds()
+    elif isinstance(output.get("model_latency"), dict):
+        mean_latency = output["model_latency"].get("mean")
+        if isinstance(mean_latency, (int, float)):
+            latency_seconds = float(mean_latency)
+
+    return tsi.EvalResultsTrial(
+        predict_and_score_call_id=predict_and_score_call.id,
+        predict_call_id=predict_call.id if predict_call else None,
+        model_output=output.get("output"),
+        scores=scores,
+        model_latency_seconds=latency_seconds,
+        total_tokens=extract_total_tokens(
+            predict_call.summary if predict_call else predict_and_score_call.summary
+        ),
+        scorer_call_ids=best_effort_scorer_call_ids(scores, trial_children),
+    )
+
+
 @_trace_wrap("eval_results_helpers.build_eval_rows_from_calls")
 def build_eval_rows_from_calls(
     predict_and_score_calls: list[tsi.CallSchema],
@@ -249,13 +345,13 @@ def build_eval_rows_from_calls(
     row_map: dict[str, tsi.EvalResultsRow] = {}
     row_eval_map: dict[str, dict[str, tsi.EvalResultsRowEvaluation]] = defaultdict(dict)
 
-    for pas_call in predict_and_score_calls:
-        eval_call_id = pas_call.parent_id
+    for predict_and_score_call in predict_and_score_calls:
+        eval_call_id = predict_and_score_call.parent_id
         if eval_call_id is None:
             continue
         example = (
-            pas_call.inputs.get("example")
-            if isinstance(pas_call.inputs, dict)
+            predict_and_score_call.inputs.get("example")
+            if isinstance(predict_and_score_call.inputs, dict)
             else None
         )
         row_digest, _ = extract_row_digest_from_example(example)
@@ -275,39 +371,7 @@ def build_eval_rows_from_calls(
             eval_entry = tsi.EvalResultsRowEvaluation(evaluation_call_id=eval_call_id)
             row_eval_map[row_digest][eval_call_id] = eval_entry
 
-        output = pas_call.output if isinstance(pas_call.output, dict) else {}
-        scores = output.get("scores") if isinstance(output.get("scores"), dict) else {}
-        trial_children = child_by_parent.get(pas_call.id, [])
-        model_ref = (
-            pas_call.inputs.get("model") if isinstance(pas_call.inputs, dict) else None
-        )
-        predict_call = select_predict_call(trial_children, model_ref)
-        latency_seconds = None
-        if predict_call and predict_call.started_at and predict_call.ended_at:
-            latency_seconds = (
-                predict_call.ended_at - predict_call.started_at
-            ).total_seconds()
-        elif isinstance(output.get("model_latency"), dict):
-            model_latency = output.get("model_latency", {})
-            mean_latency = model_latency.get("mean")
-            if isinstance(mean_latency, (int, float)):
-                latency_seconds = float(mean_latency)
-
-        eval_entry.trials.append(
-            tsi.EvalResultsTrial(
-                predict_and_score_call_id=pas_call.id,
-                predict_call_id=predict_call.id if predict_call else None,
-                model_output=output.get("output"),
-                scores=scores,
-                model_latency_seconds=latency_seconds,
-                total_tokens=extract_total_tokens(
-                    predict_call.summary if predict_call else pas_call.summary
-                ),
-                scorer_call_ids=best_effort_scorer_call_ids(
-                    scores if isinstance(scores, dict) else {}, trial_children
-                ),
-            )
-        )
+        eval_entry.trials.append(_build_trial(predict_and_score_call, child_by_parent))
 
     return row_map, row_eval_map
 
@@ -328,6 +392,66 @@ def finalize_rows(
     rows = list(row_map.values())
 
     return apply_row_selection(rows, eval_root_ids, require_intersection, offset, limit)
+
+
+@_trace_wrap("eval_results_helpers.build_eval_rows")
+def build_eval_rows(
+    page_calls: list[tsi.CallSchema],
+    eval_root_ids: list[str],
+    digest_by_call: dict[str, str],
+    include_raw_data_rows: bool,
+    include_predict_and_score_children: bool,
+) -> list[tsi.EvalResultsRow]:
+    """Build eval result rows from CTE-paginated calls with precomputed metadata.
+
+    Uses digest_by_call instead of recomputing row_digest from call inputs.
+    Rows are returned in the order they appear in page_calls (SQL ORDER BY row_order).
+    """
+    predict_and_score_calls = filter_predict_and_score_calls(page_calls, eval_root_ids)
+    if not predict_and_score_calls:
+        return []
+
+    if include_predict_and_score_children:
+        predict_and_score_set = {c.id for c in predict_and_score_calls}
+        child_calls = [c for c in page_calls if c.parent_id in predict_and_score_set]
+        child_by_parent = build_child_by_parent(child_calls)
+    else:
+        child_by_parent = {}
+
+    row_map: dict[str, tsi.EvalResultsRow] = {}
+    row_eval_map: dict[str, dict[str, tsi.EvalResultsRowEvaluation]] = defaultdict(dict)
+
+    for predict_and_score_call in predict_and_score_calls:
+        eval_call_id = predict_and_score_call.parent_id
+        if eval_call_id is None:
+            continue
+
+        row_digest = digest_by_call.get(predict_and_score_call.id)
+        if row_digest is None:
+            continue
+
+        if row_digest not in row_map:
+            raw_data_row = None
+            if include_raw_data_rows and isinstance(
+                predict_and_score_call.inputs, dict
+            ):
+                raw_data_row = predict_and_score_call.inputs.get("example")
+            row_map[row_digest] = tsi.EvalResultsRow(
+                row_digest=row_digest, raw_data_row=raw_data_row
+            )
+
+        eval_entry = row_eval_map[row_digest].get(eval_call_id)
+        if eval_entry is None:
+            eval_entry = tsi.EvalResultsRowEvaluation(evaluation_call_id=eval_call_id)
+            row_eval_map[row_digest][eval_call_id] = eval_entry
+
+        eval_entry.trials.append(_build_trial(predict_and_score_call, child_by_parent))
+
+    for row_digest, eval_entries in row_eval_map.items():
+        if row_digest in row_map:
+            row_map[row_digest].evaluations = list(eval_entries.values())
+
+    return list(row_map.values())
 
 
 def apply_row_selection(
@@ -428,6 +552,31 @@ def fetch_eval_root_metadata(
         columns=["id", "inputs", "display_name", "trace_id", "started_at"],
     )
     return extract_eval_root_metadata_from_calls(server.calls_query_stream(root_req))
+
+
+def validate_eval_results_request(req: tsi.EvalResultsQueryReq) -> None:
+    """Validate incoming eval_results request.
+
+    Raises InvalidRequest for:
+    - Unsupported sort field prefixes
+    - difference mode on non-numeric fields
+    """
+    if req.sort_by:
+        for s in req.sort_by:
+            if not any(
+                s.field.startswith(p) or s.field == p for p in _SUPPORTED_SORT_PREFIXES
+            ):
+                raise InvalidRequest(
+                    f"Unsupported sort field: '{s.field}'. "
+                    f"Supported: scores.*, inputs.*, output.*."
+                )
+            if s.mode == "difference" and not any(
+                s.field.startswith(p) or s.field == p for p in _NUMERIC_SORT_PREFIXES
+            ):
+                raise InvalidRequest(
+                    f"mode='difference' only supports numeric fields "
+                    f"(scores.*), got '{s.field}'."
+                )
 
 
 @_trace_wrap("eval_results_helpers.eval_results_query")

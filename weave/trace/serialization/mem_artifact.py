@@ -111,7 +111,14 @@ class MemTraceFilesArtifact:
         if path not in self.path_contents:
             raise FileNotFoundError(path)
 
-        self.temp_read_dir = tempfile.TemporaryDirectory()
+        # Reuse a single tempdir per artifact so repeat `path()` calls don't
+        # orphan a prior TemporaryDirectory whose finalizer fires via GC.
+        # `ignore_cleanup_errors` (Python 3.10+) swallows Windows
+        # PermissionError when a consumer still holds the file open
+        # (e.g. PIL.Image.open, wave.open, VideoFileClip), which otherwise
+        # surfaces as PytestUnraisableExceptionWarning during finalization.
+        if self.temp_read_dir is None:
+            self.temp_read_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         write_path = _safe_join(self.temp_read_dir.name, filename or path)
         os.makedirs(os.path.dirname(write_path), exist_ok=True)
         with open(write_path, "wb") as f:
@@ -126,7 +133,7 @@ class MemTraceFilesArtifact:
 
     @contextlib.contextmanager
     def writeable_file_path(self, path: str) -> Generator[str]:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             full_path = _safe_join(tmpdir, path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             yield full_path

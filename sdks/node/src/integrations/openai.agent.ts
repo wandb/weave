@@ -188,10 +188,81 @@ interface CallData {
 
 // Global map to store Weave call data for OpenAI Agent spans/traces
 // This allows the OpenAI SDK integration to look up parent call information
-const globalWeaveCallDataMap = new Map<
+// Uses globalThis + Symbol.for to ensure a single shared Map instance across
+// CJS and ESM module boundaries (the module can be loaded twice by different loaders).
+const globalWeaveCallDataMap: Map<
   string,
   {weaveCallId: string; weaveTraceId: string}
->();
+> =
+  (globalThis as any)[Symbol.for('_weave_call_data_map')] ||
+  ((globalThis as any)[Symbol.for('_weave_call_data_map')] = new Map());
+
+// ============================================================================
+// Agent Context Provider
+// ============================================================================
+//
+// We need getCurrentTrace()/getCurrentSpan() from @openai/agents at lookup time
+// (when an OpenAI SDK call like responses.create fires) to link it into the
+// agent trace. However, we must NOT load @openai/agents at lookup time.
+//
+// Why: When @openai/agents is loaded across CJS/ESM module boundaries, Node.js
+// may create a separate module instance. Each instance runs its top-level init
+// code, which calls setDefaultOpenAITracingExporter() → setTraceProcessors(),
+// resetting all registered TracingProcessors. This shuts down the active Weave
+// processor and wipes its in-flight trace data mid-run.
+//
+// Solution: Capture getCurrentTrace/getCurrentSpan once during instrumentation
+// hook time (registerAgentContextProvider) and expose Weave-scoped wrappers.
+// Consumers interact only with these wrappers, never loading @openai/agents
+// directly. The backing store lives in globalThis so it is shared regardless
+// of how this module itself is loaded (CJS or ESM).
+//
+// In a mixed CJS/ESM environment (e.g. --import=weave/instrument with an ESM
+// host app), the ESM hook fires first, so the captured functions typically pin
+// to the ESM module instance. In a pure CJS host app, only the CJS hook fires
+// and the functions come from the CJS instance.
+// ============================================================================
+
+/** Internal store — shared across module boundaries via globalThis. */
+const _agentContextProvider: {
+  getCurrentTrace?: () => any;
+  getCurrentSpan?: () => any;
+} =
+  (globalThis as any)[Symbol.for('_weave_agent_context_provider')] ||
+  ((globalThis as any)[Symbol.for('_weave_agent_context_provider')] = {});
+
+/**
+ * Register the OpenAI Agents context functions.
+ * Called during instrumentation when @openai/agents is loaded (via CJS or ESM hook).
+ */
+function registerAgentContextProvider(agentExports: any): void {
+  if (typeof agentExports.getCurrentTrace === 'function') {
+    _agentContextProvider.getCurrentTrace = agentExports.getCurrentTrace;
+  }
+  if (typeof agentExports.getCurrentSpan === 'function') {
+    _agentContextProvider.getCurrentSpan = agentExports.getCurrentSpan;
+  }
+}
+
+/**
+ * Get the current OpenAI Agents trace, if available.
+ * Returns null when not inside an agent run or when @openai/agents is not instrumented.
+ */
+function getCurrentTrace(): any | null {
+  return _agentContextProvider.getCurrentTrace?.() ?? null;
+}
+
+/**
+ * Get the current OpenAI Agents span, if available.
+ * Returns null when not inside an agent run or when @openai/agents is not instrumented.
+ */
+function getCurrentSpan(): any | null {
+  return _agentContextProvider.getCurrentSpan?.() ?? null;
+}
+
+// ============================================================================
+// Public helpers
+// ============================================================================
 
 /**
  * Get Weave call data for an OpenAI Agent span or trace by its ID
@@ -213,18 +284,12 @@ export function getWeaveCallDataForAgent(
  * @returns CallStack with parent set to the current agent call, or null if not available
  */
 export function getCallStackFromOpenAIAgents(): any | null {
-  let agents: any;
-  try {
-    // Try to dynamically require @openai/agents - it may not be installed
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    agents = require('@openai/agents');
-  } catch (e) {
-    // @openai/agents not installed - silently return null
+  const currentTrace = getCurrentTrace();
+  const currentSpan = getCurrentSpan();
+
+  if (!currentTrace && !currentSpan) {
     return null;
   }
-
-  const currentTrace = agents.getCurrentTrace?.();
-  const currentSpan = agents.getCurrentSpan?.();
 
   // Try span first (more specific), then trace
   // Support both camelCase (class getters) and snake_case (JSON serialized)
@@ -515,6 +580,9 @@ export class WeaveTracingProcessor implements TracingProcessor {
     // Finish any unfinished calls
     this.finishUnfinishedCalls('interrupted');
     this.cleanup();
+    // Allow re-registration if the processor is shut down externally
+    // (e.g., when @openai/agents calls setTraceProcessors during CJS module init)
+    _agentsInstrumented = false;
   }
 
   /**
@@ -692,6 +760,10 @@ export async function instrumentOpenAIAgents(): Promise<boolean> {
 let _agentsInstrumented = false;
 
 export function instrumentOpenAIAgentsCommon(exports: any): boolean {
+  // Always capture context functions when available — even if already instrumented,
+  // because a later module load may provide fresh references after a processor reset.
+  registerAgentContextProvider(exports);
+
   if (_agentsInstrumented) {
     return true;
   }

@@ -68,7 +68,7 @@ class WriteTarget(str, Enum):
     CALLS_COMPLETE = "calls_complete"
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class TableConfig:
     """Centralized configuration for table-specific SQL generation.
 
