@@ -2,7 +2,16 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from weave.trace_server import redis_client
+
+
+@pytest.fixture(autouse=True)
+def clear_cached_redis_client():
+    redis_client.get_redis_client.cache_clear()
+    yield
+    redis_client.get_redis_client.cache_clear()
 
 
 def test_no_url_returns_none(monkeypatch):
