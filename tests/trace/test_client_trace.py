@@ -495,12 +495,6 @@ def get_all_calls_asserting_finished(
     return res
 
 
-def flush_and_settle(client: ClientType) -> None:
-    client.flush()
-    time.sleep(0.2)
-    client.flush()
-
-
 def test_trace_call_query_filter_input_object_version_refs(client):
     call_spec = simple_line_call_bootstrap()
 
@@ -907,7 +901,9 @@ def test_trace_call_query_filter_trace_roots_only(client, no_autoflush):
         assert len(inner_res.calls) == exp_count
 
 
-@pytest.mark.flaky(reruns=3)
+# Flaky against ClickHouse in CI: read-after-write visibility lag means a
+# calls_query right after flush can miss just-written rows. Rerun to absorb it.
+@pytest.mark.flaky(reruns=2)
 def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
@@ -927,7 +923,7 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
     ):
         call_spec_2 = simple_line_call_bootstrap()
     call_spec_3 = simple_line_call_bootstrap()
-    flush_and_settle(client)
+    client.flush()
 
     total_calls = (
         call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls
@@ -953,18 +949,20 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
         assert len(inner_res.calls) == exp_count
 
 
-@pytest.mark.flaky(reruns=3)
+# Flaky against ClickHouse in CI: read-after-write visibility lag means a
+# calls_query right after flush can miss just-written rows. Rerun to absorb it.
+@pytest.mark.flaky(reruns=2)
 def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush):
     call_spec_1 = simple_line_call_bootstrap()
-    flush_and_settle(client)
+    client.flush()
 
     trace_server.set_user_id("second_user")
     call_spec_2 = simple_line_call_bootstrap()
-    flush_and_settle(client)
+    client.flush()
 
     trace_server.set_user_id("third_user")
     call_spec_3 = simple_line_call_bootstrap()
-    flush_and_settle(client)
+    client.flush()
 
     for wb_user_ids, exp_count in [
         (
