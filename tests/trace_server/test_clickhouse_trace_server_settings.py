@@ -48,6 +48,16 @@ def test_clickhouse_default_query_settings_include_estimated_runtime_guards(
         assert settings["max_estimated_execution_time"] == 12
         assert settings["timeout_before_checking_execution_speed"] == 3
 
+        # Command paths keep the base defaults without read-query prediction.
+        command_settings = settings_module.merge_default_command_settings(
+            {"allow_experimental_lightweight_update": 1}
+        )
+        assert command_settings["max_execution_time"] == 30
+        assert command_settings["allow_experimental_lightweight_update"] == 1
+        assert "max_estimated_execution_time" not in command_settings
+        assert "timeout_before_checking_execution_speed" not in command_settings
+        assert "timeout_overflow_mode" not in command_settings
+
         # Operators can disable the estimated-time guard entirely.
         monkeypatch.setenv("WF_CLICKHOUSE_DISABLE_QUERY_FAILURE_PREDICTION", "true")
         settings_module = importlib.reload(ch_settings)
