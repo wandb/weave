@@ -1938,6 +1938,36 @@ class CallsScoreRes(BaseModel):
     pass
 
 
+class JobDetails(BaseModelStrict):
+    """Details about a job's progress."""
+
+    id: str
+    total_items: int
+    successful_items: int
+    failed_items: int
+    created_at: str
+    canceled_at: str | None = None
+
+
+class JobsListReq(BaseModelStrict):
+    project_id: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class JobsListRes(BaseModel):
+    jobs: list[JobDetails]
+
+
+class JobCancelReq(BaseModelStrict):
+    project_id: str
+    job_id: str
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class JobCancelRes(BaseModel):
+    job: JobDetails
+
+
 class OpCreateBody(BaseModel):
     """Request body for creating an Op object via REST API.
 
@@ -3007,6 +3037,10 @@ class TraceServerInterface(Protocol):
 
     # Scoring API
     def calls_score(self, req: CallsScoreReq) -> CallsScoreRes: ...
+
+    # Job API
+    def jobs_list(self, req: JobsListReq) -> JobsListRes: ...
+    def job_cancel(self, req: JobCancelReq) -> JobCancelRes: ...
 
 
 class ObjectInterface(Protocol):

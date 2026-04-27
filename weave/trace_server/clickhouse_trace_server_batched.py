@@ -175,6 +175,7 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.job_manager import JobManager
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
@@ -6510,6 +6511,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self.kafka_producer.produce_score_calls(req)
 
         return tsi.CallsScoreRes()
+
+    def jobs_list(self, req: tsi.JobsListReq) -> tsi.JobsListRes:
+        """List all jobs for a project/user.
+
+        A job tracks the progress of a long-running server-side operation
+        (e.g. batch scoring). State is stored in Redis with a 1-hour TTL.
+        """
+        job_manager = JobManager(req.project_id, req.wb_user_id)
+        jobs = job_manager.list_jobs()
+        return tsi.JobsListRes(jobs=jobs)
+
+    def job_cancel(self, req: tsi.JobCancelReq) -> tsi.JobCancelRes:
+        """Cancel a running job by setting its canceled_at timestamp.
+
+        Workers polling this job are expected to check the canceled_at
+        field and stop processing.
+        """
+        job_manager = JobManager(req.project_id, req.wb_user_id)
+        job = job_manager.cancel_job(req.job_id)
+        if job is None:
+            raise ValueError(f"Job {req.job_id} not found")
+        return tsi.JobCancelRes(job=job)
 
     # Private Methods
     @property
