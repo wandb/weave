@@ -4537,9 +4537,11 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
         project_id=client.project_id,
         user_input=[],
         config=None,
-        assistant_name="MathBot",
-        topic="mathematics",
-        question="What is 2+2?",
+        template_vars={
+            "assistant_name": "MathBot",
+            "topic": "mathematics",
+            "question": "What is 2+2?",
+        },
     )
 
     # Verify the request has prompt reference and template_vars
@@ -4564,9 +4566,11 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
         project_id=client.project_id,
         user_input=[{"role": "user", "content": "Additional context"}],
         config=None,
-        assistant_name="MathBot",
-        topic="mathematics",
-        question="What is 2+2?",
+        template_vars={
+            "assistant_name": "MathBot",
+            "topic": "mathematics",
+            "question": "What is 2+2?",
+        },
     )
 
     # Should still have prompt and template_vars

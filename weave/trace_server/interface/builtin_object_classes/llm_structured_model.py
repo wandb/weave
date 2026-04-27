@@ -164,7 +164,7 @@ class LLMStructuredCompletionModel(Model):
             project_id=to_project_id(current_client.entity, current_client.project),
             user_input=user_input,
             config=config,
-            **template_vars,
+            template_vars=template_vars,
         )
 
         # 5. Call the LLM API
@@ -199,8 +199,12 @@ class LLMStructuredCompletionModel(Model):
         project_id: str,
         user_input: MessageListLike,
         config: LLMStructuredModelParamsLike | None,
-        **template_vars: Any,
+        template_vars: dict[str, Any] | None = None,
     ) -> CompletionsCreateReq:
+        # template_vars is a dict (not **kwargs) so that user-defined variable names
+        # like "config" or "project_id" can't collide with this method's reserved kwargs.
+        template_vars = template_vars or {}
+
         # Ensure user_input is properly converted to a list of Message objects
         # This is needed because the @op decorator might interfere with Pydantic validation
         if not isinstance(user_input, list) or (
