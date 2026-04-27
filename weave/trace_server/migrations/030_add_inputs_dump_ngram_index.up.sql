@@ -17,7 +17,7 @@
 -- uncoverable by the index, including short quoted string values from
 -- `_create_like_pattern_for_value` like `"hi"` (4 chars). n=5 keeps
 -- ~4-char values covered once the surrounding `"` quotes are included
--- (`"hi"` is 4 chars, below; `"abcd"` is 6, above) while still roughly
+-- (`"hi"` is 4 chars, below, `"abcd"` is 6, above) while still roughly
 -- halving the token space vs n=4.
 ALTER TABLE calls_merged
     ADD INDEX IF NOT EXISTS idx_inputs_dump_ngram
