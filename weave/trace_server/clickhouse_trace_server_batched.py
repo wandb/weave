@@ -5356,7 +5356,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.FileContentReadRes:
         """Read file content with retry for ClickHouse eventual consistency."""
         return self._read_with_retry(
-            lambda: self.file_content_read(req), max_attempts=max_attempts
+            lambda: self._file_content_read_once(req), max_attempts=max_attempts
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
@@ -5766,6 +5766,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return True
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        return self._file_content_read_with_retry(req)
+
+    def _file_content_read_once(
+        self, req: tsi.FileContentReadReq
+    ) -> tsi.FileContentReadRes:
         pb = ParamBuilder()
         query = make_file_content_read_query(
             project_id=req.project_id,
