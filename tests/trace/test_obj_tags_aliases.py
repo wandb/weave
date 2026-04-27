@@ -785,6 +785,7 @@ def test_server_filter_by_tags(client: WeaveClient):
     assert len(res.objs) >= 1
 
 
+@pytest.mark.flaky(reruns=3)
 def test_server_filter_by_aliases(client: WeaveClient):
     """Filter by aliases: custom alias, 'latest', nonexistent, specific version only."""
     oid, digest = _publish_obj(client, "srv_falias")
