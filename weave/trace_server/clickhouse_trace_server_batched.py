@@ -1865,6 +1865,114 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return obj_results
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        return self._obj_read_with_retry(req, max_attempts=OBJ_READ_RETRY_ATTEMPTS)
+
+    def _obj_read_miss_diagnostics(self, req: tsi.ObjReadReq) -> dict[str, Any]:
+        """Return counts that distinguish stale reads from malformed refs."""
+        pb = ParamBuilder()
+        project_id = pb.add(req.project_id, "project_id", "String")
+        object_id = pb.add(req.object_id, "object_id", "String")
+        digest = pb.add(req.digest, "digest", "String")
+        query = f"""
+            SELECT
+                count() AS candidate_rows,
+                countIf(
+                    project_id = {project_id}
+                    AND object_id = {object_id}
+                    AND digest = {digest}
+                ) AS exact_rows,
+                countIf(
+                    project_id = {project_id}
+                    AND object_id = {object_id}
+                ) AS project_object_rows,
+                countIf(
+                    project_id = {project_id}
+                    AND digest = {digest}
+                ) AS project_digest_rows,
+                countIf(
+                    object_id = {object_id}
+                    AND digest = {digest}
+                ) AS object_digest_rows,
+                countIf(
+                    project_id = {project_id}
+                    AND object_id = {object_id}
+                    AND digest = {digest}
+                    AND deleted_at IS NOT NULL
+                ) AS exact_deleted_rows,
+                anyIf(project_id, object_id = {object_id} AND digest = {digest})
+                    AS example_project_for_object_digest,
+                anyIf(object_id, project_id = {project_id} AND digest = {digest})
+                    AS example_object_for_project_digest,
+                anyIf(digest, project_id = {project_id} AND object_id = {object_id})
+                    AS example_digest_for_project_object
+            FROM object_versions
+            WHERE
+                (project_id = {project_id} AND object_id = {object_id})
+                OR (project_id = {project_id} AND digest = {digest})
+                OR (object_id = {object_id} AND digest = {digest})
+        """
+        result = self._query(query, pb.get_params())
+        row = result.result_rows[0]
+        return {
+            "candidate_rows": row[0],
+            "exact_rows": row[1],
+            "project_object_rows": row[2],
+            "project_digest_rows": row[3],
+            "object_digest_rows": row[4],
+            "exact_deleted_rows": row[5],
+            "example_project_for_object_digest": row[6] or None,
+            "example_object_for_project_digest": row[7] or None,
+            "example_digest_for_project_object": row[8] or None,
+        }
+
+    def _log_obj_read_miss(
+        self,
+        req: tsi.ObjReadReq,
+        *,
+        attempt: int,
+        max_attempts: int,
+        elapsed_ms: float,
+        error: NotFoundError,
+    ) -> None:
+        try:
+            diagnostics = self._obj_read_miss_diagnostics(req)
+        except Exception as diagnostics_error:
+            diagnostics = {"diagnostics_error": str(diagnostics_error)}
+
+        will_retry = attempt < max_attempts
+        logger.info(
+            "clickhouse_obj_read_not_found "
+            "attempt=%s/%s will_retry=%s project_id=%s object_id=%s digest=%s "
+            "elapsed_ms=%s database=%s async_insert=%s flush_immediately=%s "
+            "diagnostics=%s",
+            attempt,
+            max_attempts,
+            will_retry,
+            req.project_id,
+            req.object_id,
+            req.digest,
+            elapsed_ms,
+            self._database,
+            self._use_async_insert,
+            self._flush_immediately,
+            diagnostics,
+            extra={
+                "attempt": attempt,
+                "max_attempts": max_attempts,
+                "will_retry": will_retry,
+                "project_id": req.project_id,
+                "object_id": req.object_id,
+                "digest": req.digest,
+                "elapsed_ms": elapsed_ms,
+                "database": self._database,
+                "async_insert": self._use_async_insert,
+                "flush_immediately": self._flush_immediately,
+                "diagnostics": diagnostics,
+                "error_str": str(error),
+            },
+        )
+
+    def _obj_read_once(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         # Check if digest is an alias name (not a hash, not version-like, not "latest")
         digest = req.digest
         resolved_digest = self._maybe_resolve_alias(
@@ -5341,12 +5449,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._obj_read_with_retry")
     def _obj_read_with_retry(
-        self, req: tsi.ObjReadReq, max_attempts: int = 2
+        self, req: tsi.ObjReadReq, max_attempts: int = OBJ_READ_RETRY_ATTEMPTS
     ) -> tsi.ObjReadRes:
         """Read an object with retry for ClickHouse eventual consistency."""
-        return self._read_with_retry(
-            lambda: self.obj_read(req), max_attempts=max_attempts
-        )
+        start = time.monotonic()
+        attempt = 0
+
+        def read_once() -> tsi.ObjReadRes:
+            nonlocal attempt
+            attempt += 1
+            try:
+                return self._obj_read_once(req)
+            except NotFoundError as e:
+                self._log_obj_read_miss(
+                    req,
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    elapsed_ms=round((time.monotonic() - start) * 1000, 1),
+                    error=e,
+                )
+                raise
+
+        return self._read_with_retry(read_once, max_attempts=max_attempts)
 
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched._file_content_read_with_retry"
