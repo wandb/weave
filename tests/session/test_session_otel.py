@@ -19,6 +19,7 @@ from weave.session.session import (
     get_current_session,
     get_current_turn,
     start_session,
+    start_tool,
 )
 from weave.session.session_otel import (
     execute_tool_attributes,
@@ -51,6 +52,7 @@ def otel_spans():
     yield exporter
     provider.shutdown()
     session_mod._tracer_provider_override = None
+
 
 # ---------------------------------------------------------------------------
 # invoke_agent_attributes
@@ -596,3 +598,49 @@ class TestErrorRecording:
         sa_spans = [s for s in spans if s.attributes.get("gen_ai.agent.name") == "sub"]
         assert len(sa_spans) == 1
         assert sa_spans[0].status.status_code == StatusCode.ERROR
+
+
+class TestStartToolSpan:
+    def test_start_tool_creates_child_of_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_session(agent_name="bot", session_id="sess-st") as s:
+            with s.start_turn() as turn:
+                with start_tool(
+                    name="get_weather",
+                    arguments='{"city":"Tokyo"}',
+                    tool_call_id="tc_1",
+                ) as t:
+                    t.result = "75F"
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name.startswith("invoke_agent")]
+        tool_spans = [sp for sp in spans if sp.name == "execute_tool get_weather"]
+        assert len(tool_spans) == 1
+        assert len(turn_spans) == 1
+        # Tool is child of Turn
+        assert tool_spans[0].parent.span_id == turn_spans[0].context.span_id
+        # Same trace
+        assert tool_spans[0].context.trace_id == turn_spans[0].context.trace_id
+        # Attributes correct
+        attrs = dict(tool_spans[0].attributes or {})
+        assert attrs["gen_ai.operation.name"] == "execute_tool"
+        assert attrs["gen_ai.tool.name"] == "get_weather"
+        assert attrs["gen_ai.conversation.id"] == "sess-st"
+        assert attrs["gen_ai.tool.call.id"] == "tc_1"
+
+
+class TestDistinctTracePerTurn:
+    def test_two_turns_have_different_trace_ids(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_session(agent_name="bot") as s:
+            with s.start_turn(user_message="first") as t1:
+                pass
+            with s.start_turn(user_message="second") as t2:
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 2
+        trace_ids = {sp.context.trace_id for sp in spans}
+        assert len(trace_ids) == 2, "Each turn should have a distinct trace_id"

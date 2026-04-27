@@ -138,11 +138,13 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
         if api_key:
             headers["authorization"] = f"Basic {api_key}"
 
-        resource = Resource.create({
-            "service.name": "weave-session-sdk",
-            "wandb.entity": entity,
-            "wandb.project": project,
-        })
+        resource = Resource.create(
+            {
+                "service.name": "weave-session-sdk",
+                "wandb.entity": entity,
+                "wandb.project": project,
+            }
+        )
         exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
         provider = TracerProvider(resource=resource)
         provider.add_span_processor(BatchSpanProcessor(exporter))

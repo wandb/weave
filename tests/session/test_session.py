@@ -24,6 +24,7 @@ from weave.session.session import (
     log_turn,
     start_llm,
     start_session,
+    start_tool,
     start_turn,
 )
 
@@ -460,6 +461,26 @@ class TestContextVars:
         assert get_current_session() is None
         assert get_current_turn() is None
         assert get_current_llm() is None
+
+
+class TestStartTool:
+    def test_returns_tool(self) -> None:
+        t = start_tool(name="search", arguments='{"q":"test"}', tool_call_id="tc_1")
+        assert isinstance(t, Tool)
+        assert t.name == "search"
+        assert t.arguments == '{"q":"test"}'
+        assert t.tool_call_id == "tc_1"
+
+    def test_context_manager(self) -> None:
+        with start_tool(name="get_weather", arguments='{"city":"Tokyo"}') as t:
+            t.result = "75F"
+        assert t.result == "75F"
+        assert t.duration_ms >= 0
+
+    def test_accepts_none_args(self) -> None:
+        t = start_tool(name="search", arguments=None, tool_call_id=None)
+        assert t.arguments == ""
+        assert t.tool_call_id == ""
 
 
 class TestBatchLogging:
