@@ -4585,3 +4585,38 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     assert req_with_input.inputs.messages == [
         {"role": "user", "content": "Additional context"}
     ]
+
+
+def test_prepare_completion_request_template_vars_with_reserved_names(client):
+    # Regression test: template_vars used to be **kwargs on prepare_completion_request,
+    # so a template variable named "config", "project_id", or "user_input" either
+    # collided with the explicit kwarg (TypeError) or got absorbed into the wrong
+    # parameter. With the explicit-dict signature these names must round-trip
+    # untouched into req.inputs.template_vars.
+    messages_prompt = MessagesPrompt(
+        messages=[{"role": "user", "content": "{config} {project_id} {user_input}"}]
+    )
+    prompt_ref = weave.publish(messages_prompt, name="reserved_name_prompt")
+
+    model = LLMStructuredCompletionModel(
+        llm_model_id="gpt-4o-mini",
+        default_params=LLMStructuredCompletionModelDefaultParams(
+            prompt=prompt_ref.uri,
+            response_format="text",
+        ),
+    )
+
+    colliding_vars = {
+        "config": "user-supplied-config",
+        "project_id": "user-supplied-project-id",
+        "user_input": "user-supplied-user-input",
+    }
+    req = model.prepare_completion_request(
+        project_id=client.project_id,
+        user_input=[],
+        config=None,
+        template_vars=colliding_vars,
+    )
+
+    assert req.inputs.template_vars == colliding_vars
+    assert req.project_id == client.project_id
