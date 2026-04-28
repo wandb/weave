@@ -484,7 +484,7 @@ class WeaveTable(Traceable):  # noqa: PLW1641
             res = make_trace_obj(res, new_ref, self.server, self.root)
             yield res
 
-    def _known_remote_row_count(self) -> int | None:
+    def _known_unfiltered_remote_row_count(self) -> int | None:
         if self._known_length is not None:
             return self._known_length
 
@@ -497,15 +497,18 @@ class WeaveTable(Traceable):  # noqa: PLW1641
 
         return None
 
-    def _should_retry_empty_page(
-        self, response: TableQueryRes, offset: int
-    ) -> bool:
+    def _has_active_filter(self) -> bool:
+        return (
+            self.filter is not None and self.filter.model_dump(exclude_none=True) != {}
+        )
+
+    def _should_retry_empty_page(self, response: TableQueryRes, offset: int) -> bool:
         if response.rows:
             return False
-        if self.filter is not None and self.filter.row_digests is not None:
+        if self._has_active_filter():
             return False
 
-        known_row_count = self._known_remote_row_count()
+        known_row_count = self._known_unfiltered_remote_row_count()
         if known_row_count is None:
             return False
 
@@ -533,6 +536,16 @@ class WeaveTable(Traceable):  # noqa: PLW1641
                 return response
 
             if attempt == max_attempts - 1:
+                logger.warning(
+                    "Table query returned an empty page for a known non-empty "
+                    "table after retries: digest=%s offset=%s "
+                    "known_row_count=%s attempts=%s filter=%s",
+                    self.table_ref.digest,
+                    offset,
+                    self._known_unfiltered_remote_row_count(),
+                    max_attempts,
+                    self.filter,
+                )
                 return response
 
             logger.debug(

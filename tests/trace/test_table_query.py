@@ -1,4 +1,6 @@
+import logging
 import random
+import time
 from collections.abc import Iterator
 
 import pytest
@@ -11,6 +13,24 @@ from weave.trace.refs import TableRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
+
+TABLE_QUERY_VISIBILITY_MAX_ATTEMPTS = 3
+TABLE_QUERY_VISIBILITY_RETRY_DELAY_SECONDS = 0.25
+
+
+def wait_for_table_query_rows(
+    client: WeaveClient, digest: str, expected_count: int
+) -> None:
+    if expected_count == 0 or client_is_sqlite(client):
+        return
+
+    req = tsi.TableQueryReq(project_id=client.project_id, digest=digest)
+    for attempt in range(TABLE_QUERY_VISIBILITY_MAX_ATTEMPTS):
+        res = client.server.table_query(req)
+        if len(res.rows) == expected_count:
+            return
+        if attempt < TABLE_QUERY_VISIBILITY_MAX_ATTEMPTS - 1:
+            time.sleep(TABLE_QUERY_VISIBILITY_RETRY_DELAY_SECONDS)
 
 
 def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):
@@ -43,6 +63,7 @@ def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):
     )
     digest = res.digest
     row_digests = res.row_digests
+    wait_for_table_query_rows(client, digest, len(data))
 
     return digest, row_digests, data
 
@@ -59,8 +80,10 @@ class _FakeTableQueryServer:
 
 def test_weave_table_retries_empty_page_when_table_is_known_non_empty(
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     monkeypatch.setattr(vals, "REMOTE_ITER_EMPTY_PAGE_RETRY_DELAY_SECONDS", 0)
+    caplog.set_level(logging.WARNING, logger=vals.logger.name)
 
     empty_response = tsi.TableQueryRes(rows=[])
     row_response = tsi.TableQueryRes(
@@ -104,6 +127,25 @@ def test_weave_table_retries_empty_page_when_table_is_known_non_empty(
     assert [request.offset for request in server.requests] == [0, 0]
     assert rows[0]["value"] == 1
 
+    # Empty filters are still unfiltered, so known non-empty metadata can retry.
+    server = _FakeTableQueryServer([empty_response, row_response])
+    table = vals.WeaveTable(
+        server=server,
+        table_ref=TableRef(
+            entity="entity",
+            project="project",
+            _digest="table-digest",
+            _row_digests=["row-1"],
+        ),
+        filter=tsi.TableRowFilter(row_digests=None),
+    )
+
+    rows = list(table.rows)
+
+    assert len(server.requests) == 2
+    assert [request.offset for request in server.requests] == [0, 0]
+    assert rows[0]["value"] == 1
+
     # Repeated empty pages stop at the retry cap and preserve the empty result.
     server = _FakeTableQueryServer([empty_response])
     table = vals.WeaveTable(
@@ -118,8 +160,9 @@ def test_weave_table_retries_empty_page_when_table_is_known_non_empty(
 
     assert list(table.rows) == []
     assert len(server.requests) == vals.REMOTE_ITER_EMPTY_PAGE_MAX_ATTEMPTS
+    assert "known non-empty table after retries" in caplog.text
 
-    # True empty tables, unknown row digests, and filtered-empty queries do not retry.
+    # True empty tables, unknown row digests, and active filtered queries do not retry.
     no_retry_cases = [
         (
             TableRef(
@@ -439,6 +482,7 @@ def generate_duplication_simple_table_data(
     )
     digest = res.digest
     row_digests = res.row_digests
+    wait_for_table_query_rows(client, digest, len(data))
 
     return {"digest": digest, "row_digests": row_digests, "data": data}
 
