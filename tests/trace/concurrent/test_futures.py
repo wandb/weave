@@ -258,6 +258,8 @@ def test_flush_waits_for_then_callback_work() -> None:
 
     release_root.set()
     assert callback_started.wait(timeout=5)
+    # The logical then-future remains tracked while callback work is running.
+    assert executor.num_outstanding_futures == 1
 
     flush_thread = threading.Thread(
         target=lambda: (executor.flush(), flush_finished.set())
