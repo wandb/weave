@@ -5,7 +5,6 @@ import io
 import logging
 import re
 import time
-from collections.abc import Callable
 from contextlib import contextmanager
 
 from tests.trace.server_utils import find_server_layer
@@ -108,7 +107,7 @@ def get_info_loglines(
 
 
 @contextmanager
-def capture_output(callbacks: list[Callable[[], None]]):
+def capture_output():
     captured_logs = io.StringIO()
 
     # Store original stdout and logging handlers
@@ -127,14 +126,28 @@ def capture_output(callbacks: list[Callable[[], None]]):
     except DummyTestException:
         pass
     finally:
-        for callback in callbacks:
-            callback()
         root_logger.handlers = old_handlers
 
 
-def flushing_callback(client):
-    def _callback():
-        client.future_executor.flush()
-        time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
+def flush_output(client):
+    client.future_executor.flush()
+    time.sleep(0.01)  # Ensure on_finish_callback has time to fire post-flush
 
-    return _callback
+
+def flush_and_wait_for_output(
+    client,
+    captured_logs: io.StringIO,
+    expected_text: str,
+    *,
+    expected_count: int = 1,
+    timeout: float = 1.0,
+) -> bool:
+    """Flush queued work and wait for output emitted by Future callbacks."""
+    deadline = time.monotonic() + timeout
+    while True:
+        client.future_executor.flush()
+        if captured_logs.getvalue().count(expected_text) >= expected_count:
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.01)
