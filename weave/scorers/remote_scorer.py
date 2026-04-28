@@ -65,9 +65,8 @@ class RemoteScorer(Scorer):
 
     @op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
-        """
-        Override for the Scorer.score function containing a more specific error.
-        
+        """Override for the Scorer.score function containing a more specific error.
+
         Not used for remote scoring; the Weave scoring worker performs the HTTP request.
         """
         raise NotImplementedError(
