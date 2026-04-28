@@ -1,4 +1,4 @@
-import {packageVersion} from './generatedVersion';
+import {packageVersion} from './packageVersion';
 
 export {packageVersion};
 

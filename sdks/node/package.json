@@ -17,11 +17,8 @@
     }
   },
   "scripts": {
-    "generate-version": "node scripts/generate-version.mjs",
-    "prebuild": "npm run generate-version",
     "build": "tsc --outDir dist",
     "prepare": "npm run build",
-    "pretest": "npm run generate-version",
     "test": "jest --silent",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
