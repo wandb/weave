@@ -140,7 +140,7 @@ def _has_query_log_evidence(
 
 
 def test_select_obj_exact_digest_requires_value_row() -> None:
-    created_at = datetime.datetime.now(datetime.UTC)
+    created_at = datetime.datetime.now(datetime.timezone.utc)
     metadata_row = (
         "project",
         "obj",
