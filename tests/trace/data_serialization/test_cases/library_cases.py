@@ -82,7 +82,7 @@ llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_current_python = (
     "9YxDZRgBdoy8X5WEXuqYvhwTBuTtFSxKKT7ZPf9ubRA"
 )
 llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_old_python = (
-    "9YxDZRgBdoy8X5WEXuqYvhwTBuTtFSxKKT7ZPf9ubRA"
+    "hoglXaCXaJbyUlwhJClqC0S0gYzalCBrEUP62OEC8t8"
 )
 llm_as_a_judge_scorer_digest = (
     llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_current_python
