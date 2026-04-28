@@ -384,3 +384,10 @@ def internal_server(client):
     if client_is_sqlite(client):
         return find_server_layer(client.server, SqliteTraceServer)
     return find_server_layer(client.server, ClickHouseTraceServer)
+
+
+@pytest.fixture
+def require_clickhouse(request):
+    """Skip the test unless running with --trace-server=clickhouse."""
+    if get_trace_server_flag(request) != "clickhouse":
+        pytest.skip("ClickHouse-only test")

@@ -20,6 +20,12 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr
 DEFAULT_RETRY_MAX_INTERVAL_SECONDS = 60 * 5  # 5 minutes
 SETTINGS_PREFIX = "WEAVE_"
 
+# Entities that auto-opt-in to the calls_complete write path, independent of
+# the WEAVE_USE_CALLS_COMPLETE env var. This lets us dogfood calls_complete on
+# wandb-internal projects first so any regressions land on us, not customers.
+# Expand the allowlist (or flip the env default) once we have confidence.
+CALLS_COMPLETE_ENTITY_ALLOWLIST: frozenset[str] = frozenset({"wandb"})
+
 # Attention Devs:
 # To add new settings:
 # 1. Add a new field to `UserSettings`
@@ -225,7 +231,10 @@ class UserSettings(BaseModel):
     If False (default), uses the legacy call_start/call_end endpoints which
     send start and end events separately.
 
-    Can be overridden with the environment variable `WEAVE_USE_CALLS_COMPLETE`
+    Can be overridden with the environment variable `WEAVE_USE_CALLS_COMPLETE`.
+
+    Note: entities in `CALLS_COMPLETE_ENTITY_ALLOWLIST` auto-opt-in regardless
+    of this setting (see `should_use_calls_complete`).
     """
 
     enable_client_side_digests: bool = False
@@ -401,9 +410,15 @@ def should_use_stainless_server() -> bool:
     return _should("use_stainless_server")
 
 
-def should_use_calls_complete() -> bool:
-    """Returns whether the calls_complete write path should be used."""
-    return _should("use_calls_complete")
+def should_use_calls_complete(entity: str | None = None) -> bool:
+    """Returns whether the calls_complete write path should be used.
+
+    True if the `use_calls_complete` setting/env var is enabled, OR if
+    `entity` is in `CALLS_COMPLETE_ENTITY_ALLOWLIST` (dogfood gate).
+    """
+    if _should("use_calls_complete"):
+        return True
+    return entity is not None and entity in CALLS_COMPLETE_ENTITY_ALLOWLIST
 
 
 def should_enable_client_side_digests() -> bool:

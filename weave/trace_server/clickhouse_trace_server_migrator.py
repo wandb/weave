@@ -101,6 +101,13 @@ from weave.trace_server.database_engine import (
     wait_for_database_engine,
 )
 from weave.trace_server.environment import wf_clickhouse_calls_shard_key
+from weave.trace_server.migration_lock import (
+    LOCK_TABLE,
+    LOCK_TABLE_COLUMNS,
+    LOCK_TTL_SECONDS,
+    create_lock_table_sql,
+    migration_lock,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -255,10 +262,20 @@ class BaseClickHouseTraceServerMigrator(ABC):
     ) -> None:
         """Apply migrations to the target database up to the specified version.
 
+        Acquires a distributed lock so that only one replica runs migrations
+        at a time on multi-replica deployments.
+
         Args:
             target_db: The database to migrate
             target_version: The target version to migrate to (None = latest)
         """
+        with migration_lock(self.ch_client, self.management_db):
+            self._apply_migrations_locked(target_db, target_version)
+
+    def _apply_migrations_locked(
+        self, target_db: str, target_version: int | None = None
+    ) -> None:
+        """Inner migration logic, called while holding the migration lock."""
         status = self._get_migration_status(target_db)
         logger.info("""`%s` migration status: %s""", target_db, status)
         if status["partially_applied_version"]:
@@ -303,10 +320,19 @@ class BaseClickHouseTraceServerMigrator(ABC):
         )
 
     def _initialize_migration_db(self) -> None:
-        """Initialize the management database and migrations table."""
+        """Initialize the management database, migrations table, and lock table."""
         self._ensure_database(self.management_db)
         create_table_sql = self._create_management_table_sql()
         self._run_ddl_with_retry(create_table_sql)
+        lock_table_sql = self._create_lock_table_sql()
+        self._run_ddl_with_retry(lock_table_sql)
+
+    def _create_lock_table_sql(self) -> str:
+        """Generate SQL for the migration lock table.
+
+        Subclasses that need ON CLUSTER or Replicated engines override this.
+        """
+        return create_lock_table_sql(self.management_db)
 
     def _get_migration_status(self, db_name: str) -> dict:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
@@ -668,6 +694,11 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         """
         return self._prepare_ddl_for_database(create_table_sql, self.management_db)
 
+    def _create_lock_table_sql(self) -> str:
+        """Generate SQL for the lock table, adapted for the management DB engine."""
+        base_sql = create_lock_table_sql(self.management_db)
+        return self._prepare_ddl_for_database(base_sql, self.management_db)
+
     def _execute_migration_command(self, target_db: str, command: str) -> None:
         """Execute command in replicated mode."""
         command = command.strip()
@@ -872,6 +903,24 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             ({_MIGRATIONS_TABLE_COLUMNS})
             ENGINE = ReplicatedMergeTree('/clickhouse/tables/shared/{self.management_db}/migrations', '{{shard}}-{{replica}}')
             ORDER BY (db_name)
+        """
+
+    def _create_lock_table_sql(self) -> str:
+        """Generate SQL for the lock table in distributed mode.
+
+        Mirrors the management table logic: Replicated DB uses plain MergeTree
+        (auto-converted); Atomic DB uses explicit ReplicatedMergeTree with a
+        shared ZK path so all shards see the same lock state.
+        """
+        if self._uses_replicated_db_engine(self.management_db):
+            return create_lock_table_sql(self.management_db)
+        return f"""
+            CREATE TABLE IF NOT EXISTS {self.management_db}.{LOCK_TABLE}
+            ON CLUSTER {self.replicated_cluster}
+            ({LOCK_TABLE_COLUMNS})
+            ENGINE = ReplicatedMergeTree('/clickhouse/tables/shared/{self.management_db}/{LOCK_TABLE}', '{{shard}}-{{replica}}')
+            ORDER BY lock_id
+            TTL toDateTime(acquired_at) + INTERVAL {LOCK_TTL_SECONDS} SECOND
         """
 
     def _execute_migration_command(self, target_db: str, command: str) -> None:
