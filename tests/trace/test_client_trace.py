@@ -1041,31 +1041,14 @@ def test_trace_call_query_timings(client, no_autoflush):
 
     num_calls = 100
 
-    # Create calls with controlled timing - mock only datetime.datetime.now()
-    call_index = 0
-
-    def mock_now(*args, **kwargs):
-        nonlocal call_index
-        # Each create_call increments the index once at the start
-        # Return the appropriate time based on which call we're processing
-        if call_index <= num_calls - 3:  # calls 0-97 get 'now'
-            return now
-        elif call_index == num_calls - 2:  # call 98 gets 'later'
-            return later
+    for i in range(num_calls):
+        if i <= num_calls - 3:  # calls 0-97 get 'now'
+            started_at = now
+        elif i == num_calls - 2:  # call 98 gets 'later'
+            started_at = later
         else:  # call 99 gets 'even_later'
-            return even_later
-
-    with mock.patch(
-        "weave.trace.weave_client.datetime.datetime"
-    ) as mock_datetime_class:
-        # Mock only the .now() method, keep everything else as-is
-        mock_datetime_class.now = mock.Mock(side_effect=mock_now)
-        # Preserve other datetime functionality
-        mock_datetime_class.side_effect = datetime.datetime
-
-        for i in range(num_calls):
-            call_index = i
-            client.create_call("y", {"a": i})
+            started_at = even_later
+        client.create_call("y", {"a": i}, started_at=started_at)
     client.flush()
 
     def query_server():

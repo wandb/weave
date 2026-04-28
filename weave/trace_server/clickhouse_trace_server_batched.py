@@ -1864,6 +1864,147 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return obj_results
 
+    def _select_obj_exact_digest(
+        self,
+        project_id: str,
+        object_id: str,
+        digest: str,
+        metadata_only: bool,
+    ) -> list[SelectableCHObjSchema]:
+        """Read an exact object digest from the source table.
+
+        The general object metadata query computes version indexes for listing,
+        aliases, latest, and vN lookups. Exact digest reads do not need that
+        query to find the row; they only need the source rows for one object.
+        """
+        metadata_columns = [
+            "project_id",
+            "object_id",
+            "created_at",
+            "refs",
+            "kind",
+            "base_object_class",
+            "leaf_object_class",
+            "digest",
+            "deleted_at",
+            "wb_user_id",
+        ]
+        metadata_query = f"""
+SELECT
+    {", ".join(metadata_columns)}
+FROM object_versions
+WHERE project_id = {{project_id: String}}
+    AND object_id = {{object_id: String}}
+"""
+        metadata_query_result = self._query(
+            metadata_query,
+            {"project_id": project_id, "object_id": object_id},
+        )
+        metadata_rows = [
+            dict(zip(metadata_columns, row, strict=True))
+            for row in metadata_query_result.result_rows
+        ]
+        if not metadata_rows:
+            return []
+
+        first_seen_query = """
+SELECT object_id, digest, min(first_created_at) AS first_created_at
+FROM object_version_first_seen
+WHERE project_id = {project_id: String}
+    AND object_id = {object_id: String}
+GROUP BY object_id, digest
+"""
+        first_seen_query_result = self._query(
+            first_seen_query,
+            {"project_id": project_id, "object_id": object_id},
+        )
+        first_seen_by_digest = {
+            row[1]: row[2] for row in first_seen_query_result.result_rows
+        }
+
+        first_created_at: dict[tuple[str, str], datetime.datetime] = {}
+        latest_rows: dict[tuple[str, str], dict[str, Any]] = {}
+        for row in metadata_rows:
+            key = (row["kind"], row["digest"])
+            source_first_created_at = row["created_at"]
+            stable_first_created_at = first_seen_by_digest.get(
+                row["digest"], source_first_created_at
+            )
+            if (
+                key not in first_created_at
+                or stable_first_created_at < first_created_at[key]
+            ):
+                first_created_at[key] = stable_first_created_at
+
+            existing = latest_rows.get(key)
+            row_sort_key = (row["created_at"], row["deleted_at"] is not None)
+            if existing is None or row_sort_key > (
+                existing["created_at"],
+                existing["deleted_at"] is not None,
+            ):
+                latest_rows[key] = row
+
+        rows_by_kind: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in latest_rows.values():
+            rows_by_kind[row["kind"]].append(row)
+
+        result: list[SelectableCHObjSchema] = []
+        for kind_rows in rows_by_kind.values():
+            indexed_rows = sorted(
+                kind_rows,
+                key=lambda row: (
+                    first_created_at[row["kind"], row["digest"]],
+                    row["digest"],
+                ),
+            )
+            latest_key = max(
+                ((row["kind"], row["digest"]) for row in kind_rows),
+                key=lambda key: (
+                    latest_rows[key]["deleted_at"] is None,
+                    first_created_at[key],
+                    key[1],
+                ),
+            )
+            for version_index, row in enumerate(indexed_rows):
+                if row["digest"] != digest:
+                    continue
+                result.append(
+                    SelectableCHObjSchema.model_validate(
+                        {
+                            **row,
+                            "version_index": version_index,
+                            "version_count": len(indexed_rows),
+                            "is_latest": 1
+                            if (row["kind"], row["digest"]) == latest_key
+                            else 0,
+                            "is_op": 1 if row["kind"] == "op" else 0,
+                            "val_dump": "{}",
+                        }
+                    )
+                )
+
+        if not result:
+            return []
+
+        result.sort(key=lambda obj: obj.created_at)
+        if metadata_only:
+            return result
+
+        value_query, value_parameters = make_objects_val_query_and_parameters(
+            project_id=project_id,
+            object_ids=[object_id],
+            digests=[digest],
+        )
+        object_values: dict[tuple[str, str], Any] = {}
+        value_query_result = self._query(value_query, value_parameters)
+        for row in value_query_result.result_rows:
+            obj_id, obj_digest, val_dump = row
+            object_values[obj_id, obj_digest] = val_dump
+
+        for obj in result:
+            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
+        return result
+
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         # Check if digest is an alias name (not a hash, not version-like, not "latest")
         digest = req.digest
@@ -1873,13 +2014,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if resolved_digest is not None:
             digest = resolved_digest
 
-        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_digests_conditions(digest)
-        object_query_builder.add_object_ids_condition([req.object_id])
-        object_query_builder.set_include_deleted(include_deleted=True)
         metadata_only = req.metadata_only or False
-
-        objs = self._select_objs_query(object_query_builder, metadata_only)
+        is_version, _ = tsc.digest_is_version_like(digest)
+        if digest != "latest" and not is_version:
+            objs = self._select_obj_exact_digest(
+                req.project_id,
+                req.object_id,
+                digest,
+                metadata_only,
+            )
+        else:
+            object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+            object_query_builder.add_digests_conditions(digest)
+            object_query_builder.add_object_ids_condition([req.object_id])
+            object_query_builder.set_include_deleted(include_deleted=True)
+            objs = self._select_objs_query(object_query_builder, metadata_only)
         if len(objs) == 0:
             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 

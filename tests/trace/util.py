@@ -111,16 +111,21 @@ def get_info_loglines(
 def capture_output(callbacks: list[Callable[[], None]]):
     captured_logs = io.StringIO()
 
-    # Store original stdout and logging handlers
-    old_handlers = logging.getLogger().handlers[:]
+    weave_logger = logging.getLogger("weave")
+    old_handlers = weave_logger.handlers[:]
+    old_level = weave_logger.level
+    old_propagate = weave_logger.propagate
 
-    # Create a new handler for capturing logs
     log_handler = logging.StreamHandler(captured_logs)
     log_handler.setFormatter(logging.Formatter("%(message)s"))
 
-    # Replace stdout and logging handlers
-    root_logger = logging.getLogger()
-    root_logger.handlers = [log_handler]
+    # Capture the logger Weave actually emits user-facing links through.
+    # Replacing only root handlers is import-order dependent because
+    # configure_logger() installs a handler directly on the "weave" logger.
+    weave_logger.handlers = [log_handler]
+    weave_logger.propagate = False
+    if weave_logger.getEffectiveLevel() > logging.INFO:
+        weave_logger.setLevel(logging.INFO)
 
     try:
         yield captured_logs
@@ -129,7 +134,9 @@ def capture_output(callbacks: list[Callable[[], None]]):
     finally:
         for callback in callbacks:
             callback()
-        root_logger.handlers = old_handlers
+        weave_logger.handlers = old_handlers
+        weave_logger.setLevel(old_level)
+        weave_logger.propagate = old_propagate
 
 
 def flushing_callback(client):

@@ -5,6 +5,7 @@ import re
 import sys
 import time
 import uuid
+from unittest import mock
 
 import httpx
 import pydantic
@@ -14,7 +15,7 @@ from pydantic import ValidationError
 import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
-from tests.conftest import TestOnlyFlushingWeaveClient
+from tests.conftest import TestOnlyFlushingWeaveClient, _flush_test_client_for_teardown
 from tests.trace.server_utils import find_server_layer
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
@@ -2275,6 +2276,48 @@ def test_repeated_flushing(client):
     # make sure there are no pending jobs
     assert client._get_pending_jobs()["total_jobs"] == 0
     assert client._has_pending_jobs() == False
+
+
+def test_test_client_autoflushes_when_wrapped_method_raises(client, monkeypatch):
+    flush_calls = 0
+
+    def fake_flush(_self):
+        nonlocal flush_calls
+        flush_calls += 1
+
+    def fail_after_enqueue_point():
+        raise RuntimeError("intentional test failure")
+
+    monkeypatch.setattr(weave_client.WeaveClient, "_flush", fake_flush)
+    client.fail_after_enqueue_point = fail_after_enqueue_point
+
+    with pytest.raises(RuntimeError, match="intentional test failure"):
+        client.fail_after_enqueue_point()
+
+    assert flush_calls == 1
+
+    _flush_test_client_for_teardown(client)
+
+    assert flush_calls == 2
+
+
+def test_test_client_autoflushes_direct_server_calls(client, monkeypatch):
+    flush_calls = 0
+
+    def fake_flush(_self):
+        nonlocal flush_calls
+        flush_calls += 1
+
+    with monkeypatch.context() as m:
+        m.setattr(weave_client.WeaveClient, "_flush", fake_flush)
+        client.server.objs_query(tsi.ObjQueryReq(project_id=client.project_id))
+
+    assert flush_calls == 2
+
+
+def test_test_client_server_proxy_supports_patch_object(client):
+    with mock.patch.object(client.server, "refs_read_batch"):
+        pass
 
 
 def test_calls_query_filter_by_strings(client):

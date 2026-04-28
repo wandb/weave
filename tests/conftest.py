@@ -280,6 +280,10 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
     read operation(s) are performed.
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.server = TestOnlyFlushingTraceServer(self, self.server)
+
     def set_autoflush(self, value: bool):
         self._autoflush = value
 
@@ -290,14 +294,82 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
         if callable(attr) and name != "flush":
 
             def wrapper(*args, **kwargs):
-                res = attr(*args, **kwargs)
-                if self.__dict__.get("_autoflush", True):
-                    self_super._flush()
-                return res
+                try:
+                    return attr(*args, **kwargs)
+                finally:
+                    # Failed test-client methods can still enqueue background
+                    # writes before raising. Drain them so the next test's
+                    # ClickHouse reset cannot race leaked work from this test.
+                    if self.__dict__.get("_autoflush", True):
+                        self_super._flush()
 
             return wrapper
 
         return attr
+
+    def _flush_for_teardown(self) -> None:
+        """Flush without going through __getattribute__'s autoflush wrapper."""
+        super()._flush()
+
+
+def _flush_test_client_for_teardown(client: weave_client.WeaveClient) -> None:
+    if isinstance(client, TestOnlyFlushingWeaveClient):
+        TestOnlyFlushingWeaveClient._flush_for_teardown(client)
+    else:
+        client._flush()
+
+
+class TestOnlyFlushingTraceServer:
+    """Flush a test client around direct client.server method calls.
+
+    Tests often bypass WeaveClient methods and call client.server.* directly.
+    Those calls still need the same flush barrier as client methods before they
+    read state written through the client's background executors.
+    """
+
+    def __init__(
+        self,
+        client: TestOnlyFlushingWeaveClient,
+        server: tsi.TraceServerInterface,
+    ) -> None:
+        object.__setattr__(self, "_client", client)
+        object.__setattr__(self, "_server", server)
+
+    def __setattr__(self, name, value):
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self._server, name, value)
+
+    def __delattr__(self, name):
+        if name.startswith("_"):
+            object.__delattr__(self, name)
+        else:
+            delattr(self._server, name)
+
+    def __getattr__(self, name):
+        attr = getattr(self._server, name)
+        if name.startswith("_") or not callable(attr):
+            return attr
+
+        def wrapper(*args, **kwargs):
+            self._flush_client_if_safe()
+            try:
+                return attr(*args, **kwargs)
+            finally:
+                self._flush_client_if_safe()
+
+        return wrapper
+
+    def _flush_client_if_safe(self) -> None:
+        client = self._client
+        if not client.__dict__.get("_autoflush", True):
+            return
+        for executor_name in ("future_executor", "future_executor_fastlane"):
+            executor = client.__dict__.get(executor_name)
+            if executor is not None and executor._in_thread_context.get():
+                return
+        weave_client.WeaveClient._flush(client)
 
 
 def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
@@ -393,11 +465,14 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
     try:
         yield client
     finally:
-        weave_client_context.set_weave_client_global(None)
         try:
-            client.server.close()
-        except Exception:
-            pass
+            _flush_test_client_for_teardown(client)
+        finally:
+            weave_client_context.set_weave_client_global(None)
+            try:
+                client.server.close()
+            except Exception:
+                pass
 
 
 @pytest.fixture
@@ -431,17 +506,20 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
         try:
             yield client
         finally:
-            weave_client_context.set_weave_client_global(None)
-            weave.trace.settings.parse_and_apply_settings(
-                weave.trace.settings.UserSettings()
-            )
-            # Only close the caching layer, not the underlying trace_server.
-            # The trace_server is shared across multiple clients within this
-            # fixture and will be cleaned up by its own fixture teardown.
             try:
-                client.server._cache.close()
-            except Exception:
-                pass
+                _flush_test_client_for_teardown(client)
+            finally:
+                weave_client_context.set_weave_client_global(None)
+                weave.trace.settings.parse_and_apply_settings(
+                    weave.trace.settings.UserSettings()
+                )
+                # Only close the caching layer, not the underlying trace_server.
+                # The trace_server is shared across multiple clients within this
+                # fixture and will be cleaned up by its own fixture teardown.
+                try:
+                    client.server._cache.close()
+                except Exception:
+                    pass
 
     return client
 
