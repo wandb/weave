@@ -35,7 +35,8 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/wandb/weave/tree/master/sdks/node"
+    "url": "git+https://github.com/wandb/weave.git",
+    "directory": "sdks/node"
   },
   "author": "",
   "license": "Apache-2.0",
