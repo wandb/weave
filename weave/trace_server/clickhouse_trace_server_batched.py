@@ -6629,9 +6629,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # All-or-nothing: if any metadata row is missing its value row (e.g. due
         # to ClickHouse replication lag), return empty so callers raise
         # NotFoundError and retry, instead of silently filling with "{}".
-        if any(
-            (obj.object_id, obj.digest) not in object_values for obj in metadata_result
-        ):
+        all_value_rows_found = all(
+            (obj.object_id, obj.digest) in object_values for obj in metadata_result
+        )
+        if not all_value_rows_found:
             return []
         for obj in metadata_result:
             obj.val_dump = object_values[obj.object_id, obj.digest]
