@@ -1,17 +1,15 @@
 """Normalize agent spans into a structured chat / agent trajectory view.
 
-Converts a flat list of `AgentSpanSchema` rows (from the `spans`
-table) into a linear sequence of `AgentChatMessage` objects suitable for
-rendering an agent conversation UI.
+The database stores a trace as tree-shaped span rows. The chat UI needs a
+linear timeline, so this module projects the span tree into ordered
+`AgentChatMessage` events: one leading user prompt, then lifecycle markers,
+tool calls, assistant responses, and context compaction events.
 
-This is a **Weave product feature**, not a semconv concern.  The message types
-include Weave-specific concepts that have no OTel GenAI semconv equivalent:
-
-- `agent_start`: agent lifecycle boundary
-- `context_compacted`: Weave context compaction events
-
-The normalization handles provider-specific span formats (OpenAI Agents SDK,
-Google ADK) and produces a unified output.
+This is a Weave product projection, not an OTel semantic-convention layer.
+Subagent spans remain inline in the same turn, inheriting the nearest enclosing
+agent label unless they provide their own. When SDKs mirror the final assistant
+text onto both an `invoke_agent` span and a descendant LLM span, the descendant
+message wins and the parent invoke output is suppressed.
 """
 
 from __future__ import annotations
@@ -96,6 +94,43 @@ def _root_sort_key(span: AgentSpanSchema) -> tuple[bool, datetime | None, str]:
     return (span.ended_at is not None, span.ended_at, span.span_id)
 
 
+def _own_agent_label(span: AgentSpanSchema) -> str | None:
+    """Return this span's own agent identity, preferring display name over id."""
+    return span.agent_name or span.agent_id or None
+
+
+def _agent_label(span: AgentSpanSchema, nearest_agent: str | None) -> str | None:
+    """Return this span's agent label, inheriting from the nearest agent."""
+    return _own_agent_label(span) or nearest_agent
+
+
+def _invoke_agent_label(span: AgentSpanSchema, nearest_agent: str | None) -> str | None:
+    """Return the label descendants should inherit from an invoke_agent span."""
+    span_name = span.span_name or ""
+    span_name_label = (
+        span_name.removeprefix(f"{OP_INVOKE_AGENT} ").strip()
+        if span_name.startswith(f"{OP_INVOKE_AGENT} ")
+        else None
+    )
+    return _agent_label(span, nearest_agent) or span_name_label or None
+
+
+def _has_agent_start_payload(span: AgentSpanSchema, agent_label: str | None) -> bool:
+    """Return whether an invoke_agent span has useful lifecycle data to show."""
+    return bool(
+        agent_label
+        or span.request_model
+        or span.system_instructions
+        or span.tool_definitions
+    )
+
+
+def _join_or_none(items: list[str]) -> str | None:
+    if not items:
+        return None
+    return "\n".join(items)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -135,169 +170,155 @@ def build_trace_chat(
 def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
     """Convert a list of agent spans into a linear chat trajectory.
 
-    Build steps:
-
-    1. Build a parent-child tree from the flat span list (`build_span_tree`).
-    2. Emit a single `user_message` at the front, sourced from the first
-       `invoke_agent` span's `input_messages` (falling back to any span with
-       a usable user prompt; see `_find_user_prompt`).
-    3. Walk each root in `started_at` order. The walk is a preorder
-       traversal: emit lifecycle markers as we descend, recurse into
-       children, then emit trailing messages (agent response, compaction)
-       on the way back up.
-
-    The walk emits, in order:
-
-    - `agent_start` when we enter an `invoke_agent` span that names an agent.
-    - `tool_call` for each `execute_tool` span.
-    - `assistant_message` for the final assistant text in each subtree — either
-      from a descendant LLM span (`chat` / `generate_content`), or from the
-      `invoke_agent` span itself if no descendant emitted one. This avoids
-      double-rendering when SDKs (e.g. OpenAI Agents SDK, Google ADK) mirror
-      the final response onto both the parent `invoke_agent` and its inner
-      LLM call.
-    - `context_compacted` when a compaction event rides on an `invoke_agent`
-      span.
-
-    Subagents are not flattened into separate turns. They are traversed in
-    place, inherit the nearest enclosing agent name when their own span omits
-    one, and can still emit their own lifecycle/tool/assistant messages.
+    Build the parent-child tree, prepend a single user prompt if one can be
+    found, then let `ChatTraversal` apply the explicit tree-walk policy.
     """
     if not spans:
         return []
 
     tree = build_span_tree(spans)
-    messages: list[AgentChatMessage] = []
+    traversal = ChatTraversal()
 
     if user_message := _find_user_message(spans):
-        messages.append(user_message)
+        traversal.messages.append(user_message)
 
-    def _walk(node: SpanNode, nearest_agent: str = "", _depth: int = 0) -> bool:
-        """Preorder-walk one subtree, appending to the enclosing `messages`.
+    traversal.walk_roots(tree)
+    return traversal.messages
 
-        Returns True iff this subtree emitted at least one `assistant_message`.
-        An enclosing `invoke_agent` uses that signal to decide whether to
-        emit its own mirrored response: if any descendant already did, the
-        parent stays quiet to avoid showing the same text twice.
 
-        `nearest_agent` carries the name of the closest enclosing
-        `invoke_agent` so descendants inherit it when they have no
-        `agent_name` of their own.
-        """
-        if _depth > MAX_WALK_DEPTH:
+@dataclass
+class ChatTraversal:
+    """Stateful span-tree to chat-timeline traversal.
+
+    The traversal emits lifecycle and tool events as it enters spans, then
+    walks children. Content spans may emit assistant text after children. An
+    `invoke_agent` span emits its own assistant text only when no descendant
+    already emitted one; that boolean return value is the mirror-suppression
+    signal for parent agent spans.
+    """
+
+    messages: list[AgentChatMessage] = field(default_factory=list)
+
+    def walk_roots(self, roots: list[SpanNode]) -> None:
+        for root in roots:
+            self._walk_node(root, nearest_agent=None, depth=0)
+
+    def _walk_node(self, node: SpanNode, nearest_agent: str | None, depth: int) -> bool:
+        """Walk one subtree and return whether it emitted assistant text."""
+        span = node.span
+        if depth > MAX_WALK_DEPTH:
             logger.warning(
                 "span tree walk truncated at depth %d (trace_id=%s, span_id=%s)",
-                _depth,
-                node.span.trace_id,
-                node.span.span_id,
+                depth,
+                span.trace_id,
+                span.span_id,
             )
             return False
+
+        if span.operation_name == OP_INVOKE_AGENT:
+            return self._walk_invoke_agent(node, nearest_agent, depth)
+        if span.operation_name == OP_EXECUTE_TOOL:
+            return self._walk_tool(node, nearest_agent, depth)
+        return self._walk_content_span(node, nearest_agent, depth)
+
+    def _walk_invoke_agent(
+        self, node: SpanNode, nearest_agent: str | None, depth: int
+    ) -> bool:
+        """Walk an agent invocation and suppress mirrored parent output."""
         span = node.span
-        op = span.operation_name
-        agent_name = span.agent_name or nearest_agent
+        agent_start_label = _own_agent_label(span)
+        subtree_agent = _invoke_agent_label(span, nearest_agent)
 
-        # ---- invoke_agent ----
-        if op == OP_INVOKE_AGENT:
-            span_name = span.span_name or ""
-            name = (
-                span.agent_name
-                or nearest_agent
-                or span_name.removeprefix(f"{OP_INVOKE_AGENT} ")
-            )
-
-            if span.agent_name:
-                messages.append(
-                    AgentChatMessage(
-                        type="agent_start",
-                        span_id=span.span_id,
-                        agent_name=span.agent_name,
-                        model=span.request_model,
-                        status=span.status_code,
-                        system_instructions="\n".join(span.system_instructions)
-                        if span.system_instructions
-                        else "",
-                        tool_definitions=span.tool_definitions or "",
-                        started_at=span.started_at,
-                    )
-                )
-            else:
-                # `gen_ai.agent.name` is a recommended (not required)
-                # attribute, so some producers omit it. We still walk the
-                # subtree but don't emit an `agent_start` divider because
-                # there's nothing meaningful to label it with.
-                logger.debug(
-                    "invoke_agent span without agent_name (span_id=%s)",
-                    span.span_id,
-                )
-
-            emitted_in_subtree = False
-            for child in node.children:
-                if _walk(child, name, _depth + 1):
-                    emitted_in_subtree = True
-
-            # Only emit from the invoke_agent itself if no descendant LLM
-            # span already produced an `assistant_message`. This is the
-            # mirroring guard described in the function docstring.
-            if not emitted_in_subtree:
-                msg = _emit_assistant_message(span, name, aggregate_node=node)
-                if msg:
-                    messages.append(msg)
-                    emitted_in_subtree = True
-
-            if span.compaction_summary or (span.compaction_items_before or 0) > 0:
-                messages.append(
-                    AgentChatMessage(
-                        type="context_compacted",
-                        span_id=span.span_id,
-                        agent_name=name,
-                        compaction_summary=span.compaction_summary,
-                        compaction_items_before=span.compaction_items_before,
-                        compaction_items_after=span.compaction_items_after,
-                        started_at=span.started_at,
-                    )
-                )
-            return emitted_in_subtree
-
-        # ---- execute_tool ----
-        if op == OP_EXECUTE_TOOL:
-            span_name = span.span_name or ""
-            tool_name = span.tool_name or span_name.removeprefix(f"{OP_EXECUTE_TOOL} ")
-            messages.append(
+        if _has_agent_start_payload(span, agent_start_label):
+            self.messages.append(
                 AgentChatMessage(
-                    type="tool_call",
+                    type="agent_start",
                     span_id=span.span_id,
-                    agent_name=span.agent_name or nearest_agent,
-                    tool_name=tool_name,
-                    tool_arguments=span.tool_call_arguments,
-                    tool_result=span.tool_call_result,
-                    duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
-                    started_at=span.started_at,
+                    agent_name=agent_start_label,
+                    model=span.request_model,
                     status=span.status_code,
-                    content_refs=_content_refs(span),
+                    system_instructions=_join_or_none(span.system_instructions),
+                    tool_definitions=span.tool_definitions or None,
+                    started_at=span.started_at,
                 )
             )
-            emitted_in_subtree = False
-            for child in node.children:
-                if _walk(child, nearest_agent, _depth + 1):
-                    emitted_in_subtree = True
-            return emitted_in_subtree
+        else:
+            logger.debug(
+                "invoke_agent span without agent identity or lifecycle metadata (span_id=%s)",
+                span.span_id,
+            )
 
-        # ---- chat / generate_content / unknown: walk children, maybe emit ----
-        emitted_in_subtree = False
-        for child in node.children:
-            if _walk(child, agent_name, _depth + 1):
-                emitted_in_subtree = True
+        subtree_emitted_assistant = self._walk_children(
+            node, nearest_agent=subtree_agent, depth=depth
+        )
+        if not subtree_emitted_assistant:
+            msg = _emit_assistant_message(span, subtree_agent, aggregate_node=node)
+            if msg:
+                self.messages.append(msg)
+                subtree_emitted_assistant = True
+
+        if span.compaction_summary or (span.compaction_items_before or 0) > 0:
+            self.messages.append(
+                AgentChatMessage(
+                    type="context_compacted",
+                    span_id=span.span_id,
+                    agent_name=subtree_agent,
+                    compaction_summary=span.compaction_summary,
+                    compaction_items_before=span.compaction_items_before,
+                    compaction_items_after=span.compaction_items_after,
+                    started_at=span.started_at,
+                )
+            )
+
+        return subtree_emitted_assistant
+
+    def _walk_tool(self, node: SpanNode, nearest_agent: str | None, depth: int) -> bool:
+        """Emit a tool-call event, then walk any nested spans below it."""
+        span = node.span
+        agent_name = _agent_label(span, nearest_agent)
+        span_name = span.span_name or ""
+        tool_name = span.tool_name or span_name.removeprefix(f"{OP_EXECUTE_TOOL} ")
+        self.messages.append(
+            AgentChatMessage(
+                type="tool_call",
+                span_id=span.span_id,
+                agent_name=agent_name,
+                tool_name=tool_name,
+                tool_arguments=span.tool_call_arguments,
+                tool_result=span.tool_call_result,
+                duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
+                started_at=span.started_at,
+                status=span.status_code,
+                content_refs=_content_refs(span),
+            )
+        )
+        return self._walk_children(node, nearest_agent=agent_name, depth=depth)
+
+    def _walk_content_span(
+        self, node: SpanNode, nearest_agent: str | None, depth: int
+    ) -> bool:
+        """Walk a regular content span and emit its assistant text if present."""
+        span = node.span
+        agent_name = _agent_label(span, nearest_agent)
+        subtree_emitted_assistant = self._walk_children(
+            node, nearest_agent=agent_name, depth=depth
+        )
 
         msg = _emit_assistant_message(span, agent_name)
         if msg:
-            messages.append(msg)
-            emitted_in_subtree = True
-        return emitted_in_subtree
+            self.messages.append(msg)
+            return True
+        return subtree_emitted_assistant
 
-    for root in tree:
-        _walk(root)
-
-    return messages
+    def _walk_children(
+        self, node: SpanNode, nearest_agent: str | None, depth: int
+    ) -> bool:
+        """Walk children and return whether any child subtree emitted assistant text."""
+        emitted_assistant = False
+        for child in node.children:
+            if self._walk_node(child, nearest_agent, depth + 1):
+                emitted_assistant = True
+        return emitted_assistant
 
 
 def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
@@ -495,11 +516,18 @@ def _find_user_message(spans: list[AgentSpanSchema]) -> AgentChatMessage | None:
 
 def _emit_assistant_message(
     span: AgentSpanSchema,
-    agent_name: str,
+    agent_name: str | None,
     *,
     aggregate_node: SpanNode | None = None,
 ) -> AgentChatMessage | None:
-    """Build an assistant_message from a span's output_messages, or None if empty."""
+    """Build a renderable assistant_message from a span's output_messages.
+
+    `invoke_agent` spans sometimes mirror the final assistant text from a
+    descendant LLM span. Callers pass `aggregate_node` only when the invoke span
+    itself needs to emit because no descendant already did; in that case token
+    usage is summed across the subtree so the emitted message reflects the
+    whole agent turn. Returns None when there is no non-user output text.
+    """
     if not span.output_messages:
         return None
     text = _extract_non_user_output_text(span.output_messages)

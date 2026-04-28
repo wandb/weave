@@ -1,9 +1,7 @@
-"""Unit tests for agent_chat_view.py — span → chat trajectory.
+"""Unit tests for agent_chat_view.py — span tree to chat trajectory.
 
-Just two tests: one empty-input smoke check, one comprehensive
-end-to-end scenario that exercises every message type the projection
-emits. Integration tests in test_genai_agent_queries.py cover realistic
-trace shapes end-to-end against ClickHouse.
+Integration tests in test_genai_agent_queries.py cover realistic trace shapes
+end-to-end against ClickHouse; these tests pin the pure projection rules.
 """
 
 import datetime
@@ -153,6 +151,61 @@ def test_full_agent_turn() -> None:
     # Tool spans don't contribute tokens.
     assert by_type["assistant_message"].input_tokens == 210
     assert by_type["assistant_message"].output_tokens == 105
+
+
+def test_agent_start_uses_agent_id_when_name_missing() -> None:
+    messages = build_chat_messages(
+        [
+            _span(
+                span_id="agent",
+                operation_name="invoke_agent",
+                agent_id="agent-123",
+                output_messages=[{"role": "assistant", "content": "hello"}],
+            )
+        ]
+    )
+
+    agent_start = next(m for m in messages if m.type == "agent_start")
+    assistant = next(m for m in messages if m.type == "assistant_message")
+    assert agent_start.agent_name == "agent-123"
+    assert assistant.agent_name == "agent-123"
+
+
+def test_agent_start_emits_useful_metadata_without_agent_identity() -> None:
+    messages = build_chat_messages(
+        [
+            _span(
+                span_id="agent",
+                operation_name="invoke_agent",
+                span_name="invoke_agent",
+                request_model="gpt-4o",
+                system_instructions=["You are helpful."],
+                tool_definitions='[{"name":"search"}]',
+            )
+        ]
+    )
+
+    assert [m.type for m in messages] == ["agent_start"]
+    assert messages[0].agent_name is None
+    assert messages[0].model == "gpt-4o"
+    assert messages[0].system_instructions == "You are helpful."
+    assert messages[0].tool_definitions == '[{"name":"search"}]'
+
+
+def test_anonymous_invoke_without_metadata_skips_empty_agent_start() -> None:
+    messages = build_chat_messages(
+        [
+            _span(
+                span_id="agent",
+                operation_name="invoke_agent",
+                span_name="invoke_agent",
+                output_messages=[{"role": "assistant", "content": "hello"}],
+            )
+        ]
+    )
+
+    assert [m.type for m in messages] == ["assistant_message"]
+    assert messages[0].agent_name is None
 
 
 def test_build_span_tree_handles_null_started_at() -> None:
@@ -332,6 +385,46 @@ def test_invoke_agent_emits_when_no_descendant_llm_span() -> None:
     agent_messages = [m for m in messages if m.type == "assistant_message"]
     assert len(agent_messages) == 1
     assert agent_messages[0].text == "hi there"
+
+
+def test_subagent_spans_render_inline_with_agent_label_inheritance() -> None:
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    messages = build_chat_messages(
+        [
+            _span(
+                span_id="root-agent",
+                operation_name="invoke_agent",
+                agent_name="root",
+                started_at=at(0),
+            ),
+            _span(
+                span_id="root-chat",
+                parent_span_id="root-agent",
+                operation_name="chat",
+                output_messages=[{"role": "assistant", "content": "root reply"}],
+                started_at=at(1),
+            ),
+            _span(
+                span_id="sub-agent",
+                parent_span_id="root-agent",
+                operation_name="invoke_agent",
+                agent_name="sub",
+                output_messages=[{"role": "assistant", "content": "sub reply"}],
+                started_at=at(2),
+            ),
+        ]
+    )
+
+    assert [(m.type, m.agent_name, m.text) for m in messages] == [
+        ("agent_start", "root", None),
+        ("assistant_message", "root", "root reply"),
+        ("agent_start", "sub", None),
+        ("assistant_message", "sub", "sub reply"),
+    ]
 
 
 def test_system_message_not_used_as_user_prompt_fallback() -> None:
