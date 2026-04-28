@@ -253,6 +253,8 @@ npm run test
 - Update relevant docstrings for Python code
 - Add JSDoc comments for TypeScript code
 - Update this file when introducing new patterns or concepts
+- GEPA is a standalone optimizer integration. Its Weave patcher wraps the public entry points `gepa.optimize`, `gepa.api.optimize`, and `gepa.optimize_anything.optimize_anything`, and its dedicated nox shard is `tests-3.12(shard='gepa')`.
+
 
 ---
 
@@ -316,4 +318,5 @@ If there is something that doesn't make sense architecturally, devex-wise, or pr
 Think of this as the reverse-task assignment - a place where you can communicate back to us.
 
 - [ ] Add TypeScript testing guidelines
+- [ ] Decide whether `weave[dspy]` should move to GEPA >=0.1.0. Current DSPy releases pin pre-0.1 GEPA versions, so `weave[dspy]` and `weave[gepa]` are currently declared as conflicting extras in `pyproject.toml`.
 - [ ] ...
