@@ -134,6 +134,59 @@ def wf_scoring_worker_debounced_scoring_max_call_history() -> int:
     return max(0, value)
 
 
+def wf_scoring_worker_remote_scorer_bearer_token() -> str | None:
+    """Optional bearer credential for outbound remote scorer HTTP requests.
+
+    The wire format is ``Authorization: Bearer <token>``; this environment
+    variable supplies one possible ``<token>`` (alongside other mechanisms such
+    as per-scorer configuration or OAuth client-credentials token exchange).
+    When set, the scoring worker's remote scorer path may prefer this value
+    over those other sources; exact precedence is defined by that
+    implementation. When unset, the worker resolves credentials from other
+    configuration only.
+
+    Returns:
+        The token string, or None if unset. Whitespace-only values are treated as
+        None.
+    """
+    raw = os.environ.get("WF_SCORING_WORKER_REMOTE_SCORER_BEARER_TOKEN")
+    if raw is None:
+        return None
+    stripped = raw.strip()
+    return stripped if stripped else None
+
+
+DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS = 30.0
+
+
+def wf_scoring_worker_remote_scorer_enabled() -> bool:
+    """Whether outbound remote scorer HTTP is enabled in the scoring worker.
+
+    When false (default), the worker does not run the remote HTTP path for
+    :class:`RemoteScorer`, regardless of other configuration.
+    """
+    return (
+        os.environ.get("WF_SCORING_WORKER_REMOTE_SCORING_ENABLED", "false").lower()
+        == "true"
+    )
+
+
+def wf_scoring_worker_remote_scorer_http_timeout_seconds() -> float:
+    """Wall-clock timeout for each remote scorer HTTP request/response (seconds).
+
+    Default ``30`` matches the remote scorer product default.
+    """
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_REMOTE_HTTP_TIMEOUT_SECONDS",
+        str(int(DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS)),
+    )
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
+    return value if value > 0 else DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
+
+
 # Clickhouse Settings
 
 
