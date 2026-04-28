@@ -6626,9 +6626,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             (object_id, digest, val_dump) = row
             object_values[object_id, digest] = val_dump
 
-        # update the val_dump for each object
+        # All-or-nothing: if any metadata row is missing its value row (e.g. due
+        # to ClickHouse replication lag), return empty so callers raise
+        # NotFoundError and retry, instead of silently filling with "{}".
+        if any(
+            (obj.object_id, obj.digest) not in object_values for obj in metadata_result
+        ):
+            return []
         for obj in metadata_result:
-            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
+            obj.val_dump = object_values[obj.object_id, obj.digest]
         return metadata_result
 
     def _run_migrations(self) -> None:
