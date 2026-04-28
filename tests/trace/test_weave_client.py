@@ -3700,35 +3700,78 @@ def test_calls_query_filter_by_root_refs(client):
     calls = client.get_calls(filter={"trace_roots_only": False})
     assert len(calls) == 6
 
-    # trace roots only + inputs query
-    calls = client.get_calls(
-        filter={"trace_roots_only": True},
-        query={
-            "$expr": {
+    root_query_cases = [
+        (
+            "inputs explicit convert",
+            {
                 "$eq": [
                     {"$convert": {"input": {"$getField": "inputs.x"}, "to": "int"}},
                     {"$literal": 1},
                 ]
-            }
-        },
-    )
-    assert len(calls) == 1
-    assert op_name_from_call(calls[0]) == "root_op"
-
-    # trace roots only + output query
-    calls = client.get_calls(
-        filter={"trace_roots_only": True},
-        query={
-            "$expr": {
+            },
+            1,
+        ),
+        (
+            "inputs inferred convert",
+            {"$eq": [{"$getField": "inputs.x"}, {"$literal": 1}]},
+            1,
+        ),
+        (
+            "output explicit convert",
+            {
                 "$eq": [
                     {"$convert": {"input": {"$getField": "output.n"}, "to": "int"}},
                     {"$literal": 2},
                 ],
-            }
-        },
+            },
+            2,
+        ),
+        (
+            "output inferred convert",
+            {"$eq": [{"$getField": "output.n"}, {"$literal": 2}]},
+            2,
+        ),
+    ]
+    for label, expr, expected_x in root_query_cases:
+        calls = client.get_calls(
+            filter={"trace_roots_only": True},
+            query={"$expr": expr},
+        )
+        assert len(calls) == 1, label
+        assert op_name_from_call(calls[0]) == "root_op", label
+        assert calls[0].inputs["x"] == expected_x, label
+
+    typed_call = client.create_call(
+        "typed_filter_op",
+        {"x": 1},
+        attributes={"rank": 2, "enabled": True},
+    )
+    typed_call.summary = {"score": 0.75}
+    client.finish_call(typed_call, {"n": 5})
+
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$and": [
+                        {"$eq": [{"$getField": "attributes.rank"}, {"$literal": 2}]},
+                        {
+                            "$eq": [
+                                {"$getField": "attributes.enabled"},
+                                {"$literal": True},
+                            ]
+                        },
+                        {"$gt": [{"$getField": "summary.score"}, {"$literal": 0.5}]},
+                    ]
+                }
+            },
+            columns=["id", "attributes", "summary"],
+        )
     )
     assert len(calls) == 1
-    assert op_name_from_call(calls[0]) == "root_op"
+    assert calls[0].attributes["rank"] == 2
+    assert calls[0].attributes["enabled"] is True
+    assert calls[0].summary["score"] == 0.75
 
     # trace roots only + op filter
     calls = client.get_calls(

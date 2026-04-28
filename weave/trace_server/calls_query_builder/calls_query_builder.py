@@ -2077,6 +2077,40 @@ def _get_multi_value_feedback_field(
     return None
 
 
+def _cast_for_literal_filter(value: object) -> tsi_query.CastTo | None:
+    """Infer a JSON dynamic-field cast from a comparison literal.
+
+    ``JSON_VALUE`` returns strings, so numeric and boolean literals need the
+    field side cast to match the parameter type ClickHouse receives. String,
+    ``None``, and structured literals keep the existing uncast path.
+    """
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int):
+        return "int"
+    if isinstance(value, float):
+        return "double"
+    return None
+
+
+def _shared_cast_for_literal_filters(
+    operands: Sequence[tsi_query.Operand],
+) -> tsi_query.CastTo | None:
+    """Return a shared inferred cast for homogeneous literal lists."""
+    cast: tsi_query.CastTo | None = None
+    for operand in operands:
+        if not isinstance(operand, tsi_query.LiteralOperation):
+            return None
+        operand_cast = _cast_for_literal_filter(operand.literal_)
+        if operand_cast is None:
+            return None
+        if cast is None:
+            cast = operand_cast
+        elif operand_cast != cast:
+            return None
+    return cast
+
+
 def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
@@ -2091,6 +2125,54 @@ def process_query_to_conditions(
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
         cond = None
+
+        def process_dynamic_field_operand_with_inferred_cast(
+            operand: tsi_query.Operand,
+            cast: tsi_query.CastTo | None,
+        ) -> str | None:
+            if cast is None or not isinstance(operand, tsi_query.GetFieldOperator):
+                return None
+            if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
+                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+
+            structured_field = get_field_by_name(operand.get_field_)
+            if not isinstance(structured_field, CallsMergedDynamicField):
+                return None
+
+            raw_fields_used[structured_field.field] = structured_field
+            return structured_field.as_sql(
+                param_builder,
+                table_alias,
+                cast=cast,
+                use_agg_fn=use_agg_fn,
+            )
+
+        def process_binary_operands(
+            ops: Sequence[tsi_query.Operand],
+        ) -> tuple[str, str]:
+            lhs_cast = (
+                _cast_for_literal_filter(ops[1].literal_)
+                if isinstance(ops[1], tsi_query.LiteralOperation)
+                else None
+            )
+            rhs_cast = (
+                _cast_for_literal_filter(ops[0].literal_)
+                if isinstance(ops[0], tsi_query.LiteralOperation)
+                else None
+            )
+            lhs_cast_sql = process_dynamic_field_operand_with_inferred_cast(
+                ops[0], lhs_cast
+            )
+            rhs_cast_sql = process_dynamic_field_operand_with_inferred_cast(
+                ops[1], rhs_cast
+            )
+            lhs_part = (
+                lhs_cast_sql if lhs_cast_sql is not None else process_operand(ops[0])
+            )
+            rhs_part = (
+                rhs_cast_sql if rhs_cast_sql is not None else process_operand(ops[1])
+            )
+            return lhs_part, rhs_part
 
         if isinstance(operation, tsi_query.AndOperation):
             if len(operation.and_) == 0:
@@ -2123,45 +2205,47 @@ def process_query_to_conditions(
                 else:
                     rhs_part = process_operand(ops[1])
                     cond = f"has({array_expr}, {rhs_part})"
-            else:
+            elif (
+                isinstance(ops[1], tsi_query.LiteralOperation)
+                and ops[1].literal_ is None
+            ):
                 lhs_part = process_operand(ops[0])
-                if (
-                    isinstance(ops[1], tsi_query.LiteralOperation)
-                    and ops[1].literal_ is None
-                ):
-                    field_name = _extract_field_name(ops[0])
-                    if field_name is not None:
-                        null_check = ch_sentinel_values.null_check_sql(
-                            field_name, lhs_part, read_table, param_builder
-                        )
-                        cond = f"({null_check})"
-                    else:
-                        cond = f"({lhs_part} IS NULL)"
+                field_name = _extract_field_name(ops[0])
+                if field_name is not None:
+                    null_check = ch_sentinel_values.null_check_sql(
+                        field_name, lhs_part, read_table, param_builder
+                    )
+                    cond = f"({null_check})"
                 else:
-                    rhs_part = process_operand(ops[1])
-                    cond = f"({lhs_part} = {rhs_part})"
+                    cond = f"({lhs_part} IS NULL)"
+            else:
+                lhs_part, rhs_part = process_binary_operands(ops)
+                cond = f"({lhs_part} = {rhs_part})"
         elif isinstance(operation, tsi_query.GtOperation):
             ops = _maybe_convert_datetime_operands(operation.gt_)
-            lhs_part = process_operand(ops[0])
-            rhs_part = process_operand(ops[1])
+            lhs_part, rhs_part = process_binary_operands(ops)
             cond = f"({lhs_part} > {rhs_part})"
         elif isinstance(operation, tsi_query.LtOperation):
             ops = _maybe_convert_datetime_operands(operation.lt_)
-            lhs_part = process_operand(ops[0])
-            rhs_part = process_operand(ops[1])
+            lhs_part, rhs_part = process_binary_operands(ops)
             cond = f"({lhs_part} < {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
             ops = _maybe_convert_datetime_operands(operation.gte_)
-            lhs_part = process_operand(ops[0])
-            rhs_part = process_operand(ops[1])
+            lhs_part, rhs_part = process_binary_operands(ops)
             cond = f"({lhs_part} >= {rhs_part})"
         elif isinstance(operation, tsi_query.LteOperation):
             ops = _maybe_convert_datetime_operands(operation.lte_)
-            lhs_part = process_operand(ops[0])
-            rhs_part = process_operand(ops[1])
+            lhs_part, rhs_part = process_binary_operands(ops)
             cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
-            lhs_part = process_operand(operation.in_[0])
+            lhs_cast_sql = process_dynamic_field_operand_with_inferred_cast(
+                operation.in_[0], _shared_cast_for_literal_filters(operation.in_[1])
+            )
+            lhs_part = (
+                lhs_cast_sql
+                if lhs_cast_sql is not None
+                else process_operand(operation.in_[0])
+            )
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
             cond = f"({lhs_part} IN ({rhs_part}))"
         elif isinstance(operation, tsi_query.ContainsOperation):

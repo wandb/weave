@@ -1157,7 +1157,7 @@ def test_calls_query_with_complex_heavy_filters() -> None:
             HAVING (
                 ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
                 AND
-                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') > {pb_3:Int64}))
+                ((toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '')) > {pb_3:Int64}))
                 AND (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_4:String}), 'null'), '') = {pb_5:String})
                   OR positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}), 'null'), ''), {pb_7:String}) > 0))
                 AND
@@ -1559,7 +1559,7 @@ def test_calls_query_with_unoptimizable_or_condition() -> None:
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((
             (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String})
-            OR (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') > {pb_3:Int64})))
+            OR (toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '')) > {pb_3:Int64})))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
@@ -1571,6 +1571,72 @@ def test_calls_query_with_unoptimizable_or_condition() -> None:
             "pb_3": 10,
             "pb_4": '%"hello"%',
             "pb_5": "project",
+        },
+    )
+
+
+def test_dynamic_json_filters_infer_casts_from_literals() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    # Numeric literal on the RHS casts the dynamic field.
+                    {"$gt": [{"$getField": "inputs.count"}, {"$literal": 3}]},
+                    # Numeric literal on the LHS casts the dynamic field without flipping the operator.
+                    {"$lt": [{"$literal": 2.5}, {"$getField": "output.score"}]},
+                    # JSON booleans extract as "true"/"false" strings and need boolean coercion.
+                    {"$eq": [{"$getField": "attributes.enabled"}, {"$literal": True}]},
+                    # Homogeneous numeric IN lists cast the dynamic field once.
+                    {
+                        "$in": [
+                            {"$getField": "summary.tokens"},
+                            [{"$literal": 10}, {"$literal": 11}],
+                        ]
+                    },
+                    # Scalar root dynamic fields can also infer from typed literals.
+                    {"$eq": [{"$getField": "output"}, {"$literal": 7}]},
+                    # String literals keep the existing uncast JSON_VALUE path.
+                    {"$eq": [{"$getField": "inputs.label"}, {"$literal": "ok"}]},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_12:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((
+            (toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '')) > {pb_1:Int64})
+            OR ({pb_3:Float64} < toFloat64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}), 'null'), '')))
+            OR (multiIf(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_4:String}), 'null'), '') = 'true', 1, coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_4:String}), 'null'), '') = 'false', 0, toUInt8OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_4:String}), 'null'), ''))) = {pb_5:Bool})
+            OR (toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_6:String}), 'null'), '')) IN ({pb_7:Int64},{pb_8:Int64}))
+            OR (toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), '$'), 'null'), '')) = {pb_9:Int64})
+            OR (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_10:String}), 'null'), '') = {pb_11:String})
+        ))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."count"',
+            "pb_1": 3,
+            "pb_2": '$."score"',
+            "pb_3": 2.5,
+            "pb_4": '$."enabled"',
+            "pb_5": True,
+            "pb_6": '$."tokens"',
+            "pb_7": 10,
+            "pb_8": 11,
+            "pb_9": 7,
+            "pb_10": '$."label"',
+            "pb_11": "ok",
+            "pb_12": "project",
         },
     )
 
@@ -3173,7 +3239,7 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
                 OR calls_merged.output_dump IS NULL))
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
-        HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_0:String}), 'null'), '') = {pb_1:Int64}))
+        HAVING (((toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_0:String}), 'null'), '')) = {pb_1:Int64}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
@@ -3296,7 +3362,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             AND (calls_complete.trace_id = {pb_4:String}
                 OR calls_complete.trace_id IS NULL)
         AND (
-            ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:Int64}))
+            ((toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')) > {pb_1:Int64}))
             AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
         )
         ORDER BY CASE
