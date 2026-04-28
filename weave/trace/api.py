@@ -321,12 +321,57 @@ def publish(
 
 
 def add_tags(obj_ref: ObjectRef | str, tags: list[str]) -> None:
-    """Add tags to an object version.
+    """Attaches tags to a published object version, extending its existing tag set.
+
+    Tags are free-form, additive labels you can apply to a published
+    object version for filtering, grouping, and organization in the
+    Weave UI. Calls to `add_tags` are cumulative; use
+    `weave.remove_tags` to take tags off and `weave.get_tags` to read
+    the current set.
+
+    Tags differ from aliases. Any number of tags can coexist on a single
+    version, and the same tag can apply to any number of versions. An
+    alias such as `production`, by contrast, resolves to one specific
+    version at a time. See `weave.set_aliases` for the alias workflow.
+
+    The target object must already be published. Most callers obtain
+    its `ObjectRef` from `weave.publish()`; alternatively, pass the
+    `weave:///` URI string copied from the Weave UI or returned by a
+    previous `ref.uri()` call.
 
     Args:
-        obj_ref: Reference to the object version, either an ObjectRef
-            (returned by `weave.publish()`) or a weave:/// URI string.
-        tags: List of tag strings to add.
+        obj_ref: The version to tag. Pass either an `ObjectRef` returned
+            by `weave.publish()` or a fully qualified `weave:///` URI
+            string. Short forms like `"name:version"` aren't accepted
+            here; resolve them to a URI with `weave.ref()` first.
+        tags: Tag strings to add to the version's tag set.
+
+    Raises:
+        WeaveInitError: If `weave.init()` hasn't been called in the
+            current process.
+        ValueError: If `obj_ref` is a string that isn't a valid
+            `weave:///` URI.
+
+    Example:
+        >>> import weave
+        >>> weave.init("your-team/your-project")
+        >>>
+        >>> @weave.op
+        ... def greet(name: str) -> str:
+        ...     return f"Hello, {name}!"
+        >>>
+        >>> ref = weave.publish(greet)
+        >>> weave.add_tags(ref, ["reviewed", "frozen"])
+
+    See Also:
+        - `weave.publish`: Saves an object and returns the `ObjectRef`
+          to tag.
+        - `weave.remove_tags`: Removes tags from a version (inverse).
+        - `weave.get_tags`: Reads the current tags on a version.
+        - `weave.list_tags`: Lists every distinct tag in the project.
+        - `weave.get_tags_and_aliases`: Reads tags and aliases together.
+        - `weave.set_aliases`: Manages aliases, the version-pointer
+          companion to tags.
     """
     client = weave_client_context.require_weave_client()
     client.add_tags(obj_ref, tags)
