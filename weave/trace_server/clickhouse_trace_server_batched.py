@@ -294,6 +294,12 @@ MAX_OTEL_ERROR_MESSAGES = 20
 # go fully fire-and-forget with wait_for_async_insert=0.
 OTEL_ASYNC_INSERT_TIMEOUT_MS = 100
 
+# In-process dedupe of placeholder op inserts: we skip the CH write when this
+# process has already inserted (project_id, op_name).  RMT dedupes the writes
+# on the server side, so eviction just costs one extra batched write — the
+# bound is purely a memory ceiling.
+INSERTED_OPS_CACHE_MAX_SIZE = 50_000
+
 # Cache size for ref expansion during call streaming
 REF_EXPANSION_CACHE_SIZE = 1000
 
@@ -347,8 +353,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
-        self._inserted_ops: set[tuple[str, str]] = set()
-        self._inserted_ops_lock = threading.Lock()
+        self._inserted_ops: LRUCache = LRUCache(max_size=INSERTED_OPS_CACHE_MAX_SIZE)
+        self._otel_state_lock = threading.Lock()
         self._placeholder_file_projects: set[str] = set()
         self._database_ensured = False
 
@@ -500,7 +506,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _ensure_placeholder_file_exists(self, project_id: str) -> None:
         """Write the OTEL placeholder source file at most once per project per process."""
-        with self._inserted_ops_lock:
+        with self._otel_state_lock:
             if project_id in self._placeholder_file_projects:
                 return
             self._placeholder_file_projects.add(project_id)
@@ -573,7 +579,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # process hasn't seen yet.  ReplacingMergeTree + the deduped view
         # collapse duplicates, so blind-inserting is safe and avoids all
         # CH reads on the hot path.
-        with self._inserted_ops_lock:
+        with self._otel_state_lock:
             new_ops = {
                 name
                 for name in obj_id_idx_map
@@ -593,8 +599,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     for op_name in new_ops
                 ]
             )
-            with self._inserted_ops_lock:
-                self._inserted_ops.update((req.project_id, name) for name in new_ops)
+            with self._otel_state_lock:
+                for name in new_ops:
+                    self._inserted_ops[req.project_id, name] = True
 
         # Construct all ref URIs deterministically — no CH read needed
         for op_name, idxs in obj_id_idx_map.items():
@@ -1711,11 +1718,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> list[tsi.ObjCreateRes]:
         """Batch-insert objects using a fixed placeholder digest.
 
-        Skips version numbering in exchange for a large performance gain (no CH reads).
-        Used by OTel ingest. If a real op with the same object_id already exists,
-        the placeholder will be inserted as an additional version and may become
-        is_latest. This is acceptable because this case is very rare, and call
-        display/filtering can be digest-agnostic.
+        Skips version numbering in exchange for a large performance gain (no CH
+        reads).  Used by OTel ingest.
+
+        Trade-off when an `object_id` collides with a real op:
+        - The placeholder is inserted as an additional version.  Calls written
+          by `otel_export` reference the placeholder digest explicitly, so call
+          rendering is unaffected.
+        - `latest_only` queries for that `object_id` will return the placeholder
+          version (it was inserted after the real one).  The real op remains
+          readable by its original digest.
+        - See `test_otel_export_uses_placeholder_even_with_existing_real_op`
+          for the contract.
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
