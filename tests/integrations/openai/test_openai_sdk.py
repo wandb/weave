@@ -14,8 +14,8 @@ from weave.trace.autopatch import OpSettings
 
 @dataclass
 class DummyClient:
-    _base_url: str
-    _version: str = "1.0.0"
+    base_url: str
+    version: str = "1.0.0"
 
 
 @dataclass
@@ -23,9 +23,6 @@ class DummyCompletion:
     base_url: str
     version: str = "1.0.0"
     messages: list[dict] = field(default_factory=list)
-
-    def __post_init__(self) -> None:
-        self._client = DummyClient(self.base_url, self.version)
 
 
 class NonCompletion:

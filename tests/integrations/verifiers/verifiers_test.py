@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import pytest
 import verifiers as vf
 from datasets import Dataset
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
-from openai.types.chat.chat_completion import Choice
+from openai import OpenAI
 
 from weave.integrations.integration_utilities import (
     flatten_calls,
@@ -15,34 +15,6 @@ from weave.integrations.integration_utilities import (
 )
 from weave.integrations.verifiers.verifiers import get_verifiers_patcher
 from weave.trace.weave_client import WeaveClient
-
-
-class _MockChatCompletions:
-    async def create(self, model: str, **kwargs: Any) -> ChatCompletion:
-        return ChatCompletion(
-            id="chatcmpl-mock",
-            choices=[
-                Choice(
-                    finish_reason="stop",
-                    index=0,
-                    message=ChatCompletionMessage(
-                        role="assistant",
-                        content="<think>mock reasoning</think>mock response",
-                    ),
-                )
-            ],
-            created=0,
-            model=model,
-            object="chat.completion",
-        )
-
-
-class _MockChat:
-    completions = _MockChatCompletions()
-
-
-class _MockAsyncOpenAI:
-    chat = _MockChat()
 
 
 @pytest.fixture(autouse=True)
@@ -123,7 +95,7 @@ def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> No
 
     env = MockEnv()
 
-    openai_client = _MockAsyncOpenAI()
+    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "DUMMY_API_KEY"))
     results = env.evaluate(
         openai_client,
         "gpt-4.1-mini",
@@ -135,39 +107,47 @@ def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> No
     assert results is not None
     assert len(results.prompt) == 1
 
-    # Validate that the expected weave ops were traced.
+    # Validate that the expected weave ops were traced
     calls = list(client.get_calls())
     flattened = flatten_calls(calls)
-    flattened_names = flattened_calls_to_names(flattened)
-    assert len(flattened) == 35
-    assert flattened_names == [
+    assert len(flattened) == 43
+
+    assert flattened_calls_to_names(flattened) == [
         ("verifiers.Environment.evaluate", 0),
         ("verifiers.Environment.generate", 1),
         ("verifiers.Environment.a_generate", 2),
         ("verifiers.envs.multiturn_env.MultiTurnEnv.rollout", 3),
         ("verifiers.Environment.get_model_response", 4),
-        ("verifiers.Rubric.score_rollout", 3),
-        ("verifiers.ThinkParser.format_reward", 4),
-        ("verifiers.Parser.parse", 4),
-        ("verifiers.Parser.extract_fn", 5),
+        ("verifiers.Rubric.score_rollouts", 3),
+        ("verifiers.Rubric.score_rollout", 4),
+        ("verifiers.ThinkParser.format_reward", 5),
+        ("verifiers.Parser.parse", 5),
+        ("verifiers.Parser.extract_fn", 6),
         ("verifiers.Environment.generate", 0),
         ("verifiers.Environment.a_generate", 1),
         ("verifiers.envs.multiturn_env.MultiTurnEnv.rollout", 2),
         ("verifiers.Environment.get_model_response", 3),
+        ("verifiers.Rubric.score_rollouts", 2),
+        ("verifiers.Rubric.score_rollout", 3),
+        ("verifiers.ThinkParser.format_reward", 4),
+        ("verifiers.Parser.parse", 4),
+        ("verifiers.Parser.extract_fn", 5),
+        ("verifiers.Environment.a_generate", 0),
+        ("verifiers.envs.multiturn_env.MultiTurnEnv.rollout", 1),
+        ("verifiers.Environment.get_model_response", 2),
+        ("verifiers.Rubric.score_rollouts", 1),
         ("verifiers.Rubric.score_rollout", 2),
         ("verifiers.ThinkParser.format_reward", 3),
         ("verifiers.Parser.parse", 3),
         ("verifiers.Parser.extract_fn", 4),
-        ("verifiers.Environment.a_generate", 0),
-        ("verifiers.envs.multiturn_env.MultiTurnEnv.rollout", 1),
-        ("verifiers.Environment.get_model_response", 2),
+        ("verifiers.envs.multiturn_env.MultiTurnEnv.rollout", 0),
+        ("verifiers.Environment.get_model_response", 1),
+        ("verifiers.Environment.get_model_response", 0),
+        ("verifiers.Rubric.score_rollouts", 0),
         ("verifiers.Rubric.score_rollout", 1),
         ("verifiers.ThinkParser.format_reward", 2),
         ("verifiers.Parser.parse", 2),
         ("verifiers.Parser.extract_fn", 3),
-        ("verifiers.envs.multiturn_env.MultiTurnEnv.rollout", 0),
-        ("verifiers.Environment.get_model_response", 1),
-        ("verifiers.Environment.get_model_response", 0),
         ("verifiers.Rubric.score_rollout", 0),
         ("verifiers.ThinkParser.format_reward", 1),
         ("verifiers.Parser.parse", 1),
