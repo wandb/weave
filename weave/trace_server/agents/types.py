@@ -118,21 +118,6 @@ class AgentSortBy(BaseModel):
     direction: Literal["asc", "desc"] = "desc"
 
 
-class AgentSpansQueryFilters(BaseModel):
-    """Optional filters for querying agent spans."""
-
-    trace_id: str | None = None
-    operation_name: str | None = None
-    agent_name: str | None = None
-    provider_name: str | None = None
-    tool_name: str | None = None
-    request_model: str | None = None
-    agent_version: str | None = None
-    conversation_id: str | None = None
-    status_code: str | None = None
-    custom_filters: list[AgentCustomAttrFilter] = Field(default_factory=list)
-
-
 class AgentGroupByRef(BaseModel):
     """Reference to a column or map-key that spans should be grouped by.
 
@@ -187,11 +172,8 @@ class AgentSpansQueryReq(BaseModel):
     """
 
     project_id: str
-    filters: AgentSpansQueryFilters | None = None
-    # Mongo-style filter expression applied alongside `filters`. Both are
-    # AND-ed. Field names resolve via semconv, direct span columns, or the
-    # typed custom attribute Map columns. The narrower `filters` object keeps
-    # common UI filters simple; `query` covers advanced nested expressions.
+    # Mongo-style filter expression. Field names resolve via semconv, direct
+    # span columns, or the typed custom attribute Map columns.
     query: Query | None = None
     group_by: list[AgentGroupByRef] | None = None
     sort_by: list[AgentSortBy] | None = None
@@ -419,19 +401,6 @@ class AgentsQueryRes(BaseModel):
 
     agents: list[AgentSchema]
     total_count: int = 0
-
-
-# ---------------------------------------------------------------------------
-# Custom attribute filters (used by spans queries)
-# ---------------------------------------------------------------------------
-
-
-class AgentCustomAttrFilter(BaseModel):
-    """Filter on a custom attribute stored in `custom_attrs_string` Map column."""
-
-    attr_key: str
-    operator: str = "eq"
-    value: str | int | float | bool = ""
 
 
 # ---------------------------------------------------------------------------

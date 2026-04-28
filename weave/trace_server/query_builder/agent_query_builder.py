@@ -18,7 +18,6 @@ from typing import Any
 
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
-    AgentCustomAttrFilter,
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
@@ -101,16 +100,6 @@ AGENT_SORTABLE_COLS: frozenset[str] = frozenset(
         "error_count",
     }
 )
-
-# Allowed operators for custom attribute filters.
-_ATTR_OPS: dict[str, str] = {
-    "eq": "=",
-    "ne": "!=",
-    "gt": ">",
-    "lt": "<",
-    "gte": ">=",
-    "lte": "<=",
-}
 
 # Valid SQL identifier (used to validate group_by aliases).
 _IDENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
@@ -271,40 +260,6 @@ def add_time_filters(
         conditions.append(f"{column} < {end_slot}")
 
 
-def add_span_filters(
-    conditions: list[str],
-    pb: ParamBuilder,
-    filters: Any,
-    *,
-    table_alias: str = "s",
-) -> None:
-    """Add validated equality filters. Only columns in SPAN_FILTERABLE_COLS are allowed."""
-    for attr in sorted(SPAN_FILTERABLE_COLS):
-        val = getattr(filters, attr, None)
-        if val:
-            val_slot = pb.add(val, param_type="String")
-            conditions.append(f"{table_alias}.{attr} = {val_slot}")
-
-
-def add_custom_attr_filters(
-    conditions: list[str],
-    pb: ParamBuilder,
-    custom_filters: list[AgentCustomAttrFilter] | None,
-    *,
-    table_alias: str = "s",
-) -> None:
-    """Add custom_attrs_string Map(String, String) filters with parameterized values."""
-    if not custom_filters:
-        return
-    for cf in custom_filters:
-        op = _ATTR_OPS.get(cf.operator, "=")
-        key_slot = pb.add(str(cf.attr_key), param_type="String")
-        val_slot = pb.add(str(cf.value), param_type="String")
-        conditions.append(
-            f"{table_alias}.custom_attrs_string[{key_slot}] {op} {val_slot}"
-        )
-
-
 def _pagination_slots(
     pb: ParamBuilder, limit: int, offset: int
 ) -> tuple[str, str, int]:
@@ -372,11 +327,6 @@ def _spans_where(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     pid_slot = pb.add(req.project_id, param_type="String")
     conditions = [f"s.project_id = {pid_slot}"]
     add_time_filters(conditions, pb, start=req.start, end=req.end)
-    if req.filters:
-        add_span_filters(conditions, pb, req.filters)
-        add_custom_attr_filters(
-            conditions, pb, getattr(req.filters, "custom_filters", None)
-        )
     if req.query is not None:
         # Imported lazily to avoid a circular import between this module
         # (used by agent_query_compiler) and the compiler itself.

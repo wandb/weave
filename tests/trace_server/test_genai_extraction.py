@@ -211,6 +211,25 @@ def test_normalize_message_missing_role_and_finish_reason() -> None:
     assert result.output_messages[0].finish_reason == ""
 
 
+def test_normalize_input_messages_without_role_uses_empty_role() -> None:
+    result = extract_genai_span(
+        _make_span(
+            attrs={
+                "gen_ai.input.messages": [
+                    "plain prompt",
+                    {"content": "structured prompt"},
+                ],
+            },
+        ),
+        project_id="p1",
+    )
+
+    assert [(m.role, m.content) for m in result.input_messages] == [
+        ("", "plain prompt"),
+        ("", "structured prompt"),
+    ]
+
+
 def test_genai_prompt_attr_stays_custom_attr() -> None:
     result = extract_genai_span(
         _make_span(attrs={"gen_ai.prompt": "hello"}),

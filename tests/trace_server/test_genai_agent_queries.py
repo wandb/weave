@@ -18,7 +18,6 @@ from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentGroupByRef,
     AgentSearchReq,
-    AgentSpansQueryFilters,
     AgentSpansQueryReq,
     AgentsQueryReq,
 )
@@ -98,7 +97,16 @@ def test_spans_insert_and_query(ch_server):
     res_filtered = ch_server.agent_spans_query(
         AgentSpansQueryReq(
             project_id=project_id,
-            filters=AgentSpansQueryFilters(agent_name="agent-A"),
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "agent.name"},
+                            {"$literal": "agent-A"},
+                        ]
+                    }
+                }
+            ),
         )
     )
     assert res_filtered.total_count == 2
@@ -209,7 +217,6 @@ def test_group_by_conversation_id(ch_server):
     res = ch_server.agent_spans_query(
         AgentSpansQueryReq(
             project_id=project_id,
-            filters=AgentSpansQueryFilters(),
             group_by=[AgentGroupByRef(source="column", key="conversation_id")],
         )
     )

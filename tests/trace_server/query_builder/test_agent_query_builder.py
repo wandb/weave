@@ -14,16 +14,15 @@ from pydantic import ValidationError
 
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
-    AgentCustomAttrFilter,
     AgentGroupByRef,
     AgentSearchReq,
     AgentSortBy,
-    AgentSpansQueryFilters,
     AgentSpansQueryReq,
     AgentsQueryFilters,
     AgentsQueryReq,
     AgentVersionsQueryReq,
 )
+from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     CHAT_VIEW_COLS,
@@ -71,7 +70,7 @@ class TestMakeSpansCountQuery:
         expected = "SELECT count() FROM spans s WHERE s.project_id = {genai_0:String}"
         assert_sql(expected, {"genai_0": "p1"}, query, pb.get_params())
 
-    def test_with_filters_and_time(self) -> None:
+    def test_with_query_and_time(self) -> None:
         pb = ParamBuilder("genai")
         start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
         end = datetime.datetime(2026, 2, 1, tzinfo=datetime.timezone.utc)
@@ -79,13 +78,25 @@ class TestMakeSpansCountQuery:
             pb,
             AgentSpansQueryReq(
                 project_id="p1",
-                filters=AgentSpansQueryFilters(
-                    agent_name="bot",
-                    custom_filters=[
-                        AgentCustomAttrFilter(
-                            attr_key="env", operator="eq", value="prod"
-                        )
-                    ],
+                query=Query.model_validate(
+                    {
+                        "$expr": {
+                            "$and": [
+                                {
+                                    "$eq": [
+                                        {"$getField": "agent.name"},
+                                        {"$literal": "bot"},
+                                    ]
+                                },
+                                {
+                                    "$eq": [
+                                        {"$getField": "custom_attrs_string.env"},
+                                        {"$literal": "prod"},
+                                    ]
+                                },
+                            ]
+                        }
+                    }
                 ),
                 start=start,
                 end=end,
@@ -97,8 +108,7 @@ class TestMakeSpansCountQuery:
             WHERE s.project_id = {genai_0:String}
               AND s.started_at >= {genai_1:DateTime64(6)}
               AND s.started_at < {genai_2:DateTime64(6)}
-              AND s.agent_name = {genai_3:String}
-              AND s.custom_attrs_string[{genai_4:String}] = {genai_5:String}
+              AND ((s.agent_name = {genai_3:String}) AND (s.custom_attrs_string[{genai_4:String}] = {genai_5:String}))
         """
         expected_params = {
             "genai_0": "p1",

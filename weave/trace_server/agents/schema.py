@@ -40,7 +40,7 @@ class NormalizedMessage(BaseModel):
     Lossless original data is preserved in `raw_span_dump` on the span.
     """
 
-    role: str
+    role: str = ""
     content: str
     finish_reason: str = ""
 
