@@ -13,7 +13,10 @@ from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_schema import ALL_CALL_INSERT_COLUMNS
+from weave.trace_server.clickhouse_schema import (
+    ALL_CALL_INSERT_COLUMNS,
+    SelectableCHObjSchema,
+)
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
@@ -937,6 +940,103 @@ def test_insert_retries_empty_query_error():
 
         assert result == mock_summary
         assert mock_ch_client.insert.call_count == 2  # Retried once
+
+
+def test_insert_settings_make_write_visibility_explicit():
+    """INSERT settings should make the returned response a read-after-write barrier."""
+    mock_summary = MagicMock()
+
+    # Default path: force synchronous inserts while preserving unrelated caller settings.
+    sync_ch_client = MagicMock()
+    sync_ch_client.insert.return_value = mock_summary
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=sync_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._insert(
+            "t",
+            data=[[1]],
+            column_names=["a"],
+            settings={
+                "insert_deduplicate": 0,
+                "async_insert": 1,
+                "wait_end_of_query": 0,
+            },
+        )
+
+    sync_settings = sync_ch_client.insert.call_args.kwargs["settings"]
+    assert sync_settings["async_insert"] == 0
+    assert sync_settings["wait_for_async_insert"] == 1
+    assert sync_settings["wait_end_of_query"] == 1
+    assert sync_settings["insert_deduplicate"] == 0
+
+    # Explicit async path: use async inserts, but wait for ClickHouse to flush and
+    # hold the HTTP response until the insert query finishes.
+    async_ch_client = MagicMock()
+    async_ch_client.insert.return_value = mock_summary
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=async_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host", use_async_insert=True)
+        server._insert("t", data=[[1]], column_names=["a"])
+
+    async_settings = async_ch_client.insert.call_args.kwargs["settings"]
+    assert async_settings["async_insert"] == 1
+    assert async_settings["wait_for_async_insert"] == 1
+    assert async_settings["wait_end_of_query"] == 1
+
+
+def test_obj_read_exact_digest_uses_direct_fallback_when_metadata_query_misses():
+    """Exact digest reads should not report NotFound if the source row is visible."""
+    digest = "a" * 43
+    fallback_obj = SelectableCHObjSchema(
+        project_id="project",
+        object_id="obj",
+        created_at=dt.datetime.now(dt.timezone.utc),
+        refs=[],
+        val_dump='{"ok": true}',
+        kind="object",
+        base_object_class=None,
+        leaf_object_class=None,
+        digest=digest,
+        version_index=0,
+        is_latest=1,
+        deleted_at=None,
+        wb_user_id=None,
+    )
+
+    server = chts.ClickHouseTraceServer(host="test_host")
+    with (
+        patch.object(server, "_maybe_resolve_alias", return_value=None),
+        patch.object(server, "_select_objs_query", return_value=[]),
+        patch.object(
+            server,
+            "_select_obj_exact_digest_fallback",
+            return_value=[fallback_obj],
+        ) as fallback,
+    ):
+        res = server.obj_read(
+            tsi.ObjReadReq(project_id="project", object_id="obj", digest=digest)
+        )
+
+    assert res.obj.object_id == "obj"
+    assert res.obj.digest == digest
+    assert res.obj.val == {"ok": True}
+    fallback.assert_called_once_with("project", "obj", digest, False)
+
+
+def test_obj_read_exact_digest_direct_fallback_queries_clickhouse(ch_server):
+    project_id = _make_project_id("exact_fallback")
+    created = _obj_create(ch_server, project_id, "obj", {"ok": True})
+
+    objs = ch_server._select_obj_exact_digest_fallback(
+        project_id, "obj", created.digest, metadata_only=False
+    )
+
+    assert len(objs) == 1
+    assert objs[0].object_id == "obj"
+    assert objs[0].digest == created.digest
+    assert json.loads(objs[0].val_dump) == {"ok": True}
 
 
 def test_ensure_obj_version_exists_retries_eventual_consistency():
