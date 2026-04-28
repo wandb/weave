@@ -2,6 +2,7 @@ import dataclasses
 import inspect
 import logging
 import operator
+import time
 from collections.abc import Callable, Generator, Iterator, Sequence
 from copy import deepcopy
 from typing import Any, Literal, Optional, SupportsIndex, cast
@@ -29,6 +30,7 @@ from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,
+    TableQueryRes,
     TableQueryStatsReq,
     TableRowFilter,
     TraceServerInterface,
@@ -39,6 +41,8 @@ from weave.utils.project_id import to_project_id
 logger = logging.getLogger(__name__)
 
 REMOTE_ITER_PAGE_SIZE = 100
+REMOTE_ITER_EMPTY_PAGE_MAX_ATTEMPTS = 3
+REMOTE_ITER_EMPTY_PAGE_RETRY_DELAY_SECONDS = 0.25
 
 
 class InternalError(Exception): ...
@@ -480,6 +484,66 @@ class WeaveTable(Traceable):  # noqa: PLW1641
             res = make_trace_obj(res, new_ref, self.server, self.root)
             yield res
 
+    def _known_remote_row_count(self) -> int | None:
+        if self._known_length is not None:
+            return self._known_length
+
+        if self.table_ref is None:
+            return None
+
+        row_digests = self.table_ref._row_digests
+        if isinstance(row_digests, list):
+            return len(row_digests)
+
+        return None
+
+    def _should_retry_empty_page(
+        self, response: TableQueryRes, offset: int
+    ) -> bool:
+        if response.rows:
+            return False
+        if self.filter is not None and self.filter.row_digests is not None:
+            return False
+
+        known_row_count = self._known_remote_row_count()
+        if known_row_count is None:
+            return False
+
+        return offset < known_row_count
+
+    def _remote_query_page(self, page_index: int, page_size: int) -> TableQueryRes:
+        if self.table_ref is None:
+            raise ValueError("Cannot query remote page of table without table ref")
+
+        offset = page_index * page_size
+        max_attempts = max(1, REMOTE_ITER_EMPTY_PAGE_MAX_ATTEMPTS)
+
+        for attempt in range(max_attempts):
+            response = self.server.table_query(
+                TableQueryReq(
+                    project_id=self.table_ref.project_id,
+                    digest=self.table_ref.digest,
+                    offset=offset,
+                    limit=page_size,
+                    filter=self.filter,
+                )
+            )
+
+            if not self._should_retry_empty_page(response, offset):
+                return response
+
+            if attempt == max_attempts - 1:
+                return response
+
+            logger.debug(
+                "Retrying empty table page for non-empty table ref %s",
+                self.table_ref.uri,
+            )
+            if REMOTE_ITER_EMPTY_PAGE_RETRY_DELAY_SECONDS > 0:
+                time.sleep(REMOTE_ITER_EMPTY_PAGE_RETRY_DELAY_SECONDS)
+
+        raise InternalError("unreachable")
+
     def _remote_iter(self) -> Generator[dict, None, None]:
         if self.table_ref is None:
             return
@@ -491,15 +555,7 @@ class WeaveTable(Traceable):  # noqa: PLW1641
         page_index = 0
         page_size = REMOTE_ITER_PAGE_SIZE
         while True:
-            response = self.server.table_query(
-                TableQueryReq(
-                    project_id=self.table_ref.project_id,
-                    digest=self.table_ref.digest,
-                    offset=page_index * page_size,
-                    limit=page_size,
-                    filter=self.filter,
-                )
-            )
+            response = self._remote_query_page(page_index, page_size)
 
             # When paginating through large datasets, we need special handling for prefetched rows
             # on the first page. This is because prefetched_rows contains ALL rows, while each

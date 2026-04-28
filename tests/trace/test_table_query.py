@@ -6,6 +6,8 @@ import pytest
 from tests.trace.util import (
     client_is_sqlite,
 )
+from weave.trace import vals
+from weave.trace.refs import TableRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -43,6 +45,120 @@ def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):
     row_digests = res.row_digests
 
     return digest, row_digests, data
+
+
+class _FakeTableQueryServer:
+    def __init__(self, responses: list[tsi.TableQueryRes]) -> None:
+        self.responses = responses
+        self.requests: list[tsi.TableQueryReq] = []
+
+    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+        self.requests.append(req)
+        return self.responses[min(len(self.requests) - 1, len(self.responses) - 1)]
+
+
+def test_weave_table_retries_empty_page_when_table_is_known_non_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(vals, "REMOTE_ITER_EMPTY_PAGE_RETRY_DELAY_SECONDS", 0)
+
+    empty_response = tsi.TableQueryRes(rows=[])
+    row_response = tsi.TableQueryRes(
+        rows=[tsi.TableRowSchema(digest="row-1", val={"value": 1}, original_index=0)]
+    )
+
+    # Known non-empty table: an empty first page is inconsistent, so retry.
+    server = _FakeTableQueryServer([empty_response, row_response])
+    table = vals.WeaveTable(
+        server=server,
+        table_ref=TableRef(
+            entity="entity",
+            project="project",
+            _digest="table-digest",
+            _row_digests=["row-1"],
+        ),
+    )
+
+    rows = list(table.rows)
+
+    assert len(server.requests) == 2
+    assert [request.offset for request in server.requests] == [0, 0]
+    assert rows[0]["value"] == 1
+
+    # A known length from a prior stats call also proves an empty page is inconsistent.
+    server = _FakeTableQueryServer([empty_response, row_response])
+    table = vals.WeaveTable(
+        server=server,
+        table_ref=TableRef(
+            entity="entity",
+            project="project",
+            _digest="table-digest",
+            _row_digests=None,
+        ),
+    )
+    table._known_length = 1
+
+    rows = list(table.rows)
+
+    assert len(server.requests) == 2
+    assert [request.offset for request in server.requests] == [0, 0]
+    assert rows[0]["value"] == 1
+
+    # Repeated empty pages stop at the retry cap and preserve the empty result.
+    server = _FakeTableQueryServer([empty_response])
+    table = vals.WeaveTable(
+        server=server,
+        table_ref=TableRef(
+            entity="entity",
+            project="project",
+            _digest="table-digest",
+            _row_digests=["row-1"],
+        ),
+    )
+
+    assert list(table.rows) == []
+    assert len(server.requests) == vals.REMOTE_ITER_EMPTY_PAGE_MAX_ATTEMPTS
+
+    # True empty tables, unknown row digests, and filtered-empty queries do not retry.
+    no_retry_cases = [
+        (
+            TableRef(
+                entity="entity",
+                project="project",
+                _digest="empty-table-digest",
+                _row_digests=[],
+            ),
+            None,
+        ),
+        (
+            TableRef(
+                entity="entity",
+                project="project",
+                _digest="unknown-table-digest",
+                _row_digests=None,
+            ),
+            None,
+        ),
+        (
+            TableRef(
+                entity="entity",
+                project="project",
+                _digest="filtered-table-digest",
+                _row_digests=["row-1"],
+            ),
+            tsi.TableRowFilter(row_digests=["missing-row"]),
+        ),
+    ]
+    for table_ref, table_filter in no_retry_cases:
+        server = _FakeTableQueryServer([empty_response])
+        table = vals.WeaveTable(
+            server=server,
+            table_ref=table_ref,
+            filter=table_filter,
+        )
+
+        assert list(table.rows) == []
+        assert len(server.requests) == 1
 
 
 def test_table_query(client: WeaveClient):
