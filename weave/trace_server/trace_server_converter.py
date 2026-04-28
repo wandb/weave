@@ -1,5 +1,8 @@
+"""Helpers for converting trace refs with copy-on-write traversal."""
+
+import dataclasses
 from collections.abc import Callable
-from typing import TypeVar, cast
+from typing import Any, NamedTuple, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -149,21 +152,146 @@ E = TypeVar("E")
 F = TypeVar("F")
 
 
+class _CopyOnWriteResult(NamedTuple):
+    value: Any
+    changed: bool
+    fully_supported: bool
+
+
 def _map_values(obj: E, func: Callable[[E], E]) -> E:
+    """Recursively apply `func` while preserving untouched object identity."""
+    return cast(E, _map_values_copy_on_write(obj, func).value)
+
+
+def _map_values_copy_on_write(
+    obj: E,
+    func: Callable[[E], E],
+) -> _CopyOnWriteResult:
+    """Apply `func` recursively with copy-on-write traversal.
+
+    `changed` means this branch was rewritten and callers must clone its ancestors.
+    `fully_supported` means the fast path can preserve Pydantic model validation
+    semantics. Dataclasses nested under models are handled safely by Pydantic's
+    dump/validate path, so seeing one forces that fallback.
+    """
     if isinstance(obj, BaseModel):
-        # `by_alias` is required since we have Mongo-style properties in the
-        # query models that are aliased to conform to start with `$`. Without
-        # this, the model_dump will use the internal property names which are
-        # not valid for the `model_validate` step.
-        orig = obj.model_dump(by_alias=True)
-        new = _map_values(orig, func)
-        return obj.model_validate(new)
+        return _map_model_values(obj, cast(Callable[[Any], Any], func))
     if isinstance(obj, dict):
-        return cast(E, {k: _map_values(v, func) for k, v in obj.items()})
+        # Clone only after the first changed child.
+        updated_dict: dict[Any, Any] | None = None
+        fully_supported = True
+        for key, value in obj.items():
+            result = _map_values_copy_on_write(value, func)
+            if result.changed:
+                if updated_dict is None:
+                    updated_dict = dict(obj)
+                updated_dict[key] = result.value
+            fully_supported = fully_supported and result.fully_supported
+        if updated_dict is None:
+            return _CopyOnWriteResult(obj, False, fully_supported)
+        return _CopyOnWriteResult(cast(E, updated_dict), True, fully_supported)
     if isinstance(obj, list):
-        return cast(E, [_map_values(v, func) for v in obj])
+        # Same copy-on-write rule for lists.
+        updated_list: list[Any] | None = None
+        fully_supported = True
+        for index, value in enumerate(obj):
+            result = _map_values_copy_on_write(value, func)
+            if result.changed:
+                if updated_list is None:
+                    updated_list = list(obj)
+                updated_list[index] = result.value
+            fully_supported = fully_supported and result.fully_supported
+        if updated_list is None:
+            return _CopyOnWriteResult(obj, False, fully_supported)
+        return _CopyOnWriteResult(cast(E, updated_list), True, fully_supported)
     if isinstance(obj, tuple):
-        return cast(E, tuple(_map_values(v, func) for v in obj))
+        # Buffer tuple updates and rebuild only if something changed.
+        updated_items: list[Any] | None = None
+        fully_supported = True
+        for index, value in enumerate(obj):
+            result = _map_values_copy_on_write(value, func)
+            if result.changed:
+                if updated_items is None:
+                    updated_items = list(obj)
+                updated_items[index] = result.value
+            fully_supported = fully_supported and result.fully_supported
+        if updated_items is None:
+            return _CopyOnWriteResult(obj, False, fully_supported)
+        return _CopyOnWriteResult(cast(E, tuple(updated_items)), True, fully_supported)
     if isinstance(obj, set):
-        return cast(E, {_map_values(v, func) for v in obj})
-    return func(obj)
+        # Sets rebuild on change, but still skip allocation on no-op paths.
+        values = []
+        changed = False
+        fully_supported = True
+        for value in obj:
+            result = _map_values_copy_on_write(value, func)
+            values.append(result.value)
+            changed = changed or result.changed
+            fully_supported = fully_supported and result.fully_supported
+        if not changed:
+            return _CopyOnWriteResult(obj, False, fully_supported)
+        return _CopyOnWriteResult(cast(E, set(values)), True, fully_supported)
+
+    new_obj = func(obj)
+    if new_obj is not obj:
+        return _CopyOnWriteResult(new_obj, True, True)
+    return _CopyOnWriteResult(new_obj, False, not dataclasses.is_dataclass(obj))
+
+
+def _map_model_values(
+    obj: BaseModel,
+    func: Callable[[Any], Any],
+) -> _CopyOnWriteResult:
+    """Rewrite model fields in place when possible.
+
+    Frozen models use `model_copy`. Nested dataclasses fall back to
+    dump/validate.
+    """
+    updates: dict[str, Any] = {}
+    fully_supported = True
+    for field_name, field_info in obj.__class__.model_fields.items():
+        if field_info.exclude is True:
+            continue
+        current_value = getattr(obj, field_name)
+        result = _map_values_copy_on_write(current_value, func)
+        if result.changed:
+            updates[field_name] = result.value
+        fully_supported = fully_supported and result.fully_supported
+
+    if not fully_supported:
+        # Nested dataclasses force the old dump/validate fallback.
+        return _CopyOnWriteResult(
+            _map_model_values_with_roundtrip(obj, func), True, True
+        )
+
+    if not updates:
+        # Revalidate the existing instance so callers that intentionally
+        # bypassed model validation with `model_construct(...)` still see the
+        # same validation behavior without paying for a full dump/rebuild.
+        return _CopyOnWriteResult(obj.__class__.model_validate(obj), False, True)
+
+    if obj.__class__.model_config.get("frozen"):
+        updated_obj = obj.model_copy(update=updates)
+        return _CopyOnWriteResult(
+            updated_obj.__class__.model_validate(updated_obj), True, True
+        )
+
+    # Mutating non-frozen models is intentional: callers keep the outer model
+    # identity and only changed fields are replaced.
+    for field_name, new_value in updates.items():
+        setattr(obj, field_name, new_value)
+    return _CopyOnWriteResult(obj.__class__.model_validate(obj), True, True)
+
+
+def _map_model_values_with_roundtrip(
+    obj: BaseModel,
+    func: Callable[[Any], Any],
+) -> BaseModel:
+    """Fallback path for models that contain unsupported nested dataclasses."""
+    # `by_alias` is required since we have Mongo-style properties in the
+    # query models that are aliased to conform to start with `$`. Without
+    # this, the model_dump will use the internal property names which are
+    # not valid for the `model_validate` step.
+    orig = obj.model_dump(by_alias=True)
+    result = _map_values_copy_on_write(orig, func)
+    return obj.model_validate(result.value)

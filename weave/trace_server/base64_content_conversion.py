@@ -114,6 +114,9 @@ def replace_base64_with_content_objects(
     Follows the same pattern as extract_refs_from_values, visiting all values
     and replacing base64 content where found.
 
+    The walker is copy-on-write so large no-op payloads keep their original
+    branches. We only clone the path that actually changes.
+
     Args:
         vals: Value to process (can be dict, list, or primitive)
         project_id: Project ID for storage
@@ -125,12 +128,25 @@ def replace_base64_with_content_objects(
 
     def _visit(val: Any) -> Any:
         if isinstance(val, dict):
-            result = {}
-            for k, v in val.items():
-                result[k] = _visit(v)
-            return result
+            # Clone on first change so no-op requests can reuse the original payload.
+            updated_dict: dict[Any, Any] | None = None
+            for key, child in val.items():
+                visited_child = _visit(child)
+                if visited_child is not child:
+                    if updated_dict is None:
+                        updated_dict = dict(val)
+                    updated_dict[key] = visited_child
+            return val if updated_dict is None else updated_dict
         elif isinstance(val, list):
-            return [_visit(v) for v in val]
+            # Same copy-on-write rule for lists.
+            updated_list: list[Any] | None = None
+            for index, child in enumerate(val):
+                visited_child = _visit(child)
+                if visited_child is not child:
+                    if updated_list is None:
+                        updated_list = list(val)
+                    updated_list[index] = visited_child
+            return val if updated_list is None else updated_list
         elif isinstance(val, str) and len(val) > AUTO_CONVERSION_MIN_SIZE:
             # Check for data URI pattern first
             if is_data_uri(val):

@@ -97,6 +97,47 @@ class TestContentObjectStorage:
 class TestBase64Replacement:
     """Test base64 replacement in data structures."""
 
+    def test_replace_data_uri_uses_copy_on_write(self):
+        """Only changed branches should be rebuilt during replacement."""
+        trace_server = MagicMock()
+        trace_server.file_create = MagicMock(
+            side_effect=[
+                FileCreateRes(digest="content_digest"),
+                FileCreateRes(digest="metadata_digest"),
+            ]
+        )
+
+        test_data = b"a" * LARGE_TEST_DATA_SIZE
+        b64_data = base64.b64encode(test_data).decode("ascii")
+        untouched_branch = {"nested": ["plain", {"value": "still-plain"}]}
+        input_data = {
+            "keep": untouched_branch,
+            "convert": ["before", {"image": f"data:image/png;base64,{b64_data}"}],
+        }
+        original_convert = input_data["convert"]
+        original_convert_leaf = input_data["convert"][1]
+
+        result = replace_base64_with_content_objects(
+            input_data, "test_project", trace_server
+        )
+
+        assert result is not input_data
+        assert result["keep"] is untouched_branch
+        assert result["convert"] is not original_convert
+        assert result["convert"][1] is not original_convert_leaf
+        assert original_convert_leaf["image"] == f"data:image/png;base64,{b64_data}"
+        assert result["convert"][1]["image"]["_type"] == "CustomWeaveType"
+
+        # No-op input should be returned unchanged.
+        no_op_input = {"keep": {"nested": ["plain", {"value": "still-plain"}]}}
+        assert (
+            replace_base64_with_content_objects(
+                no_op_input, "test_project", trace_server
+            )
+            is no_op_input
+        )
+        assert trace_server.file_create.call_count == 2
+
     def test_replace_data_uri_in_dict_only(self):
         """Only base64 data URIs are replaced; raw base64 is left untouched."""
         # Mock trace server
