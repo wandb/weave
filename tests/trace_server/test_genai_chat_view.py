@@ -366,3 +366,41 @@ def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:
     ]
     roots = build_span_tree(spans)
     assert [r.span.span_id for r in roots] == ["a", "b", "c"]
+
+
+def test_build_span_tree_sorts_equal_starts_by_latest_end_first() -> None:
+    """Enclosing spans often share child start times and should sort first."""
+    t0 = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    t1 = datetime.datetime(2026, 1, 1, 0, 0, 1, tzinfo=datetime.timezone.utc)
+    t2 = datetime.datetime(2026, 1, 1, 0, 0, 2, tzinfo=datetime.timezone.utc)
+    spans = [
+        AgentSpanSchema(
+            project_id="p1",
+            trace_id="t1",
+            span_id="a-short",
+            span_name="short",
+            status_code="OK",
+            started_at=t0,
+            ended_at=t1,
+        ),
+        AgentSpanSchema(
+            project_id="p1",
+            trace_id="t1",
+            span_id="z-long",
+            span_name="long",
+            status_code="OK",
+            started_at=t0,
+            ended_at=t2,
+        ),
+        AgentSpanSchema(
+            project_id="p1",
+            trace_id="t1",
+            span_id="b-short",
+            span_name="also short",
+            status_code="OK",
+            started_at=t0,
+            ended_at=t1,
+        ),
+    ]
+    roots = build_span_tree(spans)
+    assert [r.span.span_id for r in roots] == ["z-long", "a-short", "b-short"]

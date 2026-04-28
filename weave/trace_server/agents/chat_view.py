@@ -67,15 +67,28 @@ class TokenTotals:
     reasoning_content: str | None
 
 
-def _span_sort_key(span: AgentSpanSchema) -> tuple[bool, datetime | None, str]:
+def _datetime_sort_seconds(dt: datetime | None) -> float:
+    if dt is None:
+        return 0.0
+    return dt.timestamp()
+
+
+def _span_sort_key(span: AgentSpanSchema) -> tuple[bool, float, bool, float, str]:
     """Ordering key for deterministic chronological span sorts.
 
     `started_at` is non-null from ClickHouse but can be None in in-memory
     callers and tests. The `is None` first element groups nulls last
-    without forcing a datetime.min fallback (which would mix tz-aware
-    and naive values). span_id tiebreaks equal timestamps.
+    without forcing a datetime.min fallback. When spans share a start time,
+    prefer the later-ended span first so enclosing spans sort before shorter
+    children; span_id is only the final deterministic tiebreaker.
     """
-    return (span.started_at is None, span.started_at, span.span_id)
+    return (
+        span.started_at is None,
+        _datetime_sort_seconds(span.started_at),
+        span.ended_at is None,
+        -_datetime_sort_seconds(span.ended_at),
+        span.span_id,
+    )
 
 
 def _root_sort_key(span: AgentSpanSchema) -> tuple[bool, datetime | None, str]:
