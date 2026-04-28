@@ -1,13 +1,18 @@
+import json
 import random
 import string
 from typing import Any
 
 import pandas as pd
-from notdiamond.toolkit.custom_router import CustomRouter
 
 import weave
 from weave.evaluation.eval import EvaluationResults
 from weave.utils.iterators import first
+
+try:
+    from notdiamond import NotDiamond
+except ImportError:  # pragma: no cover
+    NotDiamond = None
 
 
 @weave.op(
@@ -21,29 +26,41 @@ def train_router(
     language: str | None = None,
     maximize: bool | None = None,
     api_key: str | None = None,
-) -> CustomRouter:
+) -> str:
     """Currently only supports EvaluationResults with a single score column."""
     router_dataset: dict[str, pd.DataFrame] = {}
 
     for model_key, eval_results in model_evals.items():
-        model = (
-            model_key.name or f"model-{_placeholder_model_name()}"
-            if isinstance(model_key, weave.Model)
-            else model_key
-        )
+        model = _model_name(model_key)
 
         score_col_name, eval_df = _build_dataframe(model, eval_results)
         router_dataset[model] = eval_df
 
-    custom_router = CustomRouter(language=language, maximize=maximize, api_key=api_key)
-
-    return custom_router.fit(
+    client = _notdiamond_client(api_key)
+    training_df = _build_training_dataframe(
         router_dataset,
         prompt_column=prompt_column,
         response_column=response_column,
         score_column=score_col_name,
-        preference_id=preference_id,
     )
+    train_kwargs: dict[str, Any] = {
+        "dataset_file": (
+            "router_dataset.csv",
+            training_df.to_csv(index=False).encode("utf-8"),
+            "text/csv",
+        ),
+        "language": language or "en",
+        "llm_providers": json.dumps(
+            [_llm_provider_from_model_name(model) for model in router_dataset]
+        ),
+        "maximize": True if maximize is None else maximize,
+        "prompt_column": prompt_column,
+    }
+    if preference_id is not None:
+        train_kwargs["preference_id"] = preference_id
+
+    response = client.custom_router.train_custom_router(**train_kwargs)
+    return response.preference_id
 
 
 @weave.op(
@@ -58,33 +75,54 @@ def evaluate_router(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     router_dataset: dict[str, pd.DataFrame] = {}
 
-    for model, dataset in model_datasets.items():
+    for source_model, dataset in model_datasets.items():
+        model = _model_name(source_model)
         score_column, model_df = _build_dataframe(model, dataset)
         router_dataset[model] = model_df[[prompt_column, response_column, score_column]]
 
-    custom_router = CustomRouter(api_key=api_key)
-    eval_results, eval_stats = custom_router.eval(
-        router_dataset,
-        prompt_column=prompt_column,
-        response_column=response_column,
-        score_column=score_column,
-        preference_id=preference_id,
-    )
-    best_provider = eval_stats["Best Average Provider"][0]
-
-    def _get_model_results(provider_name: str) -> pd.DataFrame:
-        return eval_results[
-            [prompt_column, f"{provider_name}/score", f"{provider_name}/response"]
-        ].rename(
-            columns={
-                prompt_column: "prompt",
-                f"{provider_name}/score": "score",
-                f"{provider_name}/response": "response",
+    client = _notdiamond_client(api_key)
+    providers = [_llm_provider_from_model_name(model) for model in router_dataset]
+    prompt_df = first(router_dataset.values())
+    routed_rows = []
+    for prompt in prompt_df[prompt_column]:
+        response = client.model_router.select_model(
+            llm_providers=providers,
+            messages=[{"role": "user", "content": prompt}],
+            metric="accuracy",
+            max_model_depth=4,
+            hash_content=False,
+            preference_id=preference_id,
+        )
+        provider = response.providers[0]
+        routed_model = f"{provider.provider}/{provider.model}"
+        source_df = router_dataset[routed_model]
+        response_value, score_value = source_df[
+            source_df[prompt_column] == prompt
+        ][[response_column, score_column]].values[0]
+        routed_rows.append(
+            {
+                "prompt": prompt,
+                "response": response_value,
+                "score": score_value,
             }
         )
 
+    def _get_model_results(provider_name: str) -> pd.DataFrame:
+        model_df = router_dataset[provider_name]
+        return model_df[[prompt_column, response_column, score_column]].rename(
+            columns={
+                prompt_column: "prompt",
+                response_column: "response",
+                score_column: "score",
+            }
+        )
+
+    best_provider = max(
+        router_dataset,
+        key=lambda model: router_dataset[model][score_column].mean(),
+    )
     model_results = _get_model_results(best_provider)
-    not_diamond_results = _get_model_results("notdiamond")
+    not_diamond_results = pd.DataFrame(routed_rows)
 
     class _DummyEvalModel(weave.Model):
         model_results: pd.DataFrame
@@ -114,6 +152,49 @@ def evaluate_router(
     not_diamond_model = NotDiamondRoutedModel(model_results=not_diamond_results)
 
     return best_provider_model, not_diamond_model
+
+
+def _notdiamond_client(api_key: str | None) -> Any:
+    if NotDiamond is None:
+        raise ImportError("notdiamond is required for custom router support")
+    return NotDiamond(api_key=api_key)
+
+
+def _model_name(model: weave.Model | str) -> str:
+    if isinstance(model, weave.Model):
+        return model.name or f"model-{_placeholder_model_name()}"
+    return model
+
+
+def _llm_provider_from_model_name(model: str) -> dict[str, Any]:
+    if "/" in model:
+        provider, model_name = model.split("/", 1)
+    else:
+        provider, model_name = "custom", model
+    return {
+        "provider": provider,
+        "model": model_name,
+        "is_custom": provider == "custom",
+        "context_length": None,
+        "input_price": None,
+        "output_price": None,
+        "latency": None,
+    }
+
+
+def _build_training_dataframe(
+    router_dataset: dict[str, pd.DataFrame],
+    prompt_column: str,
+    response_column: str,
+    score_column: str,
+) -> pd.DataFrame:
+    first_model_df = first(router_dataset.values()).reset_index(drop=True)
+    training_df = pd.DataFrame({prompt_column: first_model_df[prompt_column]})
+    for model, source_model_df in router_dataset.items():
+        model_df = source_model_df.reset_index(drop=True)
+        training_df[f"{model}/response"] = model_df[response_column]
+        training_df[f"{model}/score"] = model_df[score_column]
+    return training_df
 
 
 def _get_score_column(
