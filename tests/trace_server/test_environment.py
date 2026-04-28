@@ -3,6 +3,7 @@ import os
 import pytest
 
 from weave.trace_server.environment import (
+    DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS,
     VALID_CALLS_SHARD_KEYS,
     kafka_producer_max_buffer_size,
     wf_clickhouse_calls_shard_key,
@@ -11,6 +12,8 @@ from weave.trace_server.environment import (
     wf_scoring_worker_debounced_scoring_max_sampling_rate,
     wf_scoring_worker_kafka_consumer_group_id_override,
     wf_scoring_worker_remote_scorer_bearer_token,
+    wf_scoring_worker_remote_scorer_enabled,
+    wf_scoring_worker_remote_scorer_http_timeout_seconds,
 )
 
 
@@ -153,3 +156,52 @@ def test_wf_scoring_worker_remote_scorer_bearer_token(monkeypatch):
 
     monkeypatch.setenv(key, "  padded-token  ")
     assert wf_scoring_worker_remote_scorer_bearer_token() == "padded-token"
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_enabled(monkeypatch):
+    """Remote scoring is off by default; only a case-insensitive ``true`` enables it."""
+    key = "WF_SCORING_WORKER_REMOTE_SCORING_ENABLED"
+    monkeypatch.delenv(key, raising=False)
+    assert wf_scoring_worker_remote_scorer_enabled() is False
+
+    monkeypatch.setenv(key, "true")
+    assert wf_scoring_worker_remote_scorer_enabled() is True
+    monkeypatch.setenv(key, "True")
+    assert wf_scoring_worker_remote_scorer_enabled() is True
+
+    monkeypatch.setenv(key, "false")
+    assert wf_scoring_worker_remote_scorer_enabled() is False
+    monkeypatch.setenv(key, "")
+    assert wf_scoring_worker_remote_scorer_enabled() is False
+    monkeypatch.setenv(key, "1")
+    assert wf_scoring_worker_remote_scorer_enabled() is False
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_http_timeout_seconds(monkeypatch):
+    """Timeout defaults to 30s; parses positive floats; invalid or non-positive -> default."""
+    key = "WF_SCORING_WORKER_REMOTE_HTTP_TIMEOUT_SECONDS"
+    monkeypatch.delenv(key, raising=False)
+    assert wf_scoring_worker_remote_scorer_http_timeout_seconds() == (
+        DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
+    )
+
+    monkeypatch.setenv(key, "60")
+    assert wf_scoring_worker_remote_scorer_http_timeout_seconds() == 60.0
+    monkeypatch.setenv(key, "45.5")
+    assert wf_scoring_worker_remote_scorer_http_timeout_seconds() == 45.5
+
+    monkeypatch.setenv(key, "0")
+    assert wf_scoring_worker_remote_scorer_http_timeout_seconds() == (
+        DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
+    )
+    monkeypatch.setenv(key, "-1")
+    assert wf_scoring_worker_remote_scorer_http_timeout_seconds() == (
+        DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
+    )
+
+    monkeypatch.setenv(key, "not-a-number")
+    assert wf_scoring_worker_remote_scorer_http_timeout_seconds() == (
+        DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
+    )

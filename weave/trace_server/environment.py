@@ -156,6 +156,37 @@ def wf_scoring_worker_remote_scorer_bearer_token() -> str | None:
     return stripped if stripped else None
 
 
+DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS = 30.0
+
+
+def wf_scoring_worker_remote_scorer_enabled() -> bool:
+    """Whether outbound remote scorer HTTP is enabled in the scoring worker.
+
+    When false (default), the worker does not run the remote HTTP path for
+    :class:`RemoteScorer`, regardless of other configuration.
+    """
+    return (
+        os.environ.get("WF_SCORING_WORKER_REMOTE_SCORING_ENABLED", "false").lower()
+        == "true"
+    )
+
+
+def wf_scoring_worker_remote_scorer_http_timeout_seconds() -> float:
+    """Wall-clock timeout for each remote scorer HTTP request/response (seconds).
+
+    Default ``30`` matches the remote scorer product default.
+    """
+    raw = os.environ.get(
+        "WF_SCORING_WORKER_REMOTE_HTTP_TIMEOUT_SECONDS",
+        str(int(DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS)),
+    )
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
+    return value if value > 0 else DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS
+
+
 # Clickhouse Settings
 
 
