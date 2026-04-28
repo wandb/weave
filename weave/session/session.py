@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import types
 import uuid
-import warnings
 from contextvars import ContextVar, Token
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
@@ -125,14 +124,24 @@ class _SpanBase(BaseModel):
             otel_trace.set_span_in_context(self._otel_span)
         )
 
-    def _end_otel_span(self, attrs: dict[str, Any]) -> None:
-        """Set attributes and end the OTel span, then detach context."""
+    def _end_otel_span(
+        self, attrs: dict[str, Any], *, end_time_ns: int | None = None
+    ) -> None:
+        """Set attributes and end the OTel span, then detach context.
+
+        ``end_time_ns`` lets the caller pass the logical end time when the
+        SDK object recorded ``ended_at`` separately from when ``end()`` was
+        called (e.g. the batch-logging path).
+        """
         if not _OTEL_AVAILABLE or self._otel_span is None:
             return
         if self._otel_span.is_recording():
             for k, v in attrs.items():
                 self._otel_span.set_attribute(k, v)
-            self._otel_span.end()
+            if end_time_ns is not None:
+                self._otel_span.end(end_time=end_time_ns)
+            else:
+                self._otel_span.end()
         if self._otel_token is not None:
             otel_context.detach(self._otel_token)
             self._otel_token = None
@@ -153,16 +162,19 @@ class Tool(_SpanBase):
     result: str = ""
     tool_call_id: str = ""
     duration_ms: int = 0
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
 
-    _started_at: datetime | None = PrivateAttr(default=None)
     _ended: bool = PrivateAttr(default=False)
 
     def end(self) -> None:
         if self._ended:
             return
         self._ended = True
-        if self._started_at is not None:
-            elapsed = datetime.now(timezone.utc) - self._started_at
+        if self.ended_at is None:
+            self.ended_at = datetime.now(timezone.utc)
+        if self.started_at is not None:
+            elapsed = self.ended_at - self.started_at
             self.duration_ms = int(elapsed.total_seconds() * 1000)
 
         session = _current_session.get()
@@ -177,8 +189,10 @@ class Tool(_SpanBase):
         self._end_otel_span(attrs)
 
     def __enter__(self) -> Self:
-        self._started_at = datetime.now(timezone.utc)
-        self._start_otel_span(f"execute_tool {self.name}")
+        if self.started_at is None:
+            self.started_at = datetime.now(timezone.utc)
+        start_ns = int(self.started_at.timestamp() * 1_000_000_000)
+        self._start_otel_span(f"execute_tool {self.name}", start_time_ns=start_ns)
         return self
 
     def __exit__(
@@ -409,6 +423,7 @@ class Turn(_SpanBase):
     agent_name: str = ""
     model: str = ""
     messages: list[Message] = Field(default_factory=list)
+    spans: list[LLM | Tool | SubAgent] = Field(default_factory=list)
     continue_parent_trace: bool = False
     started_at: datetime | None = None
     ended_at: datetime | None = None
@@ -724,28 +739,242 @@ def get_current_llm() -> LLM | None:
     return _current_llm.get()
 
 
+def _to_ns(dt: datetime | None) -> int | None:
+    """Convert a datetime to nanoseconds since epoch, or None."""
+    return int(dt.timestamp() * 1_000_000_000) if dt is not None else None
+
+
+def _format_trace_id(trace_id: int) -> str:
+    """W3C Trace Context lowercase 32-char hex."""
+    return format(trace_id, "032x")
+
+
+def _format_span_id(span_id: int) -> str:
+    """W3C Trace Context lowercase 16-char hex."""
+    return format(span_id, "016x")
+
+
+def _emit_span_now(
+    name: str,
+    *,
+    parent_ctx: Any,
+    start_time_ns: int | None,
+    end_time_ns: int | None,
+    attrs: dict[str, Any],
+) -> Any:
+    """Emit a fully-formed span without touching contextvars.
+
+    Used by the batch-logging path (``log_turn`` / ``log_session``) to
+    create children of a parent span without attaching them to the calling
+    thread's OTel context. Returns the finished Span so the caller can
+    read trace_id / span_id, or None if OTel is unavailable.
+    """
+    if not _OTEL_AVAILABLE:
+        return None
+    tracer = otel_trace.get_tracer(_TRACER_NAME)
+    kwargs: dict[str, Any] = {}
+    if parent_ctx is not None:
+        kwargs["context"] = parent_ctx
+    if start_time_ns is not None:
+        kwargs["start_time"] = start_time_ns
+    span = tracer.start_span(name, **kwargs)
+    for k, v in attrs.items():
+        span.set_attribute(k, v)
+    if end_time_ns is not None:
+        span.end(end_time=end_time_ns)
+    else:
+        span.end()
+    return span
+
+
+def _resolve_turn_timestamps(
+    *,
+    started_at: datetime | None,
+    ended_at: datetime | None,
+    spans: list[LLM | Tool | SubAgent],
+) -> tuple[datetime, datetime]:
+    """Pick start/end times for the turn span.
+
+    Prefer explicit ``started_at`` / ``ended_at`` from the caller. Fall back
+    to the earliest/latest child timestamps when those are missing. Final
+    fallback: ``now()``. Resolved BEFORE constructing the Turn so the
+    Turn's ``model_post_init`` doesn't override with ``now()`` first.
+    """
+    now = datetime.now(timezone.utc)
+    starts = [s.started_at for s in spans if s.started_at is not None]
+    ends = [s.ended_at for s in spans if s.ended_at is not None]
+    return (
+        started_at or (min(starts) if starts else now),
+        ended_at or (max(ends) if ends else now),
+    )
+
+
+def _attrs_for_span(
+    span: LLM | Tool | SubAgent,
+    *,
+    session_id: str,
+    session_name: str,
+    include_content: bool,
+) -> tuple[str, dict[str, Any]]:
+    """Build (otel_span_name, attribute_dict) for a child span."""
+    if isinstance(span, LLM):
+        attrs = llm_attributes(
+            model=span.model,
+            provider_name=span.provider_name,
+            conversation_id=session_id,
+            input_messages=span.input_messages if include_content else None,
+            output_messages=span.output_messages if include_content else None,
+            system_instructions=span.system_instructions if include_content else None,
+            usage=span.usage,
+            reasoning=span.reasoning,
+            finish_reasons=span.finish_reasons,
+            response_id=span.response_id,
+        )
+        return f"chat {span.model}", attrs
+    if isinstance(span, Tool):
+        attrs = execute_tool_attributes(
+            tool_name=span.name,
+            conversation_id=session_id,
+            tool_call_arguments=span.arguments if include_content else "",
+            tool_call_result=span.result if include_content else "",
+            tool_call_id=span.tool_call_id,
+        )
+        return f"execute_tool {span.name}", attrs
+    # SubAgent
+    attrs = invoke_agent_attributes(
+        agent_name=span.name,
+        model=span.model,
+        conversation_id=session_id,
+        conversation_name=session_name,
+    )
+    return f"invoke_agent {span.name}", attrs
+
+
 def log_turn(
     *,
     session_id: str,
-    messages: list[dict[str, str]] | None = None,
-    spans: list[LLM | Tool] | None = None,
     agent_name: str = "",
-    model: str = "",
     session_name: str = "",
+    model: str = "",
+    messages: list[Message] | None = None,
+    spans: list[LLM | Tool | SubAgent] | None = None,
+    started_at: datetime | None = None,
+    ended_at: datetime | None = None,
+    include_content: bool = True,
+    continue_parent_trace: bool = False,
 ) -> LogResult:
-    """Batch-ingest a single turn. Stub — not yet implemented."""
-    warnings.warn("log_turn is not yet implemented; call is a no-op", stacklevel=2)
-    return LogResult(session_id=session_id)
+    """Imperatively emit one turn and its child spans to OTel.
+
+    Use when context managers aren't viable (stateless containers, callbacks,
+    queue workers). Each child span passed in should have ``started_at`` /
+    ``ended_at`` set; the emitted OTel span timestamps come from those fields.
+    Falls back to the earliest/latest child timestamp, then ``now()``, when
+    the turn doesn't supply its own.
+    """
+    if not _OTEL_AVAILABLE:
+        return LogResult(session_id=session_id)
+
+    resolved_spans = spans or []
+    turn_started_at, turn_ended_at = _resolve_turn_timestamps(
+        started_at=started_at,
+        ended_at=ended_at,
+        spans=resolved_spans,
+    )
+    turn = Turn(
+        agent_name=agent_name,
+        model=model,
+        messages=messages or [],
+        spans=resolved_spans,
+        started_at=turn_started_at,
+        ended_at=turn_ended_at,
+        continue_parent_trace=continue_parent_trace,
+    )
+
+    turn_attrs = invoke_agent_attributes(
+        agent_name=turn.agent_name,
+        conversation_id=session_id,
+        conversation_name=session_name,
+        model=turn.model,
+        input_messages=turn.messages if include_content else None,
+    )
+
+    parent_ctx = Context() if not continue_parent_trace else None
+    turn_span = _emit_span_now(
+        f"invoke_agent {turn.agent_name}",
+        parent_ctx=parent_ctx,
+        start_time_ns=_to_ns(turn_started_at),
+        end_time_ns=_to_ns(turn_ended_at),
+        attrs=turn_attrs,
+    )
+    if turn_span is None:
+        return LogResult(session_id=session_id)
+
+    child_ctx = otel_trace.set_span_in_context(turn_span)
+    for child in turn.spans:
+        name, attrs = _attrs_for_span(
+            child,
+            session_id=session_id,
+            session_name=session_name,
+            include_content=include_content,
+        )
+        _emit_span_now(
+            name,
+            parent_ctx=child_ctx,
+            start_time_ns=_to_ns(child.started_at),
+            end_time_ns=_to_ns(child.ended_at),
+            attrs=attrs,
+        )
+
+    return LogResult(
+        session_id=session_id,
+        trace_ids=[_format_trace_id(turn_span.context.trace_id)],
+        root_span_ids=[_format_span_id(turn_span.context.span_id)],
+        span_count=1 + len(turn.spans),
+    )
 
 
 def log_session(
     *,
-    turns: list[dict[str, Any]],
-    agent_name: str = "",
-    model: str = "",
+    turns: list[Turn],
     session_id: str = "",
     session_name: str = "",
+    agent_name: str = "",
+    model: str = "",
+    include_content: bool = True,
+    continue_parent_trace: bool = False,
 ) -> LogResult:
-    """Batch-ingest a complete session. Stub — not yet implemented."""
-    warnings.warn("log_session is not yet implemented; call is a no-op", stacklevel=2)
-    return LogResult(session_id=session_id or str(uuid.uuid4()))
+    """Imperatively emit a complete session.
+
+    Each Turn's ``.spans`` attribute provides its children. Auto-generates
+    ``session_id`` if empty. By default each turn gets its own OTel trace.
+    """
+    sid = session_id or str(uuid.uuid4())
+    if not _OTEL_AVAILABLE:
+        return LogResult(session_id=sid)
+
+    trace_ids: list[str] = []
+    root_span_ids: list[str] = []
+    span_count = 0
+    for turn in turns:
+        result = log_turn(
+            session_id=sid,
+            session_name=session_name,
+            agent_name=turn.agent_name or agent_name,
+            model=turn.model or model,
+            messages=turn.messages,
+            spans=turn.spans,
+            started_at=turn.started_at,
+            ended_at=turn.ended_at,
+            include_content=include_content,
+            continue_parent_trace=continue_parent_trace,
+        )
+        trace_ids.extend(result.trace_ids)
+        root_span_ids.extend(result.root_span_ids)
+        span_count += result.span_count
+
+    return LogResult(
+        session_id=sid,
+        trace_ids=trace_ids,
+        root_span_ids=root_span_ids,
+        span_count=span_count,
+    )

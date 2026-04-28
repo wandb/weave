@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from opentelemetry import trace as otel_trace
@@ -13,13 +14,20 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import NoOpTracerProvider, StatusCode
 
 from weave.session.session import (
+    LLM,
+    LogResult,
     Message,
     Reasoning,
     Session,
+    SubAgent,
+    Tool,
+    Turn,
     Usage,
     get_current_llm,
     get_current_session,
     get_current_turn,
+    log_session,
+    log_turn,
     start_session,
     start_tool,
 )
@@ -719,3 +727,370 @@ class TestStartTimeFromLogicalConstruction:
         llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
         assert len(llm_spans) == 1
         assert abs(llm_spans[0].start_time - expected_ns) <= 1_000_000
+
+
+# ---------------------------------------------------------------------------
+# log_turn
+# ---------------------------------------------------------------------------
+
+
+def _ts(seconds_offset: float) -> datetime:
+    """Helper for fixed-base test timestamps."""
+    base = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    return base + timedelta(seconds=seconds_offset)
+
+
+class TestLogTurn:
+    def test_emits_turn_span_with_correct_timestamps(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        result = log_turn(
+            session_id="sess-1",
+            agent_name="weather-bot",
+            session_name="Weather Chat",
+            messages=[Message(role="user", content="What's the weather?")],
+            started_at=_ts(0),
+            ended_at=_ts(3),
+        )
+
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 1
+        sp = spans[0]
+        assert sp.name == "invoke_agent weather-bot"
+        attrs = dict(sp.attributes or {})
+        assert attrs["gen_ai.operation.name"] == "invoke_agent"
+        assert attrs["gen_ai.agent.name"] == "weather-bot"
+        assert attrs["gen_ai.conversation.id"] == "sess-1"
+        assert attrs["gen_ai.conversation.name"] == "Weather Chat"
+        assert sp.start_time == int(_ts(0).timestamp() * 1_000_000_000)
+        assert sp.end_time == int(_ts(3).timestamp() * 1_000_000_000)
+
+        assert isinstance(result, LogResult)
+        assert result.session_id == "sess-1"
+        assert len(result.trace_ids) == 1
+        assert len(result.root_span_ids) == 1
+        assert result.span_count == 1
+        # IDs are W3C Trace Context lowercase hex
+        assert len(result.trace_ids[0]) == 32
+        assert len(result.root_span_ids[0]) == 16
+
+    def test_with_llm_and_tool_children(self, otel_spans: InMemorySpanExporter) -> None:
+        result = log_turn(
+            session_id="sess-2",
+            agent_name="bot",
+            messages=[Message(role="user", content="Search for X")],
+            spans=[
+                LLM(
+                    model="gpt-4o",
+                    input_messages=[Message(role="user", content="Search for X")],
+                    output_messages=[Message(role="assistant", content="Searching...")],
+                    usage=Usage(input_tokens=10, output_tokens=5),
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+                Tool(
+                    name="search",
+                    arguments='{"q":"X"}',
+                    result="found",
+                    tool_call_id="tc_1",
+                    started_at=_ts(1),
+                    ended_at=_ts(2),
+                ),
+            ],
+            started_at=_ts(0),
+            ended_at=_ts(3),
+        )
+
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 3
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        llm_spans = [sp for sp in spans if sp.name == "chat gpt-4o"]
+        tool_spans = [sp for sp in spans if sp.name == "execute_tool search"]
+        assert len(turn_spans) == 1
+        assert len(llm_spans) == 1
+        assert len(tool_spans) == 1
+
+        turn_span = turn_spans[0]
+        # Children share the turn's trace_id and have it as parent
+        assert llm_spans[0].context.trace_id == turn_span.context.trace_id
+        assert tool_spans[0].context.trace_id == turn_span.context.trace_id
+        assert llm_spans[0].parent.span_id == turn_span.context.span_id
+        assert tool_spans[0].parent.span_id == turn_span.context.span_id
+
+        # Children have explicit timestamps
+        assert llm_spans[0].start_time == int(_ts(0).timestamp() * 1_000_000_000)
+        assert llm_spans[0].end_time == int(_ts(1).timestamp() * 1_000_000_000)
+        assert tool_spans[0].start_time == int(_ts(1).timestamp() * 1_000_000_000)
+        assert tool_spans[0].end_time == int(_ts(2).timestamp() * 1_000_000_000)
+
+        assert result.span_count == 3
+
+    def test_with_subagent_child(self, otel_spans: InMemorySpanExporter) -> None:
+        log_turn(
+            session_id="sess-3",
+            agent_name="orchestrator",
+            spans=[
+                SubAgent(
+                    name="research-bot",
+                    model="gpt-4o-mini",
+                    started_at=_ts(0),
+                    ended_at=_ts(2),
+                ),
+            ],
+            started_at=_ts(0),
+            ended_at=_ts(3),
+        )
+
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent orchestrator"]
+        assert len(sa_spans) == 1
+        assert len(turn_spans) == 1
+        assert sa_spans[0].parent.span_id == turn_spans[0].context.span_id
+
+    def test_continue_parent_trace_nests_under_outer_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request") as outer:
+            outer_trace_id = outer.get_span_context().trace_id
+            outer_span_id = outer.get_span_context().span_id
+            log_turn(
+                session_id="sess-4",
+                agent_name="bot",
+                started_at=_ts(0),
+                ended_at=_ts(1),
+                continue_parent_trace=True,
+            )
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        assert turn_spans[0].context.trace_id == outer_trace_id
+        assert turn_spans[0].parent.span_id == outer_span_id
+
+    def test_default_starts_new_trace_under_outer_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request") as outer:
+            outer_trace_id = outer.get_span_context().trace_id
+            log_turn(
+                session_id="sess-5",
+                agent_name="bot",
+                started_at=_ts(0),
+                ended_at=_ts(1),
+            )
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert turn_spans[0].context.trace_id != outer_trace_id
+
+    def test_include_content_false_suppresses_messages(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_turn(
+            session_id="sess-6",
+            agent_name="bot",
+            messages=[Message(role="user", content="secret")],
+            spans=[
+                LLM(
+                    model="gpt-4o",
+                    input_messages=[Message(role="user", content="secret")],
+                    output_messages=[
+                        Message(role="assistant", content="secret response")
+                    ],
+                    system_instructions=["be helpful"],
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+                Tool(
+                    name="search",
+                    arguments='{"q":"secret"}',
+                    result="secret result",
+                    started_at=_ts(1),
+                    ended_at=_ts(2),
+                ),
+            ],
+            started_at=_ts(0),
+            ended_at=_ts(3),
+            include_content=False,
+        )
+
+        spans = otel_spans.get_finished_spans()
+        for sp in spans:
+            attrs = dict(sp.attributes or {})
+            assert "gen_ai.input.messages" not in attrs
+            assert "gen_ai.output.messages" not in attrs
+            assert "gen_ai.system_instructions" not in attrs
+            assert "gen_ai.tool.call.arguments" not in attrs
+            assert "gen_ai.tool.call.result" not in attrs
+
+    def test_no_spans_just_emits_turn(self, otel_spans: InMemorySpanExporter) -> None:
+        result = log_turn(
+            session_id="sess-7",
+            agent_name="bot",
+            started_at=_ts(0),
+            ended_at=_ts(1),
+        )
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 1
+        assert result.span_count == 1
+
+    def test_falls_back_to_child_timestamps(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # Turn timestamps not provided — should derive from children
+        log_turn(
+            session_id="sess-8",
+            agent_name="bot",
+            spans=[
+                LLM(model="gpt-4o", started_at=_ts(0), ended_at=_ts(1)),
+                Tool(name="search", started_at=_ts(2), ended_at=_ts(3)),
+            ],
+        )
+        spans = otel_spans.get_finished_spans()
+        turn_span = next(sp for sp in spans if sp.name == "invoke_agent bot")
+        # Earliest child start, latest child end
+        assert turn_span.start_time == int(_ts(0).timestamp() * 1_000_000_000)
+        assert turn_span.end_time == int(_ts(3).timestamp() * 1_000_000_000)
+
+    def test_returns_log_result_with_correctly_formatted_ids(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        result = log_turn(
+            session_id="sess-9",
+            agent_name="bot",
+            started_at=_ts(0),
+            ended_at=_ts(1),
+        )
+        # W3C Trace Context: trace_id is 32 hex, span_id is 16 hex, lowercase.
+        assert all(c in "0123456789abcdef" for c in result.trace_ids[0])
+        assert all(c in "0123456789abcdef" for c in result.root_span_ids[0])
+
+
+class TestLogTurnNoOtel:
+    def test_returns_log_result_when_otel_unavailable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Simulate OTel not installed.
+        import weave.session.session as session_mod
+
+        monkeypatch.setattr(session_mod, "_OTEL_AVAILABLE", False)
+        result = log_turn(
+            session_id="sess-noop",
+            agent_name="bot",
+            started_at=_ts(0),
+            ended_at=_ts(1),
+        )
+        assert isinstance(result, LogResult)
+        assert result.session_id == "sess-noop"
+        assert result.trace_ids == []
+        assert result.root_span_ids == []
+        assert result.span_count == 0
+
+
+# ---------------------------------------------------------------------------
+# log_session
+# ---------------------------------------------------------------------------
+
+
+class TestLogSession:
+    def test_emits_one_trace_per_turn(self, otel_spans: InMemorySpanExporter) -> None:
+        result = log_session(
+            session_id="sess-multi",
+            agent_name="bot",
+            turns=[
+                Turn(
+                    agent_name="bot",
+                    messages=[Message(role="user", content="first")],
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+                Turn(
+                    agent_name="bot",
+                    messages=[Message(role="user", content="second")],
+                    started_at=_ts(2),
+                    ended_at=_ts(3),
+                ),
+            ],
+        )
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 2
+        # Distinct trace IDs for the two turns
+        assert turn_spans[0].context.trace_id != turn_spans[1].context.trace_id
+
+        assert len(result.trace_ids) == 2
+        assert len(result.root_span_ids) == 2
+        assert result.span_count == 2
+        assert result.session_id == "sess-multi"
+
+    def test_auto_generates_session_id_when_empty(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        result = log_session(
+            turns=[
+                Turn(agent_name="bot", started_at=_ts(0), ended_at=_ts(1)),
+            ],
+        )
+        # Session ID is a UUID4 string when auto-generated
+        assert result.session_id != ""
+        assert len(result.session_id) == 36
+
+    def test_continue_parent_trace_keeps_all_under_outer(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request") as outer:
+            outer_trace_id = outer.get_span_context().trace_id
+            log_session(
+                session_id="sess-nested",
+                turns=[
+                    Turn(agent_name="bot", started_at=_ts(0), ended_at=_ts(1)),
+                    Turn(agent_name="bot", started_at=_ts(2), ended_at=_ts(3)),
+                ],
+                continue_parent_trace=True,
+            )
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 2
+        for sp in turn_spans:
+            assert sp.context.trace_id == outer_trace_id
+
+    def test_propagates_children_from_each_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_session(
+            session_id="sess-children",
+            turns=[
+                Turn(
+                    agent_name="bot",
+                    started_at=_ts(0),
+                    ended_at=_ts(2),
+                    spans=[
+                        LLM(model="gpt-4o", started_at=_ts(0), ended_at=_ts(1)),
+                        Tool(name="search", started_at=_ts(1), ended_at=_ts(2)),
+                    ],
+                ),
+                Turn(
+                    agent_name="bot",
+                    started_at=_ts(3),
+                    ended_at=_ts(4),
+                    spans=[LLM(model="gpt-4o", started_at=_ts(3), ended_at=_ts(4))],
+                ),
+            ],
+        )
+        spans = otel_spans.get_finished_spans()
+        # 2 turns + 2 LLMs + 1 tool = 5
+        assert len(spans) == 5
+
+    def test_empty_turns_returns_empty_log_result(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        result = log_session(turns=[], session_id="sess-empty")
+        assert result.session_id == "sess-empty"
+        assert result.trace_ids == []
+        assert result.root_span_ids == []
+        assert result.span_count == 0
+        assert otel_spans.get_finished_spans() == ()
