@@ -92,9 +92,9 @@ def evaluate_router(
         provider = response.providers[0]
         routed_model = f"{provider.provider}/{provider.model}"
         source_df = router_dataset[routed_model]
-        response_value, score_value = source_df[
-            source_df[prompt_column] == prompt
-        ][[response_column, score_column]].values[0]
+        response_value, score_value = source_df[source_df[prompt_column] == prompt][
+            [response_column, score_column]
+        ].values[0]
         routed_rows.append(
             {
                 "prompt": prompt,
