@@ -152,7 +152,7 @@ def _discover_truncatable_tables(ch_client, database: str) -> list[str]:
 def _truncate_all_tables(ch_client, database: str, tables: list[str]) -> None:
     """Truncate all data tables in the database for test isolation."""
     for table in tables:
-        ch_client.command(f"TRUNCATE TABLE {database}.{table}")
+        ch_client.command(f"TRUNCATE TABLE {database}.{table} SYNC")
 
 
 def _reset_server_state(server: ClickHouseTraceServer) -> None:
